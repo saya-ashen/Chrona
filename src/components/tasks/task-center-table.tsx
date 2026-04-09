@@ -31,12 +31,13 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
             <th className="px-4 py-3 font-medium">Block Reason</th>
             <th className="px-4 py-3 font-medium">Schedule</th>
             <th className="px-4 py-3 font-medium">Due</th>
+            <th className="px-4 py-3 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+              <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                 No tasks match this filter.
               </td>
             </tr>
@@ -44,12 +45,15 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
             rows.map((row) => (
               <tr key={row.taskId} className="border-t align-top">
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/workspaces/${row.workspaceId}/tasks/${row.taskId}`}
-                    className="font-medium text-foreground transition-colors hover:text-primary"
-                  >
-                    {row.title}
-                  </Link>
+                  <div className="space-y-1">
+                    <Link
+                      href={`/workspaces/${row.workspaceId}/tasks/${row.taskId}`}
+                      className="font-medium text-foreground transition-colors hover:text-primary"
+                    >
+                      {row.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">Open task for planning details, or jump straight into work.</p>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {row.displayState ?? row.persistedStatus}
@@ -58,6 +62,22 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
                 <td className="px-4 py-3 text-muted-foreground">{row.actionRequired ?? "-"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{row.scheduleStatus ?? "-"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{formatDate(row.dueAt)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/workspaces/${row.workspaceId}/work/${row.taskId}`}
+                      className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                    >
+                      Open Work
+                    </Link>
+                    <Link
+                      href={`/workspaces/${row.workspaceId}/tasks/${row.taskId}`}
+                      className="rounded-md border px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted"
+                    >
+                      Open Task
+                    </Link>
+                  </div>
+                </td>
               </tr>
             ))
           )}

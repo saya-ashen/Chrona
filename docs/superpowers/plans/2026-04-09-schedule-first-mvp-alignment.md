@@ -16,7 +16,9 @@
 - Do not rewrite the existing prototype from scratch. Extend the current repo state.
 - Keep the route-B hard constraint intact: if the product starts collapsing into admin-first or chat-first behavior, stop and correct the implementation rather than continuing.
 - Treat the existing OpenClaw feasibility probe as a gate that must still pass before any schedule work is considered valid.
-- UI/reference sketch: `docs/superpowers/sketches/2026-04-09-schedule-page-wireframe.md`
+- UI/reference sketches:
+  - `docs/superpowers/sketches/2026-04-09-schedule-page-wireframe.md`
+  - `docs/superpowers/sketches/2026-04-09-schedule-timeline-hybrid-wireframe.md`
 
 ## File Structure
 

@@ -317,23 +317,28 @@ MVP 顶层导航调整为：
 - 刚刚发生了什么
 - 我现在需要介入什么
 
+当前产品方向进一步收敛为：`Work Page` 必须表现为 **run-level collaboration workbench**，而不是监控页、聊天壳或信息堆叠页。
+
 它应承载：
-- current / recent run
-- execution timeline
-- conversation
-- tool activity
+- sticky `Task / Run` context bar
+- `Next Action` 主干预区
+- `Shared Output`
+- `Execution Workstream`
 - approvals / input requests
 - artifacts
+- tool activity
 - 后续可能扩展的代码查看、文档查看和编辑能力
 
-桌面端默认采用三栏布局：
-- 左栏：任务摘要、状态、优先级、依赖、排期、block reason、关键动作
-- 中栏：`Execution Timeline` 为主，`Conversation` 为辅
-- 右栏：recent run summary、pending approvals、recent artifacts、tool-call summary、runtime refs、相关 memory
+桌面端默认采用 **workbench hierarchy**：
+- 顶部：sticky context bar，显示 task / run / schedule impact / block summary / deep links
+- 主列：`Next Action` → `Shared Output` → `Execution Workstream`
+- 右栏：inspector rail，承载 run snapshot、approvals、artifacts、tool activity、sync/runtime health
 
 核心原则：
-- timeline 永远是主观察面
-- conversation 是解释执行过程的辅助视图，不是页面中心
+- 主区必须优先回答 `现在要做什么`
+- `Execution Workstream` 是默认可见的观察面，但不应退化成原始日志堆
+- conversation 是执行证据的一种切面，不是页面中心
+- 低频信息和原始 payload 必须折叠或降级
 
 ### 8.7 Inbox
 `Inbox` 只收纳需要人立刻处理的中断点，例如：

@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 
 export async function getTaskCenter(
   workspaceId: string,
   filter?: "Running" | "WaitingForApproval" | "Blocked" | "Failed" | "Unscheduled" | "Overdue",
 ) {
+  await syncStaleWorkspaceRunsForRead(workspaceId);
+
   const projections = await db.taskProjection.findMany({
     where: { workspaceId },
     include: { task: true },

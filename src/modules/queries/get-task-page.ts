@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
 
 function readBlockReason(
   task: {
@@ -32,6 +33,8 @@ function readBlockReason(
 }
 
 export async function getTaskPage(taskId: string) {
+  await syncTaskRunForRead(taskId);
+
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
     include: {

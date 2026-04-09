@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { applySchedule as applyScheduleCommand } from "@/modules/commands/apply-schedule";
 import { clearSchedule as clearScheduleCommand } from "@/modules/commands/clear-schedule";
+import { createTask as createTaskCommand } from "@/modules/commands/create-task";
 import { decideScheduleProposal as decideScheduleProposalCommand } from "@/modules/commands/decide-schedule-proposal";
 import { invalidateMemory as invalidateMemoryCommand } from "@/modules/commands/invalidate-memory";
 import { proposeSchedule as proposeScheduleCommand } from "@/modules/commands/propose-schedule";
@@ -35,6 +36,16 @@ function revalidateMemoryPaths(workspaceId: string, taskId: string | null) {
 export async function updateTask(input: Parameters<typeof updateTaskCommand>[0]) {
   const result = await updateTaskCommand(input);
   revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function createTask(input: Parameters<typeof createTaskCommand>[0]) {
+  const result = await createTaskCommand(input);
+  revalidatePath("/workspaces");
+  revalidatePath("/schedule");
+  revalidatePath("/tasks");
+  revalidatePath(`/workspaces/${result.workspaceId}`);
+  revalidatePath(`/workspaces/${result.workspaceId}/tasks/${result.taskId}`);
   return result;
 }
 

@@ -1,7 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { MemoryStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { createTask } from "@/modules/commands/create-task";
 import { invalidateMemory } from "@/modules/commands/invalidate-memory";
+import { resolveApproval } from "@/modules/commands/resolve-approval";
 import { startRun } from "@/modules/commands/start-run";
 
 async function resetDb() {
@@ -104,6 +106,52 @@ describe("startRun", () => {
   });
 });
 
+describe("createTask", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("creates a ready human-owned task and rebuilds projection", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Create Commands",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "  Bootstrap task creation  ",
+      description: "  Add the first real create flow  ",
+      priority: "High",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({
+      where: { id: result.taskId },
+      include: { projection: true },
+    });
+    const createdEvent = await db.event.findFirst({
+      where: { taskId: result.taskId, eventType: "task.created" },
+    });
+
+    expect(result.workspaceId).toBe(workspace.id);
+    expect(storedTask.title).toBe("Bootstrap task creation");
+    expect(storedTask.description).toBe("Add the first real create flow");
+    expect(storedTask.status).toBe("Ready");
+    expect(storedTask.ownerType).toBe("human");
+    expect(storedTask.priority).toBe("High");
+    expect(storedTask.projection).not.toBeNull();
+    expect(createdEvent?.payload).toEqual(
+      expect.objectContaining({
+        title: "Bootstrap task creation",
+        priority: "High",
+        status: "Ready",
+      }),
+    );
+  });
+});
+
 describe("invalidateMemory", () => {
   beforeEach(async () => {
     await resetDb();
@@ -155,5 +203,178 @@ describe("invalidateMemory", () => {
         previous_status: "Active",
       }),
     );
+  });
+});
+
+describe("resolveApproval", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("sends edited approval content upstream before marking it resolved locally", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Approval Workspace",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Review generated patch",
+        status: "WaitingForApproval",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        runtimeRunRef: "runtime_run_1",
+        runtimeSessionRef: "session_1",
+        status: "WaitingForApproval",
+        triggeredBy: "user",
+      },
+    });
+    await db.approval.create({
+      data: {
+        id: "approval_1",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        type: "exec",
+        title: "Approve patch",
+        summary: "Allow the patch to be applied",
+        riskLevel: "medium",
+        status: "Pending",
+        requestedAt: new Date(),
+      },
+    });
+
+    const adapter = {
+      async createRun() {
+        throw new Error("not used");
+      },
+      async getRunSnapshot() {
+        return {
+          runtimeRunRef: "runtime_run_1",
+          runtimeSessionKey: "session_1",
+          status: "Running" as const,
+        };
+      },
+      async readHistory() {
+        return { messages: [] };
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return "allow-once" as const;
+      },
+      async resumeRun(input: { approvalId?: string; decision?: string; inputText?: string }) {
+        expect(input.approvalId).toBe("approval_1");
+        expect(input.decision).toBe("approve");
+        expect(input.inputText).toBe("Use the safer patch");
+        return { accepted: true, runtimeRunRef: "runtime_run_1", runtimeSessionKey: "session_1", runStarted: true };
+      },
+    };
+
+    await resolveApproval({
+      approvalId: "approval_1",
+      decision: "EditedAndApproved",
+      editedContent: "Use the safer patch",
+      resolutionNote: "Adjusted command before approving",
+      adapter,
+    });
+
+    const storedApproval = await db.approval.findUniqueOrThrow({ where: { id: "approval_1" } });
+    const storedRun = await db.run.findUniqueOrThrow({ where: { id: run.id } });
+
+    expect(storedApproval.status).toBe("EditedAndApproved");
+    expect(storedApproval.resolutionNote).toBe("Adjusted command before approving");
+    expect(storedRun.status).toBe("Running");
+  });
+
+  it("keeps a pending approval unchanged if upstream rejection fails", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Approval Failure Workspace",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Reject dangerous command",
+        status: "WaitingForApproval",
+        priority: "Urgent",
+        ownerType: "human",
+      },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        runtimeRunRef: "runtime_run_2",
+        runtimeSessionRef: "session_2",
+        status: "WaitingForApproval",
+        triggeredBy: "user",
+      },
+    });
+    await db.approval.create({
+      data: {
+        id: "approval_2",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        type: "exec",
+        title: "Reject patch",
+        summary: "Deny the operation",
+        riskLevel: "high",
+        status: "Pending",
+        requestedAt: new Date(),
+      },
+    });
+
+    const adapter = {
+      async createRun() {
+        throw new Error("not used");
+      },
+      async getRunSnapshot() {
+        throw new Error("not used");
+      },
+      async readHistory() {
+        return { messages: [] };
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return null;
+      },
+      async resumeRun(input: { decision?: string }) {
+        expect(input.decision).toBe("reject");
+        return { accepted: false };
+      },
+    };
+
+    await expect(
+      resolveApproval({
+        approvalId: "approval_2",
+        decision: "Rejected",
+        resolutionNote: "Unsafe change",
+        adapter,
+      }),
+    ).rejects.toThrow("Runtime rejected the approval resolution.");
+
+    const storedApproval = await db.approval.findUniqueOrThrow({ where: { id: "approval_2" } });
+    const storedRun = await db.run.findUniqueOrThrow({ where: { id: run.id } });
+
+    expect(storedApproval.status).toBe("Pending");
+    expect(storedApproval.resolvedAt).toBeNull();
+    expect(storedRun.status).toBe("WaitingForApproval");
   });
 });

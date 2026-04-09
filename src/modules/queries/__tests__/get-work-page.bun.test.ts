@@ -97,12 +97,51 @@ describe("getWorkPage", () => {
       ],
     });
 
+    await db.conversationEntry.create({
+      data: {
+        runId: run.id,
+        role: "assistant",
+        content: "I need approval before editing files.",
+        sequence: 1,
+      },
+    });
+
+    await db.event.create({
+      data: {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        eventType: "approval.requested",
+        actorType: "runtime",
+        actorId: "openclaw",
+        source: "runtime",
+        dedupeKey: `approval.requested:${task.id}`,
+        payload: { command: "edit files", scope: "repo" },
+        ingestSequence: 1,
+      },
+    });
+
     const page = await getWorkPage(task.id);
 
-    expect(page.approvals).toHaveLength(1);
-    expect(page.approvals[0]).toMatchObject({
+    expect(page.currentIntervention).toMatchObject({
+      kind: "approval",
+      title: "Resolve approval",
+      whyNow: "A human decision is required before the next execution step can proceed.",
+    });
+    expect(page.inspector.approvals).toHaveLength(1);
+    expect(page.inspector.approvals[0]).toMatchObject({
       id: "approval_pending",
       status: "Pending",
+    });
+    expect(page.currentIntervention?.approvals).toHaveLength(1);
+    expect(page.currentIntervention?.evidence.length).toBeGreaterThan(0);
+    expect(page.latestOutput).toMatchObject({
+      kind: "message",
+      sourceLabel: "Conversation output",
+    });
+    expect(page.workstreamItems[0]).toMatchObject({
+      kind: "approval",
+      badge: "Needs approval",
+      linkedEvidenceLabel: "Linked to Next Action",
     });
   });
 });

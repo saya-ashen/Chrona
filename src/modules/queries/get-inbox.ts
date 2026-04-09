@@ -1,7 +1,10 @@
 import { ApprovalStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 
 export async function getInbox(workspaceId: string) {
+  await syncStaleWorkspaceRunsForRead(workspaceId);
+
   const approvals = await db.approval.findMany({
     where: {
       workspaceId,

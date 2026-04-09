@@ -93,6 +93,25 @@ type ScheduleCardItem = {
   scheduledEndAt?: Date | null;
 };
 
+type ScheduledItem = SchedulePageProps["data"]["scheduled"][number];
+
+type ScheduledDayGroup = {
+  key: string;
+  label: string;
+  items: ScheduledItem[];
+  proposalCount: number;
+  riskCount: number;
+};
+
+type CompressedTimelineHour = {
+  hour: number;
+  startMinute: number;
+  endMinute: number;
+  visualStart: number;
+  visualHeight: number;
+  active: boolean;
+};
+
 function formatDateTime(value: Date | null | undefined) {
   if (!value) {
     return "-";
@@ -101,6 +120,17 @@ function formatDateTime(value: Date | null | undefined) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(value);
+}
+
+function formatTime(value: Date | null | undefined) {
+  if (!value) {
+    return "--";
+  }
+
+  return new Intl.DateTimeFormat("en", {
     hour: "numeric",
     minute: "2-digit",
   }).format(value);
@@ -126,11 +156,160 @@ function describeOwner(ownerType: string, assigneeAgentId: string | null) {
   return "Human-owned";
 }
 
-function groupScheduledByDay(items: SchedulePageProps["data"]["scheduled"]) {
-  const groups = new Map<string, { label: string; items: typeof items }>();
+function formatTimeRange(start: Date | null | undefined, end: Date | null | undefined) {
+  if (!start && !end) {
+    return "Time not set";
+  }
+
+  return `${formatTime(start)} → ${formatTime(end)}`;
+}
+
+function getPriorityAccent(priority: string) {
+  switch (priority.toLowerCase()) {
+    case "urgent":
+      return "bg-red-500";
+    case "high":
+      return "bg-amber-500";
+    case "medium":
+      return "bg-sky-500";
+    default:
+      return "bg-emerald-500";
+  }
+}
+
+function getDayKey(value: Date | null | undefined) {
+  return value ? value.toISOString().slice(0, 10) : "unspecified";
+}
+
+function formatShortDay(value: Date | null | undefined) {
+  if (!value) {
+    return "Unscheduled";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    weekday: "short",
+    day: "numeric",
+  }).format(value);
+}
+
+function formatDateKey(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function startOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function addDays(value: Date, amount: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function getTodayKey() {
+  return formatDateKey(startOfDay(new Date()));
+}
+
+function formatDurationMinutes(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
+function buildCompressedTimeline(items: ScheduledItem[]) {
+  const activeHourHeight = 72;
+  const idleHourHeight = 22;
+  const dayStartMinute = 0;
+  const dayEndMinute = 24 * 60;
+  const hourActivity = Array.from({ length: 24 }, () => false);
 
   for (const item of items) {
-    const key = item.scheduledStartAt ? item.scheduledStartAt.toISOString().slice(0, 10) : "unspecified";
+    const start = item.scheduledStartAt ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes() : null;
+    const end = item.scheduledEndAt ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes() : null;
+
+    if (start === null) {
+      continue;
+    }
+
+    const safeEnd = Math.max(end ?? start + 60, start + 45);
+    const firstHour = Math.floor(start / 60);
+    const lastHour = Math.min(23, Math.floor((safeEnd - 1) / 60));
+
+    for (let hour = firstHour; hour <= lastHour; hour += 1) {
+      hourActivity[hour] = true;
+    }
+  }
+
+  const hours: CompressedTimelineHour[] = [];
+  let visualCursor = 0;
+
+  for (let hour = 0; hour < 24; hour += 1) {
+    const visualHeight = hourActivity[hour] ? activeHourHeight : idleHourHeight;
+    hours.push({
+      hour,
+      startMinute: hour * 60,
+      endMinute: (hour + 1) * 60,
+      visualStart: visualCursor,
+      visualHeight,
+      active: hourActivity[hour],
+    });
+    visualCursor += visualHeight;
+  }
+
+  const compressedGapCount = hourActivity.filter((active) => !active).length;
+  const visualMinutes = visualCursor / activeHourHeight * 60;
+
+  function mapMinuteToY(minute: number) {
+    const safeMinute = Math.min(Math.max(minute, dayStartMinute), dayEndMinute);
+    if (safeMinute === dayEndMinute) {
+      return visualCursor;
+    }
+
+    const hourIndex = Math.min(23, Math.floor(safeMinute / 60));
+    const hour = hours[hourIndex];
+    const minuteWithinHour = safeMinute - hour.startMinute;
+    return hour.visualStart + (minuteWithinHour / 60) * hour.visualHeight;
+  }
+
+  return {
+    hours,
+    totalVisualHeight: Math.max(visualCursor, 320),
+    compressedGapCount,
+    visualMinutes,
+    mapMinuteToY,
+  };
+}
+
+function groupScheduledByDay(
+  items: SchedulePageProps["data"]["scheduled"],
+  proposals: SchedulePageProps["data"]["proposals"],
+  risks: SchedulePageProps["data"]["risks"],
+) {
+  const proposalCounts = new Map<string, number>();
+  const riskCounts = new Map<string, number>();
+  const groups = new Map<string, ScheduledDayGroup>();
+
+  for (const proposal of proposals) {
+    const key = getDayKey(proposal.scheduledStartAt);
+    proposalCounts.set(key, (proposalCounts.get(key) ?? 0) + 1);
+  }
+
+  for (const risk of risks) {
+    const key = getDayKey(risk.scheduledStartAt);
+    riskCounts.set(key, (riskCounts.get(key) ?? 0) + 1);
+  }
+
+  for (const item of items) {
+    const key = getDayKey(item.scheduledStartAt);
     const existing = groups.get(key);
 
     if (existing) {
@@ -139,12 +318,24 @@ function groupScheduledByDay(items: SchedulePageProps["data"]["scheduled"]) {
     }
 
     groups.set(key, {
+      key,
       label: formatDayHeading(item.scheduledStartAt),
       items: [item],
+      proposalCount: proposalCounts.get(key) ?? 0,
+      riskCount: riskCounts.get(key) ?? 0,
     });
   }
 
-  return [...groups.values()];
+  return [...groups.values()]
+    .map((group) => ({
+    ...group,
+    items: [...group.items].sort((a, b) => {
+      const aTime = a.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bTime = b.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    }),
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 function MetricCard({ label, value, hint }: { label: string; value: number; hint: string }) {
@@ -173,50 +364,215 @@ function ItemMeta({ item }: { item: ScheduleCardItem }) {
   );
 }
 
-function TimelineCard({ item }: { item: SchedulePageProps["data"]["scheduled"][number] }) {
+function DayTimelineSummary({ items }: { items: SchedulePageProps["data"]["scheduled"] }) {
+  const starts = items.map((item) => item.scheduledStartAt?.getTime()).filter((value): value is number => value !== undefined);
+  const ends = items.map((item) => item.scheduledEndAt?.getTime()).filter((value): value is number => value !== undefined);
+
+  if (starts.length === 0 || ends.length === 0) {
+    return <span>Time range pending</span>;
+  }
+
+  const earliest = new Date(Math.min(...starts));
+  const latest = new Date(Math.max(...ends));
+
+  return <span>{formatTime(earliest)} → {formatTime(latest)}</span>;
+}
+
+function buildScheduleHref(day: string, taskId?: string) {
+  const params = new URLSearchParams();
+  params.set("day", day);
+
+  if (taskId) {
+    params.set("task", taskId);
+  }
+
+  return `/schedule?${params.toString()}`;
+}
+
+function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selectedDay: string }) {
+  return (
+    <div className="rounded-xl border bg-background p-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+        {groups.map((group) => {
+          const isActive = group.key === selectedDay;
+
+          return (
+            <Link
+              key={group.key}
+              href={buildScheduleHref(group.key)}
+              className={`rounded-xl border px-3 py-3 transition-colors hover:border-primary/50 hover:bg-muted/60 ${
+                isActive ? "border-primary bg-primary/5" : "bg-card"
+              }`}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-foreground">{formatShortDay(group.items[0]?.scheduledStartAt ?? null)}</p>
+                  {group.riskCount > 0 ? <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label="Risk day" /> : null}
+                </div>
+                <p className="text-xs text-muted-foreground">{group.label}</p>
+                <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                  <span>{group.items.length} block{group.items.length === 1 ? "" : "s"}</span>
+                  {group.proposalCount > 0 ? <span>{group.proposalCount} proposal{group.proposalCount === 1 ? "" : "s"}</span> : null}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledItem[]; selectedDay: string; selectedTaskId?: string }) {
+  const compressedTimeline = buildCompressedTimeline(items);
+  const timelineHeight = compressedTimeline.totalVisualHeight;
+
   return (
     <div className="rounded-xl border bg-background p-4">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-2">
-            <Link
-              href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`}
-              className="text-base font-medium text-foreground transition-colors hover:text-primary"
-            >
-              {item.title}
-            </Link>
-            <ItemMeta item={item} />
-          </div>
-          <div className="text-sm text-muted-foreground">
-            <p>
-              {formatDateTime(item.scheduledStartAt)} → {formatDateTime(item.scheduledEndAt)}
-            </p>
-            <p>Due {formatDateTime(item.dueAt)}</p>
-          </div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">{formatDayHeading(items[0]?.scheduledStartAt ?? null)}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <DayTimelineSummary items={items} /> · {items.length} scheduled block{items.length === 1 ? "" : "s"}
+          </p>
         </div>
-
-        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-          <Link href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`} className="hover:text-primary">
-            Open Task
-          </Link>
-          <Link href={`/workspaces/${item.workspaceId}/work/${item.taskId}`} className="hover:text-primary">
-            Open Work
-          </Link>
+        <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <p>Full-day timeline · scroll inside</p>
+          <p className="mt-1 normal-case tracking-normal">
+            Timeline compressed: 24h shown as {formatDurationMinutes(Math.round(compressedTimeline.visualMinutes))}
+            {compressedTimeline.compressedGapCount > 0 ? ` · ${compressedTimeline.compressedGapCount} quiet hours compressed` : ""}
+          </p>
         </div>
+      </div>
 
-        {item.actionRequired ? <p className="text-sm text-muted-foreground">Next: {item.actionRequired}</p> : null}
+      <div className="max-h-[70vh] overflow-y-auto rounded-xl border bg-card/30 pr-2">
+        <div className="flex gap-3">
+          <div className="sticky left-0 top-0 hidden w-16 shrink-0 self-start bg-background/95 py-2 sm:block">
+            <div className="relative" style={{ height: `${timelineHeight}px` }}>
+              {compressedTimeline.hours.map((hour) => (
+                <div key={hour.hour} className="absolute left-0 right-0" style={{ top: `${hour.visualStart}px` }}>
+                  <span className="-translate-y-1/2 text-xs text-muted-foreground">{formatTime(new Date(2026, 0, 1, hour.hour, 0))}</span>
+                </div>
+              ))}
+              <div className="absolute left-0 right-0" style={{ top: `${timelineHeight}px` }}>
+                <span className="-translate-y-1/2 text-xs text-muted-foreground">11:59 PM</span>
+              </div>
+            </div>
+          </div>
 
-        <div className="rounded-xl border border-dashed p-3">
-          <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Adjust block</p>
-          <ScheduleEditorForm
-            taskId={item.taskId}
-            dueAt={item.dueAt}
-            scheduledStartAt={item.scheduledStartAt}
-            scheduledEndAt={item.scheduledEndAt}
-          />
+          <div className="relative flex-1 rounded-xl border bg-card/50" style={{ height: `${timelineHeight}px` }}>
+            {compressedTimeline.hours.map((hour) => (
+              <div key={hour.hour} className="absolute inset-x-0" style={{ top: `${hour.visualStart}px`, height: `${hour.visualHeight}px` }}>
+                <div className="absolute inset-x-0 top-0 border-t border-dashed border-border/70" />
+                {!hour.active ? <div className="absolute inset-x-3 inset-y-1 rounded-md bg-muted/35" /> : null}
+              </div>
+            ))}
+            <div className="absolute inset-x-0 border-t border-dashed border-border/70" style={{ top: `${timelineHeight}px` }} />
+
+            {items.map((item) => {
+              const accent = getPriorityAccent(item.priority);
+              const start = item.scheduledStartAt ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes() : 0;
+              const end = item.scheduledEndAt ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes() : start + 60;
+              const safeEnd = Math.max(end, start + 45);
+              const top = compressedTimeline.mapMinuteToY(start);
+              const height = Math.max(compressedTimeline.mapMinuteToY(safeEnd) - top, 56);
+              const isSelected = selectedTaskId === item.taskId;
+
+              return (
+                <Link
+                  key={item.taskId}
+                  href={buildScheduleHref(selectedDay, item.taskId)}
+                  className={`absolute left-3 right-3 rounded-xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 ${
+                    isSelected ? "border-primary ring-1 ring-primary/30" : "border-border"
+                  }`}
+                  style={{ top: `${top}px`, minHeight: "56px", height: `${height}px` }}
+                >
+                  <div className="flex h-full gap-3 overflow-hidden">
+                    <div className={`w-1 shrink-0 rounded-full ${accent}`} />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
+                        <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{item.priority}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{formatTimeRange(item.scheduledStartAt, item.scheduledEndAt)}</p>
+                      <p className="line-clamp-1 text-xs text-muted-foreground">{describeOwner(item.ownerType, item.assigneeAgentId)}</p>
+                      {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
+                        <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">
+                          {item.scheduleStatus === "Overdue" ? <span className="rounded-full border border-red-200 px-2 py-0.5 text-red-600">Overdue</span> : null}
+                          {item.approvalPendingCount ? <span className="rounded-full border px-2 py-0.5">Approval pending</span> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function SelectedBlockSheet({ item, selectedDay }: { item: ScheduledItem; selectedDay: string }) {
+  return (
+    <>
+      <Link
+        href={buildScheduleHref(selectedDay)}
+        aria-label="Close task details"
+        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+      />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-task-sheet-title"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-3xl border bg-background p-5 shadow-2xl md:inset-y-4 md:right-4 md:left-auto md:w-[min(520px,92vw)] md:max-h-none md:rounded-3xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b pb-4">
+          <div className="space-y-1">
+            <h2 id="schedule-task-sheet-title" className="text-sm font-semibold text-foreground">Task Details</h2>
+            <p className="text-sm text-muted-foreground">Review the selected block in a floating panel, then return to the timeline.</p>
+          </div>
+          <Link href={buildScheduleHref(selectedDay)} className="rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted">
+            Close
+          </Link>
+        </div>
+
+        <div className="mt-4 space-y-4 overflow-y-auto pr-1 text-sm text-muted-foreground md:max-h-[calc(100vh-9rem)]">
+          <div className="space-y-2">
+            <p className="text-base font-medium text-foreground">{item.title}</p>
+            <p>{formatTimeRange(item.scheduledStartAt, item.scheduledEndAt)}</p>
+            <ItemMeta item={item} />
+          </div>
+
+          <div className="grid gap-1">
+            <p>Due: {formatDateTime(item.dueAt)}</p>
+            <p>Current plan: {item.scheduleStatus ?? "Scheduled"}</p>
+            <p>Latest run: {item.latestRunStatus ?? "No active run"}</p>
+            {item.actionRequired ? <p>Next action: {item.actionRequired}</p> : null}
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`} className="hover:text-primary">
+              Open Task
+            </Link>
+            <Link href={`/workspaces/${item.workspaceId}/work/${item.taskId}`} className="hover:text-primary">
+              Open Work
+            </Link>
+          </div>
+
+          <div className="rounded-xl border border-dashed p-3">
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Adjust block</p>
+            <ScheduleEditorForm
+              taskId={item.taskId}
+              dueAt={item.dueAt}
+              scheduledStartAt={item.scheduledStartAt}
+              scheduledEndAt={item.scheduledEndAt}
+            />
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -338,8 +694,18 @@ function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }
   );
 }
 
-export function SchedulePage({ data }: SchedulePageProps) {
-  const scheduledGroups = groupScheduledByDay(data.scheduled);
+export function SchedulePage({
+  data,
+  selectedDay,
+  selectedTaskId,
+}: SchedulePageProps & { selectedDay?: string; selectedTaskId?: string }) {
+  const scheduledGroups = groupScheduledByDay(data.scheduled, data.proposals, data.risks);
+  const todayKey = getTodayKey();
+  const fallbackDay = scheduledGroups.find((group) => group.key === todayKey)?.key ?? scheduledGroups[0]?.key;
+  const activeDay = scheduledGroups.find((group) => group.key === selectedDay)?.key ?? fallbackDay;
+  const activeGroup = scheduledGroups.find((group) => group.key === activeDay) ?? null;
+  const selectedItem = activeGroup?.items.find((item) => item.taskId === selectedTaskId) ?? null;
+  const tomorrowKey = formatDateKey(addDays(startOfDay(new Date()), 1));
 
   return (
     <div className="space-y-8">
@@ -350,6 +716,21 @@ export function SchedulePage({ data }: SchedulePageProps) {
             Use this page as the global planning workbench for the default workspace: place unscheduled work,
             review AI suggestions, and resolve schedule risks before execution drifts.
           </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link href={buildScheduleHref(todayKey)} className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted">
+            Today
+          </Link>
+          <Link href={buildScheduleHref(tomorrowKey)} className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted">
+            Tomorrow
+          </Link>
+          <Link
+            href={buildScheduleHref(activeDay ?? todayKey)}
+            className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted"
+          >
+            This Week
+          </Link>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -367,7 +748,7 @@ export function SchedulePage({ data }: SchedulePageProps) {
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Scheduled Timeline</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  The current plan, grouped by start day so you can adjust blocks without leaving the page.
+                  Use the week strip to switch days, then inspect a single scheduled block without reopening the whole page.
                 </p>
               </div>
               <span className="rounded-full border px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -381,21 +762,13 @@ export function SchedulePage({ data }: SchedulePageProps) {
                   No scheduled blocks yet. Start from the queue below and place the first task on the timeline.
                 </div>
               ) : (
-                scheduledGroups.map((group) => (
-                  <div key={group.label} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-foreground">{group.label}</h3>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        {group.items.length} block{group.items.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      {group.items.map((item) => (
-                        <TimelineCard key={item.taskId} item={item} />
-                      ))}
-                    </div>
+                <>
+                  <div>
+                    <h3 className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Week Overview</h3>
+                    <WeekStrip groups={scheduledGroups} selectedDay={activeDay ?? todayKey} />
                   </div>
-                ))
+                  {activeGroup ? <DayTimeline items={activeGroup.items} selectedDay={activeGroup.key} selectedTaskId={selectedTaskId} /> : null}
+                </>
               )}
             </div>
           </section>
@@ -482,6 +855,8 @@ export function SchedulePage({ data }: SchedulePageProps) {
           </section>
         </div>
       </div>
+
+      {selectedItem && activeDay ? <SelectedBlockSheet item={selectedItem} selectedDay={activeDay} /> : null}
     </div>
   );
 }
