@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client"
+  engineType = "client"
+  runtime = "bun"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum WorkspaceStatus {
+  Active
+  Archived
+}
+
+enum TaskStatus {
+  Draft
+  Ready
+  Queued
+  Running
+  WaitingForInput
+  WaitingForApproval
+  Scheduled
+  Blocked
+  Failed
+  Completed
+  Cancelled
+}
+
+enum TaskPriority {
+  Low
+  Medium
+  High
+  Urgent
+}
+
+enum OwnerType {
+  human
+  agent
+}
+
+enum RunStatus {
+  Pending
+  Running
+  WaitingForInput
+  WaitingForApproval
+  Failed
+  Completed
+  Cancelled
+}
+
+enum ApprovalStatus {
+  Pending
+  Approved
+  Rejected
+  EditedAndApproved
+  Expired
+}
+
+enum ArtifactType {
+  file
+  patch
+  summary
+  report
+  terminal_output
+  url
+}
+
+enum MemoryScope {
+  user
+  workspace
+  project
+  task
+}
+
+enum MemorySourceType {
+  user_input
+  agent_inferred
+  imported
+  system_rule
+}
+
+enum MemoryStatus {
+  Active
+  Inactive
+  Conflicted
+  Expired
+}
+
+enum TaskDependencyType {
+  blocks
+  relates_to
+  child_of
+}
+
+model Workspace {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  defaultRuntime  String
+  status          WorkspaceStatus
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tasks           Task[]
+  approvals       Approval[]
+  artifacts       Artifact[]
+  memories        Memory[]
+  events          Event[]
+  taskDependencies TaskDependency[]
+  taskProjections TaskProjection[]
+}
+
+model Task {
+  id               String          @id @default(cuid())
+  workspaceId      String
+  title            String
+  description      String?
+  status           TaskStatus
+  priority         TaskPriority
+  ownerType        OwnerType
+  assigneeAgentId  String?
+  sourceSessionId  String?
+  parentTaskId     String?
+  dueAt            DateTime?
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
+  budgetLimit      Int?
+  blockReason      Json?
+  latestRunId      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  completedAt      DateTime?
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id])
+  runs             Run[]
+  approvals        Approval[]
+  artifacts        Artifact[]
+  memories         Memory[]
+  events           Event[]
+  projection       TaskProjection?
+  dependencies     TaskDependency[] @relation("TaskDependencies")
+  dependentTasks   TaskDependency[] @relation("TaskDependents")
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, priority])
+}
+
+model TaskDependency {
+  id              String             @id @default(cuid())
+  workspaceId     String
+  taskId          String
+  dependsOnTaskId String
+  dependencyType  TaskDependencyType
+  createdAt       DateTime           @default(now())
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id])
+  task            Task               @relation("TaskDependencies", fields: [taskId], references: [id])
+  dependsOnTask   Task               @relation("TaskDependents", fields: [dependsOnTaskId], references: [id])
+
+  @@index([workspaceId, taskId])
+  @@index([workspaceId, dependsOnTaskId])
+  @@unique([taskId, dependsOnTaskId])
+}
+
+model Run {
+  id                  String              @id @default(cuid())
+  taskId              String
+  runtimeName         String
+  runtimeRunRef       String?             @unique
+  runtimeSessionRef   String?
+  status              RunStatus
+  startedAt           DateTime?
+  endedAt             DateTime?
+  errorSummary        String?
+  resumeToken         String?
+  triggeredBy         String
+  retryable           Boolean             @default(false)
+  resumeSupported     Boolean             @default(false)
+  pendingInputPrompt  String?
+  pendingInputType    String?
+  lastSyncedAt        DateTime?
+  syncStatus          String              @default("healthy")
+  mappingPartial      Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  task                Task                @relation(fields: [taskId], references: [id])
+  approvals           Approval[]
+  artifacts           Artifact[]
+  events              Event[]
+  conversationEntries ConversationEntry[]
+  toolCallDetails     ToolCallDetail[]
+  runtimeCursor       RuntimeCursor?
+
+  @@index([taskId, status])
+  @@index([runtimeName, status])
+}
+
+model Approval {
+  id             String         @id @default(cuid())
+  workspaceId    String
+  taskId         String
+  runId          String
+  type           String
+  title          String
+  summary        String
+  riskLevel      String
+  payload        Json?
+  status         ApprovalStatus
+  requestedAt    DateTime
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  resolutionNote String?
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id])
+  task           Task           @relation(fields: [taskId], references: [id])
+  run            Run            @relation(fields: [runId], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([taskId, status])
+  @@index([runId, status])
+}
+
+model Artifact {
+  id             String       @id @default(cuid())
+  workspaceId    String
+  taskId         String
+  runId          String
+  type           ArtifactType
+  title          String
+  uri            String
+  contentPreview String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id])
+  task           Task         @relation(fields: [taskId], references: [id])
+  run            Run          @relation(fields: [runId], references: [id])
+
+  @@index([workspaceId, type])
+  @@index([taskId, createdAt])
+  @@index([runId, createdAt])
+}
+
+model Memory {
+  id          String           @id @default(cuid())
+  workspaceId String
+  taskId      String?
+  sourceRunId String?
+  content     String
+  scope       MemoryScope
+  sourceType  MemorySourceType
+  confidence  Float?
+  status      MemoryStatus
+  expiresAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id])
+  task        Task?            @relation(fields: [taskId], references: [id])
+
+  @@index([workspaceId, scope, status])
+  @@index([taskId])
+}
+
+model Event {
+  id             String    @id @default(cuid())
+  eventType      String
+  workspaceId    String
+  taskId         String
+  runId          String?
+  actorType      String
+  actorId        String
+  source         String
+  payload        Json
+  dedupeKey      String    @unique
+  runtimeTs      DateTime?
+  ingestSequence Int
+  createdAt      DateTime  @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  task           Task      @relation(fields: [taskId], references: [id])
+  run            Run?      @relation(fields: [runId], references: [id])
+
+  @@index([taskId, ingestSequence])
+  @@index([runId, ingestSequence])
+  @@index([workspaceId, eventType, ingestSequence])
+}
+
+model ConversationEntry {
+  id          String   @id @default(cuid())
+  runId       String
+  role        String
+  content     String
+  runtimeTs   DateTime?
+  sequence    Int
+  externalRef String?  @unique
+  createdAt   DateTime @default(now())
+  run         Run      @relation(fields: [runId], references: [id])
+
+  @@index([runId, sequence])
+}
+
+model ToolCallDetail {
+  id               String   @id @default(cuid())
+  runId            String
+  toolName         String
+  status           String
+  argumentsSummary String?
+  resultSummary    String?
+  errorSummary     String?
+  runtimeTs        DateTime?
+  externalRef      String?  @unique
+  createdAt        DateTime @default(now())
+  run              Run      @relation(fields: [runId], references: [id])
+
+  @@index([runId, createdAt])
+}
+
+model TaskProjection {
+  taskId               String    @id
+  workspaceId          String
+  persistedStatus      String
+  displayState         String?
+  blockType            String?
+  blockScope           String?
+  blockSince           DateTime?
+  actionRequired       String?
+  latestRunStatus      String?
+  approvalPendingCount Int       @default(0)
+  dueAt                DateTime?
+  scheduledStartAt     DateTime?
+  scheduledEndAt       DateTime?
+  latestArtifactTitle  String?
+  lastActivityAt       DateTime?
+  updatedAt            DateTime  @updatedAt
+  workspace            Workspace @relation(fields: [workspaceId], references: [id])
+  task                 Task      @relation(fields: [taskId], references: [id])
+
+  @@index([workspaceId, persistedStatus])
+  @@index([workspaceId, displayState])
+}
+
+model RuntimeCursor {
+  runId        String   @id
+  runtimeName  String
+  nextCursor   String?
+  lastEventRef String?
+  lastSyncedAt DateTime?
+  healthStatus String   @default("healthy")
+  lastError    String?
+  run          Run      @relation(fields: [runId], references: [id])
+}
