@@ -7,7 +7,14 @@ describe("WorkspaceOverview", () => {
     render(
       <WorkspaceOverview
         data={{
-          running: [],
+          running: [
+            {
+              taskId: "task_1",
+              workspaceId: "ws_1",
+              title: "Ship workspace nav",
+              latestRunStatus: "Running",
+            },
+          ],
           waitingForApproval: [],
           blockedOrFailed: [],
           scheduleRisks: [],
@@ -23,5 +30,14 @@ describe("WorkspaceOverview", () => {
     expect(screen.getByText("Schedule Risks")).toBeInTheDocument();
     expect(screen.getByText("Upcoming Deadlines")).toBeInTheDocument();
     expect(screen.getByText("Recently Updated Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Ship workspace nav")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/tasks/task_1",
+    );
+    expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/work/task_1",
+    );
   });
 });

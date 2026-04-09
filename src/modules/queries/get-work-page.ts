@@ -233,7 +233,7 @@ function buildCurrentIntervention({
     return {
       kind: "idle",
       title: "Start execution",
-      description: "No run is active yet. Launch one from the Task Page when the plan is ready.",
+      description: "No run is active yet. Launch one from this workbench or the task page when the plan is ready.",
       actionLabel: "Open Task",
       whyNow: blockReason?.actionRequired ?? "There is no active run, so execution cannot progress from this page yet.",
       evidence: sharedEvidence,

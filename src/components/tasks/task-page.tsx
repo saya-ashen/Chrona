@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
+import { buttonVariants } from "@/components/ui/button";
+import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  SurfaceCard,
+  SurfaceCardDescription,
+  SurfaceCardHeader,
+  SurfaceCardTitle,
+} from "@/components/ui/surface-card";
+import { TaskContextLinks } from "@/components/ui/task-context-links";
 
 type TaskPageProps = {
   data: {
@@ -66,45 +76,122 @@ type TaskPageProps = {
     }>;
   };
   startRunAction?: (formData: FormData) => Promise<void>;
+  updateTaskAction?: (formData: FormData) => Promise<void>;
+  proposeScheduleAction?: (formData: FormData) => Promise<void>;
 };
 
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
 }
 
+function formatDateTimeInput(value: string | null | undefined) {
+  return value ? value.slice(0, 16) : "";
+}
+
 function parseDate(value: string | null) {
   return value ? new Date(value) : null;
 }
 
-export function TaskPage({ data, startRunAction }: TaskPageProps) {
+function priorityTone(priority: string) {
+  if (priority === "Urgent") return "critical" as const;
+  if (priority === "High") return "warning" as const;
+  return "neutral" as const;
+}
+
+function scheduleTone(status: string) {
+  if (status === "Overdue") return "critical" as const;
+  if (status === "AtRisk") return "warning" as const;
+  if (status === "InProgress" || status === "Scheduled") return "info" as const;
+  return "neutral" as const;
+}
+
+export function TaskPage({ data, startRunAction, updateTaskAction, proposeScheduleAction }: TaskPageProps) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="space-y-6 rounded-2xl border bg-card p-6 shadow-sm">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{data.task.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {data.task.description ?? "No task description yet."}
-          </p>
-        </header>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <SurfaceCard className="space-y-6" padding="lg">
+        <SurfaceCardHeader className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-balance">{data.task.title}</h1>
+              <p className="text-sm leading-6 text-muted-foreground">
+                {data.task.description ?? "No task description yet."}
+              </p>
+            </div>
+            <TaskContextLinks
+              workspaceId={data.task.workspaceId}
+              taskId={data.task.id}
+              latestRunStatus={data.latestRunSummary?.status ?? null}
+              taskLabel="Open Task"
+              workLabel={data.latestRunSummary ? "Resume in Workbench" : "Start Work"}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge tone="info">{data.task.status}</StatusBadge>
+            <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
+            <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
+            <StatusBadge>Due {formatDate(data.task.dueAt)}</StatusBadge>
+          </div>
+        </SurfaceCardHeader>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <section className="rounded-xl border bg-background p-4">
-            <h2 className="text-sm font-semibold">Task Control</h2>
-            <dl className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between gap-4">
-                <dt>Status</dt>
-                <dd>{data.task.status}</dd>
+          <SurfaceCard variant="inset" className="space-y-3">
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>Task Control</SurfaceCardTitle>
+              <SurfaceCardDescription>
+                Keep the task definition current without leaving the control surface.
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
+            <form action={updateTaskAction} className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge>Status {data.task.status}</StatusBadge>
+                <StatusBadge>Priority {data.task.priority}</StatusBadge>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>Priority</dt>
-                <dd>{data.task.priority}</dd>
+              <Field label="Title">
+                <input name="title" required defaultValue={data.task.title} className={inputClassName} />
+              </Field>
+              <Field label="Description">
+                <textarea
+                  name="description"
+                  rows={5}
+                  defaultValue={data.task.description ?? ""}
+                  placeholder="Execution context, desired outcome, or constraints"
+                  className={textareaClassName}
+                />
+              </Field>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Priority">
+                  <select name="priority" defaultValue={data.task.priority} className={selectClassName}>
+                    {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Due">
+                  <input
+                    type="datetime-local"
+                    name="dueAt"
+                    defaultValue={formatDateTimeInput(data.task.dueAt)}
+                    className={inputClassName}
+                  />
+                </Field>
               </div>
-            </dl>
-          </section>
+              <button type="submit" className={buttonVariants({ variant: "default" })}>
+                Save Task Details
+              </button>
+            </form>
+          </SurfaceCard>
 
-          <section className="rounded-xl border bg-background p-4">
-            <h2 className="text-sm font-semibold">Scheduling</h2>
-            <dl className="mt-3 space-y-2 text-sm text-muted-foreground">
+          <SurfaceCard variant="inset" className="space-y-3">
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>Scheduling</SurfaceCardTitle>
+              <SurfaceCardDescription>
+                Keep the task window visible and editable from the same planning surface.
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
+            <dl className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center justify-between gap-4">
                 <dt>Due</dt>
                 <dd>{formatDate(data.task.dueAt)}</dd>
@@ -126,7 +213,7 @@ export function TaskPage({ data, startRunAction }: TaskPageProps) {
                 <dd>{data.task.scheduleSource ?? "-"}</dd>
               </div>
             </dl>
-            <div className="mt-4">
+            <div className="pt-1">
               <ScheduleEditorForm
                 taskId={data.task.id}
                 dueAt={parseDate(data.task.dueAt)}
@@ -135,31 +222,34 @@ export function TaskPage({ data, startRunAction }: TaskPageProps) {
                 scheduleSource={(data.task.scheduleSource as "human" | "ai" | "system" | null) ?? "human"}
               />
             </div>
-          </section>
+          </SurfaceCard>
         </div>
 
-        <section className="rounded-xl border bg-background p-4">
-          <h2 className="text-sm font-semibold">Dependencies</h2>
-          <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+        <SurfaceCard variant="inset" className="space-y-3">
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>Dependencies</SurfaceCardTitle>
+            <SurfaceCardDescription>Track upstream work without opening a second planning surface.</SurfaceCardDescription>
+          </SurfaceCardHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
             {data.task.dependencies.length === 0 ? (
               <p>No dependencies linked yet.</p>
             ) : (
               data.task.dependencies.map((dependency) => (
-                <div key={dependency.id} className="rounded-lg border bg-card px-3 py-2">
+                <SurfaceCard key={dependency.id} as="div" variant="default" padding="sm" className="rounded-2xl">
                   <p className="font-medium text-foreground">{dependency.dependsOnTask.title}</p>
                   <p>
                     {dependency.dependencyType} · {dependency.dependsOnTask.status}
                   </p>
-                </div>
+                </SurfaceCard>
               ))
             )}
           </div>
-        </section>
-      </section>
+        </SurfaceCard>
+      </SurfaceCard>
 
       <aside className="space-y-4">
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Latest Run</h2>
+        <SurfaceCard>
+          <SurfaceCardTitle>Latest Run</SurfaceCardTitle>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
             {data.latestRunSummary ? (
               <>
@@ -171,102 +261,144 @@ export function TaskPage({ data, startRunAction }: TaskPageProps) {
               <p>No run started yet.</p>
             )}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Block Reason</h2>
+        <SurfaceCard>
+          <SurfaceCardTitle>Block Reason</SurfaceCardTitle>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
             <p>{data.task.blockReason?.actionRequired ?? "No block"}</p>
             {data.task.blockReason?.scope ? <p>Scope: {data.task.blockReason.scope}</p> : null}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Pending Schedule Proposals</h2>
+        <SurfaceCard>
+          <SurfaceCardTitle>Pending Schedule Proposals</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.scheduleProposals.length === 0 ? (
               <p>No pending schedule proposals.</p>
             ) : (
               data.scheduleProposals.map((proposal) => (
-                <div key={proposal.id} className="rounded-lg border bg-background px-3 py-2">
+                <SurfaceCard key={proposal.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
                   <p className="font-medium text-foreground">{proposal.summary}</p>
                   <p>
                     {proposal.source} via {proposal.proposedBy}
                   </p>
                   <p>Status: {proposal.status}</p>
-                </div>
+                </SurfaceCard>
               ))
             )}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Recent Approvals</h2>
+        <SurfaceCard>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>Create Schedule Proposal</SurfaceCardTitle>
+            <SurfaceCardDescription>
+              Capture a human planning suggestion so Schedule can review and accept it later.
+            </SurfaceCardDescription>
+          </SurfaceCardHeader>
+          <form action={proposeScheduleAction} className="mt-3 space-y-3">
+            <Field label="Proposal summary">
+              <textarea
+                name="summary"
+                rows={4}
+                required
+                placeholder="Suggest how this task should move in the schedule"
+                className={textareaClassName}
+              />
+            </Field>
+            <div className="grid gap-3">
+              <Field label="Proposed due">
+                <input
+                  type="datetime-local"
+                  name="dueAt"
+                  defaultValue={formatDateTimeInput(data.task.dueAt)}
+                  className={inputClassName}
+                />
+              </Field>
+              <Field label="Proposed start">
+                <input
+                  type="datetime-local"
+                  name="scheduledStartAt"
+                  defaultValue={formatDateTimeInput(data.task.scheduledStartAt)}
+                  className={inputClassName}
+                />
+              </Field>
+              <Field label="Proposed end">
+                <input
+                  type="datetime-local"
+                  name="scheduledEndAt"
+                  defaultValue={formatDateTimeInput(data.task.scheduledEndAt)}
+                  className={inputClassName}
+                />
+              </Field>
+            </div>
+            <button type="submit" className={buttonVariants({ variant: "outline" })}>
+              Create Proposal
+            </button>
+          </form>
+        </SurfaceCard>
+
+        <SurfaceCard>
+          <SurfaceCardTitle>Recent Approvals</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.approvals.length === 0 ? (
               <p>No recent approvals.</p>
             ) : (
               data.approvals.map((approval) => (
-                <div key={approval.id} className="rounded-lg border bg-background px-3 py-2">
+                <SurfaceCard key={approval.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
                   <p className="font-medium text-foreground">{approval.title}</p>
                   <p>{approval.status}</p>
-                </div>
+                </SurfaceCard>
               ))
             )}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Recent Artifacts</h2>
+        <SurfaceCard>
+          <SurfaceCardTitle>Recent Artifacts</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.artifacts.length === 0 ? (
               <p>No artifacts yet.</p>
             ) : (
               data.artifacts.map((artifact) => (
-                <div key={artifact.id} className="rounded-lg border bg-background px-3 py-2">
+                <SurfaceCard key={artifact.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
                   <p className="font-medium text-foreground">{artifact.title}</p>
                   <p>{artifact.type}</p>
-                </div>
+                </SurfaceCard>
               ))
             )}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Actions</h2>
+        <SurfaceCard>
+          <SurfaceCardTitle>Actions</SurfaceCardTitle>
           <div className="mt-3 flex flex-col gap-3">
-            <form action={startRunAction} className="space-y-2 rounded-lg border bg-background p-3">
-              <label className="grid gap-1 text-sm text-foreground">
-                <span className="font-medium">Run prompt</span>
+            <form action={startRunAction} className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-3">
+              <Field label="Run prompt">
                 <textarea
                   name="prompt"
                   required
                   rows={4}
                   defaultValue={data.task.description ?? `Continue working on: ${data.task.title}`}
-                  className="rounded-md border bg-card px-3 py-2 text-sm"
+                  className={textareaClassName}
                 />
-              </label>
-              <button
-                type="submit"
-                className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-              >
+              </Field>
+              <button type="submit" className={buttonVariants({ variant: "default" })}>
                 Start Run
               </button>
             </form>
-            <Link
-              href="/schedule"
-              className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-            >
+            <Link href="/schedule" className={buttonVariants({ variant: "outline" })}>
               Open Schedule
             </Link>
             <Link
               href={`/workspaces/${data.task.workspaceId}/work/${data.task.id}`}
-              className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+              className={buttonVariants({ variant: "outline" })}
             >
-              Open Work Page
+              Open Workbench
             </Link>
           </div>
-        </section>
+        </SurfaceCard>
       </aside>
     </div>
   );

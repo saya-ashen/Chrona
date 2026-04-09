@@ -6,6 +6,8 @@ describe("TaskPage", () => {
   it("shows planning controls plus entry points into the work surface", () => {
     render(
       <TaskPage
+        updateTaskAction={async () => {}}
+        proposeScheduleAction={async () => {}}
         startRunAction={async () => {}}
         data={{
           task: {
@@ -48,8 +50,10 @@ describe("TaskPage", () => {
     );
 
     expect(screen.getByRole("button", { name: "Start Run" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Task Details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Plan the read model");
-    expect(screen.getByRole("link", { name: "Open Work Page" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
       "href",
       "/workspaces/ws_1/work/task_1",
     );
@@ -60,5 +64,6 @@ describe("TaskPage", () => {
     expect(screen.getByText("Block Reason")).toBeInTheDocument();
     expect(screen.getByText("Pending Schedule Proposals")).toBeInTheDocument();
     expect(screen.getByText("Schedule this tomorrow morning")).toBeInTheDocument();
+    expect(screen.getByText("Create Schedule Proposal")).toBeInTheDocument();
   });
 });

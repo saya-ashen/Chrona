@@ -13,6 +13,8 @@ export async function getMemoryConsole(workspaceId: string) {
     sourceType: item.sourceType,
     scope: item.scope,
     status: item.status,
+    workspaceId: item.workspaceId,
+    taskId: item.taskId,
     taskTitle: item.task?.title ?? null,
     runLabel: item.sourceRunId ?? null,
   }));

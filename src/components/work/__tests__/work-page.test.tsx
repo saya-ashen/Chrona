@@ -100,4 +100,61 @@ describe("WorkPageClient", () => {
     expect(screen.getByRole("button", { name: "Conversation" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Work draft" })).not.toBeInTheDocument();
   });
+
+  it("lets operators start the first run directly from the workbench", () => {
+    render(
+      <WorkPageClient
+        initialData={{
+          taskShell: {
+            id: "task_2",
+            workspaceId: "ws_1",
+            title: "Draft rollout note",
+            status: "Ready",
+            priority: "Medium",
+            dueAt: null,
+            scheduledStartAt: null,
+            scheduledEndAt: null,
+            scheduleStatus: "Unscheduled",
+            blockReason: { actionRequired: "Start the first execution pass" },
+          },
+          currentRun: null,
+          currentIntervention: {
+            kind: "idle",
+            title: "Start execution",
+            description: "No run is active yet. Launch one from this workbench or the task page when the plan is ready.",
+            whyNow: "There is no active run, so execution cannot progress from this page yet.",
+            actionLabel: "Open Task",
+            evidence: [],
+          },
+          latestOutput: {
+            kind: "empty",
+            title: "No mapped output yet",
+            body: "The latest artifact or agent result will appear here first.",
+            timestamp: null,
+            href: null,
+            empty: true,
+            sourceLabel: "No output source",
+          },
+          scheduleImpact: {
+            status: "Unscheduled",
+            dueAt: null,
+            scheduledStartAt: null,
+            scheduledEndAt: null,
+            summary: "No planned window exists yet.",
+          },
+          workstreamItems: [],
+          conversation: [],
+          inspector: {
+            approvals: [],
+            artifacts: [],
+            toolCalls: [],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Continue working on: Draft rollout note");
+    expect(screen.getByRole("button", { name: "Start Run Here" })).toBeInTheDocument();
+    expect(screen.getByText("No active run yet")).toBeInTheDocument();
+  });
 });

@@ -68,7 +68,7 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
                       href={`/workspaces/${row.workspaceId}/work/${row.taskId}`}
                       className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
                     >
-                      Open Work
+                      {row.latestRunStatus ? "Open Work" : "Start Work"}
                     </Link>
                     <Link
                       href={`/workspaces/${row.workspaceId}/tasks/${row.taskId}`}
