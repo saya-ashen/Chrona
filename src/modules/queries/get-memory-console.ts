@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 
-export async function getMemoryConsole() {
+export async function getMemoryConsole(workspaceId: string) {
   const items = await db.memory.findMany({
+    where: { workspaceId },
     include: { task: true },
     orderBy: { updatedAt: "desc" },
   });

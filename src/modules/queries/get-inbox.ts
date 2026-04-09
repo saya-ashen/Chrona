@@ -1,9 +1,12 @@
 import { ApprovalStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 
-export async function getInbox() {
+export async function getInbox(workspaceId: string) {
   const approvals = await db.approval.findMany({
-    where: { status: ApprovalStatus.Pending },
+    where: {
+      workspaceId,
+      status: ApprovalStatus.Pending,
+    },
     include: {
       task: true,
       run: true,

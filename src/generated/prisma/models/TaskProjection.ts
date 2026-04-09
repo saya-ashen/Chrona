@@ -28,10 +28,12 @@ export type AggregateTaskProjection = {
 
 export type TaskProjectionAvgAggregateOutputType = {
   approvalPendingCount: number | null
+  scheduleProposalCount: number | null
 }
 
 export type TaskProjectionSumAggregateOutputType = {
   approvalPendingCount: number | null
+  scheduleProposalCount: number | null
 }
 
 export type TaskProjectionMinAggregateOutputType = {
@@ -48,6 +50,9 @@ export type TaskProjectionMinAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: string | null
+  scheduleSource: string | null
+  scheduleProposalCount: number | null
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
   updatedAt: Date | null
@@ -67,6 +72,9 @@ export type TaskProjectionMaxAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: string | null
+  scheduleSource: string | null
+  scheduleProposalCount: number | null
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
   updatedAt: Date | null
@@ -86,6 +94,9 @@ export type TaskProjectionCountAggregateOutputType = {
   dueAt: number
   scheduledStartAt: number
   scheduledEndAt: number
+  scheduleStatus: number
+  scheduleSource: number
+  scheduleProposalCount: number
   latestArtifactTitle: number
   lastActivityAt: number
   updatedAt: number
@@ -95,10 +106,12 @@ export type TaskProjectionCountAggregateOutputType = {
 
 export type TaskProjectionAvgAggregateInputType = {
   approvalPendingCount?: true
+  scheduleProposalCount?: true
 }
 
 export type TaskProjectionSumAggregateInputType = {
   approvalPendingCount?: true
+  scheduleProposalCount?: true
 }
 
 export type TaskProjectionMinAggregateInputType = {
@@ -115,6 +128,9 @@ export type TaskProjectionMinAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
+  scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
   updatedAt?: true
@@ -134,6 +150,9 @@ export type TaskProjectionMaxAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
+  scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
   updatedAt?: true
@@ -153,6 +172,9 @@ export type TaskProjectionCountAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
+  scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
   updatedAt?: true
@@ -259,6 +281,9 @@ export type TaskProjectionGroupByOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: string | null
+  scheduleSource: string | null
+  scheduleProposalCount: number
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
   updatedAt: Date
@@ -301,6 +326,9 @@ export type TaskProjectionWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  scheduleStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleSource?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
@@ -322,6 +350,9 @@ export type TaskProjectionOrderByWithRelationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -346,6 +377,9 @@ export type TaskProjectionWhereUniqueInput = Prisma.AtLeast<{
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  scheduleStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleSource?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
@@ -367,6 +401,9 @@ export type TaskProjectionOrderByWithAggregationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -394,6 +431,9 @@ export type TaskProjectionScalarWhereWithAggregatesInput = {
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
+  scheduleStatus?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  scheduleSource?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  scheduleProposalCount?: Prisma.IntWithAggregatesFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"TaskProjection"> | Date | string
@@ -411,6 +451,9 @@ export type TaskProjectionCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -432,6 +475,9 @@ export type TaskProjectionUncheckedCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -449,6 +495,9 @@ export type TaskProjectionUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -470,6 +519,9 @@ export type TaskProjectionUncheckedUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -489,6 +541,9 @@ export type TaskProjectionCreateManyInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -506,6 +561,9 @@ export type TaskProjectionUpdateManyMutationInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -525,6 +583,9 @@ export type TaskProjectionUncheckedUpdateManyInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -559,6 +620,9 @@ export type TaskProjectionCountOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -566,6 +630,7 @@ export type TaskProjectionCountOrderByAggregateInput = {
 
 export type TaskProjectionAvgOrderByAggregateInput = {
   approvalPendingCount?: Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
 }
 
 export type TaskProjectionMaxOrderByAggregateInput = {
@@ -582,6 +647,9 @@ export type TaskProjectionMaxOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -601,6 +669,9 @@ export type TaskProjectionMinOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -608,6 +679,7 @@ export type TaskProjectionMinOrderByAggregateInput = {
 
 export type TaskProjectionSumOrderByAggregateInput = {
   approvalPendingCount?: Prisma.SortOrder
+  scheduleProposalCount?: Prisma.SortOrder
 }
 
 export type TaskProjectionCreateNestedManyWithoutWorkspaceInput = {
@@ -696,6 +768,9 @@ export type TaskProjectionCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -715,6 +790,9 @@ export type TaskProjectionUncheckedCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -762,6 +840,9 @@ export type TaskProjectionScalarWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  scheduleStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleSource?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
@@ -779,6 +860,9 @@ export type TaskProjectionCreateWithoutTaskInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -798,6 +882,9 @@ export type TaskProjectionUncheckedCreateWithoutTaskInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -831,6 +918,9 @@ export type TaskProjectionUpdateWithoutTaskInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -850,6 +940,9 @@ export type TaskProjectionUncheckedUpdateWithoutTaskInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -868,6 +961,9 @@ export type TaskProjectionCreateManyWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: string | null
+  scheduleSource?: string | null
+  scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
   updatedAt?: Date | string
@@ -885,6 +981,9 @@ export type TaskProjectionUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -904,6 +1003,9 @@ export type TaskProjectionUncheckedUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -922,6 +1024,9 @@ export type TaskProjectionUncheckedUpdateManyWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -943,6 +1048,9 @@ export type TaskProjectionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
+  scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
   updatedAt?: boolean
@@ -964,6 +1072,9 @@ export type TaskProjectionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
+  scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
   updatedAt?: boolean
@@ -985,6 +1096,9 @@ export type TaskProjectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
+  scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
   updatedAt?: boolean
@@ -1006,12 +1120,15 @@ export type TaskProjectionSelectScalar = {
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
+  scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
   updatedAt?: boolean
 }
 
-export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "latestArtifactTitle" | "lastActivityAt" | "updatedAt", ExtArgs["result"]["taskProjection"]>
+export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "scheduleProposalCount" | "latestArtifactTitle" | "lastActivityAt" | "updatedAt", ExtArgs["result"]["taskProjection"]>
 export type TaskProjectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1045,6 +1162,9 @@ export type $TaskProjectionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     dueAt: Date | null
     scheduledStartAt: Date | null
     scheduledEndAt: Date | null
+    scheduleStatus: string | null
+    scheduleSource: string | null
+    scheduleProposalCount: number
     latestArtifactTitle: string | null
     lastActivityAt: Date | null
     updatedAt: Date
@@ -1486,6 +1606,9 @@ export interface TaskProjectionFieldRefs {
   readonly dueAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
   readonly scheduledStartAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
   readonly scheduledEndAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
+  readonly scheduleStatus: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly scheduleSource: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly scheduleProposalCount: Prisma.FieldRef<"TaskProjection", 'Int'>
   readonly latestArtifactTitle: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly lastActivityAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>

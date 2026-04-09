@@ -3,6 +3,11 @@ type WorkspaceOverviewProps = {
     running: Array<{ taskId: string; latestRunStatus: string | null }>;
     waitingForApproval: Array<{ taskId: string; actionRequired: string | null }>;
     blockedOrFailed: Array<{ taskId: string; persistedStatus: string }>;
+    scheduleRisks: Array<{
+      taskId: string;
+      scheduleStatus: string | null;
+      actionRequired: string | null;
+    }>;
     upcomingDeadlines: Array<{ taskId: string; dueAt: Date | null }>;
     recentlyUpdated: Array<{ taskId: string; lastActivityAt: Date | null }>;
   };
@@ -33,6 +38,13 @@ export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
       items: data.blockedOrFailed.map((item) => ({
         taskId: item.taskId,
         meta: item.persistedStatus,
+      })),
+    },
+    {
+      title: "Schedule Risks",
+      items: data.scheduleRisks.map((item) => ({
+        taskId: item.taskId,
+        meta: [item.scheduleStatus, item.actionRequired].filter(Boolean).join(" · "),
       })),
     },
     {

@@ -39,6 +39,11 @@ export async function getTaskPage(taskId: string) {
       runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      scheduleProposals: {
+        where: { status: "Pending" },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
       dependencies: {
         include: {
           dependsOnTask: {
@@ -62,6 +67,8 @@ export async function getTaskPage(taskId: string) {
       dueAt: task.dueAt?.toISOString() ?? null,
       scheduledStartAt: task.scheduledStartAt?.toISOString() ?? null,
       scheduledEndAt: task.scheduledEndAt?.toISOString() ?? null,
+      scheduleStatus: task.scheduleStatus,
+      scheduleSource: task.scheduleSource,
       blockReason: readBlockReason(task),
       dependencies: task.dependencies.map((dependency) => ({
         id: dependency.id,
@@ -77,6 +84,16 @@ export async function getTaskPage(taskId: string) {
           syncStatus: latestRun.syncStatus,
         }
       : null,
+    scheduleProposals: task.scheduleProposals.map((proposal) => ({
+      id: proposal.id,
+      source: proposal.source,
+      proposedBy: proposal.proposedBy,
+      summary: proposal.summary,
+      status: proposal.status,
+      dueAt: proposal.dueAt?.toISOString() ?? null,
+      scheduledStartAt: proposal.scheduledStartAt?.toISOString() ?? null,
+      scheduledEndAt: proposal.scheduledEndAt?.toISOString() ?? null,
+    })),
     approvals: task.approvals.map((approval) => ({
       id: approval.id,
       title: approval.title,

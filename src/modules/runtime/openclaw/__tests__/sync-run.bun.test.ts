@@ -5,6 +5,7 @@ import { createMockOpenClawAdapter } from "@/modules/runtime/openclaw/mock-adapt
 import { syncRunFromRuntime } from "@/modules/runtime/openclaw/sync-run";
 
 async function resetDb() {
+  await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();

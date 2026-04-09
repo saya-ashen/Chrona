@@ -8,6 +8,7 @@ type TaskCenterTableProps = {
     displayState: string | null;
     latestRunStatus: string | null;
     actionRequired: string | null;
+    scheduleStatus: string | null;
     dueAt: Date | null;
     updatedAt: Date;
     workspaceId: string;
@@ -28,13 +29,14 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 font-medium">Latest Run</th>
             <th className="px-4 py-3 font-medium">Block Reason</th>
+            <th className="px-4 py-3 font-medium">Schedule</th>
             <th className="px-4 py-3 font-medium">Due</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+              <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                 No tasks match this filter.
               </td>
             </tr>
@@ -54,6 +56,7 @@ export function TaskCenterTable({ rows }: TaskCenterTableProps) {
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{row.latestRunStatus ?? "No run"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{row.actionRequired ?? "-"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{row.scheduleStatus ?? "-"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{formatDate(row.dueAt)}</td>
               </tr>
             ))

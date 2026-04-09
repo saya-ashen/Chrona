@@ -5,6 +5,7 @@ import { invalidateMemory } from "@/modules/commands/invalidate-memory";
 import { startRun } from "@/modules/commands/start-run";
 
 async function resetDb() {
+  await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();

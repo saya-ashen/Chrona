@@ -6,9 +6,11 @@ import {
   rejectApproval,
 } from "@/app/actions/task-actions";
 import { getInbox } from "@/modules/queries/get-inbox";
+import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 
 export default async function InboxPage() {
-  const items = await getInbox();
+  const workspace = await getDefaultWorkspace();
+  const items = await getInbox(workspace.id);
 
   const itemsWithActions = items.map((item) => ({
     ...item,

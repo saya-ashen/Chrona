@@ -60,6 +60,9 @@ export async function getWorkPage(taskId: string) {
       status: task.projection?.displayState ?? task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
+      scheduledStartAt: task.scheduledStartAt?.toISOString() ?? null,
+      scheduledEndAt: task.scheduledEndAt?.toISOString() ?? null,
+      scheduleStatus: task.scheduleStatus,
       blockReason: readBlockReason(task),
     },
     currentRun: currentRun

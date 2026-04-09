@@ -97,6 +97,11 @@ export type ToolCallDetail = Prisma.ToolCallDetailModel
  */
 export type TaskProjection = Prisma.TaskProjectionModel
 /**
+ * Model ScheduleProposal
+ * 
+ */
+export type ScheduleProposal = Prisma.ScheduleProposalModel
+/**
  * Model RuntimeCursor
  * 
  */

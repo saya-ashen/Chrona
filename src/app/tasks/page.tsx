@@ -2,17 +2,19 @@ import Link from "next/link";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 import { TaskCenterTable } from "@/components/tasks/task-center-table";
 import { getTaskCenter } from "@/modules/queries/get-task-center";
+import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 
-const FILTERS = ["Running", "WaitingForApproval", "Blocked", "Failed"] as const;
+const FILTERS = ["Running", "WaitingForApproval", "Blocked", "Failed", "Unscheduled", "Overdue"] as const;
 
 export default async function TasksPage(props: {
   searchParams?: Promise<{ status?: string }>;
 }) {
   const searchParams = (await props.searchParams) ?? {};
+  const workspace = await getDefaultWorkspace();
   const activeFilter = FILTERS.includes(searchParams.status as (typeof FILTERS)[number])
     ? (searchParams.status as (typeof FILTERS)[number])
     : undefined;
-  const rows = await getTaskCenter(activeFilter);
+  const rows = await getTaskCenter(workspace.id, activeFilter);
 
   return (
     <ControlPlaneShell>
@@ -20,7 +22,7 @@ export default async function TasksPage(props: {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Task Center</h1>
           <p className="text-sm text-muted-foreground">
-            Focus on running, blocked, approval-waiting, and failed work without reading full transcripts.
+            Focus on running, blocked, approval-waiting, unscheduled, and overdue work without reading full transcripts.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

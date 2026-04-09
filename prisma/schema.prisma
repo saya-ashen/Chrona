@@ -40,6 +40,28 @@ enum OwnerType {
   agent
 }
 
+enum ScheduleStatus {
+  Unscheduled
+  Scheduled
+  InProgress
+  AtRisk
+  Interrupted
+  Overdue
+  Completed
+}
+
+enum ScheduleSource {
+  human
+  ai
+  system
+}
+
+enum ScheduleProposalStatus {
+  Pending
+  Accepted
+  Rejected
+}
+
 enum RunStatus {
   Pending
   Running
@@ -109,6 +131,7 @@ model Workspace {
   events          Event[]
   taskDependencies TaskDependency[]
   taskProjections TaskProjection[]
+  scheduleProposals ScheduleProposal[]
 }
 
 model Task {
@@ -125,6 +148,8 @@ model Task {
   dueAt            DateTime?
   scheduledStartAt DateTime?
   scheduledEndAt   DateTime?
+  scheduleStatus   ScheduleStatus  @default(Unscheduled)
+  scheduleSource   ScheduleSource?
   budgetLimit      Int?
   blockReason      Json?
   latestRunId      String?
@@ -140,9 +165,11 @@ model Task {
   projection       TaskProjection?
   dependencies     TaskDependency[] @relation("TaskDependencies")
   dependentTasks   TaskDependency[] @relation("TaskDependents")
+  scheduleProposals ScheduleProposal[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
+  @@index([workspaceId, scheduleStatus])
 }
 
 model TaskDependency {
@@ -325,6 +352,9 @@ model TaskProjection {
   dueAt                DateTime?
   scheduledStartAt     DateTime?
   scheduledEndAt       DateTime?
+  scheduleStatus       String?
+  scheduleSource       String?
+  scheduleProposalCount Int      @default(0)
   latestArtifactTitle  String?
   lastActivityAt       DateTime?
   updatedAt            DateTime  @updatedAt
@@ -333,6 +363,28 @@ model TaskProjection {
 
   @@index([workspaceId, persistedStatus])
   @@index([workspaceId, displayState])
+}
+
+model ScheduleProposal {
+  id               String                 @id @default(cuid())
+  workspaceId      String
+  taskId           String
+  source           ScheduleSource
+  status           ScheduleProposalStatus @default(Pending)
+  proposedBy       String
+  summary          String
+  dueAt            DateTime?
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
+  assigneeAgentId  String?
+  createdAt        DateTime               @default(now())
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  workspace        Workspace              @relation(fields: [workspaceId], references: [id])
+  task             Task                   @relation(fields: [taskId], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([taskId, status])
 }
 
 model RuntimeCursor {

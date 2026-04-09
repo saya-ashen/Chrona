@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     exclude: [
       ...configDefaults.exclude,
+      ".worktrees/**",
       "e2e/**",
       "**/*.bun.test.ts",
       "src/modules/db/**/*.test.ts",

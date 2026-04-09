@@ -17,6 +17,8 @@ describe("TaskPage", () => {
             dueAt: null,
             scheduledStartAt: null,
             scheduledEndAt: null,
+            scheduleStatus: "Unscheduled",
+            scheduleSource: null,
             blockReason: { actionRequired: "Approve / Reject / Edit and Approve" },
             dependencies: [],
           },
@@ -26,6 +28,18 @@ describe("TaskPage", () => {
             startedAt: new Date().toISOString(),
             syncStatus: "healthy",
           },
+          scheduleProposals: [
+            {
+              id: "proposal_1",
+              source: "ai",
+              proposedBy: "planner-agent",
+              summary: "Schedule this tomorrow morning",
+              status: "Pending",
+              dueAt: null,
+              scheduledStartAt: null,
+              scheduledEndAt: null,
+            },
+          ],
           approvals: [],
           artifacts: [],
         }}
@@ -37,6 +51,12 @@ describe("TaskPage", () => {
       "href",
       "/workspaces/ws_1/work/task_1",
     );
+    expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
+      "href",
+      "/schedule",
+    );
     expect(screen.getByText("Block Reason")).toBeInTheDocument();
+    expect(screen.getByText("Pending Schedule Proposals")).toBeInTheDocument();
+    expect(screen.getByText("Schedule this tomorrow morning")).toBeInTheDocument();
   });
 });

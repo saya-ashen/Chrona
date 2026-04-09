@@ -1,4 +1,5 @@
 import { ControlPlaneShell } from "@/components/control-plane-shell";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const settings = {
@@ -33,6 +34,22 @@ export default function SettingsPage() {
             <dd>{settings.pollIntervalMs}ms</dd>
           </div>
         </dl>
+        <div className="rounded-xl border bg-muted/30 p-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-medium text-foreground">Advanced</h2>
+            <p className="text-sm text-muted-foreground">
+              Workspace management and deeper operational controls live outside the daily task flow.
+            </p>
+          </div>
+          <div className="mt-3">
+            <Link
+              href="/settings/advanced"
+              className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              Open Advanced Settings
+            </Link>
+          </div>
+        </div>
       </div>
     </ControlPlaneShell>
   );
