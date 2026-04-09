@@ -1,9 +1,8 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { SYNC_STALE_MS } from "@/modules/runtime/openclaw/freshness";
 import { deriveScheduleState } from "@/modules/tasks/derive-schedule-state";
 import { deriveTaskState } from "@/modules/tasks/derive-task-state";
-
-const SYNC_STALE_MS = 5 * 60 * 1000;
 
 export async function rebuildTaskProjection(taskId: string) {
   const task = await db.task.findUniqueOrThrow({

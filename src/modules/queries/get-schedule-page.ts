@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 
 export async function getSchedulePage(workspaceId: string) {
+  await syncStaleWorkspaceRunsForRead(workspaceId);
+
   const [projections, proposals] = await Promise.all([
     db.taskProjection.findMany({
       where: { workspaceId },

@@ -90,10 +90,23 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
     },
     async resumeRun(input) {
       if (input.approvalId) {
-        return client.resolveApproval({
+        const approvalResolution = await client.resolveApproval({
           approvalId: input.approvalId,
           decision: input.decision ?? "approve",
         });
+
+        if (!approvalResolution.accepted) {
+          return approvalResolution;
+        }
+
+        if (input.inputText) {
+          return client.sendInput({
+            runtimeSessionKey: input.runtimeSessionKey,
+            message: input.inputText,
+          });
+        }
+
+        return approvalResolution;
       }
 
       if (input.inputText) {

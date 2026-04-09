@@ -1,4 +1,7 @@
 type ConversationPanelProps = {
+  title?: string;
+  description?: string;
+  embedded?: boolean;
   entries: Array<{
     id: string;
     role: string;
@@ -11,10 +14,13 @@ function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
 }
 
-export function ConversationPanel({ entries }: ConversationPanelProps) {
-  return (
-    <section className="rounded-2xl border bg-card p-4 shadow-sm">
-      <h2 className="text-sm font-semibold">Conversation</h2>
+export function ConversationPanel({ entries, title = "Conversation", description, embedded = false }: ConversationPanelProps) {
+  const content = (
+    <>
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+      </div>
       <div className="mt-3 space-y-3 text-sm text-muted-foreground">
         {entries.length === 0 ? (
           <p>No conversation mapped yet.</p>
@@ -30,6 +36,16 @@ export function ConversationPanel({ entries }: ConversationPanelProps) {
           ))
         )}
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-3">{content}</div>;
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      {content}
     </section>
   );
 }

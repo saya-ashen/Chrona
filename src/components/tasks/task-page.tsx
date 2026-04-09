@@ -65,6 +65,7 @@ type TaskPageProps = {
       uri?: string;
     }>;
   };
+  startRunAction?: (formData: FormData) => Promise<void>;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -75,7 +76,7 @@ function parseDate(value: string | null) {
   return value ? new Date(value) : null;
 }
 
-export function TaskPage({ data }: TaskPageProps) {
+export function TaskPage({ data, startRunAction }: TaskPageProps) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="space-y-6 rounded-2xl border bg-card p-6 shadow-sm">
@@ -233,13 +234,25 @@ export function TaskPage({ data }: TaskPageProps) {
 
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Actions</h2>
-          <div className="mt-3 flex flex-col gap-2">
-            <button
-              type="button"
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Start Run
-            </button>
+          <div className="mt-3 flex flex-col gap-3">
+            <form action={startRunAction} className="space-y-2 rounded-lg border bg-background p-3">
+              <label className="grid gap-1 text-sm text-foreground">
+                <span className="font-medium">Run prompt</span>
+                <textarea
+                  name="prompt"
+                  required
+                  rows={4}
+                  defaultValue={data.task.description ?? `Continue working on: ${data.task.title}`}
+                  className="rounded-md border bg-card px-3 py-2 text-sm"
+                />
+              </label>
+              <button
+                type="submit"
+                className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Start Run
+              </button>
+            </form>
             <Link
               href="/schedule"
               className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"

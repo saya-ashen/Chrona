@@ -6,6 +6,7 @@ describe("TaskPage", () => {
   it("shows planning controls plus entry points into the work surface", () => {
     render(
       <TaskPage
+        startRunAction={async () => {}}
         data={{
           task: {
             id: "task_1",
@@ -47,6 +48,7 @@ describe("TaskPage", () => {
     );
 
     expect(screen.getByRole("button", { name: "Start Run" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Plan the read model");
     expect(screen.getByRole("link", { name: "Open Work Page" })).toHaveAttribute(
       "href",
       "/workspaces/ws_1/work/task_1",
