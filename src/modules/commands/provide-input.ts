@@ -1,0 +1,22 @@
+import { RunStatus } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
+import { resumeRun } from "@/modules/commands/resume-run";
+import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+
+export async function provideInput(input: {
+  runId: string;
+  inputText: string;
+  adapter?: OpenClawAdapter;
+}) {
+  const run = await db.run.findUniqueOrThrow({ where: { id: input.runId } });
+
+  if (run.status !== RunStatus.WaitingForInput) {
+    throw new Error("Input can only be provided when the run is waiting for input.");
+  }
+
+  return resumeRun({
+    runId: run.id,
+    inputText: input.inputText,
+    adapter: input.adapter,
+  });
+}

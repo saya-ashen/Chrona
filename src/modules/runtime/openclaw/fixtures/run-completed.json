@@ -1,0 +1,32 @@
+{
+  "snapshot": {
+    "runtimeRunRef": "runtime_completed_1",
+    "runtimeSessionKey": "agent:main:dashboard:session_completed_1",
+    "status": "Completed",
+    "rawStatus": "completed"
+  },
+  "history": {
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          { "type": "text", "text": "Summarize the current project status." }
+        ],
+        "timestamp": 1737265000000,
+        "__openclaw": { "id": "msg_completed_1", "seq": 1 }
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "The project bootstrap, runtime probe, schema, and projections are in place."
+          }
+        ],
+        "timestamp": 1737265001000,
+        "__openclaw": { "id": "msg_completed_2", "seq": 2 }
+      }
+    ]
+  },
+  "approvals": []
+}

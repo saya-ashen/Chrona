@@ -1,0 +1,74 @@
+import { Prisma } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
+import { deriveTaskState } from "@/modules/tasks/derive-task-state";
+
+const SYNC_STALE_MS = 5 * 60 * 1000;
+
+export async function rebuildTaskProjection(taskId: string) {
+  const task = await db.task.findUniqueOrThrow({
+    where: { id: taskId },
+    include: {
+      runs: { orderBy: { updatedAt: "desc" } },
+      approvals: { where: { status: "Pending" }, orderBy: { requestedAt: "desc" } },
+      artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+
+  const syncStale = task.runs.some(
+    (run) => run.lastSyncedAt && Date.now() - run.lastSyncedAt.getTime() > SYNC_STALE_MS,
+  );
+
+  const derived = deriveTaskState({
+    task: { status: task.status, latestRunId: task.latestRunId },
+    runs: task.runs,
+    approvals: task.approvals,
+    sync: { stale: syncStale },
+  });
+
+  await db.task.update({
+    where: { id: task.id },
+    data: {
+      status: derived.persistedStatus as never,
+      blockReason: derived.blockReason
+        ? (derived.blockReason as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+    },
+  });
+
+  return db.taskProjection.upsert({
+    where: { taskId: task.id },
+    update: {
+      workspaceId: task.workspaceId,
+      persistedStatus: derived.persistedStatus,
+      displayState: derived.displayState,
+      blockType: derived.blockReason?.blockType ?? null,
+      blockScope: derived.blockReason?.scope ?? null,
+      blockSince: derived.blockSince,
+      actionRequired: derived.blockReason?.actionRequired ?? null,
+      latestRunStatus: task.runs[0]?.status ?? null,
+      approvalPendingCount: task.approvals.length,
+      dueAt: task.dueAt,
+      scheduledStartAt: task.scheduledStartAt,
+      scheduledEndAt: task.scheduledEndAt,
+      latestArtifactTitle: task.artifacts[0]?.title ?? null,
+      lastActivityAt: task.runs[0]?.updatedAt ?? task.updatedAt,
+    },
+    create: {
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      persistedStatus: derived.persistedStatus,
+      displayState: derived.displayState,
+      blockType: derived.blockReason?.blockType ?? null,
+      blockScope: derived.blockReason?.scope ?? null,
+      blockSince: derived.blockSince,
+      actionRequired: derived.blockReason?.actionRequired ?? null,
+      latestRunStatus: task.runs[0]?.status ?? null,
+      approvalPendingCount: task.approvals.length,
+      dueAt: task.dueAt,
+      scheduledStartAt: task.scheduledStartAt,
+      scheduledEndAt: task.scheduledEndAt,
+      latestArtifactTitle: task.artifacts[0]?.title ?? null,
+      lastActivityAt: task.runs[0]?.updatedAt ?? task.updatedAt,
+    },
+  });
+}
