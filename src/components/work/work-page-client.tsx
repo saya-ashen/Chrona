@@ -8,10 +8,22 @@ import {
   provideInput,
   rejectApproval,
   retryRun,
+  startRun,
 } from "@/app/actions/task-actions";
+import { buttonVariants } from "@/components/ui/button";
+import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  SurfaceCard,
+  SurfaceCardDescription,
+  SurfaceCardHeader,
+  SurfaceCardTitle,
+} from "@/components/ui/surface-card";
+import { TaskContextLinks } from "@/components/ui/task-context-links";
 import { ConversationPanel } from "@/components/work/conversation-panel";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { RunSidePanel } from "@/components/work/run-side-panel";
+import { cn } from "@/lib/utils";
 
 type WorkPageClientProps = {
   initialData: {
@@ -135,6 +147,10 @@ function getComposerDefaultValue(taskTitle: string, currentRun: WorkPageClientPr
   return currentRun?.pendingInputPrompt ?? `Continue work on ${taskTitle}`;
 }
 
+function getStartRunDefaultValue(taskTitle: string) {
+  return `Continue working on: ${taskTitle}`;
+}
+
 function getEvidenceToneClass(tone: "neutral" | "warning" | "critical") {
   if (tone === "critical") {
     return "border-red-200 bg-red-50 text-red-700";
@@ -220,43 +236,51 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     await submitAgentMessage(inputText);
   }
 
+  async function handleStartRunSubmit(formData: FormData) {
+    const prompt = String(formData.get("prompt") ?? "").trim();
+
+    if (!prompt) {
+      throw new Error("prompt is required");
+    }
+
+    await runAction(async () => {
+      await startRun({ taskId: data.taskShell.id, prompt });
+    });
+  }
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
-        <section className="sticky top-4 z-10 rounded-2xl border bg-card/95 p-4 shadow-sm backdrop-blur">
+        <SurfaceCard className="sticky top-4 z-10" variant="highlight">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <h1 className="text-lg font-semibold">{data.taskShell.title}</h1>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-1.5">
+              <h1 className="text-2xl font-semibold tracking-tight">{data.taskShell.title}</h1>
+              <p className="max-w-2xl text-sm text-muted-foreground">
                 Keep this run moving from one focused workbench instead of hopping between logs and controls.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/workspaces/${data.taskShell.workspaceId}/tasks/${data.taskShell.id}`}
-                className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-              >
-                Open Task
-              </Link>
-              <Link
-                href="/schedule"
-                className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-              >
+              <TaskContextLinks
+                workspaceId={data.taskShell.workspaceId}
+                taskId={data.taskShell.id}
+                latestRunStatus={currentRun?.status ?? null}
+              />
+              <Link href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Open Schedule
               </Link>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border px-2 py-1">{data.taskShell.status}</span>
-            <span className="rounded-full border px-2 py-1">{data.taskShell.priority}</span>
-            <span className="rounded-full border px-2 py-1">Run {currentRun?.status ?? "No run"}</span>
-            <span className="rounded-full border px-2 py-1">{data.taskShell.scheduleStatus}</span>
-            <span className="rounded-full border px-2 py-1">Due {formatDate(data.taskShell.dueAt)}</span>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <StatusBadge tone="info">{data.taskShell.status}</StatusBadge>
+            <StatusBadge>{data.taskShell.priority}</StatusBadge>
+            <StatusBadge>Run {currentRun?.status ?? "No run"}</StatusBadge>
+            <StatusBadge>{data.taskShell.scheduleStatus}</StatusBadge>
+            <StatusBadge>Due {formatDate(data.taskShell.dueAt)}</StatusBadge>
           </div>
 
-          <div className="mt-4 grid gap-2 rounded-xl border bg-background p-3 text-sm text-muted-foreground sm:grid-cols-2">
+          <div className="mt-4 grid gap-2 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground sm:grid-cols-2">
             <div>
               <p className="font-medium text-foreground">Blocked by</p>
               <p>{data.taskShell.blockReason?.actionRequired ?? "No blocking action recorded."}</p>
@@ -268,21 +292,21 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               </p>
             </div>
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold">Next Action</h2>
-            <p className="text-sm text-muted-foreground">
+        <SurfaceCard>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>Next Action</SurfaceCardTitle>
+            <SurfaceCardDescription>
               {data.currentIntervention?.title ?? getNextActionLabel(currentRun?.status)} — make the next intervention obvious and keep everything else secondary.
-            </p>
-          </div>
+            </SurfaceCardDescription>
+          </SurfaceCardHeader>
 
           <div className="mt-3 space-y-3">
             {errorMessage ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
 
             {data.currentIntervention ? (
-              <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Why now</p>
                 <p className="mt-2">{data.currentIntervention.whyNow}</p>
 
@@ -328,21 +352,20 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             {canProvideInput ? (
               <form action={handleComposerSubmit} className="space-y-3">
                 <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <label className="grid gap-1 text-sm text-foreground">
-                  <span className="font-medium">Agent message</span>
+                <Field label="Agent message">
                   <textarea
                     name="inputText"
                     rows={5}
                     required
                     defaultValue={data.currentIntervention?.defaultMessage ?? getComposerDefaultValue(data.taskShell.title, currentRun)}
-                    className="rounded-xl border bg-background px-3 py-3 text-sm"
+                    className={textareaClassName}
                   />
-                </label>
+                </Field>
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                    className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}
                   >
                     {currentRun?.status === "WaitingForInput" ? "Send to Agent" : "Resume with Message"}
                   </button>
@@ -355,7 +378,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
                 {(data.currentIntervention?.approvals ?? []).map((approval) => (
-                  <div key={approval.id} className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">
+                  <div key={approval.id} className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
                     <div className="space-y-1">
                       <p className="font-medium text-foreground">{approval.title}</p>
                       <p>{approval.summary ?? "Review the approval request before resuming the run."}</p>
@@ -368,7 +391,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                           });
                         }}
                       >
-                        <button type="submit" disabled={isPending} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">
+                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
                           Approve
                         </button>
                       </form>
@@ -379,7 +402,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                           });
                         }}
                       >
-                        <button type="submit" disabled={isPending} className="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
+                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "destructive", className: "disabled:opacity-60" })}>
                           Reject
                         </button>
                       </form>
@@ -396,9 +419,9 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                           type="text"
                           name="editedContent"
                           placeholder="Edited instruction"
-                          className="min-w-48 rounded-md border bg-card px-3 py-2 text-sm"
+                          className={cn(inputClassName, "min-w-48")}
                         />
-                        <button type="submit" disabled={isPending} className="rounded-md border px-3 py-2 text-sm text-foreground disabled:opacity-60">
+                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
                           Edit and Approve
                         </button>
                       </form>
@@ -421,50 +444,70 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 className="space-y-3"
               >
                 <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <label className="grid gap-1 text-sm text-foreground">
-                  <span className="font-medium">Retry prompt</span>
+                <Field label="Retry prompt">
                   <textarea
                     name="prompt"
                     rows={5}
                     required
                     defaultValue={`Retry task: ${data.taskShell.title}`}
-                    className="rounded-xl border bg-background px-3 py-3 text-sm"
+                    className={textareaClassName}
                   />
-                </label>
-                <button type="submit" disabled={isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">
+                </Field>
+                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
                   Retry Run
                 </button>
               </form>
             ) : currentRun?.status === "Running" ? (
-              <div className="rounded-xl border bg-background px-3 py-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
                 {data.currentIntervention?.description}
               </div>
             ) : currentRun?.status === "Completed" ? (
-              <div className="rounded-xl border bg-background px-3 py-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
                 {data.currentIntervention?.description}
               </div>
+            ) : !currentRun ? (
+              <form action={handleStartRunSubmit} className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Start the first run here so the workbench becomes the live execution surface instead of a dead end.
+                </p>
+                <Field label="Run prompt">
+                  <textarea
+                    name="prompt"
+                    rows={5}
+                    required
+                    defaultValue={getStartRunDefaultValue(data.taskShell.title)}
+                    className={textareaClassName}
+                  />
+                </Field>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
+                    Start Run Here
+                  </button>
+                  <p className="text-xs text-muted-foreground">No active run yet</p>
+                </div>
+              </form>
             ) : (
-              <div className="rounded-xl border bg-background px-3 py-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
                 {currentRun
                   ? data.currentIntervention?.description ?? "The run does not currently require operator input. Review the output and inspector state below."
                   : "Start a run from the task page before sending agent instructions here."}
               </div>
             )}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold">Shared Output</h2>
-            <p className="text-sm text-muted-foreground">The latest useful result from this run should be visible without digging through logs.</p>
-          </div>
+        <SurfaceCard>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>Shared Output</SurfaceCardTitle>
+            <SurfaceCardDescription>The latest useful result from this run should be visible without digging through logs.</SurfaceCardDescription>
+          </SurfaceCardHeader>
 
           {!data.latestOutput.empty ? (
-            <div className="mt-3 rounded-xl border bg-background p-3 text-sm text-muted-foreground">
+            <div className="mt-3 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border px-2 py-1">{data.latestOutput.sourceLabel}</span>
+                <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
                 {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
-                  <span className="rounded-full border border-primary/30 bg-primary/5 px-2 py-1 text-foreground">Used by next action</span>
+                  <StatusBadge tone="info">Used by next action</StatusBadge>
                 ) : null}
                 {data.latestOutput.timestamp ? <span>Updated {formatDateTime(data.latestOutput.timestamp)}</span> : null}
               </div>
@@ -477,34 +520,36 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               ) : null}
             </div>
           ) : (
-            <div className="mt-3 rounded-xl border bg-background px-3 py-3 text-sm text-muted-foreground">
+            <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
               {data.latestOutput.body}
             </div>
           )}
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold">Execution Workstream</h2>
-            <p className="text-sm text-muted-foreground">Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.</p>
-          </div>
+        <SurfaceCard>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>Execution Workstream</SurfaceCardTitle>
+            <SurfaceCardDescription>Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.</SurfaceCardDescription>
+          </SurfaceCardHeader>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setActiveTab("workstream")}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                activeTab === "workstream" ? "border-primary bg-primary/5 text-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
+              className={cn(
+                buttonVariants({ variant: activeTab === "workstream" ? "secondary" : "outline", size: "sm" }),
+                "rounded-full",
+              )}
             >
               Workstream
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("conversation")}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                activeTab === "conversation" ? "border-primary bg-primary/5 text-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
+              className={cn(
+                buttonVariants({ variant: activeTab === "conversation" ? "secondary" : "outline", size: "sm" }),
+                "rounded-full",
+              )}
             >
               Conversation
             </button>
@@ -522,7 +567,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               />
             )}
           </div>
-        </section>
+        </SurfaceCard>
       </div>
 
       <RunSidePanel

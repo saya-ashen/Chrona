@@ -13,6 +13,8 @@ describe("MemoryConsole", () => {
             sourceType: "user_input",
             scope: "workspace",
             status: "Active",
+            workspaceId: "ws_1",
+            taskId: "task_1",
             taskTitle: "Write task projection",
             runLabel: "run_projection",
           },
@@ -25,5 +27,13 @@ describe("MemoryConsole", () => {
     expect(screen.getByText(/Active/i)).toBeInTheDocument();
     expect(screen.getByText(/Write task projection/i)).toBeInTheDocument();
     expect(screen.getByText(/run_projection/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/tasks/task_1",
+    );
+    expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/work/task_1",
+    );
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 describe("ControlPlaneShell", () => {
-  it("renders the single-workspace control-plane navigation and excludes Workspaces", () => {
+  it("renders the control-plane navigation including Workspaces", () => {
     render(
       <ControlPlaneShell>
         <div>Workspace body</div>
@@ -11,7 +11,7 @@ describe("ControlPlaneShell", () => {
     );
 
     expect(screen.getByRole("link", { name: "Agent Dashboard" })).toHaveAttribute("href", "/schedule");
-    expect(screen.queryByRole("link", { name: "Workspaces" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workspaces" })).toHaveAttribute("href", "/workspaces");
     expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/schedule");
     expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute(
       "href",

@@ -9,10 +9,14 @@ describe("InboxList", () => {
         items={[
           {
             id: "approval_1",
+            kind: "approval",
             actionType: "approval",
             riskLevel: "high",
             sourceTaskTitle: "Review adapter mapping",
+            sourceTaskId: "task_1",
+            workspaceId: "ws_1",
             currentRunLabel: "run_projection",
+            detail: "command approval",
             summary: "Approve the file patch",
             consequence: "Blocks deployment until approved",
           },
@@ -25,5 +29,13 @@ describe("InboxList", () => {
     expect(screen.getByText(/Task: Review adapter mapping/i)).toBeInTheDocument();
     expect(screen.getByText("Approve the file patch")).toBeInTheDocument();
     expect(screen.getByText("Blocks deployment until approved")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/tasks/task_1",
+    );
+    expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/work/task_1",
+    );
   });
 });

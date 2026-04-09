@@ -5,6 +5,10 @@ export type ControlPlaneNavItem = {
 
 export const NAV_ITEMS: ControlPlaneNavItem[] = [
   {
+    href: "/workspaces",
+    label: "Workspaces",
+  },
+  {
     href: "/schedule",
     label: "Schedule",
   },

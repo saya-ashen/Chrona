@@ -35,4 +35,30 @@ describe("TaskCenterTable", () => {
       screen.getByText("Open task for planning details, or jump straight into work."),
     ).toBeInTheDocument();
   });
+
+  it("turns the primary work action into a start cue when no run exists yet", () => {
+    render(
+      <TaskCenterTable
+        rows={[
+          {
+            taskId: "task_2",
+            title: "Draft rollout note",
+            persistedStatus: "Ready",
+            displayState: "Unscheduled",
+            latestRunStatus: null,
+            actionRequired: "Plan execution",
+            scheduleStatus: "Unscheduled",
+            dueAt: null,
+            updatedAt: new Date("2026-04-20T10:00:00.000Z"),
+            workspaceId: "ws_1",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Start Work" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws_1/work/task_2",
+    );
+  });
 });
