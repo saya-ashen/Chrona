@@ -7,11 +7,23 @@ describe("SchedulePage", () => {
     render(
       <SchedulePage
         data={{
+          summary: {
+            scheduledCount: 1,
+            unscheduledCount: 1,
+            proposalCount: 1,
+            riskCount: 1,
+          },
           scheduled: [
             {
               taskId: "task_scheduled",
               workspaceId: "ws_1",
               title: "Ship projection cleanup",
+              priority: "High",
+              ownerType: "human",
+              assigneeAgentId: null,
+              persistedStatus: "Ready",
+              actionRequired: null,
+              approvalPendingCount: 0,
               scheduleStatus: "Scheduled",
               scheduleSource: "human",
               dueAt: new Date("2026-04-16T18:00:00.000Z"),
@@ -25,8 +37,14 @@ describe("SchedulePage", () => {
               taskId: "task_unscheduled",
               workspaceId: "ws_1",
               title: "Queue follow-up docs",
+              priority: "Medium",
+              ownerType: "human",
+              assigneeAgentId: null,
               persistedStatus: "Ready",
               actionRequired: "Schedule task",
+              approvalPendingCount: 0,
+              dueAt: null,
+              latestRunStatus: null,
               scheduleProposalCount: 1,
             },
           ],
@@ -36,6 +54,9 @@ describe("SchedulePage", () => {
               taskId: "task_unscheduled",
               workspaceId: "ws_1",
               title: "Queue follow-up docs",
+              priority: "Medium",
+              ownerType: "human",
+              assigneeAgentId: null,
               source: "ai",
               proposedBy: "planner-agent",
               summary: "Plan this for tomorrow morning",
@@ -49,10 +70,16 @@ describe("SchedulePage", () => {
               taskId: "task_risk",
               workspaceId: "ws_1",
               title: "Recover overdue adapter run",
+              priority: "Urgent",
+              ownerType: "human",
+              assigneeAgentId: null,
               persistedStatus: "Blocked",
               scheduleStatus: "Overdue",
               actionRequired: "Reschedule task",
+              approvalPendingCount: 0,
+              latestRunStatus: null,
               dueAt: new Date("2026-04-15T18:00:00.000Z"),
+              scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
               scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
             },
           ],
@@ -61,12 +88,15 @@ describe("SchedulePage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Schedule" })).toBeInTheDocument();
-    expect(screen.getByText("Scheduled Blocks")).toBeInTheDocument();
-    expect(screen.getByText("Unscheduled Queue")).toBeInTheDocument();
-    expect(screen.getByText("AI Proposals")).toBeInTheDocument();
-    expect(screen.getByText("Conflicts / Overdue Risks")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Scheduled Timeline" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Unscheduled Queue" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI Proposals" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Planning Guide" })).toBeInTheDocument();
+    expect(screen.getByText("Committed blocks on the current plan.")).toBeInTheDocument();
     expect(screen.getByText("Ship projection cleanup")).toBeInTheDocument();
     expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(2);
     expect(screen.getByText("Recover overdue adapter run")).toBeInTheDocument();
+    expect(screen.getByText("Default workspace")).toBeInTheDocument();
   });
 });

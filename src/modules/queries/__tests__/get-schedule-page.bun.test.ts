@@ -172,6 +172,8 @@ describe("getSchedulePage", () => {
     expect(page.scheduled[0]).toMatchObject({
       taskId: scheduledTask.id,
       title: "Ship projection cleanup",
+      priority: "High",
+      persistedStatus: "Ready",
       scheduleStatus: "Scheduled",
     });
 
@@ -179,6 +181,7 @@ describe("getSchedulePage", () => {
     expect(page.unscheduled[0]).toMatchObject({
       taskId: unscheduledTask.id,
       title: "Queue follow-up docs",
+      priority: "Medium",
       actionRequired: "Schedule task",
     });
 
@@ -186,6 +189,7 @@ describe("getSchedulePage", () => {
     expect(page.risks[0]).toMatchObject({
       taskId: riskTask.id,
       title: "Recover overdue adapter run",
+      priority: "Urgent",
       scheduleStatus: "Overdue",
       actionRequired: "Reschedule task",
     });
@@ -194,8 +198,16 @@ describe("getSchedulePage", () => {
     expect(page.proposals[0]).toMatchObject({
       taskId: unscheduledTask.id,
       title: "Queue follow-up docs",
+      priority: "Medium",
       source: "ai",
       summary: "Plan this for tomorrow morning",
+    });
+
+    expect(page.summary).toEqual({
+      scheduledCount: 1,
+      unscheduledCount: 1,
+      proposalCount: 1,
+      riskCount: 1,
     });
 
     expect(page.scheduled.some((item) => item.taskId === hiddenTask.id)).toBe(false);
