@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { ConversationPanel } from "@/components/work/conversation-panel";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
@@ -14,6 +15,9 @@ type WorkPageClientProps = {
       status: string;
       priority: string;
       dueAt: string | null;
+      scheduledStartAt: string | null;
+      scheduledEndAt: string | null;
+      scheduleStatus: string;
       blockReason: {
         actionRequired?: string;
         blockType?: string;
@@ -100,10 +104,26 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             <dd>{formatDate(data.taskShell.dueAt)}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
+            <dt>Schedule</dt>
+            <dd>{data.taskShell.scheduleStatus}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt>Window</dt>
+            <dd>
+              {formatDate(data.taskShell.scheduledStartAt)} to {formatDate(data.taskShell.scheduledEndAt)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
             <dt>Next action</dt>
             <dd>{data.taskShell.blockReason?.actionRequired ?? "Observe timeline"}</dd>
           </div>
         </dl>
+        <Link
+          href="/schedule"
+          className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+        >
+          Open Schedule
+        </Link>
       </aside>
 
       <div className="space-y-4">

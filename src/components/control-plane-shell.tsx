@@ -11,7 +11,7 @@ export function ControlPlaneShell({ children }: ControlPlaneShellProps) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-background/95">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-6 px-6 py-4">
-          <Link href="/workspaces" className="text-sm font-semibold tracking-tight">
+          <Link href="/schedule" className="text-sm font-semibold tracking-tight">
             Agent Dashboard
           </Link>
           <nav aria-label="Primary" className="flex items-center gap-4 text-sm">

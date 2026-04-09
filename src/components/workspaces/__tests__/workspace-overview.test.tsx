@@ -10,6 +10,7 @@ describe("WorkspaceOverview", () => {
           running: [],
           waitingForApproval: [],
           blockedOrFailed: [],
+          scheduleRisks: [],
           upcomingDeadlines: [],
           recentlyUpdated: [],
         }}
@@ -19,6 +20,7 @@ describe("WorkspaceOverview", () => {
     expect(screen.getByText("Running Tasks")).toBeInTheDocument();
     expect(screen.getByText("Waiting for Approval")).toBeInTheDocument();
     expect(screen.getByText("Blocked / Failed Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Schedule Risks")).toBeInTheDocument();
     expect(screen.getByText("Upcoming Deadlines")).toBeInTheDocument();
     expect(screen.getByText("Recently Updated Tasks")).toBeInTheDocument();
   });

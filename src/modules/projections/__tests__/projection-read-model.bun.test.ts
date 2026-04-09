@@ -12,6 +12,7 @@ import { getWorkProjection } from "@/modules/projections/get-work-projection";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 
 async function resetDb() {
+  await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();

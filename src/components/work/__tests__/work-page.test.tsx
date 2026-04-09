@@ -14,6 +14,9 @@ describe("WorkPageClient", () => {
             status: "Blocked",
             priority: "High",
             dueAt: null,
+            scheduledStartAt: "2026-04-16T09:00:00.000Z",
+            scheduledEndAt: "2026-04-16T11:00:00.000Z",
+            scheduleStatus: "AtRisk",
             blockReason: { actionRequired: "Approve / Reject / Edit and Approve" },
           },
           currentRun: { id: "run_1", status: "WaitingForApproval" },
@@ -29,5 +32,10 @@ describe("WorkPageClient", () => {
     expect(screen.getByRole("heading", { name: "Execution Timeline" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conversation" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pending Approvals" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
+      "href",
+      "/schedule",
+    );
+    expect(screen.getByText("AtRisk")).toBeInTheDocument();
   });
 });

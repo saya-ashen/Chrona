@@ -21,6 +21,17 @@ export async function getWorkspaceOverview(workspaceId: string) {
           item.displayState === "Attention Needed",
       )
       .map((item) => ({ taskId: item.taskId, persistedStatus: item.persistedStatus })),
+    scheduleRisks: projections
+      .filter(
+        (item) =>
+          Boolean(item.scheduleStatus) &&
+          ["AtRisk", "Overdue", "Interrupted"].includes(item.scheduleStatus ?? ""),
+      )
+      .map((item) => ({
+        taskId: item.taskId,
+        scheduleStatus: item.scheduleStatus,
+        actionRequired: item.actionRequired,
+      })),
     upcomingDeadlines: projections
       .filter((item) => Boolean(item.dueAt))
       .sort((left, right) => (left.dueAt?.getTime() ?? Infinity) - (right.dueAt?.getTime() ?? Infinity))

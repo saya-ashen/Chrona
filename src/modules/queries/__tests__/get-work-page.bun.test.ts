@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { getWorkPage } from "@/modules/queries/get-work-page";
 
 async function resetDb() {
+  await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();

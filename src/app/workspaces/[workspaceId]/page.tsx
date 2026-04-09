@@ -14,7 +14,7 @@ export default async function WorkspacePage(props: {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Workspace Overview</h1>
           <p className="text-sm text-muted-foreground">
-            Triage the runs that need attention before diving into execution detail.
+            Triage runs, approvals, and schedule risks before diving into execution detail.
           </p>
         </div>
         <WorkspaceOverview data={data} />

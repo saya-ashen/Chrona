@@ -48,6 +48,8 @@ export type TaskMinAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: $Enums.ScheduleStatus | null
+  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   latestRunId: string | null
   createdAt: Date | null
@@ -69,6 +71,8 @@ export type TaskMaxAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: $Enums.ScheduleStatus | null
+  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   latestRunId: string | null
   createdAt: Date | null
@@ -90,6 +94,8 @@ export type TaskCountAggregateOutputType = {
   dueAt: number
   scheduledStartAt: number
   scheduledEndAt: number
+  scheduleStatus: number
+  scheduleSource: number
   budgetLimit: number
   blockReason: number
   latestRunId: number
@@ -122,6 +128,8 @@ export type TaskMinAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
   budgetLimit?: true
   latestRunId?: true
   createdAt?: true
@@ -143,6 +151,8 @@ export type TaskMaxAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
   budgetLimit?: true
   latestRunId?: true
   createdAt?: true
@@ -164,6 +174,8 @@ export type TaskCountAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
+  scheduleStatus?: true
+  scheduleSource?: true
   budgetLimit?: true
   blockReason?: true
   latestRunId?: true
@@ -273,6 +285,8 @@ export type TaskGroupByOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
+  scheduleStatus: $Enums.ScheduleStatus
+  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   blockReason: runtime.JsonValue | null
   latestRunId: string | null
@@ -318,6 +332,8 @@ export type TaskWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -333,6 +349,7 @@ export type TaskWhereInput = {
   projection?: Prisma.XOR<Prisma.TaskProjectionNullableScalarRelationFilter, Prisma.TaskProjectionWhereInput> | null
   dependencies?: Prisma.TaskDependencyListRelationFilter
   dependentTasks?: Prisma.TaskDependencyListRelationFilter
+  scheduleProposals?: Prisma.ScheduleProposalListRelationFilter
 }
 
 export type TaskOrderByWithRelationInput = {
@@ -349,6 +366,8 @@ export type TaskOrderByWithRelationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
   budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -364,6 +383,7 @@ export type TaskOrderByWithRelationInput = {
   projection?: Prisma.TaskProjectionOrderByWithRelationInput
   dependencies?: Prisma.TaskDependencyOrderByRelationAggregateInput
   dependentTasks?: Prisma.TaskDependencyOrderByRelationAggregateInput
+  scheduleProposals?: Prisma.ScheduleProposalOrderByRelationAggregateInput
 }
 
 export type TaskWhereUniqueInput = Prisma.AtLeast<{
@@ -383,6 +403,8 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -398,6 +420,7 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   projection?: Prisma.XOR<Prisma.TaskProjectionNullableScalarRelationFilter, Prisma.TaskProjectionWhereInput> | null
   dependencies?: Prisma.TaskDependencyListRelationFilter
   dependentTasks?: Prisma.TaskDependencyListRelationFilter
+  scheduleProposals?: Prisma.ScheduleProposalListRelationFilter
 }, "id">
 
 export type TaskOrderByWithAggregationInput = {
@@ -414,6 +437,8 @@ export type TaskOrderByWithAggregationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
   budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -444,6 +469,8 @@ export type TaskScalarWhereWithAggregatesInput = {
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusWithAggregatesFilter<"Task"> | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.EnumScheduleSourceNullableWithAggregatesFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableWithAggregatesFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
   latestRunId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
@@ -465,6 +492,8 @@ export type TaskCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -480,6 +509,7 @@ export type TaskCreateInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateInput = {
@@ -496,6 +526,8 @@ export type TaskUncheckedCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -510,6 +542,7 @@ export type TaskUncheckedCreateInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUpdateInput = {
@@ -525,6 +558,8 @@ export type TaskUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -540,6 +575,7 @@ export type TaskUpdateInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateInput = {
@@ -556,6 +592,8 @@ export type TaskUncheckedUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -570,6 +608,7 @@ export type TaskUncheckedUpdateInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyInput = {
@@ -586,6 +625,8 @@ export type TaskCreateManyInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -607,6 +648,8 @@ export type TaskUpdateManyMutationInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -629,6 +672,8 @@ export type TaskUncheckedUpdateManyInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -661,6 +706,8 @@ export type TaskCountOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   blockReason?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
@@ -687,6 +734,8 @@ export type TaskMaxOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -708,6 +757,8 @@ export type TaskMinOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
+  scheduleStatus?: Prisma.SortOrder
+  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -785,6 +836,14 @@ export type EnumOwnerTypeFieldUpdateOperationsInput = {
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
+}
+
+export type EnumScheduleStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ScheduleStatus
+}
+
+export type NullableEnumScheduleSourceFieldUpdateOperationsInput = {
+  set?: $Enums.ScheduleSource | null
 }
 
 export type NullableIntFieldUpdateOperationsInput = {
@@ -909,6 +968,20 @@ export type TaskUpdateOneRequiredWithoutProjectionNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutProjectionInput, Prisma.TaskUpdateWithoutProjectionInput>, Prisma.TaskUncheckedUpdateWithoutProjectionInput>
 }
 
+export type TaskCreateNestedOneWithoutScheduleProposalsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutScheduleProposalsInput, Prisma.TaskUncheckedCreateWithoutScheduleProposalsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutScheduleProposalsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutScheduleProposalsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutScheduleProposalsInput, Prisma.TaskUncheckedCreateWithoutScheduleProposalsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutScheduleProposalsInput
+  upsert?: Prisma.TaskUpsertWithoutScheduleProposalsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutScheduleProposalsInput, Prisma.TaskUpdateWithoutScheduleProposalsInput>, Prisma.TaskUncheckedUpdateWithoutScheduleProposalsInput>
+}
+
 export type TaskCreateWithoutWorkspaceInput = {
   id?: string
   title: string
@@ -922,6 +995,8 @@ export type TaskCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -936,6 +1011,7 @@ export type TaskCreateWithoutWorkspaceInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkspaceInput = {
@@ -951,6 +1027,8 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -965,6 +1043,7 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkspaceInput = {
@@ -1009,6 +1088,8 @@ export type TaskScalarWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -1030,6 +1111,8 @@ export type TaskCreateWithoutDependenciesInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1044,6 +1127,7 @@ export type TaskCreateWithoutDependenciesInput = {
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependenciesInput = {
@@ -1060,6 +1144,8 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1073,6 +1159,7 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependenciesInput = {
@@ -1093,6 +1180,8 @@ export type TaskCreateWithoutDependentTasksInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1107,6 +1196,7 @@ export type TaskCreateWithoutDependentTasksInput = {
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependentTasksInput = {
@@ -1123,6 +1213,8 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1136,6 +1228,7 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependentTasksInput = {
@@ -1167,6 +1260,8 @@ export type TaskUpdateWithoutDependenciesInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1181,6 +1276,7 @@ export type TaskUpdateWithoutDependenciesInput = {
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependenciesInput = {
@@ -1197,6 +1293,8 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1210,6 +1308,7 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUpsertWithoutDependentTasksInput = {
@@ -1236,6 +1335,8 @@ export type TaskUpdateWithoutDependentTasksInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1250,6 +1351,7 @@ export type TaskUpdateWithoutDependentTasksInput = {
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependentTasksInput = {
@@ -1266,6 +1368,8 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1279,6 +1383,7 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutRunsInput = {
@@ -1294,6 +1399,8 @@ export type TaskCreateWithoutRunsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1308,6 +1415,7 @@ export type TaskCreateWithoutRunsInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutRunsInput = {
@@ -1324,6 +1432,8 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1337,6 +1447,7 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutRunsInput = {
@@ -1368,6 +1479,8 @@ export type TaskUpdateWithoutRunsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1382,6 +1495,7 @@ export type TaskUpdateWithoutRunsInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutRunsInput = {
@@ -1398,6 +1512,8 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1411,6 +1527,7 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutApprovalsInput = {
@@ -1426,6 +1543,8 @@ export type TaskCreateWithoutApprovalsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1440,6 +1559,7 @@ export type TaskCreateWithoutApprovalsInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutApprovalsInput = {
@@ -1456,6 +1576,8 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1469,6 +1591,7 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutApprovalsInput = {
@@ -1500,6 +1623,8 @@ export type TaskUpdateWithoutApprovalsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1514,6 +1639,7 @@ export type TaskUpdateWithoutApprovalsInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutApprovalsInput = {
@@ -1530,6 +1656,8 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1543,6 +1671,7 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutArtifactsInput = {
@@ -1558,6 +1687,8 @@ export type TaskCreateWithoutArtifactsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1572,6 +1703,7 @@ export type TaskCreateWithoutArtifactsInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutArtifactsInput = {
@@ -1588,6 +1720,8 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1601,6 +1735,7 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutArtifactsInput = {
@@ -1632,6 +1767,8 @@ export type TaskUpdateWithoutArtifactsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1646,6 +1783,7 @@ export type TaskUpdateWithoutArtifactsInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutArtifactsInput = {
@@ -1662,6 +1800,8 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1675,6 +1815,7 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutMemoriesInput = {
@@ -1690,6 +1831,8 @@ export type TaskCreateWithoutMemoriesInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1704,6 +1847,7 @@ export type TaskCreateWithoutMemoriesInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutMemoriesInput = {
@@ -1720,6 +1864,8 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1733,6 +1879,7 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutMemoriesInput = {
@@ -1764,6 +1911,8 @@ export type TaskUpdateWithoutMemoriesInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1778,6 +1927,7 @@ export type TaskUpdateWithoutMemoriesInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutMemoriesInput = {
@@ -1794,6 +1944,8 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1807,6 +1959,7 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutEventsInput = {
@@ -1822,6 +1975,8 @@ export type TaskCreateWithoutEventsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1836,6 +1991,7 @@ export type TaskCreateWithoutEventsInput = {
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutEventsInput = {
@@ -1852,6 +2008,8 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1865,6 +2023,7 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutEventsInput = {
@@ -1896,6 +2055,8 @@ export type TaskUpdateWithoutEventsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1910,6 +2071,7 @@ export type TaskUpdateWithoutEventsInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutEventsInput = {
@@ -1926,6 +2088,8 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1939,6 +2103,7 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutProjectionInput = {
@@ -1954,6 +2119,8 @@ export type TaskCreateWithoutProjectionInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1968,6 +2135,7 @@ export type TaskCreateWithoutProjectionInput = {
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutProjectionInput = {
@@ -1984,6 +2152,8 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -1997,6 +2167,7 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutProjectionInput = {
@@ -2028,6 +2199,8 @@ export type TaskUpdateWithoutProjectionInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2042,6 +2215,7 @@ export type TaskUpdateWithoutProjectionInput = {
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutProjectionInput = {
@@ -2058,6 +2232,8 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2069,6 +2245,151 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutScheduleProposalsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  scheduledStartAt?: Date | string | null
+  scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+}
+
+export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  scheduledStartAt?: Date | string | null
+  scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+}
+
+export type TaskCreateOrConnectWithoutScheduleProposalsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutScheduleProposalsInput, Prisma.TaskUncheckedCreateWithoutScheduleProposalsInput>
+}
+
+export type TaskUpsertWithoutScheduleProposalsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutScheduleProposalsInput, Prisma.TaskUncheckedUpdateWithoutScheduleProposalsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutScheduleProposalsInput, Prisma.TaskUncheckedCreateWithoutScheduleProposalsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutScheduleProposalsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutScheduleProposalsInput, Prisma.TaskUncheckedUpdateWithoutScheduleProposalsInput>
+}
+
+export type TaskUpdateWithoutScheduleProposalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
 }
@@ -2086,6 +2407,8 @@ export type TaskCreateManyWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
+  scheduleStatus?: $Enums.ScheduleStatus
+  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: string | null
@@ -2107,6 +2430,8 @@ export type TaskUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2121,6 +2446,7 @@ export type TaskUpdateWithoutWorkspaceInput = {
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkspaceInput = {
@@ -2136,6 +2462,8 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2150,6 +2478,7 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
@@ -2165,6 +2494,8 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
+  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2186,6 +2517,7 @@ export type TaskCountOutputType = {
   events: number
   dependencies: number
   dependentTasks: number
+  scheduleProposals: number
 }
 
 export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2196,6 +2528,7 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   events?: boolean | TaskCountOutputTypeCountEventsArgs
   dependencies?: boolean | TaskCountOutputTypeCountDependenciesArgs
   dependentTasks?: boolean | TaskCountOutputTypeCountDependentTasksArgs
+  scheduleProposals?: boolean | TaskCountOutputTypeCountScheduleProposalsArgs
 }
 
 /**
@@ -2257,6 +2590,13 @@ export type TaskCountOutputTypeCountDependentTasksArgs<ExtArgs extends runtime.T
   where?: Prisma.TaskDependencyWhereInput
 }
 
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountScheduleProposalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ScheduleProposalWhereInput
+}
+
 
 export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2272,6 +2612,8 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   latestRunId?: boolean
@@ -2287,6 +2629,7 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   projection?: boolean | Prisma.Task$projectionArgs<ExtArgs>
   dependencies?: boolean | Prisma.Task$dependenciesArgs<ExtArgs>
   dependentTasks?: boolean | Prisma.Task$dependentTasksArgs<ExtArgs>
+  scheduleProposals?: boolean | Prisma.Task$scheduleProposalsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["task"]>
 
@@ -2304,6 +2647,8 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   latestRunId?: boolean
@@ -2327,6 +2672,8 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   latestRunId?: boolean
@@ -2350,6 +2697,8 @@ export type TaskSelectScalar = {
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
+  scheduleStatus?: boolean
+  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   latestRunId?: boolean
@@ -2358,7 +2707,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -2369,6 +2718,7 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   projection?: boolean | Prisma.Task$projectionArgs<ExtArgs>
   dependencies?: boolean | Prisma.Task$dependenciesArgs<ExtArgs>
   dependentTasks?: boolean | Prisma.Task$dependentTasksArgs<ExtArgs>
+  scheduleProposals?: boolean | Prisma.Task$scheduleProposalsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2390,6 +2740,7 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     projection: Prisma.$TaskProjectionPayload<ExtArgs> | null
     dependencies: Prisma.$TaskDependencyPayload<ExtArgs>[]
     dependentTasks: Prisma.$TaskDependencyPayload<ExtArgs>[]
+    scheduleProposals: Prisma.$ScheduleProposalPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2405,6 +2756,8 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     dueAt: Date | null
     scheduledStartAt: Date | null
     scheduledEndAt: Date | null
+    scheduleStatus: $Enums.ScheduleStatus
+    scheduleSource: $Enums.ScheduleSource | null
     budgetLimit: number | null
     blockReason: runtime.JsonValue | null
     latestRunId: string | null
@@ -2814,6 +3167,7 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   projection<T extends Prisma.Task$projectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$projectionArgs<ExtArgs>>): Prisma.Prisma__TaskProjectionClient<runtime.Types.Result.GetResult<Prisma.$TaskProjectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   dependencies<T extends Prisma.Task$dependenciesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$dependenciesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskDependencyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   dependentTasks<T extends Prisma.Task$dependentTasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$dependentTasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskDependencyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  scheduleProposals<T extends Prisma.Task$scheduleProposalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$scheduleProposalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ScheduleProposalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2856,6 +3210,8 @@ export interface TaskFieldRefs {
   readonly dueAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly scheduledStartAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly scheduledEndAt: Prisma.FieldRef<"Task", 'DateTime'>
+  readonly scheduleStatus: Prisma.FieldRef<"Task", 'ScheduleStatus'>
+  readonly scheduleSource: Prisma.FieldRef<"Task", 'ScheduleSource'>
   readonly budgetLimit: Prisma.FieldRef<"Task", 'Int'>
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>
   readonly latestRunId: Prisma.FieldRef<"Task", 'String'>
@@ -3445,6 +3801,30 @@ export type Task$dependentTasksArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.TaskDependencyScalarFieldEnum | Prisma.TaskDependencyScalarFieldEnum[]
+}
+
+/**
+ * Task.scheduleProposals
+ */
+export type Task$scheduleProposalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ScheduleProposal
+   */
+  select?: Prisma.ScheduleProposalSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ScheduleProposal
+   */
+  omit?: Prisma.ScheduleProposalOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ScheduleProposalInclude<ExtArgs> | null
+  where?: Prisma.ScheduleProposalWhereInput
+  orderBy?: Prisma.ScheduleProposalOrderByWithRelationInput | Prisma.ScheduleProposalOrderByWithRelationInput[]
+  cursor?: Prisma.ScheduleProposalWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ScheduleProposalScalarFieldEnum | Prisma.ScheduleProposalScalarFieldEnum[]
 }
 
 /**

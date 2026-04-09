@@ -62,6 +62,7 @@ export const ModelName = {
   ConversationEntry: 'ConversationEntry',
   ToolCallDetail: 'ToolCallDetail',
   TaskProjection: 'TaskProjection',
+  ScheduleProposal: 'ScheduleProposal',
   RuntimeCursor: 'RuntimeCursor'
 } as const
 
@@ -105,6 +106,8 @@ export const TaskScalarFieldEnum = {
   dueAt: 'dueAt',
   scheduledStartAt: 'scheduledStartAt',
   scheduledEndAt: 'scheduledEndAt',
+  scheduleStatus: 'scheduleStatus',
+  scheduleSource: 'scheduleSource',
   budgetLimit: 'budgetLimit',
   blockReason: 'blockReason',
   latestRunId: 'latestRunId',
@@ -271,12 +274,35 @@ export const TaskProjectionScalarFieldEnum = {
   dueAt: 'dueAt',
   scheduledStartAt: 'scheduledStartAt',
   scheduledEndAt: 'scheduledEndAt',
+  scheduleStatus: 'scheduleStatus',
+  scheduleSource: 'scheduleSource',
+  scheduleProposalCount: 'scheduleProposalCount',
   latestArtifactTitle: 'latestArtifactTitle',
   lastActivityAt: 'lastActivityAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type TaskProjectionScalarFieldEnum = (typeof TaskProjectionScalarFieldEnum)[keyof typeof TaskProjectionScalarFieldEnum]
+
+
+export const ScheduleProposalScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  source: 'source',
+  status: 'status',
+  proposedBy: 'proposedBy',
+  summary: 'summary',
+  dueAt: 'dueAt',
+  scheduledStartAt: 'scheduledStartAt',
+  scheduledEndAt: 'scheduledEndAt',
+  assigneeAgentId: 'assigneeAgentId',
+  createdAt: 'createdAt',
+  resolvedAt: 'resolvedAt',
+  resolutionNote: 'resolutionNote'
+} as const
+
+export type ScheduleProposalScalarFieldEnum = (typeof ScheduleProposalScalarFieldEnum)[keyof typeof ScheduleProposalScalarFieldEnum]
 
 
 export const RuntimeCursorScalarFieldEnum = {

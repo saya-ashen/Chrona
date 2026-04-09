@@ -9,6 +9,7 @@ import { db as prisma } from "@/lib/db";
 
 describe("schema smoke", () => {
   beforeAll(async () => {
+    await prisma.scheduleProposal.deleteMany();
     await prisma.event.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.artifact.deleteMany();

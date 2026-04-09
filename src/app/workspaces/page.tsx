@@ -11,8 +11,11 @@ export default async function WorkspacesPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Workspaces</h1>
           <p className="text-sm text-muted-foreground">
-            Operational entry points for task triage and run supervision.
+            Advanced workspace management for internal or multi-workspace operations.
           </p>
+        </div>
+        <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Daily work now starts from Schedule, Tasks, Inbox, and Memory. This page remains available for deeper workspace administration.
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {workspaces.map((workspace) => (

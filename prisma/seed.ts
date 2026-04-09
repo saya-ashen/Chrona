@@ -3,6 +3,9 @@ import {
   ArtifactType,
   PrismaClient,
   RunStatus,
+  ScheduleProposalStatus,
+  ScheduleSource,
+  ScheduleStatus,
   TaskPriority,
   TaskStatus,
   WorkspaceStatus,
@@ -72,6 +75,95 @@ async function main() {
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
       ownerType: "human",
+    },
+  });
+
+  const scheduledTask = await prisma.task.upsert({
+    where: { id: "task_scheduled" },
+    update: {
+      workspaceId: workspace.id,
+      title: "Prepare release schedule",
+      description: "Lock the next release block and due date.",
+      status: TaskStatus.Scheduled,
+      priority: TaskPriority.Medium,
+      ownerType: "human",
+      dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
+      scheduleStatus: ScheduleStatus.Scheduled,
+      scheduleSource: ScheduleSource.human,
+    },
+    create: {
+      id: "task_scheduled",
+      workspaceId: workspace.id,
+      title: "Prepare release schedule",
+      description: "Lock the next release block and due date.",
+      status: TaskStatus.Scheduled,
+      priority: TaskPriority.Medium,
+      ownerType: "human",
+      dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
+      scheduleStatus: ScheduleStatus.Scheduled,
+      scheduleSource: ScheduleSource.human,
+    },
+  });
+
+  const unscheduledTask = await prisma.task.upsert({
+    where: { id: "task_unscheduled" },
+    update: {
+      workspaceId: workspace.id,
+      title: "Queue follow-up docs",
+      description: "Needs a planned slot before AI starts drafting.",
+      status: TaskStatus.Ready,
+      priority: TaskPriority.Medium,
+      ownerType: "human",
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      scheduleStatus: ScheduleStatus.Unscheduled,
+      scheduleSource: null,
+    },
+    create: {
+      id: "task_unscheduled",
+      workspaceId: workspace.id,
+      title: "Queue follow-up docs",
+      description: "Needs a planned slot before AI starts drafting.",
+      status: TaskStatus.Ready,
+      priority: TaskPriority.Medium,
+      ownerType: "human",
+      scheduleStatus: ScheduleStatus.Unscheduled,
+    },
+  });
+
+  const overdueTask = await prisma.task.upsert({
+    where: { id: "task_overdue" },
+    update: {
+      workspaceId: workspace.id,
+      title: "Recover overdue adapter run",
+      description: "Execution slipped past the planned window and needs replanning.",
+      status: TaskStatus.Running,
+      priority: TaskPriority.High,
+      ownerType: "human",
+      dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+      scheduleStatus: ScheduleStatus.Overdue,
+      scheduleSource: ScheduleSource.human,
+    },
+    create: {
+      id: "task_overdue",
+      workspaceId: workspace.id,
+      title: "Recover overdue adapter run",
+      description: "Execution slipped past the planned window and needs replanning.",
+      status: TaskStatus.Running,
+      priority: TaskPriority.High,
+      ownerType: "human",
+      dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+      scheduleStatus: ScheduleStatus.Overdue,
+      scheduleSource: ScheduleSource.human,
     },
   });
 
@@ -240,6 +332,85 @@ async function main() {
     },
   });
 
+  await prisma.taskProjection.upsert({
+    where: { taskId: scheduledTask.id },
+    update: {
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Scheduled,
+      displayState: "Scheduled",
+      dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
+      scheduleStatus: "Scheduled",
+      scheduleSource: "human",
+      lastActivityAt: new Date("2026-04-16T15:00:00.000Z"),
+    },
+    create: {
+      taskId: scheduledTask.id,
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Scheduled,
+      displayState: "Scheduled",
+      dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
+      scheduleStatus: "Scheduled",
+      scheduleSource: "human",
+      lastActivityAt: new Date("2026-04-16T15:00:00.000Z"),
+    },
+  });
+
+  await prisma.taskProjection.upsert({
+    where: { taskId: unscheduledTask.id },
+    update: {
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Ready,
+      displayState: "Ready",
+      actionRequired: "Schedule task",
+      scheduleStatus: "Unscheduled",
+      scheduleProposalCount: 1,
+      lastActivityAt: new Date("2026-04-16T14:00:00.000Z"),
+    },
+    create: {
+      taskId: unscheduledTask.id,
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Ready,
+      displayState: "Ready",
+      actionRequired: "Schedule task",
+      scheduleStatus: "Unscheduled",
+      scheduleProposalCount: 1,
+      lastActivityAt: new Date("2026-04-16T14:00:00.000Z"),
+    },
+  });
+
+  await prisma.taskProjection.upsert({
+    where: { taskId: overdueTask.id },
+    update: {
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Running,
+      displayState: "Running",
+      actionRequired: "Reschedule task",
+      dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+      scheduleStatus: "Overdue",
+      scheduleSource: "human",
+      lastActivityAt: new Date("2026-04-15T12:30:00.000Z"),
+    },
+    create: {
+      taskId: overdueTask.id,
+      workspaceId: workspace.id,
+      persistedStatus: TaskStatus.Running,
+      displayState: "Running",
+      actionRequired: "Reschedule task",
+      dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+      scheduleStatus: "Overdue",
+      scheduleSource: "human",
+      lastActivityAt: new Date("2026-04-15T12:30:00.000Z"),
+    },
+  });
+
   await prisma.taskDependency.upsert({
     where: {
       taskId_dependsOnTaskId: {
@@ -256,6 +427,37 @@ async function main() {
       taskId: blockedTask.id,
       dependsOnTaskId: runningTask.id,
       dependencyType: "blocks",
+    },
+  });
+
+  await prisma.scheduleProposal.upsert({
+    where: { id: "proposal_unscheduled" },
+    update: {
+      workspaceId: workspace.id,
+      taskId: unscheduledTask.id,
+      source: ScheduleSource.ai,
+      status: ScheduleProposalStatus.Pending,
+      proposedBy: "planner-agent",
+      summary: "Move this into tomorrow morning",
+      dueAt: new Date("2026-04-18T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-18T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-18T10:30:00.000Z"),
+      assigneeAgentId: "planner-agent",
+      resolvedAt: null,
+      resolutionNote: null,
+    },
+    create: {
+      id: "proposal_unscheduled",
+      workspaceId: workspace.id,
+      taskId: unscheduledTask.id,
+      source: ScheduleSource.ai,
+      status: ScheduleProposalStatus.Pending,
+      proposedBy: "planner-agent",
+      summary: "Move this into tomorrow morning",
+      dueAt: new Date("2026-04-18T18:00:00.000Z"),
+      scheduledStartAt: new Date("2026-04-18T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-18T10:30:00.000Z"),
+      assigneeAgentId: "planner-agent",
     },
   });
 

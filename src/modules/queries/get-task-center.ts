@@ -1,9 +1,11 @@
 import { db } from "@/lib/db";
 
 export async function getTaskCenter(
-  filter?: "Running" | "WaitingForApproval" | "Blocked" | "Failed",
+  workspaceId: string,
+  filter?: "Running" | "WaitingForApproval" | "Blocked" | "Failed" | "Unscheduled" | "Overdue",
 ) {
   const projections = await db.taskProjection.findMany({
+    where: { workspaceId },
     include: { task: true },
     orderBy: [{ lastActivityAt: "desc" }, { updatedAt: "desc" }],
   });
@@ -30,6 +32,10 @@ export async function getTaskCenter(
         );
       }
 
+      if (filter === "Unscheduled" || filter === "Overdue") {
+        return item.scheduleStatus === filter;
+      }
+
       return item.persistedStatus === filter;
     })
     .map((item) => ({
@@ -39,6 +45,7 @@ export async function getTaskCenter(
       displayState: item.displayState,
       latestRunStatus: item.latestRunStatus,
       actionRequired: item.actionRequired,
+      scheduleStatus: item.scheduleStatus,
       dueAt: item.dueAt,
       updatedAt: item.lastActivityAt ?? item.updatedAt,
       workspaceId: item.workspaceId,

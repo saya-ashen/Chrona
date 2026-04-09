@@ -1,7 +1,11 @@
 'use server'
 
 import { revalidatePath } from "next/cache";
+import { applySchedule as applyScheduleCommand } from "@/modules/commands/apply-schedule";
+import { clearSchedule as clearScheduleCommand } from "@/modules/commands/clear-schedule";
+import { decideScheduleProposal as decideScheduleProposalCommand } from "@/modules/commands/decide-schedule-proposal";
 import { invalidateMemory as invalidateMemoryCommand } from "@/modules/commands/invalidate-memory";
+import { proposeSchedule as proposeScheduleCommand } from "@/modules/commands/propose-schedule";
 import { provideInput as provideInputCommand } from "@/modules/commands/provide-input";
 import { resolveApproval as resolveApprovalCommand } from "@/modules/commands/resolve-approval";
 import { resumeRun as resumeRunCommand } from "@/modules/commands/resume-run";
@@ -12,6 +16,7 @@ import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
 
 function revalidateWorkspaceTaskPaths(workspaceId: string, taskId: string) {
   revalidatePath("/workspaces");
+  revalidatePath("/schedule");
   revalidatePath("/tasks");
   revalidatePath(`/workspaces/${workspaceId}`);
   revalidatePath(`/workspaces/${workspaceId}/tasks/${taskId}`);
@@ -29,6 +34,44 @@ function revalidateMemoryPaths(workspaceId: string, taskId: string | null) {
 
 export async function updateTask(input: Parameters<typeof updateTaskCommand>[0]) {
   const result = await updateTaskCommand(input);
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function applySchedule(input: Parameters<typeof applyScheduleCommand>[0]) {
+  const result = await applyScheduleCommand(input);
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function clearSchedule(input: Parameters<typeof clearScheduleCommand>[0]) {
+  const result = await clearScheduleCommand(input);
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function proposeSchedule(input: Parameters<typeof proposeScheduleCommand>[0]) {
+  const result = await proposeScheduleCommand(input);
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function acceptScheduleProposal(proposalId: string, resolutionNote?: string) {
+  const result = await decideScheduleProposalCommand({
+    proposalId,
+    decision: "Accepted",
+    resolutionNote,
+  });
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function rejectScheduleProposal(proposalId: string, resolutionNote?: string) {
+  const result = await decideScheduleProposalCommand({
+    proposalId,
+    decision: "Rejected",
+    resolutionNote,
+  });
   revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
   return result;
 }

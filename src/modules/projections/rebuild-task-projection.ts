@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { deriveScheduleState } from "@/modules/tasks/derive-schedule-state";
 import { deriveTaskState } from "@/modules/tasks/derive-task-state";
 
 const SYNC_STALE_MS = 5 * 60 * 1000;
@@ -11,6 +12,7 @@ export async function rebuildTaskProjection(taskId: string) {
       runs: { orderBy: { updatedAt: "desc" } },
       approvals: { where: { status: "Pending" }, orderBy: { requestedAt: "desc" } },
       artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
+      scheduleProposals: { where: { status: "Pending" } },
     },
   });
 
@@ -25,10 +27,29 @@ export async function rebuildTaskProjection(taskId: string) {
     sync: { stale: syncStale },
   });
 
+  const latestRun = task.runs[0] ?? null;
+  const schedule = deriveScheduleState({
+    task: {
+      dueAt: task.dueAt,
+      scheduledStartAt: task.scheduledStartAt,
+      scheduledEndAt: task.scheduledEndAt,
+      scheduleSource: task.scheduleSource,
+    },
+    latestRun: latestRun
+      ? {
+          status: latestRun.status,
+          startedAt: latestRun.startedAt,
+          endedAt: latestRun.endedAt,
+        }
+      : null,
+    now: new Date(),
+  });
+
   await db.task.update({
     where: { id: task.id },
     data: {
       status: derived.persistedStatus as never,
+      scheduleStatus: schedule.scheduleStatus as never,
       blockReason: derived.blockReason
         ? (derived.blockReason as Prisma.InputJsonValue)
         : Prisma.DbNull,
@@ -45,13 +66,16 @@ export async function rebuildTaskProjection(taskId: string) {
       blockScope: derived.blockReason?.scope ?? null,
       blockSince: derived.blockSince,
       actionRequired: derived.blockReason?.actionRequired ?? null,
-      latestRunStatus: task.runs[0]?.status ?? null,
+      latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
       scheduledStartAt: task.scheduledStartAt,
       scheduledEndAt: task.scheduledEndAt,
+      scheduleStatus: schedule.scheduleStatus,
+      scheduleSource: task.scheduleSource,
+      scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
-      lastActivityAt: task.runs[0]?.updatedAt ?? task.updatedAt,
+      lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
     },
     create: {
       taskId: task.id,
@@ -62,13 +86,16 @@ export async function rebuildTaskProjection(taskId: string) {
       blockScope: derived.blockReason?.scope ?? null,
       blockSince: derived.blockSince,
       actionRequired: derived.blockReason?.actionRequired ?? null,
-      latestRunStatus: task.runs[0]?.status ?? null,
+      latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
       scheduledStartAt: task.scheduledStartAt,
       scheduledEndAt: task.scheduledEndAt,
+      scheduleStatus: schedule.scheduleStatus,
+      scheduleSource: task.scheduleSource,
+      scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
-      lastActivityAt: task.runs[0]?.updatedAt ?? task.updatedAt,
+      lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
     },
   });
 }

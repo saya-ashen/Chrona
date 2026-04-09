@@ -52,6 +52,37 @@ export const OwnerType = {
 export type OwnerType = (typeof OwnerType)[keyof typeof OwnerType]
 
 
+export const ScheduleStatus = {
+  Unscheduled: 'Unscheduled',
+  Scheduled: 'Scheduled',
+  InProgress: 'InProgress',
+  AtRisk: 'AtRisk',
+  Interrupted: 'Interrupted',
+  Overdue: 'Overdue',
+  Completed: 'Completed'
+} as const
+
+export type ScheduleStatus = (typeof ScheduleStatus)[keyof typeof ScheduleStatus]
+
+
+export const ScheduleSource = {
+  human: 'human',
+  ai: 'ai',
+  system: 'system'
+} as const
+
+export type ScheduleSource = (typeof ScheduleSource)[keyof typeof ScheduleSource]
+
+
+export const ScheduleProposalStatus = {
+  Pending: 'Pending',
+  Accepted: 'Accepted',
+  Rejected: 'Rejected'
+} as const
+
+export type ScheduleProposalStatus = (typeof ScheduleProposalStatus)[keyof typeof ScheduleProposalStatus]
+
+
 export const RunStatus = {
   Pending: 'Pending',
   Running: 'Running',

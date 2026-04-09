@@ -395,6 +395,7 @@ export const ModelName = {
   ConversationEntry: 'ConversationEntry',
   ToolCallDetail: 'ToolCallDetail',
   TaskProjection: 'TaskProjection',
+  ScheduleProposal: 'ScheduleProposal',
   RuntimeCursor: 'RuntimeCursor'
 } as const
 
@@ -411,7 +412,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "runtimeCursor"
+    modelProps: "workspace" | "task" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1229,6 +1230,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ScheduleProposal: {
+      payload: Prisma.$ScheduleProposalPayload<ExtArgs>
+      fields: Prisma.ScheduleProposalFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ScheduleProposalFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ScheduleProposalFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        findFirst: {
+          args: Prisma.ScheduleProposalFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ScheduleProposalFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        findMany: {
+          args: Prisma.ScheduleProposalFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>[]
+        }
+        create: {
+          args: Prisma.ScheduleProposalCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        createMany: {
+          args: Prisma.ScheduleProposalCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ScheduleProposalCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>[]
+        }
+        delete: {
+          args: Prisma.ScheduleProposalDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        update: {
+          args: Prisma.ScheduleProposalUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        deleteMany: {
+          args: Prisma.ScheduleProposalDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ScheduleProposalUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ScheduleProposalUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>[]
+        }
+        upsert: {
+          args: Prisma.ScheduleProposalUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScheduleProposalPayload>
+        }
+        aggregate: {
+          args: Prisma.ScheduleProposalAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateScheduleProposal>
+        }
+        groupBy: {
+          args: Prisma.ScheduleProposalGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScheduleProposalGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ScheduleProposalCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScheduleProposalCountAggregateOutputType> | number
+        }
+      }
+    }
     RuntimeCursor: {
       payload: Prisma.$RuntimeCursorPayload<ExtArgs>
       fields: Prisma.RuntimeCursorFieldRefs
@@ -1366,6 +1441,8 @@ export const TaskScalarFieldEnum = {
   dueAt: 'dueAt',
   scheduledStartAt: 'scheduledStartAt',
   scheduledEndAt: 'scheduledEndAt',
+  scheduleStatus: 'scheduleStatus',
+  scheduleSource: 'scheduleSource',
   budgetLimit: 'budgetLimit',
   blockReason: 'blockReason',
   latestRunId: 'latestRunId',
@@ -1532,12 +1609,35 @@ export const TaskProjectionScalarFieldEnum = {
   dueAt: 'dueAt',
   scheduledStartAt: 'scheduledStartAt',
   scheduledEndAt: 'scheduledEndAt',
+  scheduleStatus: 'scheduleStatus',
+  scheduleSource: 'scheduleSource',
+  scheduleProposalCount: 'scheduleProposalCount',
   latestArtifactTitle: 'latestArtifactTitle',
   lastActivityAt: 'lastActivityAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type TaskProjectionScalarFieldEnum = (typeof TaskProjectionScalarFieldEnum)[keyof typeof TaskProjectionScalarFieldEnum]
+
+
+export const ScheduleProposalScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  source: 'source',
+  status: 'status',
+  proposedBy: 'proposedBy',
+  summary: 'summary',
+  dueAt: 'dueAt',
+  scheduledStartAt: 'scheduledStartAt',
+  scheduledEndAt: 'scheduledEndAt',
+  assigneeAgentId: 'assigneeAgentId',
+  createdAt: 'createdAt',
+  resolvedAt: 'resolvedAt',
+  resolutionNote: 'resolutionNote'
+} as const
+
+export type ScheduleProposalScalarFieldEnum = (typeof ScheduleProposalScalarFieldEnum)[keyof typeof ScheduleProposalScalarFieldEnum]
 
 
 export const RuntimeCursorScalarFieldEnum = {
@@ -1650,6 +1750,20 @@ export type EnumOwnerTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
 
 
 /**
+ * Reference to a field of type 'ScheduleStatus'
+ */
+export type EnumScheduleStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ScheduleStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ScheduleSource'
+ */
+export type EnumScheduleSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ScheduleSource'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -1730,6 +1844,13 @@ export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, '
  * Reference to a field of type 'MemoryStatus'
  */
 export type EnumMemoryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MemoryStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ScheduleProposalStatus'
+ */
+export type EnumScheduleProposalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ScheduleProposalStatus'>
     
 
 /**
@@ -1838,6 +1959,7 @@ export type GlobalOmitConfig = {
   conversationEntry?: Prisma.ConversationEntryOmit
   toolCallDetail?: Prisma.ToolCallDetailOmit
   taskProjection?: Prisma.TaskProjectionOmit
+  scheduleProposal?: Prisma.ScheduleProposalOmit
   runtimeCursor?: Prisma.RuntimeCursorOmit
 }
 

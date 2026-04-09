@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 
 type TaskPageProps = {
   data: {
@@ -12,6 +13,8 @@ type TaskPageProps = {
       dueAt: string | null;
       scheduledStartAt: string | null;
       scheduledEndAt: string | null;
+      scheduleStatus: string;
+      scheduleSource: string | null;
       blockReason:
         | {
             blockType?: string;
@@ -38,6 +41,16 @@ type TaskPageProps = {
           syncStatus: string;
         }
       | null;
+    scheduleProposals: Array<{
+      id: string;
+      source: string;
+      proposedBy: string;
+      summary: string;
+      status: string;
+      dueAt: string | null;
+      scheduledStartAt: string | null;
+      scheduledEndAt: string | null;
+    }>;
     approvals: Array<{
       id: string;
       title: string;
@@ -56,6 +69,10 @@ type TaskPageProps = {
 
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
+}
+
+function parseDate(value: string | null) {
+  return value ? new Date(value) : null;
 }
 
 export function TaskPage({ data }: TaskPageProps) {
@@ -99,7 +116,24 @@ export function TaskPage({ data }: TaskPageProps) {
                 <dt>End</dt>
                 <dd>{formatDate(data.task.scheduledEndAt)}</dd>
               </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt>Schedule Status</dt>
+                <dd>{data.task.scheduleStatus}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt>Schedule Source</dt>
+                <dd>{data.task.scheduleSource ?? "-"}</dd>
+              </div>
             </dl>
+            <div className="mt-4">
+              <ScheduleEditorForm
+                taskId={data.task.id}
+                dueAt={parseDate(data.task.dueAt)}
+                scheduledStartAt={parseDate(data.task.scheduledStartAt)}
+                scheduledEndAt={parseDate(data.task.scheduledEndAt)}
+                scheduleSource={(data.task.scheduleSource as "human" | "ai" | "system" | null) ?? "human"}
+              />
+            </div>
           </section>
         </div>
 
@@ -147,6 +181,25 @@ export function TaskPage({ data }: TaskPageProps) {
         </section>
 
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
+          <h2 className="text-sm font-semibold">Pending Schedule Proposals</h2>
+          <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+            {data.scheduleProposals.length === 0 ? (
+              <p>No pending schedule proposals.</p>
+            ) : (
+              data.scheduleProposals.map((proposal) => (
+                <div key={proposal.id} className="rounded-lg border bg-background px-3 py-2">
+                  <p className="font-medium text-foreground">{proposal.summary}</p>
+                  <p>
+                    {proposal.source} via {proposal.proposedBy}
+                  </p>
+                  <p>Status: {proposal.status}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border bg-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Recent Approvals</h2>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.approvals.length === 0 ? (
@@ -187,6 +240,12 @@ export function TaskPage({ data }: TaskPageProps) {
             >
               Start Run
             </button>
+            <Link
+              href="/schedule"
+              className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              Open Schedule
+            </Link>
             <Link
               href={`/workspaces/${data.task.workspaceId}/work/${data.task.id}`}
               className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
