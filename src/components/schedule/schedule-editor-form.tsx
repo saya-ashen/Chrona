@@ -1,4 +1,6 @@
 import { applySchedule, clearSchedule } from "@/app/actions/task-actions";
+import { buttonVariants } from "@/components/ui/button";
+import { Field, inputClassName } from "@/components/ui/field";
 
 type ScheduleEditorFormProps = {
   taskId: string;
@@ -60,45 +62,39 @@ export function ScheduleEditorForm({
   return (
     <div className="space-y-2">
       <form action={submitSchedule} className="grid gap-2 md:grid-cols-3">
-        <label className="space-y-1 text-xs text-muted-foreground">
-          <span>Due</span>
+        <Field label="Due" className="text-xs text-muted-foreground">
           <input
             type="datetime-local"
             name="dueAt"
             defaultValue={formatDateTimeInput(dueAt)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+            className={inputClassName}
           />
-        </label>
-        <label className="space-y-1 text-xs text-muted-foreground">
-          <span>Start</span>
+        </Field>
+        <Field label="Start" className="text-xs text-muted-foreground">
           <input
             type="datetime-local"
             name="scheduledStartAt"
             defaultValue={formatDateTimeInput(scheduledStartAt)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+            className={inputClassName}
           />
-        </label>
-        <label className="space-y-1 text-xs text-muted-foreground">
-          <span>End</span>
+        </Field>
+        <Field label="End" className="text-xs text-muted-foreground">
           <input
             type="datetime-local"
             name="scheduledEndAt"
             defaultValue={formatDateTimeInput(scheduledEndAt)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+            className={inputClassName}
           />
-        </label>
-        <div className="md:col-span-3 flex flex-wrap gap-2">
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-          >
+        </Field>
+        <div className="flex flex-wrap gap-2 md:col-span-3">
+          <button type="submit" className={buttonVariants({ variant: "default" })}>
             {submitLabel}
           </button>
         </div>
       </form>
       {allowClear ? (
         <form action={clearTaskSchedule}>
-          <button type="submit" className="rounded-md border px-3 py-2 text-sm text-foreground">
+          <button type="submit" className={buttonVariants({ variant: "outline" })}>
             Clear Schedule
           </button>
         </form>

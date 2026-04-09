@@ -1,6 +1,16 @@
 import Link from "next/link";
 import { acceptScheduleProposal, rejectScheduleProposal } from "@/app/actions/task-actions";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
+import { buttonVariants } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  SurfaceCard,
+  SurfaceCardDescription,
+  SurfaceCardHeader,
+  SurfaceCardTitle,
+} from "@/components/ui/surface-card";
+import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { cn } from "@/lib/utils";
 
 type SchedulePageProps = {
   data: {
@@ -177,6 +187,58 @@ function getPriorityAccent(priority: string) {
   }
 }
 
+function getPriorityTone(priority: string) {
+  switch (priority.toLowerCase()) {
+    case "urgent":
+      return "critical" as const;
+    case "high":
+      return "warning" as const;
+    case "medium":
+      return "info" as const;
+    default:
+      return "success" as const;
+  }
+}
+
+function getScheduleTone(status: string | null | undefined) {
+  if (!status) {
+    return "neutral" as const;
+  }
+
+  switch (status.toLowerCase()) {
+    case "overdue":
+    case "blocked":
+      return "critical" as const;
+    case "atrisk":
+    case "at risk":
+      return "warning" as const;
+    case "scheduled":
+    case "inprogress":
+      return "info" as const;
+    default:
+      return "neutral" as const;
+  }
+}
+
+function getRunTone(status: string | null | undefined) {
+  if (!status) {
+    return "neutral" as const;
+  }
+
+  switch (status.toLowerCase()) {
+    case "completed":
+      return "success" as const;
+    case "waitingforapproval":
+    case "waitingforinput":
+      return "warning" as const;
+    case "failed":
+    case "cancelled":
+      return "critical" as const;
+    default:
+      return "info" as const;
+  }
+}
+
 function getDayKey(value: Date | null | undefined) {
   return value ? value.toISOString().slice(0, 10) : "unspecified";
 }
@@ -340,28 +402,47 @@ function groupScheduledByDay(
 
 function MetricCard({ label, value, hint }: { label: string; value: number; hint: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
+    <SurfaceCard variant="inset" padding="sm" className="rounded-2xl">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-    </div>
+    </SurfaceCard>
   );
 }
 
 function ItemMeta({ item }: { item: ScheduleCardItem }) {
   return (
-    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-      <span className="rounded-full border px-2 py-1">{item.priority}</span>
-      <span className="rounded-full border px-2 py-1">{describeOwner(item.ownerType, item.assigneeAgentId)}</span>
-      {item.persistedStatus ? <span className="rounded-full border px-2 py-1">Status: {item.persistedStatus}</span> : null}
-      {item.scheduleStatus ? <span className="rounded-full border px-2 py-1">Plan: {item.scheduleStatus}</span> : null}
-      {item.scheduleSource ? <span className="rounded-full border px-2 py-1">Source: {item.scheduleSource}</span> : null}
-      {item.latestRunStatus ? <span className="rounded-full border px-2 py-1">Run: {item.latestRunStatus}</span> : null}
+    <div className="flex flex-wrap gap-2">
+      <StatusBadge tone={getPriorityTone(item.priority)}>{item.priority}</StatusBadge>
+      <StatusBadge>{describeOwner(item.ownerType, item.assigneeAgentId)}</StatusBadge>
+      {item.scheduleStatus ? <StatusBadge tone={getScheduleTone(item.scheduleStatus)}>Plan: {item.scheduleStatus}</StatusBadge> : null}
+      {item.latestRunStatus ? <StatusBadge tone={getRunTone(item.latestRunStatus)}>Run: {item.latestRunStatus}</StatusBadge> : null}
       {item.approvalPendingCount ? (
-        <span className="rounded-full border px-2 py-1">Approvals: {item.approvalPendingCount}</span>
+        <StatusBadge tone="warning">Approvals: {item.approvalPendingCount}</StatusBadge>
       ) : null}
     </div>
   );
+}
+
+function DetailGrid({
+  items,
+}: {
+  items: Array<{ label: string; value: string | null | undefined }>;
+}) {
+  return (
+    <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+      {items.map((item) => (
+        <div key={item.label} className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
+          <dt className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</dt>
+          <dd className="mt-1 text-sm text-foreground">{item.value ?? "-"}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function EmptyState({ children }: { children: string }) {
+  return <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">{children}</div>;
 }
 
 function DayTimelineSummary({ items }: { items: SchedulePageProps["data"]["scheduled"] }) {
@@ -391,7 +472,7 @@ function buildScheduleHref(day: string, taskId?: string) {
 
 function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selectedDay: string }) {
   return (
-    <div className="rounded-xl border bg-background p-3">
+    <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
         {groups.map((group) => {
           const isActive = group.key === selectedDay;
@@ -400,26 +481,27 @@ function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selec
             <Link
               key={group.key}
               href={buildScheduleHref(group.key)}
-              className={`rounded-xl border px-3 py-3 transition-colors hover:border-primary/50 hover:bg-muted/60 ${
-                isActive ? "border-primary bg-primary/5" : "bg-card"
-              }`}
+              className={cn(
+                "rounded-2xl border px-3 py-3 transition-colors hover:border-primary/40 hover:bg-background",
+                isActive ? "border-primary/60 bg-primary/5 shadow-sm" : "border-border/60 bg-background/70",
+              )}
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-foreground">{formatShortDay(group.items[0]?.scheduledStartAt ?? null)}</p>
-                  {group.riskCount > 0 ? <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label="Risk day" /> : null}
+                  {group.riskCount > 0 ? <StatusBadge tone="critical">Risk day</StatusBadge> : null}
                 </div>
                 <p className="text-xs text-muted-foreground">{group.label}</p>
-                <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-                  <span>{group.items.length} block{group.items.length === 1 ? "" : "s"}</span>
-                  {group.proposalCount > 0 ? <span>{group.proposalCount} proposal{group.proposalCount === 1 ? "" : "s"}</span> : null}
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge>{group.items.length} block{group.items.length === 1 ? "" : "s"}</StatusBadge>
+                  {group.proposalCount > 0 ? <StatusBadge tone="info">{group.proposalCount} proposal{group.proposalCount === 1 ? "" : "s"}</StatusBadge> : null}
                 </div>
               </div>
             </Link>
           );
         })}
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -428,7 +510,7 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
   const timelineHeight = compressedTimeline.totalVisualHeight;
 
   return (
-    <div className="rounded-xl border bg-background p-4">
+    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{formatDayHeading(items[0]?.scheduledStartAt ?? null)}</h3>
@@ -445,7 +527,7 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
         </div>
       </div>
 
-      <div className="max-h-[70vh] overflow-y-auto rounded-xl border bg-card/30 pr-2">
+      <div className="max-h-[70vh] overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2">
         <div className="flex gap-3">
           <div className="sticky left-0 top-0 hidden w-16 shrink-0 self-start bg-background/95 py-2 sm:block">
             <div className="relative" style={{ height: `${timelineHeight}px` }}>
@@ -460,7 +542,7 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
             </div>
           </div>
 
-          <div className="relative flex-1 rounded-xl border bg-card/50" style={{ height: `${timelineHeight}px` }}>
+          <div className="relative flex-1 rounded-2xl border border-border/60 bg-card/60" style={{ height: `${timelineHeight}px` }}>
             {compressedTimeline.hours.map((hour) => (
               <div key={hour.hour} className="absolute inset-x-0" style={{ top: `${hour.visualStart}px`, height: `${hour.visualHeight}px` }}>
                 <div className="absolute inset-x-0 top-0 border-t border-dashed border-border/70" />
@@ -482,7 +564,7 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
                 <Link
                   key={item.taskId}
                   href={buildScheduleHref(selectedDay, item.taskId)}
-                  className={`absolute left-3 right-3 rounded-xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 ${
+                  className={`absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 ${
                     isSelected ? "border-primary ring-1 ring-primary/30" : "border-border"
                   }`}
                   style={{ top: `${top}px`, minHeight: "56px", height: `${height}px` }}
@@ -492,14 +574,14 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
-                        <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{item.priority}</span>
+                        <StatusBadge tone={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">{item.priority}</StatusBadge>
                       </div>
                       <p className="text-xs text-muted-foreground">{formatTimeRange(item.scheduledStartAt, item.scheduledEndAt)}</p>
                       <p className="line-clamp-1 text-xs text-muted-foreground">{describeOwner(item.ownerType, item.assigneeAgentId)}</p>
                       {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
                         <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">
-                          {item.scheduleStatus === "Overdue" ? <span className="rounded-full border border-red-200 px-2 py-0.5 text-red-600">Overdue</span> : null}
-                          {item.approvalPendingCount ? <span className="rounded-full border px-2 py-0.5">Approval pending</span> : null}
+                          {item.scheduleStatus === "Overdue" ? <StatusBadge tone="critical" className="px-2 py-0.5 text-[11px]">Overdue</StatusBadge> : null}
+                          {item.approvalPendingCount ? <StatusBadge tone="warning" className="px-2 py-0.5 text-[11px]">Approval pending</StatusBadge> : null}
                         </div>
                       ) : null}
                     </div>
@@ -510,7 +592,7 @@ function DayTimeline({ items, selectedDay, selectedTaskId }: { items: ScheduledI
           </div>
         </div>
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -526,14 +608,14 @@ function SelectedBlockSheet({ item, selectedDay }: { item: ScheduledItem; select
         role="dialog"
         aria-modal="true"
         aria-labelledby="schedule-task-sheet-title"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-3xl border bg-background p-5 shadow-2xl md:inset-y-4 md:right-4 md:left-auto md:w-[min(520px,92vw)] md:max-h-none md:rounded-3xl"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-3xl border border-border/70 bg-background p-5 shadow-2xl md:inset-y-4 md:right-4 md:left-auto md:w-[min(520px,92vw)] md:max-h-none md:rounded-3xl"
       >
         <div className="flex items-start justify-between gap-4 border-b pb-4">
           <div className="space-y-1">
             <h2 id="schedule-task-sheet-title" className="text-sm font-semibold text-foreground">Task Details</h2>
             <p className="text-sm text-muted-foreground">Review the selected block in a floating panel, then return to the timeline.</p>
           </div>
-          <Link href={buildScheduleHref(selectedDay)} className="rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted">
+          <Link href={buildScheduleHref(selectedDay)} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Close
           </Link>
         </div>
@@ -545,23 +627,18 @@ function SelectedBlockSheet({ item, selectedDay }: { item: ScheduledItem; select
             <ItemMeta item={item} />
           </div>
 
-          <div className="grid gap-1">
-            <p>Due: {formatDateTime(item.dueAt)}</p>
-            <p>Current plan: {item.scheduleStatus ?? "Scheduled"}</p>
-            <p>Latest run: {item.latestRunStatus ?? "No active run"}</p>
-            {item.actionRequired ? <p>Next action: {item.actionRequired}</p> : null}
-          </div>
+          <DetailGrid
+            items={[
+              { label: "Due", value: formatDateTime(item.dueAt) },
+              { label: "Current plan", value: item.scheduleStatus ?? "Scheduled" },
+              { label: "Latest run", value: item.latestRunStatus ?? "No active run" },
+              { label: "Next action", value: item.actionRequired ?? "Stay on plan" },
+            ]}
+          />
 
-          <div className="flex flex-wrap gap-3">
-            <Link href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`} className="hover:text-primary">
-              Open Task
-            </Link>
-            <Link href={`/workspaces/${item.workspaceId}/work/${item.taskId}`} className="hover:text-primary">
-              Open Work
-            </Link>
-          </div>
+          <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} latestRunStatus={item.latestRunStatus} workLabel="Open Workbench" />
 
-          <div className="rounded-xl border border-dashed p-3">
+          <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl border-dashed">
             <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Adjust block</p>
             <ScheduleEditorForm
               taskId={item.taskId}
@@ -569,7 +646,7 @@ function SelectedBlockSheet({ item, selectedDay }: { item: ScheduledItem; select
               scheduledStartAt={item.scheduledStartAt}
               scheduledEndAt={item.scheduledEndAt}
             />
-          </div>
+          </SurfaceCard>
         </div>
       </section>
     </>
@@ -578,7 +655,7 @@ function SelectedBlockSheet({ item, selectedDay }: { item: ScheduledItem; select
 
 function QueueCard({ item }: { item: SchedulePageProps["data"]["unscheduled"][number] }) {
   return (
-    <div className="rounded-xl border bg-background p-4">
+    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
       <div className="space-y-3">
         <div className="space-y-2">
           <Link
@@ -590,25 +667,29 @@ function QueueCard({ item }: { item: SchedulePageProps["data"]["unscheduled"][nu
           <ItemMeta item={item} />
         </div>
 
-        <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-          <p>Due: {formatDateTime(item.dueAt)}</p>
-          <p>Pending proposals: {item.scheduleProposalCount}</p>
-          <p>Needs: {item.actionRequired ?? "A planned time block"}</p>
-          <p>Latest run: {item.latestRunStatus ?? "No active run"}</p>
-        </div>
+        <DetailGrid
+          items={[
+            { label: "Due", value: formatDateTime(item.dueAt) },
+            { label: "Pending proposals", value: String(item.scheduleProposalCount) },
+            { label: "Needs", value: item.actionRequired ?? "A planned time block" },
+            { label: "Latest run", value: item.latestRunStatus ?? "No active run" },
+          ]}
+        />
 
-        <div className="rounded-xl border border-dashed p-3">
+        <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} latestRunStatus={item.latestRunStatus} workLabel="Open Workbench" />
+
+        <SurfaceCard as="div" variant="default" padding="sm" className="rounded-2xl border-dashed">
           <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Place on timeline</p>
           <ScheduleEditorForm taskId={item.taskId} dueAt={item.dueAt} allowClear={false} submitLabel="Schedule Task" />
-        </div>
+        </SurfaceCard>
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
 function ProposalCard({ proposal }: { proposal: SchedulePageProps["data"]["proposals"][number] }) {
   return (
-    <div key={proposal.proposalId} className="rounded-xl border bg-background p-4">
+    <SurfaceCard key={proposal.proposalId} as="div" variant="inset" className="rounded-2xl">
       <div className="space-y-3 text-sm text-muted-foreground">
         <div className="space-y-2">
           <Link
@@ -620,13 +701,15 @@ function ProposalCard({ proposal }: { proposal: SchedulePageProps["data"]["propo
           <ItemMeta item={proposal} />
         </div>
         <p>{proposal.summary}</p>
-        <div className="grid gap-1">
-          <p>Proposed by: {proposal.proposedBy}</p>
-          <p>
-            Candidate block: {formatDateTime(proposal.scheduledStartAt)} → {formatDateTime(proposal.scheduledEndAt)}
-          </p>
-          <p>Due impact reference: {formatDateTime(proposal.dueAt)}</p>
-        </div>
+        <DetailGrid
+          items={[
+            { label: "Proposed by", value: proposal.proposedBy },
+            { label: "Candidate block", value: `${formatDateTime(proposal.scheduledStartAt)} → ${formatDateTime(proposal.scheduledEndAt)}` },
+            { label: "Due impact", value: formatDateTime(proposal.dueAt) },
+            { label: "Source", value: proposal.source },
+          ]}
+        />
+        <TaskContextLinks workspaceId={proposal.workspaceId} taskId={proposal.taskId} workLabel="Open Workbench" />
         <div className="flex flex-wrap gap-2">
           <form
             action={async () => {
@@ -634,32 +717,29 @@ function ProposalCard({ proposal }: { proposal: SchedulePageProps["data"]["propo
               await acceptScheduleProposal(proposal.proposalId, "Accepted on schedule page");
             }}
           >
-            <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+            <button type="submit" className={buttonVariants({ variant: "default" })}>
               Accept Proposal
             </button>
           </form>
-          <Link href={`/workspaces/${proposal.workspaceId}/tasks/${proposal.taskId}`} className="rounded-md border px-3 py-2 text-sm text-foreground">
-            Review Task
-          </Link>
           <form
             action={async () => {
               "use server";
               await rejectScheduleProposal(proposal.proposalId, "Rejected on schedule page");
             }}
           >
-            <button type="submit" className="rounded-md border px-3 py-2 text-sm text-foreground">
+            <button type="submit" className={buttonVariants({ variant: "outline" })}>
               Reject Proposal
             </button>
           </form>
         </div>
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
 function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }) {
   return (
-    <div className="rounded-xl border bg-background p-4">
+    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
       <div className="space-y-3 text-sm text-muted-foreground">
         <div className="space-y-2">
           <Link
@@ -670,27 +750,22 @@ function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }
           </Link>
           <ItemMeta item={item} />
         </div>
-        <div className="grid gap-1">
-          <p>Risk: {item.scheduleStatus ?? item.persistedStatus}</p>
-          <p>Action: {item.actionRequired ?? "Review schedule impact"}</p>
-          <p>
-            Planned window: {formatDateTime(item.scheduledStartAt)} → {formatDateTime(item.scheduledEndAt)}
-          </p>
-          <p>Due: {formatDateTime(item.dueAt)}</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link href={`/workspaces/${item.workspaceId}/work/${item.taskId}`} className="hover:text-primary">
-            Open Work
-          </Link>
-          <Link href="/inbox" className="hover:text-primary">
+        <DetailGrid
+          items={[
+            { label: "Risk", value: item.scheduleStatus ?? item.persistedStatus ?? "Needs review" },
+            { label: "Action", value: item.actionRequired ?? "Review schedule impact" },
+            { label: "Planned window", value: `${formatDateTime(item.scheduledStartAt)} → ${formatDateTime(item.scheduledEndAt)}` },
+            { label: "Due", value: formatDateTime(item.dueAt) },
+          ]}
+        />
+        <div className="flex flex-wrap gap-2">
+          <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} latestRunStatus={item.latestRunStatus} workLabel="Open Workbench" />
+          <Link href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Open Inbox
-          </Link>
-          <Link href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`} className="hover:text-primary">
-            Reschedule in Task
           </Link>
         </div>
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -710,57 +785,57 @@ export function SchedulePage({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Schedule</h1>
-          <p className="text-sm text-muted-foreground">
-            Use this page as the global planning workbench for the default workspace: place unscheduled work,
-            review AI suggestions, and resolve schedule risks before execution drifts.
-          </p>
-        </div>
+        <SurfaceCard variant="highlight" className="space-y-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-semibold tracking-tight">Schedule</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Use Schedule as the global planning workbench for the default workspace: place unscheduled work,
+              review AI suggestions, and resolve schedule risks before execution drifts.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link href={buildScheduleHref(todayKey)} className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted">
-            Today
-          </Link>
-          <Link href={buildScheduleHref(tomorrowKey)} className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted">
-            Tomorrow
-          </Link>
-          <Link
-            href={buildScheduleHref(activeDay ?? todayKey)}
-            className="rounded-full border px-3 py-2 text-foreground transition-colors hover:bg-muted"
-          >
-            This Week
-          </Link>
-        </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Link href={buildScheduleHref(todayKey)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Today
+            </Link>
+            <Link href={buildScheduleHref(tomorrowKey)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Tomorrow
+            </Link>
+            <Link
+              href={buildScheduleHref(activeDay ?? todayKey)}
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
+            >
+              Current Plan
+            </Link>
+          </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Scheduled" value={data.summary.scheduledCount} hint="Committed blocks on the current plan." />
-          <MetricCard label="Queue" value={data.summary.unscheduledCount} hint="Tasks still waiting to enter the timeline." />
-          <MetricCard label="AI Proposals" value={data.summary.proposalCount} hint="Pending suggestions that need a decision." />
-          <MetricCard label="Risks" value={data.summary.riskCount} hint="At-risk, overdue, or interrupted work." />
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Scheduled" value={data.summary.scheduledCount} hint="Committed blocks on the current plan." />
+            <MetricCard label="Queue" value={data.summary.unscheduledCount} hint="Tasks still waiting to enter the timeline." />
+            <MetricCard label="AI Proposals" value={data.summary.proposalCount} hint="Pending suggestions that need a decision." />
+            <MetricCard label="Risks" value={data.summary.riskCount} hint="At-risk, overdue, or interrupted work." />
+          </div>
+        </SurfaceCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]">
         <div className="space-y-4">
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
+          <SurfaceCard variant="highlight">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Scheduled Timeline</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+              <SurfaceCardHeader>
+                <SurfaceCardTitle>Scheduled Timeline</SurfaceCardTitle>
+                <SurfaceCardDescription>
                   Use the week strip to switch days, then inspect a single scheduled block without reopening the whole page.
-                </p>
-              </div>
-              <span className="rounded-full border px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Default workspace
-              </span>
+                </SurfaceCardDescription>
+              </SurfaceCardHeader>
+              <StatusBadge>Planning surface</StatusBadge>
             </div>
 
             <div className="mt-4 space-y-4">
               {scheduledGroups.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                <EmptyState>
                   No scheduled blocks yet. Start from the queue below and place the first task on the timeline.
-                </div>
+                </EmptyState>
               ) : (
                 <>
                   <div>
@@ -771,88 +846,88 @@ export function SchedulePage({
                 </>
               )}
             </div>
-          </section>
+          </SurfaceCard>
 
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">Unscheduled Queue</h2>
-              <p className="text-sm text-muted-foreground">
+          <SurfaceCard>
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>Unscheduled Queue</SurfaceCardTitle>
+              <SurfaceCardDescription>
                 Tasks that still need a time block. Prioritize urgent work, then place it directly onto the plan.
-              </p>
-            </div>
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
 
             <div className="mt-4 space-y-4 text-sm text-muted-foreground">
               {data.unscheduled.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4">
+                <EmptyState>
                   No unscheduled work. New tasks that lose their plan or need initial placement will appear here.
-                </div>
+                </EmptyState>
               ) : (
                 data.unscheduled.map((item) => <QueueCard key={item.taskId} item={item} />)
               )}
             </div>
-          </section>
+          </SurfaceCard>
         </div>
 
         <div className="space-y-4">
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">AI Proposals</h2>
-              <p className="text-sm text-muted-foreground">
-                Review AI-generated suggestions as explicit planning decisions before they change the timeline.
-              </p>
-            </div>
-            <div className="mt-4 space-y-4 text-sm text-muted-foreground">
-              {data.proposals.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4">
-                  No pending AI proposals. When planner automation suggests a new block, it will appear here for review.
-                </div>
-              ) : (
-                data.proposals.map((proposal) => <ProposalCard key={proposal.proposalId} proposal={proposal} />)
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">Conflicts / Overdue Risks</h2>
-              <p className="text-sm text-muted-foreground">
+          <SurfaceCard>
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>Conflicts / Overdue Risks</SurfaceCardTitle>
+              <SurfaceCardDescription>
                 Exceptions that threaten the plan. Use these entries to jump straight into recovery or rescheduling.
-              </p>
-            </div>
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               {data.risks.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4">
+                <EmptyState>
                   No schedule risks detected. Blocked, overdue, or interrupted work will surface here.
-                </div>
+                </EmptyState>
               ) : (
                 data.risks.map((item) => <RiskCard key={item.taskId} item={item} />)
               )}
             </div>
-          </section>
+          </SurfaceCard>
 
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-foreground">Planning Guide</h2>
-              <p className="text-sm text-muted-foreground">
-                Use Schedule for global arrangement, Task pages for single-task plan details, and Work pages for execution diagnosis.
-              </p>
+          <SurfaceCard>
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>AI Proposals</SurfaceCardTitle>
+              <SurfaceCardDescription>
+                Review AI-generated suggestions as explicit planning decisions before they change the timeline.
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
+            <div className="mt-4 space-y-4 text-sm text-muted-foreground">
+              {data.proposals.length === 0 ? (
+                <EmptyState>
+                  No pending AI proposals. When planner automation suggests a new block, it will appear here for review.
+                </EmptyState>
+              ) : (
+                data.proposals.map((proposal) => <ProposalCard key={proposal.proposalId} proposal={proposal} />)
+              )}
             </div>
+          </SurfaceCard>
+
+          <SurfaceCard variant="inset">
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>Planning Guide</SurfaceCardTitle>
+              <SurfaceCardDescription>
+                Use Schedule for global arrangement, Task pages for single-task plan details, and Work pages for execution diagnosis.
+              </SurfaceCardDescription>
+            </SurfaceCardHeader>
 
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
               <p>1. Clear the highest-risk items first.</p>
               <p>2. Place unscheduled work into concrete time blocks.</p>
               <p>3. Review AI proposals as reversible diffs, not automatic truth.</p>
               <p>4. Jump to Inbox when approvals or inputs are what actually block the schedule.</p>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Link href="/tasks" className="hover:text-primary">
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Link href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
                   Open Task Center
                 </Link>
-                <Link href="/inbox" className="hover:text-primary">
+                <Link href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
                   Open Inbox
                 </Link>
               </div>
             </div>
-          </section>
+          </SurfaceCard>
         </div>
       </div>
 

@@ -103,11 +103,11 @@ describe("SchedulePage", () => {
     expect(screen.getByRole("dialog", { name: "Task Details" })).toBeInTheDocument();
     expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(2);
     expect(screen.getByText("Recover overdue adapter run")).toBeInTheDocument();
-    expect(screen.getByText("Default workspace")).toBeInTheDocument();
+    expect(screen.getByText("Planning surface")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Close" })).toHaveAttribute("href", "/schedule?day=2026-04-16");
     expect(
       screen
-        .getAllByRole("link", { name: "Open Work" })
+        .getAllByRole("link", { name: "Open Workbench" })
         .some((link) => link.getAttribute("href") === "/workspaces/ws_1/work/task_scheduled"),
     ).toBe(true);
   });
