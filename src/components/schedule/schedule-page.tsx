@@ -505,8 +505,18 @@ function getRunnabilityTone(isRunnable: boolean | undefined) {
   return isRunnable ? ("success" as const) : ("warning" as const);
 }
 
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatLocalDateKeyParts(year: number, month: number, day: number) {
+  return `${year}-${padDatePart(month)}-${padDatePart(day)}`;
+}
+
 function getDayKey(value: Date | null | undefined) {
-  return value ? value.toISOString().slice(0, 10) : "unspecified";
+  return value
+    ? formatLocalDateKeyParts(value.getFullYear(), value.getMonth() + 1, value.getDate())
+    : "unspecified";
 }
 
 function formatShortDay(value: Date | null | undefined, locale: string, copy: SchedulePageCopy) {
@@ -521,7 +531,7 @@ function formatShortDay(value: Date | null | undefined, locale: string, copy: Sc
 }
 
 function formatDateKey(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return formatLocalDateKeyParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
 }
 
 function startOfDay(value: Date) {
@@ -1892,7 +1902,17 @@ export function SchedulePage({
   const todayKey = getTodayKey();
   const selectedGroupKey = scheduledGroups.find((group) => group.key === selectedDay)?.key;
   const todayGroupKey = scheduledGroups.find((group) => group.key === todayKey)?.key;
-  const activeDay = selectedGroupKey ?? todayGroupKey ?? scheduledGroups[0]?.key ?? todayKey;
+  const todayGroup = scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
+  const firstPopulatedGroup =
+    scheduledGroups.find((group) => group.items.length > 0 || group.proposalCount > 0 || group.riskCount > 0)?.key ?? null;
+  const activeDay =
+    selectedGroupKey ??
+    (todayGroup && (todayGroup.items.length > 0 || todayGroup.proposalCount > 0 || todayGroup.riskCount > 0)
+      ? todayGroup.key
+      : null) ??
+    firstPopulatedGroup ??
+    scheduledGroups[0]?.key ??
+    todayKey;
   const activeGroup = scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
   const selectedItem = activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ?? null;
@@ -2150,20 +2170,6 @@ export function SchedulePage({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <LocalizedLink
-                href={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
-                className={buttonVariants({ variant: activeView === "timeline" ? "default" : "outline", size: "sm" })}
-              >
-                 {copy.timeline}
-              </LocalizedLink>
-              <LocalizedLink
-                href={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
-                className={buttonVariants({ variant: activeView === "list" ? "default" : "outline", size: "sm" })}
-              >
-                 {copy.list}
-              </LocalizedLink>
-            </div>
           </div>
 
           {errorMessage ? (
@@ -2181,12 +2187,10 @@ export function SchedulePage({
         </SurfaceCard>
       </div>
 
-      {activeView === "list" ? (
-        <ScheduleTaskList items={viewData.listItems} onSaveTaskConfig={handleTaskConfigSave} isPending={isPending} />
-      ) : (
-        <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
-          <TodayFocusCard items={todayFocusItems} copy={copy} />
+      <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
+        <TodayFocusCard items={todayFocusItems} copy={copy} />
 
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,2.9fr)_minmax(340px,1fr)] xl:items-start">
           <SurfaceCard variant="highlight">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SurfaceCardHeader>
@@ -2198,30 +2202,46 @@ export function SchedulePage({
               <div className="flex flex-wrap items-center gap-2">
                 {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
                 <StatusBadge>{copy.planningSurface}</StatusBadge>
+                <LocalizedLink
+                  href={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
+                  className={buttonVariants({ variant: activeView === "timeline" ? "default" : "outline", size: "sm" })}
+                >
+                  {copy.timeline}
+                </LocalizedLink>
+                <LocalizedLink
+                  href={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
+                  className={buttonVariants({ variant: activeView === "list" ? "default" : "outline", size: "sm" })}
+                >
+                  {copy.list}
+                </LocalizedLink>
               </div>
             </div>
 
             <div className="mt-4 space-y-4">
-              {activeGroup ? (
-                <DayTimeline
-                  items={activeGroup.items}
-                  dayDate={activeGroup.date}
-                  selectedDay={activeGroup.key}
-                  selectedTaskId={selectedTaskId}
-                  draggedItem={draggedItem}
-                  isPending={isPending}
-                  onScheduleDrop={handleScheduleDrop}
-                  onCreateTaskBlock={handleCreateTaskBlock}
-                  onScheduledDragStart={handleScheduledDragStart}
-                  onDragEnd={handleQueueDragEnd}
-                />
+              {activeView === "timeline" ? (
+                activeGroup ? (
+                  <DayTimeline
+                    items={activeGroup.items}
+                    dayDate={activeGroup.date}
+                    selectedDay={activeGroup.key}
+                    selectedTaskId={selectedTaskId}
+                    draggedItem={draggedItem}
+                    isPending={isPending}
+                    onScheduleDrop={handleScheduleDrop}
+                    onCreateTaskBlock={handleCreateTaskBlock}
+                    onScheduledDragStart={handleScheduledDragStart}
+                    onDragEnd={handleQueueDragEnd}
+                  />
+                ) : (
+                  <EmptyState>{copy.noTimelineDay}</EmptyState>
+                )
               ) : (
-                <EmptyState>{copy.noTimelineDay}</EmptyState>
+                <ScheduleTaskList items={viewData.listItems} onSaveTaskConfig={handleTaskConfigSave} isPending={isPending} />
               )}
             </div>
           </SurfaceCard>
 
-          <SurfaceCard>
+          <SurfaceCard className="xl:sticky xl:top-4 xl:self-start">
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
               <SurfaceCardDescription>
@@ -2251,8 +2271,9 @@ export function SchedulePage({
               )}
             </div>
           </SurfaceCard>
+        </div>
 
-          <SurfaceCard>
+        <SurfaceCard>
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.secondaryPlanning}</SurfaceCardTitle>
               <SurfaceCardDescription>{copy.secondaryPlanningDescription}</SurfaceCardDescription>
@@ -2327,9 +2348,8 @@ export function SchedulePage({
                 </div>
               </details>
             </div>
-          </SurfaceCard>
-        </div>
-      )}
+        </SurfaceCard>
+      </div>
 
       {activeView === "timeline" && selectedItem && activeDay ? (
         <SelectedBlockSheet item={selectedItem} selectedDay={activeDay} isPending={isPending} onSaveTaskConfig={handleTaskConfigSave} />

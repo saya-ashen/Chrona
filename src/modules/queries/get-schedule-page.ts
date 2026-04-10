@@ -83,11 +83,7 @@ export async function getSchedulePage(workspaceId: string) {
   const listItems = projections.map((item) => mapProjectionItem(item));
 
   const scheduled = listItems
-    .filter(
-      (item) =>
-        item.scheduleStatus &&
-        !["Unscheduled", "AtRisk", "Overdue", "Interrupted"].includes(item.scheduleStatus),
-    )
+    .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
     .map((item) => item);
 
   const unscheduled = listItems

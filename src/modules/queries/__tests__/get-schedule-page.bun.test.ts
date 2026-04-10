@@ -168,13 +168,19 @@ describe("getSchedulePage", () => {
 
     const page = await getSchedulePage(workspace.id);
 
-    expect(page.scheduled).toHaveLength(1);
-    expect(page.scheduled[0]).toMatchObject({
+    expect(page.scheduled).toHaveLength(2);
+    expect(page.scheduled.find((item) => item.taskId === scheduledTask.id)).toMatchObject({
       taskId: scheduledTask.id,
       title: "Ship projection cleanup",
       priority: "High",
       persistedStatus: "Ready",
       scheduleStatus: "Scheduled",
+    });
+    expect(page.scheduled.find((item) => item.taskId === riskTask.id)).toMatchObject({
+      taskId: riskTask.id,
+      title: "Recover overdue adapter run",
+      priority: "Urgent",
+      scheduleStatus: "Overdue",
     });
 
     expect(page.unscheduled).toHaveLength(1);
@@ -204,7 +210,7 @@ describe("getSchedulePage", () => {
     });
 
     expect(page.summary).toEqual({
-      scheduledCount: 1,
+      scheduledCount: 2,
       unscheduledCount: 1,
       proposalCount: 1,
       riskCount: 1,
