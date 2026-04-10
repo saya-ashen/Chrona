@@ -1,31 +1,27 @@
 export type ControlPlaneNavItem = {
   href: string;
-  label: string;
+  labelKey: string;
 };
 
 export const NAV_ITEMS: ControlPlaneNavItem[] = [
   {
     href: "/workspaces",
-    label: "Workspaces",
+    labelKey: "nav.workspaces",
   },
   {
     href: "/schedule",
-    label: "Schedule",
-  },
-  {
-    href: "/tasks",
-    label: "Tasks",
+    labelKey: "nav.schedule",
   },
   {
     href: "/inbox",
-    label: "Inbox",
+    labelKey: "nav.inbox",
   },
   {
     href: "/memory",
-    label: "Memory",
+    labelKey: "nav.memory",
   },
   {
     href: "/settings",
-    label: "Settings",
+    labelKey: "nav.settings",
   },
 ];

@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "@/i18n/client";
+
 type RunSidePanelProps = {
   currentRun:
     | {
@@ -22,6 +26,30 @@ type RunSidePanelProps = {
   }>;
 };
 
+const DEFAULT_COPY = {
+  runSnapshot: "Run Snapshot",
+  runSnapshotDescription: "Current run state, timing, and sync health.",
+  noRun: "No run",
+  sync: "Sync",
+  approvalSingular: "approval",
+  approvalPlural: "approvals",
+  started: "Started",
+  ended: "Ended",
+  resumeSupported: "Resume supported",
+  yes: "Yes",
+  no: "No",
+  prompt: "Prompt",
+  noActiveRunYet: "No active run yet.",
+  evidence: "Evidence",
+  evidenceDescription: "Approvals, artifacts, and tool output stay here as supporting context.",
+  approvals: "Approvals",
+  noPendingApprovals: "No pending approvals.",
+  artifacts: "Artifacts",
+  noArtifacts: "No artifacts.",
+  toolActivity: "Tool Activity",
+  noToolCalls: "No tool calls.",
+} as const;
+
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
 }
@@ -32,47 +60,49 @@ export function RunSidePanel({
   artifacts,
   toolCalls,
 }: RunSidePanelProps) {
+  const { messages } = useI18n();
+  const copy = { ...DEFAULT_COPY, ...(messages.components?.runSidePanel ?? {}) };
   const hasBlockingApprovals = approvals.length > 0;
 
   return (
     <aside className="space-y-4">
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Run Snapshot</h2>
-          <p className="text-sm text-muted-foreground">Current run state, timing, and sync health.</p>
+          <h2 className="text-sm font-semibold">{copy.runSnapshot}</h2>
+          <p className="text-sm text-muted-foreground">{copy.runSnapshotDescription}</p>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span className="rounded-full border px-2 py-1">{currentRun?.status ?? "No run"}</span>
-          <span className="rounded-full border px-2 py-1">Sync {currentRun?.syncStatus ?? "-"}</span>
-          {hasBlockingApprovals ? <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-amber-700">{approvals.length} approval{approvals.length === 1 ? "" : "s"}</span> : null}
+          <span className="rounded-full border px-2 py-1">{currentRun?.status ?? copy.noRun}</span>
+          <span className="rounded-full border px-2 py-1">{copy.sync} {currentRun?.syncStatus ?? "-"}</span>
+          {hasBlockingApprovals ? <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-amber-700">{approvals.length} {approvals.length === 1 ? copy.approvalSingular : copy.approvalPlural}</span> : null}
         </div>
 
         <div className="mt-3 space-y-3 text-sm text-muted-foreground">
           <div className="grid gap-1 rounded-lg bg-background/80 p-3">
-            <p>Started: {formatDate(currentRun?.startedAt)}</p>
-            <p>Ended: {formatDate(currentRun?.endedAt)}</p>
-            <p>Resume supported: {currentRun?.resumeSupported ? "Yes" : "No"}</p>
-            {currentRun?.pendingInputPrompt ? <p>Prompt: {currentRun.pendingInputPrompt}</p> : null}
+            <p>{copy.started}: {formatDate(currentRun?.startedAt)}</p>
+            <p>{copy.ended}: {formatDate(currentRun?.endedAt)}</p>
+            <p>{copy.resumeSupported}: {currentRun?.resumeSupported ? copy.yes : copy.no}</p>
+            {currentRun?.pendingInputPrompt ? <p>{copy.prompt}: {currentRun.pendingInputPrompt}</p> : null}
           </div>
-          {!currentRun ? <p>No active run yet.</p> : null}
+          {!currentRun ? <p>{copy.noActiveRunYet}</p> : null}
         </div>
       </section>
 
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Evidence</h2>
-          <p className="text-sm text-muted-foreground">Approvals, artifacts, and tool output stay here as supporting context.</p>
+          <h2 className="text-sm font-semibold">{copy.evidence}</h2>
+          <p className="text-sm text-muted-foreground">{copy.evidenceDescription}</p>
         </div>
 
         <div className="mt-3 space-y-3 text-sm text-muted-foreground">
           <details className="rounded-lg border bg-background p-3" open={hasBlockingApprovals}>
             <summary className="cursor-pointer list-none font-medium text-foreground">
-              Approvals {approvals.length > 0 ? `(${approvals.length})` : ""}
+              {copy.approvals} {approvals.length > 0 ? `(${approvals.length})` : ""}
             </summary>
             <div className="mt-3 space-y-3">
               {approvals.length === 0 ? (
-                <p>No pending approvals.</p>
+                <p>{copy.noPendingApprovals}</p>
               ) : (
                 approvals.map((approval) => (
                   <div key={approval.id} className="rounded-lg border bg-card px-3 py-2">
@@ -87,11 +117,11 @@ export function RunSidePanel({
 
           <details className="rounded-lg border bg-background p-3">
             <summary className="cursor-pointer list-none font-medium text-foreground">
-              Artifacts {artifacts.length > 0 ? `(${artifacts.length})` : ""}
+              {copy.artifacts} {artifacts.length > 0 ? `(${artifacts.length})` : ""}
             </summary>
             <div className="mt-3 space-y-3">
               {artifacts.length === 0 ? (
-                <p>No artifacts.</p>
+                <p>{copy.noArtifacts}</p>
               ) : (
                 artifacts.map((artifact) => (
                   <div key={artifact.id} className="rounded-lg border bg-card px-3 py-2">
@@ -105,11 +135,11 @@ export function RunSidePanel({
 
           <details className="rounded-lg border bg-background p-3">
             <summary className="cursor-pointer list-none font-medium text-foreground">
-              Tool Activity {toolCalls.length > 0 ? `(${toolCalls.length})` : ""}
+              {copy.toolActivity} {toolCalls.length > 0 ? `(${toolCalls.length})` : ""}
             </summary>
             <div className="mt-3 space-y-3">
               {toolCalls.length === 0 ? (
-                <p>No tool calls.</p>
+                <p>{copy.noToolCalls}</p>
               ) : (
                 toolCalls.map((tool) => (
                   <div key={tool.id} className="rounded-lg border bg-card px-3 py-2">

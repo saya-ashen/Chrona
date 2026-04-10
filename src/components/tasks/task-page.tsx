@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
-import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   SurfaceCard,
@@ -9,7 +7,6 @@ import {
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
 
 type TaskPageProps = {
   data: {
@@ -18,6 +15,9 @@ type TaskPageProps = {
       workspaceId: string;
       title: string;
       description: string | null;
+      runtimeModel: string | null;
+      prompt: string | null;
+      runtimeConfig: unknown;
       status: string;
       priority: string;
       dueAt: string | null;
@@ -25,6 +25,8 @@ type TaskPageProps = {
       scheduledEndAt: string | null;
       scheduleStatus: string;
       scheduleSource: string | null;
+      isRunnable: boolean;
+      runnabilitySummary: string;
       blockReason:
         | {
             blockType?: string;
@@ -75,21 +77,70 @@ type TaskPageProps = {
       uri?: string;
     }>;
   };
-  startRunAction?: (formData: FormData) => Promise<void>;
-  updateTaskAction?: (formData: FormData) => Promise<void>;
-  proposeScheduleAction?: (formData: FormData) => Promise<void>;
+  copy?: Partial<typeof DEFAULT_COPY>;
+};
+
+const DEFAULT_COPY = {
+  eyebrow: "Secondary task detail",
+  fallbackDescription: "Use this page for reference, deep links, and heavier context that would clutter Schedule.",
+  backToSchedule: "Back to Schedule",
+  openWorkbench: "Open Workbench",
+  dueBadgePrefix: "Due",
+  primarySurfacesTitle: "Use the primary surfaces",
+  primarySurfacesDescription:
+    "Keep core planning and task configuration in Schedule, then move into Work for execution and collaboration.",
+  editPlanning: "Edit planning in Schedule",
+  continueExecution: "Continue execution in Work",
+  runtimeConfigurationTitle: "Runtime configuration",
+  runtimeConfigurationDescription:
+    "Keep the runnable definition visible here, but treat Schedule as the default place to edit it.",
+  model: "Model",
+  needsModel: "Needs model",
+  runnability: "Runnability",
+  prompt: "Prompt",
+  noPrompt: "No prompt saved yet. Configure one in Schedule before execution.",
+  runtimeParams: "Runtime params",
+  noRuntimeParams: "No advanced runtime params saved.",
+  planningContextTitle: "Planning context",
+  planningContextDescription:
+    "Keep the current plan visible without turning this page back into the main planning surface.",
+  due: "Due",
+  start: "Start",
+  end: "End",
+  scheduleStatus: "Schedule status",
+  scheduleSource: "Schedule source",
+  noBlockingAction: "No blocking action recorded.",
+  dependenciesTitle: "Dependencies",
+  dependenciesDescription: "Track upstream work without pulling planning controls back into this page.",
+  noDependencies: "No dependencies linked yet.",
+  latestRunTitle: "Latest Run",
+  status: "Status",
+  started: "Started",
+  sync: "Sync",
+  noRunStarted: "No run started yet.",
+  pendingScheduleProposalsTitle: "Pending Schedule Proposals",
+  noPendingScheduleProposals: "No pending schedule proposals.",
+  via: "via",
+  recentApprovalsTitle: "Recent Approvals",
+  noRecentApprovals: "No recent approvals.",
+  recentArtifactsTitle: "Recent Artifacts",
+  noArtifacts: "No artifacts yet.",
 };
 
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
 }
 
-function formatDateTimeInput(value: string | null | undefined) {
-  return value ? value.slice(0, 16) : "";
-}
+function formatJson(value: unknown) {
+  if (value == null) {
+    return null;
+  }
 
-function parseDate(value: string | null) {
-  return value ? new Date(value) : null;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function priorityTone(priority: string) {
@@ -105,185 +156,191 @@ function scheduleTone(status: string) {
   return "neutral" as const;
 }
 
-export function TaskPage({ data, startRunAction, updateTaskAction, proposeScheduleAction }: TaskPageProps) {
+export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
+  const runtimeConfigJson = formatJson(data.task.runtimeConfig);
+  const copy = { ...DEFAULT_COPY, ...copyProp };
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <SurfaceCard className="space-y-6" padding="lg">
-        <SurfaceCardHeader className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-balance">{data.task.title}</h1>
-              <p className="text-sm leading-6 text-muted-foreground">
-                {data.task.description ?? "No task description yet."}
-              </p>
-            </div>
-            <TaskContextLinks
-              workspaceId={data.task.workspaceId}
-              taskId={data.task.id}
-              latestRunStatus={data.latestRunSummary?.status ?? null}
-              taskLabel="Open Task"
-              workLabel={data.latestRunSummary ? "Resume in Workbench" : "Start Work"}
-            />
-          </div>
+      <div className="space-y-6">
+        <SurfaceCard className="space-y-6" padding="lg">
+          <SurfaceCardHeader className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-3xl space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
+                  {copy.eyebrow}
+                </p>
+                <h1 className="text-3xl font-semibold tracking-tight text-balance">{data.task.title}</h1>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {data.task.description ?? copy.fallbackDescription}
+                </p>
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge tone="info">{data.task.status}</StatusBadge>
-            <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
-            <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
-            <StatusBadge>Due {formatDate(data.task.dueAt)}</StatusBadge>
-          </div>
-        </SurfaceCardHeader>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <SurfaceCard variant="inset" className="space-y-3">
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>Task Control</SurfaceCardTitle>
-              <SurfaceCardDescription>
-                Keep the task definition current without leaving the control surface.
-              </SurfaceCardDescription>
-            </SurfaceCardHeader>
-            <form action={updateTaskAction} className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <StatusBadge>Status {data.task.status}</StatusBadge>
-                <StatusBadge>Priority {data.task.priority}</StatusBadge>
+                <LocalizedLink href="/schedule" className={buttonVariants({ variant: "default" })}>
+                  {copy.backToSchedule}
+                </LocalizedLink>
+                <LocalizedLink
+                  href={`/workspaces/${data.task.workspaceId}/work/${data.task.id}`}
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  {copy.openWorkbench}
+                </LocalizedLink>
               </div>
-              <Field label="Title">
-                <input name="title" required defaultValue={data.task.title} className={inputClassName} />
-              </Field>
-              <Field label="Description">
-                <textarea
-                  name="description"
-                  rows={5}
-                  defaultValue={data.task.description ?? ""}
-                  placeholder="Execution context, desired outcome, or constraints"
-                  className={textareaClassName}
-                />
-              </Field>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Priority">
-                  <select name="priority" defaultValue={data.task.priority} className={selectClassName}>
-                    {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
-                      <option key={priority} value={priority}>
-                        {priority}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Due">
-                  <input
-                    type="datetime-local"
-                    name="dueAt"
-                    defaultValue={formatDateTimeInput(data.task.dueAt)}
-                    className={inputClassName}
-                  />
-                </Field>
-              </div>
-              <button type="submit" className={buttonVariants({ variant: "default" })}>
-                Save Task Details
-              </button>
-            </form>
-          </SurfaceCard>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge tone="info">{data.task.status}</StatusBadge>
+              <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
+              <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
+              <StatusBadge tone={data.task.isRunnable ? "success" : "warning"}>{data.task.runnabilitySummary}</StatusBadge>
+              <StatusBadge>
+                {copy.dueBadgePrefix} {formatDate(data.task.dueAt)}
+              </StatusBadge>
+            </div>
+          </SurfaceCardHeader>
 
           <SurfaceCard variant="inset" className="space-y-3">
             <SurfaceCardHeader>
-              <SurfaceCardTitle>Scheduling</SurfaceCardTitle>
-              <SurfaceCardDescription>
-                Keep the task window visible and editable from the same planning surface.
-              </SurfaceCardDescription>
+              <SurfaceCardTitle>{copy.primarySurfacesTitle}</SurfaceCardTitle>
+              <SurfaceCardDescription>{copy.primarySurfacesDescription}</SurfaceCardDescription>
             </SurfaceCardHeader>
-            <dl className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between gap-4">
-                <dt>Due</dt>
-                <dd>{formatDate(data.task.dueAt)}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>Start</dt>
-                <dd>{formatDate(data.task.scheduledStartAt)}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>End</dt>
-                <dd>{formatDate(data.task.scheduledEndAt)}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>Schedule Status</dt>
-                <dd>{data.task.scheduleStatus}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>Schedule Source</dt>
-                <dd>{data.task.scheduleSource ?? "-"}</dd>
-              </div>
-            </dl>
-            <div className="pt-1">
-              <ScheduleEditorForm
-                taskId={data.task.id}
-                dueAt={parseDate(data.task.dueAt)}
-                scheduledStartAt={parseDate(data.task.scheduledStartAt)}
-                scheduledEndAt={parseDate(data.task.scheduledEndAt)}
-                scheduleSource={(data.task.scheduleSource as "human" | "ai" | "system" | null) ?? "human"}
-              />
+
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <LocalizedLink href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                {copy.editPlanning}
+              </LocalizedLink>
+              <LocalizedLink
+                href={`/workspaces/${data.task.workspaceId}/work/${data.task.id}`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                {copy.continueExecution}
+              </LocalizedLink>
             </div>
           </SurfaceCard>
-        </div>
 
-        <SurfaceCard variant="inset" className="space-y-3">
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>Dependencies</SurfaceCardTitle>
-            <SurfaceCardDescription>Track upstream work without opening a second planning surface.</SurfaceCardDescription>
-          </SurfaceCardHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            {data.task.dependencies.length === 0 ? (
-              <p>No dependencies linked yet.</p>
-            ) : (
-              data.task.dependencies.map((dependency) => (
-                <SurfaceCard key={dependency.id} as="div" variant="default" padding="sm" className="rounded-2xl">
-                  <p className="font-medium text-foreground">{dependency.dependsOnTask.title}</p>
-                  <p>
-                    {dependency.dependencyType} · {dependency.dependsOnTask.status}
-                  </p>
-                </SurfaceCard>
-              ))
-            )}
+          <div className="grid gap-4 md:grid-cols-2">
+            <SurfaceCard variant="inset" className="space-y-3">
+              <SurfaceCardHeader>
+                <SurfaceCardTitle>{copy.runtimeConfigurationTitle}</SurfaceCardTitle>
+                <SurfaceCardDescription>{copy.runtimeConfigurationDescription}</SurfaceCardDescription>
+              </SurfaceCardHeader>
+
+              <dl className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.model}</dt>
+                  <dd className="text-right text-foreground">{data.task.runtimeModel ?? copy.needsModel}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.runnability}</dt>
+                  <dd className="text-right text-foreground">{data.task.runnabilitySummary}</dd>
+                </div>
+              </dl>
+
+              <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.prompt}</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {data.task.prompt ?? copy.noPrompt}
+                </p>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.runtimeParams}</p>
+                {runtimeConfigJson ? (
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-foreground">{runtimeConfigJson}</pre>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{copy.noRuntimeParams}</p>
+                )}
+              </div>
+            </SurfaceCard>
+
+            <SurfaceCard variant="inset" className="space-y-3">
+              <SurfaceCardHeader>
+                <SurfaceCardTitle>{copy.planningContextTitle}</SurfaceCardTitle>
+                <SurfaceCardDescription>{copy.planningContextDescription}</SurfaceCardDescription>
+              </SurfaceCardHeader>
+
+              <dl className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.due}</dt>
+                  <dd>{formatDate(data.task.dueAt)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.start}</dt>
+                  <dd>{formatDate(data.task.scheduledStartAt)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.end}</dt>
+                  <dd>{formatDate(data.task.scheduledEndAt)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.scheduleStatus}</dt>
+                  <dd>{data.task.scheduleStatus}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt>{copy.scheduleSource}</dt>
+                  <dd>{data.task.scheduleSource ?? "-"}</dd>
+                </div>
+              </dl>
+
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
+                {data.task.blockReason?.actionRequired ?? copy.noBlockingAction}
+              </div>
+            </SurfaceCard>
           </div>
+
+          <SurfaceCard variant="inset" className="space-y-3">
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>{copy.dependenciesTitle}</SurfaceCardTitle>
+              <SurfaceCardDescription>{copy.dependenciesDescription}</SurfaceCardDescription>
+            </SurfaceCardHeader>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              {data.task.dependencies.length === 0 ? (
+                <p>{copy.noDependencies}</p>
+              ) : (
+                data.task.dependencies.map((dependency) => (
+                  <SurfaceCard key={dependency.id} as="div" variant="default" padding="sm" className="rounded-2xl">
+                    <p className="font-medium text-foreground">{dependency.dependsOnTask.title}</p>
+                    <p>
+                      {dependency.dependencyType} · {dependency.dependsOnTask.status}
+                    </p>
+                  </SurfaceCard>
+                ))
+              )}
+            </div>
+          </SurfaceCard>
         </SurfaceCard>
-      </SurfaceCard>
+      </div>
 
       <aside className="space-y-4">
         <SurfaceCard>
-          <SurfaceCardTitle>Latest Run</SurfaceCardTitle>
+          <SurfaceCardTitle>{copy.latestRunTitle}</SurfaceCardTitle>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
             {data.latestRunSummary ? (
               <>
-                <p>Status: {data.latestRunSummary.status}</p>
-                <p>Started: {formatDate(data.latestRunSummary.startedAt)}</p>
-                <p>Sync: {data.latestRunSummary.syncStatus}</p>
+                <p>{copy.status}: {data.latestRunSummary.status}</p>
+                <p>{copy.started}: {formatDate(data.latestRunSummary.startedAt)}</p>
+                <p>{copy.sync}: {data.latestRunSummary.syncStatus}</p>
               </>
             ) : (
-              <p>No run started yet.</p>
+              <p>{copy.noRunStarted}</p>
             )}
           </div>
         </SurfaceCard>
 
         <SurfaceCard>
-          <SurfaceCardTitle>Block Reason</SurfaceCardTitle>
-          <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <p>{data.task.blockReason?.actionRequired ?? "No block"}</p>
-            {data.task.blockReason?.scope ? <p>Scope: {data.task.blockReason.scope}</p> : null}
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard>
-          <SurfaceCardTitle>Pending Schedule Proposals</SurfaceCardTitle>
+          <SurfaceCardTitle>{copy.pendingScheduleProposalsTitle}</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.scheduleProposals.length === 0 ? (
-              <p>No pending schedule proposals.</p>
+              <p>{copy.noPendingScheduleProposals}</p>
             ) : (
               data.scheduleProposals.map((proposal) => (
                 <SurfaceCard key={proposal.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
                   <p className="font-medium text-foreground">{proposal.summary}</p>
                   <p>
-                    {proposal.source} via {proposal.proposedBy}
+                    {proposal.source} {copy.via} {proposal.proposedBy}
                   </p>
-                  <p>Status: {proposal.status}</p>
+                  <p>{copy.status}: {proposal.status}</p>
                 </SurfaceCard>
               ))
             )}
@@ -291,59 +348,10 @@ export function TaskPage({ data, startRunAction, updateTaskAction, proposeSchedu
         </SurfaceCard>
 
         <SurfaceCard>
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>Create Schedule Proposal</SurfaceCardTitle>
-            <SurfaceCardDescription>
-              Capture a human planning suggestion so Schedule can review and accept it later.
-            </SurfaceCardDescription>
-          </SurfaceCardHeader>
-          <form action={proposeScheduleAction} className="mt-3 space-y-3">
-            <Field label="Proposal summary">
-              <textarea
-                name="summary"
-                rows={4}
-                required
-                placeholder="Suggest how this task should move in the schedule"
-                className={textareaClassName}
-              />
-            </Field>
-            <div className="grid gap-3">
-              <Field label="Proposed due">
-                <input
-                  type="datetime-local"
-                  name="dueAt"
-                  defaultValue={formatDateTimeInput(data.task.dueAt)}
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="Proposed start">
-                <input
-                  type="datetime-local"
-                  name="scheduledStartAt"
-                  defaultValue={formatDateTimeInput(data.task.scheduledStartAt)}
-                  className={inputClassName}
-                />
-              </Field>
-              <Field label="Proposed end">
-                <input
-                  type="datetime-local"
-                  name="scheduledEndAt"
-                  defaultValue={formatDateTimeInput(data.task.scheduledEndAt)}
-                  className={inputClassName}
-                />
-              </Field>
-            </div>
-            <button type="submit" className={buttonVariants({ variant: "outline" })}>
-              Create Proposal
-            </button>
-          </form>
-        </SurfaceCard>
-
-        <SurfaceCard>
-          <SurfaceCardTitle>Recent Approvals</SurfaceCardTitle>
+          <SurfaceCardTitle>{copy.recentApprovalsTitle}</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.approvals.length === 0 ? (
-              <p>No recent approvals.</p>
+              <p>{copy.noRecentApprovals}</p>
             ) : (
               data.approvals.map((approval) => (
                 <SurfaceCard key={approval.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
@@ -356,10 +364,10 @@ export function TaskPage({ data, startRunAction, updateTaskAction, proposeSchedu
         </SurfaceCard>
 
         <SurfaceCard>
-          <SurfaceCardTitle>Recent Artifacts</SurfaceCardTitle>
+          <SurfaceCardTitle>{copy.recentArtifactsTitle}</SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.artifacts.length === 0 ? (
-              <p>No artifacts yet.</p>
+              <p>{copy.noArtifacts}</p>
             ) : (
               data.artifacts.map((artifact) => (
                 <SurfaceCard key={artifact.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
@@ -368,35 +376,6 @@ export function TaskPage({ data, startRunAction, updateTaskAction, proposeSchedu
                 </SurfaceCard>
               ))
             )}
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard>
-          <SurfaceCardTitle>Actions</SurfaceCardTitle>
-          <div className="mt-3 flex flex-col gap-3">
-            <form action={startRunAction} className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-3">
-              <Field label="Run prompt">
-                <textarea
-                  name="prompt"
-                  required
-                  rows={4}
-                  defaultValue={data.task.description ?? `Continue working on: ${data.task.title}`}
-                  className={textareaClassName}
-                />
-              </Field>
-              <button type="submit" className={buttonVariants({ variant: "default" })}>
-                Start Run
-              </button>
-            </form>
-            <Link href="/schedule" className={buttonVariants({ variant: "outline" })}>
-              Open Schedule
-            </Link>
-            <Link
-              href={`/workspaces/${data.task.workspaceId}/work/${data.task.id}`}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Open Workbench
-            </Link>
           </div>
         </SurfaceCard>
       </aside>

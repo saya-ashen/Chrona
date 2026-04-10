@@ -35,9 +35,9 @@
 后续可以补 `使用说明`，但不能依赖文档来弥补页面职责本身的不清楚。
 
 MVP 页面必须做到即使用户不看说明，也能大致理解这三类工作面：
-- `Schedule`：安排任务
-- `Task Page`：管理单个任务的计划与控制
-- `Work Page`：观察和推进单个任务的执行
+- `Schedule`：安排任务，并完成轻量 task 配置
+- `Task Page / Task Detail`：次级详情面，承载 deep link 和高级编辑
+- `Work Page`：观察和推进单个任务的执行，并与 AI 协作
 
 ### 2.4 MVP 守门原则
 如果出现以下情况，说明产品正在偏离 B：
@@ -231,14 +231,14 @@ Webhooks 或流式订阅可以作为后续增强，但不是 MVP 依赖项。
 
 ### 8.1 顶层导航
 MVP 顶层导航调整为：
-- `Workspaces`
 - `Schedule`
-- `Tasks`
+- `Work`
 - `Inbox`
 - `Memory`
 - `Settings`
+- `Workspaces`（Advanced / Internal）
 
-这里 `Schedule` 是关键入口，不再视为 Phase 2 附属页面。
+这里 `Schedule` 是关键入口，不再视为 Phase 2 附属页面；`Task` 不再作为顶层主导航，而是 `Schedule` 内的次级详情能力。
 
 ### 8.2 Workspace Overview
 `Workspace Overview` 是运营分诊面，不是 BI dashboard，也不是欢迎页。
@@ -260,14 +260,22 @@ MVP 顶层导航调整为：
 - 谁或哪个 agent 做
 - 当前排程是否冲突
 
+并且在当前 MVP 收敛方向下，还要回答：
+- 这个 task 是否已经具备可运行配置
+- 是否可以直接从这里进入执行
+
 核心内容：
 - 日程视图：按时间块看已安排任务
 - `Unscheduled Queue`：还没进入时间表的任务
 - `AI Proposals`：AI 提出的排程建议
 - `Conflicts / Overdue Risks`：冲突、超期风险、容量问题
+- 轻量 task 配置：至少支持 `model`、`prompt / instructions` 与最小运行参数
+- 多视图切换：`Timeline / Queue / List` 应视为同一 planning surface 的不同观察方式
 
 ### 8.4 Task Center
-`Task Center` 不是被动数据表，而是任务控制列表。
+`Task Center` 不应再被视为独立主入口，而应优先演化为 `Schedule` 的 `List` 视图或其等价形态。
+
+它不是被动数据表，而是任务控制列表。
 
 每条任务摘要至少应显示：
 - title
@@ -290,11 +298,13 @@ MVP 顶层导航调整为：
 ### 8.5 Task Page
 建议路由：`/workspaces/:workspaceId/tasks/:taskId`
 
-`Task Page` 负责计划和控制，回答：
+`Task Page` 在当前方向下是 **次级详情页**，不是首要工作流页面。它负责承接 deep link、较重的单任务编辑，以及在必要时承载高级配置。
+
+它主要回答：
 - 这个任务是什么
 - 为什么重要
-- 什么时候做
 - 当前卡在哪里
+- 当前运行配置是否完整
 
 它应承载：
 - task definition
@@ -302,7 +312,8 @@ MVP 顶层导航调整为：
 - dependencies
 - owner
 - budget
-- deadline 和 schedule
+- deadline 和 schedule（必要时）
+- advanced runtime config（如 tools / skills / backend overrides，仅在后续需要时）
 - latest run summary
 - recent approvals / artifacts / block reason
 - 进入 `Work Page` 的入口
@@ -384,19 +395,22 @@ MVP 顶层导航调整为：
 ### 9.1 页面职责边界
 `Schedule` 负责：
 - 全局任务编排
+- 任务创建
+- 轻量运行时配置
 - 冲突检查
 - 批量排程
 - 接受或拒绝 AI 排程建议
 
 `Task Page` 负责：
-- 任务定义与计划控制
-- 单个任务的安排调整
-- 依赖、负责人、优先级和 block reason
+- 次级详情查看
+- 高级任务编辑
+- 不适合直接塞进 `Schedule` 的低频配置
 
 `Work Page` 负责：
 - 当前执行观察
 - 审批和输入介入
 - 失败诊断与恢复动作
+- 输出导向的实时协作
 
 ### 9.2 读模型分层
 至少拆成三类投影视图：
@@ -454,14 +468,20 @@ MVP 顶层导航调整为：
 `Task Shell` 只保留跨页面必须知道的任务信息，例如标题、状态、优先级、block reason、deadline、schedule summary 和依赖摘要。
 
 ### 9.4 写操作边界
-任务级编辑动作主要留在 `Task Page`：
+任务级编辑动作优先放在 `Schedule`，仅把低频或高级项留在 `Task Page`：
+- 创建 task
 - 修改标题或描述
 - 调整优先级
+- 设置 model / prompt / 最小运行配置
+
+高级编辑动作保留在 `Task Page`：
+- 修改标题或描述
 - 调整依赖
 - 调整负责人
 - 更新目标定义
+- 高级 runtime overrides（如后续开放 tools / skills / backend）
 
-排程级动作主要放在 `Schedule` 和 `Task Page`：
+排程级动作主要放在 `Schedule`：
 - propose schedule
 - apply schedule
 - clear schedule
@@ -476,7 +496,7 @@ MVP 顶层导航调整为：
 - provide input
 - 查看执行输出与过程证据
 
-允许 `Task Page` 保留少量控制入口动作，例如 `Start Run` 和 `Open Work Page`，但不应承载主要执行过程交互。
+允许 `Task Page` 保留少量控制入口动作，例如 `Start Run` 和 `Open Work Page`，但它不应再承担 MVP 的主要计划流或主要执行流。
 
 ### 9.5 一致性规则
 - 同一个任务的计划信息必须来自统一任务事实源

@@ -1,5 +1,59 @@
 import { db } from "@/lib/db";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
+import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+
+function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  ownerType: string;
+  assigneeAgentId: string | null;
+  runtimeModel: string | null;
+  prompt: string | null;
+  runtimeConfig: unknown;
+} }) {
+  return {
+    taskId: item.taskId,
+    workspaceId: item.workspaceId,
+    title: item.task.title,
+    description: item.task.description,
+    priority: item.task.priority,
+    ownerType: item.task.ownerType,
+    assigneeAgentId: item.task.assigneeAgentId,
+    persistedStatus: item.persistedStatus,
+    displayState: item.displayState,
+    actionRequired: item.actionRequired,
+    approvalPendingCount: item.approvalPendingCount ?? 0,
+    scheduleStatus: item.scheduleStatus,
+    scheduleSource: item.scheduleSource,
+    dueAt: item.dueAt,
+    scheduledStartAt: item.scheduledStartAt,
+    scheduledEndAt: item.scheduledEndAt,
+    latestRunStatus: item.latestRunStatus,
+    scheduleProposalCount: item.scheduleProposalCount ?? 0,
+    lastActivityAt: item.lastActivityAt,
+    ...mapTaskRunnability(item.task),
+  };
+}
+
+function mapTaskRunnability(task: {
+  runtimeModel: string | null;
+  prompt: string | null;
+  runtimeConfig: unknown;
+}) {
+  const runnability = deriveTaskRunnability(task);
+
+  return {
+    runtimeModel: task.runtimeModel,
+    prompt: task.prompt,
+    runtimeConfig: task.runtimeConfig,
+    isRunnable: runnability.isRunnable,
+    runnabilityState: runnability.state,
+    runnabilitySummary: runnability.summary,
+  };
+}
 
 export async function getSchedulePage(workspaceId: string) {
   await syncStaleWorkspaceRunsForRead(workspaceId);
@@ -26,67 +80,25 @@ export async function getSchedulePage(workspaceId: string) {
     }),
   ]);
 
-  const scheduled = projections
+  const listItems = projections.map((item) => mapProjectionItem(item));
+
+  const scheduled = listItems
     .filter(
       (item) =>
         item.scheduleStatus &&
         !["Unscheduled", "AtRisk", "Overdue", "Interrupted"].includes(item.scheduleStatus),
     )
-    .map((item) => ({
-      taskId: item.taskId,
-      workspaceId: item.workspaceId,
-      title: item.task.title,
-      priority: item.task.priority,
-      ownerType: item.task.ownerType,
-      assigneeAgentId: item.task.assigneeAgentId,
-      persistedStatus: item.persistedStatus,
-      actionRequired: item.actionRequired,
-      approvalPendingCount: item.approvalPendingCount,
-      scheduleStatus: item.scheduleStatus,
-      scheduleSource: item.scheduleSource,
-      dueAt: item.dueAt,
-      scheduledStartAt: item.scheduledStartAt,
-      scheduledEndAt: item.scheduledEndAt,
-      latestRunStatus: item.latestRunStatus,
-    }));
+    .map((item) => item);
 
-  const unscheduled = projections
+  const unscheduled = listItems
     .filter((item) => item.scheduleStatus === "Unscheduled")
-    .map((item) => ({
-      taskId: item.taskId,
-      workspaceId: item.workspaceId,
-      title: item.task.title,
-      priority: item.task.priority,
-      ownerType: item.task.ownerType,
-      assigneeAgentId: item.task.assigneeAgentId,
-      persistedStatus: item.persistedStatus,
-      actionRequired: item.actionRequired,
-      approvalPendingCount: item.approvalPendingCount,
-      dueAt: item.dueAt,
-      latestRunStatus: item.latestRunStatus,
-      scheduleProposalCount: item.scheduleProposalCount,
-    }));
+    .map((item) => item);
 
-  const risks = projections
+  const risks = listItems
     .filter(
       (item) => item.scheduleStatus && ["AtRisk", "Overdue", "Interrupted"].includes(item.scheduleStatus),
     )
-    .map((item) => ({
-      taskId: item.taskId,
-      workspaceId: item.workspaceId,
-      title: item.task.title,
-      priority: item.task.priority,
-      ownerType: item.task.ownerType,
-      assigneeAgentId: item.task.assigneeAgentId,
-      persistedStatus: item.persistedStatus,
-      scheduleStatus: item.scheduleStatus,
-      actionRequired: item.actionRequired,
-      approvalPendingCount: item.approvalPendingCount,
-      latestRunStatus: item.latestRunStatus,
-      dueAt: item.dueAt,
-      scheduledStartAt: item.scheduledStartAt,
-      scheduledEndAt: item.scheduledEndAt,
-    }));
+    .map((item) => item);
 
   const mappedProposals = proposals.map((proposal) => ({
     proposalId: proposal.id,
@@ -114,6 +126,7 @@ export async function getSchedulePage(workspaceId: string) {
     scheduled,
     unscheduled,
     risks,
+    listItems,
     proposals: mappedProposals,
   };
 }

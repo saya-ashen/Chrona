@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -25,9 +24,23 @@ type InboxListProps = {
     consequence: string;
     actions?: ReactNode;
   }>;
+  copy?: Partial<typeof DEFAULT_COPY>;
 };
 
-export function InboxList({ items }: InboxListProps) {
+const DEFAULT_COPY = {
+  risk: "Risk",
+  task: "Task",
+  run: "Run",
+  openWorkContext: "Open Work Context",
+  openWorkbench: "Open Workbench",
+  approve: "Approve",
+  reject: "Reject",
+  editAndApprove: "Edit and Approve",
+};
+
+export function InboxList({ items, copy: copyProp }: InboxListProps) {
+  const copy = { ...DEFAULT_COPY, ...copyProp };
+
   return (
     <div className="space-y-4">
       {items.map((item) => (
@@ -39,21 +52,21 @@ export function InboxList({ items }: InboxListProps) {
                 <SurfaceCardDescription>{item.sourceTaskTitle}</SurfaceCardDescription>
               </div>
               <StatusBadge tone={item.riskLevel.toLowerCase() === "high" ? "critical" : item.riskLevel.toLowerCase() === "medium" ? "warning" : "neutral"}>
-                Risk: {item.riskLevel}
+                {copy.risk}: {item.riskLevel}
               </StatusBadge>
             </div>
           </SurfaceCardHeader>
           <div className="grid gap-2 text-sm text-muted-foreground">
             {item.detail ? <p>{item.detail}</p> : null}
-            <p>Task: {item.sourceTaskTitle}</p>
-            {item.currentRunLabel ? <p>Run: {item.currentRunLabel}</p> : null}
+            <p>{copy.task}: {item.sourceTaskTitle}</p>
+            {item.currentRunLabel ? <p>{copy.run}: {item.currentRunLabel}</p> : null}
             <p>{item.summary}</p>
             <p>{item.consequence}</p>
           </div>
           <TaskContextLinks
             workspaceId={item.workspaceId}
             taskId={item.sourceTaskId}
-            workLabel={item.kind === "schedule_proposal" ? "Open Work Context" : "Open Workbench"}
+            workLabel={item.kind === "schedule_proposal" ? copy.openWorkContext : copy.openWorkbench}
           />
           <div className="flex flex-wrap gap-2">
             {item.actions ?? (
@@ -62,19 +75,19 @@ export function InboxList({ items }: InboxListProps) {
                   type="button"
                   className={buttonVariants({ variant: "default" })}
                 >
-                  Approve
+                  {copy.approve}
                 </button>
                 <button
                   type="button"
                   className={buttonVariants({ variant: "destructive" })}
                 >
-                  Reject
+                  {copy.reject}
                 </button>
                 <button
                   type="button"
                   className={buttonVariants({ variant: "outline" })}
                 >
-                  Edit and Approve
+                  {copy.editAndApprove}
                 </button>
               </>
             )}

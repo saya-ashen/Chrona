@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -18,9 +17,20 @@ type MemoryConsoleProps = {
     runLabel: string | null;
     actions?: ReactNode;
   }>;
+  copy?: Partial<typeof DEFAULT_COPY>;
 };
 
-export function MemoryConsole({ items }: MemoryConsoleProps) {
+const DEFAULT_COPY = {
+  source: "Source",
+  task: "Task",
+  run: "Run",
+  openWorkbench: "Open Workbench",
+  invalidate: "Invalidate",
+};
+
+export function MemoryConsole({ items, copy: copyProp }: MemoryConsoleProps) {
+  const copy = { ...DEFAULT_COPY, ...copyProp };
+
   return (
     <div className="space-y-4">
       {items.map((item) => (
@@ -35,15 +45,15 @@ export function MemoryConsole({ items }: MemoryConsoleProps) {
             </div>
           </SurfaceCardHeader>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>Source: {item.sourceType}</p>
-            <p>Task: {item.taskTitle ?? "-"}</p>
-            <p>Run: {item.runLabel ?? "-"}</p>
+            <p>{copy.source}: {item.sourceType}</p>
+            <p>{copy.task}: {item.taskTitle ?? "-"}</p>
+            <p>{copy.run}: {item.runLabel ?? "-"}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {item.taskId ? (
-              <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} workLabel="Open Workbench" />
+              <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} workLabel={copy.openWorkbench} />
             ) : null}
-            {item.actions ?? <button type="button" className={buttonVariants({ variant: "outline" })}>Invalidate</button>}
+            {item.actions ?? <button type="button" className={buttonVariants({ variant: "outline" })}>{copy.invalidate}</button>}
           </div>
         </SurfaceCard>
       ))}

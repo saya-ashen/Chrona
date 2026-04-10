@@ -5,7 +5,7 @@ import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
 
 export async function retryRun(input: {
   taskId: string;
-  prompt: string;
+  prompt?: string;
   adapter?: OpenClawAdapter;
 }) {
   const latestRun = await db.run.findFirst({

@@ -4,14 +4,20 @@ AI-native task control plane prototype for planning, scheduling, and observing r
 
 ## What It Is
 
-This repository implements the schedule-first MVP described in `docs/superpowers/specs/2026-04-09-task-centric-ai-control-plane-design.md`.
+This repository implements the schedule-first MVP described in `docs/PRD.md` and `docs/superpowers/specs/2026-04-09-task-centric-ai-control-plane-design.md`.
 
 Key product surfaces:
-- `Schedule`: top-level planning surface for scheduled blocks, unscheduled work, AI proposals, and overdue/conflict risk
-- `Tasks`: task-centric control surface
-- `Work`: execution-centric surface with timeline, conversation, approvals, and artifacts
+- `Schedule`: primary planning and task-configuration surface with timeline, queue, and list-style task views
+- `Work`: execution-centric surface for observing output, reviewing runtime state, and collaborating with AI during/after runs
+- `Task`: secondary deep-linkable detail surface for advanced task editing, not a primary workflow destination
 - `Inbox` and `Memory`: human intervention and memory management surfaces
 - `Workspaces`: advanced/internal management surface reached through `Settings -> Advanced`
+
+Current MVP direction:
+- release quality is gated by two primary loops: `Schedule` (plan + configure) and `Work` (execute + collaborate)
+- runnable tasks should gain runtime configuration such as model and prompt before broader release
+- provider/backend selection is deferred unless users truly need to choose it explicitly; model selection is the main MVP control
+- templates should begin as lightweight starter presets / duplicate-task flows, not a heavy template library
 
 Default app entry now follows a single-workspace UX:
 - `/` redirects to `/schedule`
@@ -98,6 +104,7 @@ This requires `OPENCLAW_GATEWAY_URL` (or legacy `OPENCLAW_BASE_URL`) in `.env`.
 
 ## Planning Artifacts
 
+- PRD: `docs/PRD.md`
 - Spec: `docs/superpowers/specs/2026-04-09-task-centric-ai-control-plane-design.md`
 - Plan: `docs/superpowers/plans/2026-04-09-schedule-first-mvp-alignment.md`
 - Plan: `docs/superpowers/plans/2026-04-09-single-workspace-ux-alignment.md`

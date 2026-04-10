@@ -31,11 +31,11 @@ describe("InboxList", () => {
     expect(screen.getByText("Blocks deployment until approved")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/tasks/task_1",
+      "/en/workspaces/ws_1/tasks/task_1",
     );
     expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/work/task_1",
+      "/en/workspaces/ws_1/work/task_1",
     );
   });
 });

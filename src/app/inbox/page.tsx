@@ -1,5 +1,3 @@
-import { ControlPlaneShell } from "@/components/control-plane-shell";
-import { InboxList } from "@/components/inbox/inbox-list";
 import {
   approveApproval,
   acceptScheduleProposal,
@@ -7,11 +5,18 @@ import {
   rejectScheduleProposal,
   rejectApproval,
 } from "@/app/actions/task-actions";
-import Link from "next/link";
+import { ControlPlaneShell } from "@/components/control-plane-shell";
+import { LocalizedLink } from "@/components/i18n/localized-link";
+import { InboxList } from "@/components/inbox/inbox-list";
+import { resolveLocale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/get-dictionary";
 import { getInbox } from "@/modules/queries/get-inbox";
 import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 
-export default async function InboxPage() {
+export default async function InboxPage(props: { params?: Promise<{ lang?: string }> }) {
+  const locale = resolveLocale((await props.params)?.lang);
+  const dictionary = await getDictionary(locale);
+  const t = dictionary.pages.inbox;
   const workspace = await getDefaultWorkspace();
   const items = await getInbox(workspace.id);
 
@@ -25,7 +30,7 @@ export default async function InboxPage() {
               type="submit"
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
             >
-              Approve
+              {t.approve}
             </button>
           </form>
           <form action={rejectApproval.bind(null, item.id)}>
@@ -33,7 +38,7 @@ export default async function InboxPage() {
               type="submit"
               className="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-white"
             >
-              Reject
+              {t.reject}
             </button>
           </form>
           <form action={editAndApproveApproval} className="flex flex-wrap gap-2">
@@ -41,11 +46,11 @@ export default async function InboxPage() {
             <input
               type="text"
               name="editedContent"
-              placeholder="Edited instruction"
+              placeholder={t.editPlaceholder}
               className="min-w-48 rounded-md border bg-background px-3 py-2 text-sm"
             />
             <button type="submit" className="rounded-md border px-3 py-2 text-sm text-foreground">
-              Edit and Approve
+              {t.editAndApprove}
             </button>
           </form>
         </>
@@ -62,7 +67,7 @@ export default async function InboxPage() {
               type="submit"
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
             >
-              Accept Proposal
+              {t.acceptProposal}
             </button>
           </form>
           <form
@@ -76,23 +81,23 @@ export default async function InboxPage() {
               type="submit"
               className="rounded-md border px-3 py-2 text-sm text-foreground"
             >
-              Reject Proposal
+              {t.rejectProposal}
             </button>
           </form>
-          <Link
+          <LocalizedLink
             href="/schedule"
             className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
           >
-            Open Schedule
-          </Link>
+            {t.openSchedule}
+          </LocalizedLink>
         </>
       ) : (
-        <Link
+        <LocalizedLink
           href={`/workspaces/${item.workspaceId}/work/${item.sourceTaskId}`}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
-          Open Workbench
-        </Link>
+          {t.openWorkbench}
+        </LocalizedLink>
       )
     ),
   }));
@@ -101,12 +106,10 @@ export default async function InboxPage() {
     <ControlPlaneShell>
       <div className="space-y-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-          <p className="text-sm text-muted-foreground">
-            Triage approvals, input requests, schedule proposals, and recovery work from one interruption queue.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
-        <InboxList items={itemsWithActions} />
+        <InboxList items={itemsWithActions} copy={dictionary.components.inboxList} />
       </div>
     </ControlPlaneShell>
   );

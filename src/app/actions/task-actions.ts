@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from "next/cache";
+import { getPathVariants } from "@/i18n/routing";
 import { applySchedule as applyScheduleCommand } from "@/modules/commands/apply-schedule";
 import { clearSchedule as clearScheduleCommand } from "@/modules/commands/clear-schedule";
 import { createTask as createTaskCommand } from "@/modules/commands/create-task";
@@ -16,20 +17,30 @@ import { updateTask as updateTaskCommand } from "@/modules/commands/update-task"
 import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
 
 function revalidateWorkspaceTaskPaths(workspaceId: string, taskId: string) {
-  revalidatePath("/workspaces");
-  revalidatePath("/schedule");
-  revalidatePath("/tasks");
-  revalidatePath(`/workspaces/${workspaceId}`);
-  revalidatePath(`/workspaces/${workspaceId}/tasks/${taskId}`);
-  revalidatePath(`/workspaces/${workspaceId}/work/${taskId}`);
-  revalidatePath("/inbox");
+  revalidateAppPaths([
+    "/workspaces",
+    "/schedule",
+    "/tasks",
+    `/workspaces/${workspaceId}`,
+    `/workspaces/${workspaceId}/tasks/${taskId}`,
+    `/workspaces/${workspaceId}/work/${taskId}`,
+    "/inbox",
+  ]);
 }
 
 function revalidateMemoryPaths(workspaceId: string, taskId: string | null) {
-  revalidatePath("/memory");
+  revalidateAppPaths(["/memory"]);
 
   if (taskId) {
     revalidateWorkspaceTaskPaths(workspaceId, taskId);
+  }
+}
+
+function revalidateAppPaths(paths: string[]) {
+  const variants = new Set(paths.flatMap((path) => getPathVariants(path)));
+
+  for (const path of variants) {
+    revalidatePath(path);
   }
 }
 
@@ -41,12 +52,22 @@ export async function updateTask(input: Parameters<typeof updateTaskCommand>[0])
 
 export async function createTask(input: Parameters<typeof createTaskCommand>[0]) {
   const result = await createTaskCommand(input);
-  revalidatePath("/workspaces");
-  revalidatePath("/schedule");
-  revalidatePath("/tasks");
-  revalidatePath(`/workspaces/${result.workspaceId}`);
-  revalidatePath(`/workspaces/${result.workspaceId}/tasks/${result.taskId}`);
+  revalidateAppPaths([
+    "/workspaces",
+    "/schedule",
+    "/tasks",
+    `/workspaces/${result.workspaceId}`,
+    `/workspaces/${result.workspaceId}/tasks/${result.taskId}`,
+  ]);
   return result;
+}
+
+export async function createTaskFromSchedule(input: Parameters<typeof createTaskCommand>[0]) {
+  return createTask(input);
+}
+
+export async function updateTaskConfigFromSchedule(input: Parameters<typeof updateTaskCommand>[0]) {
+  return updateTask(input);
 }
 
 export async function applySchedule(input: Parameters<typeof applyScheduleCommand>[0]) {

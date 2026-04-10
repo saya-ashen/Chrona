@@ -1,6 +1,122 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
 
+type WorkPageCopy = {
+  needsApproval: string;
+  needsInput: string;
+  needsRecovery: string;
+  result: string;
+  output: string;
+  progress: string;
+  humanApprovalMatters: string;
+  linkedToNextAction: string;
+  recoveryEvidence: string;
+  feedsSharedOutput: string;
+  noPlannedWindowYet: string;
+  executionTimingSlipping: string;
+  overdueRecovery: string;
+  scheduleAligned: string;
+  latestOutput: string;
+  latestMilestone: string;
+  scheduleImpact: string;
+  startExecution: string;
+  noRunActiveDescription: string;
+  noActiveRunWhy: string;
+  provideInput: string;
+  waitingForGuidance: string;
+  pausedUntilReply: string;
+  requestedGuidance: string;
+  resolveApproval: string;
+  blockedOnApproval: string;
+  humanDecisionRequired: string;
+  pendingApproval: string;
+  approvalRequest: string;
+  approvalSummary: string;
+  recoverRun: string;
+  stoppedBeforeFinishing: string;
+  executionStopped: string;
+  latestToolIssue: string;
+  reviewResult: string;
+  completedDescription: string;
+  resultAvailableWhy: string;
+  observeProgress: string;
+  runActiveDescription: string;
+  agentExecutingWhy: string;
+  checkRunState: string;
+  inspectBeforeActing: string;
+  stateNeedsInspection: string;
+  startRunHere: string;
+  sendToAgent: string;
+  approveRejectEdit: string;
+  retryRun: string;
+  reviewOutput: string;
+  watchWorkstream: string;
+  inspectRun: string;
+  latestAgentOutput: string;
+  conversationOutput: string;
+  noMappedOutputYet: string;
+  latestArtifactAppears: string;
+  noOutputSource: string;
+};
+
+const DEFAULT_COPY: WorkPageCopy = {
+  needsApproval: "Needs approval",
+  needsInput: "Needs input",
+  needsRecovery: "Needs recovery",
+  result: "Result",
+  output: "Output",
+  progress: "Progress",
+  humanApprovalMatters: "Human approval or review directly affects whether this run can continue.",
+  linkedToNextAction: "Linked to Next Action",
+  recoveryEvidence: "Recovery evidence",
+  feedsSharedOutput: "Feeds Shared Output",
+  noPlannedWindowYet: "No planned window exists yet. Place or adjust the task from Schedule.",
+  executionTimingSlipping: "Execution timing is slipping against the planned window.",
+  overdueRecovery: "The task is beyond its expected window and needs recovery.",
+  scheduleAligned: "Schedule remains aligned with the current plan.",
+  latestOutput: "Latest output",
+  latestMilestone: "Latest milestone",
+  scheduleImpact: "Schedule impact",
+  startExecution: "Start execution",
+  noRunActiveDescription: "No run is active yet. Launch one from this workbench once the task is ready in Schedule.",
+  noActiveRunWhy: "There is no active run, so execution cannot progress from this page yet.",
+  provideInput: "Provide input",
+  waitingForGuidance: "The agent is waiting for operator guidance.",
+  pausedUntilReply: "The run is paused until the operator replies.",
+  requestedGuidance: "Requested guidance",
+  resolveApproval: "Resolve approval",
+  blockedOnApproval: "The run is blocked on an approval decision before it can continue.",
+  humanDecisionRequired: "A human decision is required before the next execution step can proceed.",
+  pendingApproval: "Pending approval",
+  approvalRequest: "Approval request",
+  approvalSummary: "Approval summary",
+  recoverRun: "Recover run",
+  stoppedBeforeFinishing: "The last run stopped before finishing. Retry with a focused recovery prompt.",
+  executionStopped: "Execution stopped and will not progress until a recovery action is taken.",
+  latestToolIssue: "Latest tool issue",
+  reviewResult: "Review result",
+  completedDescription: "The run completed. Review the latest output and decide whether follow-up work is needed.",
+  resultAvailableWhy: "The latest result is available and should be reviewed before closing or extending the task.",
+  observeProgress: "Observe progress",
+  runActiveDescription: "The run is still active. Watch the newest milestones and intervene only if the state changes.",
+  agentExecutingWhy: "The agent is currently executing, so the best next step is to monitor the newest evidence.",
+  checkRunState: "Check run state",
+  inspectBeforeActing: "Review the latest output and inspector state before acting.",
+  stateNeedsInspection: "The run state needs inspection before the next action is clear.",
+  startRunHere: "Start Run Here",
+  sendToAgent: "Send to Agent",
+  approveRejectEdit: "Approve / Reject / Edit",
+  retryRun: "Retry Run",
+  reviewOutput: "Review Output",
+  watchWorkstream: "Watch Workstream",
+  inspectRun: "Inspect Run",
+  latestAgentOutput: "Latest agent output",
+  conversationOutput: "Conversation output",
+  noMappedOutputYet: "No mapped output yet",
+  latestArtifactAppears: "The latest artifact or agent result will appear here first.",
+  noOutputSource: "No output source",
+};
+
 type EvidenceItem = {
   label: string;
   value: string;
@@ -16,7 +132,7 @@ function toIsoString(value: Date | null | undefined) {
   return value?.toISOString() ?? null;
 }
 
-function summarizeValue(value: unknown) {
+function summarizeValue(value: unknown, copy: WorkPageCopy) {
   if (typeof value === "string") {
     return value;
   }
@@ -26,7 +142,7 @@ function summarizeValue(value: unknown) {
   }
 
   if (Array.isArray(value)) {
-    return `${value.length} item${value.length === 1 ? "" : "s"}`;
+    return `${value.length} ${value.length === 1 ? "item" : "items"}`;
   }
 
   if (value && typeof value === "object") {
@@ -36,14 +152,14 @@ function summarizeValue(value: unknown) {
   return "-";
 }
 
-function summarizePayload(payload: Record<string, unknown>) {
+function summarizePayload(payload: Record<string, unknown>, copy: WorkPageCopy) {
   const entries = Object.entries(payload).slice(0, 3);
 
   if (entries.length === 0) {
     return "No structured payload recorded.";
   }
 
-  return entries.map(([key, value]) => `${key}: ${summarizeValue(value)}`).join(" · ");
+  return entries.map(([key, value]) => `${key}: ${summarizeValue(value, copy)}`).join(" · ");
 }
 
 function formatEventTitle(eventType: string) {
@@ -52,55 +168,55 @@ function formatEventTitle(eventType: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function classifyWorkstreamItem(eventType: string) {
+function classifyWorkstreamItem(eventType: string, copy: WorkPageCopy) {
   if (/approval/i.test(eventType)) {
     return {
       kind: "approval",
-      badge: "Needs approval",
-      whyItMatters: "Human approval or review directly affects whether this run can continue.",
-      linkedEvidenceLabel: "Linked to Next Action",
+      badge: copy.needsApproval,
+      whyItMatters: copy.humanApprovalMatters,
+      linkedEvidenceLabel: copy.linkedToNextAction,
     } as const;
   }
 
   if (/input/i.test(eventType)) {
     return {
       kind: "input",
-      badge: "Needs input",
-      whyItMatters: "The agent cannot continue until an operator provides guidance.",
-      linkedEvidenceLabel: "Linked to Next Action",
+      badge: copy.needsInput,
+      whyItMatters: copy.waitingForGuidance,
+      linkedEvidenceLabel: copy.linkedToNextAction,
     } as const;
   }
 
   if (/fail|error|blocked|reject/i.test(eventType)) {
     return {
       kind: "failure",
-      badge: "Needs recovery",
+      badge: copy.needsRecovery,
       whyItMatters: "This event likely explains why the run stalled or needs a retry path.",
-      linkedEvidenceLabel: "Recovery evidence",
+      linkedEvidenceLabel: copy.recoveryEvidence,
     } as const;
   }
 
   if (/complete|finish/i.test(eventType)) {
     return {
       kind: "result",
-      badge: "Result",
+      badge: copy.result,
       whyItMatters: "This milestone helps explain the latest outcome and what follow-up may be needed.",
-      linkedEvidenceLabel: "Feeds Shared Output",
+      linkedEvidenceLabel: copy.feedsSharedOutput,
     } as const;
   }
 
   if (/artifact|memory|output/i.test(eventType)) {
     return {
       kind: "output",
-      badge: "Output",
+      badge: copy.output,
       whyItMatters: "This event produced material that can guide the next decision or handoff.",
-      linkedEvidenceLabel: "Feeds Shared Output",
+      linkedEvidenceLabel: copy.feedsSharedOutput,
     } as const;
   }
 
   return {
     kind: "progress",
-    badge: "Progress",
+    badge: copy.progress,
     whyItMatters: "This shows the latest execution progress without demanding immediate action.",
     linkedEvidenceLabel: null,
   } as const;
@@ -111,18 +227,20 @@ function buildScheduleImpact(task: {
   dueAt: Date | null;
   scheduledStartAt: Date | null;
   scheduledEndAt: Date | null;
-}) {
+}, copy: WorkPageCopy) {
   return {
     status: task.scheduleStatus,
     dueAt: toIsoString(task.dueAt),
     scheduledStartAt: toIsoString(task.scheduledStartAt),
     scheduledEndAt: toIsoString(task.scheduledEndAt),
     summary:
-      task.scheduleStatus === "AtRisk"
-        ? "Execution timing is slipping against the planned window."
+      task.scheduleStatus === "Unscheduled"
+        ? copy.noPlannedWindowYet
+        : task.scheduleStatus === "AtRisk"
+        ? copy.executionTimingSlipping
         : task.scheduleStatus === "Overdue"
-          ? "The task is beyond its expected window and needs recovery."
-          : "Schedule remains aligned with the current plan.",
+          ? copy.overdueRecovery
+          : copy.scheduleAligned,
   };
 }
 
@@ -166,6 +284,7 @@ function buildCurrentIntervention({
   workstreamItems,
   toolCalls,
   scheduleImpact,
+  copy,
 }: {
   taskTitle: string;
   currentRun:
@@ -199,14 +318,15 @@ function buildCurrentIntervention({
     status: string;
     summary: string;
   };
+  copy: WorkPageCopy;
 }) {
   const latestWorkstreamItem = [...workstreamItems].reverse()[0] ?? null;
   const latestToolIssue = [...toolCalls].reverse().find((tool) => tool.errorSummary || tool.status === "failed") ?? null;
   const sharedEvidence: EvidenceItem[] = [];
 
   if (!latestOutput.empty) {
-    sharedEvidence.push({
-      label: "Latest output",
+      sharedEvidence.push({
+      label: copy.latestOutput,
       value: latestOutput.title,
       tone: "neutral",
       href: latestOutput.href,
@@ -214,16 +334,16 @@ function buildCurrentIntervention({
   }
 
   if (latestWorkstreamItem) {
-    sharedEvidence.push({
-      label: "Latest milestone",
+      sharedEvidence.push({
+      label: copy.latestMilestone,
       value: latestWorkstreamItem.summary,
       tone: latestWorkstreamItem.kind === "failure" ? "critical" : "neutral",
     });
   }
 
   if (scheduleImpact.status === "AtRisk" || scheduleImpact.status === "Overdue") {
-    sharedEvidence.push({
-      label: "Schedule impact",
+      sharedEvidence.push({
+      label: copy.scheduleImpact,
       value: scheduleImpact.summary,
       tone: scheduleImpact.status === "Overdue" ? "critical" : "warning",
     });
@@ -232,10 +352,10 @@ function buildCurrentIntervention({
   if (!currentRun) {
     return {
       kind: "idle",
-      title: "Start execution",
-      description: "No run is active yet. Launch one from this workbench or the task page when the plan is ready.",
-      actionLabel: "Open Task",
-      whyNow: blockReason?.actionRequired ?? "There is no active run, so execution cannot progress from this page yet.",
+        title: copy.startExecution,
+        description: copy.noRunActiveDescription,
+        actionLabel: copy.startRunHere,
+        whyNow: blockReason?.actionRequired ?? copy.noActiveRunWhy,
       evidence: sharedEvidence,
     } as const;
   }
@@ -244,14 +364,14 @@ function buildCurrentIntervention({
     case "WaitingForInput":
       return {
         kind: "input",
-        title: "Provide input",
-        description: currentRun.pendingInputPrompt ?? blockReason?.actionRequired ?? "The agent is waiting for operator guidance.",
-        actionLabel: "Send to Agent",
+        title: copy.provideInput,
+        description: currentRun.pendingInputPrompt ?? blockReason?.actionRequired ?? copy.waitingForGuidance,
+        actionLabel: copy.sendToAgent,
         defaultMessage: currentRun.pendingInputPrompt ?? `Continue work on ${taskTitle}`,
-        whyNow: blockReason?.actionRequired ?? "The run is paused until the operator replies.",
+        whyNow: blockReason?.actionRequired ?? copy.pausedUntilReply,
         evidence: [
           makeEvidence({
-            label: "Requested guidance",
+            label: copy.requestedGuidance,
             value: currentRun.pendingInputPrompt ?? `Continue work on ${taskTitle}`,
             tone: "warning",
           }),
@@ -261,24 +381,24 @@ function buildCurrentIntervention({
     case "WaitingForApproval":
       return {
         kind: "approval",
-        title: "Resolve approval",
+        title: copy.resolveApproval,
         description:
           approvals[0]?.summary ??
           blockReason?.actionRequired ??
-          "The run is blocked on an approval decision before it can continue.",
-        actionLabel: "Approve / Reject / Edit",
+          copy.blockedOnApproval,
+        actionLabel: copy.approveRejectEdit,
         approvals,
-        whyNow: blockReason?.actionRequired ?? "A human decision is required before the next execution step can proceed.",
+        whyNow: blockReason?.actionRequired ?? copy.humanDecisionRequired,
         evidence: [
           makeEvidence({
-            label: "Pending approval",
-            value: approvals[0]?.title ?? "Approval request",
+            label: copy.pendingApproval,
+            value: approvals[0]?.title ?? copy.approvalRequest,
             tone: "warning",
           }),
           ...(approvals[0]?.summary
             ? [
                 makeEvidence({
-                  label: "Approval summary",
+                  label: copy.approvalSummary,
                   value: approvals[0].summary,
                   tone: "warning",
                 }),
@@ -291,16 +411,16 @@ function buildCurrentIntervention({
     case "Cancelled":
       return {
         kind: "retry",
-        title: "Recover run",
-        description: blockReason?.actionRequired ?? "The last run stopped before finishing. Retry with a focused recovery prompt.",
-        actionLabel: "Retry Run",
+        title: copy.recoverRun,
+        description: blockReason?.actionRequired ?? copy.stoppedBeforeFinishing,
+        actionLabel: copy.retryRun,
         defaultMessage: `Retry task: ${taskTitle}`,
-        whyNow: blockReason?.actionRequired ?? "Execution stopped and will not progress until a recovery action is taken.",
+        whyNow: blockReason?.actionRequired ?? copy.executionStopped,
         evidence: [
           ...(latestToolIssue
             ? [
                 makeEvidence({
-                  label: "Latest tool issue",
+                  label: copy.latestToolIssue,
                   value: latestToolIssue.errorSummary ?? `${latestToolIssue.toolName} ended in ${latestToolIssue.status}`,
                   tone: "critical",
                 }),
@@ -312,28 +432,28 @@ function buildCurrentIntervention({
     case "Completed":
       return {
         kind: "review",
-        title: "Review result",
-        description: "The run completed. Review the latest output and decide whether follow-up work is needed.",
-        actionLabel: "Review Output",
-        whyNow: "The latest result is available and should be reviewed before closing or extending the task.",
+        title: copy.reviewResult,
+        description: copy.completedDescription,
+        actionLabel: copy.reviewOutput,
+        whyNow: copy.resultAvailableWhy,
         evidence: sharedEvidence.slice(0, 3),
       } as const;
     case "Running":
       return {
         kind: "observe",
-        title: "Observe progress",
-        description: "The run is still active. Watch the newest milestones and intervene only if the state changes.",
-        actionLabel: "Watch Workstream",
-        whyNow: "The agent is currently executing, so the best next step is to monitor the newest evidence.",
+        title: copy.observeProgress,
+        description: copy.runActiveDescription,
+        actionLabel: copy.watchWorkstream,
+        whyNow: copy.agentExecutingWhy,
         evidence: sharedEvidence.slice(0, 3),
       } as const;
     default:
       return {
         kind: "idle",
-        title: "Check run state",
-        description: blockReason?.actionRequired ?? "Review the latest output and inspector state before acting.",
-        actionLabel: "Inspect Run",
-        whyNow: blockReason?.actionRequired ?? "The run state needs inspection before the next action is clear.",
+        title: copy.checkRunState,
+        description: blockReason?.actionRequired ?? copy.inspectBeforeActing,
+        actionLabel: copy.inspectRun,
+        whyNow: blockReason?.actionRequired ?? copy.stateNeedsInspection,
         evidence: sharedEvidence.slice(0, 3),
       } as const;
   }
@@ -342,9 +462,11 @@ function buildCurrentIntervention({
 function buildLatestOutput({
   artifacts,
   conversation,
+  copy,
 }: {
   artifacts: Array<{ id: string; title: string; type: string; uri?: string | null; createdAt?: Date | null }>;
   conversation: Array<{ id: string; role: string; content: string; runtimeTs?: Date | null }>;
+  copy: WorkPageCopy;
 }) {
   const latestArtifact = artifacts[0];
 
@@ -365,27 +487,28 @@ function buildLatestOutput({
   if (latestAgentOutput) {
     return {
       kind: "message",
-      title: "Latest agent output",
+      title: copy.latestAgentOutput,
       body: latestAgentOutput.content,
       timestamp: toIsoString(latestAgentOutput.runtimeTs),
       href: null,
       empty: false,
-      sourceLabel: "Conversation output",
+      sourceLabel: copy.conversationOutput,
     } as const;
   }
 
   return {
     kind: "empty",
-    title: "No mapped output yet",
-    body: "The latest artifact or agent result will appear here first.",
+    title: copy.noMappedOutputYet,
+    body: copy.latestArtifactAppears,
     timestamp: null,
     href: null,
     empty: true,
-    sourceLabel: "No output source",
+    sourceLabel: copy.noOutputSource,
   } as const;
 }
 
-export async function getWorkPage(taskId: string) {
+export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPageCopy>) {
+  const copy = { ...DEFAULT_COPY, ...copyOverrides };
   await syncTaskRunForRead(taskId);
 
   const task = await db.task.findUniqueOrThrow({
@@ -440,13 +563,13 @@ export async function getWorkPage(taskId: string) {
       errorSummary: tool.errorSummary,
     })) ?? [];
   const workstreamItems = task.events.map((event) => {
-    const eventInfo = classifyWorkstreamItem(event.eventType);
+    const eventInfo = classifyWorkstreamItem(event.eventType, copy);
 
     return {
       id: event.id,
       eventType: event.eventType,
       title: formatEventTitle(event.eventType),
-      summary: summarizePayload(event.payload as Record<string, unknown>),
+      summary: summarizePayload(event.payload as Record<string, unknown>, copy),
       payload: event.payload as Record<string, unknown>,
       runtimeTs: toIsoString(event.runtimeTs),
       kind: eventInfo.kind,
@@ -481,14 +604,17 @@ export async function getWorkPage(taskId: string) {
       content: entry.content,
       runtimeTs: entry.runtimeTs,
     })) ?? [],
+    copy,
   });
-  const scheduleImpact = buildScheduleImpact(task);
+  const scheduleImpact = buildScheduleImpact(task, copy);
 
   return {
     taskShell: {
       id: task.id,
       workspaceId: task.workspaceId,
       title: task.title,
+      runtimeModel: task.runtimeModel,
+      prompt: task.prompt,
       status: task.projection?.displayState ?? task.status,
       priority: task.priority,
       dueAt: toIsoString(task.dueAt),
@@ -507,6 +633,7 @@ export async function getWorkPage(taskId: string) {
       workstreamItems,
       toolCalls,
       scheduleImpact,
+      copy,
     }),
     latestOutput,
     scheduleImpact,

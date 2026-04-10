@@ -44,6 +44,8 @@ describe("startRun", () => {
       data: {
         workspaceId: workspace.id,
         title: "Start a run",
+        runtimeModel: "gpt-5.4",
+        prompt: "Implement projection",
         status: "Ready",
         priority: "High",
         ownerType: "human",
@@ -104,6 +106,61 @@ describe("startRun", () => {
     expect(storedTask.runs).toHaveLength(1);
     expect(storedTask.runs[0]?.runtimeRunRef).toBe("runtime_123");
   });
+
+  it("uses the stored task prompt when no override prompt is provided", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Stored Runnable Config",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Run from saved config",
+        runtimeModel: "gpt-5.4",
+        prompt: "Use the saved prompt",
+        status: "Ready",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+
+    const adapter = {
+      async createRun(input: { prompt: string }) {
+        expect(input.prompt).toBe("Use the saved prompt");
+
+        return {
+          runtimeRunRef: "runtime_saved",
+          runtimeSessionKey: "agent:main:dashboard:runtime_saved",
+          runStarted: true,
+        };
+      },
+      async getRunSnapshot() {
+        throw new Error("not used in startRun test");
+      },
+      async readHistory() {
+        throw new Error("not used in startRun test");
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return null;
+      },
+      async resumeRun() {
+        throw new Error("not used in startRun test");
+      },
+    };
+
+    const result = await startRun({
+      taskId: task.id,
+      adapter,
+    });
+
+    expect(result.runtimeRunRef).toBe("runtime_saved");
+  });
 });
 
 describe("createTask", () => {
@@ -125,6 +182,8 @@ describe("createTask", () => {
       title: "  Bootstrap task creation  ",
       description: "  Add the first real create flow  ",
       priority: "High",
+      runtimeModel: "  gpt-5.4  ",
+      prompt: "  Add the first real create flow  ",
     });
 
     const storedTask = await db.task.findUniqueOrThrow({
@@ -139,6 +198,8 @@ describe("createTask", () => {
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
     expect(storedTask.status).toBe("Ready");
+    expect(storedTask.runtimeModel).toBe("gpt-5.4");
+    expect(storedTask.prompt).toBe("Add the first real create flow");
     expect(storedTask.ownerType).toBe("human");
     expect(storedTask.priority).toBe("High");
     expect(storedTask.projection).not.toBeNull();

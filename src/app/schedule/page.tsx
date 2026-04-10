@@ -7,6 +7,7 @@ type ScheduleRoutePageProps = {
   searchParams?: Promise<{
     day?: string;
     task?: string;
+    view?: string;
   }>;
 };
 
@@ -17,7 +18,13 @@ export default async function ScheduleRoutePage({ searchParams }: ScheduleRouteP
 
   return (
     <ControlPlaneShell>
-      <SchedulePage data={data} selectedDay={params?.day} selectedTaskId={params?.task} />
+      <SchedulePage
+        workspaceId={workspace.id}
+        data={data}
+        selectedDay={params?.day}
+        selectedTaskId={params?.task}
+        selectedView={params?.view}
+      />
     </ControlPlaneShell>
   );
 }
