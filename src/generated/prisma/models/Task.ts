@@ -39,6 +39,8 @@ export type TaskMinAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  runtimeAdapterKey: string | null
+  runtimeInputVersion: string | null
   runtimeModel: string | null
   prompt: string | null
   status: $Enums.TaskStatus | null
@@ -64,6 +66,8 @@ export type TaskMaxAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  runtimeAdapterKey: string | null
+  runtimeInputVersion: string | null
   runtimeModel: string | null
   prompt: string | null
   status: $Enums.TaskStatus | null
@@ -89,6 +93,9 @@ export type TaskCountAggregateOutputType = {
   workspaceId: number
   title: number
   description: number
+  runtimeAdapterKey: number
+  runtimeInput: number
+  runtimeInputVersion: number
   runtimeModel: number
   prompt: number
   runtimeConfig: number
@@ -126,6 +133,8 @@ export type TaskMinAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeAdapterKey?: true
+  runtimeInputVersion?: true
   runtimeModel?: true
   prompt?: true
   status?: true
@@ -151,6 +160,8 @@ export type TaskMaxAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeAdapterKey?: true
+  runtimeInputVersion?: true
   runtimeModel?: true
   prompt?: true
   status?: true
@@ -176,6 +187,9 @@ export type TaskCountAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeAdapterKey?: true
+  runtimeInput?: true
+  runtimeInputVersion?: true
   runtimeModel?: true
   prompt?: true
   runtimeConfig?: true
@@ -290,6 +304,9 @@ export type TaskGroupByOutputType = {
   workspaceId: string
   title: string
   description: string | null
+  runtimeAdapterKey: string | null
+  runtimeInput: runtime.JsonValue | null
+  runtimeInputVersion: string | null
   runtimeModel: string | null
   prompt: string | null
   runtimeConfig: runtime.JsonValue | null
@@ -340,6 +357,9 @@ export type TaskWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeInput?: Prisma.JsonNullableFilter<"Task">
+  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
   prompt?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeConfig?: Prisma.JsonNullableFilter<"Task">
@@ -377,6 +397,9 @@ export type TaskOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeAdapterKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeInput?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeInputVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
   prompt?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -417,6 +440,9 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeInput?: Prisma.JsonNullableFilter<"Task">
+  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
   prompt?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeConfig?: Prisma.JsonNullableFilter<"Task">
@@ -454,6 +480,9 @@ export type TaskOrderByWithAggregationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeAdapterKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeInput?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeInputVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
   prompt?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -489,6 +518,9 @@ export type TaskScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"Task"> | string
   title?: Prisma.StringWithAggregatesFilter<"Task"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  runtimeAdapterKey?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  runtimeInput?: Prisma.JsonNullableWithAggregatesFilter<"Task">
+  runtimeInputVersion?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   runtimeModel?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   prompt?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   runtimeConfig?: Prisma.JsonNullableWithAggregatesFilter<"Task">
@@ -515,6 +547,9 @@ export type TaskCreateInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -552,6 +587,9 @@ export type TaskUncheckedCreateInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -587,6 +625,9 @@ export type TaskUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -624,6 +665,9 @@ export type TaskUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -660,6 +704,9 @@ export type TaskCreateManyInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -686,6 +733,9 @@ export type TaskUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -713,6 +763,9 @@ export type TaskUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -750,6 +803,9 @@ export type TaskCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeAdapterKey?: Prisma.SortOrder
+  runtimeInput?: Prisma.SortOrder
+  runtimeInputVersion?: Prisma.SortOrder
   runtimeModel?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
   runtimeConfig?: Prisma.SortOrder
@@ -781,6 +837,8 @@ export type TaskMaxOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeAdapterKey?: Prisma.SortOrder
+  runtimeInputVersion?: Prisma.SortOrder
   runtimeModel?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -806,6 +864,8 @@ export type TaskMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeAdapterKey?: Prisma.SortOrder
+  runtimeInputVersion?: Prisma.SortOrder
   runtimeModel?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -1046,6 +1106,9 @@ export type TaskCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1081,6 +1144,9 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1145,6 +1211,9 @@ export type TaskScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeInput?: Prisma.JsonNullableFilter<"Task">
+  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
   prompt?: Prisma.StringNullableFilter<"Task"> | string | null
   runtimeConfig?: Prisma.JsonNullableFilter<"Task">
@@ -1171,6 +1240,9 @@ export type TaskCreateWithoutDependenciesInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1207,6 +1279,9 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1246,6 +1321,9 @@ export type TaskCreateWithoutDependentTasksInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1282,6 +1360,9 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1332,6 +1413,9 @@ export type TaskUpdateWithoutDependenciesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1368,6 +1452,9 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1413,6 +1500,9 @@ export type TaskUpdateWithoutDependentTasksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1449,6 +1539,9 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1483,6 +1576,9 @@ export type TaskCreateWithoutRunsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1519,6 +1615,9 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1569,6 +1668,9 @@ export type TaskUpdateWithoutRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1605,6 +1707,9 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1639,6 +1744,9 @@ export type TaskCreateWithoutApprovalsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1675,6 +1783,9 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1725,6 +1836,9 @@ export type TaskUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1761,6 +1875,9 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1795,6 +1912,9 @@ export type TaskCreateWithoutArtifactsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1831,6 +1951,9 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1881,6 +2004,9 @@ export type TaskUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1917,6 +2043,9 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1951,6 +2080,9 @@ export type TaskCreateWithoutMemoriesInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1987,6 +2119,9 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2037,6 +2172,9 @@ export type TaskUpdateWithoutMemoriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2073,6 +2211,9 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2107,6 +2248,9 @@ export type TaskCreateWithoutEventsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2143,6 +2287,9 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2193,6 +2340,9 @@ export type TaskUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2229,6 +2379,9 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2263,6 +2416,9 @@ export type TaskCreateWithoutProjectionInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2299,6 +2455,9 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2349,6 +2508,9 @@ export type TaskUpdateWithoutProjectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2385,6 +2547,9 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2419,6 +2584,9 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2455,6 +2623,9 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2505,6 +2676,9 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2541,6 +2715,9 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2575,6 +2752,9 @@ export type TaskCreateManyWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
   runtimeModel?: string | null
   prompt?: string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2601,6 +2781,9 @@ export type TaskUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2636,6 +2819,9 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2671,6 +2857,9 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2792,6 +2981,9 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeAdapterKey?: boolean
+  runtimeInput?: boolean
+  runtimeInputVersion?: boolean
   runtimeModel?: boolean
   prompt?: boolean
   runtimeConfig?: boolean
@@ -2830,6 +3022,9 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeAdapterKey?: boolean
+  runtimeInput?: boolean
+  runtimeInputVersion?: boolean
   runtimeModel?: boolean
   prompt?: boolean
   runtimeConfig?: boolean
@@ -2858,6 +3053,9 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeAdapterKey?: boolean
+  runtimeInput?: boolean
+  runtimeInputVersion?: boolean
   runtimeModel?: boolean
   prompt?: boolean
   runtimeConfig?: boolean
@@ -2886,6 +3084,9 @@ export type TaskSelectScalar = {
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeAdapterKey?: boolean
+  runtimeInput?: boolean
+  runtimeInputVersion?: boolean
   runtimeModel?: boolean
   prompt?: boolean
   runtimeConfig?: boolean
@@ -2908,7 +3109,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeAdapterKey" | "runtimeInput" | "runtimeInputVersion" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -2948,6 +3149,9 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     workspaceId: string
     title: string
     description: string | null
+    runtimeAdapterKey: string | null
+    runtimeInput: runtime.JsonValue | null
+    runtimeInputVersion: string | null
     runtimeModel: string | null
     prompt: string | null
     runtimeConfig: runtime.JsonValue | null
@@ -3405,6 +3609,9 @@ export interface TaskFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"Task", 'String'>
   readonly title: Prisma.FieldRef<"Task", 'String'>
   readonly description: Prisma.FieldRef<"Task", 'String'>
+  readonly runtimeAdapterKey: Prisma.FieldRef<"Task", 'String'>
+  readonly runtimeInput: Prisma.FieldRef<"Task", 'Json'>
+  readonly runtimeInputVersion: Prisma.FieldRef<"Task", 'String'>
   readonly runtimeModel: Prisma.FieldRef<"Task", 'String'>
   readonly prompt: Prisma.FieldRef<"Task", 'String'>
   readonly runtimeConfig: Prisma.FieldRef<"Task", 'Json'>

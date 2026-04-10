@@ -56,4 +56,23 @@ describe("deriveTaskRunnability", () => {
       state: "ready_to_run",
     });
   });
+
+  it("reads required fields from normalized runtime input", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          prompt: "Implement the schedule query",
+          approvalPolicy: "never",
+        },
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
+      missingFields: [],
+    });
+  });
 });

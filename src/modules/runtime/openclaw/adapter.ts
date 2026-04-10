@@ -1,6 +1,13 @@
 import { OpenClawGatewayClient, type OpenClawRuntimeClient } from "@/modules/runtime/openclaw/client";
 import { loadOpenClawPersistedDeviceIdentity } from "@/modules/runtime/openclaw/device-identity";
 import { createMockOpenClawAdapter } from "@/modules/runtime/openclaw/mock-adapter";
+import {
+  getOpenClawTaskConfigSpec,
+  OPENCLAW_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_RUNTIME_INPUT_VERSION,
+  validateOpenClawTaskConfig,
+} from "@/modules/runtime/openclaw/config";
+import type { RuntimeInput } from "@/modules/runtime/types";
 import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
@@ -9,8 +16,15 @@ import type {
   OpenClawSendInputResult,
 } from "@/modules/runtime/openclaw/types";
 
+export {
+  getOpenClawTaskConfigSpec,
+  OPENCLAW_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_RUNTIME_INPUT_VERSION,
+  validateOpenClawTaskConfig,
+};
+
 export type OpenClawAdapter = {
-  createRun(input: { prompt: string }): Promise<{
+  createRun(input: { prompt: string; runtimeInput: RuntimeInput }): Promise<{
     runtimeRunRef?: string;
     runtimeSessionRef?: string;
     runtimeSessionKey?: string;
@@ -68,7 +82,7 @@ export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
 export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenClawAdapter {
   return {
     async createRun(input) {
-      return client.createRun(input);
+      return client.createRun({ prompt: input.prompt });
     },
     async getRunSnapshot(input) {
       return client.waitForRun(input.runtimeRunRef, input.timeoutMs ?? 250);

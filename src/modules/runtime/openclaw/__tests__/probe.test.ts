@@ -32,6 +32,9 @@ function createRuntimeClient(): OpenClawRuntimeClient {
       approvalId: "approval_123",
       status: "pending",
     }),
+    listApprovals: vi.fn().mockResolvedValue([]),
+    waitForApprovalDecision: vi.fn().mockResolvedValue(null),
+    sendInput: vi.fn().mockResolvedValue({ accepted: true }),
     resolveApproval: vi.fn().mockResolvedValue({ accepted: true }),
   };
 }

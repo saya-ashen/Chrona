@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/runtime/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
@@ -7,9 +8,13 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
   workspaceId: string;
   title: string;
   description: string | null;
+  workspace: { defaultRuntime: string };
   priority: string;
   ownerType: string;
   assigneeAgentId: string | null;
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig: unknown;
@@ -39,13 +44,27 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
 }
 
 function mapTaskRunnability(task: {
+  workspace: { defaultRuntime: string };
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig: unknown;
 }) {
-  const runnability = deriveTaskRunnability(task);
+  const runnability = deriveTaskRunnability({
+    workspaceDefaultRuntime: task.workspace.defaultRuntime,
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    runtimeInput: task.runtimeInput,
+    runtimeModel: task.runtimeModel,
+    prompt: task.prompt,
+    runtimeConfig: task.runtimeConfig,
+  });
 
   return {
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    runtimeInput: task.runtimeInput,
+    runtimeInputVersion: task.runtimeInputVersion,
     runtimeModel: task.runtimeModel,
     prompt: task.prompt,
     runtimeConfig: task.runtimeConfig,
@@ -58,10 +77,14 @@ function mapTaskRunnability(task: {
 export async function getSchedulePage(workspaceId: string) {
   await syncStaleWorkspaceRunsForRead(workspaceId);
 
-  const [projections, proposals] = await Promise.all([
+  const [workspace, projections, proposals] = await Promise.all([
+    db.workspace.findUniqueOrThrow({
+      where: { id: workspaceId },
+      select: { defaultRuntime: true },
+    }),
     db.taskProjection.findMany({
       where: { workspaceId },
-      include: { task: true },
+      include: { task: { include: { workspace: { select: { defaultRuntime: true } } } } },
       orderBy: [
         { scheduledStartAt: "asc" },
         { dueAt: "asc" },
@@ -79,6 +102,11 @@ export async function getSchedulePage(workspaceId: string) {
       orderBy: [{ scheduledStartAt: "asc" }, { dueAt: "asc" }, { createdAt: "asc" }],
     }),
   ]);
+  const runtimeAdapters = listRuntimeAdapterKeys().map((key) => ({
+    key,
+    label: key,
+    spec: getRuntimeTaskConfigSpec(key),
+  }));
 
   const listItems = projections.map((item) => mapProjectionItem(item));
 
@@ -113,6 +141,8 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   return {
+    defaultRuntimeAdapterKey: workspace.defaultRuntime,
+    runtimeAdapters,
     summary: {
       scheduledCount: scheduled.length,
       unscheduledCount: unscheduled.length,

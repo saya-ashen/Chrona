@@ -26,6 +26,56 @@ vi.mock("@/app/actions/task-actions", () => ({
 }));
 
 import { SchedulePage } from "@/components/schedule/schedule-page";
+import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+
+const OPENCLAW_RUNTIME_ADAPTER: TaskConfigRuntimeAdapter = {
+  key: "openclaw",
+  label: "openclaw",
+  spec: {
+    adapterKey: "openclaw",
+    version: "openclaw-legacy-v1",
+        fields: [
+          { key: "model", path: "model", label: "Model", kind: "text", constraints: { maxLength: 200 } },
+          { key: "prompt", path: "prompt", label: "Prompt / instructions", kind: "textarea", constraints: { maxLength: 20000 } },
+          {
+            key: "temperature",
+            path: "temperature",
+            label: "Temperature",
+            kind: "number",
+        advanced: true,
+        defaultValue: 0.2,
+        constraints: { min: 0, max: 2, step: 0.1 },
+          },
+          {
+            key: "approvalPolicy",
+            path: "approvalPolicy",
+            label: "Approval policy",
+            kind: "select",
+        advanced: true,
+        defaultValue: "never",
+        options: [
+          { label: "Never", value: "never" },
+          { label: "On failure", value: "on-failure" },
+          { label: "Always", value: "always" },
+        ],
+          },
+          {
+            key: "toolMode",
+            path: "toolMode",
+            label: "Tool mode",
+            kind: "select",
+        advanced: true,
+        defaultValue: "workspace-write",
+        options: [
+          { label: "Read only", value: "read-only" },
+          { label: "Workspace write", value: "workspace-write" },
+          { label: "Danger full access", value: "danger-full-access" },
+        ],
+      },
+    ],
+    runnability: { requiredPaths: ["model", "prompt"] },
+  },
+};
 
 function buildBaseData() {
   const scheduled = [
@@ -49,6 +99,15 @@ function buildBaseData() {
       latestRunStatus: null,
       scheduleProposalCount: 0,
       lastActivityAt: new Date("2026-04-16T11:00:00.000Z"),
+      runtimeAdapterKey: "openclaw",
+      runtimeInputVersion: "openclaw-legacy-v1",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt: "Update the projection flow and keep tests green",
+        temperature: 0.2,
+        approvalPolicy: "never",
+        toolMode: "workspace-write",
+      },
       runtimeModel: "gpt-5.4",
       prompt: "Update the projection flow and keep tests green",
       runtimeConfig: { temperature: 0.2 },
@@ -79,6 +138,13 @@ function buildBaseData() {
       latestRunStatus: null,
       scheduleProposalCount: 1,
       lastActivityAt: new Date("2026-04-16T12:00:00.000Z"),
+      runtimeAdapterKey: "openclaw",
+      runtimeInputVersion: "openclaw-legacy-v1",
+      runtimeInput: {
+        temperature: 0.2,
+        approvalPolicy: "never",
+        toolMode: "workspace-write",
+      },
       runtimeModel: null,
       prompt: null,
       runtimeConfig: null,
@@ -109,6 +175,14 @@ function buildBaseData() {
       scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
       scheduleProposalCount: 0,
       lastActivityAt: new Date("2026-04-15T11:00:00.000Z"),
+      runtimeAdapterKey: "openclaw",
+      runtimeInputVersion: "openclaw-legacy-v1",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt: "Recover the run and summarize the issue",
+        approvalPolicy: "never",
+        toolMode: "workspace-write",
+      },
       runtimeModel: "gpt-5.4",
       prompt: "Recover the run and summarize the issue",
       runtimeConfig: null,
@@ -119,6 +193,8 @@ function buildBaseData() {
   ];
 
   return {
+    defaultRuntimeAdapterKey: "openclaw",
+    runtimeAdapters: [OPENCLAW_RUNTIME_ADAPTER],
     summary: {
       scheduledCount: 1,
       unscheduledCount: 1,
@@ -216,6 +292,8 @@ describe("SchedulePage", () => {
             proposalCount: 0,
             riskCount: 0,
           },
+          defaultRuntimeAdapterKey: "openclaw",
+          runtimeAdapters: [OPENCLAW_RUNTIME_ADAPTER],
           scheduled: [],
           unscheduled: [
             {
@@ -238,6 +316,13 @@ describe("SchedulePage", () => {
               latestRunStatus: null,
               scheduleProposalCount: 0,
               lastActivityAt: new Date("2026-04-18T09:00:00.000Z"),
+              runtimeAdapterKey: "openclaw",
+              runtimeInputVersion: "openclaw-legacy-v1",
+              runtimeInput: {
+                temperature: 0.2,
+                approvalPolicy: "never",
+                toolMode: "workspace-write",
+              },
               runtimeModel: null,
               prompt: null,
               runtimeConfig: null,
@@ -269,6 +354,13 @@ describe("SchedulePage", () => {
               latestRunStatus: null,
               scheduleProposalCount: 0,
               lastActivityAt: new Date("2026-04-18T09:00:00.000Z"),
+              runtimeAdapterKey: "openclaw",
+              runtimeInputVersion: "openclaw-legacy-v1",
+              runtimeInput: {
+                temperature: 0.2,
+                approvalPolicy: "never",
+                toolMode: "workspace-write",
+              },
               runtimeModel: null,
               prompt: null,
               runtimeConfig: null,
@@ -307,6 +399,8 @@ describe("SchedulePage", () => {
             proposalCount: 0,
             riskCount: 0,
           },
+          defaultRuntimeAdapterKey: "openclaw",
+          runtimeAdapters: [OPENCLAW_RUNTIME_ADAPTER],
           scheduled: [],
           unscheduled: [],
           proposals: [],
@@ -334,13 +428,17 @@ describe("SchedulePage", () => {
       expect(screen.getAllByText("Create timeline task").length).toBeGreaterThan(0);
     });
 
-    expect(createTaskFromScheduleMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Create timeline task",
-        runtimeModel: "gpt-5.4",
-        prompt: "Implement the task and report status",
-      }),
-    );
+      expect(createTaskFromScheduleMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Create timeline task",
+          runtimeAdapterKey: "openclaw",
+          runtimeInputVersion: "openclaw-legacy-v1",
+          runtimeInput: expect.objectContaining({
+            model: "gpt-5.4",
+            prompt: "Implement the task and report status",
+          }),
+        }),
+      );
     expect(applyScheduleMock).toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock.mock.calls[0]?.[0]).toContain("task=task_created");
@@ -361,6 +459,8 @@ describe("SchedulePage", () => {
             proposalCount: 0,
             riskCount: 0,
           },
+          defaultRuntimeAdapterKey: "openclaw",
+          runtimeAdapters: [OPENCLAW_RUNTIME_ADAPTER],
           scheduled: [],
           unscheduled: [],
           proposals: [],
@@ -389,13 +489,14 @@ describe("SchedulePage", () => {
     fireEvent.submit(within(composer).getByRole("button", { name: "Create and schedule" }).closest("form")!);
 
     await waitFor(() => {
-      expect(createTaskFromScheduleMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Investigate runtime drift",
-          priority: "High",
-          runtimeModel: "gpt-5.4",
-        }),
-      );
+        expect(createTaskFromScheduleMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "Investigate runtime drift",
+            priority: "High",
+            runtimeAdapterKey: "openclaw",
+            runtimeInput: expect.objectContaining({ model: "gpt-5.4" }),
+          }),
+        );
     });
   });
 
@@ -439,14 +540,17 @@ describe("SchedulePage", () => {
     });
     fireEvent.submit(quickEditForm);
 
-    await waitFor(() => {
-      expect(updateTaskConfigFromScheduleMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          taskId: "task_unscheduled",
-          runtimeModel: "gpt-5.4",
-          prompt: "Write the follow-up note",
-        }),
-      );
-    });
+      await waitFor(() => {
+        expect(updateTaskConfigFromScheduleMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            taskId: "task_unscheduled",
+            runtimeAdapterKey: "openclaw",
+            runtimeInput: expect.objectContaining({
+              model: "gpt-5.4",
+              prompt: "Write the follow-up note",
+            }),
+          }),
+        );
+      });
   });
 });

@@ -5,8 +5,18 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 export async function reopenTask(input: { taskId: string }) {
-  const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
+  const task = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    include: {
+      workspace: {
+        select: { defaultRuntime: true },
+      },
+    },
+  });
   const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    workspaceDefaultRuntime: task.workspace.defaultRuntime,
+    runtimeInput: task.runtimeInput,
     runtimeModel: task.runtimeModel,
     prompt: task.prompt,
     runtimeConfig: task.runtimeConfig,

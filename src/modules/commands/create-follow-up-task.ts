@@ -20,9 +20,19 @@ export async function createFollowUpTask(input: {
   dueAt?: Date | null;
   priority?: "Low" | "Medium" | "High" | "Urgent";
 }) {
-  const parentTask = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
+  const parentTask = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    include: {
+      workspace: {
+        select: { defaultRuntime: true },
+      },
+    },
+  });
   const title = normalizeTitle(input.title);
   const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: parentTask.runtimeAdapterKey,
+    workspaceDefaultRuntime: parentTask.workspace.defaultRuntime,
+    runtimeInput: parentTask.runtimeInput,
     runtimeModel: parentTask.runtimeModel,
     prompt: parentTask.prompt,
     runtimeConfig: parentTask.runtimeConfig,
@@ -34,6 +44,12 @@ export async function createFollowUpTask(input: {
       workspaceId: parentTask.workspaceId,
       parentTaskId: parentTask.id,
       title,
+      runtimeAdapterKey: parentTask.runtimeAdapterKey,
+      runtimeInput:
+        parentTask.runtimeInput === null
+          ? Prisma.DbNull
+          : (parentTask.runtimeInput as Prisma.InputJsonValue),
+      runtimeInputVersion: parentTask.runtimeInputVersion,
       runtimeModel: parentTask.runtimeModel,
       prompt: parentTask.prompt,
       runtimeConfig:

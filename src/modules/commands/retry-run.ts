@@ -1,12 +1,12 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { startRun } from "@/modules/commands/start-run";
-import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
 
 export async function retryRun(input: {
   taskId: string;
   prompt?: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeExecutionAdapter;
 }) {
   const latestRun = await db.run.findFirst({
     where: { taskId: input.taskId },

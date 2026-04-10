@@ -1,20 +1,36 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { Prisma } from "@/generated/prisma/client";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { useI18n } from "@/i18n/client";
+import {
+  deleteValueAtPath,
+  getValueAtPath,
+  setValueAtPath,
+  validateTaskConfigAgainstSpec,
+} from "@/modules/runtime/config-spec";
+import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@/modules/runtime/types";
 
 export type TaskConfigFormInput = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
-  runtimeModel: string;
-  prompt: string;
   dueAt: Date | null;
+  runtimeAdapterKey: string;
+  runtimeInput: Prisma.InputJsonObject;
+  runtimeInputVersion: string;
+  runtimeModel: string | null;
+  prompt: string | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
+};
+
+export type TaskConfigRuntimeAdapter = {
+  key: string;
+  label: string;
+  spec: RuntimeTaskConfigSpec;
 };
 
 export type TaskConfigPreset = {
@@ -28,27 +44,33 @@ type TaskConfigFormState = {
   title: string;
   description: string;
   priority: TaskConfigFormInput["priority"];
-  runtimeModel: string;
-  prompt: string;
   dueAt: string;
-  runtimeConfig: string;
+  runtimeAdapterKey: string;
+  runtimeInputVersion: string;
+  fieldRuntimeInput: RuntimeInput;
+  extraRuntimeConfig: string;
 };
 
 type TaskConfigFormProps = {
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   initialValues?: {
     title?: string;
     description?: string | null;
     priority?: "Low" | "Medium" | "High" | "Urgent";
+    dueAt?: Date | null;
+    runtimeAdapterKey?: string | null;
+    runtimeInput?: unknown;
+    runtimeInputVersion?: string | null;
     runtimeModel?: string | null;
     prompt?: string | null;
-    dueAt?: Date | null;
     runtimeConfig?: unknown;
   };
   submitLabel: string;
   pendingLabel: string;
   isPending?: boolean;
   presets?: TaskConfigPreset[];
-  onSubmit: (input: TaskConfigFormInput) => Promise<void> | void;
+  onSubmitAction: (input: TaskConfigFormInput) => Promise<void> | void;
 };
 
 const DEFAULT_COPY = {
@@ -63,14 +85,12 @@ const DEFAULT_COPY = {
     Urgent: "Urgent",
   },
   dueDate: "Due date",
-  model: "Model",
-  promptInstructions: "Prompt / instructions",
-  promptPlaceholder: "Describe the task, constraints, and expected outcome",
+  adapter: "Adapter",
   advancedFields: "Advanced fields",
   description: "Description",
   descriptionPlaceholder: "Optional execution context or desired outcome",
-  runtimeParams: "Runtime params (JSON)",
-  runtimeParamsPlaceholder: '{"temperature": 0.2}',
+  runtimeParams: "Additional runtime params (JSON)",
+  runtimeParamsPlaceholder: '{"customFlag": true}',
   errorInvalidJson: "Runtime params must be valid JSON",
   errorJsonObject: "Runtime params must be a JSON object",
   actionFailed: "Action failed",
@@ -78,6 +98,10 @@ const DEFAULT_COPY = {
 
 function formatDateTimeInput(value?: Date | null) {
   return value ? value.toISOString().slice(0, 16) : "";
+}
+
+function isRuntimeInputObject(value: unknown): value is RuntimeInput {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function formatRuntimeConfig(value: unknown) {
@@ -113,20 +137,236 @@ function parseRuntimeConfig(
   return parsed as Prisma.InputJsonObject;
 }
 
-function toFormState(initialValues?: TaskConfigFormProps["initialValues"]): TaskConfigFormState {
+function cloneRuntimeInput(input: RuntimeInput) {
+  return structuredClone(input);
+}
+
+function buildCompatRuntimeInput(initialValues?: TaskConfigFormProps["initialValues"]) {
+  const runtimeInput: RuntimeInput = isRuntimeInputObject(initialValues?.runtimeInput)
+    ? cloneRuntimeInput(initialValues.runtimeInput)
+    : isRuntimeInputObject(initialValues?.runtimeConfig)
+      ? cloneRuntimeInput(initialValues.runtimeConfig)
+      : {};
+
+  if (typeof initialValues?.runtimeModel === "string" && initialValues.runtimeModel.trim()) {
+    runtimeInput.model = initialValues.runtimeModel.trim();
+  }
+
+  if (typeof initialValues?.prompt === "string" && initialValues.prompt.trim()) {
+    runtimeInput.prompt = initialValues.prompt.trim();
+  }
+
+  return runtimeInput;
+}
+
+function resolveRuntimeAdapter(
+  runtimeAdapters: TaskConfigRuntimeAdapter[],
+  runtimeAdapterKey: string | null | undefined,
+  defaultRuntimeAdapterKey: string,
+) {
+  const normalizedKey = runtimeAdapterKey?.trim() || defaultRuntimeAdapterKey;
+
+  return (
+    runtimeAdapters.find((adapter) => adapter.key === normalizedKey) ??
+    runtimeAdapters[0] ?? {
+      key: defaultRuntimeAdapterKey,
+      label: defaultRuntimeAdapterKey,
+      spec: {
+        adapterKey: defaultRuntimeAdapterKey,
+        version: `${defaultRuntimeAdapterKey}-v1`,
+        fields: [],
+        runnability: { requiredPaths: [] },
+      },
+    }
+  );
+}
+
+function pickSpecFieldRuntimeInput(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
+  const picked: RuntimeInput = {};
+
+  for (const field of spec.fields) {
+    const value = getValueAtPath(runtimeInput, field.path);
+
+    if (value !== undefined) {
+      setValueAtPath(picked, field.path, structuredClone(value));
+    }
+  }
+
+  return picked;
+}
+
+function pickExtraRuntimeInput(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
+  const extra = cloneRuntimeInput(runtimeInput);
+
+  for (const field of spec.fields) {
+    deleteValueAtPath(extra, field.path);
+  }
+
+  return Object.keys(extra).length > 0 ? extra : null;
+}
+
+function areRuntimeFieldValuesEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function stripDefaultRuntimeFieldValues(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
+  const strippedRuntimeInput = cloneRuntimeInput(runtimeInput);
+
+  for (const field of spec.fields) {
+    if (field.defaultValue === undefined) {
+      continue;
+    }
+
+    const value = getValueAtPath(strippedRuntimeInput, field.path);
+
+    if (value !== undefined && areRuntimeFieldValuesEqual(value, field.defaultValue)) {
+      deleteValueAtPath(strippedRuntimeInput, field.path);
+    }
+  }
+
+  return strippedRuntimeInput;
+}
+
+function buildInitialRuntimeState(input: {
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
+  runtimeAdapterKey?: string | null;
+  runtimeInput?: unknown;
+  runtimeInputVersion?: string | null;
+  runtimeModel?: string | null;
+  prompt?: string | null;
+  runtimeConfig?: unknown;
+}) {
+  const runtimeAdapter = resolveRuntimeAdapter(
+    input.runtimeAdapters,
+    input.runtimeAdapterKey,
+    input.defaultRuntimeAdapterKey,
+  );
+  const rawRuntimeInput = isRuntimeInputObject(input.runtimeInput)
+    ? input.runtimeInput
+    : buildCompatRuntimeInput({
+        runtimeModel: input.runtimeModel,
+        prompt: input.prompt,
+        runtimeConfig: input.runtimeConfig,
+      });
+  const explicitRuntimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, rawRuntimeInput, {
+    applyDefaults: false,
+  });
+  const hydratedRuntimeInput = stripDefaultRuntimeFieldValues(runtimeAdapter.spec, explicitRuntimeInput);
+
+  return {
+    runtimeAdapterKey: runtimeAdapter.key,
+    runtimeInputVersion: input.runtimeInputVersion?.trim() || runtimeAdapter.spec.version,
+    fieldRuntimeInput: pickSpecFieldRuntimeInput(runtimeAdapter.spec, hydratedRuntimeInput),
+    extraRuntimeConfig: formatRuntimeConfig(pickExtraRuntimeInput(runtimeAdapter.spec, hydratedRuntimeInput)),
+  };
+}
+
+function toFormState(
+  initialValues: TaskConfigFormProps["initialValues"] | undefined,
+  runtimeAdapters: TaskConfigRuntimeAdapter[],
+  defaultRuntimeAdapterKey: string,
+): TaskConfigFormState {
+  const runtimeState = buildInitialRuntimeState({
+    runtimeAdapters,
+    defaultRuntimeAdapterKey,
+    runtimeAdapterKey: initialValues?.runtimeAdapterKey,
+    runtimeInput: initialValues?.runtimeInput,
+    runtimeInputVersion: initialValues?.runtimeInputVersion,
+    runtimeModel: initialValues?.runtimeModel,
+    prompt: initialValues?.prompt,
+    runtimeConfig: initialValues?.runtimeConfig,
+  });
+
   return {
     title: initialValues?.title ?? "",
     description: initialValues?.description ?? "",
     priority: initialValues?.priority ?? "Medium",
-    runtimeModel: initialValues?.runtimeModel ?? "",
-    prompt: initialValues?.prompt ?? "",
     dueAt: formatDateTimeInput(initialValues?.dueAt),
-    runtimeConfig: formatRuntimeConfig(initialValues?.runtimeConfig),
+    ...runtimeState,
   };
 }
 
-function applyPresetValues(current: TaskConfigFormState, values: TaskConfigPreset["values"]) {
-  const next = { ...current };
+function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
+  const runtimeModel = typeof runtimeInput.model === "string" && runtimeInput.model.trim() ? runtimeInput.model.trim() : null;
+  const prompt = typeof runtimeInput.prompt === "string" && runtimeInput.prompt.trim() ? runtimeInput.prompt.trim() : null;
+  const runtimeConfig = cloneRuntimeInput(runtimeInput);
+
+  delete runtimeConfig.model;
+  delete runtimeConfig.prompt;
+
+  return {
+    runtimeModel,
+    prompt,
+    runtimeConfig: Object.keys(runtimeConfig).length > 0 ? (runtimeConfig as Prisma.InputJsonObject) : null,
+  };
+}
+
+function buildTaskConfigFormInput(
+  formState: TaskConfigFormState,
+  runtimeAdapters: TaskConfigRuntimeAdapter[],
+  copy: { errorInvalidJson: string; errorJsonObject: string },
+): TaskConfigFormInput {
+  const runtimeAdapter = resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, formState.runtimeAdapterKey);
+  const extraRuntimeInput = parseRuntimeConfig(formState.extraRuntimeConfig, copy);
+  const mergedRuntimeInput = {
+    ...cloneRuntimeInput(formState.fieldRuntimeInput),
+    ...(extraRuntimeInput ?? {}),
+  };
+  const runtimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput) as Prisma.InputJsonObject;
+  const runtimeInputWithoutDefaults = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput, {
+    applyDefaults: false,
+  });
+  const legacyRuntimeFields = extractLegacyRuntimeFields(runtimeInputWithoutDefaults);
+
+  return {
+    title: formState.title,
+    description: formState.description,
+    priority: formState.priority,
+    dueAt: formState.dueAt ? new Date(formState.dueAt) : null,
+    runtimeAdapterKey: runtimeAdapter.key,
+    runtimeInputVersion: runtimeAdapter.spec.version,
+    runtimeInput,
+    runtimeModel: legacyRuntimeFields.runtimeModel,
+    prompt: legacyRuntimeFields.prompt,
+    runtimeConfig: legacyRuntimeFields.runtimeConfig,
+  };
+}
+
+function applyRuntimeAdapterChange(
+  current: TaskConfigFormState,
+  runtimeAdapter: TaskConfigRuntimeAdapter,
+): TaskConfigFormState {
+  const remappedRuntimeInput: RuntimeInput = {};
+
+  for (const field of runtimeAdapter.spec.fields) {
+    const value = getValueAtPath(current.fieldRuntimeInput, field.path);
+
+    if (value !== undefined) {
+      setValueAtPath(remappedRuntimeInput, field.path, structuredClone(value));
+    }
+  }
+
+  const normalizedRuntimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, remappedRuntimeInput, {
+    applyDefaults: false,
+  });
+
+  return {
+    ...current,
+    runtimeAdapterKey: runtimeAdapter.key,
+    runtimeInputVersion: runtimeAdapter.spec.version,
+    fieldRuntimeInput: pickSpecFieldRuntimeInput(runtimeAdapter.spec, normalizedRuntimeInput),
+    extraRuntimeConfig: "",
+  };
+}
+
+function applyPresetValues(
+  current: TaskConfigFormState,
+  values: TaskConfigPreset["values"],
+  runtimeAdapters: TaskConfigRuntimeAdapter[],
+  defaultRuntimeAdapterKey: string,
+) {
+  let next = { ...current };
 
   if ("title" in values) {
     next.title = values.title ?? "";
@@ -140,32 +380,92 @@ function applyPresetValues(current: TaskConfigFormState, values: TaskConfigPrese
     next.priority = values.priority;
   }
 
-  if ("runtimeModel" in values) {
-    next.runtimeModel = values.runtimeModel ?? "";
-  }
-
-  if ("prompt" in values) {
-    next.prompt = values.prompt ?? "";
-  }
-
   if ("dueAt" in values) {
     next.dueAt = formatDateTimeInput(values.dueAt ?? null);
   }
 
-  if ("runtimeConfig" in values) {
-    next.runtimeConfig = formatRuntimeConfig(values.runtimeConfig ?? null);
+  if (
+    "runtimeAdapterKey" in values ||
+    "runtimeInput" in values ||
+    "runtimeInputVersion" in values ||
+    "runtimeModel" in values ||
+    "prompt" in values ||
+    "runtimeConfig" in values
+  ) {
+    const runtimeState = buildInitialRuntimeState({
+      runtimeAdapters,
+      defaultRuntimeAdapterKey,
+      runtimeAdapterKey: values.runtimeAdapterKey ?? next.runtimeAdapterKey,
+      runtimeInput: values.runtimeInput,
+      runtimeInputVersion: values.runtimeInputVersion,
+      runtimeModel: values.runtimeModel,
+      prompt: values.prompt,
+      runtimeConfig: values.runtimeConfig,
+    });
+
+    next = {
+      ...next,
+      ...runtimeState,
+    };
   }
 
   return next;
 }
 
+function readDisplayedFieldValue(field: RuntimeTaskConfigField, runtimeInput: RuntimeInput) {
+  const value = getValueAtPath(runtimeInput, field.path);
+  return value === undefined ? field.defaultValue : value;
+}
+
+function isFieldVisible(field: RuntimeTaskConfigField, runtimeInput: RuntimeInput) {
+  if (!field.visibleWhen || field.visibleWhen.length === 0) {
+    return true;
+  }
+
+  return field.visibleWhen.every((rule) => {
+    const value = getValueAtPath(runtimeInput, rule.path);
+
+    if (rule.op === "eq") {
+      return value === rule.value;
+    }
+
+    if (rule.op === "in") {
+      return Array.isArray(rule.value) && rule.value.includes(value);
+    }
+
+    return true;
+  });
+}
+
+function renderFieldValue(value: unknown) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  return JSON.stringify(value);
+}
+
 export function TaskConfigForm({
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   initialValues,
   submitLabel,
   pendingLabel,
   isPending = false,
   presets,
-  onSubmit,
+  onSubmitAction,
 }: TaskConfigFormProps) {
   const { messages } = useI18n();
   const copy = {
@@ -178,14 +478,19 @@ export function TaskConfigForm({
   };
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
   const initialState = useMemo(
-    () => toFormState(initialValues),
+    () => toFormState(initialValues, runtimeAdapters, defaultRuntimeAdapterKey),
     [
+      defaultRuntimeAdapterKey,
+      runtimeAdapters,
       initialValues?.title,
       initialValues?.description,
       initialValues?.priority,
+      initialValues?.dueAt?.toISOString(),
+      initialValues?.runtimeAdapterKey,
+      initialValues?.runtimeInputVersion,
       initialValues?.runtimeModel,
       initialValues?.prompt,
-      initialValues?.dueAt?.toISOString(),
+      formatRuntimeConfig(initialValues?.runtimeInput),
       formatRuntimeConfig(initialValues?.runtimeConfig),
     ],
   );
@@ -195,20 +500,53 @@ export function TaskConfigForm({
     setFormState(initialState);
   }, [initialState]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const selectedRuntimeAdapter = useMemo(
+    () => resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, defaultRuntimeAdapterKey),
+    [defaultRuntimeAdapterKey, formState.runtimeAdapterKey, runtimeAdapters],
+  );
+  const visibleRuntimeInput = useMemo(
+    () =>
+      selectedRuntimeAdapter.spec.fields.reduce<RuntimeInput>((accumulator, field) => {
+        const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+
+        if (value !== undefined) {
+          setValueAtPath(accumulator, field.path, value);
+        }
+
+        return accumulator;
+      }, cloneRuntimeInput(formState.fieldRuntimeInput)),
+    [formState.fieldRuntimeInput, selectedRuntimeAdapter.spec.fields],
+  );
+  const visibleStandardFields = selectedRuntimeAdapter.spec.fields.filter(
+    (field) => !field.advanced && isFieldVisible(field, visibleRuntimeInput),
+  );
+  const visibleAdvancedFields = selectedRuntimeAdapter.spec.fields.filter(
+    (field) => field.advanced && isFieldVisible(field, visibleRuntimeInput),
+  );
+
+  function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
+    setFormState((current) => {
+      const nextRuntimeInput = cloneRuntimeInput(current.fieldRuntimeInput);
+
+      if (nextValue === undefined) {
+        deleteValueAtPath(nextRuntimeInput, field.path);
+      } else {
+        setValueAtPath(nextRuntimeInput, field.path, nextValue);
+      }
+
+      return {
+        ...current,
+        fieldRuntimeInput: nextRuntimeInput,
+      };
+    });
+  }
+
+  async function handleSubmit(event: Parameters<NonNullable<JSX.IntrinsicElements["form"]["onSubmit"]>>[0]) {
     event.preventDefault();
     setLocalErrorMessage(null);
 
     try {
-      await onSubmit({
-        title: formState.title,
-        description: formState.description,
-        priority: formState.priority,
-        runtimeModel: formState.runtimeModel,
-        prompt: formState.prompt,
-        dueAt: formState.dueAt ? new Date(formState.dueAt) : null,
-        runtimeConfig: parseRuntimeConfig(formState.runtimeConfig, copy),
-      });
+      await onSubmitAction(buildTaskConfigFormInput(formState, runtimeAdapters, copy));
     } catch (error) {
       setLocalErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
     }
@@ -229,7 +567,11 @@ export function TaskConfigForm({
                 key={preset.id}
                 type="button"
                 disabled={isPending}
-                onClick={() => setFormState((current) => applyPresetValues(current, preset.values))}
+                onClick={() =>
+                  setFormState((current) =>
+                    applyPresetValues(current, preset.values, runtimeAdapters, defaultRuntimeAdapterKey),
+                  )
+                }
                 className="rounded-2xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"
               >
                 <p className="text-sm font-medium text-foreground">{preset.label}</p>
@@ -284,28 +626,129 @@ export function TaskConfigForm({
           </Field>
         </div>
 
-        <Field label={copy.model} className="text-xs text-muted-foreground">
-          <input
-            name="runtimeModel"
-            required
-            value={formState.runtimeModel}
-            onChange={(event) => setFormState((current) => ({ ...current, runtimeModel: event.target.value }))}
-            placeholder="gpt-5.4"
-            className={inputClassName}
-          />
-        </Field>
+        {runtimeAdapters.length > 1 ? (
+          <Field label={copy.adapter} className="text-xs text-muted-foreground">
+            <select
+              name="runtimeAdapterKey"
+              value={formState.runtimeAdapterKey}
+              onChange={(event) =>
+                setFormState((current) =>
+                  applyRuntimeAdapterChange(
+                    current,
+                    resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
+                  ),
+                )
+              }
+              className={selectClassName}
+            >
+              {runtimeAdapters.map((adapter) => (
+                <option key={adapter.key} value={adapter.key}>
+                  {adapter.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
 
-        <Field label={copy.promptInstructions} className="text-xs text-muted-foreground">
-          <textarea
-            name="prompt"
-            required
-            rows={4}
-            value={formState.prompt}
-            onChange={(event) => setFormState((current) => ({ ...current, prompt: event.target.value }))}
-            placeholder={copy.promptPlaceholder}
-            className={textareaClassName}
-          />
-        </Field>
+        {visibleStandardFields.map((field) => {
+          const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+
+          if (field.kind === "textarea") {
+            return (
+              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <textarea
+                  name={field.path}
+                  rows={4}
+                  value={renderFieldValue(value)}
+                  onChange={(event) => updateRuntimeField(field, event.target.value)}
+                  maxLength={field.constraints?.maxLength}
+                  className={textareaClassName}
+                />
+              </Field>
+            );
+          }
+
+          if (field.kind === "select") {
+            return (
+              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <select
+                  name={field.path}
+                  value={renderFieldValue(value)}
+                  onChange={(event) => updateRuntimeField(field, event.target.value || undefined)}
+                  className={selectClassName}
+                >
+                  <option value="">-</option>
+                  {(field.options ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            );
+          }
+
+          if (field.kind === "number") {
+            return (
+              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <input
+                  name={field.path}
+                  type="number"
+                  value={renderFieldValue(value)}
+                  onChange={(event) => updateRuntimeField(field, event.target.value === "" ? undefined : event.target.value)}
+                  min={field.constraints?.min}
+                  max={field.constraints?.max}
+                  step={field.constraints?.step}
+                  className={inputClassName}
+                />
+              </Field>
+            );
+          }
+
+          if (field.kind === "boolean") {
+            return (
+              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
+                  <input
+                    name={field.path}
+                    type="checkbox"
+                    checked={Boolean(value)}
+                    onChange={(event) => updateRuntimeField(field, event.target.checked)}
+                  />
+                  <span>{field.label}</span>
+                </label>
+              </Field>
+            );
+          }
+
+          if (field.kind === "json") {
+            return (
+              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <textarea
+                  name={field.path}
+                  rows={5}
+                  value={typeof value === "string" ? value : formatRuntimeConfig(value)}
+                  onChange={(event) => updateRuntimeField(field, event.target.value)}
+                  className={textareaClassName}
+                />
+              </Field>
+            );
+          }
+
+          return (
+            <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <input
+                name={field.path}
+                value={renderFieldValue(value)}
+                onChange={(event) => updateRuntimeField(field, event.target.value)}
+                minLength={field.constraints?.minLength}
+                maxLength={field.constraints?.maxLength}
+                pattern={field.constraints?.pattern}
+                className={inputClassName}
+              />
+            </Field>
+          );
+        })}
 
         <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
           <summary className="cursor-pointer text-sm font-medium text-foreground">{copy.advancedFields}</summary>
@@ -322,12 +765,80 @@ export function TaskConfigForm({
               />
             </Field>
 
+            {visibleAdvancedFields.map((field) => {
+              const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+
+              if (field.kind === "select") {
+                return (
+                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <select
+                      name={field.path}
+                      value={renderFieldValue(value)}
+                      onChange={(event) => updateRuntimeField(field, event.target.value || undefined)}
+                      className={selectClassName}
+                    >
+                      <option value="">-</option>
+                      {(field.options ?? []).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                );
+              }
+
+              if (field.kind === "number") {
+                return (
+                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <input
+                      name={field.path}
+                      type="number"
+                      value={renderFieldValue(value)}
+                      onChange={(event) => updateRuntimeField(field, event.target.value === "" ? undefined : event.target.value)}
+                      min={field.constraints?.min}
+                      max={field.constraints?.max}
+                      step={field.constraints?.step}
+                      className={inputClassName}
+                    />
+                  </Field>
+                );
+              }
+
+              if (field.kind === "boolean") {
+                return (
+                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
+                      <input
+                        name={field.path}
+                        type="checkbox"
+                        checked={Boolean(value)}
+                        onChange={(event) => updateRuntimeField(field, event.target.checked)}
+                      />
+                      <span>{field.label}</span>
+                    </label>
+                  </Field>
+                );
+              }
+
+              return (
+                <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <input
+                    name={field.path}
+                    value={renderFieldValue(value)}
+                    onChange={(event) => updateRuntimeField(field, event.target.value)}
+                    className={inputClassName}
+                  />
+                </Field>
+              );
+            })}
+
             <Field label={copy.runtimeParams} className="text-xs text-muted-foreground">
               <textarea
                 name="runtimeConfig"
                 rows={6}
-                value={formState.runtimeConfig}
-                onChange={(event) => setFormState((current) => ({ ...current, runtimeConfig: event.target.value }))}
+                value={formState.extraRuntimeConfig}
+                onChange={(event) => setFormState((current) => ({ ...current, extraRuntimeConfig: event.target.value }))}
                 placeholder={copy.runtimeParamsPlaceholder}
                 className={textareaClassName}
               />

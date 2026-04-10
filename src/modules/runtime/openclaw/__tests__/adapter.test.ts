@@ -4,9 +4,12 @@ import { createLiveOpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
 describe("createLiveOpenClawAdapter", () => {
   it("resolves approval first and then sends edited input", async () => {
     const client = {
+      connect: vi.fn(),
+      close: vi.fn(),
       createRun: vi.fn(),
       waitForRun: vi.fn(),
       readOutputs: vi.fn(),
+      requestApproval: vi.fn(),
       listApprovals: vi.fn(),
       waitForApprovalDecision: vi.fn(),
       resolveApproval: vi.fn().mockResolvedValue({ accepted: true }),

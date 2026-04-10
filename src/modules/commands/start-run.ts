@@ -2,24 +2,51 @@ import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import {
-  createRuntimeAdapter,
-  type OpenClawAdapter,
-} from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeExecutionAdapter } from "@/modules/runtime/execution-registry";
+import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 export async function startRun(input: {
   taskId: string;
   prompt?: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeExecutionAdapter;
 }) {
-  const adapter = input.adapter ?? (await createRuntimeAdapter());
-  const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
-  const effectivePrompt = input.prompt?.trim() || task.prompt?.trim() || null;
-  const runnability = deriveTaskRunnability({
+  const task = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    include: {
+      workspace: {
+        select: { defaultRuntime: true },
+      },
+    },
+  });
+  const persistedRuntimeConfig = validateTaskRuntimeConfig({
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    workspaceDefaultRuntime: task.workspace.defaultRuntime,
+    runtimeInput: task.runtimeInput,
+    runtimeInputVersion: task.runtimeInputVersion,
     runtimeModel: task.runtimeModel,
-    prompt: effectivePrompt,
+    prompt: task.prompt,
     runtimeConfig: task.runtimeConfig,
+  });
+  const runRuntimeConfig = validateTaskRuntimeConfig({
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    workspaceDefaultRuntime: task.workspace.defaultRuntime,
+    runtimeInput: task.runtimeInput,
+    runtimeInputVersion: task.runtimeInputVersion,
+    runtimeModel: task.runtimeModel,
+    prompt: task.prompt,
+    runtimeConfig: task.runtimeConfig,
+    promptOverride: input.prompt,
+  });
+  const adapter = input.adapter ?? (await createRuntimeExecutionAdapter(runRuntimeConfig.runtimeAdapterKey));
+  const effectivePrompt = runRuntimeConfig.prompt;
+  const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: runRuntimeConfig.runtimeAdapterKey,
+    runtimeInput: runRuntimeConfig.runtimeInput,
+    runtimeModel: runRuntimeConfig.runtimeModel,
+    prompt: effectivePrompt,
+    runtimeConfig: runRuntimeConfig.runtimeInput,
   });
 
   if (!runnability.isRunnable || !effectivePrompt) {
@@ -33,7 +60,9 @@ export async function startRun(input: {
   const run = await db.run.create({
     data: {
       taskId: task.id,
-      runtimeName: "openclaw",
+      runtimeName: runRuntimeConfig.runtimeAdapterKey,
+      runtimeConfigSnapshot: runRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
+      runtimeConfigVersion: runRuntimeConfig.runtimeInputVersion,
       status: RunStatus.Pending,
       triggeredBy: "user",
       startedAt: new Date(),
@@ -41,7 +70,10 @@ export async function startRun(input: {
   });
 
   try {
-    const created = await adapter.createRun({ prompt: effectivePrompt });
+    const created = await adapter.createRun({
+      prompt: effectivePrompt,
+      runtimeInput: runRuntimeConfig.runtimeInput,
+    });
     const nextRunStatus = created.runStarted ? RunStatus.Running : RunStatus.Pending;
     const nextTaskStatus = created.runStarted ? TaskStatus.Running : TaskStatus.Queued;
 
@@ -59,6 +91,9 @@ export async function startRun(input: {
     await db.task.update({
       where: { id: task.id },
       data: {
+        runtimeAdapterKey: persistedRuntimeConfig.runtimeAdapterKey,
+        runtimeInput: persistedRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
+        runtimeInputVersion: persistedRuntimeConfig.runtimeInputVersion,
         latestRunId: run.id,
         status: nextTaskStatus,
         blockReason: Prisma.DbNull,
@@ -74,8 +109,8 @@ export async function startRun(input: {
       actorId: "server-action",
       source: "ui",
       payload: {
-        runtime_name: "openclaw",
-        task_model: task.runtimeModel,
+        runtime_name: runRuntimeConfig.runtimeAdapterKey,
+        task_model: runRuntimeConfig.runtimeModel,
         runtime_run_ref: created.runtimeRunRef ?? null,
         runtime_session_key: created.runtimeSessionKey ?? null,
         triggered_by: "user",
@@ -108,6 +143,9 @@ export async function startRun(input: {
     await db.task.update({
       where: { id: task.id },
       data: {
+        runtimeAdapterKey: persistedRuntimeConfig.runtimeAdapterKey,
+        runtimeInput: persistedRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
+        runtimeInputVersion: persistedRuntimeConfig.runtimeInputVersion,
         latestRunId: run.id,
         status: TaskStatus.Blocked,
         blockReason: {
@@ -125,7 +163,7 @@ export async function startRun(input: {
       taskId: task.id,
       runId: run.id,
       actorType: "runtime",
-      actorId: "openclaw",
+      actorId: runRuntimeConfig.runtimeAdapterKey,
       source: "adapter",
       payload: {
         error: message,
