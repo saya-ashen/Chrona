@@ -9,6 +9,7 @@ import { markTaskDone } from "@/modules/commands/mark-task-done";
 import { reopenTask } from "@/modules/commands/reopen-task";
 import { resolveApproval } from "@/modules/commands/resolve-approval";
 import { startRun } from "@/modules/commands/start-run";
+import { updateTask } from "@/modules/commands/update-task";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -49,7 +50,7 @@ describe("startRun", () => {
         workspaceId: workspace.id,
         title: "Start a run",
         runtimeModel: "gpt-5.4",
-        prompt: "Implement projection",
+        prompt: "Stored prompt",
         status: "Ready",
         priority: "High",
         ownerType: "human",
@@ -58,9 +59,16 @@ describe("startRun", () => {
 
     let createRunCalls = 0;
     const adapter = {
-      async createRun(input: { prompt: string }) {
+      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
         createRunCalls += 1;
-        expect(input.prompt).toBe("Implement projection");
+        expect(input.prompt).toBe("Override prompt");
+        expect(input.runtimeInput).toEqual({
+          approvalPolicy: "never",
+          model: "gpt-5.4",
+          prompt: "Override prompt",
+          temperature: 0.2,
+          toolMode: "workspace-write",
+        });
 
         const pendingRun = await db.run.findFirstOrThrow({
           where: { taskId: task.id },
@@ -94,7 +102,7 @@ describe("startRun", () => {
 
     const result = await startRun({
       taskId: task.id,
-      prompt: "Implement projection",
+      prompt: "Override prompt",
       adapter,
     });
 
@@ -107,7 +115,24 @@ describe("startRun", () => {
     expect(createRunCalls).toBe(1);
     expect(storedTask.latestRunId).toBe(result.runId);
     expect(storedTask.status).toBe("Running");
+    expect(storedTask.prompt).toBe("Stored prompt");
+    expect(storedTask.runtimeInput).toEqual({
+      approvalPolicy: "never",
+      model: "gpt-5.4",
+      prompt: "Stored prompt",
+      temperature: 0.2,
+      toolMode: "workspace-write",
+    });
     expect(storedTask.runs).toHaveLength(1);
+    expect(storedTask.runs[0]?.runtimeName).toBe("openclaw");
+    expect(storedTask.runs[0]?.runtimeConfigSnapshot).toEqual({
+      approvalPolicy: "never",
+      model: "gpt-5.4",
+      prompt: "Override prompt",
+      temperature: 0.2,
+      toolMode: "workspace-write",
+    });
+    expect(storedTask.runs[0]?.runtimeConfigVersion).toBe("openclaw-legacy-v1");
     expect(storedTask.runs[0]?.runtimeRunRef).toBe("runtime_123");
   });
 
@@ -132,8 +157,15 @@ describe("startRun", () => {
     });
 
     const adapter = {
-      async createRun(input: { prompt: string }) {
+      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
         expect(input.prompt).toBe("Use the saved prompt");
+        expect(input.runtimeInput).toEqual({
+          approvalPolicy: "never",
+          model: "gpt-5.4",
+          prompt: "Use the saved prompt",
+          temperature: 0.2,
+          toolMode: "workspace-write",
+        });
 
         return {
           runtimeRunRef: "runtime_saved",
@@ -164,6 +196,84 @@ describe("startRun", () => {
     });
 
     expect(result.runtimeRunRef).toBe("runtime_saved");
+  });
+
+  it("reuses startRun for a second adapter with different required fields", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Research Runtime",
+        status: "Active",
+        defaultRuntime: "research",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Research a scheduling issue",
+        runtimeAdapterKey: "research",
+        runtimeInput: {
+          prompt: "Investigate why schedule tasks drift",
+        },
+        runtimeInputVersion: "research-v1",
+        prompt: "Investigate why schedule tasks drift",
+        status: "Ready",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+
+    const adapter = {
+      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
+        expect(input.prompt).toBe("Investigate why schedule tasks drift");
+        expect(input.runtimeInput).toEqual({
+          prompt: "Investigate why schedule tasks drift",
+          depth: "standard",
+          citationStyle: "bullet-links",
+          webSearch: true,
+        });
+
+        return {
+          runtimeRunRef: "runtime_research",
+          runtimeSessionKey: "agent:main:dashboard:runtime_research",
+          runStarted: true,
+        };
+      },
+      async getRunSnapshot() {
+        throw new Error("not used in startRun test");
+      },
+      async readHistory() {
+        throw new Error("not used in startRun test");
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return null;
+      },
+      async resumeRun() {
+        throw new Error("not used in startRun test");
+      },
+    };
+
+    const result = await startRun({
+      taskId: task.id,
+      adapter,
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({
+      where: { id: task.id },
+      include: { runs: { orderBy: { createdAt: "desc" } } },
+    });
+
+    expect(result.runtimeRunRef).toBe("runtime_research");
+    expect(storedTask.runs[0]?.runtimeName).toBe("research");
+    expect(storedTask.runs[0]?.runtimeConfigSnapshot).toEqual({
+      prompt: "Investigate why schedule tasks drift",
+      depth: "standard",
+      citationStyle: "bullet-links",
+      webSearch: true,
+    });
+    expect(storedTask.runs[0]?.runtimeConfigVersion).toBe("research-v1");
   });
 });
 
@@ -202,8 +312,18 @@ describe("createTask", () => {
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
     expect(storedTask.status).toBe("Ready");
+    expect(storedTask.runtimeAdapterKey).toBe("openclaw");
+    expect(storedTask.runtimeInput).toEqual({
+      approvalPolicy: "never",
+      model: "gpt-5.4",
+      prompt: "Add the first real create flow",
+      temperature: 0.2,
+      toolMode: "workspace-write",
+    });
+    expect(storedTask.runtimeInputVersion).toBe("openclaw-legacy-v1");
     expect(storedTask.runtimeModel).toBe("gpt-5.4");
     expect(storedTask.prompt).toBe("Add the first real create flow");
+    expect(storedTask.runtimeConfig).toBeNull();
     expect(storedTask.ownerType).toBe("human");
     expect(storedTask.priority).toBe("High");
     expect(storedTask.projection).not.toBeNull();
@@ -214,6 +334,86 @@ describe("createTask", () => {
         status: "Ready",
       }),
     );
+  });
+
+  it("rejects invalid adapter config values from the server command", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Invalid Config",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    await expect(
+      createTask({
+        workspaceId: workspace.id,
+        title: "Invalid runtime config",
+        runtimeModel: "gpt-5.4",
+        prompt: "Run the invalid case",
+        runtimeConfig: {
+          approvalPolicy: "sometimes",
+        },
+      }),
+    ).rejects.toThrow(/Approval policy must be one of/);
+  });
+});
+
+describe("updateTask", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("preserves existing runtime input keys when updating the prompt", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Update Commands",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Keep adapter config",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          prompt: "Original prompt",
+          temperature: 0.2,
+          approvalPolicy: "never",
+          toolMode: "workspace-write",
+        },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Original prompt",
+        runtimeConfig: { temperature: 0.2 },
+        status: "Ready",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      prompt: "Updated prompt",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(storedTask.runtimeInput).toEqual({
+      approvalPolicy: "never",
+      model: "gpt-5.4",
+      prompt: "Updated prompt",
+      temperature: 0.2,
+      toolMode: "workspace-write",
+    });
+    expect(storedTask.runtimeInputVersion).toBe("openclaw-legacy-v1");
+    expect(storedTask.runtimeConfig).toEqual({
+      approvalPolicy: "never",
+      temperature: 0.2,
+      toolMode: "workspace-write",
+    });
   });
 });
 

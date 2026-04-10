@@ -58,6 +58,40 @@ describe("runnable task config commands", () => {
     expect(storedTask.runtimeConfig).toEqual({ temperature: 0.2 });
   });
 
+  it("supports a second adapter with different required fields", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Research Runtime",
+        status: "Active",
+        defaultRuntime: "research",
+      },
+    });
+
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "Investigate plan drift",
+      runtimeInput: {
+        prompt: "  Investigate why scheduling keeps drifting  ",
+        depth: "deep",
+      },
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: result.taskId } });
+
+    expect(storedTask.status).toBe("Ready");
+    expect(storedTask.runtimeAdapterKey).toBe("research");
+    expect(storedTask.runtimeInputVersion).toBe("research-v1");
+    expect(storedTask.runtimeInput).toEqual({
+      prompt: "Investigate why scheduling keeps drifting",
+      depth: "deep",
+      citationStyle: "bullet-links",
+      webSearch: true,
+    });
+    expect(storedTask.runtimeModel).toBeNull();
+    expect(storedTask.prompt).toBe("Investigate why scheduling keeps drifting");
+    expect(storedTask.runtimeConfig).toEqual({ depth: "deep" });
+  });
+
   it("creates a draft task when runnable config is incomplete", async () => {
     const workspace = await db.workspace.create({
       data: {
@@ -186,6 +220,151 @@ describe("runnable task config commands", () => {
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
 
     expect(storedTask.status).toBe("Ready");
+  });
+
+  it("treats explicit runtimeInput updates as authoritative", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Runnable Input Authority",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Explicit runtime input wins",
+        status: "Ready",
+        priority: "Medium",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          prompt: "Old prompt",
+          approvalPolicy: "never",
+        },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Old prompt",
+        runtimeConfig: { approvalPolicy: "never" },
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      runtimeInput: {
+        model: "gpt-5.4-mini",
+        prompt: "New prompt",
+        approvalPolicy: "on-request",
+      },
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(storedTask.runtimeModel).toBe("gpt-5.4-mini");
+    expect(storedTask.prompt).toBe("New prompt");
+    expect(storedTask.runtimeConfig).toEqual({ approvalPolicy: "on-request" });
+  });
+
+  it("can switch an existing task to a second adapter without requiring a model", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Runnable Adapter Switch",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Switch adapters",
+        status: "Draft",
+        priority: "Medium",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          prompt: "Old prompt",
+        },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Old prompt",
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      runtimeAdapterKey: "research",
+      runtimeInput: {
+        prompt: "Investigate the scheduling drift",
+      },
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(storedTask.status).toBe("Ready");
+    expect(storedTask.runtimeAdapterKey).toBe("research");
+    expect(storedTask.runtimeInputVersion).toBe("research-v1");
+    expect(storedTask.runtimeInput).toEqual({
+      prompt: "Investigate the scheduling drift",
+      depth: "standard",
+      citationStyle: "bullet-links",
+      webSearch: true,
+    });
+    expect(storedTask.runtimeModel).toBeNull();
+    expect(storedTask.prompt).toBe("Investigate the scheduling drift");
+    expect(storedTask.runtimeConfig).toBeNull();
+  });
+
+  it("resets stale adapter-specific fields when only the adapter key changes", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Runnable Adapter Reset",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Switch adapters by key only",
+        status: "Ready",
+        priority: "Medium",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          prompt: "Carry the prompt forward",
+          temperature: 0.2,
+        },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Carry the prompt forward",
+        runtimeConfig: { temperature: 0.2 },
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      runtimeAdapterKey: "research",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(storedTask.runtimeAdapterKey).toBe("research");
+    expect(storedTask.runtimeInputVersion).toBe("research-v1");
+    expect(storedTask.runtimeInput).toEqual({
+      prompt: "Carry the prompt forward",
+      depth: "standard",
+      citationStyle: "bullet-links",
+      webSearch: true,
+    });
+    expect(storedTask.runtimeModel).toBeNull();
+    expect(storedTask.prompt).toBe("Carry the prompt forward");
+    expect(storedTask.runtimeConfig).toBeNull();
   });
 
   it("drops a ready task back to draft when required runnable config is cleared", async () => {

@@ -14,7 +14,12 @@ import {
 } from "@/app/actions/task-actions";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import { ScheduleTaskList, type ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
-import { TaskConfigForm, type TaskConfigFormInput, type TaskConfigPreset } from "@/components/schedule/task-config-form";
+import {
+  TaskConfigForm,
+  type TaskConfigFormInput,
+  type TaskConfigPreset,
+  type TaskConfigRuntimeAdapter,
+} from "@/components/schedule/task-config-form";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -32,66 +37,16 @@ import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 type SchedulePageProps = {
   workspaceId: string;
   data: {
+    defaultRuntimeAdapterKey: string;
+    runtimeAdapters: TaskConfigRuntimeAdapter[];
     summary: {
       scheduledCount: number;
       unscheduledCount: number;
       proposalCount: number;
       riskCount: number;
     };
-    scheduled: Array<{
-      taskId: string;
-      workspaceId: string;
-      title: string;
-      description: string | null;
-      priority: string;
-      ownerType: string;
-      assigneeAgentId: string | null;
-      persistedStatus: string;
-      displayState: string | null;
-      actionRequired: string | null;
-      approvalPendingCount: number;
-      scheduleStatus: string | null;
-      scheduleSource: string | null;
-      dueAt: Date | null;
-      scheduledStartAt: Date | null;
-      scheduledEndAt: Date | null;
-      latestRunStatus: string | null;
-      scheduleProposalCount: number;
-      lastActivityAt: Date | null;
-      runtimeModel: string | null;
-      prompt: string | null;
-      runtimeConfig: unknown;
-      isRunnable: boolean;
-      runnabilityState: string;
-      runnabilitySummary: string;
-    }>;
-    unscheduled: Array<{
-      taskId: string;
-      workspaceId: string;
-      title: string;
-      description: string | null;
-      priority: string;
-      ownerType: string;
-      assigneeAgentId: string | null;
-      persistedStatus: string;
-      displayState: string | null;
-      actionRequired: string | null;
-      approvalPendingCount: number;
-      dueAt: Date | null;
-      scheduledStartAt: Date | null;
-      scheduledEndAt: Date | null;
-      scheduleStatus: string | null;
-      scheduleSource: string | null;
-      latestRunStatus: string | null;
-      scheduleProposalCount: number;
-      lastActivityAt: Date | null;
-      runtimeModel: string | null;
-      prompt: string | null;
-      runtimeConfig: unknown;
-      isRunnable: boolean;
-      runnabilityState: string;
-      runnabilitySummary: string;
-    }>;
+    scheduled: Array<ScheduleRecord>;
+    unscheduled: Array<ScheduleRecord>;
     proposals: Array<{
       proposalId: string;
       taskId: string;
@@ -107,35 +62,44 @@ type SchedulePageProps = {
       scheduledStartAt: Date | null;
       scheduledEndAt: Date | null;
     }>;
-    risks: Array<{
-      taskId: string;
-      workspaceId: string;
-      title: string;
-      description: string | null;
-      priority: string;
-      ownerType: string;
-      assigneeAgentId: string | null;
-      persistedStatus: string;
-      displayState: string | null;
-      scheduleStatus: string | null;
-      actionRequired: string | null;
-      approvalPendingCount: number;
-      latestRunStatus: string | null;
-      dueAt: Date | null;
-      scheduledStartAt: Date | null;
-      scheduledEndAt: Date | null;
-      scheduleProposalCount: number;
-      lastActivityAt: Date | null;
-      runtimeModel: string | null;
-      prompt: string | null;
-      runtimeConfig: unknown;
-      isRunnable: boolean;
-      runnabilityState: string;
-      runnabilitySummary: string;
-    }>;
+    risks: Array<ScheduleRecord>;
     listItems: ScheduleTaskListItem[];
   };
 };
+
+type ScheduleRuntimeFields = {
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
+  runtimeModel: string | null;
+  prompt: string | null;
+  runtimeConfig: unknown;
+  isRunnable: boolean;
+  runnabilityState: string;
+  runnabilitySummary: string;
+};
+
+type ScheduleRecord = {
+  taskId: string;
+  workspaceId: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  ownerType: string;
+  assigneeAgentId: string | null;
+  persistedStatus: string;
+  displayState: string | null;
+  actionRequired: string | null;
+  approvalPendingCount: number;
+  scheduleStatus: string | null;
+  scheduleSource: string | null;
+  dueAt: Date | null;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
+  latestRunStatus: string | null;
+  scheduleProposalCount: number;
+  lastActivityAt: Date | null;
+} & ScheduleRuntimeFields;
 
 type ScheduleCardItem = {
   taskId: string;
@@ -154,6 +118,9 @@ type ScheduleCardItem = {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
+  runtimeAdapterKey?: string | null;
+  runtimeInput?: unknown;
+  runtimeInputVersion?: string | null;
   runtimeModel?: string | null;
   prompt?: string | null;
   runtimeConfig?: unknown;
@@ -215,8 +182,11 @@ type TimelineCreateInput = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
-  runtimeModel: string;
-  prompt: string;
+  runtimeAdapterKey: string;
+  runtimeInput: Prisma.InputJsonObject;
+  runtimeInputVersion: string;
+  runtimeModel: string | null;
+  prompt: string | null;
   dueAt: Date | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
   scheduledStartAt: Date;
@@ -235,10 +205,12 @@ const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
     description: "Clarify goals, constraints, and the first execution plan.",
     values: {
       priority: "Medium",
-      runtimeModel: "gpt-5.4",
-      prompt:
-        "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
-      runtimeConfig: { temperature: 0.2 },
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt: "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
+        temperature: 0.2,
+      },
     },
   },
   {
@@ -247,10 +219,13 @@ const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
     description: "Reproduce the issue, identify root cause, and propose the safest fix.",
     values: {
       priority: "High",
-      runtimeModel: "gpt-5.4",
-      prompt:
-        "Reproduce the issue, identify the root cause, describe the impact, and suggest the safest fix before making broader changes.",
-      runtimeConfig: { temperature: 0.1 },
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt:
+          "Reproduce the issue, identify the root cause, describe the impact, and suggest the safest fix before making broader changes.",
+        temperature: 0.1,
+      },
     },
   },
   {
@@ -259,10 +234,13 @@ const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
     description: "Complete the change, verify it, and summarize what shipped.",
     values: {
       priority: "Medium",
-      runtimeModel: "gpt-5.4",
-      prompt:
-        "Implement the change, verify the result with the smallest reliable test loop, and summarize the final outcome and any follow-up.",
-      runtimeConfig: { temperature: 0.2 },
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt:
+          "Implement the change, verify the result with the smallest reliable test loop, and summarize the final outcome and any follow-up.",
+        temperature: 0.2,
+      },
     },
   },
 ];
@@ -777,6 +755,9 @@ function createScheduledItemFromQueueItem(item: UnscheduledItem, startAt: Date, 
     scheduleProposalCount: item.scheduleProposalCount,
     lastActivityAt: item.lastActivityAt,
     description: item.description,
+    runtimeAdapterKey: item.runtimeAdapterKey,
+    runtimeInput: item.runtimeInput,
+    runtimeInputVersion: item.runtimeInputVersion,
     runtimeModel: item.runtimeModel,
     prompt: item.prompt,
     runtimeConfig: item.runtimeConfig,
@@ -786,8 +767,16 @@ function createScheduledItemFromQueueItem(item: UnscheduledItem, startAt: Date, 
   };
 }
 
-function createScheduledItemFromCreateInput(taskId: string, workspaceId: string, input: TimelineCreateInput): ScheduledItem {
+function createScheduledItemFromCreateInput(
+  taskId: string,
+  workspaceId: string,
+  workspaceDefaultRuntime: string,
+  input: TimelineCreateInput,
+): ScheduledItem {
   const runnability = deriveTaskRunnability({
+    workspaceDefaultRuntime,
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    runtimeInput: input.runtimeInput,
     runtimeModel: input.runtimeModel,
     prompt: input.prompt,
     runtimeConfig: input.runtimeConfig,
@@ -813,6 +802,9 @@ function createScheduledItemFromCreateInput(taskId: string, workspaceId: string,
     latestRunStatus: null,
     scheduleProposalCount: 0,
     lastActivityAt: new Date(),
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    runtimeInput: input.runtimeInput,
+    runtimeInputVersion: input.runtimeInputVersion,
     runtimeModel: input.runtimeModel,
     prompt: input.prompt,
     runtimeConfig: input.runtimeConfig,
@@ -849,6 +841,8 @@ function applyTaskConfigToItem<T extends ScheduledItem | UnscheduledItem | ListI
 ): T {
   const runtimeConfig = input.runtimeConfig ?? null;
   const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    runtimeInput: input.runtimeInput,
     runtimeModel: input.runtimeModel,
     prompt: input.prompt,
     runtimeConfig,
@@ -860,6 +854,9 @@ function applyTaskConfigToItem<T extends ScheduledItem | UnscheduledItem | ListI
     description: input.description || null,
     priority: input.priority,
     dueAt: input.dueAt,
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    runtimeInput: input.runtimeInput,
+    runtimeInputVersion: input.runtimeInputVersion,
     runtimeModel: input.runtimeModel,
     prompt: input.prompt,
     runtimeConfig,
@@ -1074,6 +1071,9 @@ function toTaskConfigInitialValues(item: {
   title: string;
   description?: string | null;
   priority: string;
+  runtimeAdapterKey?: string | null;
+  runtimeInput?: unknown;
+  runtimeInputVersion?: string | null;
   runtimeModel?: string | null;
   prompt?: string | null;
   dueAt?: Date | null;
@@ -1083,6 +1083,9 @@ function toTaskConfigInitialValues(item: {
     title: item.title,
     description: item.description ?? null,
     priority: item.priority as TaskConfigFormInput["priority"],
+    runtimeAdapterKey: item.runtimeAdapterKey ?? null,
+    runtimeInput: item.runtimeInput,
+    runtimeInputVersion: item.runtimeInputVersion ?? null,
     runtimeModel: item.runtimeModel ?? null,
     prompt: item.prompt ?? null,
     dueAt: item.dueAt ?? null,
@@ -1093,12 +1096,16 @@ function toTaskConfigInitialValues(item: {
 function TimelineCreateComposer({
   draft,
   timelineHeight,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   isPending,
   onClose,
   onCreate,
 }: {
   draft: DragPreview;
   timelineHeight: number;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isPending: boolean;
   onClose: () => void;
   onCreate: (input: TimelineCreateInput) => Promise<void>;
@@ -1128,11 +1135,13 @@ function TimelineCreateComposer({
       </div>
 
       <TaskConfigForm
+        runtimeAdapters={runtimeAdapters}
+        defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
         isPending={isPending}
         presets={TASK_CONFIG_PRESETS}
         submitLabel={copy.createAndSchedule}
         pendingLabel={copy.creating}
-        onSubmit={async (input) => {
+        onSubmitAction={async (input) => {
           await onCreate({
             ...input,
             scheduledStartAt: draft.startAt,
@@ -1194,6 +1203,8 @@ function DayTimeline({
   selectedDay,
   selectedTaskId,
   draggedItem,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
@@ -1205,6 +1216,8 @@ function DayTimeline({
   selectedDay: string;
   selectedTaskId?: string;
   draggedItem: TimelineDragItem | null;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isPending: boolean;
   onScheduleDrop: (item: TimelineDragItem, startAt: Date, endAt: Date) => Promise<void>;
   onCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
@@ -1445,6 +1458,8 @@ function DayTimeline({
               <TimelineCreateComposer
                 draft={composerDraft}
                 timelineHeight={timelineHeight}
+                runtimeAdapters={runtimeAdapters}
+                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
                 isPending={isPending}
                 onClose={() => setComposerDraft(null)}
                 onCreate={async (input) => {
@@ -1548,13 +1563,17 @@ function DayTimeline({
 function SelectedBlockSheet({
   item,
   selectedDay,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   isPending,
-  onSaveTaskConfig,
+  onSaveTaskConfigAction,
 }: {
   item: ScheduledItem;
   selectedDay: string;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onSaveTaskConfig: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 }) {
   const locale = useLocale();
   const { messages, t } = useI18n();
@@ -1606,11 +1625,13 @@ function SelectedBlockSheet({
           <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl border-dashed">
             <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.taskConfig}</p>
             <TaskConfigForm
+              runtimeAdapters={runtimeAdapters}
+              defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
               isPending={isPending}
               initialValues={toTaskConfigInitialValues(item)}
               submitLabel={copy.saveTaskConfig}
               pendingLabel={copy.saving}
-              onSubmit={(input) => onSaveTaskConfig(item.taskId, input)}
+              onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
             />
           </SurfaceCard>
 
@@ -1639,42 +1660,52 @@ function SelectedBlockSheet({
 
 function QueueTaskConfigEditor({
   item,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   isPending,
-  onSaveTaskConfig,
+  onSaveTaskConfigAction,
 }: {
   item: UnscheduledItem;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onSaveTaskConfig: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 }) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   return (
     <TaskConfigForm
+      runtimeAdapters={runtimeAdapters}
+      defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
       isPending={isPending}
       initialValues={toTaskConfigInitialValues(item)}
       submitLabel={copy.saveTaskConfig}
       pendingLabel={copy.saving}
-      onSubmit={(input) => onSaveTaskConfig(item.taskId, input)}
+      onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
     />
   );
 }
 
 function QueueCard({
   item,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
   isDragging,
   isPending,
   isExpanded,
   onToggle,
-  onSaveTaskConfig,
+  onSaveTaskConfigAction,
   onDragStart,
   onDragEnd,
 }: {
   item: UnscheduledItem;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isDragging: boolean;
   isPending: boolean;
   isExpanded: boolean;
   onToggle: () => void;
-  onSaveTaskConfig: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
 }) {
@@ -1737,7 +1768,13 @@ function QueueCard({
 
           <SurfaceCard as="div" variant="default" padding="sm" className="rounded-2xl border-dashed">
             <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.taskConfig}</p>
-            <QueueTaskConfigEditor item={item} isPending={isPending} onSaveTaskConfig={onSaveTaskConfig} />
+              <QueueTaskConfigEditor
+                item={item}
+                runtimeAdapters={runtimeAdapters}
+                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                isPending={isPending}
+                onSaveTaskConfigAction={onSaveTaskConfigAction}
+              />
           </SurfaceCard>
 
           <TaskContextLinks
@@ -2055,6 +2092,9 @@ export function SchedulePage({
         description: input.description || null,
         priority: input.priority,
         dueAt: input.dueAt,
+        runtimeAdapterKey: input.runtimeAdapterKey,
+        runtimeInput: input.runtimeInput,
+        runtimeInputVersion: input.runtimeInputVersion,
         runtimeModel: input.runtimeModel,
         prompt: input.prompt,
         runtimeConfig: input.runtimeConfig ?? null,
@@ -2074,8 +2114,16 @@ export function SchedulePage({
           ...current.summary,
           scheduledCount: current.summary.scheduledCount + 1,
         },
-        scheduled: sortScheduledItems([...current.scheduled, createScheduledItemFromCreateInput(created.taskId, workspaceId, input)]),
-        listItems: [...current.listItems, createListItemFromScheduledItem(createScheduledItemFromCreateInput(created.taskId, workspaceId, input))],
+        scheduled: sortScheduledItems([
+          ...current.scheduled,
+          createScheduledItemFromCreateInput(created.taskId, workspaceId, data.defaultRuntimeAdapterKey, input),
+        ]),
+        listItems: [
+          ...current.listItems,
+          createListItemFromScheduledItem(
+            createScheduledItemFromCreateInput(created.taskId, workspaceId, data.defaultRuntimeAdapterKey, input),
+          ),
+        ],
       }));
       setLocalSelectedTaskId(created.taskId);
       router.push(localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)));
@@ -2125,6 +2173,9 @@ export function SchedulePage({
         description: input.description || null,
         priority: input.priority,
         dueAt: input.dueAt,
+        runtimeAdapterKey: input.runtimeAdapterKey,
+        runtimeInput: input.runtimeInput,
+        runtimeInputVersion: input.runtimeInputVersion,
         runtimeModel: input.runtimeModel,
         prompt: input.prompt,
         runtimeConfig: input.runtimeConfig ?? null,
@@ -2226,6 +2277,8 @@ export function SchedulePage({
                     selectedDay={activeGroup.key}
                     selectedTaskId={selectedTaskId}
                     draggedItem={draggedItem}
+                    runtimeAdapters={data.runtimeAdapters}
+                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
                     isPending={isPending}
                     onScheduleDrop={handleScheduleDrop}
                     onCreateTaskBlock={handleCreateTaskBlock}
@@ -2236,7 +2289,13 @@ export function SchedulePage({
                   <EmptyState>{copy.noTimelineDay}</EmptyState>
                 )
               ) : (
-                <ScheduleTaskList items={viewData.listItems} onSaveTaskConfig={handleTaskConfigSave} isPending={isPending} />
+                  <ScheduleTaskList
+                    items={viewData.listItems}
+                    runtimeAdapters={data.runtimeAdapters}
+                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                    onSaveTaskConfigAction={handleTaskConfigSave}
+                    isPending={isPending}
+                  />
               )}
             </div>
           </SurfaceCard>
@@ -2259,11 +2318,13 @@ export function SchedulePage({
                   <QueueCard
                     key={item.taskId}
                     item={item}
+                    runtimeAdapters={data.runtimeAdapters}
+                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
                     isPending={isPending}
                     isDragging={draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId}
                     isExpanded={expandedQueueTaskIds.includes(item.taskId)}
                     onToggle={() => toggleQueueCard(item.taskId)}
-                    onSaveTaskConfig={handleTaskConfigSave}
+                    onSaveTaskConfigAction={handleTaskConfigSave}
                     onDragStart={handleQueueDragStart}
                     onDragEnd={handleQueueDragEnd}
                   />
@@ -2352,7 +2413,14 @@ export function SchedulePage({
       </div>
 
       {activeView === "timeline" && selectedItem && activeDay ? (
-        <SelectedBlockSheet item={selectedItem} selectedDay={activeDay} isPending={isPending} onSaveTaskConfig={handleTaskConfigSave} />
+        <SelectedBlockSheet
+          item={selectedItem}
+          selectedDay={activeDay}
+          runtimeAdapters={data.runtimeAdapters}
+          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+          isPending={isPending}
+          onSaveTaskConfigAction={handleTaskConfigSave}
+        />
       ) : null}
     </div>
   );

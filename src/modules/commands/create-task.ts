@@ -2,6 +2,7 @@ import { OwnerType, Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 function normalizeOptionalTextField(value: string | null | undefined, field: string) {
@@ -44,6 +45,9 @@ export async function createTask(input: {
   description?: string | null;
   priority?: "Low" | "Medium" | "High" | "Urgent";
   dueAt?: Date | null;
+  runtimeAdapterKey?: string | null;
+  runtimeInput?: Prisma.InputJsonObject | null;
+  runtimeInputVersion?: string | null;
   runtimeModel?: string | null;
   prompt?: string | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
@@ -58,10 +62,27 @@ export async function createTask(input: {
     throw new Error("title is required");
   }
 
-  const runnability = deriveTaskRunnability({
+  const workspace = await db.workspace.findUniqueOrThrow({
+    where: { id: input.workspaceId },
+    select: { defaultRuntime: true },
+  });
+  const validatedRuntimeConfig = validateTaskRuntimeConfig({
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    workspaceDefaultRuntime: workspace.defaultRuntime,
+    runtimeInput: input.runtimeInput,
+    runtimeInputIsAuthoritative: input.runtimeInput !== undefined,
+    runtimeInputVersion: input.runtimeInputVersion,
     runtimeModel,
     prompt,
-    runtimeConfig: input.runtimeConfig,
+    runtimeConfig,
+  });
+
+  const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
+    runtimeInput: validatedRuntimeConfig.runtimeInput,
+    runtimeModel: validatedRuntimeConfig.runtimeModel,
+    prompt: validatedRuntimeConfig.prompt,
+    runtimeConfig: validatedRuntimeConfig.runtimeConfig,
   });
   const status = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
 
@@ -70,9 +91,15 @@ export async function createTask(input: {
       workspaceId: input.workspaceId,
       title,
       description,
-      ...(runtimeModel !== undefined ? { runtimeModel } : {}),
-      ...(prompt !== undefined ? { prompt } : {}),
-      ...(runtimeConfig !== undefined ? { runtimeConfig } : {}),
+      runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
+      runtimeInput: validatedRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
+      runtimeInputVersion: validatedRuntimeConfig.runtimeInputVersion,
+      runtimeModel: validatedRuntimeConfig.runtimeModel,
+      prompt: validatedRuntimeConfig.prompt,
+      runtimeConfig:
+        validatedRuntimeConfig.runtimeConfig === null
+          ? Prisma.DbNull
+          : (validatedRuntimeConfig.runtimeConfig as Prisma.InputJsonObject),
       priority: input.priority ? TaskPriority[input.priority] : TaskPriority.Medium,
       status,
       ownerType: OwnerType.human,

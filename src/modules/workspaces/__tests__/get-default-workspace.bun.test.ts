@@ -104,7 +104,7 @@ describe("getDefaultWorkspace", () => {
       create: typeof db.workspace.create;
     }).create = (async () => {
       throw new Error("create failed");
-    }) as typeof db.workspace.create;
+    }) as unknown as typeof db.workspace.create;
 
     try {
       await expect(getDefaultWorkspace()).rejects.toBeInstanceOf(DefaultWorkspaceError);

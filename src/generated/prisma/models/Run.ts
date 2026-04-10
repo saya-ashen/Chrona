@@ -28,6 +28,7 @@ export type RunMinAggregateOutputType = {
   id: string | null
   taskId: string | null
   runtimeName: string | null
+  runtimeConfigVersion: string | null
   runtimeRunRef: string | null
   runtimeSessionRef: string | null
   status: $Enums.RunStatus | null
@@ -51,6 +52,7 @@ export type RunMaxAggregateOutputType = {
   id: string | null
   taskId: string | null
   runtimeName: string | null
+  runtimeConfigVersion: string | null
   runtimeRunRef: string | null
   runtimeSessionRef: string | null
   status: $Enums.RunStatus | null
@@ -74,6 +76,8 @@ export type RunCountAggregateOutputType = {
   id: number
   taskId: number
   runtimeName: number
+  runtimeConfigSnapshot: number
+  runtimeConfigVersion: number
   runtimeRunRef: number
   runtimeSessionRef: number
   status: number
@@ -99,6 +103,7 @@ export type RunMinAggregateInputType = {
   id?: true
   taskId?: true
   runtimeName?: true
+  runtimeConfigVersion?: true
   runtimeRunRef?: true
   runtimeSessionRef?: true
   status?: true
@@ -122,6 +127,7 @@ export type RunMaxAggregateInputType = {
   id?: true
   taskId?: true
   runtimeName?: true
+  runtimeConfigVersion?: true
   runtimeRunRef?: true
   runtimeSessionRef?: true
   status?: true
@@ -145,6 +151,8 @@ export type RunCountAggregateInputType = {
   id?: true
   taskId?: true
   runtimeName?: true
+  runtimeConfigSnapshot?: true
+  runtimeConfigVersion?: true
   runtimeRunRef?: true
   runtimeSessionRef?: true
   status?: true
@@ -241,6 +249,8 @@ export type RunGroupByOutputType = {
   id: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot: runtime.JsonValue | null
+  runtimeConfigVersion: string | null
   runtimeRunRef: string | null
   runtimeSessionRef: string | null
   status: $Enums.RunStatus
@@ -285,6 +295,8 @@ export type RunWhereInput = {
   id?: Prisma.StringFilter<"Run"> | string
   taskId?: Prisma.StringFilter<"Run"> | string
   runtimeName?: Prisma.StringFilter<"Run"> | string
+  runtimeConfigSnapshot?: Prisma.JsonNullableFilter<"Run">
+  runtimeConfigVersion?: Prisma.StringNullableFilter<"Run"> | string | null
   runtimeRunRef?: Prisma.StringNullableFilter<"Run"> | string | null
   runtimeSessionRef?: Prisma.StringNullableFilter<"Run"> | string | null
   status?: Prisma.EnumRunStatusFilter<"Run"> | $Enums.RunStatus
@@ -315,6 +327,8 @@ export type RunOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runtimeName?: Prisma.SortOrder
+  runtimeConfigSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeConfigVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeRunRef?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeSessionRef?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -349,6 +363,8 @@ export type RunWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.RunWhereInput | Prisma.RunWhereInput[]
   taskId?: Prisma.StringFilter<"Run"> | string
   runtimeName?: Prisma.StringFilter<"Run"> | string
+  runtimeConfigSnapshot?: Prisma.JsonNullableFilter<"Run">
+  runtimeConfigVersion?: Prisma.StringNullableFilter<"Run"> | string | null
   runtimeSessionRef?: Prisma.StringNullableFilter<"Run"> | string | null
   status?: Prisma.EnumRunStatusFilter<"Run"> | $Enums.RunStatus
   startedAt?: Prisma.DateTimeNullableFilter<"Run"> | Date | string | null
@@ -378,6 +394,8 @@ export type RunOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runtimeName?: Prisma.SortOrder
+  runtimeConfigSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeConfigVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeRunRef?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeSessionRef?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -407,6 +425,8 @@ export type RunScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Run"> | string
   taskId?: Prisma.StringWithAggregatesFilter<"Run"> | string
   runtimeName?: Prisma.StringWithAggregatesFilter<"Run"> | string
+  runtimeConfigSnapshot?: Prisma.JsonNullableWithAggregatesFilter<"Run">
+  runtimeConfigVersion?: Prisma.StringNullableWithAggregatesFilter<"Run"> | string | null
   runtimeRunRef?: Prisma.StringNullableWithAggregatesFilter<"Run"> | string | null
   runtimeSessionRef?: Prisma.StringNullableWithAggregatesFilter<"Run"> | string | null
   status?: Prisma.EnumRunStatusWithAggregatesFilter<"Run"> | $Enums.RunStatus
@@ -429,6 +449,8 @@ export type RunScalarWhereWithAggregatesInput = {
 export type RunCreateInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -459,6 +481,8 @@ export type RunUncheckedCreateInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -487,6 +511,8 @@ export type RunUncheckedCreateInput = {
 export type RunUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -517,6 +543,8 @@ export type RunUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -546,6 +574,8 @@ export type RunCreateManyInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -568,6 +598,8 @@ export type RunCreateManyInput = {
 export type RunUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -591,6 +623,8 @@ export type RunUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -624,6 +658,8 @@ export type RunCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runtimeName?: Prisma.SortOrder
+  runtimeConfigSnapshot?: Prisma.SortOrder
+  runtimeConfigVersion?: Prisma.SortOrder
   runtimeRunRef?: Prisma.SortOrder
   runtimeSessionRef?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -647,6 +683,7 @@ export type RunMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runtimeName?: Prisma.SortOrder
+  runtimeConfigVersion?: Prisma.SortOrder
   runtimeRunRef?: Prisma.SortOrder
   runtimeSessionRef?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -670,6 +707,7 @@ export type RunMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runtimeName?: Prisma.SortOrder
+  runtimeConfigVersion?: Prisma.SortOrder
   runtimeRunRef?: Prisma.SortOrder
   runtimeSessionRef?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -838,6 +876,8 @@ export type RunUpdateOneRequiredWithoutRuntimeCursorNestedInput = {
 export type RunCreateWithoutTaskInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -866,6 +906,8 @@ export type RunCreateWithoutTaskInput = {
 export type RunUncheckedCreateWithoutTaskInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -923,6 +965,8 @@ export type RunScalarWhereInput = {
   id?: Prisma.StringFilter<"Run"> | string
   taskId?: Prisma.StringFilter<"Run"> | string
   runtimeName?: Prisma.StringFilter<"Run"> | string
+  runtimeConfigSnapshot?: Prisma.JsonNullableFilter<"Run">
+  runtimeConfigVersion?: Prisma.StringNullableFilter<"Run"> | string | null
   runtimeRunRef?: Prisma.StringNullableFilter<"Run"> | string | null
   runtimeSessionRef?: Prisma.StringNullableFilter<"Run"> | string | null
   status?: Prisma.EnumRunStatusFilter<"Run"> | $Enums.RunStatus
@@ -945,6 +989,8 @@ export type RunScalarWhereInput = {
 export type RunCreateWithoutApprovalsInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -974,6 +1020,8 @@ export type RunUncheckedCreateWithoutApprovalsInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1017,6 +1065,8 @@ export type RunUpdateToOneWithWhereWithoutApprovalsInput = {
 export type RunUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1046,6 +1096,8 @@ export type RunUncheckedUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1073,6 +1125,8 @@ export type RunUncheckedUpdateWithoutApprovalsInput = {
 export type RunCreateWithoutArtifactsInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1102,6 +1156,8 @@ export type RunUncheckedCreateWithoutArtifactsInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1145,6 +1201,8 @@ export type RunUpdateToOneWithWhereWithoutArtifactsInput = {
 export type RunUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1174,6 +1232,8 @@ export type RunUncheckedUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1201,6 +1261,8 @@ export type RunUncheckedUpdateWithoutArtifactsInput = {
 export type RunCreateWithoutEventsInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1230,6 +1292,8 @@ export type RunUncheckedCreateWithoutEventsInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1273,6 +1337,8 @@ export type RunUpdateToOneWithWhereWithoutEventsInput = {
 export type RunUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1302,6 +1368,8 @@ export type RunUncheckedUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1329,6 +1397,8 @@ export type RunUncheckedUpdateWithoutEventsInput = {
 export type RunCreateWithoutConversationEntriesInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1358,6 +1428,8 @@ export type RunUncheckedCreateWithoutConversationEntriesInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1401,6 +1473,8 @@ export type RunUpdateToOneWithWhereWithoutConversationEntriesInput = {
 export type RunUpdateWithoutConversationEntriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1430,6 +1504,8 @@ export type RunUncheckedUpdateWithoutConversationEntriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1457,6 +1533,8 @@ export type RunUncheckedUpdateWithoutConversationEntriesInput = {
 export type RunCreateWithoutToolCallDetailsInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1486,6 +1564,8 @@ export type RunUncheckedCreateWithoutToolCallDetailsInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1529,6 +1609,8 @@ export type RunUpdateToOneWithWhereWithoutToolCallDetailsInput = {
 export type RunUpdateWithoutToolCallDetailsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1558,6 +1640,8 @@ export type RunUncheckedUpdateWithoutToolCallDetailsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1585,6 +1669,8 @@ export type RunUncheckedUpdateWithoutToolCallDetailsInput = {
 export type RunCreateWithoutRuntimeCursorInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1614,6 +1700,8 @@ export type RunUncheckedCreateWithoutRuntimeCursorInput = {
   id?: string
   taskId: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1657,6 +1745,8 @@ export type RunUpdateToOneWithWhereWithoutRuntimeCursorInput = {
 export type RunUpdateWithoutRuntimeCursorInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1686,6 +1776,8 @@ export type RunUncheckedUpdateWithoutRuntimeCursorInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1713,6 +1805,8 @@ export type RunUncheckedUpdateWithoutRuntimeCursorInput = {
 export type RunCreateManyTaskInput = {
   id?: string
   runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
   runtimeRunRef?: string | null
   runtimeSessionRef?: string | null
   status: $Enums.RunStatus
@@ -1735,6 +1829,8 @@ export type RunCreateManyTaskInput = {
 export type RunUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1763,6 +1859,8 @@ export type RunUpdateWithoutTaskInput = {
 export type RunUncheckedUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1791,6 +1889,8 @@ export type RunUncheckedUpdateWithoutTaskInput = {
 export type RunUncheckedUpdateManyWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
@@ -1881,6 +1981,8 @@ export type RunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = ru
   id?: boolean
   taskId?: boolean
   runtimeName?: boolean
+  runtimeConfigSnapshot?: boolean
+  runtimeConfigVersion?: boolean
   runtimeRunRef?: boolean
   runtimeSessionRef?: boolean
   status?: boolean
@@ -1912,6 +2014,8 @@ export type RunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extension
   id?: boolean
   taskId?: boolean
   runtimeName?: boolean
+  runtimeConfigSnapshot?: boolean
+  runtimeConfigVersion?: boolean
   runtimeRunRef?: boolean
   runtimeSessionRef?: boolean
   status?: boolean
@@ -1936,6 +2040,8 @@ export type RunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extension
   id?: boolean
   taskId?: boolean
   runtimeName?: boolean
+  runtimeConfigSnapshot?: boolean
+  runtimeConfigVersion?: boolean
   runtimeRunRef?: boolean
   runtimeSessionRef?: boolean
   status?: boolean
@@ -1960,6 +2066,8 @@ export type RunSelectScalar = {
   id?: boolean
   taskId?: boolean
   runtimeName?: boolean
+  runtimeConfigSnapshot?: boolean
+  runtimeConfigVersion?: boolean
   runtimeRunRef?: boolean
   runtimeSessionRef?: boolean
   status?: boolean
@@ -1979,7 +2087,7 @@ export type RunSelectScalar = {
   updatedAt?: boolean
 }
 
-export type RunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "runtimeName" | "runtimeRunRef" | "runtimeSessionRef" | "status" | "startedAt" | "endedAt" | "errorSummary" | "resumeToken" | "triggeredBy" | "retryable" | "resumeSupported" | "pendingInputPrompt" | "pendingInputType" | "lastSyncedAt" | "syncStatus" | "mappingPartial" | "createdAt" | "updatedAt", ExtArgs["result"]["run"]>
+export type RunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "runtimeName" | "runtimeConfigSnapshot" | "runtimeConfigVersion" | "runtimeRunRef" | "runtimeSessionRef" | "status" | "startedAt" | "endedAt" | "errorSummary" | "resumeToken" | "triggeredBy" | "retryable" | "resumeSupported" | "pendingInputPrompt" | "pendingInputType" | "lastSyncedAt" | "syncStatus" | "mappingPartial" | "createdAt" | "updatedAt", ExtArgs["result"]["run"]>
 export type RunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   approvals?: boolean | Prisma.Run$approvalsArgs<ExtArgs>
@@ -2012,6 +2120,8 @@ export type $RunPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
     id: string
     taskId: string
     runtimeName: string
+    runtimeConfigSnapshot: runtime.JsonValue | null
+    runtimeConfigVersion: string | null
     runtimeRunRef: string | null
     runtimeSessionRef: string | null
     status: $Enums.RunStatus
@@ -2462,6 +2572,8 @@ export interface RunFieldRefs {
   readonly id: Prisma.FieldRef<"Run", 'String'>
   readonly taskId: Prisma.FieldRef<"Run", 'String'>
   readonly runtimeName: Prisma.FieldRef<"Run", 'String'>
+  readonly runtimeConfigSnapshot: Prisma.FieldRef<"Run", 'Json'>
+  readonly runtimeConfigVersion: Prisma.FieldRef<"Run", 'String'>
   readonly runtimeRunRef: Prisma.FieldRef<"Run", 'String'>
   readonly runtimeSessionRef: Prisma.FieldRef<"Run", 'String'>
   readonly status: Prisma.FieldRef<"Run", 'RunStatus'>

@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskConfigForm, type TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import {
+  TaskConfigForm,
+  type TaskConfigFormInput,
+  type TaskConfigRuntimeAdapter,
+} from "@/components/schedule/task-config-form";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -35,6 +39,9 @@ export type ScheduleTaskListItem = {
   scheduleSource: string | null;
   scheduleProposalCount: number;
   lastActivityAt: Date | null;
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig: unknown;
@@ -45,8 +52,10 @@ export type ScheduleTaskListItem = {
 
 type ScheduleTaskListProps = {
   items: ScheduleTaskListItem[];
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onSaveTaskConfig: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 };
 
 type ListFilterKey =
@@ -166,6 +175,9 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     title: item.title,
     description: item.description,
     priority: item.priority as TaskConfigFormInput["priority"],
+    runtimeAdapterKey: item.runtimeAdapterKey,
+    runtimeInput: item.runtimeInput,
+    runtimeInputVersion: item.runtimeInputVersion,
     runtimeModel: item.runtimeModel,
     prompt: item.prompt,
     dueAt: item.dueAt,
@@ -173,7 +185,13 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
   };
 }
 
-export function ScheduleTaskList({ items, isPending, onSaveTaskConfig }: ScheduleTaskListProps) {
+export function ScheduleTaskList({
+  items,
+  runtimeAdapters,
+  defaultRuntimeAdapterKey,
+  isPending,
+  onSaveTaskConfigAction,
+}: ScheduleTaskListProps) {
   const { t } = useI18n();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState<ListFilterKey>("all");
@@ -339,7 +357,7 @@ export function ScheduleTaskList({ items, isPending, onSaveTaskConfig }: Schedul
                       {item.scheduleProposalCount > 0 ? (
                         <StatusBadge tone="info">{copy.proposals}: {item.scheduleProposalCount}</StatusBadge>
                       ) : null}
-                      <StatusBadge>{item.runtimeModel ?? copy.noModel}</StatusBadge>
+                      <StatusBadge>{item.runtimeModel ?? item.runtimeAdapterKey ?? copy.noModel}</StatusBadge>
                     </div>
                   </div>
 
@@ -359,12 +377,14 @@ export function ScheduleTaskList({ items, isPending, onSaveTaskConfig }: Schedul
                 {isExpanded ? (
                   <div className="mt-4 rounded-2xl border border-border/60 bg-background/75 p-4">
                     <TaskConfigForm
+                      runtimeAdapters={runtimeAdapters}
+                      defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
                       initialValues={toTaskConfigInitialValues(item)}
                       isPending={isPending}
                       submitLabel={copy.saveTaskConfig}
                       pendingLabel={copy.saving}
-                      onSubmit={async (input) => {
-                        await onSaveTaskConfig(item.taskId, input);
+                      onSubmitAction={async (input) => {
+                        await onSaveTaskConfigAction(item.taskId, input);
                         setExpandedTaskId(null);
                       }}
                     />

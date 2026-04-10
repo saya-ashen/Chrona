@@ -48,6 +48,9 @@ export async function getTaskPage(taskId: string) {
         orderBy: { createdAt: "desc" },
         take: 5,
       },
+      workspace: {
+        select: { defaultRuntime: true },
+      },
       dependencies: {
         include: {
           dependsOnTask: {
@@ -60,6 +63,9 @@ export async function getTaskPage(taskId: string) {
 
   const latestRun = task.runs[0] ?? null;
   const runnability = deriveTaskRunnability({
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    workspaceDefaultRuntime: task.workspace.defaultRuntime,
+    runtimeInput: task.runtimeInput,
     runtimeModel: task.runtimeModel,
     prompt: task.prompt,
     runtimeConfig: task.runtimeConfig,
@@ -71,6 +77,9 @@ export async function getTaskPage(taskId: string) {
       workspaceId: task.workspaceId,
       title: task.title,
       description: task.description,
+      runtimeAdapterKey: task.runtimeAdapterKey,
+      runtimeInput: task.runtimeInput,
+      runtimeInputVersion: task.runtimeInputVersion,
       runtimeModel: task.runtimeModel,
       prompt: task.prompt,
       runtimeConfig: task.runtimeConfig,

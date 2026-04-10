@@ -140,6 +140,9 @@ model Task {
   workspaceId      String
   title            String
   description      String?
+  runtimeAdapterKey String?
+  runtimeInput     Json?
+  runtimeInputVersion String?
   runtimeModel     String?
   prompt           String?
   runtimeConfig    Json?
@@ -196,6 +199,8 @@ model Run {
   id                  String              @id @default(cuid())
   taskId              String
   runtimeName         String
+  runtimeConfigSnapshot Json?
+  runtimeConfigVersion String?
   runtimeRunRef       String?             @unique
   runtimeSessionRef   String?
   status              RunStatus

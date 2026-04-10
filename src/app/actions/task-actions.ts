@@ -113,8 +113,7 @@ export async function rejectScheduleProposal(proposalId: string, resolutionNote?
 }
 
 export async function startRun(input: Parameters<typeof startRunCommand>[0]) {
-  const adapter = await createRuntimeAdapter();
-  const result = await startRunCommand({ ...input, adapter });
+  const result = await startRunCommand(input);
   revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
   return result;
 }

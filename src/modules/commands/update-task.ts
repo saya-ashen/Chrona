@@ -2,6 +2,8 @@ import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/runtime/registry";
+import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
 
@@ -53,6 +55,30 @@ function normalizeRuntimeConfig(value: Prisma.InputJsonObject | null | undefined
   return value;
 }
 
+function isRuntimeObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function stripSyncedRuntimeConfigKeys(runtimeInput: unknown, previousRuntimeConfig: unknown) {
+  if (!isRuntimeObject(runtimeInput)) {
+    return runtimeInput;
+  }
+
+  const nextRuntimeInput = { ...runtimeInput };
+
+  if (isRuntimeObject(previousRuntimeConfig)) {
+    for (const key of Object.keys(previousRuntimeConfig)) {
+      delete nextRuntimeInput[key];
+    }
+  }
+
+  return nextRuntimeInput;
+}
+
+function adapterSpecHasFieldPath(adapterKey: string, path: string) {
+  return getRuntimeTaskConfigSpec(adapterKey).fields.some((field) => field.path === path);
+}
+
 export async function updateTask(input: {
   taskId: string;
   title?: string;
@@ -61,6 +87,9 @@ export async function updateTask(input: {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
+  runtimeAdapterKey?: string | null;
+  runtimeInput?: Prisma.InputJsonObject | null;
+  runtimeInputVersion?: string | null;
   runtimeModel?: string | null;
   prompt?: string | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
@@ -71,7 +100,14 @@ export async function updateTask(input: {
   const runtimeModel = normalizeOptionalTextField(input.runtimeModel, "runtimeModel");
   const prompt = normalizeOptionalTextField(input.prompt, "prompt");
   const runtimeConfig = normalizeRuntimeConfig(input.runtimeConfig);
-  const currentTask = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
+  const currentTask = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    include: {
+      workspace: {
+        select: { defaultRuntime: true },
+      },
+    },
+  });
   validateScheduleWindow({
     scheduledStartAt:
       input.scheduledStartAt === undefined ? currentTask.scheduledStartAt : input.scheduledStartAt,
@@ -80,11 +116,61 @@ export async function updateTask(input: {
   });
   const nextRuntimeModel = runtimeModel === undefined ? currentTask.runtimeModel : runtimeModel;
   const nextPrompt = prompt === undefined ? currentTask.prompt : prompt;
-  const nextRuntimeConfig = input.runtimeConfig === undefined ? currentTask.runtimeConfig : input.runtimeConfig;
+  const nextRuntimeConfig =
+    input.runtimeConfig === undefined ? currentTask.runtimeConfig : input.runtimeConfig;
+  const nextRuntimeAdapterKeyInput =
+    input.runtimeAdapterKey === undefined ? currentTask.runtimeAdapterKey : input.runtimeAdapterKey;
+  const currentResolvedRuntimeAdapterKey = resolveRuntimeAdapterKey({
+    runtimeAdapterKey: currentTask.runtimeAdapterKey,
+    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
+  });
+  const nextResolvedRuntimeAdapterKey = resolveRuntimeAdapterKey({
+    runtimeAdapterKey: nextRuntimeAdapterKeyInput,
+    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
+  });
+  const adapterChanged = nextResolvedRuntimeAdapterKey !== currentResolvedRuntimeAdapterKey;
+  const nextAdapterSupportsModel = adapterSpecHasFieldPath(nextResolvedRuntimeAdapterKey, "model");
+  const nextAdapterSupportsPrompt = adapterSpecHasFieldPath(nextResolvedRuntimeAdapterKey, "prompt");
+  const nextRuntimeInputBase =
+    input.runtimeInput !== undefined
+      ? input.runtimeInput
+      : adapterChanged
+        ? undefined
+      : input.runtimeConfig === undefined
+        ? currentTask.runtimeInput
+        : stripSyncedRuntimeConfigKeys(currentTask.runtimeInput, currentTask.runtimeConfig);
+  const nextRuntimeInputVersion =
+    input.runtimeInputVersion !== undefined
+      ? input.runtimeInputVersion
+      : input.runtimeAdapterKey !== undefined && input.runtimeAdapterKey !== currentTask.runtimeAdapterKey
+        ? undefined
+        : currentTask.runtimeInputVersion;
+  const validatedRuntimeConfig = validateTaskRuntimeConfig({
+    runtimeAdapterKey: nextRuntimeAdapterKeyInput,
+    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
+    runtimeInput: nextRuntimeInputBase,
+    runtimeInputIsAuthoritative: input.runtimeInput !== undefined,
+    runtimeInputVersion: nextRuntimeInputVersion,
+    runtimeModel:
+      input.runtimeInput !== undefined
+        ? runtimeModel
+        : adapterChanged && !nextAdapterSupportsModel
+          ? runtimeModel
+          : nextRuntimeModel,
+    prompt:
+      input.runtimeInput !== undefined
+        ? prompt
+        : adapterChanged && !nextAdapterSupportsPrompt
+          ? prompt
+          : nextPrompt,
+    runtimeConfig: input.runtimeInput !== undefined || adapterChanged ? runtimeConfig : nextRuntimeConfig,
+  });
   const runnability = deriveTaskRunnability({
-    runtimeModel: nextRuntimeModel,
-    prompt: nextPrompt,
-    runtimeConfig: nextRuntimeConfig,
+    runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
+    runtimeInput: validatedRuntimeConfig.runtimeInput,
+    runtimeModel: validatedRuntimeConfig.runtimeModel,
+    prompt: validatedRuntimeConfig.prompt,
+    runtimeConfig: validatedRuntimeConfig.runtimeConfig,
   });
   const shouldManageStatus =
     currentTask.status === TaskStatus.Draft || currentTask.status === TaskStatus.Ready;
@@ -93,6 +179,13 @@ export async function updateTask(input: {
       ? TaskStatus.Ready
       : TaskStatus.Draft
     : undefined;
+  const shouldPersistResolvedRuntimeConfig =
+    input.runtimeInput !== undefined ||
+    input.runtimeAdapterKey !== undefined ||
+    input.runtimeInputVersion !== undefined ||
+    input.runtimeModel !== undefined ||
+    input.prompt !== undefined ||
+    input.runtimeConfig !== undefined;
 
   const changedFields = [
     input.title !== undefined ? "title" : null,
@@ -101,6 +194,9 @@ export async function updateTask(input: {
     input.dueAt !== undefined ? "dueAt" : null,
     input.scheduledStartAt !== undefined ? "scheduledStartAt" : null,
     input.scheduledEndAt !== undefined ? "scheduledEndAt" : null,
+    input.runtimeAdapterKey !== undefined ? "runtimeAdapterKey" : null,
+    input.runtimeInput !== undefined ? "runtimeInput" : null,
+    input.runtimeInputVersion !== undefined ? "runtimeInputVersion" : null,
     input.runtimeModel !== undefined ? "runtimeModel" : null,
     input.prompt !== undefined ? "prompt" : null,
     input.runtimeConfig !== undefined ? "runtimeConfig" : null,
@@ -115,9 +211,23 @@ export async function updateTask(input: {
       dueAt: input.dueAt,
       scheduledStartAt: input.scheduledStartAt,
       scheduledEndAt: input.scheduledEndAt,
-      runtimeModel,
-      prompt,
-      runtimeConfig,
+      runtimeAdapterKey: shouldPersistResolvedRuntimeConfig
+        ? validatedRuntimeConfig.runtimeAdapterKey
+        : undefined,
+      runtimeInput:
+        !shouldPersistResolvedRuntimeConfig
+          ? undefined
+          : (validatedRuntimeConfig.runtimeInput as Prisma.InputJsonObject),
+      runtimeInputVersion: shouldPersistResolvedRuntimeConfig
+        ? validatedRuntimeConfig.runtimeInputVersion
+        : undefined,
+      runtimeModel: shouldPersistResolvedRuntimeConfig ? validatedRuntimeConfig.runtimeModel : runtimeModel,
+      prompt: shouldPersistResolvedRuntimeConfig ? validatedRuntimeConfig.prompt : prompt,
+      runtimeConfig: shouldPersistResolvedRuntimeConfig
+        ? validatedRuntimeConfig.runtimeConfig === null
+          ? Prisma.DbNull
+          : (validatedRuntimeConfig.runtimeConfig as Prisma.InputJsonObject)
+        : runtimeConfig,
       status: nextStatus,
     },
   });
