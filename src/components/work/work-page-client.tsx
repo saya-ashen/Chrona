@@ -2,10 +2,14 @@
 
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import {
+  acceptTaskResult,
   approveApproval,
+  createFollowUpTask,
   editAndApproveApproval,
+  markTaskDone,
   provideInput,
   rejectApproval,
+  reopenTask,
   retryRun,
   startRun,
 } from "@/app/actions/task-actions";
@@ -47,15 +51,18 @@ type WorkPageClientProps = {
       } | null;
     };
     currentRun:
-      | {
-          id: string;
-          status: string;
-          startedAt?: string | null;
-          endedAt?: string | null;
-          syncStatus?: string | null;
-          resumeSupported?: boolean | null;
-          pendingInputPrompt?: string | null;
-        }
+        | {
+            id: string;
+            status: string;
+            startedAt?: string | null;
+            endedAt?: string | null;
+            updatedAt?: string | null;
+            lastSyncedAt?: string | null;
+            syncStatus?: string | null;
+            resumeSupported?: boolean | null;
+            pendingInputPrompt?: string | null;
+            errorSummary?: string | null;
+          }
       | null;
     currentIntervention:
       | {
@@ -89,6 +96,35 @@ type WorkPageClientProps = {
       scheduledStartAt: string | null;
       scheduledEndAt: string | null;
       summary: string;
+    };
+    reliability: {
+      refreshedAt: string;
+      lastSyncedAt: string | null;
+      lastUpdatedAt: string | null;
+      syncStatus: string | null;
+      isStale: boolean;
+      stuckFor: string | null;
+      stopReason: string | null;
+    };
+    closure: {
+      resultAccepted: boolean;
+      acceptedAt: string | null;
+      isDone: boolean;
+      doneAt: string | null;
+      canAcceptResult: boolean;
+      canMarkDone: boolean;
+      canCreateFollowUp: boolean;
+      canRetry: boolean;
+      canReopen: boolean;
+      latestFollowUp:
+        | {
+            id: string;
+            title: string;
+            status: string;
+            scheduleStatus: string;
+            createdAt: string | null;
+          }
+        | null;
     };
     workstreamItems: Array<{
       id: string;
@@ -130,6 +166,13 @@ const DEFAULT_COPY = {
   interventionFocus: "Intervention focus",
   noBlockingAction: "No blocking action recorded.",
   plannedWindow: "Planned window",
+  reliability: "Reliability",
+  lastRefresh: "Last refresh",
+  lastSync: "Last sync",
+  stopReason: "Stop reason",
+  stuckFor: "Stuck for",
+  staleSync: "Sync stale",
+  healthySync: "Sync healthy",
   nextAction: "Next Action",
   whyNow: "Why now",
   evidence: "Evidence",
@@ -143,6 +186,15 @@ const DEFAULT_COPY = {
   editAndApprove: "Edit and Approve",
   retryPrompt: "Retry prompt",
   retryRun: "Retry Run",
+  acceptResult: "Accept Result",
+  markTaskDone: "Mark Task Done",
+  createFollowUp: "Create Follow-up",
+  followUpTitle: "Follow-up title",
+  followUpDue: "Follow-up due date",
+  reopenTask: "Re-open Task",
+  latestFollowUp: "Latest follow-up",
+  resultAccepted: "Result accepted",
+  taskDone: "Task done",
   startRunDescription: "Start the first run here so the workbench becomes the live execution surface instead of a dead end.",
   runPrompt: "Run prompt",
   startRunHere: "Start Run Here",
@@ -261,7 +313,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const currentRun = data.currentRun;
   const canProvideInput = data.currentIntervention?.kind === "input";
   const hasPendingApprovals = data.currentIntervention?.kind === "approval" && (data.currentIntervention.approvals?.length ?? 0) > 0;
-  const canRetry = currentRun ? ["Failed", "Cancelled"].includes(currentRun.status) : false;
+  const canRetryRecovery = currentRun ? ["Failed", "Cancelled"].includes(currentRun.status) : false;
 
   async function submitAgentMessage(inputText: string) {
     if (!currentRun) {
@@ -326,14 +378,16 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <StatusBadge tone="info">{data.taskShell.status}</StatusBadge>
+            <StatusBadge tone="info">{currentRun?.status ?? data.taskShell.status}</StatusBadge>
+            <StatusBadge>{data.scheduleImpact.status}</StatusBadge>
             <StatusBadge>{data.taskShell.priority}</StatusBadge>
-            <StatusBadge>{copy.runPrefix} {currentRun?.status ?? copy.noRun}</StatusBadge>
-            <StatusBadge>{data.taskShell.scheduleStatus}</StatusBadge>
             <StatusBadge>{copy.duePrefix} {formatDate(data.taskShell.dueAt)}</StatusBadge>
+            <StatusBadge>{data.reliability.isStale ? copy.staleSync : copy.healthySync}</StatusBadge>
+            {data.closure.resultAccepted ? <StatusBadge>{copy.resultAccepted}</StatusBadge> : null}
+            {data.closure.isDone ? <StatusBadge>{copy.taskDone}</StatusBadge> : null}
           </div>
 
-          <div className="mt-4 grid gap-2 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground sm:grid-cols-2">
+          <div className="mt-4 grid gap-2 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground sm:grid-cols-3">
             <div>
               <p className="font-medium text-foreground">{copy.interventionFocus}</p>
               <p>{data.taskShell.blockReason?.actionRequired ?? copy.noBlockingAction}</p>
@@ -343,6 +397,13 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               <p>
                 {formatDate(data.scheduleImpact.scheduledStartAt)} to {formatDate(data.scheduleImpact.scheduledEndAt)}
               </p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">{copy.reliability}</p>
+              <p>{copy.lastRefresh}: {formatDateTime(data.reliability.refreshedAt)}</p>
+              <p>{copy.lastSync}: {formatDateTime(data.reliability.lastSyncedAt ?? data.reliability.lastUpdatedAt)}</p>
+              {data.reliability.stuckFor ? <p>{copy.stuckFor}: {data.reliability.stuckFor}</p> : null}
+              {data.reliability.stopReason ? <p>{copy.stopReason}: {data.reliability.stopReason}</p> : null}
             </div>
           </div>
         </SurfaceCard>
@@ -482,7 +543,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                   </div>
                 ))}
               </div>
-            ) : canRetry ? (
+            ) : canRetryRecovery ? (
               <form
                 action={async (formData) => {
                   const prompt = String(formData.get("prompt") ?? "").trim();
@@ -515,8 +576,139 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 {data.currentIntervention?.description}
               </div>
             ) : currentRun?.status === "Completed" ? (
-              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-                {data.currentIntervention?.description}
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
+                <p>{data.currentIntervention?.description}</p>
+
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {data.closure.resultAccepted && data.closure.acceptedAt ? (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
+                      {copy.resultAccepted} · {formatDateTime(data.closure.acceptedAt)}
+                    </span>
+                  ) : null}
+                  {data.closure.isDone && data.closure.doneAt ? (
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">
+                      {copy.taskDone} · {formatDateTime(data.closure.doneAt)}
+                    </span>
+                  ) : null}
+                  {data.closure.latestFollowUp ? (
+                    <span className="rounded-full border border-border bg-background px-3 py-1 text-muted-foreground">
+                      {copy.latestFollowUp} · {data.closure.latestFollowUp.title}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {data.closure.canAcceptResult ? (
+                    <form
+                      action={async () => {
+                        await runAction(async () => {
+                          await acceptTaskResult({ taskId: data.taskShell.id });
+                        });
+                      }}
+                    >
+                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                        {copy.acceptResult}
+                      </button>
+                    </form>
+                  ) : null}
+
+                  {data.closure.canMarkDone ? (
+                    <form
+                      action={async () => {
+                        await runAction(async () => {
+                          await markTaskDone({ taskId: data.taskShell.id });
+                        });
+                      }}
+                    >
+                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
+                        {copy.markTaskDone}
+                      </button>
+                    </form>
+                  ) : null}
+
+                  {data.closure.canReopen ? (
+                    <form
+                      action={async () => {
+                        await runAction(async () => {
+                          await reopenTask({ taskId: data.taskShell.id });
+                        });
+                      }}
+                    >
+                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                        {copy.reopenTask}
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+
+                {data.closure.canCreateFollowUp ? (
+                  <form
+                    action={async (formData) => {
+                      const title = String(formData.get("title") ?? "").trim();
+                      const dueAtValue = String(formData.get("dueAt") ?? "").trim();
+
+                      if (!title) {
+                        throw new Error("title is required");
+                      }
+
+                      await runAction(async () => {
+                        await createFollowUpTask({
+                          taskId: data.taskShell.id,
+                          title,
+                          dueAt: dueAtValue ? new Date(`${dueAtValue}T00:00:00.000Z`) : null,
+                        });
+                      });
+                    }}
+                    className="grid gap-3 rounded-2xl border border-border/60 bg-background p-4 md:grid-cols-[minmax(0,1fr)_180px_auto]"
+                  >
+                    <Field label={copy.followUpTitle}>
+                      <input
+                        type="text"
+                        name="title"
+                        required
+                        defaultValue={`Follow up: ${data.taskShell.title}`}
+                        className={inputClassName}
+                      />
+                    </Field>
+                    <Field label={copy.followUpDue}>
+                      <input type="date" name="dueAt" className={inputClassName} />
+                    </Field>
+                    <div className="flex items-end">
+                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "secondary", className: "w-full disabled:opacity-60" })}>
+                        {copy.createFollowUp}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {!data.closure.canReopen && data.closure.canRetry ? (
+                  <form
+                    action={async (formData) => {
+                      const prompt = String(formData.get("prompt") ?? "").trim();
+                      if (!prompt) {
+                        throw new Error("retry prompt is required");
+                      }
+
+                      await runAction(async () => {
+                        await retryRun({ taskId: data.taskShell.id, prompt });
+                      });
+                    }}
+                    className="space-y-3"
+                  >
+                    <Field label={copy.retryPrompt}>
+                      <textarea
+                        name="prompt"
+                        rows={4}
+                        required
+                        defaultValue={data.taskShell.prompt ?? `Retry task: ${data.taskShell.title}`}
+                        className={textareaClassName}
+                      />
+                    </Field>
+                    <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                      {copy.retryRun}
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ) : !currentRun ? (
               <form action={handleStartRunSubmit} className="space-y-3">
@@ -625,6 +817,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
       <RunSidePanel
         currentRun={currentRun}
+        reliability={data.reliability}
         approvals={data.inspector.approvals}
         artifacts={data.inspector.artifacts}
         toolCalls={data.inspector.toolCalls}

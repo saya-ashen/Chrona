@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
+import { SYNC_STALE_MS, syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
 
 type WorkPageCopy = {
   needsApproval: string;
@@ -507,9 +507,149 @@ function buildLatestOutput({
   } as const;
 }
 
+function formatDuration(ms: number | null) {
+  if (ms === null || ms < 0) {
+    return null;
+  }
+
+  const minutes = Math.floor(ms / 60000);
+
+  if (minutes < 1) {
+    return "<1m";
+  }
+
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours < 24) {
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+function buildReliability({
+  currentRun,
+  blockReason,
+  now,
+}: {
+  currentRun:
+    | {
+        status: string;
+        startedAt: string | null;
+        endedAt: string | null;
+        updatedAt: string | null;
+        lastSyncedAt: string | null;
+        syncStatus: string | null;
+        errorSummary: string | null;
+      }
+    | null;
+  blockReason: ReturnType<typeof readBlockReason>;
+  now: Date;
+}) {
+  if (!currentRun) {
+    return {
+      refreshedAt: now.toISOString(),
+      lastSyncedAt: null,
+      lastUpdatedAt: null,
+      syncStatus: null,
+      isStale: false,
+      stuckFor: null,
+      stopReason: blockReason?.actionRequired ?? null,
+    };
+  }
+
+  const lastSyncedAt = currentRun.lastSyncedAt ? new Date(currentRun.lastSyncedAt) : null;
+  const lastUpdatedAt = currentRun.updatedAt ? new Date(currentRun.updatedAt) : null;
+  const activeStatuses = new Set(["Pending", "Running", "WaitingForInput", "WaitingForApproval"]);
+  const syncReference = lastSyncedAt ?? lastUpdatedAt;
+  const isStale = Boolean(
+    currentRun.syncStatus === "stale" ||
+      (activeStatuses.has(currentRun.status) && syncReference && now.getTime() - syncReference.getTime() > SYNC_STALE_MS),
+  );
+
+  let stopReason = currentRun.errorSummary ?? blockReason?.actionRequired ?? null;
+
+  if (!stopReason) {
+    if (currentRun.status === "WaitingForInput") {
+      stopReason = "Waiting for operator input";
+    } else if (currentRun.status === "WaitingForApproval") {
+      stopReason = "Waiting for approval decision";
+    } else if (currentRun.status === "Completed") {
+      stopReason = "Run finished and is ready for review";
+    } else if (currentRun.status === "Cancelled") {
+      stopReason = "Run was cancelled before completion";
+    }
+  }
+
+  return {
+    refreshedAt: now.toISOString(),
+    lastSyncedAt: currentRun.lastSyncedAt,
+    lastUpdatedAt: currentRun.updatedAt,
+    syncStatus: currentRun.syncStatus,
+    isStale,
+    stuckFor:
+      activeStatuses.has(currentRun.status) && syncReference
+        ? formatDuration(now.getTime() - syncReference.getTime())
+        : null,
+    stopReason,
+  };
+}
+
+function buildClosureState({
+  task,
+  currentRun,
+  events,
+  latestFollowUp,
+}: {
+  task: { status: string; completedAt: Date | null };
+  currentRun: { id: string; status: string } | null;
+  events: Array<{ eventType: string; runId: string | null; createdAt: Date }>;
+  latestFollowUp:
+    | { id: string; title: string; status: string; scheduleStatus: string; createdAt: Date }
+    | null;
+}) {
+  const latestReopenedAt =
+    [...events].reverse().find((event) => event.eventType === "task.reopened")?.createdAt ?? null;
+  const latestAcceptedEvent = [...events].reverse().find(
+    (event) =>
+      event.eventType === "task.result_accepted" &&
+      (!currentRun || event.runId === currentRun.id) &&
+      (!latestReopenedAt || event.createdAt > latestReopenedAt),
+  );
+
+  return {
+    resultAccepted: Boolean(latestAcceptedEvent),
+    acceptedAt: toIsoString(latestAcceptedEvent?.createdAt),
+    isDone: task.status === "Done",
+    doneAt: toIsoString(task.completedAt),
+    canAcceptResult: currentRun?.status === "Completed" && !latestAcceptedEvent,
+    canMarkDone: currentRun?.status === "Completed" && task.status !== "Done",
+    canCreateFollowUp: currentRun?.status === "Completed",
+    canRetry: currentRun ? ["Completed", "Failed", "Cancelled"].includes(currentRun.status) : false,
+    canReopen: task.status === "Done",
+    latestFollowUp: latestFollowUp
+      ? {
+          id: latestFollowUp.id,
+          title: latestFollowUp.title,
+          status: latestFollowUp.status,
+          scheduleStatus: latestFollowUp.scheduleStatus,
+          createdAt: toIsoString(latestFollowUp.createdAt),
+        }
+      : null,
+  };
+}
+
 export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPageCopy>) {
   const copy = { ...DEFAULT_COPY, ...copyOverrides };
   await syncTaskRunForRead(taskId);
+  const now = new Date();
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -530,6 +670,10 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
   });
 
   const currentRun = task.runs[0] ?? null;
+  const latestFollowUp = await db.task.findFirst({
+    where: { parentTaskId: task.id },
+    orderBy: { createdAt: "desc" },
+  });
   const blockReason = readBlockReason(task);
   const approvals =
     currentRun?.approvals.map((approval) => ({
@@ -584,9 +728,12 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
         status: currentRun.status,
         startedAt: toIsoString(currentRun.startedAt),
         endedAt: toIsoString(currentRun.endedAt),
+        updatedAt: toIsoString(currentRun.updatedAt),
+        lastSyncedAt: toIsoString(currentRun.lastSyncedAt),
         syncStatus: currentRun.syncStatus,
         resumeSupported: currentRun.resumeSupported,
         pendingInputPrompt: currentRun.pendingInputPrompt,
+        errorSummary: currentRun.errorSummary,
       }
     : null;
 
@@ -607,6 +754,24 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     copy,
   });
   const scheduleImpact = buildScheduleImpact(task, copy);
+  const reliability = buildReliability({
+    currentRun: serializedRun,
+    blockReason,
+    now,
+  });
+  const closure = buildClosureState({
+    task: {
+      status: task.status,
+      completedAt: task.completedAt,
+    },
+    currentRun: serializedRun,
+    events: task.events.map((event) => ({
+      eventType: event.eventType,
+      runId: event.runId,
+      createdAt: event.createdAt,
+    })),
+    latestFollowUp,
+  });
 
   return {
     taskShell: {
@@ -637,6 +802,8 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     }),
     latestOutput,
     scheduleImpact,
+    reliability,
+    closure,
     workstreamItems,
     conversation,
     inspector: {

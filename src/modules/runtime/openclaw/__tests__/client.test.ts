@@ -66,7 +66,11 @@ function createClient(
   });
 }
 
-async function connectClient(client: OpenClawGatewayClient, socket: MockWebSocket) {
+async function connectClient(
+  client: OpenClawGatewayClient,
+  socket: MockWebSocket,
+  methods: string[] = ["sessions.create", "agent.wait", "chat.history", "exec.approval.list"],
+) {
   const connectPromise = client.connect();
 
   socket.open();
@@ -87,7 +91,7 @@ async function connectClient(client: OpenClawGatewayClient, socket: MockWebSocke
       minProtocol: 3,
       maxProtocol: 3,
       role: "operator",
-      scopes: ["operator.read", "operator.write", "operator.approvals"],
+      scopes: ["operator.read", "operator.write", "operator.approvals", "operator.admin"],
       auth: { token: "test-key" },
       client: {
         id: "openclaw-probe",
@@ -103,13 +107,13 @@ async function connectClient(client: OpenClawGatewayClient, socket: MockWebSocke
     payload: {
       type: "hello-ok",
       protocol: 3,
-      features: { methods: ["sessions.create", "agent.wait", "chat.history"] },
+      features: { methods },
     },
   });
 
   await expect(connectPromise).resolves.toMatchObject({
     protocol: 3,
-    methods: ["sessions.create", "agent.wait", "chat.history"],
+    methods,
   });
 }
 
@@ -360,6 +364,42 @@ describe("OpenClawGatewayClient", () => {
     await expect(waitDecisionPromise).resolves.toBe("allow-once");
   });
 
+  it("returns an empty approval list when the gateway does not advertise list support", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket, ["sessions.create", "agent.wait", "chat.history"]);
+
+    const sentBefore = socket.sentFrames.length;
+    await expect(client.listApprovals()).resolves.toEqual([]);
+    expect(socket.sentFrames).toHaveLength(sentBefore);
+  });
+
+  it("downgrades unknown approval list methods to an empty result", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket);
+
+    socket.sentFrames.length = 0;
+    const listPromise = client.listApprovals();
+    await Promise.resolve();
+    const listRequest = socket.sentFrames.at(-1);
+
+    expect(listRequest).toMatchObject({
+      type: "req",
+      method: "exec.approval.list",
+      params: {},
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: listRequest?.id,
+      ok: false,
+      error: { message: "unknown method exec.approval.list" },
+    });
+
+    await expect(listPromise).resolves.toEqual([]);
+  });
+
   it("sends a stable device identity and reuses the stored device token during connect", async () => {
     const socket = new MockWebSocket();
     const sign = vi.fn().mockResolvedValue("signed-payload");
@@ -386,7 +426,7 @@ describe("OpenClawGatewayClient", () => {
     await Promise.resolve();
 
     expect(sign).toHaveBeenCalledWith(
-      "v3|device_123|openclaw-probe|probe|operator|operator.read,operator.write,operator.approvals|1737264000000|device-token-123|nonce-123|linux|",
+      "v3|device_123|openclaw-probe|probe|operator|operator.read,operator.write,operator.approvals,operator.admin|1737264000000|device-token-123|nonce-123|linux|",
     );
 
     const connectRequest = socket.sentFrames.at(0);

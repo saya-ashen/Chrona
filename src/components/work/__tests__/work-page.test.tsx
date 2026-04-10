@@ -50,6 +50,27 @@ describe("WorkPageClient", () => {
             scheduledEndAt: "2026-04-16T11:00:00.000Z",
             summary: "Execution timing is slipping against the planned window.",
           },
+          reliability: {
+            refreshedAt: "2026-04-16T10:16:00.000Z",
+            lastSyncedAt: "2026-04-16T10:15:00.000Z",
+            lastUpdatedAt: "2026-04-16T10:15:00.000Z",
+            syncStatus: "healthy",
+            isStale: false,
+            stuckFor: "1m",
+            stopReason: "Approve / Reject / Edit and Approve",
+          },
+          closure: {
+            resultAccepted: false,
+            acceptedAt: null,
+            isDone: false,
+            doneAt: null,
+            canAcceptResult: false,
+            canMarkDone: false,
+            canCreateFollowUp: false,
+            canRetry: false,
+            canReopen: false,
+            latestFollowUp: null,
+          },
           workstreamItems: [
             {
               id: "evt_1",
@@ -146,6 +167,27 @@ describe("WorkPageClient", () => {
             scheduledEndAt: null,
             summary: "No planned window exists yet.",
           },
+          reliability: {
+            refreshedAt: "2026-04-16T10:16:00.000Z",
+            lastSyncedAt: null,
+            lastUpdatedAt: null,
+            syncStatus: null,
+            isStale: false,
+            stuckFor: null,
+            stopReason: "Start the first execution pass",
+          },
+          closure: {
+            resultAccepted: false,
+            acceptedAt: null,
+            isDone: false,
+            doneAt: null,
+            canAcceptResult: false,
+            canMarkDone: false,
+            canCreateFollowUp: false,
+            canRetry: false,
+            canReopen: false,
+            latestFollowUp: null,
+          },
           workstreamItems: [],
           conversation: [],
           inspector: {
@@ -160,5 +202,98 @@ describe("WorkPageClient", () => {
     expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Continue working on: Draft rollout note");
     expect(screen.getByRole("button", { name: "Start Run Here" })).toBeInTheDocument();
     expect(screen.getByText("No active run yet")).toBeInTheDocument();
+  });
+
+  it("renders completed closure actions directly in the main action area", () => {
+    render(
+      <WorkPageClient
+        initialData={{
+          taskShell: {
+            id: "task_3",
+            workspaceId: "ws_1",
+            title: "Close rollout checklist",
+            runtimeModel: "gpt-5.4",
+            prompt: "Summarize the rollout",
+            status: "Completed",
+            priority: "High",
+            dueAt: "2026-04-20T18:00:00.000Z",
+            scheduledStartAt: "2026-04-20T09:00:00.000Z",
+            scheduledEndAt: "2026-04-20T11:00:00.000Z",
+            scheduleStatus: "Completed",
+            blockReason: null,
+          },
+          currentRun: {
+            id: "run_3",
+            status: "Completed",
+            startedAt: "2026-04-20T09:00:00.000Z",
+            endedAt: "2026-04-20T09:45:00.000Z",
+            updatedAt: "2026-04-20T09:45:00.000Z",
+            lastSyncedAt: "2026-04-20T09:45:00.000Z",
+            syncStatus: "healthy",
+            resumeSupported: false,
+            pendingInputPrompt: null,
+            errorSummary: null,
+          },
+          currentIntervention: {
+            kind: "review",
+            title: "Review result",
+            description: "The run completed. Review the latest output and decide whether follow-up work is needed.",
+            whyNow: "The latest result is available and should be reviewed before closing or extending the task.",
+            actionLabel: "Review Output",
+            evidence: [],
+          },
+          latestOutput: {
+            kind: "artifact",
+            title: "Rollout summary",
+            body: "Type: report",
+            timestamp: "2026-04-20T09:45:00.000Z",
+            href: null,
+            empty: false,
+            sourceLabel: "Artifact · report",
+          },
+          scheduleImpact: {
+            status: "Completed",
+            dueAt: "2026-04-20T18:00:00.000Z",
+            scheduledStartAt: "2026-04-20T09:00:00.000Z",
+            scheduledEndAt: "2026-04-20T11:00:00.000Z",
+            summary: "Schedule remains aligned with the current plan.",
+          },
+          reliability: {
+            refreshedAt: "2026-04-20T09:46:00.000Z",
+            lastSyncedAt: "2026-04-20T09:45:00.000Z",
+            lastUpdatedAt: "2026-04-20T09:45:00.000Z",
+            syncStatus: "healthy",
+            isStale: false,
+            stuckFor: null,
+            stopReason: "Run finished and is ready for review",
+          },
+          closure: {
+            resultAccepted: false,
+            acceptedAt: null,
+            isDone: false,
+            doneAt: null,
+            canAcceptResult: true,
+            canMarkDone: true,
+            canCreateFollowUp: true,
+            canRetry: true,
+            canReopen: false,
+            latestFollowUp: null,
+          },
+          workstreamItems: [],
+          conversation: [],
+          inspector: {
+            approvals: [],
+            artifacts: [],
+            toolCalls: [],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Accept Result" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark Task Done" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Follow-up" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry Run" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Follow-up title" })).toBeInTheDocument();
   });
 });

@@ -168,6 +168,14 @@ type UnscheduledItem = SchedulePageProps["data"]["unscheduled"][number];
 type ListItem = SchedulePageProps["data"]["listItems"][number];
 type ScheduleViewMode = "timeline" | "list";
 
+type TodayFocusItem = {
+  taskId: string;
+  workspaceId: string;
+  title: string;
+  reason: string;
+  tone: "neutral" | "info" | "warning" | "critical" | "success";
+};
+
 type ScheduledDayGroup = {
   key: string;
   date: Date;
@@ -357,6 +365,21 @@ const DEFAULT_COPY = {
   unscheduledQueue: "Unscheduled Queue",
   unscheduledQueueDescription: "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
   noUnscheduledWork: "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
+  dateSwitcher: "Date",
+  todayFocus: "Today Focus",
+  todayFocusDescription: "Clear the items that can block today before you keep reshaping the timeline.",
+  todayFocusEmpty: "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
+  focusOverdue: "Overdue",
+  focusAtRisk: "At risk",
+  focusWaitingForInput: "Waiting for input",
+  focusWaitingForApproval: "Waiting for approval",
+  focusReadyToday: "Ready to start today",
+  todayBlocks: "Today blocks",
+  queueReady: "Queue ready",
+  needsAttention: "Needs attention",
+  secondaryPlanning: "Secondary planning info",
+  secondaryPlanningDescription: "Use this area for proposals, week context, and planning help after today's work is clear.",
+  aiProposalsCompactEmpty: "No pending AI proposals.",
 } as const;
 
 type SchedulePageCopy = Record<keyof typeof DEFAULT_COPY, string>;
@@ -849,6 +872,97 @@ function MetricCard({ label, value, hint }: { label: string; value: number; hint
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+    </SurfaceCard>
+  );
+}
+
+function buildTodayFocusItems(
+  data: SchedulePageData,
+  activeGroup: ScheduledDayGroup | null,
+  copy: SchedulePageCopy,
+): TodayFocusItem[] {
+  const focus = new Map<string, TodayFocusItem>();
+
+  function push(item: ScheduleCardItem, reason: string, tone: TodayFocusItem["tone"]) {
+    if (focus.has(item.taskId)) {
+      return;
+    }
+
+    focus.set(item.taskId, {
+      taskId: item.taskId,
+      workspaceId: item.workspaceId,
+      title: item.title,
+      reason,
+      tone,
+    });
+  }
+
+  for (const item of data.risks) {
+    if (item.scheduleStatus === "Overdue") {
+      push(item, copy.focusOverdue, "critical");
+      continue;
+    }
+
+    if (item.latestRunStatus === "WaitingForInput" || item.displayState === "WaitingForInput") {
+      push(item, copy.focusWaitingForInput, "warning");
+      continue;
+    }
+
+    if (item.latestRunStatus === "WaitingForApproval" || item.displayState === "WaitingForApproval") {
+      push(item, copy.focusWaitingForApproval, "warning");
+      continue;
+    }
+
+    push(item, copy.focusAtRisk, "warning");
+  }
+
+  for (const item of activeGroup?.items ?? []) {
+    const isHighPriority = item.priority === "High" || item.priority === "Urgent";
+    const hasStarted = Boolean(item.latestRunStatus && item.latestRunStatus !== "Pending");
+
+    if (!hasStarted && isHighPriority) {
+      push(item, copy.focusReadyToday, "info");
+    }
+  }
+
+  return Array.from(focus.values()).slice(0, 5);
+}
+
+function TodayFocusCard({
+  items,
+  copy,
+}: {
+  items: TodayFocusItem[];
+  copy: SchedulePageCopy;
+}) {
+  return (
+    <SurfaceCard>
+      <SurfaceCardHeader>
+        <SurfaceCardTitle>{copy.todayFocus}</SurfaceCardTitle>
+        <SurfaceCardDescription>{copy.todayFocusDescription}</SurfaceCardDescription>
+      </SurfaceCardHeader>
+
+      {items.length === 0 ? (
+        <EmptyState>{copy.todayFocusEmpty}</EmptyState>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <SurfaceCard as="div" key={item.taskId} variant="inset" padding="sm" className="rounded-2xl">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
+                </div>
+                <LocalizedLink
+                  href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
+                  className="line-clamp-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                >
+                  {item.title}
+                </LocalizedLink>
+              </div>
+            </SurfaceCard>
+          ))}
+        </div>
+      )}
     </SurfaceCard>
   );
 }
@@ -1783,6 +1897,7 @@ export function SchedulePage({
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
   const selectedItem = activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ?? null;
   const tomorrowKey = formatDateKey(addDays(startOfDay(new Date()), 1));
+  const todayFocusItems = useMemo(() => buildTodayFocusItems(viewData, activeGroup, copy), [activeGroup, copy, viewData]);
   const draggedQueueItem =
     draggedTask?.kind === "queue" ? viewData.unscheduled.find((item) => item.taskId === draggedTask.taskId) ?? null : null;
   const draggedScheduledItem =
@@ -2019,17 +2134,23 @@ export function SchedulePage({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-sm">
-            <LocalizedLink href={buildScheduleViewHref(todayKey, activeView)} className={buttonVariants({ variant: "outline", size: "sm" })}>
-              {copy.today}
-            </LocalizedLink>
-            <LocalizedLink href={buildScheduleViewHref(tomorrowKey, activeView)} className={buttonVariants({ variant: "outline", size: "sm" })}>
-              {copy.tomorrow}
-            </LocalizedLink>
-            <LocalizedLink href={buildScheduleViewHref(activeDay, activeView)} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              {copy.currentPlanButton}
-            </LocalizedLink>
-            <div className="ml-auto flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.dateSwitcher}</span>
+              <div className="flex flex-wrap gap-2 rounded-2xl border border-border/60 bg-background/70 p-1">
+                <LocalizedLink href={buildScheduleViewHref(todayKey, activeView)} className={buttonVariants({ variant: activeDay === todayKey ? "default" : "ghost", size: "sm" })}>
+                  {copy.today}
+                </LocalizedLink>
+                <LocalizedLink href={buildScheduleViewHref(tomorrowKey, activeView)} className={buttonVariants({ variant: activeDay === tomorrowKey ? "default" : "ghost", size: "sm" })}>
+                  {copy.tomorrow}
+                </LocalizedLink>
+                <LocalizedLink href={buildScheduleViewHref(activeDay, activeView)} className={buttonVariants({ variant: activeDay !== todayKey && activeDay !== tomorrowKey ? "default" : "ghost", size: "sm" })}>
+                  {copy.currentPlanButton}
+                </LocalizedLink>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
               <LocalizedLink
                 href={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
                 className={buttonVariants({ variant: activeView === "timeline" ? "default" : "outline", size: "sm" })}
@@ -2049,11 +2170,13 @@ export function SchedulePage({
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label={copy.scheduledMetric} value={viewData.summary.scheduledCount} hint={copy.scheduledMetricHint} />
-            <MetricCard label={copy.queueMetric} value={viewData.summary.unscheduledCount} hint={copy.queueMetricHint} />
-            <MetricCard label={copy.aiProposalsMetric} value={viewData.summary.proposalCount} hint={copy.aiProposalsMetricHint} />
-            <MetricCard label={copy.risksMetric} value={viewData.summary.riskCount} hint={copy.risksMetricHint} />
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge>{copy.todayBlocks}: {activeGroup?.items.length ?? 0}</StatusBadge>
+            <StatusBadge tone={viewData.summary.unscheduledCount > 0 ? "info" : "neutral"}>{copy.queueReady}: {viewData.summary.unscheduledCount}</StatusBadge>
+            <StatusBadge tone={viewData.summary.riskCount > 0 ? "critical" : "neutral"}>{copy.needsAttention}: {viewData.summary.riskCount}</StatusBadge>
+            {viewData.summary.proposalCount > 0 ? (
+              <StatusBadge tone="info">{copy.aiProposalsMetric}: {viewData.summary.proposalCount}</StatusBadge>
+            ) : null}
           </div>
         </SurfaceCard>
       </div>
@@ -2061,8 +2184,9 @@ export function SchedulePage({
       {activeView === "list" ? (
         <ScheduleTaskList items={viewData.listItems} onSaveTaskConfig={handleTaskConfigSave} isPending={isPending} />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2.9fr)_minmax(340px,1fr)]">
-          <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
+        <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
+          <TodayFocusCard items={todayFocusItems} copy={copy} />
+
           <SurfaceCard variant="highlight">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SurfaceCardHeader>
@@ -2078,76 +2202,6 @@ export function SchedulePage({
             </div>
 
             <div className="mt-4 space-y-4">
-              <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_280px]">
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground">{copy.conflictsTitle}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground">{copy.conflictsDescription}</p>
-                      </div>
-                      <StatusBadge tone={viewData.risks.length > 0 ? "critical" : "neutral"}>{viewData.risks.length}</StatusBadge>
-                    </div>
-                    <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                      {viewData.risks.length === 0 ? (
-                        <EmptyState>{copy.noScheduleRisks}</EmptyState>
-                      ) : (
-                        viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground">{copy.aiProposalsTitle}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground">{copy.aiProposalsDescription}</p>
-                      </div>
-                      <StatusBadge tone={viewData.proposals.length > 0 ? "info" : "neutral"}>{viewData.proposals.length}</StatusBadge>
-                    </div>
-                    <div className="mt-3 space-y-4 text-sm text-muted-foreground">
-                      {viewData.proposals.length === 0 ? (
-                        <EmptyState>
-                          {copy.noAiProposals}
-                        </EmptyState>
-                      ) : (
-                        viewData.proposals.slice(0, 2).map((proposal) => (
-                          <ProposalCard
-                            key={proposal.proposalId}
-                            proposal={proposal}
-                            isPending={isPending}
-                            onAccept={handleAcceptProposal}
-                            onReject={handleRejectProposal}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
-                    <p className="text-sm font-semibold text-foreground">{copy.planningGuide}</p>
-                    <div className="mt-3 space-y-2">
-                      <p>{copy.guideStep1}</p>
-                      <p>{copy.guideStep2}</p>
-                      <p>{copy.guideStep3}</p>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <LocalizedLink href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                        {copy.openTaskCenter}
-                      </LocalizedLink>
-                      <LocalizedLink href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                        Open Inbox
-                      </LocalizedLink>
-                    </div>
-                  </div>
-                </div>
-              </SurfaceCard>
-
-              <div>
-                <h3 className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.weekOverview}</h3>
-                <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
-              </div>
-
               {activeGroup ? (
                 <DayTimeline
                   items={activeGroup.items}
@@ -2166,9 +2220,7 @@ export function SchedulePage({
               )}
             </div>
           </SurfaceCard>
-          </div>
 
-          <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <SurfaceCard>
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
@@ -2199,7 +2251,83 @@ export function SchedulePage({
               )}
             </div>
           </SurfaceCard>
-          </div>
+
+          <SurfaceCard>
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>{copy.secondaryPlanning}</SurfaceCardTitle>
+              <SurfaceCardDescription>{copy.secondaryPlanningDescription}</SurfaceCardDescription>
+            </SurfaceCardHeader>
+
+            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(280px,0.8fr)]">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.weekOverview}</h3>
+                  <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{copy.conflictsTitle}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{copy.conflictsDescription}</p>
+                    </div>
+                    <StatusBadge tone={viewData.risks.length > 0 ? "critical" : "neutral"}>{viewData.risks.length}</StatusBadge>
+                  </div>
+                  <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                    {viewData.risks.length === 0 ? (
+                      <EmptyState>{copy.noScheduleRisks}</EmptyState>
+                    ) : (
+                      viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">{copy.aiProposalsTitle}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">{copy.aiProposalsDescription}</p>
+                  </div>
+                  <StatusBadge tone={viewData.proposals.length > 0 ? "info" : "neutral"}>{viewData.proposals.length}</StatusBadge>
+                </div>
+                <div className="mt-3 space-y-4 text-sm text-muted-foreground">
+                  {viewData.proposals.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                      {copy.aiProposalsCompactEmpty}
+                    </div>
+                  ) : (
+                    viewData.proposals.slice(0, 2).map((proposal) => (
+                      <ProposalCard
+                        key={proposal.proposalId}
+                        proposal={proposal}
+                        isPending={isPending}
+                        onAccept={handleAcceptProposal}
+                        onReject={handleRejectProposal}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <details className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
+                <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">{copy.planningGuide}</summary>
+                <div className="mt-3 space-y-2">
+                  <p>{copy.guideStep1}</p>
+                  <p>{copy.guideStep2}</p>
+                  <p>{copy.guideStep3}</p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <LocalizedLink href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    {copy.openTaskCenter}
+                  </LocalizedLink>
+                  <LocalizedLink href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    Open Inbox
+                  </LocalizedLink>
+                </div>
+              </details>
+            </div>
+          </SurfaceCard>
         </div>
       )}
 

@@ -15,7 +15,7 @@ import type {
 } from "@/modules/runtime/openclaw/types";
 
 const PROTOCOL_VERSION = 3;
-const DEFAULT_SCOPES = ["operator.read", "operator.write", "operator.approvals"];
+const DEFAULT_SCOPES = ["operator.read", "operator.write", "operator.approvals", "operator.admin"];
 
 type OpenClawFrame = Record<string, unknown>;
 type PendingRequest = {
@@ -336,7 +336,21 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
   }
 
   async listApprovals() {
-    const payload = await this.callRaw("exec.approval.list", {});
+    if (!this.supportsMethod("exec.approval.list")) {
+      return [];
+    }
+
+    let payload: unknown;
+
+    try {
+      payload = await this.callRaw("exec.approval.list", {});
+    } catch (error) {
+      if (this.isUnknownMethodError(error)) {
+        return [];
+      }
+
+      throw error;
+    }
 
     if (!Array.isArray(payload)) {
       return [];
@@ -542,5 +556,17 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
     }
 
     return [];
+  }
+
+  private supportsMethod(method: string) {
+    return this.hello?.methods.includes(method) ?? false;
+  }
+
+  private isUnknownMethodError(error: unknown) {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return /unknown method/i.test(error.message);
   }
 }

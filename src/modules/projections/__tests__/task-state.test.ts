@@ -29,4 +29,16 @@ describe("deriveTaskState", () => {
     expect(result.persistedStatus).toBe("Completed");
     expect(result.displayState).toBe("Sync Stale");
   });
+
+  it("preserves done tasks instead of projecting them back to completed", () => {
+    const result = deriveTaskState({
+      task: { status: "Done", latestRunId: "run_3" },
+      runs: [{ id: "run_3", status: "Completed", updatedAt: new Date("2026-04-08T10:00:00Z") }],
+      approvals: [],
+      sync: { stale: false },
+    });
+
+    expect(result.persistedStatus).toBe("Done");
+    expect(result.displayState).toBeNull();
+  });
 });

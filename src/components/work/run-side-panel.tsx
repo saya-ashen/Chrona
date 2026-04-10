@@ -9,11 +9,23 @@ type RunSidePanelProps = {
         status: string;
         startedAt?: string | null;
         endedAt?: string | null;
+        updatedAt?: string | null;
+        lastSyncedAt?: string | null;
         syncStatus?: string | null;
         resumeSupported?: boolean | null;
         pendingInputPrompt?: string | null;
+        errorSummary?: string | null;
       }
     | null;
+  reliability: {
+    refreshedAt: string;
+    lastSyncedAt: string | null;
+    lastUpdatedAt: string | null;
+    syncStatus: string | null;
+    isStale: boolean;
+    stuckFor: string | null;
+    stopReason: string | null;
+  };
   approvals: Array<{ id: string; title: string; status: string; summary?: string }>;
   artifacts: Array<{ id: string; title: string; type: string; uri?: string | null }>;
   toolCalls: Array<{
@@ -31,6 +43,13 @@ const DEFAULT_COPY = {
   runSnapshotDescription: "Current run state, timing, and sync health.",
   noRun: "No run",
   sync: "Sync",
+  refreshed: "Refreshed",
+  lastSync: "Last sync",
+  lastUpdate: "Last update",
+  stopReason: "Stop reason",
+  stuckFor: "Stuck for",
+  stale: "Stale",
+  healthy: "Healthy",
   approvalSingular: "approval",
   approvalPlural: "approvals",
   started: "Started",
@@ -56,6 +75,7 @@ function formatDate(value: string | null | undefined) {
 
 export function RunSidePanel({
   currentRun,
+  reliability,
   approvals,
   artifacts,
   toolCalls,
@@ -75,14 +95,20 @@ export function RunSidePanel({
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
           <span className="rounded-full border px-2 py-1">{currentRun?.status ?? copy.noRun}</span>
           <span className="rounded-full border px-2 py-1">{copy.sync} {currentRun?.syncStatus ?? "-"}</span>
+          <span className="rounded-full border px-2 py-1">{reliability.isStale ? copy.stale : copy.healthy}</span>
           {hasBlockingApprovals ? <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-amber-700">{approvals.length} {approvals.length === 1 ? copy.approvalSingular : copy.approvalPlural}</span> : null}
         </div>
 
         <div className="mt-3 space-y-3 text-sm text-muted-foreground">
           <div className="grid gap-1 rounded-lg bg-background/80 p-3">
+            <p>{copy.refreshed}: {formatDate(reliability.refreshedAt)}</p>
+            <p>{copy.lastSync}: {formatDate(reliability.lastSyncedAt)}</p>
+            <p>{copy.lastUpdate}: {formatDate(reliability.lastUpdatedAt ?? currentRun?.updatedAt)}</p>
             <p>{copy.started}: {formatDate(currentRun?.startedAt)}</p>
             <p>{copy.ended}: {formatDate(currentRun?.endedAt)}</p>
             <p>{copy.resumeSupported}: {currentRun?.resumeSupported ? copy.yes : copy.no}</p>
+            {reliability.stuckFor ? <p>{copy.stuckFor}: {reliability.stuckFor}</p> : null}
+            {reliability.stopReason ? <p>{copy.stopReason}: {reliability.stopReason}</p> : null}
             {currentRun?.pendingInputPrompt ? <p>{copy.prompt}: {currentRun.pendingInputPrompt}</p> : null}
           </div>
           {!currentRun ? <p>{copy.noActiveRunYet}</p> : null}

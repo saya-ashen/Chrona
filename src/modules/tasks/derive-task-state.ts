@@ -19,6 +19,15 @@ type DeriveTaskStateResult = {
 };
 
 export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateResult {
+  if (input.task.status === "Done") {
+    return {
+      persistedStatus: "Done",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
   const activeRun =
     input.runs.find((run) => run.id === input.task.latestRunId) ??
     [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0] ??
@@ -91,8 +100,15 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
   }
 
   if (activeRun?.status === "Completed") {
+    const reopenedStatus = new Set(["Draft", "Ready"]);
+
     return {
-      persistedStatus: "Completed",
+      persistedStatus:
+        input.task.status === "Done"
+          ? "Done"
+          : reopenedStatus.has(input.task.status)
+            ? input.task.status
+            : "Completed",
       displayState: null,
       blockReason: null,
       blockSince: null,

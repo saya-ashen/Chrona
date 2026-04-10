@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
 
 function normalizeOptionalTextField(value: string | null | undefined, field: string) {
   if (value === undefined) {
@@ -71,6 +72,12 @@ export async function updateTask(input: {
   const prompt = normalizeOptionalTextField(input.prompt, "prompt");
   const runtimeConfig = normalizeRuntimeConfig(input.runtimeConfig);
   const currentTask = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
+  validateScheduleWindow({
+    scheduledStartAt:
+      input.scheduledStartAt === undefined ? currentTask.scheduledStartAt : input.scheduledStartAt,
+    scheduledEndAt:
+      input.scheduledEndAt === undefined ? currentTask.scheduledEndAt : input.scheduledEndAt,
+  });
   const nextRuntimeModel = runtimeModel === undefined ? currentTask.runtimeModel : runtimeModel;
   const nextPrompt = prompt === undefined ? currentTask.prompt : prompt;
   const nextRuntimeConfig = input.runtimeConfig === undefined ? currentTask.runtimeConfig : input.runtimeConfig;

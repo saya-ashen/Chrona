@@ -26,6 +26,10 @@ export async function startRun(input: {
     throw new Error(runnability.summary);
   }
 
+  if (task.status === TaskStatus.Done) {
+    throw new Error("Re-open the task before starting another run.");
+  }
+
   const run = await db.run.create({
     data: {
       taskId: task.id,
