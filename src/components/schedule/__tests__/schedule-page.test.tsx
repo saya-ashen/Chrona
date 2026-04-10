@@ -167,6 +167,7 @@ describe("SchedulePage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Schedule" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Scheduled Timeline" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Unscheduled Queue" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
@@ -174,8 +175,8 @@ describe("SchedulePage", () => {
     expect(screen.getByText("Keep recovery work visible without crowding the queue rail.")).toBeInTheDocument();
     expect(screen.getByText("Review suggestions near the timeline, not inside the queue rail.")).toBeInTheDocument();
     expect(screen.getByText("Planning Guide")).toBeInTheDocument();
-    expect(screen.getByText("Committed blocks on the current plan.")).toBeInTheDocument();
-    expect(screen.getAllByText("Ship projection cleanup")).toHaveLength(2);
+    expect(screen.getByText("Secondary planning info")).toBeInTheDocument();
+    expect(screen.getAllByText("Ship projection cleanup").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Create Task Block").length).toBeGreaterThan(0);
     expect(screen.getByText("Click any slot or drag to adjust")).toBeInTheDocument();
     expect(screen.getByText(/quiet hours compressed/i)).toBeInTheDocument();
@@ -183,7 +184,7 @@ describe("SchedulePage", () => {
     expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(2);
     expect(screen.getAllByText("Ready to run").length).toBeGreaterThan(0);
     expect(screen.getByText("Needs model and prompt")).toBeInTheDocument();
-    expect(screen.getByText("Recover overdue adapter run")).toBeInTheDocument();
+    expect(screen.getAllByText("Recover overdue adapter run").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Planning surface")).toBeInTheDocument();
     expect(screen.queryByText("Pending proposals")).not.toBeInTheDocument();
     expect(

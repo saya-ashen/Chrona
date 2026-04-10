@@ -25,6 +25,7 @@ enum TaskStatus {
   Blocked
   Failed
   Completed
+  Done
   Cancelled
 }
 

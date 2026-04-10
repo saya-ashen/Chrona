@@ -89,6 +89,36 @@ describe("applySchedule", () => {
     );
   });
 
+  it("rejects schedule windows where end is earlier than start", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Schedule Validation",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Invalid window",
+        status: "Ready",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+
+    await expect(
+      applySchedule({
+        taskId: task.id,
+        dueAt: null,
+        scheduledStartAt: new Date("2026-04-12T11:00:00.000Z"),
+        scheduledEndAt: new Date("2026-04-12T09:00:00.000Z"),
+        scheduleSource: "human",
+      }),
+    ).rejects.toThrow("scheduledEndAt cannot be earlier than scheduledStartAt");
+  });
+
   it("clears the task schedule, records an unscheduled event, and resets the projection", async () => {
     const workspace = await db.workspace.create({
       data: {

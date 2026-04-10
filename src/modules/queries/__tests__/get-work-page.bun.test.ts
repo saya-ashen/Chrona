@@ -138,10 +138,122 @@ describe("getWorkPage", () => {
       kind: "message",
       sourceLabel: "Conversation output",
     });
+    expect(page.reliability).toMatchObject({
+      syncStatus: expect.any(String),
+      isStale: false,
+      stopReason: "Waiting for approval decision",
+    });
+    expect(page.closure).toMatchObject({
+      canAcceptResult: false,
+      canMarkDone: false,
+      canCreateFollowUp: false,
+    });
     expect(page.workstreamItems[0]).toMatchObject({
       kind: "approval",
       badge: "Needs approval",
       linkedEvidenceLabel: "Linked to Next Action",
+    });
+  });
+
+  it("returns reliability and closure metadata for completed runs", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Work Closure",
+        defaultRuntime: "openclaw",
+        status: WorkspaceStatus.Active,
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Close the loop",
+        status: TaskStatus.Completed,
+        priority: TaskPriority.High,
+        ownerType: "human",
+      },
+    });
+
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        status: RunStatus.Completed,
+        triggeredBy: "user",
+        startedAt: new Date("2026-04-08T10:00:00.000Z"),
+        endedAt: new Date("2026-04-08T10:30:00.000Z"),
+        lastSyncedAt: new Date("2026-04-08T10:31:00.000Z"),
+      },
+    });
+
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+
+    await db.event.createMany({
+      data: [
+        {
+          taskId: task.id,
+          workspaceId: workspace.id,
+          runId: run.id,
+          eventType: "run.completed",
+          actorType: "runtime",
+          actorId: "openclaw",
+          source: "runtime",
+          dedupeKey: `run.completed:${run.id}`,
+          payload: { outcome: "success" },
+          ingestSequence: 1,
+        },
+        {
+          taskId: task.id,
+          workspaceId: workspace.id,
+          runId: run.id,
+          eventType: "task.result_accepted",
+          actorType: "user",
+          actorId: "server-action",
+          source: "ui",
+          dedupeKey: `task.result_accepted:${task.id}:${run.id}`,
+          payload: { accepted: true },
+          ingestSequence: 2,
+        },
+      ],
+    });
+
+    const followUp = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        parentTaskId: task.id,
+        title: "Follow up the loop",
+        status: TaskStatus.Draft,
+        priority: TaskPriority.Medium,
+        ownerType: "human",
+        scheduleStatus: "Unscheduled",
+      },
+    });
+
+    const page = await getWorkPage(task.id);
+
+    expect(page.currentIntervention).toMatchObject({
+      kind: "review",
+    });
+    expect(page.reliability).toMatchObject({
+      isStale: false,
+      stopReason: "Run finished and is ready for review",
+    });
+    expect(page.closure).toMatchObject({
+      resultAccepted: true,
+      canAcceptResult: false,
+      canMarkDone: true,
+      canCreateFollowUp: true,
+      canRetry: true,
+      canReopen: false,
+      latestFollowUp: {
+        id: followUp.id,
+        title: "Follow up the loop",
+        status: "Draft",
+        scheduleStatus: "Unscheduled",
+      },
     });
   });
 });

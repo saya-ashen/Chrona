@@ -57,7 +57,7 @@ describe("loadOpenClawPersistedDeviceIdentity", () => {
             operator: {
               token: "device-token-123",
               role: "operator",
-              scopes: ["operator.read", "operator.write"],
+              scopes: ["operator.read", "operator.write", "operator.admin"],
               updatedAtMs: 1737264000000,
             },
           },

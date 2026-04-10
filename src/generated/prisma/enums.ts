@@ -28,6 +28,7 @@ export const TaskStatus = {
   Blocked: 'Blocked',
   Failed: 'Failed',
   Completed: 'Completed',
+  Done: 'Done',
   Cancelled: 'Cancelled'
 } as const
 

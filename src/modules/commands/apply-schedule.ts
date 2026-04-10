@@ -2,6 +2,7 @@ import type { ScheduleSource } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -10,6 +11,8 @@ export async function applySchedule(input: {
   scheduledEndAt: Date | null;
   scheduleSource: ScheduleSource;
 }) {
+  validateScheduleWindow(input);
+
   const task = await db.task.update({
     where: { id: input.taskId },
     data: {
