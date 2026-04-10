@@ -139,6 +139,9 @@ model Task {
   workspaceId      String
   title            String
   description      String?
+  runtimeModel     String?
+  prompt           String?
+  runtimeConfig    Json?
   status           TaskStatus
   priority         TaskPriority
   ownerType        OwnerType

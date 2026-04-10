@@ -10,10 +10,10 @@ import { redirect } from "next/navigation";
 import HomePage from "@/app/page";
 
 describe("HomePage", () => {
-  it("redirects root traffic to /workspaces", () => {
+  it("redirects root traffic to the default localized schedule page", () => {
     const redirectMock = vi.mocked(redirect);
 
     expect(() => HomePage()).toThrow("NEXT_REDIRECT");
-    expect(redirectMock).toHaveBeenCalledWith("/workspaces");
+    expect(redirectMock).toHaveBeenCalledWith("/en/schedule");
   });
 });

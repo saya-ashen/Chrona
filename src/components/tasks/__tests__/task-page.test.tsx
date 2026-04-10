@@ -1,20 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
 import { TaskPage } from "@/components/tasks/task-page";
 
 describe("TaskPage", () => {
-  it("shows planning controls plus entry points into the work surface", () => {
+  it("behaves like a secondary detail surface with links back to Schedule and Work", () => {
     render(
       <TaskPage
-        updateTaskAction={async () => {}}
-        proposeScheduleAction={async () => {}}
-        startRunAction={async () => {}}
         data={{
           task: {
             id: "task_1",
             workspaceId: "ws_1",
             title: "Write projection",
             description: "Plan the read model",
+            runtimeModel: "gpt-5.4",
+            runtimeConfig: { temperature: 0.2 },
+            prompt: null,
             status: "Blocked",
             priority: "High",
             dueAt: null,
@@ -22,6 +23,8 @@ describe("TaskPage", () => {
             scheduledEndAt: null,
             scheduleStatus: "Unscheduled",
             scheduleSource: null,
+            isRunnable: false,
+            runnabilitySummary: "Needs prompt",
             blockReason: { actionRequired: "Approve / Reject / Edit and Approve" },
             dependencies: [],
           },
@@ -49,21 +52,22 @@ describe("TaskPage", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Start Run" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Task Details" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Proposal" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Plan the read model");
+    expect(screen.getByText("Secondary task detail")).toBeInTheDocument();
+    expect(screen.getByText("Use the primary surfaces")).toBeInTheDocument();
+    expect(screen.getByText("Runtime configuration")).toBeInTheDocument();
+    expect(screen.getByText("Planning context")).toBeInTheDocument();
+    expect(screen.getAllByText("Needs prompt").length).toBeGreaterThan(0);
+    expect(screen.getByText("No prompt saved yet. Configure one in Schedule before execution.")).toBeInTheDocument();
+    expect(screen.getByText(/temperature/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Schedule" })).toHaveAttribute("href", "/en/schedule");
     expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/work/task_1",
+      "/en/workspaces/ws_1/work/task_1",
     );
-    expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
-      "href",
-      "/schedule",
-    );
-    expect(screen.getByText("Block Reason")).toBeInTheDocument();
     expect(screen.getByText("Pending Schedule Proposals")).toBeInTheDocument();
     expect(screen.getByText("Schedule this tomorrow morning")).toBeInTheDocument();
-    expect(screen.getByText("Create Schedule Proposal")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Task Details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create Proposal" })).not.toBeInTheDocument();
   });
 });

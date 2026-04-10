@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
+import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 function readBlockReason(
   task: {
@@ -58,6 +59,11 @@ export async function getTaskPage(taskId: string) {
   });
 
   const latestRun = task.runs[0] ?? null;
+  const runnability = deriveTaskRunnability({
+    runtimeModel: task.runtimeModel,
+    prompt: task.prompt,
+    runtimeConfig: task.runtimeConfig,
+  });
 
   return {
     task: {
@@ -65,6 +71,9 @@ export async function getTaskPage(taskId: string) {
       workspaceId: task.workspaceId,
       title: task.title,
       description: task.description,
+      runtimeModel: task.runtimeModel,
+      prompt: task.prompt,
+      runtimeConfig: task.runtimeConfig,
       status: task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
@@ -72,6 +81,8 @@ export async function getTaskPage(taskId: string) {
       scheduledEndAt: task.scheduledEndAt?.toISOString() ?? null,
       scheduleStatus: task.scheduleStatus,
       scheduleSource: task.scheduleSource,
+      isRunnable: runnability.isRunnable,
+      runnabilitySummary: runnability.summary,
       blockReason: readBlockReason(task),
       dependencies: task.dependencies.map((dependency) => ({
         id: dependency.id,

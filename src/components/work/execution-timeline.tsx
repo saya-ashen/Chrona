@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "@/i18n/client";
+
 type ExecutionTimelineProps = {
   title?: string;
   events: Array<{
@@ -14,15 +18,34 @@ type ExecutionTimelineProps = {
   }>;
 };
 
+const DEFAULT_COPY = {
+  title: "Execution Timeline",
+  noEventsYet: "No events yet.",
+  progress: "Progress",
+  rawPayload: "Raw payload",
+  noStructuredPayload: "No structured payload recorded.",
+  itemSingular: "item",
+  itemPlural: "items",
+  details: "details",
+} as const;
+
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
 }
 
-function summarizePayload(payload: Record<string, unknown>) {
+function summarizePayload(
+  payload: Record<string, unknown>,
+  copy: {
+    noStructuredPayload: string;
+    itemSingular: string;
+    itemPlural: string;
+    details: string;
+  },
+) {
   const entries = Object.entries(payload).slice(0, 3);
 
   if (entries.length === 0) {
-    return "No structured payload recorded.";
+    return copy.noStructuredPayload;
   }
 
   return entries
@@ -36,11 +59,11 @@ function summarizePayload(payload: Record<string, unknown>) {
       }
 
       if (Array.isArray(value)) {
-        return `${key}: ${value.length} item${value.length === 1 ? "" : "s"}`;
+        return `${key}: ${value.length} ${value.length === 1 ? copy.itemSingular : copy.itemPlural}`;
       }
 
       if (value && typeof value === "object") {
-        return `${key}: details`;
+        return `${key}: ${copy.details}`;
       }
 
       return `${key}: -`;
@@ -64,29 +87,31 @@ function getBadgeClass(kind: string | undefined) {
 }
 
 export function ExecutionTimeline({ events, title = "Execution Timeline" }: ExecutionTimelineProps) {
+  const { messages } = useI18n();
+  const copy = { ...DEFAULT_COPY, ...(messages.components?.executionTimeline ?? {}) };
   return (
     <div className="space-y-3 text-sm text-muted-foreground">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <h3 className="text-sm font-semibold text-foreground">{title === DEFAULT_COPY.title ? copy.title : title}</h3>
       <div className="space-y-3">
         {events.length === 0 ? (
-          <p>No events yet.</p>
+          <p>{copy.noEventsYet}</p>
         ) : (
           events.map((event) => (
             <div key={event.id} className="rounded-lg border bg-background px-3 py-3">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full border px-2 py-1 text-[11px] ${getBadgeClass(event.kind)}`}>
-                    {event.badge ?? "Progress"}
+                    {event.badge ?? copy.progress}
                   </span>
                   <p className="font-medium text-foreground">{event.title ?? event.eventType}</p>
                 </div>
                 <p className="text-xs">{formatDate(event.runtimeTs)}</p>
               </div>
-              <p className="mt-2 text-xs">{event.summary ?? summarizePayload(event.payload)}</p>
+              <p className="mt-2 text-xs">{event.summary ?? summarizePayload(event.payload, copy)}</p>
               {event.whyItMatters ? <p className="mt-2 text-xs text-muted-foreground/90">{event.whyItMatters}</p> : null}
               {event.linkedEvidenceLabel ? <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">{event.linkedEvidenceLabel}</p> : null}
               <details className="mt-3 rounded-md border bg-card px-3 py-2">
-                <summary className="cursor-pointer list-none text-xs font-medium text-foreground">Raw payload</summary>
+                <summary className="cursor-pointer list-none text-xs font-medium text-foreground">{copy.rawPayload}</summary>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">
                   {JSON.stringify(event.payload, null, 2)}
                 </pre>

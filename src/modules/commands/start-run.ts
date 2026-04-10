@@ -6,14 +6,25 @@ import {
   createRuntimeAdapter,
   type OpenClawAdapter,
 } from "@/modules/runtime/openclaw/adapter";
+import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 export async function startRun(input: {
   taskId: string;
-  prompt: string;
+  prompt?: string;
   adapter?: OpenClawAdapter;
 }) {
   const adapter = input.adapter ?? (await createRuntimeAdapter());
   const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
+  const effectivePrompt = input.prompt?.trim() || task.prompt?.trim() || null;
+  const runnability = deriveTaskRunnability({
+    runtimeModel: task.runtimeModel,
+    prompt: effectivePrompt,
+    runtimeConfig: task.runtimeConfig,
+  });
+
+  if (!runnability.isRunnable || !effectivePrompt) {
+    throw new Error(runnability.summary);
+  }
 
   const run = await db.run.create({
     data: {
@@ -26,7 +37,7 @@ export async function startRun(input: {
   });
 
   try {
-    const created = await adapter.createRun({ prompt: input.prompt });
+    const created = await adapter.createRun({ prompt: effectivePrompt });
     const nextRunStatus = created.runStarted ? RunStatus.Running : RunStatus.Pending;
     const nextTaskStatus = created.runStarted ? TaskStatus.Running : TaskStatus.Queued;
 
@@ -60,6 +71,7 @@ export async function startRun(input: {
       source: "ui",
       payload: {
         runtime_name: "openclaw",
+        task_model: task.runtimeModel,
         runtime_run_ref: created.runtimeRunRef ?? null,
         runtime_session_key: created.runtimeSessionKey ?? null,
         triggered_by: "user",

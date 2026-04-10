@@ -7,12 +7,14 @@ describe("WorkPageClient", () => {
     render(
       <WorkPageClient
         initialData={{
-          taskShell: {
-            id: "task_1",
-            workspaceId: "ws_1",
-            title: "Write projection",
-            status: "Blocked",
-            priority: "High",
+            taskShell: {
+              id: "task_1",
+              workspaceId: "ws_1",
+              title: "Write projection",
+              runtimeModel: "gpt-5.4",
+              prompt: null,
+              status: "Blocked",
+              priority: "High",
             dueAt: null,
             scheduledStartAt: "2026-04-16T09:00:00.000Z",
             scheduledEndAt: "2026-04-16T11:00:00.000Z",
@@ -81,11 +83,11 @@ describe("WorkPageClient", () => {
     expect(screen.getAllByText("Evidence").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
       "href",
-      "/schedule",
+      "/en/schedule",
     );
-    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View task detail" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/tasks/task_1",
+      "/en/workspaces/ws_1/tasks/task_1",
     );
     expect(screen.getByText("AtRisk")).toBeInTheDocument();
     expect(screen.getAllByText("Approve tool execution").length).toBeGreaterThanOrEqual(2);
@@ -105,11 +107,13 @@ describe("WorkPageClient", () => {
     render(
       <WorkPageClient
         initialData={{
-          taskShell: {
-            id: "task_2",
-            workspaceId: "ws_1",
-            title: "Draft rollout note",
-            status: "Ready",
+            taskShell: {
+              id: "task_2",
+              workspaceId: "ws_1",
+              title: "Draft rollout note",
+              runtimeModel: "gpt-5.4",
+              prompt: null,
+              status: "Ready",
             priority: "Medium",
             dueAt: null,
             scheduledStartAt: null,
@@ -118,14 +122,14 @@ describe("WorkPageClient", () => {
             blockReason: { actionRequired: "Start the first execution pass" },
           },
           currentRun: null,
-          currentIntervention: {
-            kind: "idle",
-            title: "Start execution",
-            description: "No run is active yet. Launch one from this workbench or the task page when the plan is ready.",
-            whyNow: "There is no active run, so execution cannot progress from this page yet.",
-            actionLabel: "Open Task",
-            evidence: [],
-          },
+            currentIntervention: {
+              kind: "idle",
+              title: "Start execution",
+              description: "No run is active yet. Launch one from this workbench once the task is ready in Schedule.",
+              whyNow: "There is no active run, so execution cannot progress from this page yet.",
+              actionLabel: "Start Run Here",
+              evidence: [],
+            },
           latestOutput: {
             kind: "empty",
             title: "No mapped output yet",

@@ -39,6 +39,8 @@ export type TaskMinAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  runtimeModel: string | null
+  prompt: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
   ownerType: $Enums.OwnerType | null
@@ -62,6 +64,8 @@ export type TaskMaxAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  runtimeModel: string | null
+  prompt: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
   ownerType: $Enums.OwnerType | null
@@ -85,6 +89,9 @@ export type TaskCountAggregateOutputType = {
   workspaceId: number
   title: number
   description: number
+  runtimeModel: number
+  prompt: number
+  runtimeConfig: number
   status: number
   priority: number
   ownerType: number
@@ -119,6 +126,8 @@ export type TaskMinAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeModel?: true
+  prompt?: true
   status?: true
   priority?: true
   ownerType?: true
@@ -142,6 +151,8 @@ export type TaskMaxAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeModel?: true
+  prompt?: true
   status?: true
   priority?: true
   ownerType?: true
@@ -165,6 +176,9 @@ export type TaskCountAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  runtimeModel?: true
+  prompt?: true
+  runtimeConfig?: true
   status?: true
   priority?: true
   ownerType?: true
@@ -276,6 +290,9 @@ export type TaskGroupByOutputType = {
   workspaceId: string
   title: string
   description: string | null
+  runtimeModel: string | null
+  prompt: string | null
+  runtimeConfig: runtime.JsonValue | null
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -323,6 +340,9 @@ export type TaskWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
+  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
@@ -357,6 +377,9 @@ export type TaskOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  prompt?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   ownerType?: Prisma.SortOrder
@@ -394,6 +417,9 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
+  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
@@ -428,6 +454,9 @@ export type TaskOrderByWithAggregationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  prompt?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   ownerType?: Prisma.SortOrder
@@ -460,6 +489,9 @@ export type TaskScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"Task"> | string
   title?: Prisma.StringWithAggregatesFilter<"Task"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  runtimeModel?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  prompt?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  runtimeConfig?: Prisma.JsonNullableWithAggregatesFilter<"Task">
   status?: Prisma.EnumTaskStatusWithAggregatesFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityWithAggregatesFilter<"Task"> | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeWithAggregatesFilter<"Task"> | $Enums.OwnerType
@@ -483,6 +515,9 @@ export type TaskCreateInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -517,6 +552,9 @@ export type TaskUncheckedCreateInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -549,6 +587,9 @@ export type TaskUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -583,6 +624,9 @@ export type TaskUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -616,6 +660,9 @@ export type TaskCreateManyInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -639,6 +686,9 @@ export type TaskUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -663,6 +713,9 @@ export type TaskUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -697,6 +750,9 @@ export type TaskCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeModel?: Prisma.SortOrder
+  prompt?: Prisma.SortOrder
+  runtimeConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   ownerType?: Prisma.SortOrder
@@ -725,6 +781,8 @@ export type TaskMaxOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeModel?: Prisma.SortOrder
+  prompt?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   ownerType?: Prisma.SortOrder
@@ -748,6 +806,8 @@ export type TaskMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  runtimeModel?: Prisma.SortOrder
+  prompt?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   ownerType?: Prisma.SortOrder
@@ -986,6 +1046,9 @@ export type TaskCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1018,6 +1081,9 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1079,6 +1145,9 @@ export type TaskScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
+  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
+  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
@@ -1102,6 +1171,9 @@ export type TaskCreateWithoutDependenciesInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1135,6 +1207,9 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1171,6 +1246,9 @@ export type TaskCreateWithoutDependentTasksInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1204,6 +1282,9 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1251,6 +1332,9 @@ export type TaskUpdateWithoutDependenciesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1284,6 +1368,9 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1326,6 +1413,9 @@ export type TaskUpdateWithoutDependentTasksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1359,6 +1449,9 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1390,6 +1483,9 @@ export type TaskCreateWithoutRunsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1423,6 +1519,9 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1470,6 +1569,9 @@ export type TaskUpdateWithoutRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1503,6 +1605,9 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1534,6 +1639,9 @@ export type TaskCreateWithoutApprovalsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1567,6 +1675,9 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1614,6 +1725,9 @@ export type TaskUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1647,6 +1761,9 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1678,6 +1795,9 @@ export type TaskCreateWithoutArtifactsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1711,6 +1831,9 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1758,6 +1881,9 @@ export type TaskUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1791,6 +1917,9 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1822,6 +1951,9 @@ export type TaskCreateWithoutMemoriesInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1855,6 +1987,9 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1902,6 +2037,9 @@ export type TaskUpdateWithoutMemoriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1935,6 +2073,9 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -1966,6 +2107,9 @@ export type TaskCreateWithoutEventsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -1999,6 +2143,9 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2046,6 +2193,9 @@ export type TaskUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2079,6 +2229,9 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2110,6 +2263,9 @@ export type TaskCreateWithoutProjectionInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2143,6 +2299,9 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2190,6 +2349,9 @@ export type TaskUpdateWithoutProjectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2223,6 +2385,9 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2254,6 +2419,9 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2287,6 +2455,9 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2334,6 +2505,9 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2367,6 +2541,9 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2398,6 +2575,9 @@ export type TaskCreateManyWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   ownerType: $Enums.OwnerType
@@ -2421,6 +2601,9 @@ export type TaskUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2453,6 +2636,9 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2485,6 +2671,9 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
@@ -2603,6 +2792,9 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeModel?: boolean
+  prompt?: boolean
+  runtimeConfig?: boolean
   status?: boolean
   priority?: boolean
   ownerType?: boolean
@@ -2638,6 +2830,9 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeModel?: boolean
+  prompt?: boolean
+  runtimeConfig?: boolean
   status?: boolean
   priority?: boolean
   ownerType?: boolean
@@ -2663,6 +2858,9 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeModel?: boolean
+  prompt?: boolean
+  runtimeConfig?: boolean
   status?: boolean
   priority?: boolean
   ownerType?: boolean
@@ -2688,6 +2886,9 @@ export type TaskSelectScalar = {
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  runtimeModel?: boolean
+  prompt?: boolean
+  runtimeConfig?: boolean
   status?: boolean
   priority?: boolean
   ownerType?: boolean
@@ -2707,7 +2908,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -2747,6 +2948,9 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     workspaceId: string
     title: string
     description: string | null
+    runtimeModel: string | null
+    prompt: string | null
+    runtimeConfig: runtime.JsonValue | null
     status: $Enums.TaskStatus
     priority: $Enums.TaskPriority
     ownerType: $Enums.OwnerType
@@ -3201,6 +3405,9 @@ export interface TaskFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"Task", 'String'>
   readonly title: Prisma.FieldRef<"Task", 'String'>
   readonly description: Prisma.FieldRef<"Task", 'String'>
+  readonly runtimeModel: Prisma.FieldRef<"Task", 'String'>
+  readonly prompt: Prisma.FieldRef<"Task", 'String'>
+  readonly runtimeConfig: Prisma.FieldRef<"Task", 'Json'>
   readonly status: Prisma.FieldRef<"Task", 'TaskStatus'>
   readonly priority: Prisma.FieldRef<"Task", 'TaskPriority'>
   readonly ownerType: Prisma.FieldRef<"Task", 'OwnerType'>

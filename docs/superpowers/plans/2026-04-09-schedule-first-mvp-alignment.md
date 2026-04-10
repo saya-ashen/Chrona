@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Evolve the existing prototype into the approved schedule-first MVP by formalizing schedule state, adding the top-level `Schedule` surface, and tightening `Schedule / Task Page / Work Page` responsibilities without rewriting the current OpenClaw integration.
+**Goal:** Evolve the existing prototype into the approved schedule-first MVP by formalizing schedule state, adding the top-level `Schedule` surface, and tightening `Schedule / Task Detail / Work Page` responsibilities without rewriting the current OpenClaw integration.
 
-**Architecture:** Keep the existing `Next.js + Prisma + SQLite` application and current canonical object model, then extend it with schedule-specific state (`ScheduleStatus`, `ScheduleSource`, `ScheduleProposal`) that flows through the same command -> event -> projection path as the rest of the control plane. `Schedule` becomes the global planning surface, `Task Page` remains the single-task planning surface, and `Work Page` continues as the execution surface that reflects schedule risk rather than owning schedule writes.
+**Architecture:** Keep the existing `Next.js + Prisma + SQLite` application and current canonical object model, then extend it with schedule-specific state (`ScheduleStatus`, `ScheduleSource`, `ScheduleProposal`) that flows through the same command -> event -> projection path as the rest of the control plane. `Schedule` becomes the primary planning + lightweight task-configuration surface, `Task Page` is reduced to a secondary deep-linkable detail surface for advanced editing, and `Work Page` remains the execution/collaboration surface that reflects schedule risk rather than owning schedule writes.
 
 **Tech Stack:** `Next.js` App Router, `React 19`, `TypeScript`, `Bun`, `Prisma`, `SQLite`, `shadcn/ui`, `bun:test`, `Vitest`, `Testing Library`, `Playwright`
 
@@ -16,6 +16,10 @@
 - Do not rewrite the existing prototype from scratch. Extend the current repo state.
 - Keep the route-B hard constraint intact: if the product starts collapsing into admin-first or chat-first behavior, stop and correct the implementation rather than continuing.
 - Treat the existing OpenClaw feasibility probe as a gate that must still pass before any schedule work is considered valid.
+- MVP release quality is gated primarily by two loops: `Schedule` (plan + configure) and `Work` (execute + collaborate).
+- `Schedule` should absorb the main task-creation flow plus core runtime configuration (`model`, `prompt`, minimal runtime params) before broader release.
+- Defer per-task provider/backend selection unless capability differences truly require explicit user choice; prefer model selection and workspace defaults first.
+- Treat templates as a lightweight follow-up: starter presets and duplicate-task flows first, full template library later.
 - UI/reference sketches:
   - `docs/superpowers/sketches/2026-04-09-schedule-page-wireframe.md`
   - `docs/superpowers/sketches/2026-04-09-schedule-timeline-hybrid-wireframe.md`

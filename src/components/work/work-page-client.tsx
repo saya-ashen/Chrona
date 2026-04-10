@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import {
   approveApproval,
@@ -10,6 +9,7 @@ import {
   retryRun,
   startRun,
 } from "@/app/actions/task-actions";
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -19,10 +19,10 @@ import {
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
 import { ConversationPanel } from "@/components/work/conversation-panel";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { RunSidePanel } from "@/components/work/run-side-panel";
+import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 type WorkPageClientProps = {
@@ -31,6 +31,8 @@ type WorkPageClientProps = {
       id: string;
       workspaceId: string;
       title: string;
+      runtimeModel: string | null;
+      prompt: string | null;
       status: string;
       priority: string;
       dueAt: string | null;
@@ -118,6 +120,54 @@ type WorkPageClientProps = {
 
 type WorkstreamTab = "workstream" | "conversation";
 
+const DEFAULT_COPY = {
+  pageDescription: "Keep execution moving here, keep planning edits in Schedule, and treat task detail as reference-only.",
+  openSchedule: "Open Schedule",
+  viewTaskDetail: "View task detail",
+  runPrefix: "Run",
+  noRun: "No run",
+  duePrefix: "Due",
+  interventionFocus: "Intervention focus",
+  noBlockingAction: "No blocking action recorded.",
+  plannedWindow: "Planned window",
+  nextAction: "Next Action",
+  whyNow: "Why now",
+  evidence: "Evidence",
+  agentMessage: "Agent message",
+  sendToAgent: "Send to Agent",
+  resumeWithMessage: "Resume with Message",
+  currentRun: "Current run",
+  approve: "Approve",
+  reject: "Reject",
+  editedInstruction: "Edited instruction",
+  editAndApprove: "Edit and Approve",
+  retryPrompt: "Retry prompt",
+  retryRun: "Retry Run",
+  startRunDescription: "Start the first run here so the workbench becomes the live execution surface instead of a dead end.",
+  runPrompt: "Run prompt",
+  startRunHere: "Start Run Here",
+  noActiveRunYet: "No active run yet",
+  fallbackNoOperatorInput: "The run does not currently require operator input. Review the output and inspector state below.",
+  fallbackStartFromTaskPage: "Start a run from the task page before sending agent instructions here.",
+  sharedOutput: "Shared Output",
+  sharedOutputDescription: "The latest useful result from this run should be visible without digging through logs.",
+  usedByNextAction: "Used by next action",
+  updated: "Updated",
+  openArtifact: "Open artifact",
+  executionWorkstream: "Execution Workstream",
+  executionWorkstreamDescription: "Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.",
+  workstream: "Workstream",
+  conversation: "Conversation",
+  latestExecutionMilestones: "Latest execution milestones",
+  conversationEvidence: "Conversation evidence",
+  conversationEvidenceDescription: "Use the conversation view when the workstream summary is not enough.",
+  messageRequired: "message is required",
+  promptRequired: "prompt is required",
+  noActiveRunToResume: "No active run to resume.",
+  currentRunNotWaitingForInput: "The current run is not waiting for direct operator input.",
+  actionFailed: "Action failed",
+} as const;
+
 function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "-";
 }
@@ -164,6 +214,8 @@ function getEvidenceToneClass(tone: "neutral" | "warning" | "critical") {
 }
 
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
+  const { messages } = useI18n();
+  const copy = { ...DEFAULT_COPY, ...(messages.components?.workPage ?? {}) };
   const [data, setData] = useState(initialData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -187,7 +239,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
       await action();
       await refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Action failed");
+      setErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
     } finally {
       setIsPending(false);
     }
@@ -213,7 +265,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
   async function submitAgentMessage(inputText: string) {
     if (!currentRun) {
-      throw new Error("No active run to resume.");
+      throw new Error(copy.noActiveRunToResume);
     }
 
     await runAction(async () => {
@@ -222,7 +274,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         return;
       }
 
-      throw new Error("The current run is not waiting for direct operator input.");
+      throw new Error(copy.currentRunNotWaitingForInput);
     });
   }
 
@@ -230,7 +282,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     const inputText = String(formData.get("inputText") ?? "").trim();
 
     if (!inputText) {
-      throw new Error("message is required");
+      throw new Error(copy.messageRequired);
     }
 
     await submitAgentMessage(inputText);
@@ -240,7 +292,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     const prompt = String(formData.get("prompt") ?? "").trim();
 
     if (!prompt) {
-      throw new Error("prompt is required");
+      throw new Error(copy.promptRequired);
     }
 
     await runAction(async () => {
@@ -256,37 +308,38 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             <div className="space-y-1.5">
               <h1 className="text-2xl font-semibold tracking-tight">{data.taskShell.title}</h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
-                Keep this run moving from one focused workbench instead of hopping between logs and controls.
+                {copy.pageDescription}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <TaskContextLinks
-                workspaceId={data.taskShell.workspaceId}
-                taskId={data.taskShell.id}
-                latestRunStatus={currentRun?.status ?? null}
-              />
-              <Link href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Open Schedule
-              </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <LocalizedLink href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                {copy.openSchedule}
+              </LocalizedLink>
+              <LocalizedLink
+                href={`/workspaces/${data.taskShell.workspaceId}/tasks/${data.taskShell.id}`}
+                className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                {copy.viewTaskDetail}
+              </LocalizedLink>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <StatusBadge tone="info">{data.taskShell.status}</StatusBadge>
             <StatusBadge>{data.taskShell.priority}</StatusBadge>
-            <StatusBadge>Run {currentRun?.status ?? "No run"}</StatusBadge>
+            <StatusBadge>{copy.runPrefix} {currentRun?.status ?? copy.noRun}</StatusBadge>
             <StatusBadge>{data.taskShell.scheduleStatus}</StatusBadge>
-            <StatusBadge>Due {formatDate(data.taskShell.dueAt)}</StatusBadge>
+            <StatusBadge>{copy.duePrefix} {formatDate(data.taskShell.dueAt)}</StatusBadge>
           </div>
 
           <div className="mt-4 grid gap-2 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground sm:grid-cols-2">
             <div>
-              <p className="font-medium text-foreground">Blocked by</p>
-              <p>{data.taskShell.blockReason?.actionRequired ?? "No blocking action recorded."}</p>
+              <p className="font-medium text-foreground">{copy.interventionFocus}</p>
+              <p>{data.taskShell.blockReason?.actionRequired ?? copy.noBlockingAction}</p>
             </div>
             <div>
-              <p className="font-medium text-foreground">Window</p>
+              <p className="font-medium text-foreground">{copy.plannedWindow}</p>
               <p>
                 {formatDate(data.scheduleImpact.scheduledStartAt)} to {formatDate(data.scheduleImpact.scheduledEndAt)}
               </p>
@@ -296,7 +349,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
         <SurfaceCard>
           <SurfaceCardHeader>
-            <SurfaceCardTitle>Next Action</SurfaceCardTitle>
+            <SurfaceCardTitle>{copy.nextAction}</SurfaceCardTitle>
             <SurfaceCardDescription>
               {data.currentIntervention?.title ?? getNextActionLabel(currentRun?.status)} — make the next intervention obvious and keep everything else secondary.
             </SurfaceCardDescription>
@@ -307,12 +360,12 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
             {data.currentIntervention ? (
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Why now</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.whyNow}</p>
                 <p className="mt-2">{data.currentIntervention.whyNow}</p>
 
                 {data.currentIntervention.evidence.length > 0 ? (
                   <div className="mt-3 space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Evidence</p>
+                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.evidence}</p>
                     <div className="flex flex-wrap gap-2">
                       {data.currentIntervention.evidence.map((item) => {
                         const content = (
@@ -352,7 +405,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             {canProvideInput ? (
               <form action={handleComposerSubmit} className="space-y-3">
                 <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <Field label="Agent message">
+                <Field label={copy.agentMessage}>
                   <textarea
                     name="inputText"
                     rows={5}
@@ -367,10 +420,10 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                     disabled={isPending}
                     className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}
                   >
-                    {currentRun?.status === "WaitingForInput" ? "Send to Agent" : "Resume with Message"}
+                    {currentRun?.status === "WaitingForInput" ? copy.sendToAgent : copy.resumeWithMessage}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    Current run: {currentRun?.status ?? "No run"}
+                    {copy.currentRun}: {currentRun?.status ?? copy.noRun}
                   </p>
                 </div>
               </form>
@@ -392,7 +445,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                         }}
                       >
                         <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
-                          Approve
+                          {copy.approve}
                         </button>
                       </form>
                       <form
@@ -403,7 +456,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                         }}
                       >
                         <button type="submit" disabled={isPending} className={buttonVariants({ variant: "destructive", className: "disabled:opacity-60" })}>
-                          Reject
+                          {copy.reject}
                         </button>
                       </form>
                       <form
@@ -418,11 +471,11 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                         <input
                           type="text"
                           name="editedContent"
-                          placeholder="Edited instruction"
+                          placeholder={copy.editedInstruction}
                           className={cn(inputClassName, "min-w-48")}
                         />
                         <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                          Edit and Approve
+                          {copy.editAndApprove}
                         </button>
                       </form>
                     </div>
@@ -444,17 +497,17 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 className="space-y-3"
               >
                 <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <Field label="Retry prompt">
+                <Field label={copy.retryPrompt}>
                   <textarea
                     name="prompt"
                     rows={5}
                     required
-                    defaultValue={`Retry task: ${data.taskShell.title}`}
+                    defaultValue={data.taskShell.prompt ?? `Retry task: ${data.taskShell.title}`}
                     className={textareaClassName}
                   />
                 </Field>
                 <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
-                  Retry Run
+                  {copy.retryRun}
                 </button>
               </form>
             ) : currentRun?.status === "Running" ? (
@@ -468,29 +521,29 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             ) : !currentRun ? (
               <form action={handleStartRunSubmit} className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Start the first run here so the workbench becomes the live execution surface instead of a dead end.
+                  {copy.startRunDescription}
                 </p>
-                <Field label="Run prompt">
+                <Field label={copy.runPrompt}>
                   <textarea
                     name="prompt"
                     rows={5}
                     required
-                    defaultValue={getStartRunDefaultValue(data.taskShell.title)}
+                    defaultValue={data.taskShell.prompt ?? getStartRunDefaultValue(data.taskShell.title)}
                     className={textareaClassName}
                   />
                 </Field>
                 <div className="flex flex-wrap items-center gap-3">
                   <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
-                    Start Run Here
+                    {copy.startRunHere}
                   </button>
-                  <p className="text-xs text-muted-foreground">No active run yet</p>
+                  <p className="text-xs text-muted-foreground">{copy.noActiveRunYet}</p>
                 </div>
               </form>
             ) : (
               <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
                 {currentRun
-                  ? data.currentIntervention?.description ?? "The run does not currently require operator input. Review the output and inspector state below."
-                  : "Start a run from the task page before sending agent instructions here."}
+                  ? data.currentIntervention?.description ?? copy.fallbackNoOperatorInput
+                  : copy.fallbackStartFromTaskPage}
               </div>
             )}
           </div>
@@ -498,24 +551,24 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
         <SurfaceCard>
           <SurfaceCardHeader>
-            <SurfaceCardTitle>Shared Output</SurfaceCardTitle>
-            <SurfaceCardDescription>The latest useful result from this run should be visible without digging through logs.</SurfaceCardDescription>
+            <SurfaceCardTitle>{copy.sharedOutput}</SurfaceCardTitle>
+            <SurfaceCardDescription>{copy.sharedOutputDescription}</SurfaceCardDescription>
           </SurfaceCardHeader>
 
           {!data.latestOutput.empty ? (
             <div className="mt-3 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
-                {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
-                  <StatusBadge tone="info">Used by next action</StatusBadge>
-                ) : null}
-                {data.latestOutput.timestamp ? <span>Updated {formatDateTime(data.latestOutput.timestamp)}</span> : null}
-              </div>
+                  <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
+                  {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
+                    <StatusBadge tone="info">{copy.usedByNextAction}</StatusBadge>
+                  ) : null}
+                  {data.latestOutput.timestamp ? <span>{copy.updated} {formatDateTime(data.latestOutput.timestamp)}</span> : null}
+                </div>
               <p className="mt-3 font-medium text-foreground">{data.latestOutput.title}</p>
               <p className="mt-2 whitespace-pre-wrap">{data.latestOutput.body}</p>
               {data.latestOutput.href ? (
                 <a href={data.latestOutput.href} className="mt-2 inline-flex text-sm text-primary hover:underline">
-                  Open artifact
+                  {copy.openArtifact}
                 </a>
               ) : null}
             </div>
@@ -528,8 +581,8 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
         <SurfaceCard>
           <SurfaceCardHeader>
-            <SurfaceCardTitle>Execution Workstream</SurfaceCardTitle>
-            <SurfaceCardDescription>Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.</SurfaceCardDescription>
+            <SurfaceCardTitle>{copy.executionWorkstream}</SurfaceCardTitle>
+            <SurfaceCardDescription>{copy.executionWorkstreamDescription}</SurfaceCardDescription>
           </SurfaceCardHeader>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -541,7 +594,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 "rounded-full",
               )}
             >
-              Workstream
+              {copy.workstream}
             </button>
             <button
               type="button"
@@ -551,20 +604,20 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 "rounded-full",
               )}
             >
-              Conversation
+              {copy.conversation}
             </button>
           </div>
 
           <div className="mt-4">
             {activeTab === "workstream" ? (
-              <ExecutionTimeline title="Latest execution milestones" events={data.workstreamItems} />
-            ) : (
-              <ConversationPanel
-                embedded
-                title="Conversation evidence"
-                description="Use the conversation view when the workstream summary is not enough."
-                entries={data.conversation}
-              />
+               <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
+             ) : (
+               <ConversationPanel
+                 embedded
+                 title={copy.conversationEvidence}
+                 description={copy.conversationEvidenceDescription}
+                 entries={data.conversation}
+               />
             )}
           </div>
         </SurfaceCard>

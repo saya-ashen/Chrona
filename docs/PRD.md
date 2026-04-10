@@ -20,6 +20,53 @@ MVP 要解决的问题：
 - Adapter-based architecture
 - 先做可管理，再做更智能
 
+## 3.1 当前确认的 MVP 收敛方向（2026-04-10）
+
+本轮产品判断进一步收敛为：**MVP 的主工作流只需要两条主线：安排与执行。**
+
+- `Schedule` 是第一主入口，负责：创建 task、填写核心运行时配置、安排到 timeline / queue、查看排程风险
+- `Work` 是第二主入口，负责：观察输出、查看运行状态、处理执行中的人工介入、与 AI 实时协作
+- `Task Page` 继续保留，但降级为 **次级详情面**（deep link / drawer / advanced editor），不再是 MVP 主导航核心
+- `Schedule` 内应支持多种视图切换，例如：`Timeline` / `Queue` / `List`，它们是同一批 task 的不同观察与操作方式
+
+### Runnable Task Config（MVP 必做）
+
+要让 task 从“记录项”变成“真正可执行单元”，MVP 必须补上最小运行时配置：
+
+- `model`
+- `prompt / instructions`
+- 基础运行参数（后端已稳定支持的最小参数集）
+
+如果后端已经稳定支持，可在高级区补充：
+
+- `tools`
+- `skills`
+
+但要坚持一个约束：**provider / backend 不作为 MVP 的每-task 必选项暴露。**
+
+- 默认优先让用户选择 `model`
+- provider/backend 尽量在系统内部推导，或作为 workspace / settings 级默认配置
+- 只有当不同 backend 的能力差异必须由用户显式决策时，才考虑在后续版本开放
+
+### 模板策略
+
+模板方向是合理的，但不应在 MVP 先做成重系统。
+
+建议顺序：
+
+1. starter presets
+2. duplicate existing task
+3. save as template / template library（后续版本）
+
+### MVP 发布判断
+
+MVP 可用并可发布的判断标准是：
+
+1. 用户可以创建 **可运行** 的 task
+2. 用户可以在 `Schedule` 中完成核心配置与排期
+3. 用户可以触发执行并进入 `Work`
+4. 用户可以在 `Work` 中观察输出、理解状态、继续协作或介入
+
 ## 4. MVP 范围
 ### 4.1 必做功能
 1. Workspace Overview
@@ -104,18 +151,21 @@ MVP 要解决的问题：
 
 ## 7. 信息架构
 ### 顶层导航
-- Workspaces
-- Tasks
+- Schedule
+- Work
 - Inbox
 - Memory
 - Settings
+- Workspaces（Advanced / Internal）
 
-注意：Calendar、Agents、Policies 暂不作为 MVP 独立主导航，可先以内嵌模块或占位方式保留扩展空间。
+注意：
+- `Task` 不再作为 MVP 顶层主导航，而是 `Schedule` 内的列表视图、详情抽屉或 deep-linkable 次级页面
+- Calendar、Agents、Policies 暂不作为 MVP 独立主导航，可先以内嵌模块或占位方式保留扩展空间
 
 ### Workspace 内页面
-- Overview
-- Tasks
-- Task Detail
+- Schedule（Timeline / Queue / List）
+- Work
+- Task Detail（secondary）
 - Inbox
 - Memory
 

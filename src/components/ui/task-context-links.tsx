@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
+
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 type TaskContextLinksProps = {
   workspaceId: string;
@@ -16,25 +19,27 @@ export function TaskContextLinks({
   workspaceId,
   taskId,
   latestRunStatus,
-  taskLabel = "Open Task",
+  taskLabel,
   workLabel,
   size = "sm",
   className,
 }: TaskContextLinksProps) {
+  const { t } = useI18n();
+
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
-      <Link
+      <LocalizedLink
         href={`/workspaces/${workspaceId}/tasks/${taskId}`}
         className={buttonVariants({ variant: "outline", size })}
       >
-        {taskLabel}
-      </Link>
-      <Link
+        {taskLabel ?? t("common.openTask")}
+      </LocalizedLink>
+      <LocalizedLink
         href={`/workspaces/${workspaceId}/work/${taskId}`}
         className={buttonVariants({ variant: "secondary", size })}
       >
-        {workLabel ?? (latestRunStatus ? "Open Workbench" : "Start Work")}
-      </Link>
+        {workLabel ?? (latestRunStatus ? t("common.openWorkbench") : t("common.startWork"))}
+      </LocalizedLink>
     </div>
   );
 }

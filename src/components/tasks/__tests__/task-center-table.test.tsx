@@ -25,11 +25,11 @@ describe("TaskCenterTable", () => {
 
     expect(screen.getByRole("link", { name: "Open Work" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/work/task_1",
+      "/en/workspaces/ws_1/work/task_1",
     );
     expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/tasks/task_1",
+      "/en/workspaces/ws_1/tasks/task_1",
     );
     expect(
       screen.getByText("Open task for planning details, or jump straight into work."),
@@ -58,7 +58,7 @@ describe("TaskCenterTable", () => {
 
     expect(screen.getByRole("link", { name: "Start Work" })).toHaveAttribute(
       "href",
-      "/workspaces/ws_1/work/task_2",
+      "/en/workspaces/ws_1/work/task_2",
     );
   });
 });

@@ -210,6 +210,17 @@ describe("getSchedulePage", () => {
       riskCount: 1,
     });
 
+    expect(page.listItems).toHaveLength(3);
+    expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
+      [riskTask.id, scheduledTask.id, unscheduledTask.id].sort(),
+    );
+    expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({
+      scheduleStatus: "Unscheduled",
+      actionRequired: "Schedule task",
+      scheduleProposalCount: 1,
+    });
+
     expect(page.scheduled.some((item) => item.taskId === hiddenTask.id)).toBe(false);
+    expect(page.listItems.some((item) => item.taskId === hiddenTask.id)).toBe(false);
   });
 });

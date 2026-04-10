@@ -1,4 +1,5 @@
-import Link from "next/link";
+"use client";
+
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   SurfaceCard,
@@ -7,6 +8,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { useI18n } from "@/i18n/client";
 
 type WorkspaceOverviewProps = {
   data: {
@@ -51,29 +53,30 @@ type OverviewItem = {
 };
 
 export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
+  const { t } = useI18n();
   const sections = [
     {
-      title: "Running Tasks",
+      title: t("components.workspaceOverview.runningTasks"),
       items: data.running.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
         title: item.title,
-        meta: item.latestRunStatus ?? "No run yet",
+        meta: item.latestRunStatus ?? t("components.workspaceOverview.noRunYet"),
         latestRunStatus: item.latestRunStatus,
       })),
     },
     {
-      title: "Waiting for Approval",
+      title: t("components.workspaceOverview.waitingForApproval"),
       items: data.waitingForApproval.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
         title: item.title,
-        meta: item.actionRequired ?? "Open task",
+        meta: item.actionRequired ?? t("components.workspaceOverview.openTask"),
         latestRunStatus: item.latestRunStatus,
       })),
     },
     {
-      title: "Blocked / Failed Tasks",
+      title: t("components.workspaceOverview.blockedOrFailed"),
       items: data.blockedOrFailed.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
@@ -83,7 +86,7 @@ export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
       })),
     },
     {
-      title: "Schedule Risks",
+      title: t("components.workspaceOverview.scheduleRisks"),
       items: data.scheduleRisks.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
@@ -93,7 +96,7 @@ export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
       })),
     },
     {
-      title: "Upcoming Deadlines",
+      title: t("components.workspaceOverview.upcomingDeadlines"),
       items: data.upcomingDeadlines.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
@@ -103,12 +106,12 @@ export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
       })),
     },
     {
-      title: "Recently Updated Tasks",
+      title: t("components.workspaceOverview.recentlyUpdated"),
       items: data.recentlyUpdated.map((item): OverviewItem => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,
         title: item.title,
-        meta: item.lastActivityAt ? item.lastActivityAt.toISOString() : "No activity yet",
+        meta: item.lastActivityAt ? item.lastActivityAt.toISOString() : t("components.workspaceOverview.noActivityYet"),
         latestRunStatus: item.latestRunStatus,
       })),
     },
@@ -120,11 +123,11 @@ export function WorkspaceOverview({ data }: WorkspaceOverviewProps) {
         <SurfaceCard key={section.title} className="space-y-4">
           <SurfaceCardHeader>
             <SurfaceCardTitle>{section.title}</SurfaceCardTitle>
-            <SurfaceCardDescription>Keep the highest-value tasks visible without opening every detail page.</SurfaceCardDescription>
+            <SurfaceCardDescription>{t("components.workspaceOverview.sectionDescription")}</SurfaceCardDescription>
           </SurfaceCardHeader>
           <div className="mt-4 space-y-2 text-sm text-muted-foreground">
             {section.items.length === 0 ? (
-              <p>No items</p>
+              <p>{t("components.workspaceOverview.noItems")}</p>
             ) : (
               section.items.map((item) => (
                 <SurfaceCard
