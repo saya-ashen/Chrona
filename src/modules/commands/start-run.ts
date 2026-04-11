@@ -4,6 +4,10 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { createRuntimeExecutionAdapter } from "@/modules/runtime/execution-registry";
 import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import {
+  ensureDefaultTaskSession,
+  updateTaskSessionStateFromRun,
+} from "@/modules/runtime/task-sessions";
 import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
@@ -57,10 +61,19 @@ export async function startRun(input: {
     throw new Error("Re-open the task before starting another run.");
   }
 
+  const taskSession = await ensureDefaultTaskSession({
+    taskId: task.id,
+    taskTitle: task.title,
+    runtimeName: runRuntimeConfig.runtimeAdapterKey,
+    defaultSessionId: task.defaultSessionId,
+  });
+
   const run = await db.run.create({
     data: {
       taskId: task.id,
+      taskSessionId: taskSession.id,
       runtimeName: runRuntimeConfig.runtimeAdapterKey,
+      runtimeSessionRef: taskSession.sessionKey,
       runtimeConfigSnapshot: runRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
       runtimeConfigVersion: runRuntimeConfig.runtimeInputVersion,
       status: RunStatus.Pending,
@@ -73,6 +86,7 @@ export async function startRun(input: {
     const created = await adapter.createRun({
       prompt: effectivePrompt,
       runtimeInput: runRuntimeConfig.runtimeInput,
+      runtimeSessionKey: taskSession.sessionKey,
     });
     const nextRunStatus = created.runStarted ? RunStatus.Running : RunStatus.Pending;
     const nextTaskStatus = created.runStarted ? TaskStatus.Running : TaskStatus.Queued;
@@ -82,10 +96,17 @@ export async function startRun(input: {
       data: {
         runtimeRunRef: created.runtimeRunRef ?? null,
         runtimeSessionRef:
-          created.runtimeSessionKey ?? created.runtimeSessionRef ?? run.runtimeSessionRef,
+          created.runtimeSessionKey ?? created.runtimeSessionRef ?? taskSession.sessionKey,
         status: nextRunStatus,
         syncStatus: "healthy",
       },
+    });
+
+    await updateTaskSessionStateFromRun({
+      taskSessionId: taskSession.id,
+      runId: run.id,
+      runStatus: nextRunStatus,
+      runtimeRunRef: created.runtimeRunRef ?? null,
     });
 
     await db.task.update({
@@ -112,7 +133,8 @@ export async function startRun(input: {
         runtime_name: runRuntimeConfig.runtimeAdapterKey,
         task_model: runRuntimeConfig.runtimeModel,
         runtime_run_ref: created.runtimeRunRef ?? null,
-        runtime_session_key: created.runtimeSessionKey ?? null,
+        runtime_session_key:
+          created.runtimeSessionKey ?? created.runtimeSessionRef ?? taskSession.sessionKey,
         triggered_by: "user",
       },
       dedupeKey: `run.started:${run.id}`,
@@ -138,6 +160,13 @@ export async function startRun(input: {
         endedAt: new Date(),
         syncStatus: "degraded",
       },
+    });
+
+    await updateTaskSessionStateFromRun({
+      taskSessionId: taskSession.id,
+      runId: run.id,
+      runStatus: RunStatus.Failed,
+      runtimeRunRef: null,
     });
 
     await db.task.update({

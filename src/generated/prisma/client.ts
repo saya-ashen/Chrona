@@ -52,6 +52,11 @@ export type Workspace = Prisma.WorkspaceModel
  */
 export type Task = Prisma.TaskModel
 /**
+ * Model TaskSession
+ * 
+ */
+export type TaskSession = Prisma.TaskSessionModel
+/**
  * Model TaskDependency
  * 
  */

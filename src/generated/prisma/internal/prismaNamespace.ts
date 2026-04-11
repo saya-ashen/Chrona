@@ -386,6 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   Workspace: 'Workspace',
   Task: 'Task',
+  TaskSession: 'TaskSession',
   TaskDependency: 'TaskDependency',
   Run: 'Run',
   Approval: 'Approval',
@@ -412,7 +413,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor"
+    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -561,6 +562,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TaskCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TaskCountAggregateOutputType> | number
+        }
+      }
+    }
+    TaskSession: {
+      payload: Prisma.$TaskSessionPayload<ExtArgs>
+      fields: Prisma.TaskSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.TaskSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        findMany: {
+          args: Prisma.TaskSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>[]
+        }
+        create: {
+          args: Prisma.TaskSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        createMany: {
+          args: Prisma.TaskSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.TaskSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        update: {
+          args: Prisma.TaskSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.TaskSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskSession>
+        }
+        groupBy: {
+          args: Prisma.TaskSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskSessionCountAggregateOutputType> | number
         }
       }
     }
@@ -1451,6 +1526,7 @@ export const TaskScalarFieldEnum = {
   scheduleSource: 'scheduleSource',
   budgetLimit: 'budgetLimit',
   blockReason: 'blockReason',
+  defaultSessionId: 'defaultSessionId',
   latestRunId: 'latestRunId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
@@ -1458,6 +1534,24 @@ export const TaskScalarFieldEnum = {
 } as const
 
 export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
+export const TaskSessionScalarFieldEnum = {
+  id: 'id',
+  taskId: 'taskId',
+  runtimeName: 'runtimeName',
+  sessionKey: 'sessionKey',
+  label: 'label',
+  status: 'status',
+  lastRunStatus: 'lastRunStatus',
+  activeRunId: 'activeRunId',
+  lastRunRef: 'lastRunRef',
+  createdByFramework: 'createdByFramework',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskSessionScalarFieldEnum = (typeof TaskSessionScalarFieldEnum)[keyof typeof TaskSessionScalarFieldEnum]
 
 
 export const TaskDependencyScalarFieldEnum = {
@@ -1475,6 +1569,7 @@ export type TaskDependencyScalarFieldEnum = (typeof TaskDependencyScalarFieldEnu
 export const RunScalarFieldEnum = {
   id: 'id',
   taskId: 'taskId',
+  taskSessionId: 'taskSessionId',
   runtimeName: 'runtimeName',
   runtimeConfigSnapshot: 'runtimeConfigSnapshot',
   runtimeConfigVersion: 'runtimeConfigVersion',
@@ -1793,6 +1888,13 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
 
 
 /**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
  * Reference to a field of type 'TaskDependencyType'
  */
 export type EnumTaskDependencyTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaskDependencyType'>
@@ -1803,13 +1905,6 @@ export type EnumTaskDependencyTypeFieldRefInput<$PrismaModel> = FieldRefInputTyp
  * Reference to a field of type 'RunStatus'
  */
 export type EnumRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RunStatus'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -1958,6 +2053,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   workspace?: Prisma.WorkspaceOmit
   task?: Prisma.TaskOmit
+  taskSession?: Prisma.TaskSessionOmit
   taskDependency?: Prisma.TaskDependencyOmit
   run?: Prisma.RunOmit
   approval?: Prisma.ApprovalOmit

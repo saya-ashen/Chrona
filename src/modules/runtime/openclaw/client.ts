@@ -15,7 +15,12 @@ import type {
 } from "@/modules/runtime/openclaw/types";
 
 const PROTOCOL_VERSION = 3;
-const DEFAULT_SCOPES = ["operator.read", "operator.write", "operator.approvals", "operator.admin"];
+const DEFAULT_SCOPES = [
+  "operator.read",
+  "operator.write",
+  "operator.approvals",
+  "operator.admin",
+];
 
 type OpenClawFrame = Record<string, unknown>;
 type PendingRequest = {
@@ -31,24 +36,36 @@ type OpenClawWebSocket = Pick<
 export interface OpenClawRuntimeClient {
   connect(): Promise<OpenClawHello>;
   close(code?: number, reason?: string): void;
-  createRun(input: {
-    prompt: string;
-  }): Promise<{
+  createRun(input: { prompt: string; runtimeSessionKey?: string }): Promise<{
     runtimeRunRef?: string;
     runtimeSessionRef?: string;
     runtimeSessionKey?: string;
     runStarted: boolean;
   }>;
-  waitForRun(runtimeRunRef: string, timeoutMs?: number): Promise<OpenClawRunSnapshot>;
+  waitForRun(
+    runtimeRunRef: string,
+    timeoutMs?: number,
+  ): Promise<OpenClawRunSnapshot>;
   readOutputs(runtimeSessionKey: string): Promise<OpenClawChatHistory>;
   listApprovals(): Promise<OpenClawPendingApproval[]>;
   sendInput(input: OpenClawSendInput): Promise<OpenClawSendInputResult>;
-  waitForApprovalDecision(approvalId: string): Promise<OpenClawApprovalDecision | null>;
-  requestApproval(input: OpenClawApprovalRequest): Promise<OpenClawApprovalRequestResult>;
+  waitForApprovalDecision(
+    approvalId: string,
+  ): Promise<OpenClawApprovalDecision | null>;
+  requestApproval(
+    input: OpenClawApprovalRequest,
+  ): Promise<OpenClawApprovalRequestResult>;
   resolveApproval(input: OpenClawApprovalResolution): Promise<{
     accepted: boolean;
   }>;
 }
+
+type OpenClawAgentRunResult = {
+  runtimeRunRef?: string;
+  runtimeSessionRef?: string;
+  runtimeSessionKey?: string;
+  runStarted: boolean;
+};
 
 type OpenClawGatewayClientOptions = {
   gatewayUrl: string;
@@ -94,12 +111,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function readString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function readNestedString(record: Record<string, unknown>, keys: string[]): string | undefined {
+function readNestedString(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
   for (const key of keys) {
     const direct = readString(record, key);
     if (direct) {
@@ -139,33 +162,22 @@ function extractResponseError(frame: Record<string, unknown>): string {
   return "OpenClaw gateway request failed";
 }
 
-function mapRunStatus(status: string | undefined): OpenClawRunSnapshot["status"] {
+function isNoSessionFoundError(error: unknown) {
+  return error instanceof Error && /no session found/i.test(error.message);
+}
+
+function mapRunStatus(
+  status: string | undefined,
+): OpenClawRunSnapshot["status"] {
   switch (status?.toLowerCase()) {
-    case "pending":
-      return "Pending";
-    case "waitingforinput":
-    case "waiting_for_input":
-    case "waiting-input":
-      return "WaitingForInput";
-    case "waitingforapproval":
-    case "waiting_for_approval":
-    case "waiting-approval":
-      return "WaitingForApproval";
-    case "failed":
+    case "ok":
+      return "Completed";
     case "error":
       return "Failed";
-    case "completed":
-    case "success":
-    case "succeeded":
-    case "done":
-      return "Completed";
-    case "cancelled":
-    case "canceled":
-    case "aborted":
-      return "Cancelled";
     case "timeout":
-    case "running":
+      return "Running";
     default:
+      console.warn(`Unknown raw status from gateway: ${status}`);
       return "Running";
   }
 }
@@ -190,7 +202,9 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
 
     const frame = JSON.parse(event.data) as OpenClawFrame;
     if (frame.type === "event" && frame.event === "connect.challenge") {
-      void this.sendConnectRequest(isRecord(frame.payload) ? frame.payload : undefined);
+      void this.sendConnectRequest(
+        isRecord(frame.payload) ? frame.payload : undefined,
+      );
       return;
     }
 
@@ -207,7 +221,10 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
       }
 
       const hello = {
-        protocol: typeof frame.payload.protocol === "number" ? frame.payload.protocol : PROTOCOL_VERSION,
+        protocol:
+          typeof frame.payload.protocol === "number"
+            ? frame.payload.protocol
+            : PROTOCOL_VERSION,
         methods: this.readMethods(frame.payload),
       } satisfies OpenClawHello;
 
@@ -233,7 +250,9 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
 
   private readonly handleClose = (event: Event | CloseEvent) => {
     const closeEvent = event instanceof CloseEvent ? event : undefined;
-    const error = new Error(closeEvent?.reason || "OpenClaw gateway connection closed");
+    const error = new Error(
+      closeEvent?.reason || "OpenClaw gateway connection closed",
+    );
 
     this.connectResolvers?.reject(error);
     this.connectResolvers = undefined;
@@ -253,15 +272,14 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
       scopes: options.scopes ?? [...DEFAULT_SCOPES],
       locale: options.locale ?? "en-US",
       userAgent: options.userAgent ?? "agent-dashboard/0.1.0",
-      client:
-        options.client ??
-        {
-          id: "openclaw-probe",
-          version: "0.1.0",
-          platform: process.platform,
-          mode: "probe",
-        },
-      webSocketFactory: options.webSocketFactory ?? ((url: string) => new WebSocket(url)),
+      client: options.client ?? {
+        id: "openclaw-probe",
+        version: "0.1.0",
+        platform: process.platform,
+        mode: "probe",
+      },
+      webSocketFactory:
+        options.webSocketFactory ?? ((url: string) => new WebSocket(url)),
     };
   }
 
@@ -291,7 +309,14 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
     this.socket?.close(code, reason);
   }
 
-  async createRun(input: { prompt: string }) {
+  async createRun(input: { prompt: string; runtimeSessionKey?: string }) {
+    if (input.runtimeSessionKey) {
+      return this.startAgentRun({
+        message: input.prompt,
+        runtimeSessionKey: input.runtimeSessionKey,
+      });
+    }
+
     const payload = this.normalizePayload(
       await this.callRaw("sessions.create", { task: input.prompt }),
     );
@@ -304,7 +329,7 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
     };
   }
 
-  async waitForRun(runtimeRunRef: string, timeoutMs = 1000) {
+  async waitForRun(runtimeRunRef: string, timeoutMs = 5000) {
     const payload = this.normalizePayload(
       await this.callRaw("agent.wait", { runId: runtimeRunRef, timeoutMs }),
     );
@@ -330,7 +355,9 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
 
     return {
       messages: Array.isArray(payload.messages)
-        ? payload.messages.filter((message): message is Record<string, unknown> => isRecord(message))
+        ? payload.messages.filter(
+            (message): message is Record<string, unknown> => isRecord(message),
+          )
         : [],
     } satisfies OpenClawChatHistory;
   }
@@ -368,27 +395,29 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
           command: readString(request, "command"),
           ask: readString(request, "ask"),
           createdAtMs:
-            typeof entry.createdAtMs === "number" ? entry.createdAtMs : undefined,
+            typeof entry.createdAtMs === "number"
+              ? entry.createdAtMs
+              : undefined,
           expiresAtMs:
-            typeof entry.expiresAtMs === "number" ? entry.expiresAtMs : undefined,
+            typeof entry.expiresAtMs === "number"
+              ? entry.expiresAtMs
+              : undefined,
         } satisfies OpenClawPendingApproval;
       })
       .filter((approval) => approval.approvalId.length > 0);
   }
 
   async sendInput(input: OpenClawSendInput) {
-    const payload = this.normalizePayload(
-      await this.callRaw("sessions.send", {
-        key: input.runtimeSessionKey,
-        message: input.message,
-      }),
-    );
+    const result = await this.startAgentRun({
+      message: input.message,
+      runtimeSessionKey: input.runtimeSessionKey,
+    });
 
     return {
       accepted: true,
-      runtimeRunRef: readNestedString(payload, ["runId"]),
-      runtimeSessionKey: readNestedString(payload, ["key", "sessionKey"]),
-      runStarted: payload.runStarted === true,
+      runtimeRunRef: result.runtimeRunRef,
+      runtimeSessionKey: result.runtimeSessionKey,
+      runStarted: result.runStarted,
     } satisfies OpenClawSendInputResult;
   }
 
@@ -398,7 +427,9 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
     );
     const decision = readString(payload, "decision");
 
-    return decision === "allow-once" || decision === "allow-always" || decision === "deny"
+    return decision === "allow-once" ||
+      decision === "allow-always" ||
+      decision === "deny"
       ? decision
       : null;
   }
@@ -406,12 +437,12 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
   async requestApproval(input: OpenClawApprovalRequest) {
     const payload = this.normalizePayload(
       await this.callRaw("exec.approval.request", {
-      command: input.command,
-      commandArgv: input.commandArgv,
-      cwd: input.cwd,
-      host: input.host ?? "gateway",
-      sessionKey: input.sessionKey,
-      twoPhase: true,
+        command: input.command,
+        commandArgv: input.commandArgv,
+        cwd: input.cwd,
+        host: input.host ?? "gateway",
+        sessionKey: input.sessionKey,
+        twoPhase: true,
       }),
     );
 
@@ -504,7 +535,11 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
   }
 
   private async sendConnectRequest(challenge?: Record<string, unknown>) {
-    if (!this.socket || !this.connectResolvers || this.connectResolvers.requestId) {
+    if (
+      !this.socket ||
+      !this.connectResolvers ||
+      this.connectResolvers.requestId
+    ) {
       return;
     }
 
@@ -552,7 +587,9 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
   private readMethods(payload: Record<string, unknown>) {
     const directFeatures = payload.features;
     if (isRecord(directFeatures) && Array.isArray(directFeatures.methods)) {
-      return directFeatures.methods.filter((method): method is string => typeof method === "string");
+      return directFeatures.methods.filter(
+        (method): method is string => typeof method === "string",
+      );
     }
 
     return [];
@@ -560,6 +597,45 @@ export class OpenClawGatewayClient implements OpenClawRuntimeClient {
 
   private supportsMethod(method: string) {
     return this.hello?.methods.includes(method) ?? false;
+  }
+
+  private async ensureSessionExists(runtimeSessionKey: string) {
+    try {
+      await this.callRaw("sessions.resolve", { key: runtimeSessionKey });
+    } catch (error) {
+      if (!isNoSessionFoundError(error)) {
+        throw error;
+      }
+
+      await this.callRaw("sessions.create", { key: runtimeSessionKey });
+    }
+  }
+
+  private async startAgentRun(input: {
+    message: string;
+    runtimeSessionKey: string;
+  }): Promise<OpenClawAgentRunResult> {
+    await this.ensureSessionExists(input.runtimeSessionKey);
+
+    const payload = this.normalizePayload(
+      await this.callRaw("agent", {
+        message: input.message,
+        sessionKey: input.runtimeSessionKey,
+        ...(process.env.OPENCLAW_AGENT_ID
+          ? { agentId: process.env.OPENCLAW_AGENT_ID }
+          : {}),
+        idempotencyKey: randomUUID(),
+      }),
+    );
+
+    return {
+      runtimeRunRef: readNestedString(payload, ["runId"]),
+      runtimeSessionRef: readNestedString(payload, ["sessionId"]),
+      runtimeSessionKey:
+        readNestedString(payload, ["key", "sessionKey"]) ??
+        input.runtimeSessionKey,
+      runStarted: true,
+    };
   }
 
   private isUnknownMethodError(error: unknown) {

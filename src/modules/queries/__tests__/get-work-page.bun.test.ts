@@ -7,7 +7,7 @@ import {
   WorkspaceStatus,
 } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getWorkPage } from "@/modules/queries/get-work-page";
+import { getWorkPage, WorkPageTaskNotFoundError } from "@/modules/queries/get-work-page";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -19,6 +19,7 @@ async function resetDb() {
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
+  await db.taskSession.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
@@ -255,5 +256,9 @@ describe("getWorkPage", () => {
         scheduleStatus: "Unscheduled",
       },
     });
+  });
+
+  it("throws a dedicated not-found error for missing tasks", async () => {
+    await expect(getWorkPage("task_missing")).rejects.toBeInstanceOf(WorkPageTaskNotFoundError);
   });
 });

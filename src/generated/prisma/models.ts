@@ -10,6 +10,7 @@
  */
 export type * from './models/Workspace'
 export type * from './models/Task'
+export type * from './models/TaskSession'
 export type * from './models/TaskDependency'
 export type * from './models/Run'
 export type * from './models/Approval'

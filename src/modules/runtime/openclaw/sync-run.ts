@@ -7,6 +7,10 @@ import {
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
+  resolveTaskSessionKey,
+  updateTaskSessionStateFromRun,
+} from "@/modules/runtime/task-sessions";
+import {
   decodeSyncCursor,
   encodeSyncCursor,
   mapApprovalDelta,
@@ -16,9 +20,14 @@ import {
 } from "@/modules/runtime/openclaw/mapper";
 
 function resolveSessionKey(run: {
+  taskSession?: { sessionKey: string } | null;
   runtimeSessionRef: string | null;
   cursor?: { sessionKey?: string };
 }) {
+  if (run.taskSession?.sessionKey) {
+    return run.taskSession.sessionKey;
+  }
+
   if (run.cursor?.sessionKey) {
     return run.cursor.sessionKey;
   }
@@ -51,12 +60,15 @@ export async function syncRunFromRuntime(input: {
   adapter?: OpenClawAdapter;
 }) {
   const adapter = input.adapter ?? (await createRuntimeAdapter());
-  const cursorRecord = await db.runtimeCursor.findUnique({ where: { runId: input.runId } });
+  const cursorRecord = await db.runtimeCursor.findUnique({
+    where: { runId: input.runId },
+  });
   const cursor = decodeSyncCursor(cursorRecord?.nextCursor);
   const run = await db.run.findUniqueOrThrow({
     where: { id: input.runId },
     include: {
       task: true,
+      taskSession: true,
     },
   });
 
@@ -66,14 +78,25 @@ export async function syncRunFromRuntime(input: {
 
   const snapshot = await adapter.getRunSnapshot({
     runtimeRunRef: run.runtimeRunRef,
-    runtimeSessionKey: resolveSessionKey({ runtimeSessionRef: run.runtimeSessionRef, cursor }),
+    runtimeSessionKey: resolveSessionKey({
+      taskSession: run.taskSession,
+      runtimeSessionRef: run.runtimeSessionRef,
+      cursor,
+    }),
   });
+  console.log(`Fetched snapshot for run ${run.id}:`, snapshot);
   const runtimeSessionKey =
     snapshot.runtimeSessionKey ??
-    resolveSessionKey({ runtimeSessionRef: run.runtimeSessionRef, cursor });
+    resolveSessionKey({
+      taskSession: run.taskSession,
+      runtimeSessionRef: run.runtimeSessionRef,
+      cursor,
+    });
 
   if (!runtimeSessionKey) {
-    throw new Error(`Run ${run.id} is missing a runtime session key for history sync`);
+    throw new Error(
+      `Run ${run.id} is missing a runtime session key for history sync`,
+    );
   }
 
   const [history, approvals] = await Promise.all([
@@ -94,7 +117,9 @@ export async function syncRunFromRuntime(input: {
     snapshot,
     runId: run.id,
   });
-  const currentApprovalIds = new Set(approvals.map((approval) => approval.approvalId));
+  const currentApprovalIds = new Set(
+    approvals.map((approval) => approval.approvalId),
+  );
   const resolvedApprovals =
     snapshot.status === "WaitingForApproval"
       ? []
@@ -234,16 +259,27 @@ export async function syncRunFromRuntime(input: {
         snapshot.status === "Cancelled"
           ? now
           : null,
-      errorSummary: snapshot.status === "Failed" ? snapshot.lastMessage ?? null : null,
+      errorSummary:
+        snapshot.status === "Failed" ? (snapshot.lastMessage ?? null) : null,
       retryable: snapshot.status === "Failed",
       resumeSupported:
-        snapshot.status === "WaitingForApproval" || snapshot.status === "WaitingForInput",
+        snapshot.status === "WaitingForApproval" ||
+        snapshot.status === "WaitingForInput",
       pendingInputPrompt:
-        snapshot.status === "WaitingForInput" ? snapshot.lastMessage ?? null : null,
+        snapshot.status === "WaitingForInput"
+          ? (snapshot.lastMessage ?? null)
+          : null,
       lastSyncedAt: now,
       syncStatus: "healthy",
       mappingPartial: false,
     },
+  });
+
+  await updateTaskSessionStateFromRun({
+    taskSessionId: run.taskSessionId,
+    runId: run.id,
+    runStatus: toRunStatus(snapshot.status),
+    runtimeRunRef: snapshot.runtimeRunRef ?? run.runtimeRunRef,
   });
 
   const nextCursor = encodeSyncCursor({
@@ -270,7 +306,10 @@ export async function syncRunFromRuntime(input: {
       runId: run.id,
       runtimeName: run.runtimeName,
       nextCursor,
-      lastEventRef: historyDelta.lastMessageSeq > 0 ? `msg:${historyDelta.lastMessageSeq}` : null,
+      lastEventRef:
+        historyDelta.lastMessageSeq > 0
+          ? `msg:${historyDelta.lastMessageSeq}`
+          : null,
       lastSyncedAt: now,
       healthStatus: "healthy",
       lastError: null,

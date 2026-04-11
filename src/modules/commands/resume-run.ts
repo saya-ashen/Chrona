@@ -6,6 +6,10 @@ import {
   createRuntimeAdapter,
   type OpenClawAdapter,
 } from "@/modules/runtime/openclaw/adapter";
+import {
+  resolveTaskSessionKey,
+  updateTaskSessionStateFromRun,
+} from "@/modules/runtime/task-sessions";
 
 export async function resumeRun(input: {
   runId: string;
@@ -14,10 +18,14 @@ export async function resumeRun(input: {
   adapter?: OpenClawAdapter;
 }) {
   const adapter = input.adapter ?? (await createRuntimeAdapter());
-  const run = await db.run.findUniqueOrThrow({
+  const run = await db.run.findUnique({
     where: { id: input.runId },
-    include: { task: true },
+    include: { task: true, taskSession: true },
   });
+
+  if (!run) {
+    throw new Error("The run no longer exists. Refresh the work page and try again.");
+  }
 
   const resumableStatuses = [RunStatus.WaitingForApproval, RunStatus.WaitingForInput];
 
@@ -25,12 +33,14 @@ export async function resumeRun(input: {
     throw new Error("Resume is only allowed for blocked runs.");
   }
 
-  if (!run.runtimeSessionRef) {
+  const runtimeSessionKey = resolveTaskSessionKey(run);
+
+  if (!runtimeSessionKey) {
     throw new Error("Cannot resume a run without a runtime session key.");
   }
 
   const resumed = await adapter.resumeRun({
-    runtimeSessionKey: run.runtimeSessionRef,
+    runtimeSessionKey,
     approvalId: input.approvalId,
     decision: input.approvalId ? "approve" : undefined,
     inputText: input.inputText,
@@ -43,15 +53,25 @@ export async function resumeRun(input: {
   await db.run.update({
     where: { id: run.id },
     data: {
-      status: RunStatus.Running,
-      runtimeRunRef: "runtimeRunRef" in resumed ? resumed.runtimeRunRef ?? run.runtimeRunRef : run.runtimeRunRef,
-      runtimeSessionRef:
-        "runtimeSessionKey" in resumed ? resumed.runtimeSessionKey ?? run.runtimeSessionRef : run.runtimeSessionRef,
-      pendingInputPrompt: null,
-      pendingInputType: null,
-      syncStatus: "healthy",
+        status: RunStatus.Running,
+        runtimeRunRef: "runtimeRunRef" in resumed ? resumed.runtimeRunRef ?? run.runtimeRunRef : run.runtimeRunRef,
+        runtimeSessionRef:
+          "runtimeSessionKey" in resumed
+            ? resumed.runtimeSessionKey ?? runtimeSessionKey
+            : runtimeSessionKey,
+        pendingInputPrompt: null,
+        pendingInputType: null,
+        syncStatus: "healthy",
       lastSyncedAt: new Date(),
     },
+  });
+
+  await updateTaskSessionStateFromRun({
+    taskSessionId: run.taskSessionId,
+    runId: run.id,
+    runStatus: RunStatus.Running,
+    runtimeRunRef:
+      "runtimeRunRef" in resumed ? resumed.runtimeRunRef ?? run.runtimeRunRef : run.runtimeRunRef,
   });
 
   await db.task.update({

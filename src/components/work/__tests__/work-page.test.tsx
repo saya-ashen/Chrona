@@ -119,9 +119,104 @@ describe("WorkPageClient", () => {
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit and Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Operator note" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send Note to Agent" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Workstream" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Conversation" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Work draft" })).not.toBeInTheDocument();
+  });
+
+  it("shows a collaboration composer while a run is actively running", () => {
+    render(
+      <WorkPageClient
+        initialData={{
+          taskShell: {
+            id: "task_running",
+            workspaceId: "ws_1",
+            title: "Monitor rollout",
+            runtimeModel: "gpt-5.4",
+            prompt: null,
+            status: "Running",
+            priority: "High",
+            dueAt: null,
+            scheduledStartAt: "2026-04-16T09:00:00.000Z",
+            scheduledEndAt: "2026-04-16T11:00:00.000Z",
+            scheduleStatus: "OnTrack",
+            blockReason: { actionRequired: "Observe progress" },
+          },
+          currentRun: {
+            id: "run_running",
+            status: "Running",
+            pendingInputPrompt: null,
+          },
+          currentIntervention: {
+            kind: "observe",
+            title: "Observe progress",
+            description: "The run is active. Watch the output and add context only when needed.",
+            whyNow: "The agent is still executing, so the next human action should stay lightweight.",
+            actionLabel: "Observe Progress",
+            evidence: [{ label: "Status", value: "Running", tone: "neutral" }],
+          },
+          latestOutput: {
+            kind: "message",
+            title: "Live update",
+            body: "Collecting deployment evidence.",
+            timestamp: "2026-04-16T10:20:00.000Z",
+            href: null,
+            empty: false,
+            sourceLabel: "Conversation output",
+          },
+          scheduleImpact: {
+            status: "OnTrack",
+            dueAt: null,
+            scheduledStartAt: "2026-04-16T09:00:00.000Z",
+            scheduledEndAt: "2026-04-16T11:00:00.000Z",
+            summary: "Execution is moving inside the planned window.",
+          },
+          reliability: {
+            refreshedAt: "2026-04-16T10:21:00.000Z",
+            lastSyncedAt: "2026-04-16T10:20:00.000Z",
+            lastUpdatedAt: "2026-04-16T10:20:00.000Z",
+            syncStatus: "healthy",
+            isStale: false,
+            stuckFor: null,
+            stopReason: null,
+          },
+          closure: {
+            resultAccepted: false,
+            acceptedAt: null,
+            isDone: false,
+            doneAt: null,
+            canAcceptResult: false,
+            canMarkDone: false,
+            canCreateFollowUp: false,
+            canRetry: false,
+            canReopen: false,
+            latestFollowUp: null,
+          },
+          workstreamItems: [],
+          conversation: [
+            {
+              id: "msg_1",
+              role: "user",
+              content: "Keep the summary brief unless a rollout risk appears.",
+              runtimeTs: "2026-04-16T10:19:00.000Z",
+            },
+          ],
+          inspector: {
+            approvals: [],
+            artifacts: [],
+            toolCalls: [],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("textbox", { name: "Operator note" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Send Note to Agent" }).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Add context for the agent without interrupting the current run. The note will land at the next safe checkpoint."),
+    ).toBeInTheDocument();
   });
 
   it("lets operators start the first run directly from the workbench", () => {

@@ -77,6 +77,7 @@ describe("research task config", () => {
     const createRun = vi.fn().mockResolvedValue({ runStarted: true });
     const baseAdapter: RuntimeExecutionAdapter = {
       createRun,
+      sendOperatorMessage: async () => ({ accepted: true, runStarted: false }),
       getRunSnapshot: async () => null,
       readHistory: async () => [],
       listApprovals: async () => [],

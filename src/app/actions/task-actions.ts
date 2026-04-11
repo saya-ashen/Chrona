@@ -16,6 +16,7 @@ import { reopenTask as reopenTaskCommand } from "@/modules/commands/reopen-task"
 import { resolveApproval as resolveApprovalCommand } from "@/modules/commands/resolve-approval";
 import { resumeRun as resumeRunCommand } from "@/modules/commands/resume-run";
 import { retryRun as retryRunCommand } from "@/modules/commands/retry-run";
+import { sendOperatorMessage as sendOperatorMessageCommand } from "@/modules/commands/send-operator-message";
 import { startRun as startRunCommand } from "@/modules/commands/start-run";
 import { updateTask as updateTaskCommand } from "@/modules/commands/update-task";
 import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
@@ -187,6 +188,12 @@ export async function provideInput(
 ) {
   const adapter = await createRuntimeAdapter();
   const result = await provideInputCommand({ ...input, adapter });
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function sendOperatorMessage(input: Parameters<typeof sendOperatorMessageCommand>[0]) {
+  const result = await sendOperatorMessageCommand(input);
   revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
   return result;
 }

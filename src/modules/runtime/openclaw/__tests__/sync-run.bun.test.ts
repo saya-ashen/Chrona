@@ -14,6 +14,7 @@ async function resetDb() {
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
+  await db.taskSession.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();

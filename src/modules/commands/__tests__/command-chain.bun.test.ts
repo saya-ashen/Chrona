@@ -8,6 +8,7 @@ import { invalidateMemory } from "@/modules/commands/invalidate-memory";
 import { markTaskDone } from "@/modules/commands/mark-task-done";
 import { reopenTask } from "@/modules/commands/reopen-task";
 import { resolveApproval } from "@/modules/commands/resolve-approval";
+import { sendOperatorMessage } from "@/modules/commands/send-operator-message";
 import { startRun } from "@/modules/commands/start-run";
 import { updateTask } from "@/modules/commands/update-task";
 
@@ -21,6 +22,7 @@ async function resetDb() {
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
+  await db.taskSession.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
@@ -59,7 +61,11 @@ describe("startRun", () => {
 
     let createRunCalls = 0;
     const adapter = {
-      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
+      async createRun(input: {
+        prompt: string;
+        runtimeInput: Record<string, unknown>;
+        runtimeSessionKey?: string;
+      }) {
         createRunCalls += 1;
         expect(input.prompt).toBe("Override prompt");
         expect(input.runtimeInput).toEqual({
@@ -69,6 +75,9 @@ describe("startRun", () => {
           temperature: 0.2,
           toolMode: "workspace-write",
         });
+        expect(input.runtimeSessionKey).toBe(
+          `agent-dashboard:openclaw:task:${task.id}:default`,
+        );
 
         const pendingRun = await db.run.findFirstOrThrow({
           where: { taskId: task.id },
@@ -82,6 +91,9 @@ describe("startRun", () => {
           runtimeSessionKey: "agent:main:dashboard:runtime_123",
           runStarted: true,
         };
+      },
+      async sendOperatorMessage() {
+        throw new Error("not used in startRun test");
       },
       async getRunSnapshot() {
         throw new Error("not used in startRun test");
@@ -108,11 +120,12 @@ describe("startRun", () => {
 
     const storedTask = await db.task.findUniqueOrThrow({
       where: { id: task.id },
-      include: { runs: { orderBy: { createdAt: "desc" } } },
+      include: { runs: { orderBy: { createdAt: "desc" } }, sessions: true },
     });
 
     expect(result.runtimeRunRef).toBe("runtime_123");
     expect(createRunCalls).toBe(1);
+    expect(storedTask.defaultSessionId).toBeTruthy();
     expect(storedTask.latestRunId).toBe(result.runId);
     expect(storedTask.status).toBe("Running");
     expect(storedTask.prompt).toBe("Stored prompt");
@@ -134,6 +147,13 @@ describe("startRun", () => {
     });
     expect(storedTask.runs[0]?.runtimeConfigVersion).toBe("openclaw-legacy-v1");
     expect(storedTask.runs[0]?.runtimeRunRef).toBe("runtime_123");
+    expect(storedTask.runs[0]?.taskSessionId).toBe(storedTask.defaultSessionId);
+    expect(storedTask.runs[0]?.runtimeSessionRef).toBe("agent:main:dashboard:runtime_123");
+    expect(storedTask.sessions).toHaveLength(1);
+    expect(storedTask.sessions[0]?.sessionKey).toBe(
+      `agent-dashboard:openclaw:task:${task.id}:default`,
+    );
+    expect(storedTask.sessions[0]?.status).toBe("running");
   });
 
   it("uses the stored task prompt when no override prompt is provided", async () => {
@@ -157,7 +177,11 @@ describe("startRun", () => {
     });
 
     const adapter = {
-      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
+      async createRun(input: {
+        prompt: string;
+        runtimeInput: Record<string, unknown>;
+        runtimeSessionKey?: string;
+      }) {
         expect(input.prompt).toBe("Use the saved prompt");
         expect(input.runtimeInput).toEqual({
           approvalPolicy: "never",
@@ -166,12 +190,18 @@ describe("startRun", () => {
           temperature: 0.2,
           toolMode: "workspace-write",
         });
+        expect(input.runtimeSessionKey).toBe(
+          `agent-dashboard:openclaw:task:${task.id}:default`,
+        );
 
         return {
           runtimeRunRef: "runtime_saved",
           runtimeSessionKey: "agent:main:dashboard:runtime_saved",
           runStarted: true,
         };
+      },
+      async sendOperatorMessage() {
+        throw new Error("not used in startRun test");
       },
       async getRunSnapshot() {
         throw new Error("not used in startRun test");
@@ -223,7 +253,11 @@ describe("startRun", () => {
     });
 
     const adapter = {
-      async createRun(input: { prompt: string; runtimeInput: Record<string, unknown> }) {
+      async createRun(input: {
+        prompt: string;
+        runtimeInput: Record<string, unknown>;
+        runtimeSessionKey?: string;
+      }) {
         expect(input.prompt).toBe("Investigate why schedule tasks drift");
         expect(input.runtimeInput).toEqual({
           prompt: "Investigate why schedule tasks drift",
@@ -231,12 +265,18 @@ describe("startRun", () => {
           citationStyle: "bullet-links",
           webSearch: true,
         });
+        expect(input.runtimeSessionKey).toBe(
+          `agent-dashboard:research:task:${task.id}:default`,
+        );
 
         return {
           runtimeRunRef: "runtime_research",
           runtimeSessionKey: "agent:main:dashboard:runtime_research",
           runStarted: true,
         };
+      },
+      async sendOperatorMessage() {
+        throw new Error("not used in startRun test");
       },
       async getRunSnapshot() {
         throw new Error("not used in startRun test");
@@ -275,6 +315,76 @@ describe("startRun", () => {
     });
     expect(storedTask.runs[0]?.runtimeConfigVersion).toBe("research-v1");
   });
+
+  it("reuses the same default task session across multiple runs", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Reusable Session Workspace",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Run twice",
+        runtimeModel: "gpt-5.4",
+        prompt: "Use the same session",
+        status: "Ready",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+
+    const seenSessionKeys: string[] = [];
+    const adapter = {
+      async createRun(input: {
+        prompt: string;
+        runtimeInput: Record<string, unknown>;
+        runtimeSessionKey?: string;
+      }) {
+        seenSessionKeys.push(input.runtimeSessionKey ?? "missing");
+
+        return {
+          runtimeRunRef: `runtime_${seenSessionKeys.length}`,
+          runtimeSessionKey: input.runtimeSessionKey,
+          runStarted: true,
+        };
+      },
+      async sendOperatorMessage() {
+        throw new Error("not used in startRun test");
+      },
+      async getRunSnapshot() {
+        throw new Error("not used in startRun test");
+      },
+      async readHistory() {
+        throw new Error("not used in startRun test");
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return null;
+      },
+      async resumeRun() {
+        throw new Error("not used in startRun test");
+      },
+    };
+
+    await startRun({ taskId: task.id, adapter });
+    await startRun({ taskId: task.id, adapter });
+
+    const sessions = await db.taskSession.findMany({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    expect(sessions).toHaveLength(1);
+    expect(seenSessionKeys).toEqual([
+      `agent-dashboard:openclaw:task:${task.id}:default`,
+      `agent-dashboard:openclaw:task:${task.id}:default`,
+    ]);
+  });
 });
 
 describe("createTask", () => {
@@ -302,7 +412,7 @@ describe("createTask", () => {
 
     const storedTask = await db.task.findUniqueOrThrow({
       where: { id: result.taskId },
-      include: { projection: true },
+      include: { projection: true, sessions: true },
     });
     const createdEvent = await db.event.findFirst({
       where: { taskId: result.taskId, eventType: "task.created" },
@@ -326,6 +436,11 @@ describe("createTask", () => {
     expect(storedTask.runtimeConfig).toBeNull();
     expect(storedTask.ownerType).toBe("human");
     expect(storedTask.priority).toBe("High");
+    expect(storedTask.defaultSessionId).toBeTruthy();
+    expect(storedTask.sessions).toHaveLength(1);
+    expect(storedTask.sessions[0]?.sessionKey).toBe(
+      `agent-dashboard:openclaw:task:${storedTask.id}:default`,
+    );
     expect(storedTask.projection).not.toBeNull();
     expect(createdEvent?.payload).toEqual(
       expect.objectContaining({
@@ -522,6 +637,9 @@ describe("resolveApproval", () => {
       async createRun() {
         throw new Error("not used");
       },
+      async sendOperatorMessage() {
+        throw new Error("not used");
+      },
       async getRunSnapshot() {
         return {
           runtimeRunRef: "runtime_run_1",
@@ -608,6 +726,9 @@ describe("resolveApproval", () => {
       async createRun() {
         throw new Error("not used");
       },
+      async sendOperatorMessage() {
+        throw new Error("not used");
+      },
       async getRunSnapshot() {
         throw new Error("not used");
       },
@@ -641,6 +762,159 @@ describe("resolveApproval", () => {
     expect(storedApproval.status).toBe("Pending");
     expect(storedApproval.resolvedAt).toBeNull();
     expect(storedRun.status).toBe("WaitingForApproval");
+  });
+});
+
+describe("sendOperatorMessage", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("sends a non-blocking note to the runtime and syncs it into conversation history", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Operator Notes Workspace",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Guide the running agent",
+        status: "Running",
+        priority: "High",
+        ownerType: "human",
+      },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        runtimeRunRef: "runtime_note_1",
+        runtimeSessionRef: "session_note_1",
+        status: "Running",
+        triggeredBy: "user",
+      },
+    });
+
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+
+    const adapter = {
+      async createRun() {
+        throw new Error("not used");
+      },
+      async sendOperatorMessage(input: { runtimeSessionKey: string; message: string }) {
+        expect(input).toEqual({
+          runtimeSessionKey: "session_note_1",
+          message: "Keep the update concise unless risk increases.",
+        });
+
+        return {
+          accepted: true,
+          runtimeRunRef: "runtime_note_1",
+          runtimeSessionKey: "session_note_1",
+          runStarted: false,
+        };
+      },
+      async getRunSnapshot() {
+        return {
+          runtimeRunRef: "runtime_note_1",
+          runtimeSessionKey: "session_note_1",
+          status: "Running" as const,
+        };
+      },
+      async readHistory() {
+        return {
+          messages: [
+            {
+              role: "user",
+              content: "Keep the update concise unless risk increases.",
+              timestamp: "2026-04-08T10:05:00.000Z",
+              __openclaw: { seq: 1, id: "msg_operator_note_1" },
+            },
+          ],
+        };
+      },
+      async listApprovals() {
+        return [];
+      },
+      async waitForApprovalDecision() {
+        return null;
+      },
+      async resumeRun() {
+        throw new Error("not used");
+      },
+    };
+
+    const result = await sendOperatorMessage({
+      runId: run.id,
+      message: "Keep the update concise unless risk increases.",
+      adapter,
+    });
+
+    const storedConversation = await db.conversationEntry.findMany({
+      where: { runId: run.id },
+      orderBy: { sequence: "asc" },
+    });
+    const noteEvent = await db.event.findFirst({
+      where: { runId: run.id, eventType: "operator.note_added" },
+      orderBy: { ingestSequence: "desc" },
+    });
+
+    expect(result).toMatchObject({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      runId: run.id,
+    });
+    expect(storedConversation).toHaveLength(1);
+    expect(storedConversation[0]).toMatchObject({
+      role: "user",
+      content: "Keep the update concise unless risk increases.",
+      externalRef: "msg_operator_note_1",
+    });
+    expect(noteEvent?.payload).toEqual(
+      expect.objectContaining({
+        message: "Keep the update concise unless risk increases.",
+        delivery: "sent_to_runtime",
+        prior_status: "Running",
+      }),
+    );
+  });
+
+  it("returns a refreshable error when the run no longer exists", async () => {
+    await expect(
+      sendOperatorMessage({
+        runId: "run_missing",
+        message: "Still there?",
+        adapter: {
+          async createRun() {
+            throw new Error("not used");
+          },
+          async sendOperatorMessage() {
+            throw new Error("not used");
+          },
+          async getRunSnapshot() {
+            throw new Error("not used");
+          },
+          async readHistory() {
+            throw new Error("not used");
+          },
+          async listApprovals() {
+            return [];
+          },
+          async waitForApprovalDecision() {
+            return null;
+          },
+          async resumeRun() {
+            throw new Error("not used");
+          },
+        },
+      }),
+    ).rejects.toThrow("The run no longer exists. Refresh the work page and try again.");
   });
 });
 

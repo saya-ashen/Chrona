@@ -4,6 +4,10 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resumeRun } from "@/modules/commands/resume-run";
 import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+import {
+  resolveTaskSessionKey,
+  updateTaskSessionStateFromRun,
+} from "@/modules/runtime/task-sessions";
 
 async function markApprovalResolved(input: {
   approval: {
@@ -54,10 +58,14 @@ export async function resolveApproval(input: {
   editedContent?: string;
   adapter?: OpenClawAdapter;
 }) {
-  const approval = await db.approval.findUniqueOrThrow({
+  const approval = await db.approval.findUnique({
     where: { id: input.approvalId },
-    include: { task: true, run: true },
+    include: { task: true, run: { include: { taskSession: true } } },
   });
+
+  if (!approval) {
+    throw new Error("The approval request no longer exists. Refresh the work page and try again.");
+  }
 
   if (approval.status !== ApprovalStatus.Pending) {
     throw new Error("Only pending approvals can be resolved.");
@@ -66,12 +74,14 @@ export async function resolveApproval(input: {
   if (input.decision === "Rejected") {
     const adapter = input.adapter ?? (await createRuntimeAdapter());
 
-    if (!approval.run.runtimeSessionRef) {
+    const runtimeSessionKey = resolveTaskSessionKey(approval.run);
+
+    if (!runtimeSessionKey) {
       throw new Error("Cannot reject approval without a runtime session key.");
     }
 
     const resumed = await adapter.resumeRun({
-      runtimeSessionKey: approval.run.runtimeSessionRef,
+      runtimeSessionKey,
       approvalId: approval.id,
       decision: "reject",
     });
@@ -96,6 +106,12 @@ export async function resolveApproval(input: {
         lastSyncedAt: new Date(),
         syncStatus: "healthy",
       },
+    });
+    await updateTaskSessionStateFromRun({
+      taskSessionId: approval.run.taskSessionId,
+      runId: approval.runId,
+      runStatus: RunStatus.Failed,
+      runtimeRunRef: approval.run.runtimeRunRef,
     });
     await db.task.update({
       where: { id: approval.taskId },

@@ -1,6 +1,17 @@
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS, syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
 
+export class WorkPageTaskNotFoundError extends Error {
+  constructor(taskId: string) {
+    super(`Work page task not found: ${taskId}`);
+    this.name = "WorkPageTaskNotFoundError";
+  }
+}
+
+function isMissingRecordError(error: unknown) {
+  return error instanceof Error && error.message.includes("No record was found for a query");
+}
+
 type WorkPageCopy = {
   needsApproval: string;
   needsInput: string;
@@ -648,10 +659,34 @@ function buildClosureState({
 
 export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPageCopy>) {
   const copy = { ...DEFAULT_COPY, ...copyOverrides };
-  await syncTaskRunForRead(taskId);
+  const taskExists = await db.task.findUnique({
+    where: { id: taskId },
+    select: { id: true },
+  });
+
+  if (!taskExists) {
+    throw new WorkPageTaskNotFoundError(taskId);
+  }
+
+  try {
+    await syncTaskRunForRead(taskId, undefined, { forceActive: true });
+  } catch (error) {
+    if (isMissingRecordError(error)) {
+      const taskStillExists = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true },
+      });
+
+      if (!taskStillExists) {
+        throw new WorkPageTaskNotFoundError(taskId);
+      }
+    }
+
+    throw error;
+  }
   const now = new Date();
 
-  const task = await db.task.findUniqueOrThrow({
+  const task = await db.task.findUnique({
     where: { id: taskId },
     include: {
       projection: true,
@@ -668,6 +703,10 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       },
     },
   });
+
+  if (!task) {
+    throw new WorkPageTaskNotFoundError(taskId);
+  }
 
   const currentRun = task.runs[0] ?? null;
   const latestFollowUp = await db.task.findFirst({

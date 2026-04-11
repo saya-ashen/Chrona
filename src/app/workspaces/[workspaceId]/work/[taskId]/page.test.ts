@@ -1,22 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
+  notFound: vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND");
+  }),
   redirect: vi.fn(() => {
     throw new Error("NEXT_REDIRECT");
   }),
 }));
 
-vi.mock("@/modules/queries/get-work-page", () => ({
-  getWorkPage: vi.fn(),
-}));
+vi.mock("@/modules/queries/get-work-page", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/modules/queries/get-work-page")>();
+
+  return {
+    ...actual,
+    getWorkPage: vi.fn(),
+  };
+});
 
 vi.mock("@/i18n/get-dictionary", () => ({
   getDictionary: vi.fn().mockResolvedValue({ queries: { workPage: {} } }),
 }));
 
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import WorkPage from "@/app/workspaces/[workspaceId]/work/[taskId]/page";
-import { getWorkPage } from "@/modules/queries/get-work-page";
+import { getWorkPage, WorkPageTaskNotFoundError } from "@/modules/queries/get-work-page";
 
 describe("WorkPage", () => {
   it("redirects routes whose workspace id does not match the task workspace", async () => {
@@ -97,5 +105,17 @@ describe("WorkPage", () => {
     ).rejects.toThrow("NEXT_REDIRECT");
 
     expect(vi.mocked(redirect)).toHaveBeenCalledWith("/en/workspaces/ws_real/work/task_1");
+  });
+
+  it("renders not-found when the task no longer exists", async () => {
+    vi.mocked(getWorkPage).mockRejectedValue(new WorkPageTaskNotFoundError("task_missing"));
+
+    await expect(
+      WorkPage({
+        params: Promise.resolve({ workspaceId: "ws_1", taskId: "task_missing" }),
+      }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(vi.mocked(notFound)).toHaveBeenCalled();
   });
 });

@@ -52,11 +52,24 @@ export type RuntimeTaskConfigSpec = {
 };
 
 export type RuntimeExecutionAdapter = {
-  createRun(input: { prompt: string; runtimeInput: RuntimeInput }): Promise<{
+  createRun(input: {
+    prompt: string;
+    runtimeInput: RuntimeInput;
+    runtimeSessionKey?: string;
+  }): Promise<{
     runtimeRunRef?: string;
     runtimeSessionRef?: string;
     runtimeSessionKey?: string;
     runStarted: boolean;
+  }>;
+  sendOperatorMessage(input: {
+    runtimeSessionKey: string;
+    message: string;
+  }): Promise<{
+    accepted: boolean;
+    runtimeRunRef?: string;
+    runtimeSessionKey?: string;
+    runStarted?: boolean;
   }>;
   getRunSnapshot(input: {
     runtimeRunRef: string;
