@@ -108,7 +108,11 @@ export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter
   }
 }
 
-export async function syncTaskRunForRead(taskId: string, adapter?: OpenClawAdapter) {
+export async function syncTaskRunForRead(
+  taskId: string,
+  adapter?: OpenClawAdapter,
+  options?: { forceActive?: boolean },
+) {
   if (shouldSkipRuntimeSync()) {
     return;
   }
@@ -126,7 +130,11 @@ export async function syncTaskRunForRead(taskId: string, adapter?: OpenClawAdapt
     return;
   }
 
-  const stale = !run.lastSyncedAt || run.lastSyncedAt.getTime() < Date.now() - SYNC_STALE_MS || run.syncStatus === "degraded";
+  const stale =
+    options?.forceActive === true ||
+    !run.lastSyncedAt ||
+    run.lastSyncedAt.getTime() < Date.now() - SYNC_STALE_MS ||
+    run.syncStatus === "degraded";
 
   if (!stale) {
     return;

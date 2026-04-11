@@ -53,6 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Workspace: 'Workspace',
   Task: 'Task',
+  TaskSession: 'TaskSession',
   TaskDependency: 'TaskDependency',
   Run: 'Run',
   Approval: 'Approval',
@@ -116,6 +117,7 @@ export const TaskScalarFieldEnum = {
   scheduleSource: 'scheduleSource',
   budgetLimit: 'budgetLimit',
   blockReason: 'blockReason',
+  defaultSessionId: 'defaultSessionId',
   latestRunId: 'latestRunId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
@@ -123,6 +125,24 @@ export const TaskScalarFieldEnum = {
 } as const
 
 export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
+export const TaskSessionScalarFieldEnum = {
+  id: 'id',
+  taskId: 'taskId',
+  runtimeName: 'runtimeName',
+  sessionKey: 'sessionKey',
+  label: 'label',
+  status: 'status',
+  lastRunStatus: 'lastRunStatus',
+  activeRunId: 'activeRunId',
+  lastRunRef: 'lastRunRef',
+  createdByFramework: 'createdByFramework',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskSessionScalarFieldEnum = (typeof TaskSessionScalarFieldEnum)[keyof typeof TaskSessionScalarFieldEnum]
 
 
 export const TaskDependencyScalarFieldEnum = {
@@ -140,6 +160,7 @@ export type TaskDependencyScalarFieldEnum = (typeof TaskDependencyScalarFieldEnu
 export const RunScalarFieldEnum = {
   id: 'id',
   taskId: 'taskId',
+  taskSessionId: 'taskSessionId',
   runtimeName: 'runtimeName',
   runtimeConfigSnapshot: 'runtimeConfigSnapshot',
   runtimeConfigVersion: 'runtimeConfigVersion',

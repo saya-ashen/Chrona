@@ -8,7 +8,11 @@ export async function provideInput(input: {
   inputText: string;
   adapter?: OpenClawAdapter;
 }) {
-  const run = await db.run.findUniqueOrThrow({ where: { id: input.runId } });
+  const run = await db.run.findUnique({ where: { id: input.runId } });
+
+  if (!run) {
+    throw new Error("The run no longer exists. Refresh the work page and try again.");
+  }
 
   if (run.status !== RunStatus.WaitingForInput) {
     throw new Error("Input can only be provided when the run is waiting for input.");

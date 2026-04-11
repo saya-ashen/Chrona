@@ -66,10 +66,29 @@ function createClient(
   });
 }
 
+async function waitForSentFrames(socket: MockWebSocket, expectedCount: number) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (socket.sentFrames.length >= expectedCount) {
+      return;
+    }
+
+    await Promise.resolve();
+  }
+
+  throw new Error(`Expected at least ${expectedCount} sent frames, received ${socket.sentFrames.length}`);
+}
+
 async function connectClient(
   client: OpenClawGatewayClient,
   socket: MockWebSocket,
-  methods: string[] = ["sessions.create", "agent.wait", "chat.history", "exec.approval.list"],
+  methods: string[] = [
+    "sessions.create",
+    "sessions.resolve",
+    "agent",
+    "agent.wait",
+    "chat.history",
+    "exec.approval.list",
+  ],
 ) {
   const connectPromise = client.connect();
 
@@ -125,7 +144,146 @@ describe("OpenClawGatewayClient", () => {
     await connectClient(client, socket);
   });
 
-  it("maps create-run requests onto sessions.create and returns session/run refs", async () => {
+  it("maps session-bound create-run requests onto sessions.resolve then agent", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket);
+
+    const createRunPromise = client.createRun({
+      prompt: "test prompt",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+    });
+    await Promise.resolve();
+    const resolveRequest = socket.sentFrames.at(-1);
+
+    expect(resolveRequest).toMatchObject({
+      type: "req",
+      method: "sessions.resolve",
+      params: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: resolveRequest?.id,
+      ok: true,
+      payload: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    await waitForSentFrames(socket, 3);
+    const agentRequest = socket.sentFrames.at(-1);
+
+    expect(agentRequest).toMatchObject({
+      type: "req",
+      method: "agent",
+      params: {
+        message: "test prompt",
+        sessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+    const agentParams = agentRequest?.params as Record<string, unknown> | undefined;
+    expect(typeof agentParams?.idempotencyKey).toBe("string");
+
+    socket.emitFrame({
+      type: "res",
+      id: agentRequest?.id,
+      ok: true,
+      payload: {
+        sessionId: "session_456",
+        runId: "run_123",
+      },
+    });
+
+    await expect(createRunPromise).resolves.toMatchObject({
+      runtimeRunRef: "run_123",
+      runtimeSessionRef: "session_456",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      runStarted: true,
+    });
+  });
+
+  it("creates the remote session before agent when the session key is missing upstream", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket);
+
+    const createRunPromise = client.createRun({
+      prompt: "test prompt",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+    });
+    await Promise.resolve();
+    const resolveRequest = socket.sentFrames.at(-1);
+
+    expect(resolveRequest).toMatchObject({
+      type: "req",
+      method: "sessions.resolve",
+      params: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: resolveRequest?.id,
+      ok: false,
+      error: { message: "No session found: agent-dashboard:openclaw:task:task_123:default" },
+    });
+
+    await waitForSentFrames(socket, 3);
+    const createSessionRequest = socket.sentFrames.at(-1);
+
+    expect(createSessionRequest).toMatchObject({
+      type: "req",
+      method: "sessions.create",
+      params: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: createSessionRequest?.id,
+      ok: true,
+      payload: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+        sessionId: "session_456",
+      },
+    });
+
+    await waitForSentFrames(socket, 4);
+    const agentRequest = socket.sentFrames.at(-1);
+
+    expect(agentRequest).toMatchObject({
+      type: "req",
+      method: "agent",
+      params: {
+        message: "test prompt",
+        sessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: agentRequest?.id,
+      ok: true,
+      payload: {
+        sessionId: "session_456",
+        runId: "run_123",
+      },
+    });
+
+    await expect(createRunPromise).resolves.toMatchObject({
+      runtimeRunRef: "run_123",
+      runtimeSessionRef: "session_456",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      runStarted: true,
+    });
+  });
+
+  it("falls back to sessions.create when no session key is provided", async () => {
     const socket = new MockWebSocket();
     const client = createClient(socket);
     await connectClient(client, socket);
@@ -315,16 +473,38 @@ describe("OpenClawGatewayClient", () => {
       message: "Please continue.",
     });
     await Promise.resolve();
+    const sendResolveRequest = socket.sentFrames.at(-1);
+
+    expect(sendResolveRequest).toMatchObject({
+      type: "req",
+      method: "sessions.resolve",
+      params: {
+        key: "session_key_456",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: sendResolveRequest?.id,
+      ok: true,
+      payload: {
+        key: "session_key_456",
+      },
+    });
+
+    await waitForSentFrames(socket, socket.sentFrames.length + 1);
     const sendRequest = socket.sentFrames.at(-1);
 
     expect(sendRequest).toMatchObject({
       type: "req",
-      method: "sessions.send",
+      method: "agent",
       params: {
-        key: "session_key_456",
         message: "Please continue.",
+        sessionKey: "session_key_456",
       },
     });
+    const sendParams = sendRequest?.params as Record<string, unknown> | undefined;
+    expect(typeof sendParams?.idempotencyKey).toBe("string");
 
     socket.emitFrame({
       type: "res",

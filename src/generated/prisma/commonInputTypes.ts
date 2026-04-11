@@ -301,6 +301,19 @@ export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedIntNullableFilter<$PrismaModel>
 }
 
+export type BoolFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
+}
+
+export type BoolWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolFilter<$PrismaModel>
+}
+
 export type EnumTaskDependencyTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.TaskDependencyType | Prisma.EnumTaskDependencyTypeFieldRefInput<$PrismaModel>
   in?: $Enums.TaskDependencyType[]
@@ -325,11 +338,6 @@ export type EnumRunStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumRunStatusFilter<$PrismaModel> | $Enums.RunStatus
 }
 
-export type BoolFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
-}
-
 export type EnumRunStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.RunStatus | Prisma.EnumRunStatusFieldRefInput<$PrismaModel>
   in?: $Enums.RunStatus[]
@@ -338,14 +346,6 @@ export type EnumRunStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumRunStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumRunStatusFilter<$PrismaModel>
-}
-
-export type BoolWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedBoolFilter<$PrismaModel>
-  _max?: Prisma.NestedBoolFilter<$PrismaModel>
 }
 
 export type EnumApprovalStatusFilter<$PrismaModel = never> = {
@@ -844,6 +844,19 @@ export type NestedFloatNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedFloatNullableFilter<$PrismaModel> | number | null
 }
 
+export type NestedBoolFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
+}
+
+export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolFilter<$PrismaModel>
+}
+
 export type NestedEnumTaskDependencyTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.TaskDependencyType | Prisma.EnumTaskDependencyTypeFieldRefInput<$PrismaModel>
   in?: $Enums.TaskDependencyType[]
@@ -868,11 +881,6 @@ export type NestedEnumRunStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumRunStatusFilter<$PrismaModel> | $Enums.RunStatus
 }
 
-export type NestedBoolFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
-}
-
 export type NestedEnumRunStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.RunStatus | Prisma.EnumRunStatusFieldRefInput<$PrismaModel>
   in?: $Enums.RunStatus[]
@@ -881,14 +889,6 @@ export type NestedEnumRunStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumRunStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumRunStatusFilter<$PrismaModel>
-}
-
-export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedBoolFilter<$PrismaModel>
-  _max?: Prisma.NestedBoolFilter<$PrismaModel>
 }
 
 export type NestedEnumApprovalStatusFilter<$PrismaModel = never> = {

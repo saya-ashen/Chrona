@@ -11,6 +11,7 @@ import {
   rejectApproval,
   reopenTask,
   retryRun,
+  sendOperatorMessage,
   startRun,
 } from "@/app/actions/task-actions";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -156,6 +157,29 @@ type WorkPageClientProps = {
 
 type WorkstreamTab = "workstream" | "conversation";
 
+type CollaborationComposer = {
+  mode: "response" | "note";
+  title: string;
+  description: string;
+  fieldLabel: string;
+  submitLabel: string;
+  defaultValue: string;
+  statusHint: string;
+};
+
+type CollaborationCopy = {
+  collaboration: string;
+  responseRequiredDescription: string;
+  agentMessage: string;
+  sendToAgent: string;
+  currentRun: string;
+  operatorNote: string;
+  sendNoteToAgent: string;
+  noteQueuedForCheckpoint: string;
+  noteWhileRunningDescription: string;
+  noteWhileAwaitingApprovalDescription: string;
+};
+
 const DEFAULT_COPY = {
   pageDescription: "Keep execution moving here, keep planning edits in Schedule, and treat task detail as reference-only.",
   openSchedule: "Open Schedule",
@@ -176,8 +200,11 @@ const DEFAULT_COPY = {
   nextAction: "Next Action",
   whyNow: "Why now",
   evidence: "Evidence",
+  collaboration: "Collaboration",
   agentMessage: "Agent message",
+  operatorNote: "Operator note",
   sendToAgent: "Send to Agent",
+  sendNoteToAgent: "Send Note to Agent",
   resumeWithMessage: "Resume with Message",
   currentRun: "Current run",
   approve: "Approve",
@@ -214,9 +241,13 @@ const DEFAULT_COPY = {
   conversationEvidence: "Conversation evidence",
   conversationEvidenceDescription: "Use the conversation view when the workstream summary is not enough.",
   messageRequired: "message is required",
+  noteQueuedForCheckpoint: "Delivered to the runtime and shown again once the next sync lands.",
+  responseRequiredDescription: "Reply directly to the agent so the blocked run can continue.",
+  noteWhileRunningDescription: "Add context for the agent without interrupting the current run. The note will land at the next safe checkpoint.",
+  noteWhileAwaitingApprovalDescription: "Leave context for the agent while the approval stays pending. The run will still wait for approval before continuing.",
   promptRequired: "prompt is required",
   noActiveRunToResume: "No active run to resume.",
-  currentRunNotWaitingForInput: "The current run is not waiting for direct operator input.",
+  currentRunCannotAcceptMessages: "The current run is not accepting operator messages.",
   actionFailed: "Action failed",
 } as const;
 
@@ -265,6 +296,55 @@ function getEvidenceToneClass(tone: "neutral" | "warning" | "critical") {
   return "border-border bg-background text-muted-foreground";
 }
 
+function getCollaborationComposer(
+  currentRun: WorkPageClientProps["initialData"]["currentRun"],
+  currentIntervention: WorkPageClientProps["initialData"]["currentIntervention"],
+  taskTitle: string,
+  copy: CollaborationCopy,
+): CollaborationComposer | null {
+  if (!currentRun) {
+    return null;
+  }
+
+  if (currentRun.status === "WaitingForInput") {
+    return {
+      mode: "response",
+      title: copy.collaboration,
+      description: currentIntervention?.description ?? copy.responseRequiredDescription,
+      fieldLabel: copy.agentMessage,
+      submitLabel: copy.sendToAgent,
+      defaultValue: currentIntervention?.defaultMessage ?? getComposerDefaultValue(taskTitle, currentRun),
+      statusHint: `${copy.currentRun}: ${currentRun.status}`,
+    };
+  }
+
+  if (currentRun.status === "Running") {
+    return {
+      mode: "note",
+      title: copy.collaboration,
+      description: copy.noteWhileRunningDescription,
+      fieldLabel: copy.operatorNote,
+      submitLabel: copy.sendNoteToAgent,
+      defaultValue: "",
+      statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+    };
+  }
+
+  if (currentRun.status === "WaitingForApproval") {
+    return {
+      mode: "note",
+      title: copy.collaboration,
+      description: copy.noteWhileAwaitingApprovalDescription,
+      fieldLabel: copy.operatorNote,
+      submitLabel: copy.sendNoteToAgent,
+      defaultValue: "",
+      statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+    };
+  }
+
+  return null;
+}
+
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.workPage ?? {}) };
@@ -272,6 +352,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkstreamTab>("workstream");
+  const [composerResetKey, setComposerResetKey] = useState(0);
 
   const refresh = useEffectEvent(async () => {
     const response = await fetch(`/api/work/${data.taskShell.id}/projection`, { cache: "no-store" });
@@ -314,6 +395,12 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const canProvideInput = data.currentIntervention?.kind === "input";
   const hasPendingApprovals = data.currentIntervention?.kind === "approval" && (data.currentIntervention.approvals?.length ?? 0) > 0;
   const canRetryRecovery = currentRun ? ["Failed", "Cancelled"].includes(currentRun.status) : false;
+  const collaborationComposer = getCollaborationComposer(
+    currentRun,
+    data.currentIntervention,
+    data.taskShell.title,
+    copy,
+  );
 
   async function submitAgentMessage(inputText: string) {
     if (!currentRun) {
@@ -326,12 +413,19 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         return;
       }
 
-      throw new Error(copy.currentRunNotWaitingForInput);
+      if (currentRun.status === "Running" || currentRun.status === "WaitingForApproval") {
+        await sendOperatorMessage({ runId: currentRun.id, message: inputText });
+        return;
+      }
+
+      throw new Error(copy.currentRunCannotAcceptMessages);
     });
+
+    setComposerResetKey((value) => value + 1);
   }
 
   async function handleComposerSubmit(formData: FormData) {
-    const inputText = String(formData.get("inputText") ?? "").trim();
+    const inputText = String(formData.get("message") ?? "").trim();
 
     if (!inputText) {
       throw new Error(copy.messageRequired);
@@ -464,14 +558,21 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             ) : null}
 
             {canProvideInput ? (
-              <form action={handleComposerSubmit} className="space-y-3">
-                <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <Field label={copy.agentMessage}>
+              <form
+                key={`collaboration-${composerResetKey}-${currentRun?.id ?? "none"}-response`}
+                action={handleComposerSubmit}
+                className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
+              >
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">{collaborationComposer?.title ?? copy.collaboration}</p>
+                  <p className="text-sm text-muted-foreground">{collaborationComposer?.description ?? data.currentIntervention?.description}</p>
+                </div>
+                <Field label={collaborationComposer?.fieldLabel ?? copy.agentMessage}>
                   <textarea
-                    name="inputText"
+                    name="message"
                     rows={5}
                     required
-                    defaultValue={data.currentIntervention?.defaultMessage ?? getComposerDefaultValue(data.taskShell.title, currentRun)}
+                    defaultValue={collaborationComposer?.defaultValue ?? getComposerDefaultValue(data.taskShell.title, currentRun)}
                     className={textareaClassName}
                   />
                 </Field>
@@ -481,10 +582,10 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                     disabled={isPending}
                     className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}
                   >
-                    {currentRun?.status === "WaitingForInput" ? copy.sendToAgent : copy.resumeWithMessage}
+                    {collaborationComposer?.submitLabel ?? copy.resumeWithMessage}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    {copy.currentRun}: {currentRun?.status ?? copy.noRun}
+                    {collaborationComposer?.statusHint ?? `${copy.currentRun}: ${currentRun?.status ?? copy.noRun}`}
                   </p>
                 </div>
               </form>
@@ -542,6 +643,38 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                     </div>
                   </div>
                 ))}
+
+                {collaborationComposer?.mode === "note" ? (
+                  <form
+                    key={`collaboration-${composerResetKey}-${currentRun?.id ?? "none"}-note-approval`}
+                    action={handleComposerSubmit}
+                    className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">{collaborationComposer.title}</p>
+                      <p className="text-sm text-muted-foreground">{collaborationComposer.description}</p>
+                    </div>
+                    <Field label={collaborationComposer.fieldLabel}>
+                      <textarea
+                        name="message"
+                        rows={4}
+                        required
+                        defaultValue={collaborationComposer.defaultValue}
+                        className={textareaClassName}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}
+                      >
+                        {collaborationComposer.submitLabel}
+                      </button>
+                      <p className="text-xs text-muted-foreground">{collaborationComposer.statusHint}</p>
+                    </div>
+                  </form>
+                ) : null}
               </div>
             ) : canRetryRecovery ? (
               <form
@@ -572,8 +705,42 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 </button>
               </form>
             ) : currentRun?.status === "Running" ? (
-              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-                {data.currentIntervention?.description}
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
+                  {data.currentIntervention?.description}
+                </div>
+
+                {collaborationComposer?.mode === "note" ? (
+                  <form
+                    key={`collaboration-${composerResetKey}-${currentRun.id}-note-running`}
+                    action={handleComposerSubmit}
+                    className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">{collaborationComposer.title}</p>
+                      <p className="text-sm text-muted-foreground">{collaborationComposer.description}</p>
+                    </div>
+                    <Field label={collaborationComposer.fieldLabel}>
+                      <textarea
+                        name="message"
+                        rows={4}
+                        required
+                        defaultValue={collaborationComposer.defaultValue}
+                        className={textareaClassName}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}
+                      >
+                        {collaborationComposer.submitLabel}
+                      </button>
+                      <p className="text-xs text-muted-foreground">{collaborationComposer.statusHint}</p>
+                    </div>
+                  </form>
+                ) : null}
               </div>
             ) : currentRun?.status === "Completed" ? (
               <div className="space-y-4 rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">

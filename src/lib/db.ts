@@ -29,14 +29,57 @@ async function createDbClient() {
   });
 }
 
+function hasRequiredDelegates(client: PrismaClient | undefined) {
+  if (!client) {
+    return false;
+  }
+
+  return typeof (client as PrismaClient & { taskSession?: unknown }).taskSession === "object";
+}
+
+async function resolveCachedClient(globalForPrisma: typeof globalThis & {
+  prisma?: PrismaClient;
+  prismaPromise?: Promise<PrismaClient>;
+}) {
+  const cachedClient = globalForPrisma.prisma;
+  if (hasRequiredDelegates(cachedClient)) {
+    return cachedClient;
+  }
+
+  if (cachedClient) {
+    await cachedClient.$disconnect().catch(() => undefined);
+    globalForPrisma.prisma = undefined;
+    globalForPrisma.prismaPromise = undefined;
+  }
+
+  const cachedPromise = globalForPrisma.prismaPromise;
+  if (!cachedPromise) {
+    return undefined;
+  }
+
+  const promisedClient = await cachedPromise.catch(() => undefined);
+  if (hasRequiredDelegates(promisedClient)) {
+    return promisedClient;
+  }
+
+  if (promisedClient) {
+    await promisedClient.$disconnect().catch(() => undefined);
+  }
+
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.prismaPromise = undefined;
+  return undefined;
+}
+
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
   prismaPromise?: Promise<PrismaClient>;
 };
 
-const prismaPromise = globalForPrisma.prisma
-  ? Promise.resolve(globalForPrisma.prisma)
-  : globalForPrisma.prismaPromise ?? createDbClient();
+const prismaPromise = (async () => {
+  const cachedClient = await resolveCachedClient(globalForPrisma);
+  return cachedClient ?? createDbClient();
+})();
 
 export const db = await prismaPromise;
 

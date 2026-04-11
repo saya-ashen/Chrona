@@ -35,12 +35,20 @@ export function createMockOpenClawAdapter(options?: {
   const fixture = options?.fixture ?? loadFixture(options?.fixtureName ?? "run-waiting-approval");
 
   return {
-    async createRun() {
+    async createRun(input) {
       return {
         runtimeRunRef: fixture.snapshot.runtimeRunRef,
         runtimeSessionRef: fixture.snapshot.runtimeSessionRef,
-        runtimeSessionKey: fixture.snapshot.runtimeSessionKey,
+        runtimeSessionKey: input.runtimeSessionKey ?? fixture.snapshot.runtimeSessionKey,
         runStarted: true,
+      };
+    },
+    async sendOperatorMessage(input) {
+      return {
+        accepted: true,
+        runtimeRunRef: fixture.snapshot.runtimeRunRef,
+        runtimeSessionKey: input.runtimeSessionKey,
+        runStarted: false,
       };
     },
     async getRunSnapshot() {

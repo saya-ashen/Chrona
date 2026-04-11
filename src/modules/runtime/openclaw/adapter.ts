@@ -24,12 +24,20 @@ export {
 };
 
 export type OpenClawAdapter = {
-  createRun(input: { prompt: string; runtimeInput: RuntimeInput }): Promise<{
+  createRun(input: {
+    prompt: string;
+    runtimeInput: RuntimeInput;
+    runtimeSessionKey?: string;
+  }): Promise<{
     runtimeRunRef?: string;
     runtimeSessionRef?: string;
     runtimeSessionKey?: string;
     runStarted: boolean;
   }>;
+  sendOperatorMessage(input: {
+    runtimeSessionKey: string;
+    message: string;
+  }): Promise<OpenClawSendInputResult>;
   getRunSnapshot(input: {
     runtimeRunRef: string;
     runtimeSessionKey?: string;
@@ -82,10 +90,19 @@ export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
 export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenClawAdapter {
   return {
     async createRun(input) {
-      return client.createRun({ prompt: input.prompt });
+      return client.createRun({
+        prompt: input.prompt,
+        runtimeSessionKey: input.runtimeSessionKey,
+      });
+    },
+    async sendOperatorMessage(input) {
+      return client.sendInput({
+        runtimeSessionKey: input.runtimeSessionKey,
+        message: input.message,
+      });
     },
     async getRunSnapshot(input) {
-      return client.waitForRun(input.runtimeRunRef, input.timeoutMs ?? 250);
+      return client.waitForRun(input.runtimeRunRef, input.timeoutMs ?? 1000);
     },
     async readHistory(input) {
       return client.readOutputs(input.runtimeSessionKey);
