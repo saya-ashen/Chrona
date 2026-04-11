@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useEffectEvent, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import {
   acceptTaskResult,
   approveApproval,
@@ -157,27 +158,37 @@ type WorkPageClientProps = {
 
 type WorkstreamTab = "workstream" | "conversation";
 
-type CollaborationComposer = {
-  mode: "response" | "note";
+type WorkbenchComposer = {
+  mode: "start" | "response" | "note" | "continue" | "retry";
   title: string;
   description: string;
   fieldLabel: string;
   submitLabel: string;
   defaultValue: string;
+  placeholder?: string;
   statusHint: string;
+  submitVariant?: "default" | "outline" | "secondary";
 };
 
-type CollaborationCopy = {
-  collaboration: string;
-  responseRequiredDescription: string;
-  agentMessage: string;
-  sendToAgent: string;
-  currentRun: string;
+type WorkbenchCopy = {
+  workbenchTitle: string;
+  workbenchDescription: string;
+  workbenchStatus: string;
+  taskArrangement: string;
+  taskArrangementHint: string;
+  conversationInput: string;
   operatorNote: string;
+  sendAndContinue: string;
   sendNoteToAgent: string;
+  retryRun: string;
+  continueRun: string;
+  continueRunDescription: string;
+  responseRequiredDescription: string;
   noteQueuedForCheckpoint: string;
   noteWhileRunningDescription: string;
   noteWhileAwaitingApprovalDescription: string;
+  currentRun: string;
+  noActiveRunYet: string;
 };
 
 const DEFAULT_COPY = {
@@ -197,13 +208,20 @@ const DEFAULT_COPY = {
   stuckFor: "Stuck for",
   staleSync: "Sync stale",
   healthySync: "Sync healthy",
+  workbenchTitle: "Workbench",
+  workbenchDescription: "Use this area like a live conversation: arrange the next task, respond to blockers, or continue with another run after completion.",
+  workbenchStatus: "Workbench status",
   nextAction: "Next Action",
   whyNow: "Why now",
   evidence: "Evidence",
+  taskArrangement: "Task arrangement",
+  taskArrangementHint: "Enter submits · Shift+Enter creates a new line",
   collaboration: "Collaboration",
   agentMessage: "Agent message",
+  conversationInput: "Conversation",
   operatorNote: "Operator note",
   sendToAgent: "Send to Agent",
+  sendAndContinue: "Send and Continue",
   sendNoteToAgent: "Send Note to Agent",
   resumeWithMessage: "Resume with Message",
   currentRun: "Current run",
@@ -222,24 +240,31 @@ const DEFAULT_COPY = {
   latestFollowUp: "Latest follow-up",
   resultAccepted: "Result accepted",
   taskDone: "Task done",
+  continueRun: "Continue with Next Run",
+  continueRunDescription: "This run is complete. Review the latest result, then continue directly here instead of switching to a follow-up flow.",
+  resultActionsTitle: "Result handling",
+  resultActionsDescription: "Keep these actions secondary. You can continue the work above at any time.",
+  followUpOptional: "Optional follow-up task",
+  followUpOptionalDescription: "Only create a follow-up task when the work truly needs to split into a new track.",
   startRunDescription: "Start the first run here so the workbench becomes the live execution surface instead of a dead end.",
   runPrompt: "Run prompt",
   startRunHere: "Start Run Here",
   noActiveRunYet: "No active run yet",
   fallbackNoOperatorInput: "The run does not currently require operator input. Review the output and inspector state below.",
   fallbackStartFromTaskPage: "Start a run from the task page before sending agent instructions here.",
-  sharedOutput: "Shared Output",
-  sharedOutputDescription: "The latest useful result from this run should be visible without digging through logs.",
+  sharedOutput: "Latest Result",
+  sharedOutputDescription: "Keep the newest useful result close to the work area so you can continue without digging through logs.",
   usedByNextAction: "Used by next action",
   updated: "Updated",
   openArtifact: "Open artifact",
-  executionWorkstream: "Execution Workstream",
-  executionWorkstreamDescription: "Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.",
-  workstream: "Workstream",
+  executionWorkstream: "Execution Record",
+  executionWorkstreamDescription: "Keep the workflow trace below the work area so execution and dialogue stay distinct but connected.",
+  workstream: "Execution Flow",
   conversation: "Conversation",
   latestExecutionMilestones: "Latest execution milestones",
   conversationEvidence: "Conversation evidence",
   conversationEvidenceDescription: "Use the conversation view when the workstream summary is not enough.",
+  composerRequired: "task arrangement or conversation is required",
   messageRequired: "message is required",
   noteQueuedForCheckpoint: "Delivered to the runtime and shown again once the next sync lands.",
   responseRequiredDescription: "Reply directly to the agent so the blocked run can continue.",
@@ -284,6 +309,10 @@ function getStartRunDefaultValue(taskTitle: string) {
   return `Continue working on: ${taskTitle}`;
 }
 
+function getContinueRunPlaceholder(taskTitle: string) {
+  return `Continue from the latest result for ${taskTitle}`;
+}
+
 function getEvidenceToneClass(tone: "neutral" | "warning" | "critical") {
   if (tone === "critical") {
     return "border-red-200 bg-red-50 text-red-700";
@@ -296,53 +325,119 @@ function getEvidenceToneClass(tone: "neutral" | "warning" | "critical") {
   return "border-border bg-background text-muted-foreground";
 }
 
-function getCollaborationComposer(
+function getWorkbenchComposer(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   currentIntervention: WorkPageClientProps["initialData"]["currentIntervention"],
-  taskTitle: string,
-  copy: CollaborationCopy,
-): CollaborationComposer | null {
+  taskShell: WorkPageClientProps["initialData"]["taskShell"],
+  copy: WorkbenchCopy,
+): WorkbenchComposer {
   if (!currentRun) {
-    return null;
+    return {
+      mode: "start",
+      title: copy.workbenchTitle,
+      description: copy.workbenchDescription,
+      fieldLabel: copy.taskArrangement,
+      submitLabel: copy.sendAndContinue,
+      defaultValue: taskShell.prompt ?? getStartRunDefaultValue(taskShell.title),
+      statusHint: copy.noActiveRunYet,
+      submitVariant: "default",
+    };
   }
 
   if (currentRun.status === "WaitingForInput") {
     return {
       mode: "response",
-      title: copy.collaboration,
+      title: currentIntervention?.title ?? copy.workbenchTitle,
       description: currentIntervention?.description ?? copy.responseRequiredDescription,
-      fieldLabel: copy.agentMessage,
-      submitLabel: copy.sendToAgent,
-      defaultValue: currentIntervention?.defaultMessage ?? getComposerDefaultValue(taskTitle, currentRun),
+      fieldLabel: copy.taskArrangement,
+      submitLabel: copy.sendAndContinue,
+      defaultValue: currentIntervention?.defaultMessage ?? getComposerDefaultValue(taskShell.title, currentRun),
       statusHint: `${copy.currentRun}: ${currentRun.status}`,
+      submitVariant: "default",
     };
   }
 
   if (currentRun.status === "Running") {
     return {
       mode: "note",
-      title: copy.collaboration,
+      title: currentIntervention?.title ?? copy.workbenchTitle,
       description: copy.noteWhileRunningDescription,
-      fieldLabel: copy.operatorNote,
+      fieldLabel: copy.conversationInput,
       submitLabel: copy.sendNoteToAgent,
       defaultValue: "",
       statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+      submitVariant: "outline",
     };
   }
 
   if (currentRun.status === "WaitingForApproval") {
     return {
       mode: "note",
-      title: copy.collaboration,
+      title: currentIntervention?.title ?? copy.workbenchTitle,
       description: copy.noteWhileAwaitingApprovalDescription,
-      fieldLabel: copy.operatorNote,
+      fieldLabel: copy.conversationInput,
       submitLabel: copy.sendNoteToAgent,
       defaultValue: "",
       statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+      submitVariant: "outline",
     };
   }
 
-  return null;
+  if (currentRun.status === "Completed") {
+    return {
+      mode: "continue",
+      title: copy.workbenchTitle,
+      description: copy.continueRunDescription,
+      fieldLabel: copy.taskArrangement,
+      submitLabel: copy.continueRun,
+      defaultValue: "",
+      placeholder: getContinueRunPlaceholder(taskShell.title),
+      statusHint: `${copy.currentRun}: ${currentRun.status}`,
+      submitVariant: "default",
+    };
+  }
+
+  if (currentRun.status === "Failed" || currentRun.status === "Cancelled") {
+    return {
+      mode: "retry",
+      title: currentIntervention?.title ?? copy.workbenchTitle,
+      description: currentIntervention?.description ?? copy.workbenchDescription,
+      fieldLabel: copy.taskArrangement,
+      submitLabel: copy.retryRun,
+      defaultValue: taskShell.prompt ?? `Retry task: ${taskShell.title}`,
+      statusHint: `${copy.currentRun}: ${currentRun.status}`,
+      submitVariant: "default",
+    };
+  }
+
+  return {
+    mode: "note",
+    title: currentIntervention?.title ?? copy.workbenchTitle,
+    description: currentIntervention?.description ?? copy.workbenchDescription,
+    fieldLabel: copy.conversationInput,
+    submitLabel: copy.sendNoteToAgent,
+    defaultValue: "",
+    statusHint: `${copy.currentRun}: ${currentRun.status}`,
+    submitVariant: "outline",
+  };
+}
+
+function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  if (event.key !== "Enter" || event.shiftKey) {
+    return;
+  }
+
+  const nativeEvent = event.nativeEvent as KeyboardEvent<HTMLTextAreaElement>["nativeEvent"] & {
+    isComposing?: boolean;
+    keyCode?: number;
+  };
+
+  if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+    return;
+  }
+
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
 }
 
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
@@ -354,7 +449,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const [activeTab, setActiveTab] = useState<WorkstreamTab>("workstream");
   const [composerResetKey, setComposerResetKey] = useState(0);
 
-  const refresh = useEffectEvent(async () => {
+  const refresh = useCallback(async () => {
     const response = await fetch(`/api/work/${data.taskShell.id}/projection`, { cache: "no-store" });
 
     if (!response.ok) {
@@ -363,9 +458,9 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
     const next = (await response.json()) as WorkPageClientProps["initialData"];
     startTransition(() => setData(next));
-  });
+  }, [data.taskShell.id]);
 
-  const runAction = useEffectEvent(async (action: () => Promise<void>) => {
+  const runAction = useCallback(async (action: () => Promise<void>) => {
     try {
       setIsPending(true);
       setErrorMessage(null);
@@ -376,7 +471,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     } finally {
       setIsPending(false);
     }
-  });
+  }, [copy.actionFailed, refresh]);
 
   useEffect(() => {
     if (!data.currentRun) {
@@ -389,25 +484,24 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     }, intervalMs);
 
     return () => window.clearInterval(interval);
-  }, [data.currentRun]);
+  }, [data.currentRun, refresh]);
 
   const currentRun = data.currentRun;
-  const canProvideInput = data.currentIntervention?.kind === "input";
   const hasPendingApprovals = data.currentIntervention?.kind === "approval" && (data.currentIntervention.approvals?.length ?? 0) > 0;
-  const canRetryRecovery = currentRun ? ["Failed", "Cancelled"].includes(currentRun.status) : false;
-  const collaborationComposer = getCollaborationComposer(
+  const workbenchComposer = getWorkbenchComposer(
     currentRun,
     data.currentIntervention,
-    data.taskShell.title,
+    data.taskShell,
     copy,
   );
 
-  async function submitAgentMessage(inputText: string) {
-    if (!currentRun) {
-      throw new Error(copy.noActiveRunToResume);
-    }
-
+  async function submitWorkbenchInput(inputText: string) {
     await runAction(async () => {
+      if (!currentRun) {
+        await startRun({ taskId: data.taskShell.id, prompt: inputText });
+        return;
+      }
+
       if (currentRun.status === "WaitingForInput") {
         await provideInput({ runId: currentRun.id, inputText });
         return;
@@ -418,32 +512,25 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         return;
       }
 
+      if (["Completed", "Failed", "Cancelled"].includes(currentRun.status)) {
+        await retryRun({ taskId: data.taskShell.id, prompt: inputText });
+        return;
+      }
+
       throw new Error(copy.currentRunCannotAcceptMessages);
     });
 
     setComposerResetKey((value) => value + 1);
   }
 
-  async function handleComposerSubmit(formData: FormData) {
+  async function handleWorkbenchSubmit(formData: FormData) {
     const inputText = String(formData.get("message") ?? "").trim();
 
     if (!inputText) {
-      throw new Error(copy.messageRequired);
+      throw new Error(copy.composerRequired);
     }
 
-    await submitAgentMessage(inputText);
-  }
-
-  async function handleStartRunSubmit(formData: FormData) {
-    const prompt = String(formData.get("prompt") ?? "").trim();
-
-    if (!prompt) {
-      throw new Error(copy.promptRequired);
-    }
-
-    await runAction(async () => {
-      await startRun({ taskId: data.taskShell.id, prompt });
-    });
+    await submitWorkbenchInput(inputText);
   }
 
   return (
@@ -504,19 +591,30 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
         <SurfaceCard>
           <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.nextAction}</SurfaceCardTitle>
+            <SurfaceCardTitle>{copy.workbenchTitle}</SurfaceCardTitle>
             <SurfaceCardDescription>
-              {data.currentIntervention?.title ?? getNextActionLabel(currentRun?.status)} — make the next intervention obvious and keep everything else secondary.
+              {copy.workbenchDescription}
             </SurfaceCardDescription>
           </SurfaceCardHeader>
 
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-4">
             {errorMessage ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
 
             {data.currentIntervention ? (
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.workbenchStatus}</p>
+                    <p className="text-base font-semibold text-foreground">{data.currentIntervention.title ?? getNextActionLabel(currentRun?.status)}</p>
+                    <p>{data.currentIntervention.description}</p>
+                  </div>
+                  <StatusBadge tone="info">{currentRun?.status ?? data.taskShell.status}</StatusBadge>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-border/50 bg-card/70 p-3">
                   <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.whyNow}</p>
-                <p className="mt-2">{data.currentIntervention.whyNow}</p>
+                  <p className="mt-2">{data.currentIntervention.whyNow}</p>
+                </div>
 
                 {data.currentIntervention.evidence.length > 0 ? (
                   <div className="mt-3 space-y-2">
@@ -557,46 +655,13 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               </div>
             ) : null}
 
-            {canProvideInput ? (
-              <form
-                key={`collaboration-${composerResetKey}-${currentRun?.id ?? "none"}-response`}
-                action={handleComposerSubmit}
-                className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">{collaborationComposer?.title ?? copy.collaboration}</p>
-                  <p className="text-sm text-muted-foreground">{collaborationComposer?.description ?? data.currentIntervention?.description}</p>
-                </div>
-                <Field label={collaborationComposer?.fieldLabel ?? copy.agentMessage}>
-                  <textarea
-                    name="message"
-                    rows={5}
-                    required
-                    defaultValue={collaborationComposer?.defaultValue ?? getComposerDefaultValue(data.taskShell.title, currentRun)}
-                    className={textareaClassName}
-                  />
-                </Field>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}
-                  >
-                    {collaborationComposer?.submitLabel ?? copy.resumeWithMessage}
-                  </button>
-                  <p className="text-xs text-muted-foreground">
-                    {collaborationComposer?.statusHint ?? `${copy.currentRun}: ${currentRun?.status ?? copy.noRun}`}
-                  </p>
-                </div>
-              </form>
-            ) : hasPendingApprovals ? (
+            {hasPendingApprovals ? (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
                 {(data.currentIntervention?.approvals ?? []).map((approval) => (
-                  <div key={approval.id} className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
+                  <div key={approval.id} className="rounded-2xl border border-amber-200/80 bg-amber-50/60 p-4 text-sm text-amber-950">
                     <div className="space-y-1">
                       <p className="font-medium text-foreground">{approval.title}</p>
-                      <p>{approval.summary ?? "Review the approval request before resuming the run."}</p>
+                      <p className="text-amber-900/80">{approval.summary ?? "Review the approval request before resuming the run."}</p>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <form
@@ -643,108 +708,49 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                     </div>
                   </div>
                 ))}
-
-                {collaborationComposer?.mode === "note" ? (
-                  <form
-                    key={`collaboration-${composerResetKey}-${currentRun?.id ?? "none"}-note-approval`}
-                    action={handleComposerSubmit}
-                    className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground">{collaborationComposer.title}</p>
-                      <p className="text-sm text-muted-foreground">{collaborationComposer.description}</p>
-                    </div>
-                    <Field label={collaborationComposer.fieldLabel}>
-                      <textarea
-                        name="message"
-                        rows={4}
-                        required
-                        defaultValue={collaborationComposer.defaultValue}
-                        className={textareaClassName}
-                      />
-                    </Field>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="submit"
-                        disabled={isPending}
-                        className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}
-                      >
-                        {collaborationComposer.submitLabel}
-                      </button>
-                      <p className="text-xs text-muted-foreground">{collaborationComposer.statusHint}</p>
-                    </div>
-                  </form>
-                ) : null}
               </div>
-            ) : canRetryRecovery ? (
-              <form
-                action={async (formData) => {
-                  const prompt = String(formData.get("prompt") ?? "").trim();
-                  if (!prompt) {
-                    throw new Error("retry prompt is required");
-                  }
+            ) : null}
 
-                  await runAction(async () => {
-                    await retryRun({ taskId: data.taskShell.id, prompt });
-                  });
-                }}
-                className="space-y-3"
-              >
-                <p className="text-sm text-muted-foreground">{data.currentIntervention?.description}</p>
-                <Field label={copy.retryPrompt}>
-                  <textarea
-                    name="prompt"
-                    rows={5}
-                    required
-                    defaultValue={data.taskShell.prompt ?? `Retry task: ${data.taskShell.title}`}
-                    className={textareaClassName}
-                  />
-                </Field>
-                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
-                  {copy.retryRun}
+            <form
+              key={`workbench-${composerResetKey}-${currentRun?.id ?? "none"}-${workbenchComposer.mode}`}
+              action={handleWorkbenchSubmit}
+              className="space-y-3 rounded-2xl border border-primary/15 bg-primary/[0.03] p-4 shadow-sm"
+            >
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">{workbenchComposer.title}</p>
+                <p className="text-sm text-muted-foreground">{workbenchComposer.description}</p>
+              </div>
+              <Field label={workbenchComposer.fieldLabel} hint={copy.taskArrangementHint}>
+                <textarea
+                  name="message"
+                  rows={6}
+                  required
+                  defaultValue={workbenchComposer.defaultValue}
+                  placeholder={workbenchComposer.placeholder}
+                  onKeyDown={handleComposerKeyDown}
+                  className={cn(textareaClassName, "min-h-36 resize-y")}
+                />
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className={buttonVariants({ variant: workbenchComposer.submitVariant ?? "default", size: "lg", className: "disabled:opacity-60" })}
+                >
+                  {workbenchComposer.submitLabel}
                 </button>
-              </form>
-            ) : currentRun?.status === "Running" ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-                  {data.currentIntervention?.description}
-                </div>
-
-                {collaborationComposer?.mode === "note" ? (
-                  <form
-                    key={`collaboration-${composerResetKey}-${currentRun.id}-note-running`}
-                    action={handleComposerSubmit}
-                    className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-4"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground">{collaborationComposer.title}</p>
-                      <p className="text-sm text-muted-foreground">{collaborationComposer.description}</p>
-                    </div>
-                    <Field label={collaborationComposer.fieldLabel}>
-                      <textarea
-                        name="message"
-                        rows={4}
-                        required
-                        defaultValue={collaborationComposer.defaultValue}
-                        className={textareaClassName}
-                      />
-                    </Field>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="submit"
-                        disabled={isPending}
-                        className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}
-                      >
-                        {collaborationComposer.submitLabel}
-                      </button>
-                      <p className="text-xs text-muted-foreground">{collaborationComposer.statusHint}</p>
-                    </div>
-                  </form>
-                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {workbenchComposer.statusHint}
+                </p>
               </div>
-            ) : currentRun?.status === "Completed" ? (
-              <div className="space-y-4 rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-                <p>{data.currentIntervention?.description}</p>
+            </form>
+
+            {currentRun?.status === "Completed" ? (
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 px-4 py-4 text-sm text-muted-foreground">
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">{copy.resultActionsTitle}</p>
+                  <p>{copy.resultActionsDescription}</p>
+                </div>
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   {data.closure.resultAccepted && data.closure.acceptedAt ? (
@@ -809,102 +815,50 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                 </div>
 
                 {data.closure.canCreateFollowUp ? (
-                  <form
-                    action={async (formData) => {
-                      const title = String(formData.get("title") ?? "").trim();
-                      const dueAtValue = String(formData.get("dueAt") ?? "").trim();
+                  <details className="rounded-2xl border border-border/60 bg-background p-4">
+                    <summary className="cursor-pointer list-none font-medium text-foreground">{copy.followUpOptional}</summary>
+                    <p className="mt-2 text-sm text-muted-foreground">{copy.followUpOptionalDescription}</p>
+                    <form
+                      action={async (formData) => {
+                        const title = String(formData.get("title") ?? "").trim();
+                        const dueAtValue = String(formData.get("dueAt") ?? "").trim();
 
-                      if (!title) {
-                        throw new Error("title is required");
-                      }
+                        if (!title) {
+                          throw new Error("title is required");
+                        }
 
-                      await runAction(async () => {
-                        await createFollowUpTask({
-                          taskId: data.taskShell.id,
-                          title,
-                          dueAt: dueAtValue ? new Date(`${dueAtValue}T00:00:00.000Z`) : null,
+                        await runAction(async () => {
+                          await createFollowUpTask({
+                            taskId: data.taskShell.id,
+                            title,
+                            dueAt: dueAtValue ? new Date(`${dueAtValue}T00:00:00.000Z`) : null,
+                          });
                         });
-                      });
-                    }}
-                    className="grid gap-3 rounded-2xl border border-border/60 bg-background p-4 md:grid-cols-[minmax(0,1fr)_180px_auto]"
-                  >
-                    <Field label={copy.followUpTitle}>
-                      <input
-                        type="text"
-                        name="title"
-                        required
-                        defaultValue={`Follow up: ${data.taskShell.title}`}
-                        className={inputClassName}
-                      />
-                    </Field>
-                    <Field label={copy.followUpDue}>
-                      <input type="date" name="dueAt" className={inputClassName} />
-                    </Field>
-                    <div className="flex items-end">
-                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "secondary", className: "w-full disabled:opacity-60" })}>
-                        {copy.createFollowUp}
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-
-                {!data.closure.canReopen && data.closure.canRetry ? (
-                  <form
-                    action={async (formData) => {
-                      const prompt = String(formData.get("prompt") ?? "").trim();
-                      if (!prompt) {
-                        throw new Error("retry prompt is required");
-                      }
-
-                      await runAction(async () => {
-                        await retryRun({ taskId: data.taskShell.id, prompt });
-                      });
-                    }}
-                    className="space-y-3"
-                  >
-                    <Field label={copy.retryPrompt}>
-                      <textarea
-                        name="prompt"
-                        rows={4}
-                        required
-                        defaultValue={data.taskShell.prompt ?? `Retry task: ${data.taskShell.title}`}
-                        className={textareaClassName}
-                      />
-                    </Field>
-                    <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                      {copy.retryRun}
-                    </button>
-                  </form>
+                      }}
+                      className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]"
+                    >
+                      <Field label={copy.followUpTitle}>
+                        <input
+                          type="text"
+                          name="title"
+                          required
+                          defaultValue={`Follow up: ${data.taskShell.title}`}
+                          className={inputClassName}
+                        />
+                      </Field>
+                      <Field label={copy.followUpDue}>
+                        <input type="date" name="dueAt" className={inputClassName} />
+                      </Field>
+                      <div className="flex items-end">
+                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "secondary", className: "w-full disabled:opacity-60" })}>
+                          {copy.createFollowUp}
+                        </button>
+                      </div>
+                    </form>
+                  </details>
                 ) : null}
               </div>
-            ) : !currentRun ? (
-              <form action={handleStartRunSubmit} className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {copy.startRunDescription}
-                </p>
-                <Field label={copy.runPrompt}>
-                  <textarea
-                    name="prompt"
-                    rows={5}
-                    required
-                    defaultValue={data.taskShell.prompt ?? getStartRunDefaultValue(data.taskShell.title)}
-                    className={textareaClassName}
-                  />
-                </Field>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "lg", className: "disabled:opacity-60" })}>
-                    {copy.startRunHere}
-                  </button>
-                  <p className="text-xs text-muted-foreground">{copy.noActiveRunYet}</p>
-                </div>
-              </form>
-            ) : (
-              <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-                {currentRun
-                  ? data.currentIntervention?.description ?? copy.fallbackNoOperatorInput
-                  : copy.fallbackStartFromTaskPage}
-              </div>
-            )}
+            ) : null}
           </div>
         </SurfaceCard>
 

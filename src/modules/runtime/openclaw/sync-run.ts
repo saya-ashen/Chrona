@@ -6,10 +6,7 @@ import {
 } from "@/modules/runtime/openclaw/adapter";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import {
-  resolveTaskSessionKey,
-  updateTaskSessionStateFromRun,
-} from "@/modules/runtime/task-sessions";
+import { updateTaskSessionStateFromRun } from "@/modules/runtime/task-sessions";
 import {
   decodeSyncCursor,
   encodeSyncCursor,
@@ -84,7 +81,6 @@ export async function syncRunFromRuntime(input: {
       cursor,
     }),
   });
-  console.log(`Fetched snapshot for run ${run.id}:`, snapshot);
   const runtimeSessionKey =
     snapshot.runtimeSessionKey ??
     resolveSessionKey({
