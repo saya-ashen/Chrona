@@ -40,7 +40,7 @@ type RunSidePanelProps = {
 
 const DEFAULT_COPY = {
   runSnapshot: "Run Snapshot",
-  runSnapshotDescription: "Current run state, timing, and sync health.",
+  runSnapshotDescription: "Keep this side rail as a lightweight inspector for run health, approvals, artifacts, and tool evidence.",
   noRun: "No run",
   sync: "Sync",
   refreshed: "Refreshed",
@@ -57,10 +57,10 @@ const DEFAULT_COPY = {
   resumeSupported: "Resume supported",
   yes: "Yes",
   no: "No",
-  prompt: "Prompt",
+  prompt: "Task arrangement",
   noActiveRunYet: "No active run yet.",
   evidence: "Evidence",
-  evidenceDescription: "Approvals, artifacts, and tool output stay here as supporting context.",
+  evidenceDescription: "Approvals, artifacts, and tool output stay here as supporting context rather than the main work area.",
   approvals: "Approvals",
   noPendingApprovals: "No pending approvals.",
   artifacts: "Artifacts",

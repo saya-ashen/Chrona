@@ -106,8 +106,8 @@ const DEFAULT_COPY: WorkPageCopy = {
   executionStopped: "Execution stopped and will not progress until a recovery action is taken.",
   latestToolIssue: "Latest tool issue",
   reviewResult: "Review result",
-  completedDescription: "The run completed. Review the latest output and decide whether follow-up work is needed.",
-  resultAvailableWhy: "The latest result is available and should be reviewed before closing or extending the task.",
+  completedDescription: "The run completed. Review the latest result and continue directly from the workbench when you are ready.",
+  resultAvailableWhy: "The latest result is available. The key decision now is how to keep the work moving, not how to step through a complex closing flow.",
   observeProgress: "Observe progress",
   runActiveDescription: "The run is still active. Watch the newest milestones and intervene only if the state changes.",
   agentExecutingWhy: "The agent is currently executing, so the best next step is to monitor the newest evidence.",
@@ -143,7 +143,7 @@ function toIsoString(value: Date | null | undefined) {
   return value?.toISOString() ?? null;
 }
 
-function summarizeValue(value: unknown, copy: WorkPageCopy) {
+function summarizeValue(value: unknown) {
   if (typeof value === "string") {
     return value;
   }
@@ -163,14 +163,14 @@ function summarizeValue(value: unknown, copy: WorkPageCopy) {
   return "-";
 }
 
-function summarizePayload(payload: Record<string, unknown>, copy: WorkPageCopy) {
+function summarizePayload(payload: Record<string, unknown>) {
   const entries = Object.entries(payload).slice(0, 3);
 
   if (entries.length === 0) {
     return "No structured payload recorded.";
   }
 
-  return entries.map(([key, value]) => `${key}: ${summarizeValue(value, copy)}`).join(" · ");
+  return entries.map(([key, value]) => `${key}: ${summarizeValue(value)}`).join(" · ");
 }
 
 function formatEventTitle(eventType: string) {
@@ -752,7 +752,7 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       id: event.id,
       eventType: event.eventType,
       title: formatEventTitle(event.eventType),
-      summary: summarizePayload(event.payload as Record<string, unknown>, copy),
+      summary: summarizePayload(event.payload as Record<string, unknown>),
       payload: event.payload as Record<string, unknown>,
       runtimeTs: toIsoString(event.runtimeTs),
       kind: eventInfo.kind,
