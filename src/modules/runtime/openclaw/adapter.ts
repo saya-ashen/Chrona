@@ -102,7 +102,11 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
       });
     },
     async getRunSnapshot(input) {
-      return client.waitForRun(input.runtimeRunRef, input.timeoutMs ?? 1000);
+      return client.waitForRun({
+        runtimeRunRef: input.runtimeRunRef,
+        runtimeSessionKey: input.runtimeSessionKey,
+        timeoutMs: input.timeoutMs ?? 1000,
+      });
     },
     async readHistory(input) {
       return client.readOutputs(input.runtimeSessionKey);

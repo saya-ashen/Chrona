@@ -56,7 +56,11 @@ export async function collectOpenClawGateChecks(
   const created = await client.createRun({ prompt: OPENCLAW_PROBE_PROMPT });
 
   const snapshot = created.runtimeRunRef
-    ? await client.waitForRun(created.runtimeRunRef, 250)
+    ? await client.waitForRun({
+        runtimeRunRef: created.runtimeRunRef,
+        runtimeSessionKey: created.runtimeSessionKey,
+        timeoutMs: 250,
+      })
     : undefined;
 
   const history = await waitForTranscriptMessages(client, created.runtimeSessionKey, options);

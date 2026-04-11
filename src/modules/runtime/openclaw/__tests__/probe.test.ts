@@ -46,7 +46,11 @@ describe("collectOpenClawGateChecks", () => {
     const checks = await collectOpenClawGateChecks(client);
 
     expect(client.createRun).toHaveBeenCalledWith({ prompt: OPENCLAW_PROBE_PROMPT });
-    expect(client.waitForRun).toHaveBeenCalledWith("run_123", 250);
+    expect(client.waitForRun).toHaveBeenCalledWith({
+      runtimeRunRef: "run_123",
+      runtimeSessionKey: "session_key_456",
+      timeoutMs: 250,
+    });
     expect(client.readOutputs).toHaveBeenCalledWith("session_key_456");
     expect(client.requestApproval).toHaveBeenCalledWith({
       command: "printf openclaw-feasibility",
