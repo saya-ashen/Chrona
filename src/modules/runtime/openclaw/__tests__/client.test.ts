@@ -41,10 +41,16 @@ class MockWebSocket {
   }
 
   emitFrame(frame: Record<string, unknown>) {
-    this.dispatch("message", new MessageEvent("message", { data: JSON.stringify(frame) }));
+    this.dispatch(
+      "message",
+      new MessageEvent("message", { data: JSON.stringify(frame) }),
+    );
   }
 
-  private dispatch(type: SocketEventName, event: Event | MessageEvent | CloseEvent) {
+  private dispatch(
+    type: SocketEventName,
+    event: Event | MessageEvent | CloseEvent,
+  ) {
     for (const listener of this.listeners[type]) {
       listener(event);
     }
@@ -67,15 +73,17 @@ function createClient(
 }
 
 async function waitForSentFrames(socket: MockWebSocket, expectedCount: number) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     if (socket.sentFrames.length >= expectedCount) {
       return;
     }
 
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  throw new Error(`Expected at least ${expectedCount} sent frames, received ${socket.sentFrames.length}`);
+  throw new Error(
+    `Expected at least ${expectedCount} sent frames, received ${socket.sentFrames.length}`,
+  );
 }
 
 async function connectClient(
@@ -100,7 +108,7 @@ async function connectClient(
     event: "connect.challenge",
     payload: { nonce: "nonce-123", ts: 1737264000000 },
   });
-  await Promise.resolve();
+  await waitForSentFrames(socket, 1);
 
   const connectRequest = socket.sentFrames.at(0);
   expect(connectRequest).toMatchObject({
@@ -110,7 +118,12 @@ async function connectClient(
       minProtocol: 3,
       maxProtocol: 3,
       role: "operator",
-      scopes: ["operator.read", "operator.write", "operator.approvals", "operator.admin"],
+      scopes: [
+        "operator.read",
+        "operator.write",
+        "operator.approvals",
+        "operator.admin",
+      ],
       auth: { token: "test-key" },
       client: {
         id: "openclaw-probe",
@@ -184,7 +197,9 @@ describe("OpenClawGatewayClient", () => {
         sessionKey: "agent-dashboard:openclaw:task:task_123:default",
       },
     });
-    const agentParams = agentRequest?.params as Record<string, unknown> | undefined;
+    const agentParams = agentRequest?.params as
+      | Record<string, unknown>
+      | undefined;
     expect(typeof agentParams?.idempotencyKey).toBe("string");
 
     socket.emitFrame({
@@ -229,7 +244,10 @@ describe("OpenClawGatewayClient", () => {
       type: "res",
       id: resolveRequest?.id,
       ok: false,
-      error: { message: "No session found: agent-dashboard:openclaw:task:task_123:default" },
+      error: {
+        message:
+          "No session found: agent-dashboard:openclaw:task:task_123:default",
+      },
     });
 
     await waitForSentFrames(socket, 3);
@@ -254,6 +272,92 @@ describe("OpenClawGatewayClient", () => {
     });
 
     await waitForSentFrames(socket, 4);
+    const agentRequest = socket.sentFrames.at(-1);
+
+    expect(agentRequest).toMatchObject({
+      type: "req",
+      method: "agent",
+      params: {
+        message: "test prompt",
+        sessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: agentRequest?.id,
+      ok: true,
+      payload: {
+        sessionId: "session_456",
+        runId: "run_123",
+      },
+    });
+
+    await expect(createRunPromise).resolves.toMatchObject({
+      runtimeRunRef: "run_123",
+      runtimeSessionRef: "session_456",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+      runStarted: true,
+    });
+  });
+
+  it("subscribes the session stream before starting agent runs when supported", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket, [
+      "sessions.create",
+      "sessions.resolve",
+      "sessions.messages.subscribe",
+      "agent",
+      "agent.wait",
+      "chat.history",
+      "exec.approval.list",
+    ]);
+
+    socket.sentFrames.length = 0;
+    const createRunPromise = client.createRun({
+      prompt: "test prompt",
+      runtimeSessionKey: "agent-dashboard:openclaw:task:task_123:default",
+    });
+    await Promise.resolve();
+    const resolveRequest = socket.sentFrames.at(-1);
+
+    expect(resolveRequest).toMatchObject({
+      type: "req",
+      method: "sessions.resolve",
+      params: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: resolveRequest?.id,
+      ok: true,
+      payload: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    await waitForSentFrames(socket, 2);
+    const subscribeRequest = socket.sentFrames.at(-1);
+
+    expect(subscribeRequest).toMatchObject({
+      type: "req",
+      method: "sessions.messages.subscribe",
+      params: {
+        key: "agent-dashboard:openclaw:task:task_123:default",
+      },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: subscribeRequest?.id,
+      ok: true,
+      payload: { key: "agent-dashboard:openclaw:task:task_123:default" },
+    });
+
+    await waitForSentFrames(socket, 3);
     const agentRequest = socket.sentFrames.at(-1);
 
     expect(agentRequest).toMatchObject({
@@ -422,6 +526,75 @@ describe("OpenClawGatewayClient", () => {
     await expect(resolvePromise).resolves.toEqual({ accepted: true });
   });
 
+  it("uses session events to refine timeout wait states", async () => {
+    const socket = new MockWebSocket();
+    const client = createClient(socket);
+    await connectClient(client, socket, [
+      "sessions.create",
+      "sessions.resolve",
+      "sessions.messages.subscribe",
+      "agent",
+      "agent.wait",
+      "chat.history",
+      "exec.approval.list",
+    ]);
+
+    socket.sentFrames.length = 0;
+    const waitPromise = client.waitForRun({
+      runtimeRunRef: "run_123",
+      runtimeSessionKey: "session_key_456",
+      timeoutMs: 25,
+    });
+    await waitForSentFrames(socket, 1);
+
+    const subscribeRequest = socket.sentFrames.at(-1);
+    expect(subscribeRequest).toMatchObject({
+      type: "req",
+      method: "sessions.messages.subscribe",
+      params: { key: "session_key_456" },
+    });
+
+    socket.emitFrame({
+      type: "res",
+      id: subscribeRequest?.id,
+      ok: true,
+      payload: { key: "session_key_456" },
+    });
+
+    await waitForSentFrames(socket, 2);
+    const waitRequest = socket.sentFrames.at(-1);
+    expect(waitRequest).toMatchObject({
+      type: "req",
+      method: "agent.wait",
+      params: { runId: "run_123", timeoutMs: 25 },
+    });
+
+    socket.emitFrame({
+      type: "event",
+      event: "session.message",
+      payload: {
+        runId: "run_123",
+        sessionKey: "session_key_456",
+        stream: "lifecycle",
+        phase: "end",
+      },
+    });
+    socket.emitFrame({
+      type: "res",
+      id: waitRequest?.id,
+      ok: true,
+      payload: { runId: "run_123", status: "timeout" },
+    });
+
+    await expect(waitPromise).resolves.toMatchObject({
+      runtimeRunRef: "run_123",
+      runtimeSessionKey: "session_key_456",
+      rawStatus: "timeout",
+      status: "Completed",
+    });
+    expect(client.getRunState("run_123")).toBe("Completed");
+  });
+
   it("maps approval listing and session input onto gateway RPC frames", async () => {
     const socket = new MockWebSocket();
     const client = createClient(socket);
@@ -503,7 +676,9 @@ describe("OpenClawGatewayClient", () => {
         sessionKey: "session_key_456",
       },
     });
-    const sendParams = sendRequest?.params as Record<string, unknown> | undefined;
+    const sendParams = sendRequest?.params as
+      | Record<string, unknown>
+      | undefined;
     expect(typeof sendParams?.idempotencyKey).toBe("string");
 
     socket.emitFrame({
@@ -547,7 +722,11 @@ describe("OpenClawGatewayClient", () => {
   it("returns an empty approval list when the gateway does not advertise list support", async () => {
     const socket = new MockWebSocket();
     const client = createClient(socket);
-    await connectClient(client, socket, ["sessions.create", "agent.wait", "chat.history"]);
+    await connectClient(client, socket, [
+      "sessions.create",
+      "agent.wait",
+      "chat.history",
+    ]);
 
     const sentBefore = socket.sentFrames.length;
     await expect(client.listApprovals()).resolves.toEqual([]);
@@ -602,8 +781,7 @@ describe("OpenClawGatewayClient", () => {
       event: "connect.challenge",
       payload: { nonce: "nonce-123", ts: 1737264000000 },
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await waitForSentFrames(socket, 1);
 
     expect(sign).toHaveBeenCalledWith(
       "v3|device_123|openclaw-probe|probe|operator|operator.read,operator.write,operator.approvals,operator.admin|1737264000000|device-token-123|nonce-123|linux|",
