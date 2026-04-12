@@ -1,9 +1,13 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { WorkPageClient } from "@/components/work/work-page-client";
 
+afterEach(() => {
+  cleanup();
+});
+
 describe("WorkPageClient", () => {
-  it("renders a workbench-first layout with secondary activity details", () => {
+  it("renders a three-column workbench layout with context and task-plan sidebars", () => {
     render(
       <WorkPageClient
         initialData={{
@@ -71,6 +75,59 @@ describe("WorkPageClient", () => {
             canReopen: false,
             latestFollowUp: null,
           },
+          taskPlan: {
+            state: "ready",
+            revision: "generated",
+            generatedBy: "work-plan-agent",
+            isMock: true,
+            summary: "先澄清目标与背景，再执行首轮产出，并把需要确认的节点收束到右侧任务计划。",
+            updatedAt: "2026-04-16T10:16:00.000Z",
+            changeSummary: "已基于当前任务背景生成初始占位计划。",
+            currentStepId: "execute-task",
+            steps: [
+              { id: "understand-task", title: "梳理目标与约束", objective: "确认目标与限制。", phase: "理解", status: "done", needsUserInput: false },
+              { id: "gather-context", title: "补齐上下文", objective: "收集当前背景。", phase: "准备", status: "done", needsUserInput: false },
+              { id: "execute-task", title: "推进首轮产出", objective: "推进当前执行并处理审批节点。", phase: "执行", status: "waiting_for_user", needsUserInput: true },
+              { id: "confirm-next-step", title: "确认结果与下一步", objective: "等待结果后确认后续动作。", phase: "确认", status: "pending", needsUserInput: false },
+            ],
+          },
+          workspaceRail: {
+            sections: [
+              {
+                id: "in-progress",
+                title: "In progress",
+                items: [
+                  {
+                    taskId: "task_1",
+                    title: "Write projection",
+                    statusLabel: "WaitingForApproval",
+                    tone: "waiting",
+                    isCurrent: true,
+                  },
+                  {
+                    taskId: "task_2",
+                    title: "Q2 growth recap",
+                    statusLabel: "Running",
+                    tone: "active",
+                    isCurrent: false,
+                  },
+                ],
+              },
+              {
+                id: "completed",
+                title: "Completed",
+                items: [
+                  {
+                    taskId: "task_3",
+                    title: "Rewrite homepage copy",
+                    statusLabel: "Done",
+                    tone: "done",
+                    isCurrent: false,
+                  },
+                ],
+              },
+            ],
+          },
           workstreamItems: [
             {
               id: "evt_1",
@@ -95,34 +152,60 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Next Action" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Shared Output" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Execution Workstream" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Run Snapshot" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Evidence" })).toBeInTheDocument();
-    expect(screen.getByText("Why now")).toBeInTheDocument();
-    expect(screen.getAllByText("Evidence").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
+    const decisionCard = screen.getByRole("heading", { name: "当前需要你决定" }).closest("section");
+    const stageCard = screen.getByRole("heading", { name: "任务阶段" }).closest("section");
+    const composerHeading = screen.getByRole("heading", { name: "给 Agent 补充要求" });
+    const resultHeading = screen.getByRole("heading", { name: "最新结果" });
+
+    expect(decisionCard).not.toBeNull();
+    expect(stageCard).not.toBeNull();
+    const decisionScope = within(decisionCard as HTMLElement);
+    const stageScope = within(stageCard as HTMLElement);
+
+    expect(decisionScope.getByText("Agent 正等待你的审批。")).toBeInTheDocument();
+    expect(decisionScope.getByText("建议先完成审批决定，再继续本次执行。")).toBeInTheDocument();
+    expect(decisionScope.getByRole("link", { name: "处理审批" })).toHaveAttribute("href", "#pending-approvals");
+    expect(screen.getByRole("heading", { name: "任务阶段" })).toBeInTheDocument();
+    expect(stageScope.getByText("任务生命周期")).toBeInTheDocument();
+    expect(stageScope.getByText("当前协作阶段")).toBeInTheDocument();
+    expect(stageScope.getByText("进行中")).toBeInTheDocument();
+    expect(stageScope.getAllByText("等待确认").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "当前需要你决定" })).toBeInTheDocument();
+    expect(composerHeading).toBeInTheDocument();
+    expect(resultHeading).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "任务历史" })).toBeInTheDocument();
+    expect(screen.queryByText("Q2 growth recap")).not.toBeInTheDocument();
+    expect(screen.getByText("日程信息")).toBeInTheDocument();
+    expect(screen.getByText("当前执行")).toBeInTheDocument();
+    expect(screen.getByText("当前阻塞")).toBeInTheDocument();
+    expect(screen.getByText("任务计划")).toBeInTheDocument();
+    expect(screen.getByText("推进首轮产出")).toBeInTheDocument();
+    expect(screen.getAllByText("等待你确认").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "重新生成占位计划" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "打开日程" })).toHaveAttribute(
       "href",
       "/en/schedule",
     );
-    expect(screen.getByRole("link", { name: "View task detail" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "查看任务详情" })).toHaveAttribute(
       "href",
       "/en/workspaces/ws_1/tasks/task_1",
     );
-    expect(screen.getByText("AtRisk")).toBeInTheDocument();
+    expect(screen.getByText("已超时")).toBeInTheDocument();
     expect(screen.getAllByText("Approve tool execution").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("Used by next action")).toBeInTheDocument();
     expect(screen.getByText("Conversation output")).toBeInTheDocument();
-    expect(screen.getByText("Needs approval")).toBeInTheDocument();
-    expect(screen.getByText("Linked to Next Action")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit and Approve" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Operator note" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send Note to Agent" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Workstream" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Conversation" })).toBeInTheDocument();
+    expect(screen.getAllByText("任务记录").length).toBeGreaterThan(0);
+    expect(screen.getByText("当前阶段: 等待审批")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Write projection" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批准" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "修改后批准" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /发送给 Agent 的内容/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送补充说明" })).toBeInTheDocument();
+    expect(screen.getAllByText("给 Agent 补充要求")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "背景" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "计划" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "工具记录" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "产出" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Work draft" })).not.toBeInTheDocument();
   });
 
@@ -194,6 +277,22 @@ describe("WorkPageClient", () => {
             canReopen: false,
             latestFollowUp: null,
           },
+          taskPlan: {
+            state: "ready",
+            revision: "updated",
+            generatedBy: "work-plan-agent",
+            isMock: true,
+            summary: "计划会随着运行状态自动维护。",
+            updatedAt: "2026-04-16T10:21:00.000Z",
+            changeSummary: "已根据当前状态重新整理占位计划。",
+            currentStepId: "execute-task",
+            steps: [
+              { id: "understand-task", title: "梳理目标与约束", objective: "确认目标。", phase: "理解", status: "done", needsUserInput: false },
+              { id: "gather-context", title: "补齐上下文", objective: "整理背景。", phase: "准备", status: "done", needsUserInput: false },
+              { id: "execute-task", title: "推进首轮产出", objective: "执行主要工作。", phase: "执行", status: "in_progress", needsUserInput: false },
+              { id: "confirm-next-step", title: "确认结果与下一步", objective: "留待结果后处理。", phase: "确认", status: "pending", needsUserInput: false },
+            ],
+          },
           workstreamItems: [],
           conversation: [
             {
@@ -212,11 +311,11 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    expect(screen.getAllByRole("textbox", { name: "Operator note" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Send Note to Agent" }).length).toBeGreaterThan(0);
-    expect(
-      screen.getByText("Add context for the agent without interrupting the current run. The note will land at the next safe checkpoint."),
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: /发送给 Agent 的内容/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "发送补充说明" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "背景" }).length).toBeGreaterThan(0);
+    expect(screen.getByText("任务计划")).toBeInTheDocument();
+    expect(screen.getAllByText("进行中").length).toBeGreaterThan(0);
   });
 
   it("lets operators start the first run directly from the workbench", () => {
@@ -283,6 +382,17 @@ describe("WorkPageClient", () => {
             canReopen: false,
             latestFollowUp: null,
           },
+          taskPlan: {
+            state: "empty",
+            revision: null,
+            generatedBy: null,
+            isMock: true,
+            summary: null,
+            updatedAt: null,
+            changeSummary: null,
+            currentStepId: null,
+            steps: [],
+          },
           workstreamItems: [],
           conversation: [],
           inspector: {
@@ -294,9 +404,22 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    expect(screen.getByRole("textbox", { name: "Run prompt" })).toHaveValue("Continue working on: Draft rollout note");
-    expect(screen.getByRole("button", { name: "Start Run Here" })).toBeInTheDocument();
-    expect(screen.getByText("No active run yet")).toBeInTheDocument();
+    const stageCard = screen.getByRole("heading", { name: "任务阶段" }).closest("section");
+    expect(stageCard).not.toBeNull();
+    const stageScope = within(stageCard as HTMLElement);
+
+    expect(screen.getByDisplayValue("继续处理：Draft rollout note")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "启动并继续" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "立即启动" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "先补充说明再启动" })).toHaveAttribute("href", "#work-composer");
+    expect(screen.getByRole("button", { name: "生成占位计划" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "给 Agent 补充要求" })).toBeInTheDocument();
+    expect(screen.getByText("任务还没有开始执行。")).toBeInTheDocument();
+    expect(stageScope.getByText("未开始")).toBeInTheDocument();
+    expect(stageScope.getAllByText("理解任务").length).toBeGreaterThan(0);
+    expect(screen.getByText("尚未生成结果")).toBeInTheDocument();
+    expect(screen.getByText("第一轮任务理解")).toBeInTheDocument();
+    expect(screen.getByText("执行建议")).toBeInTheDocument();
   });
 
   it("renders completed closure actions directly in the main action area", () => {
@@ -374,6 +497,22 @@ describe("WorkPageClient", () => {
             canReopen: false,
             latestFollowUp: null,
           },
+          taskPlan: {
+            state: "ready",
+            revision: "updated",
+            generatedBy: "work-plan-agent",
+            isMock: true,
+            summary: "结果已生成，下一步等待你确认是否收尾或继续。",
+            updatedAt: "2026-04-20T09:46:00.000Z",
+            changeSummary: "已根据完成状态更新占位计划。",
+            currentStepId: "confirm-next-step",
+            steps: [
+              { id: "understand-task", title: "梳理目标与约束", objective: "确认目标。", phase: "理解", status: "done", needsUserInput: false },
+              { id: "gather-context", title: "补齐上下文", objective: "整理背景。", phase: "准备", status: "done", needsUserInput: false },
+              { id: "execute-task", title: "推进首轮产出", objective: "完成本轮执行。", phase: "执行", status: "done", needsUserInput: false },
+              { id: "confirm-next-step", title: "确认结果与下一步", objective: "等待你确认是否继续。", phase: "确认", status: "waiting_for_user", needsUserInput: true },
+            ],
+          },
           workstreamItems: [],
           conversation: [],
           inspector: {
@@ -385,10 +524,10 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Accept Result" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark Task Done" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Follow-up" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry Run" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Follow-up title" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认结果" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "标记任务完成" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建后续任务" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重新执行" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "后续任务标题" })).toBeInTheDocument();
   });
 });

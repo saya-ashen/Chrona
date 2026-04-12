@@ -137,4 +137,50 @@ describe("TaskConfigForm", () => {
       });
     });
   });
+
+  it("keeps compact mode focused on the quick-add fields", async () => {
+    const onSubmitAction = vi.fn().mockResolvedValue(undefined);
+
+    const { container } = render(
+      <TaskConfigForm
+        compact
+        runtimeAdapters={[OPENCLAW_RUNTIME_ADAPTER, RESEARCH_RUNTIME_ADAPTER]}
+        defaultRuntimeAdapterKey="openclaw"
+        presets={[{ id: "bug", label: "Bug investigation", description: "Long description", values: { priority: "High" } }]}
+        initialValues={{ title: "" }}
+        submitLabel="Create"
+        pendingLabel="Creating"
+        onSubmitAction={onSubmitAction}
+      />,
+    );
+    const formScope = within(container);
+    const moreOptionsDetails = formScope.getByText("More options").closest("details");
+
+    expect(formScope.getByLabelText("Title")).toBeInTheDocument();
+    expect(formScope.getByLabelText("Model")).toBeInTheDocument();
+    expect(moreOptionsDetails).not.toHaveAttribute("open");
+
+    expect(formScope.getByRole("button", { name: "Bug investigation" })).toBeInTheDocument();
+    expect(formScope.queryByText("Long description")).not.toBeInTheDocument();
+
+    fireEvent.click(formScope.getByText("More options"));
+
+    expect(formScope.getByLabelText("Priority")).toBeInTheDocument();
+    expect(formScope.getByLabelText("Due date")).toBeInTheDocument();
+    expect(formScope.getByLabelText("Adapter")).toBeInTheDocument();
+
+    fireEvent.change(formScope.getByLabelText("Title"), { target: { value: "Quick add task" } });
+    fireEvent.change(formScope.getByLabelText("Model"), { target: { value: "gpt-5.4" } });
+    fireEvent.change(formScope.getByLabelText("Prompt / instructions"), { target: { value: "Do the thing" } });
+    fireEvent.click(formScope.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(onSubmitAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Quick add task",
+          runtimeInput: expect.objectContaining({ model: "gpt-5.4", prompt: "Do the thing" }),
+        }),
+      );
+    });
+  });
 });

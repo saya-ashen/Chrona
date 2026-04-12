@@ -135,6 +135,15 @@ type EvidenceItem = {
   href?: string | null;
 };
 
+type TaskPlanStepStatus = "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
+
+type TaskPlanPayloadStep = {
+  id: string;
+  title: string;
+  objective: string;
+  phase: string;
+};
+
 function makeEvidence(item: EvidenceItem) {
   return item;
 }
@@ -284,6 +293,204 @@ function readBlockReason(
         }
       : null)
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readTaskPlanPayload(payload: unknown) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  const steps = Array.isArray(payload.steps)
+    ? payload.steps.flatMap((step) => {
+        if (!isRecord(step)) {
+          return [];
+        }
+
+        if (
+          typeof step.id !== "string" ||
+          typeof step.title !== "string" ||
+          typeof step.objective !== "string" ||
+          typeof step.phase !== "string"
+        ) {
+          return [];
+        }
+
+        return [{
+          id: step.id,
+          title: step.title,
+          objective: step.objective,
+          phase: step.phase,
+        } satisfies TaskPlanPayloadStep];
+      })
+    : [];
+
+  if (steps.length === 0) {
+    return null;
+  }
+
+  return {
+    revision: payload.revision === "updated" ? "updated" : "generated",
+    generatedBy: typeof payload.generated_by === "string" ? payload.generated_by : null,
+    isMock: payload.is_mock !== false,
+    summary: typeof payload.summary === "string" ? payload.summary : null,
+    changeSummary: typeof payload.change_summary === "string" ? payload.change_summary : null,
+    steps,
+  };
+}
+
+function deriveTaskPlanStepStatus(
+  stepId: string,
+  currentRun: { status: string } | null,
+  closure: { isDone: boolean },
+): TaskPlanStepStatus {
+  if (closure.isDone) {
+    return "done";
+  }
+
+  switch (stepId) {
+    case "understand-task":
+      return currentRun ? "done" : "in_progress";
+    case "gather-context":
+      if (!currentRun) {
+        return "pending";
+      }
+
+      if (currentRun.status === "WaitingForInput") {
+        return "waiting_for_user";
+      }
+
+      if (["Running", "WaitingForApproval", "Completed", "Failed", "Cancelled"].includes(currentRun.status)) {
+        return "done";
+      }
+
+      return "in_progress";
+    case "execute-task":
+      if (!currentRun) {
+        return "pending";
+      }
+
+      if (currentRun.status === "Running") {
+        return "in_progress";
+      }
+
+      if (currentRun.status === "WaitingForApproval") {
+        return "waiting_for_user";
+      }
+
+      if (currentRun.status === "Completed") {
+        return "done";
+      }
+
+      if (currentRun.status === "Failed" || currentRun.status === "Cancelled") {
+        return "blocked";
+      }
+
+      return "pending";
+    case "confirm-next-step":
+      if (!currentRun) {
+        return "pending";
+      }
+
+      if (currentRun.status === "Completed") {
+        return "waiting_for_user";
+      }
+
+      return "pending";
+    default:
+      if (!currentRun) {
+        return "pending";
+      }
+
+      if (currentRun.status === "Completed") {
+        return "done";
+      }
+
+      if (currentRun.status === "Failed" || currentRun.status === "Cancelled") {
+        return "blocked";
+      }
+
+      return "in_progress";
+  }
+}
+
+function buildTaskPlan({
+  taskTitle,
+  latestPlanEvent,
+  currentRun,
+  closure,
+}: {
+  taskTitle: string;
+  latestPlanEvent:
+    | {
+        eventType: string;
+        payload: unknown;
+        createdAt: Date;
+        runtimeTs: Date | null;
+      }
+    | null;
+  currentRun: { status: string } | null;
+  closure: { isDone: boolean };
+}) {
+  if (!latestPlanEvent) {
+    return {
+      state: "empty" as const,
+      revision: null,
+      generatedBy: null,
+      isMock: true,
+      summary: null,
+      updatedAt: null,
+      changeSummary: null,
+      currentStepId: null,
+      steps: [],
+    };
+  }
+
+  const parsed = readTaskPlanPayload(latestPlanEvent.payload);
+
+  if (!parsed) {
+    return {
+      state: "empty" as const,
+      revision: null,
+      generatedBy: null,
+      isMock: true,
+      summary: null,
+      updatedAt: null,
+      changeSummary: null,
+      currentStepId: null,
+      steps: [],
+    };
+  }
+
+  const steps = parsed.steps.map((step) => {
+    const status = deriveTaskPlanStepStatus(step.id, currentRun, closure);
+    return {
+      ...step,
+      status,
+      needsUserInput: status === "waiting_for_user",
+    };
+  });
+
+  return {
+    state: "ready" as const,
+    revision:
+      latestPlanEvent.eventType === "task.plan_updated"
+        ? "updated"
+        : parsed.revision,
+    generatedBy: parsed.generatedBy,
+    isMock: parsed.isMock,
+    summary:
+      parsed.summary ??
+      `围绕「${taskTitle}」先澄清目标与背景，再推进首轮产出，并在关键节点回到工作台和你确认。`,
+    updatedAt: toIsoString(latestPlanEvent.runtimeTs ?? latestPlanEvent.createdAt),
+    changeSummary: parsed.changeSummary,
+    currentStepId:
+      steps.find((step) => ["in_progress", "waiting_for_user", "blocked"].includes(step.status))?.id ?? null,
+    steps,
+  };
 }
 
 function buildCurrentIntervention({
@@ -657,6 +864,117 @@ function buildClosureState({
   };
 }
 
+function buildWorkspaceRail(
+  currentTaskId: string,
+  projections: Array<{
+    taskId: string;
+    persistedStatus: string;
+    displayState: string | null;
+    lastActivityAt: Date | null;
+    updatedAt: Date;
+    task: { id: string; title: string };
+  }>,
+  currentTask?: {
+    title: string;
+    persistedStatus: string;
+    displayState: string | null;
+    updatedAt: Date;
+    lastActivityAt?: Date | null;
+  },
+) {
+  const waitingStates = new Set(["WaitingForApproval", "WaitingForInput", "Attention Needed", "Sync Stale"]);
+
+  const baseItems = projections.map((item) => ({
+    taskId: item.taskId,
+    title: item.task.title,
+    persistedStatus: item.persistedStatus,
+    displayState: item.displayState,
+    updatedAt: item.updatedAt,
+    lastActivityAt: item.lastActivityAt,
+  }));
+
+  if (currentTask && !baseItems.some((item) => item.taskId === currentTaskId)) {
+    baseItems.unshift({
+      taskId: currentTaskId,
+      title: currentTask.title,
+      persistedStatus: currentTask.persistedStatus,
+      displayState: currentTask.displayState,
+      updatedAt: currentTask.updatedAt,
+      lastActivityAt: currentTask.lastActivityAt ?? currentTask.updatedAt,
+    });
+  }
+
+  const mapped = baseItems.map((item) => {
+    const tone = waitingStates.has(item.displayState ?? "")
+      ? "waiting"
+      : item.persistedStatus === "Done" || item.persistedStatus === "Completed"
+        ? "done"
+        : "active";
+
+    return {
+      taskId: item.taskId,
+      title: item.title,
+      statusLabel: item.displayState ?? item.persistedStatus,
+      tone,
+      isCurrent: item.taskId === currentTaskId,
+      sortAt: item.lastActivityAt ?? item.updatedAt,
+    };
+  });
+
+  function takeWithCurrent(
+    items: typeof mapped,
+    limit: number,
+  ) {
+    const currentIndex = items.findIndex((item) => item.isCurrent);
+
+    if (currentIndex === -1 || currentIndex < limit) {
+      return items.slice(0, limit);
+    }
+
+    return [items[currentIndex], ...items.filter((_, index) => index !== currentIndex).slice(0, limit - 1)];
+  }
+
+  const sections = [
+    {
+      id: "in-progress",
+      title: "In progress",
+      items: takeWithCurrent(
+        mapped.filter((item) => item.tone === "active"),
+        6,
+      ),
+    },
+    {
+      id: "waiting-on-me",
+      title: "Waiting on me",
+      items: takeWithCurrent(
+        mapped.filter((item) => item.tone === "waiting"),
+        6,
+      ),
+    },
+    {
+      id: "completed",
+      title: "Completed",
+      items: takeWithCurrent(
+        mapped.filter((item) => item.tone === "done"),
+        6,
+      ),
+    },
+  ].filter((section) => section.items.length > 0)
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      items: section.items.map((item) => ({
+        taskId: item.taskId,
+        title: item.title,
+        statusLabel: item.statusLabel,
+        tone: item.tone,
+        isCurrent: item.isCurrent,
+      })),
+    }));
+
+  return { sections };
+}
+
 export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPageCopy>) {
   const copy = { ...DEFAULT_COPY, ...copyOverrides };
   const taskExists = await db.task.findUnique({
@@ -708,10 +1026,37 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     throw new WorkPageTaskNotFoundError(taskId);
   }
 
+  const workspaceProjections = await db.taskProjection.findMany({
+    where: { workspaceId: task.workspaceId },
+    include: {
+      task: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+    orderBy: [{ lastActivityAt: "desc" }, { updatedAt: "desc" }],
+    take: 24,
+  });
+
   const currentRun = task.runs[0] ?? null;
   const latestFollowUp = await db.task.findFirst({
     where: { parentTaskId: task.id },
     orderBy: { createdAt: "desc" },
+  });
+  const latestPlanEvent = await db.event.findFirst({
+    where: {
+      taskId: task.id,
+      eventType: { in: ["task.plan_generated", "task.plan_updated"] },
+    },
+    orderBy: [{ runtimeTs: "desc" }, { ingestSequence: "desc" }],
+    select: {
+      eventType: true,
+      payload: true,
+      createdAt: true,
+      runtimeTs: true,
+    },
   });
   const blockReason = readBlockReason(task);
   const approvals =
@@ -811,6 +1156,12 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     })),
     latestFollowUp,
   });
+  const taskPlan = buildTaskPlan({
+    taskTitle: task.title,
+    latestPlanEvent,
+    currentRun: serializedRun,
+    closure,
+  });
 
   return {
     taskShell: {
@@ -843,6 +1194,14 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     scheduleImpact,
     reliability,
     closure,
+    taskPlan,
+    workspaceRail: buildWorkspaceRail(task.id, workspaceProjections, {
+      title: task.title,
+      persistedStatus: task.status,
+      displayState: task.projection?.displayState ?? null,
+      updatedAt: task.updatedAt,
+      lastActivityAt: task.projection?.lastActivityAt,
+    }),
     workstreamItems,
     conversation,
     inspector: {
