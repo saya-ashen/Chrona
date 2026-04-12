@@ -2,7 +2,6 @@
 
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { applySchedule, clearSchedule } from "@/app/actions/task-actions";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName } from "@/components/ui/field";
@@ -16,6 +15,7 @@ type ScheduleEditorFormProps = {
   scheduleSource?: "human" | "ai" | "system";
   submitLabel?: string;
   allowClear?: boolean;
+  onMutatedAction?: () => Promise<void> | void;
 };
 
 const DEFAULT_COPY = {
@@ -50,10 +50,10 @@ export function ScheduleEditorForm({
   scheduleSource = "human",
   submitLabel = "Apply Schedule",
   allowClear = true,
+  onMutatedAction,
 }: ScheduleEditorFormProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.scheduleEditorForm ?? {}) };
-  const router = useRouter();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -62,7 +62,7 @@ export function ScheduleEditorForm({
       setIsPending(true);
       setErrorMessage(null);
       await action();
-      router.refresh();
+      await onMutatedAction?.();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
     } finally {

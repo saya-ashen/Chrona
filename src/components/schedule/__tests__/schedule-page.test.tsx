@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { pushMock, refreshMock, createTaskFromScheduleMock, updateTaskConfigFromScheduleMock, applyScheduleMock } = vi.hoisted(() => ({
+const { pushMock, fetchMock, createTaskFromScheduleMock, updateTaskConfigFromScheduleMock, applyScheduleMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
-  refreshMock: vi.fn(),
+  fetchMock: vi.fn(),
   createTaskFromScheduleMock: vi.fn(),
   updateTaskConfigFromScheduleMock: vi.fn(),
   applyScheduleMock: vi.fn(),
@@ -12,9 +12,10 @@ const { pushMock, refreshMock, createTaskFromScheduleMock, updateTaskConfigFromS
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
-    refresh: refreshMock,
   }),
 }));
+
+vi.stubGlobal("fetch", fetchMock);
 
 vi.mock("@/app/actions/task-actions", () => ({
   acceptScheduleProposal: vi.fn().mockResolvedValue(undefined),
@@ -228,13 +229,13 @@ function buildBaseData() {
 describe("SchedulePage", () => {
   beforeEach(() => {
     pushMock.mockReset();
-    refreshMock.mockReset();
+    fetchMock.mockReset();
     createTaskFromScheduleMock.mockReset();
     updateTaskConfigFromScheduleMock.mockReset();
     applyScheduleMock.mockReset();
   });
 
-  it("renders the schedule planning sections with a dedicated queue rail", () => {
+  it("renders the schedule surfaces with compact secondary planning", () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
 
@@ -246,18 +247,18 @@ describe("SchedulePage", () => {
     expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Scheduled Timeline" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Unscheduled Queue" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "AI Proposals" })).toBeInTheDocument();
-    expect(screen.getByText("Keep recovery work visible without crowding the queue rail.")).toBeInTheDocument();
-    expect(screen.getByText("Review suggestions near the timeline, not inside the queue rail.")).toBeInTheDocument();
-    expect(screen.getByText("Planning Guide")).toBeInTheDocument();
-    expect(screen.getByText("Secondary planning info")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Week Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Week Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI Proposals" })).toBeInTheDocument();
+    expect(screen.queryByText("Planning Guide")).not.toBeInTheDocument();
+    expect(screen.queryByText("Secondary planning info")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ship projection cleanup").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Create Task Block").length).toBeGreaterThan(0);
     expect(screen.getByText("Click any slot or drag to adjust")).toBeInTheDocument();
     expect(screen.getByText(/quiet hours compressed/i)).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Task Details" })).toBeInTheDocument();
-    expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(2);
+    expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(1);
     expect(screen.getAllByText("Ready to run").length).toBeGreaterThan(0);
     expect(screen.getByText("Needs model and prompt")).toBeInTheDocument();
     expect(screen.getAllByText("Recover overdue adapter run").length).toBeGreaterThanOrEqual(1);
@@ -387,6 +388,7 @@ describe("SchedulePage", () => {
   it("shows a newly created block immediately on the timeline", async () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
     render(
       <SchedulePage
@@ -442,11 +444,13 @@ describe("SchedulePage", () => {
     expect(applyScheduleMock).toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock.mock.calls[0]?.[0]).toContain("task=task_created");
+    expect(fetchMock).toHaveBeenCalledWith("/api/schedule/projection?workspaceId=ws_1", { cache: "no-store" });
   });
 
   it("applies starter presets before creating a scheduled task", async () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
     render(
       <SchedulePage
@@ -502,6 +506,7 @@ describe("SchedulePage", () => {
 
   it("renders the schedule list view with triage filters and quick edit", async () => {
     updateTaskConfigFromScheduleMock.mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
     render(
       <SchedulePage
@@ -552,5 +557,6 @@ describe("SchedulePage", () => {
           }),
         );
       });
+      expect(fetchMock).toHaveBeenCalledWith("/api/schedule/projection?workspaceId=ws_1", { cache: "no-store" });
   });
 });

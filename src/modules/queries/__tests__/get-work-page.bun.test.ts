@@ -154,6 +154,95 @@ describe("getWorkPage", () => {
       badge: "Needs approval",
       linkedEvidenceLabel: "Linked to Next Action",
     });
+    expect(
+      page.workspaceRail?.sections.flatMap((section) => section.items).find((item) => item.isCurrent),
+    ).toMatchObject({
+      taskId: task.id,
+      title: "Execution surface",
+      isCurrent: true,
+    });
+    expect(page.taskPlan).toMatchObject({
+      state: "empty",
+      currentStepId: null,
+    });
+  });
+
+  it("derives a ready task plan from the latest plan event and live run state", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Work Plan",
+        defaultRuntime: "openclaw",
+        status: WorkspaceStatus.Active,
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Prepare task plan",
+        status: TaskStatus.Blocked,
+        priority: TaskPriority.High,
+        ownerType: "human",
+      },
+    });
+
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        status: RunStatus.WaitingForApproval,
+        triggeredBy: "user",
+      },
+    });
+
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+
+    await db.event.create({
+      data: {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        eventType: "task.plan_generated",
+        actorType: "agent",
+        actorId: "work-plan-agent",
+        source: "planner",
+        dedupeKey: `task.plan_generated:${task.id}`,
+        payload: {
+          revision: "generated",
+          generated_by: "work-plan-agent",
+          is_mock: true,
+          summary: "先澄清目标与背景，再推进首轮产出。",
+          change_summary: "已生成初始占位计划。",
+          steps: [
+            { id: "understand-task", title: "梳理目标与约束", objective: "确认目标。", phase: "理解" },
+            { id: "gather-context", title: "补齐上下文", objective: "整理背景。", phase: "准备" },
+            { id: "execute-task", title: "推进首轮产出", objective: "推进当前执行。", phase: "执行" },
+            { id: "confirm-next-step", title: "确认结果与下一步", objective: "等待结果后确认后续动作。", phase: "确认" },
+          ],
+        },
+        ingestSequence: 1,
+      },
+    });
+
+    const page = await getWorkPage(task.id);
+
+    expect(page.taskPlan).toMatchObject({
+      state: "ready",
+      revision: "generated",
+      generatedBy: "work-plan-agent",
+      isMock: true,
+      summary: "先澄清目标与背景，再推进首轮产出。",
+      changeSummary: "已生成初始占位计划。",
+      currentStepId: "execute-task",
+    });
+    expect(page.taskPlan.steps).toEqual([
+      expect.objectContaining({ id: "understand-task", status: "done", needsUserInput: false }),
+      expect.objectContaining({ id: "gather-context", status: "done", needsUserInput: false }),
+      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", needsUserInput: true }),
+      expect.objectContaining({ id: "confirm-next-step", status: "pending", needsUserInput: false }),
+    ]);
   });
 
   it("returns reliability and closure metadata for completed runs", async () => {

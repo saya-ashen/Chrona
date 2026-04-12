@@ -15,8 +15,8 @@ type ConversationPanelProps = {
 };
 
 const DEFAULT_COPY = {
-  title: "Conversation",
-  noConversationYet: "No conversation mapped yet.",
+  title: "对话记录",
+  noConversationYet: "还没有对话记录。发送补充说明后，这里会显示人机往来。",
 } as const;
 
 function formatDate(value: string | null | undefined) {
@@ -49,7 +49,7 @@ function getEntryClasses(role: string) {
   };
 }
 
-export function ConversationPanel({ entries, title = "Conversation", description, embedded = false }: ConversationPanelProps) {
+export function ConversationPanel({ entries, title = DEFAULT_COPY.title, description, embedded = false }: ConversationPanelProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.conversationPanel ?? {}) };
   const content = (

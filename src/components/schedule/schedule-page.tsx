@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ChevronDown, GripVertical, Move, Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import type { Prisma } from "@/generated/prisma/client";
 import {
@@ -24,7 +24,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   SurfaceCard,
-  SurfaceCardDescription,
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
@@ -134,6 +133,7 @@ type ScheduledItem = SchedulePageProps["data"]["scheduled"][number];
 type UnscheduledItem = SchedulePageProps["data"]["unscheduled"][number];
 type ListItem = SchedulePageProps["data"]["listItems"][number];
 type ScheduleViewMode = "timeline" | "list";
+type SecondaryPlanningView = "week" | "risks" | "proposals";
 
 type TodayFocusItem = {
   taskId: string;
@@ -324,19 +324,15 @@ const DEFAULT_COPY = {
   risksMetric: "Risks",
   risksMetricHint: "At-risk, overdue, or interrupted work.",
   scheduledTimeline: "Scheduled Timeline",
-  scheduledTimelineDescription: "This is the main planning surface: create tasks, place queued work, and drag existing blocks to adjust time.",
+  scheduledTimelineDescription: "",
   dropMode: "Drop mode",
   planningSurface: "Planning surface",
   conflictsTitle: "Conflicts / Overdue Risks",
-  conflictsDescription: "Keep recovery work visible without crowding the queue rail.",
+  conflictsDescription: "",
   noScheduleRisks: "No schedule risks detected. Blocked, overdue, or interrupted work will surface here.",
   aiProposalsTitle: "AI Proposals",
-  aiProposalsDescription: "Review suggestions near the timeline, not inside the queue rail.",
+  aiProposalsDescription: "",
   noAiProposals: "No pending AI proposals. When planner automation suggests a new block, it will appear here for review.",
-  planningGuide: "Planning Guide",
-  guideStep1: "1. Clear the highest-risk items first.",
-  guideStep2: "2. Drag queue items into concrete blocks or click a free slot to create work inline.",
-  guideStep3: "3. Review proposals as suggestions, not automatic truth.",
   openTaskCenter: "Open Task Center",
   weekOverview: "Week Overview",
   noTimelineDay: "No timeline day is available right now.",
@@ -345,7 +341,6 @@ const DEFAULT_COPY = {
   noUnscheduledWork: "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
   dateSwitcher: "Date",
   todayFocus: "Today Focus",
-  todayFocusDescription: "Clear the items that can block today before you keep reshaping the timeline.",
   todayFocusEmpty: "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
   focusOverdue: "Overdue",
   focusAtRisk: "At risk",
@@ -355,9 +350,10 @@ const DEFAULT_COPY = {
   todayBlocks: "Today blocks",
   queueReady: "Queue ready",
   needsAttention: "Needs attention",
-  secondaryPlanning: "Secondary planning info",
-  secondaryPlanningDescription: "Use this area for proposals, week context, and planning help after today's work is clear.",
   aiProposalsCompactEmpty: "No pending AI proposals.",
+  secondaryWeek: "Week",
+  secondaryRisks: "Risks",
+  secondaryProposals: "AI Proposals",
 } as const;
 
 type SchedulePageCopy = Record<keyof typeof DEFAULT_COPY, string>;
@@ -873,16 +869,6 @@ function applyTaskConfigToItem<T extends ScheduledItem | UnscheduledItem | ListI
   };
 }
 
-function MetricCard({ label, value, hint }: { label: string; value: number; hint: string }) {
-  return (
-    <SurfaceCard variant="inset" padding="sm" className="rounded-2xl">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-    </SurfaceCard>
-  );
-}
-
 function buildTodayFocusItems(
   data: SchedulePageData,
   activeGroup: ScheduledDayGroup | null,
@@ -946,36 +932,26 @@ function TodayFocusCard({
     <SurfaceCard>
       <SurfaceCardHeader>
         <SurfaceCardTitle>{copy.todayFocus}</SurfaceCardTitle>
-        <SurfaceCardDescription>{copy.todayFocusDescription}</SurfaceCardDescription>
       </SurfaceCardHeader>
 
-      {items.length === 0 ? (
-        <EmptyState>{copy.todayFocusEmpty}</EmptyState>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => (
-            <SurfaceCard as="div" key={item.taskId} variant="inset" padding="sm" className="rounded-2xl">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
-                </div>
-                <LocalizedLink
-                  href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
-                  className="line-clamp-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
-                >
-                  {item.title}
-                </LocalizedLink>
-              </div>
-            </SurfaceCard>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2 px-6 pb-6 text-sm">
+        {items.map((item) => (
+          <LocalizedLink
+            key={item.taskId}
+            href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
+            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
+            <span className="max-w-[18rem] truncate">{item.title}</span>
+          </LocalizedLink>
+        ))}
+      </div>
     </SurfaceCard>
   );
 }
 
 function ItemMeta({ item }: { item: ScheduleCardItem }) {
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   return (
     <div className="flex flex-wrap gap-2">
@@ -1020,7 +996,7 @@ function EmptyState({ children }: { children: string }) {
 
 function DayTimelineSummary({ items, dayDate }: { items: ScheduledItem[]; dayDate: Date }) {
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   const starts = items
     .map((item) => item.scheduledStartAt?.getTime())
@@ -1111,7 +1087,7 @@ function TimelineCreateComposer({
   onCreate: (input: TimelineCreateInput) => Promise<void>;
 }) {
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   const composerTop = Math.min(
     Math.max(draft.top + draft.height - TIMELINE_COMPOSER_HEIGHT, TIMELINE_COMPOSER_MARGIN),
@@ -1121,7 +1097,7 @@ function TimelineCreateComposer({
   return (
     <div
       data-timeline-composer
-      className="absolute left-3 z-20 max-h-[356px] w-[min(360px,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-primary/30 bg-background/98 p-4 shadow-xl"
+      className="absolute left-3 z-20 max-h-[384px] w-[min(420px,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-primary/30 bg-background/98 p-4 shadow-xl"
       style={{ top: `${composerTop}px` }}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -1137,6 +1113,7 @@ function TimelineCreateComposer({
       <TaskConfigForm
         runtimeAdapters={runtimeAdapters}
         defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+        compact
         isPending={isPending}
         presets={TASK_CONFIG_PRESETS}
         submitLabel={copy.createAndSchedule}
@@ -1155,7 +1132,7 @@ function TimelineCreateComposer({
 
 function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selectedDay: string }) {
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   return (
     <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl">
@@ -1225,7 +1202,7 @@ function DayTimeline({
   onDragEnd: () => void;
 }) {
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
   const compressedTimeline = useMemo(() => buildCompressedTimeline(items), [items]);
   const timelineHeight = compressedTimeline.totalVisualHeight;
@@ -1567,6 +1544,7 @@ function SelectedBlockSheet({
   defaultRuntimeAdapterKey,
   isPending,
   onSaveTaskConfigAction,
+  onMutatedAction,
 }: {
   item: ScheduledItem;
   selectedDay: string;
@@ -1574,6 +1552,7 @@ function SelectedBlockSheet({
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
   onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onMutatedAction: () => Promise<void>;
 }) {
   const locale = useLocale();
   const { messages, t } = useI18n();
@@ -1650,6 +1629,7 @@ function SelectedBlockSheet({
               scheduledStartAt={item.scheduledStartAt}
               scheduledEndAt={item.scheduledEndAt}
               submitLabel={copy.scheduleTask}
+              onMutatedAction={onMutatedAction}
             />
           </SurfaceCard>
         </div>
@@ -1694,6 +1674,7 @@ function QueueCard({
   isPending,
   isExpanded,
   onToggle,
+  onMutatedAction,
   onSaveTaskConfigAction,
   onDragStart,
   onDragEnd,
@@ -1705,6 +1686,7 @@ function QueueCard({
   isPending: boolean;
   isExpanded: boolean;
   onToggle: () => void;
+  onMutatedAction: () => Promise<void>;
   onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
@@ -1786,7 +1768,13 @@ function QueueCard({
 
           <SurfaceCard as="div" variant="default" padding="sm" className="rounded-2xl border-dashed">
             <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.placeOnTimeline}</p>
-            <ScheduleEditorForm taskId={item.taskId} dueAt={item.dueAt} allowClear={false} submitLabel={copy.scheduleTask} />
+            <ScheduleEditorForm
+              taskId={item.taskId}
+              dueAt={item.dueAt}
+              allowClear={false}
+              submitLabel={copy.scheduleTask}
+              onMutatedAction={onMutatedAction}
+            />
           </SurfaceCard>
         </div>
       ) : null}
@@ -1913,7 +1901,8 @@ export function SchedulePage({
   const router = useRouter();
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const schedulePageMessages = messages.components?.schedulePage;
+  const copy = useMemo(() => ({ ...DEFAULT_COPY, ...(schedulePageMessages ?? {}) }), [schedulePageMessages]);
   const [viewData, setViewData] = useState<SchedulePageData>(data);
   const [draggedTask, setDraggedTask] = useState<{ kind: TimelineDragItem["kind"]; taskId: string } | null>(null);
   const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>([]);
@@ -1921,7 +1910,19 @@ export function SchedulePage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string>("");
   const [isPending, setIsPending] = useState(false);
+  const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("week");
   const activeView = normalizeScheduleView(selectedView);
+
+  const refreshProjection = useCallback(async () => {
+    const response = await fetch(`/api/schedule/projection?workspaceId=${workspaceId}`, { cache: "no-store" });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const next = (await response.json()) as SchedulePageProps["data"];
+    startTransition(() => setViewData(next));
+  }, [workspaceId]);
 
   useEffect(() => {
     setViewData(data);
@@ -1982,7 +1983,7 @@ export function SchedulePage({
       setIsPending(true);
       setErrorMessage(null);
       await action();
-      router.refresh();
+      await refreshProjection();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
     } finally {
@@ -2069,7 +2070,7 @@ export function SchedulePage({
         scheduleSource: "human",
       });
 
-      router.refresh();
+      await refreshProjection();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
       setViewData(data);
@@ -2127,7 +2128,7 @@ export function SchedulePage({
       }));
       setLocalSelectedTaskId(created.taskId);
       router.push(localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)));
-      router.refresh();
+      await refreshProjection();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
       setViewData(data);
@@ -2181,7 +2182,7 @@ export function SchedulePage({
         runtimeConfig: input.runtimeConfig ?? null,
       });
 
-      router.refresh();
+      await refreshProjection();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
       setViewData(data);
@@ -2198,11 +2199,8 @@ export function SchedulePage({
 
       <div className="space-y-4">
         <SurfaceCard variant="highlight" className="space-y-4">
-          <div className="space-y-1">
+          <div>
             <h1 className="text-3xl font-semibold tracking-tight">{copy.pageTitle}</h1>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              {copy.pageDescription}
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -2239,16 +2237,13 @@ export function SchedulePage({
       </div>
 
       <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
-        <TodayFocusCard items={todayFocusItems} copy={copy} />
+        {todayFocusItems.length > 0 ? <TodayFocusCard items={todayFocusItems} copy={copy} /> : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,2.9fr)_minmax(340px,1fr)] xl:items-start">
           <SurfaceCard variant="highlight">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SurfaceCardHeader>
                 <SurfaceCardTitle>{copy.scheduledTimeline}</SurfaceCardTitle>
-                <SurfaceCardDescription>
-                  {copy.scheduledTimelineDescription}
-                </SurfaceCardDescription>
               </SurfaceCardHeader>
               <div className="flex flex-wrap items-center gap-2">
                 {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
@@ -2303,9 +2298,6 @@ export function SchedulePage({
           <SurfaceCard className="xl:sticky xl:top-4 xl:self-start">
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
-              <SurfaceCardDescription>
-                {copy.unscheduledQueueDescription}
-              </SurfaceCardDescription>
             </SurfaceCardHeader>
 
             <div className="mt-4 max-h-[70vh] space-y-3 overflow-y-auto pr-1 text-sm text-muted-foreground">
@@ -2324,6 +2316,7 @@ export function SchedulePage({
                     isDragging={draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId}
                     isExpanded={expandedQueueTaskIds.includes(item.taskId)}
                     onToggle={() => toggleQueueCard(item.taskId)}
+                    onMutatedAction={refreshProjection}
                     onSaveTaskConfigAction={handleTaskConfigSave}
                     onDragStart={handleQueueDragStart}
                     onDragEnd={handleQueueDragEnd}
@@ -2335,80 +2328,47 @@ export function SchedulePage({
         </div>
 
         <SurfaceCard>
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>{copy.secondaryPlanning}</SurfaceCardTitle>
-              <SurfaceCardDescription>{copy.secondaryPlanningDescription}</SurfaceCardDescription>
-            </SurfaceCardHeader>
-
-            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(280px,0.8fr)]">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.weekOverview}</h3>
-                  <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
-                </div>
-
-                <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground">{copy.conflictsTitle}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{copy.conflictsDescription}</p>
-                    </div>
-                    <StatusBadge tone={viewData.risks.length > 0 ? "critical" : "neutral"}>{viewData.risks.length}</StatusBadge>
-                  </div>
-                  <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                    {viewData.risks.length === 0 ? (
-                      <EmptyState>{copy.noScheduleRisks}</EmptyState>
-                    ) : (
-                      viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{copy.aiProposalsTitle}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">{copy.aiProposalsDescription}</p>
-                  </div>
-                  <StatusBadge tone={viewData.proposals.length > 0 ? "info" : "neutral"}>{viewData.proposals.length}</StatusBadge>
-                </div>
-                <div className="mt-3 space-y-4 text-sm text-muted-foreground">
-                  {viewData.proposals.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-                      {copy.aiProposalsCompactEmpty}
-                    </div>
-                  ) : (
-                    viewData.proposals.slice(0, 2).map((proposal) => (
-                      <ProposalCard
-                        key={proposal.proposalId}
-                        proposal={proposal}
-                        isPending={isPending}
-                        onAccept={handleAcceptProposal}
-                        onReject={handleRejectProposal}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <details className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
-                <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">{copy.planningGuide}</summary>
-                <div className="mt-3 space-y-2">
-                  <p>{copy.guideStep1}</p>
-                  <p>{copy.guideStep2}</p>
-                  <p>{copy.guideStep3}</p>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <LocalizedLink href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                    {copy.openTaskCenter}
-                  </LocalizedLink>
-                  <LocalizedLink href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                    Open Inbox
-                  </LocalizedLink>
-                </div>
-              </details>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>{copy.weekOverview}</SurfaceCardTitle>
+          </SurfaceCardHeader>
+          <div className="px-6 pb-4">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["week", copy.weekOverview],
+                ["risks", copy.conflictsTitle],
+                ["proposals", copy.aiProposalsTitle],
+              ].map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setSecondaryView(value as SecondaryPlanningView)} className={buttonVariants({ variant: secondaryView === value ? "default" : "ghost", size: "sm" })}>
+                  {label}
+                </button>
+              ))}
             </div>
+          </div>
+          <div className="px-6 pb-6">
+            {secondaryView === "week" ? (
+              <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
+            ) : secondaryView === "risks" ? (
+              <div className="space-y-3">
+                {viewData.risks.length === 0 ? <EmptyState>{copy.noScheduleRisks}</EmptyState> : viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {viewData.proposals.length === 0 ? (
+                  <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
+                ) : (
+                  viewData.proposals.slice(0, 2).map((proposal) => (
+                    <ProposalCard
+                      key={proposal.proposalId}
+                      proposal={proposal}
+                      isPending={isPending}
+                      onAccept={handleAcceptProposal}
+                      onReject={handleRejectProposal}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </SurfaceCard>
       </div>
 
@@ -2420,6 +2380,7 @@ export function SchedulePage({
           defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
           isPending={isPending}
           onSaveTaskConfigAction={handleTaskConfigSave}
+          onMutatedAction={refreshProjection}
         />
       ) : null}
     </div>

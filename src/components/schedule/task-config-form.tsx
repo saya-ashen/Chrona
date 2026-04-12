@@ -54,6 +54,7 @@ type TaskConfigFormState = {
 type TaskConfigFormProps = {
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
+  compact?: boolean;
   initialValues?: {
     title?: string;
     description?: string | null;
@@ -74,6 +75,7 @@ type TaskConfigFormProps = {
 };
 
 const DEFAULT_COPY = {
+  moreOptions: "More options",
   starterPresets: "Starter presets",
   title: "Title",
   titlePlaceholder: "Add the next task to execute",
@@ -460,6 +462,7 @@ function renderFieldValue(value: unknown) {
 export function TaskConfigForm({
   runtimeAdapters,
   defaultRuntimeAdapterKey,
+  compact = false,
   initialValues,
   submitLabel,
   pendingLabel,
@@ -477,21 +480,47 @@ export function TaskConfigForm({
     },
   };
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
+  const initialTitle = initialValues?.title;
+  const initialDescription = initialValues?.description;
+  const initialPriority = initialValues?.priority;
+  const initialDueAt = initialValues?.dueAt;
+  const initialRuntimeAdapterKey = initialValues?.runtimeAdapterKey;
+  const initialRuntimeInput = initialValues?.runtimeInput;
+  const initialRuntimeInputVersion = initialValues?.runtimeInputVersion;
+  const initialRuntimeModel = initialValues?.runtimeModel;
+  const initialPrompt = initialValues?.prompt;
+  const initialRuntimeConfig = initialValues?.runtimeConfig;
   const initialState = useMemo(
-    () => toFormState(initialValues, runtimeAdapters, defaultRuntimeAdapterKey),
+    () =>
+      toFormState(
+        {
+          title: initialTitle,
+          description: initialDescription,
+          priority: initialPriority,
+          dueAt: initialDueAt,
+          runtimeAdapterKey: initialRuntimeAdapterKey,
+          runtimeInput: initialRuntimeInput,
+          runtimeInputVersion: initialRuntimeInputVersion,
+          runtimeModel: initialRuntimeModel,
+          prompt: initialPrompt,
+          runtimeConfig: initialRuntimeConfig,
+        },
+        runtimeAdapters,
+        defaultRuntimeAdapterKey,
+      ),
     [
       defaultRuntimeAdapterKey,
       runtimeAdapters,
-      initialValues?.title,
-      initialValues?.description,
-      initialValues?.priority,
-      initialValues?.dueAt?.toISOString(),
-      initialValues?.runtimeAdapterKey,
-      initialValues?.runtimeInputVersion,
-      initialValues?.runtimeModel,
-      initialValues?.prompt,
-      formatRuntimeConfig(initialValues?.runtimeInput),
-      formatRuntimeConfig(initialValues?.runtimeConfig),
+      initialTitle,
+      initialDescription,
+      initialPriority,
+      initialDueAt,
+      initialRuntimeAdapterKey,
+      initialRuntimeInput,
+      initialRuntimeInputVersion,
+      initialRuntimeModel,
+      initialPrompt,
+      initialRuntimeConfig,
     ],
   );
   const [formState, setFormState] = useState<TaskConfigFormState>(initialState);
@@ -522,6 +551,12 @@ export function TaskConfigForm({
   );
   const visibleAdvancedFields = selectedRuntimeAdapter.spec.fields.filter(
     (field) => field.advanced && isFieldVisible(field, visibleRuntimeInput),
+  );
+  const requiredRuntimeFields = visibleStandardFields.filter((field) =>
+    selectedRuntimeAdapter.spec.runnability.requiredPaths.includes(field.path),
+  );
+  const optionalRuntimeFields = visibleStandardFields.filter(
+    (field) => !selectedRuntimeAdapter.spec.runnability.requiredPaths.includes(field.path),
   );
 
   function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
@@ -559,9 +594,9 @@ export function TaskConfigForm({
       ) : null}
 
       {presets && presets.length > 0 ? (
-        <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.starterPresets}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className={compact ? "flex flex-wrap gap-2" : "rounded-2xl border border-border/60 bg-background/70 p-3"}>
+          {compact ? <p className="sr-only">{copy.starterPresets}</p> : <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.starterPresets}</p>}
+          <div className={compact ? "flex flex-wrap gap-2" : "mt-3 grid gap-2 sm:grid-cols-2"}>
             {presets.map((preset) => (
               <button
                 key={preset.id}
@@ -572,10 +607,10 @@ export function TaskConfigForm({
                     applyPresetValues(current, preset.values, runtimeAdapters, defaultRuntimeAdapterKey),
                   )
                 }
-                className="rounded-2xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"
+                className={compact ? "rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60" : "rounded-2xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"}
               >
                 <p className="text-sm font-medium text-foreground">{preset.label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p>
+                {!compact ? <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p> : null}
               </button>
             ))}
           </div>
@@ -594,11 +629,12 @@ export function TaskConfigForm({
           />
         </Field>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Field label={copy.priority} className="text-xs text-muted-foreground">
-            <select
-              name="priority"
-              value={formState.priority}
+        {!compact ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label={copy.priority} className="text-xs text-muted-foreground">
+              <select
+                name="priority"
+                value={formState.priority}
               onChange={(event) =>
                 setFormState((current) => ({
                   ...current,
@@ -613,20 +649,21 @@ export function TaskConfigForm({
                 </option>
               ))}
             </select>
-          </Field>
+            </Field>
 
-          <Field label={copy.dueDate} className="text-xs text-muted-foreground">
-            <input
-              name="dueAt"
-              type="datetime-local"
-              value={formState.dueAt}
-              onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
-              className={inputClassName}
-            />
-          </Field>
-        </div>
+            <Field label={copy.dueDate} className="text-xs text-muted-foreground">
+              <input
+                name="dueAt"
+                type="datetime-local"
+                value={formState.dueAt}
+                onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
+                className={inputClassName}
+              />
+            </Field>
+          </div>
+        ) : null}
 
-        {runtimeAdapters.length > 1 ? (
+        {runtimeAdapters.length > 1 && !compact ? (
           <Field label={copy.adapter} className="text-xs text-muted-foreground">
             <select
               name="runtimeAdapterKey"
@@ -650,7 +687,7 @@ export function TaskConfigForm({
           </Field>
         ) : null}
 
-        {visibleStandardFields.map((field) => {
+        {(compact ? requiredRuntimeFields : visibleStandardFields).map((field) => {
           const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
 
           if (field.kind === "textarea") {
@@ -658,7 +695,7 @@ export function TaskConfigForm({
               <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
                 <textarea
                   name={field.path}
-                  rows={4}
+                  rows={compact ? 3 : 4}
                   value={renderFieldValue(value)}
                   onChange={(event) => updateRuntimeField(field, event.target.value)}
                   maxLength={field.constraints?.maxLength}
@@ -726,7 +763,7 @@ export function TaskConfigForm({
               <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
                 <textarea
                   name={field.path}
-                  rows={5}
+                  rows={compact ? 4 : 5}
                   value={typeof value === "string" ? value : formatRuntimeConfig(value)}
                   onChange={(event) => updateRuntimeField(field, event.target.value)}
                   className={textareaClassName}
@@ -750,23 +787,107 @@ export function TaskConfigForm({
           );
         })}
 
-        <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">{copy.advancedFields}</summary>
+        <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3" open={!compact}>
+          <summary className="cursor-pointer text-sm font-medium text-foreground">{compact ? copy.moreOptions : copy.advancedFields}</summary>
 
           <div className="mt-3 space-y-3">
-            <Field label={copy.description} className="text-xs text-muted-foreground">
-              <textarea
-                name="description"
-                rows={3}
-                value={formState.description}
-                onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
-                placeholder={copy.descriptionPlaceholder}
-                className={textareaClassName}
-              />
-            </Field>
+            {compact ? (
+              <>
+                <Field label={copy.priority} className="text-xs text-muted-foreground">
+                  <select
+                    name="priority"
+                    value={formState.priority}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        priority: event.target.value as TaskConfigFormInput["priority"],
+                      }))
+                    }
+                    className={selectClassName}
+                  >
+                    {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
+                      <option key={priority} value={priority}>
+                        {copy.priorities[priority]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-            {visibleAdvancedFields.map((field) => {
+                <Field label={copy.dueDate} className="text-xs text-muted-foreground">
+                  <input
+                    name="dueAt"
+                    type="datetime-local"
+                    value={formState.dueAt}
+                    onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
+                    className={inputClassName}
+                  />
+                </Field>
+
+                {runtimeAdapters.length > 1 ? (
+                  <Field label={copy.adapter} className="text-xs text-muted-foreground">
+                    <select
+                      name="runtimeAdapterKey"
+                      value={formState.runtimeAdapterKey}
+                      onChange={(event) =>
+                        setFormState((current) =>
+                          applyRuntimeAdapterChange(
+                            current,
+                            resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
+                          ),
+                        )
+                      }
+                      className={selectClassName}
+                    >
+                      {runtimeAdapters.map((adapter) => (
+                        <option key={adapter.key} value={adapter.key}>
+                          {adapter.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                <Field label={copy.description} className="text-xs text-muted-foreground">
+                  <textarea
+                    name="description"
+                    rows={3}
+                    value={formState.description}
+                    onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                    placeholder={copy.descriptionPlaceholder}
+                    className={textareaClassName}
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label={copy.description} className="text-xs text-muted-foreground">
+                <textarea
+                  name="description"
+                  rows={3}
+                  value={formState.description}
+                  onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                  placeholder={copy.descriptionPlaceholder}
+                  className={textareaClassName}
+                />
+              </Field>
+            )}
+
+            {(compact ? [...optionalRuntimeFields, ...visibleAdvancedFields] : visibleAdvancedFields).map((field) => {
               const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+
+              if (field.kind === "textarea") {
+                return (
+                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <textarea
+                      name={field.path}
+                      rows={3}
+                      value={renderFieldValue(value)}
+                      onChange={(event) => updateRuntimeField(field, event.target.value)}
+                      maxLength={field.constraints?.maxLength}
+                      className={textareaClassName}
+                    />
+                  </Field>
+                );
+              }
 
               if (field.kind === "select") {
                 return (
@@ -817,6 +938,20 @@ export function TaskConfigForm({
                       />
                       <span>{field.label}</span>
                     </label>
+                  </Field>
+                );
+              }
+
+              if (field.kind === "json") {
+                return (
+                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <textarea
+                      name={field.path}
+                      rows={4}
+                      value={typeof value === "string" ? value : formatRuntimeConfig(value)}
+                      onChange={(event) => updateRuntimeField(field, event.target.value)}
+                      className={textareaClassName}
+                    />
                   </Field>
                 );
               }

@@ -8,6 +8,7 @@ import { clearSchedule as clearScheduleCommand } from "@/modules/commands/clear-
 import { createFollowUpTask as createFollowUpTaskCommand } from "@/modules/commands/create-follow-up-task";
 import { createTask as createTaskCommand } from "@/modules/commands/create-task";
 import { decideScheduleProposal as decideScheduleProposalCommand } from "@/modules/commands/decide-schedule-proposal";
+import { generateTaskPlan as generateTaskPlanCommand } from "@/modules/commands/generate-task-plan";
 import { invalidateMemory as invalidateMemoryCommand } from "@/modules/commands/invalidate-memory";
 import { markTaskDone as markTaskDoneCommand } from "@/modules/commands/mark-task-done";
 import { proposeSchedule as proposeScheduleCommand } from "@/modules/commands/propose-schedule";
@@ -89,6 +90,12 @@ export async function clearSchedule(input: Parameters<typeof clearScheduleComman
 
 export async function proposeSchedule(input: Parameters<typeof proposeScheduleCommand>[0]) {
   const result = await proposeScheduleCommand(input);
+  revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
+  return result;
+}
+
+export async function generateTaskPlan(input: Parameters<typeof generateTaskPlanCommand>[0]) {
+  const result = await generateTaskPlanCommand(input);
   revalidateWorkspaceTaskPaths(result.workspaceId, result.taskId);
   return result;
 }
