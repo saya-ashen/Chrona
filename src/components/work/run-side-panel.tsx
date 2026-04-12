@@ -110,6 +110,27 @@ function getRunStatusLabel(status: string | null | undefined, fallback: string) 
   }
 }
 
+function getRunStatusTone(status: string | null | undefined, isStale: boolean) {
+  if (isStale) {
+    return "warning" as const;
+  }
+
+  switch (status) {
+    case "Completed":
+      return "success" as const;
+    case "Failed":
+    case "Cancelled":
+      return "critical" as const;
+    case "WaitingForApproval":
+    case "WaitingForInput":
+      return "warning" as const;
+    case "Running":
+      return "info" as const;
+    default:
+      return "neutral" as const;
+  }
+}
+
 export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliability, approvals, artifacts, toolCalls }: RunSidePanelProps) {
   const { messages } = useI18n();
   const panelMessages = messages.components?.runSidePanel ?? {};
@@ -138,13 +159,17 @@ export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliabilit
     taskContext: "任务背景",
     scheduleReminder: "日程信息",
     syncSummary: "同步情况",
-    runSummary: "当前执行",
-    blockerSummary: "任务尚未开始执行，如需继续，请重新启动或调整日程。",
+    runSummary: "运行信息",
+    blockerSummary: "当前没有明确阻塞，任务可以继续推进。",
     approvals: "待处理审批",
     artifacts: "当前产出",
     ...panelMessages,
   };
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("context");
+  const blockerText = taskShell.blockReason?.actionRequired ?? reliability.stopReason ?? copy.blockerSummary;
+  const runStatusLabel = getRunStatusLabel(currentRun?.status, copy.noRun);
+  const runStatusTone = getRunStatusTone(currentRun?.status, reliability.isStale);
+  const lastUpdatedAt = reliability.lastUpdatedAt ?? reliability.lastSyncedAt ?? reliability.refreshedAt;
 
   return (
     <aside className="space-y-3">
@@ -164,11 +189,23 @@ export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliabilit
 
         <div className="mt-4 space-y-4 text-sm">
           {activeTab === "context" ? (
-            <div className="space-y-3 text-muted-foreground">
-              <div className="rounded-2xl border bg-background/80 p-3">
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div id="current-blocker-panel" className="rounded-2xl border bg-background/80 p-3">
+                <p className="text-sm font-medium text-foreground">{copy.currentBlocker}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={taskShell.blockReason?.actionRequired || reliability.stopReason ? "warning" : "info"}>
+                    {taskShell.blockReason?.actionRequired || reliability.stopReason ? "需要处理" : "可继续推进"}
+                  </StatusBadge>
+                </div>
+                <p className="mt-2 leading-6">{blockerText}</p>
+              </div>
+
+              <div id="run-summary-panel" className="rounded-2xl border bg-background/80 p-3">
                 <p className="text-sm font-medium text-foreground">{copy.taskContext}</p>
-                <p className="mt-2"><span className="text-foreground">{copy.priority}：</span>{getPriorityLabel(taskShell.priority)}</p>
-                <p className="mt-1"><span className="text-foreground">{copy.due}：</span>{formatDate(taskShell.dueAt)}</p>
+                <div className="mt-2 space-y-1.5">
+                  <p><span className="text-foreground">{copy.priority}：</span>{getPriorityLabel(taskShell.priority)}</p>
+                  <p><span className="text-foreground">{copy.due}：</span>{formatDate(taskShell.dueAt)}</p>
+                </div>
               </div>
 
               <div className="rounded-2xl border bg-background/80 p-3">
@@ -181,21 +218,18 @@ export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliabilit
               <div className="rounded-2xl border bg-background/80 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-foreground">{copy.runSummary}</p>
-                  <StatusBadge tone={reliability.isStale ? "warning" : "info"}>
-                    {getRunStatusLabel(currentRun?.status, copy.noRun)}
+                  <StatusBadge tone={runStatusTone}>
+                    {runStatusLabel}
                   </StatusBadge>
+                  {reliability.isStale ? <StatusBadge tone="warning">同步过期</StatusBadge> : null}
                 </div>
-                <p className="mt-2"><span className="text-foreground">{copy.sync}：</span>{reliability.isStale ? copy.stale : copy.healthy}</p>
-                <p className="mt-1"><span className="text-foreground">{copy.refreshed}：</span>{formatDateTime(reliability.refreshedAt)}</p>
-                <p className="mt-1"><span className="text-foreground">{copy.lastSync}：</span>{formatDateTime(reliability.lastSyncedAt)}</p>
-                <p className="mt-1"><span className="text-foreground">{copy.lastUpdate}：</span>{formatDateTime(reliability.lastUpdatedAt)}</p>
-                <p className="mt-1"><span className="text-foreground">{copy.stopReason}：</span>{reliability.stopReason ?? "暂无"}</p>
+                <div className="mt-2 space-y-1.5">
+                  <p><span className="text-foreground">{copy.sync}：</span>{reliability.isStale ? copy.stale : copy.healthy}</p>
+                  <p><span className="text-foreground">{copy.lastUpdate}：</span>{formatDateTime(lastUpdatedAt)}</p>
+                  {reliability.isStale ? <p><span className="text-foreground">{copy.lastSync}：</span>{formatDateTime(reliability.lastSyncedAt)}</p> : null}
+                  {reliability.stopReason ? <p><span className="text-foreground">{copy.stopReason}：</span>{reliability.stopReason}</p> : null}
+                </div>
                 {reliability.stuckFor ? <p className="mt-1"><span className="text-foreground">{copy.stuckFor}：</span>{reliability.stuckFor}</p> : null}
-              </div>
-
-              <div className="rounded-2xl border bg-background/80 p-3">
-                <p className="text-sm font-medium text-foreground">{copy.currentBlocker}</p>
-                <p className="mt-2">{taskShell.blockReason?.actionRequired ?? copy.blockerSummary}</p>
               </div>
             </div>
           ) : null}

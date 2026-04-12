@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e351] [cursor=pointer]:
+    - img [ref=e352]
+  - alert [ref=e355]
+  - generic [ref=e685]:
+    - banner [ref=e686]:
+      - generic [ref=e687]:
+        - generic [ref=e688]:
+          - link "Agent Dashboard" [ref=e689] [cursor=pointer]:
+            - /url: /en/schedule
+            - generic [ref=e690]: Agent Dashboard
+            - generic [ref=e691]: Task-centric AI control plane
+          - generic "Language" [ref=e692]:
+            - link "English" [ref=e693] [cursor=pointer]:
+              - /url: /en/schedule
+            - link "中文" [ref=e694] [cursor=pointer]:
+              - /url: /zh/schedule
+        - navigation "Primary" [ref=e695]:
+          - link "Workspaces" [ref=e696] [cursor=pointer]:
+            - /url: /en/workspaces
+          - link "Schedule" [ref=e697] [cursor=pointer]:
+            - /url: /en/schedule
+          - link "Inbox" [ref=e698] [cursor=pointer]:
+            - /url: /en/inbox
+          - link "Memory" [ref=e699] [cursor=pointer]:
+            - /url: /en/memory
+          - link "Settings" [ref=e700] [cursor=pointer]:
+            - /url: /en/settings
+    - main [ref=e701]:
+      - generic [ref=e702]:
+        - generic [ref=e703]:
+          - heading "Workspaces" [level=1] [ref=e704]
+          - paragraph [ref=e705]: Advanced workspace management for internal or multi-workspace operations.
+        - generic [ref=e706]: Daily work now starts from Schedule, Tasks, Inbox, and Memory. This page remains available for deeper workspace administration.
+        - generic [ref=e707]:
+          - link "Demo Workspace 5 tasks" [ref=e708] [cursor=pointer]:
+            - /url: /en/workspaces/ws_demo
+            - paragraph [ref=e709]: Demo Workspace
+            - paragraph [ref=e710]: 5 tasks
+          - link "Schedule Runnable State 3 tasks" [ref=e711] [cursor=pointer]:
+            - /url: /en/workspaces/cmnsb8i470007bvfuob9uzajt
+            - paragraph [ref=e712]: Schedule Runnable State
+            - paragraph [ref=e713]: 3 tasks

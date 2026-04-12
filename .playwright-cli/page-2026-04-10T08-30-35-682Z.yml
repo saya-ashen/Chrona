@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e351] [cursor=pointer]:
+    - img [ref=e352]
+  - alert [ref=e355]
+  - generic [ref=e572]:
+    - banner [ref=e573]:
+      - generic [ref=e574]:
+        - generic [ref=e575]:
+          - link "Agent Dashboard" [ref=e576] [cursor=pointer]:
+            - /url: /en/schedule
+            - generic [ref=e577]: Agent Dashboard
+            - generic [ref=e578]: Task-centric AI control plane
+          - generic "Language" [ref=e579]:
+            - link "English" [ref=e580] [cursor=pointer]:
+              - /url: /en/schedule
+            - link "中文" [ref=e581] [cursor=pointer]:
+              - /url: /zh/schedule
+        - navigation "Primary" [ref=e582]:
+          - link "Workspaces" [ref=e583] [cursor=pointer]:
+            - /url: /en/workspaces
+          - link "Schedule" [ref=e584] [cursor=pointer]:
+            - /url: /en/schedule
+          - link "Inbox" [ref=e585] [cursor=pointer]:
+            - /url: /en/inbox
+          - link "Memory" [ref=e586] [cursor=pointer]:
+            - /url: /en/memory
+          - link "Settings" [ref=e587] [cursor=pointer]:
+            - /url: /en/settings
+    - main [ref=e588]:
+      - generic [ref=e590]:
+        - heading "Inbox" [level=1] [ref=e591]
+        - paragraph [ref=e592]: Triage approvals, input requests, schedule proposals, and recovery work from one interruption queue.

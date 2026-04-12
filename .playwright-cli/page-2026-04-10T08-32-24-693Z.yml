@@ -1,0 +1,114 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e351] [cursor=pointer]:
+    - img [ref=e352]
+  - alert [ref=e355]
+  - generic [ref=e818]:
+    - banner [ref=e819]:
+      - generic [ref=e820]:
+        - generic [ref=e821]:
+          - link "Agent Dashboard" [ref=e822] [cursor=pointer]:
+            - /url: /en/schedule
+            - generic [ref=e823]: Agent Dashboard
+            - generic [ref=e824]: Task-centric AI control plane
+          - generic "Language" [ref=e825]:
+            - link "English" [ref=e826] [cursor=pointer]:
+              - /url: /en/schedule
+            - link "中文" [ref=e827] [cursor=pointer]:
+              - /url: /zh/schedule
+        - navigation "Primary" [ref=e828]:
+          - link "Workspaces" [ref=e829] [cursor=pointer]:
+            - /url: /en/workspaces
+          - link "Schedule" [ref=e830] [cursor=pointer]:
+            - /url: /en/schedule
+          - link "Inbox" [ref=e831] [cursor=pointer]:
+            - /url: /en/inbox
+          - link "Memory" [ref=e832] [cursor=pointer]:
+            - /url: /en/memory
+          - link "Settings" [ref=e833] [cursor=pointer]:
+            - /url: /en/settings
+    - main [ref=e834]:
+      - generic [ref=e835]:
+        - generic [ref=e837]:
+          - generic [ref=e838]:
+            - generic [ref=e839]:
+              - generic [ref=e840]:
+                - paragraph [ref=e841]: Secondary task detail
+                - heading "Configured task" [level=1] [ref=e842]
+                - paragraph [ref=e843]: Has the minimum runnable config
+              - generic [ref=e844]:
+                - link "Back to Schedule" [ref=e845] [cursor=pointer]:
+                  - /url: /en/schedule
+                - link "Open Workbench" [ref=e846] [cursor=pointer]:
+                  - /url: /en/workspaces/cmnsb8i470007bvfuob9uzajt/work/cmnsb8i4b0008bvfu7ud4hzz5
+            - generic [ref=e847]:
+              - generic [ref=e848]: Ready
+              - generic [ref=e849]: High
+              - generic [ref=e850]: Scheduled
+              - generic [ref=e851]: Ready to run
+              - generic [ref=e852]: Due -
+          - generic [ref=e853]:
+            - generic [ref=e854]:
+              - heading "Use the primary surfaces" [level=2] [ref=e855]
+              - paragraph [ref=e856]: Keep core planning and task configuration in Schedule, then move into Work for execution and collaboration.
+            - generic [ref=e857]:
+              - link "Edit planning in Schedule" [ref=e858] [cursor=pointer]:
+                - /url: /en/schedule
+              - link "Continue execution in Work" [ref=e859] [cursor=pointer]:
+                - /url: /en/workspaces/cmnsb8i470007bvfuob9uzajt/work/cmnsb8i4b0008bvfu7ud4hzz5
+          - generic [ref=e860]:
+            - generic [ref=e861]:
+              - generic [ref=e862]:
+                - heading "Runtime configuration" [level=2] [ref=e863]
+                - paragraph [ref=e864]: Keep the runnable definition visible here, but treat Schedule as the default place to edit it.
+              - generic [ref=e865]:
+                - generic [ref=e866]:
+                  - term [ref=e867]: Model
+                  - definition [ref=e868]: gpt-5.4
+                - generic [ref=e869]:
+                  - term [ref=e870]: Runnability
+                  - definition [ref=e871]: Ready to run
+              - generic [ref=e872]:
+                - paragraph [ref=e873]: Prompt
+                - paragraph [ref=e874]: Execute the configured task
+              - generic [ref=e875]:
+                - paragraph [ref=e876]: Runtime params
+                - generic [ref=e877]: "{ \"temperature\": 0.2 }"
+            - generic [ref=e878]:
+              - generic [ref=e879]:
+                - heading "Planning context" [level=2] [ref=e880]
+                - paragraph [ref=e881]: Keep the current plan visible without turning this page back into the main planning surface.
+              - generic [ref=e882]:
+                - generic [ref=e883]:
+                  - term [ref=e884]: Due
+                  - definition [ref=e885]: "-"
+                - generic [ref=e886]:
+                  - term [ref=e887]: Start
+                  - definition [ref=e888]: 2026-04-16
+                - generic [ref=e889]:
+                  - term [ref=e890]: End
+                  - definition [ref=e891]: 2026-04-16
+                - generic [ref=e892]:
+                  - term [ref=e893]: Schedule status
+                  - definition [ref=e894]: Scheduled
+                - generic [ref=e895]:
+                  - term [ref=e896]: Schedule source
+                  - definition [ref=e897]: human
+              - generic [ref=e898]: No blocking action recorded.
+          - generic [ref=e899]:
+            - generic [ref=e900]:
+              - heading "Dependencies" [level=2] [ref=e901]
+              - paragraph [ref=e902]: Track upstream work without pulling planning controls back into this page.
+            - paragraph [ref=e904]: No dependencies linked yet.
+        - complementary [ref=e905]:
+          - generic [ref=e906]:
+            - heading "Latest Run" [level=2] [ref=e907]
+            - paragraph [ref=e909]: No run started yet.
+          - generic [ref=e910]:
+            - heading "Pending Schedule Proposals" [level=2] [ref=e911]
+            - paragraph [ref=e913]: No pending schedule proposals.
+          - generic [ref=e914]:
+            - heading "Recent Approvals" [level=2] [ref=e915]
+            - paragraph [ref=e917]: No recent approvals.
+          - generic [ref=e918]:
+            - heading "Recent Artifacts" [level=2] [ref=e919]
+            - paragraph [ref=e921]: No artifacts yet.
