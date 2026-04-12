@@ -1,0 +1,124 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e351] [cursor=pointer]:
+    - img [ref=e352]
+  - alert [ref=e355]
+  - generic [ref=e459]:
+    - banner [ref=e460]:
+      - generic [ref=e461]:
+        - generic [ref=e462]:
+          - link "Agent Dashboard" [ref=e463] [cursor=pointer]:
+            - /url: /en/schedule
+            - generic [ref=e464]: Agent Dashboard
+            - generic [ref=e465]: Task-centric AI control plane
+          - generic "Language" [ref=e466]:
+            - link "English" [ref=e467] [cursor=pointer]:
+              - /url: /en/schedule
+            - link "中文" [ref=e468] [cursor=pointer]:
+              - /url: /zh/schedule
+        - navigation "Primary" [ref=e469]:
+          - link "Workspaces" [ref=e470] [cursor=pointer]:
+            - /url: /en/workspaces
+          - link "Schedule" [ref=e471] [cursor=pointer]:
+            - /url: /en/schedule
+          - link "Inbox" [ref=e472] [cursor=pointer]:
+            - /url: /en/inbox
+          - link "Memory" [ref=e473] [cursor=pointer]:
+            - /url: /en/memory
+          - link "Settings" [ref=e474] [cursor=pointer]:
+            - /url: /en/settings
+    - main [ref=e475]:
+      - generic [ref=e476]:
+        - generic [ref=e477]:
+          - generic [ref=e478]:
+            - generic [ref=e479]:
+              - generic [ref=e480]:
+                - heading "Missing prompt task" [level=1] [ref=e481]
+                - paragraph [ref=e482]: Keep execution moving here, keep planning edits in Schedule, and treat task detail as reference-only.
+              - generic [ref=e483]:
+                - link "Open Schedule" [ref=e484] [cursor=pointer]:
+                  - /url: /en/schedule
+                - link "View task detail" [ref=e485] [cursor=pointer]:
+                  - /url: /en/workspaces/cmnsb8i470007bvfuob9uzajt/tasks/cmnsb8i4g0009bvfu3r3o1vcr
+            - generic [ref=e486]:
+              - generic [ref=e487]: Running
+              - generic [ref=e488]: Medium
+              - generic [ref=e489]: Run Running
+              - generic [ref=e490]: Unscheduled
+              - generic [ref=e491]: Due -
+            - generic [ref=e492]:
+              - generic [ref=e493]:
+                - paragraph [ref=e494]: Intervention focus
+                - paragraph [ref=e495]: No blocking action recorded.
+              - generic [ref=e496]:
+                - paragraph [ref=e497]: Planned window
+                - paragraph [ref=e498]: "- to -"
+          - generic [ref=e499]:
+            - generic [ref=e500]:
+              - heading "Next Action" [level=2] [ref=e501]
+              - paragraph [ref=e502]: Observe progress — make the next intervention obvious and keep everything else secondary.
+            - generic [ref=e503]:
+              - generic [ref=e504]:
+                - paragraph [ref=e505]: Why now
+                - paragraph [ref=e506]: The agent is currently executing, so the best next step is to monitor the newest evidence.
+                - generic [ref=e507]:
+                  - paragraph [ref=e508]: Evidence
+                  - generic [ref=e509]:
+                    - generic [ref=e510]:
+                      - generic [ref=e511]: Latest output
+                      - generic [ref=e512]: Latest agent output
+                    - generic [ref=e513]:
+                      - generic [ref=e514]: Latest milestone
+                      - generic [ref=e515]: "runtime_name: openclaw · task_model: gpt-5.4 · runtime_run_ref: acc7cc0f-c89e-402c-9ead-b492497930ef"
+              - generic [ref=e516]: The run is still active. Watch the newest milestones and intervene only if the state changes.
+          - generic [ref=e517]:
+            - generic [ref=e518]:
+              - heading "Shared Output" [level=2] [ref=e519]
+              - paragraph [ref=e520]: The latest useful result from this run should be visible without digging through logs.
+            - generic [ref=e521]:
+              - generic [ref=e522]:
+                - generic [ref=e523]: Conversation output
+                - generic [ref=e524]: Updated 2026-04-10 05:45
+              - paragraph [ref=e525]: Latest agent output
+              - paragraph [ref=e526]: 我这边没有看到“Missing prompt task”的具体内容，无法继续盲做。 请直接贴任一项： - 任务说明 - 上一条相关消息 - 文件路径 / issue / TODO 内容 你一发我就接着做。
+          - generic [ref=e527]:
+            - generic [ref=e528]:
+              - heading "Execution Workstream" [level=2] [ref=e529]
+              - paragraph [ref=e530]: Use the workstream by default, then switch to conversation only when you need deeper narrative evidence.
+            - generic [ref=e531]:
+              - button "Workstream" [ref=e532]
+              - button "Conversation" [ref=e533]
+            - generic [ref=e535]:
+              - heading "Latest execution milestones" [level=3] [ref=e536]
+              - generic [ref=e538]:
+                - generic [ref=e539]:
+                  - generic [ref=e540]:
+                    - generic [ref=e541]: Progress
+                    - paragraph [ref=e542]: Run Started
+                  - paragraph [ref=e543]: "-"
+                - paragraph [ref=e544]: "runtime_name: openclaw · task_model: gpt-5.4 · runtime_run_ref: acc7cc0f-c89e-402c-9ead-b492497930ef"
+                - paragraph [ref=e545]: This shows the latest execution progress without demanding immediate action.
+                - group [ref=e546]:
+                  - generic "Raw payload" [ref=e547] [cursor=pointer]
+        - complementary [ref=e548]:
+          - generic [ref=e549]:
+            - generic [ref=e550]:
+              - heading "Run Snapshot" [level=2] [ref=e551]
+              - paragraph [ref=e552]: Current run state, timing, and sync health.
+            - generic [ref=e553]:
+              - generic [ref=e554]: Running
+              - generic [ref=e555]: Sync healthy
+            - generic [ref=e557]:
+              - paragraph [ref=e558]: "Started: 2026-04-10 05:45"
+              - paragraph [ref=e559]: "Ended: -"
+              - paragraph [ref=e560]: "Resume supported: No"
+          - generic [ref=e561]:
+            - generic [ref=e562]:
+              - heading "Evidence" [level=2] [ref=e563]
+              - paragraph [ref=e564]: Approvals, artifacts, and tool output stay here as supporting context.
+            - generic [ref=e565]:
+              - group [ref=e566]:
+                - generic "Approvals" [ref=e567] [cursor=pointer]
+              - group [ref=e568]:
+                - generic "Artifacts" [ref=e569] [cursor=pointer]
+              - group [ref=e570]:
+                - generic "Tool Activity" [ref=e571] [cursor=pointer]

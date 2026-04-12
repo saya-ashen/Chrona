@@ -1,6 +1,6 @@
 # Task-Centric AI Control Plane Design
 
-> Supersedes `docs/superpowers/specs/2026-04-08-task-centric-ai-control-plane-design.md`.
+> Supersedes the 2026-04-08 revision.
 > This revision promotes `Schedule` to an MVP-critical surface and tightens the role boundaries of `Schedule / Task / Work`.
 
 ## 1. 文档目的

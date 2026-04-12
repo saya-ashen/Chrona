@@ -5,27 +5,24 @@ import type { KeyboardEvent } from "react";
 import {
   acceptTaskResult,
   approveApproval,
-  createFollowUpTask,
   editAndApproveApproval,
   generateTaskPlan,
-  markTaskDone,
   provideInput,
   rejectApproval,
-  reopenTask,
   retryRun,
   sendOperatorMessage,
   startRun,
 } from "@/app/actions/task-actions";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
-import { Field, inputClassName, textareaClassName } from "@/components/ui/field";
+import { inputClassName, textareaClassName } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   SurfaceCard,
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-import { ConversationPanel } from "@/components/work/conversation-panel";
+import { CollaborationStream } from "@/components/work/collaboration-stream";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { RunSidePanel } from "@/components/work/run-side-panel";
 import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
@@ -188,8 +185,6 @@ type WorkPageClientProps = {
   };
 };
 
-type WorkstreamTab = "workstream" | "conversation";
-
 type WorkbenchComposer = {
   mode: "start" | "response" | "note" | "continue" | "retry";
   description: string;
@@ -203,19 +198,11 @@ type WorkbenchComposer = {
 
 type CollaborationFeedItem = {
   id: string;
-  kind: "decision" | "user" | "agent" | "event";
+  kind: "decision" | "user" | "agent" | "event" | "result";
   eyebrow: string;
   title: string;
   body: string;
   meta?: string | null;
-};
-
-type DecisionCardPlan = {
-  status: string;
-  summary: string;
-  recommendation: string;
-  steps: string[];
-  reminder?: string;
 };
 
 type WorkbenchCopy = {
@@ -302,8 +289,8 @@ const DEFAULT_COPY = {
   usedByNextAction: "下一步会用到",
   updated: "更新于",
   openArtifact: "打开产物",
-  executionWorkstream: "查看完整任务记录",
-  executionWorkstreamDescription: "把原始执行轨迹收在下方，需要排查时再展开。",
+  executionWorkstream: "任务记录",
+  executionWorkstreamDescription: "背景记录默认收在这里；需要追查细节时再切换对话往来。",
   workstream: "任务记录",
   conversation: "对话往来",
   latestExecutionMilestones: "最近任务记录",
@@ -330,8 +317,10 @@ const DEFAULT_COPY = {
   taskCompletedSummary: "最新一轮已经完成。先确认结果，再决定是否继续推进。",
   taskFailedSummary: "上一轮执行已中断。现在要决定是恢复、重试，还是改方向。",
   currentKeyDecision: "当前需要你决定",
-  collaborationFlow: "任务历史",
+  collaborationFlow: "对话记录",
+  collaborationFlowDescription: "输入后，下面按时间顺序显示对话消息：Agent 在左，你在右。",
   latestResult: "最新结果",
+  inputArea: "输入区",
   quickPrompts: "快捷补充",
   newTask: "新建任务",
   workspaceViews: "工作区入口",
@@ -339,7 +328,7 @@ const DEFAULT_COPY = {
   openInbox: "收件箱",
   openMemory: "记忆库",
   currentTask: "当前任务",
-  taskStages: "任务阶段",
+  taskStages: "任务状态",
   taskLifecycle: "任务生命周期",
   collaborationStage: "当前协作阶段",
   lifecycleNotStarted: "未开始",
@@ -361,8 +350,8 @@ const DEFAULT_COPY = {
   resultPreviewPlan: "执行建议",
   resultPreviewDraft: "草稿或摘要",
   resultPreviewQuestions: "待你确认的问题",
-  secondaryActions: "次要操作",
-  decisionReminder: "提醒",
+  secondaryActions: "次操作",
+  decisionReminder: "补充提醒",
   milestoneWaitingStart: "等待你决定是否启动",
 } as const;
 
@@ -374,86 +363,8 @@ function formatDateTime(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
 }
 
-function formatScheduleWindow(
-  scheduledStartAt: string | null | undefined,
-  scheduledEndAt: string | null | undefined,
-  fallback = DEFAULT_COPY.noScheduleWindow,
-) {
-  if (scheduledStartAt && scheduledEndAt) {
-    return `${formatDateTime(scheduledStartAt)} - ${formatDateTime(scheduledEndAt)}`;
-  }
-
-  return fallback;
-}
-
 function isOverdueScheduleStatus(status: string | null | undefined) {
   return status === "AtRisk" || status === "Overdue";
-}
-
-function getReadyDecisionSummary(data: WorkPageClientProps["initialData"]) {
-  if (data.taskShell.scheduledStartAt && data.taskShell.scheduledEndAt) {
-    if (isOverdueScheduleStatus(data.scheduleImpact.status)) {
-      return "原计划时间窗已过，建议现在重新启动。";
-    }
-
-    return `原计划时间窗为 ${formatScheduleWindow(data.taskShell.scheduledStartAt, data.taskShell.scheduledEndAt)}，现在可以开始处理。`;
-  }
-
-  return "当前还没有安排时间窗，可以直接启动，或先补充说明再启动。";
-}
-
-function getReadyDecisionReminder(data: WorkPageClientProps["initialData"]) {
-  if (isOverdueScheduleStatus(data.scheduleImpact.status)) {
-    return "该任务已超出原计划时间窗。";
-  }
-
-  if (data.taskShell.scheduledStartAt && data.taskShell.scheduledEndAt) {
-    return `原计划时间窗：${formatScheduleWindow(data.taskShell.scheduledStartAt, data.taskShell.scheduledEndAt)}。`;
-  }
-
-  return "先补充说明也没问题，Agent 会把新的约束直接带入第一轮执行。";
-}
-
-function getNextActionLabel(status: string | null | undefined) {
-  switch (status) {
-    case "WaitingForInput":
-      return "补充说明";
-    case "WaitingForApproval":
-      return "处理审批";
-    case "Failed":
-      return "恢复执行";
-    case "Completed":
-      return "查看结果";
-    case "Running":
-      return "查看进展";
-    default:
-      return "启动执行";
-  }
-}
-
-function getStageLabel(
-  currentRun: WorkPageClientProps["initialData"]["currentRun"],
-  closure: WorkPageClientProps["initialData"]["closure"],
-) {
-  if (closure.isDone) {
-    return "已完成";
-  }
-
-  switch (currentRun?.status) {
-    case "WaitingForApproval":
-      return "等待审批";
-    case "WaitingForInput":
-      return "等待补充说明";
-    case "Running":
-      return "执行中";
-    case "Completed":
-      return "等待确认结果";
-    case "Failed":
-    case "Cancelled":
-      return "等待恢复";
-    default:
-      return "待开始";
-  }
 }
 
 function getTaskSummary(data: WorkPageClientProps["initialData"], copy: typeof DEFAULT_COPY) {
@@ -474,72 +385,59 @@ function getTaskSummary(data: WorkPageClientProps["initialData"], copy: typeof D
   }
 }
 
-function getStageSteps(currentRun: WorkPageClientProps["initialData"]["currentRun"], closure: WorkPageClientProps["initialData"]["closure"]) {
-  const labels = ["理解任务", "执行中", "等待确认"];
-  let currentIndex = 0;
-
-  if (closure.isDone) {
-    currentIndex = 3;
-  } else {
-    switch (currentRun?.status) {
-      case "Running":
-        currentIndex = 1;
-        break;
-      case "WaitingForApproval":
-      case "WaitingForInput":
-      case "Completed":
-        currentIndex = 2;
-        break;
-      case "Failed":
-      case "Cancelled":
-        currentIndex = 1;
-        break;
-      default:
-        currentIndex = 0;
-        break;
-    }
+function getTaskStatusMeta(data: WorkPageClientProps["initialData"]) {
+  if (data.closure.isDone) {
+    return { label: "已完成", tone: "success" as const };
   }
 
-  return labels.map((label, index) => ({
-    label,
-    state: index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
-  }));
+  if (!data.currentRun) {
+    return { label: "待开始", tone: "neutral" as const };
+  }
+
+  if (data.currentRun.status === "Failed" || data.currentRun.status === "Cancelled") {
+    return { label: "已中断", tone: "critical" as const };
+  }
+
+  return { label: "进行中", tone: "info" as const };
 }
 
-function getLifecycleSteps(
-  currentRun: WorkPageClientProps["initialData"]["currentRun"],
-  closure: WorkPageClientProps["initialData"]["closure"],
-  copy: typeof DEFAULT_COPY,
-) {
-  const labels = [copy.lifecycleNotStarted, copy.lifecycleInProgress, copy.lifecycleCompleted];
-  const currentIndex = closure.isDone ? 2 : currentRun ? 1 : 0;
-
-  return labels.map((label, index) => ({
-    label,
-    state: index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
-  }));
-}
-
-function getCollaborationStageSummary(
+function getCurrentPhaseLabel(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   closure: WorkPageClientProps["initialData"]["closure"],
 ) {
   if (closure.isDone) {
-    return "已完成确认";
+    return "收尾完成";
   }
 
   switch (currentRun?.status) {
     case "Running":
+    case "Failed":
+    case "Cancelled":
       return "执行中";
     case "WaitingForApproval":
     case "WaitingForInput":
     case "Completed":
       return "等待确认";
-    case "Failed":
-    case "Cancelled":
-      return "执行中断，等待恢复";
     default:
       return "理解任务";
+  }
+}
+
+function getCurrentException(data: WorkPageClientProps["initialData"]) {
+  if (data.reliability.isStale) {
+    return "同步异常，等待恢复";
+  }
+
+  switch (data.currentRun?.status) {
+    case "WaitingForApproval":
+      return data.taskShell.blockReason?.actionRequired ?? "等待审批";
+    case "WaitingForInput":
+      return data.currentRun.pendingInputPrompt ?? data.taskShell.blockReason?.actionRequired ?? "等待补充说明";
+    case "Failed":
+    case "Cancelled":
+      return data.reliability.stopReason ?? data.taskShell.blockReason?.actionRequired ?? "执行已中断，等待恢复";
+    default:
+      return isOverdueScheduleStatus(data.scheduleImpact.status) ? "已超出原计划时间窗" : null;
   }
 }
 
@@ -550,177 +448,50 @@ function getQuickPrompts(workbenchComposer: WorkbenchComposer, currentRun: WorkP
   return ["基于最新结果继续", "收紧下一步动作", "记录这次决策"];
 }
 
-function buildCollaborationFeed(data: WorkPageClientProps["initialData"]): CollaborationFeedItem[] {
-  const feed: Array<CollaborationFeedItem & { order: string }> = [];
-
-  if (!data.currentRun) {
-    if (data.taskShell.scheduledStartAt && data.taskShell.scheduledEndAt) {
-      feed.push({
-        id: "milestone-schedule-window",
-        kind: "event",
-        eyebrow: "任务记录",
-        title: "已设置计划时间窗",
-        body: `计划时间窗：${formatScheduleWindow(data.taskShell.scheduledStartAt, data.taskShell.scheduledEndAt)}`,
-        meta: isOverdueScheduleStatus(data.scheduleImpact.status) ? "原计划时间窗已过" : "等待开始",
-        order: data.taskShell.scheduledStartAt,
-      });
-    }
-
-    feed.push({
-      id: "milestone-waiting-start",
-      kind: "decision",
-      eyebrow: "当前状态",
-      title: data.currentIntervention?.title ?? DEFAULT_COPY.milestoneWaitingStart,
-      body: isOverdueScheduleStatus(data.scheduleImpact.status)
-        ? "任务尚未开始，建议现在重新启动，或先补充说明再启动。"
-        : "任务还没有开始执行，你可以直接启动，也可以先补充说明。",
-      meta: data.currentIntervention?.whyNow ?? null,
-      order: data.reliability.refreshedAt,
-    });
+function getCurrentPlanAction(
+  currentRun: WorkPageClientProps["initialData"]["currentRun"],
+  taskPlan: WorkPageClientProps["initialData"]["taskPlan"],
+) {
+  if (taskPlan.state !== "ready" || !taskPlan.currentStepId) {
+    return null;
   }
 
-  if (data.currentIntervention && data.currentRun) {
-    feed.push({
-      id: `decision-${data.currentIntervention.kind}`,
-      kind: "decision",
-      eyebrow: "当前状态",
-      title: data.currentIntervention.title,
-      body: data.currentIntervention.description,
-      meta: data.currentIntervention.whyNow,
-      order: data.currentRun.updatedAt ?? data.latestOutput.timestamp ?? "9999",
-    });
+  if (!currentRun) {
+    return { label: "从这一步启动", href: "#current-key-decision" };
   }
 
-  for (const entry of data.conversation.slice(-4)) {
-    const isAgent = entry.role.toLowerCase().includes("agent") || entry.role.toLowerCase().includes("assistant");
-    feed.push({
-      id: entry.id,
-      kind: isAgent ? "agent" : "user",
-      eyebrow: isAgent ? "Agent" : "你",
-      title: isAgent ? "Agent 给出了新的进展" : "你补充了新的要求",
-      body: entry.content,
-      meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
-      order: entry.runtimeTs ?? "",
-    });
-  }
-
-  for (const event of data.workstreamItems.slice(-3)) {
-    const milestoneTitle = event.kind === "approval"
-      ? "等待你的确认"
-      : event.kind === "input"
-        ? "等待你补充说明"
-        : event.kind === "result" || event.kind === "output"
-          ? "已生成一轮结果"
-          : event.kind === "failure"
-            ? "执行过程中出现阻塞"
-            : "任务有新的进展";
-
-    feed.push({
-      id: event.id,
-      kind: "event",
-      eyebrow: "任务记录",
-      title: milestoneTitle,
-      body: event.summary || event.whyItMatters || event.title || event.eventType,
-      meta: event.runtimeTs ? formatDateTime(event.runtimeTs) : null,
-      order: event.runtimeTs ?? "",
-    });
-  }
-
-  return feed
-    .sort((a, b) => a.order.localeCompare(b.order))
-    .slice(-6)
-    .map((item) => ({
-      id: item.id,
-      kind: item.kind,
-      eyebrow: item.eyebrow,
-      title: item.title,
-      body: item.body,
-      meta: item.meta,
-    }));
-}
-
-function getFeedItemClasses(kind: CollaborationFeedItem["kind"]) {
-  switch (kind) {
-    case "decision":
-      return "border-amber-200/80 bg-amber-50/60";
-    case "agent":
-      return "border-emerald-200/80 bg-emerald-50/60";
-    case "user":
-      return "border-primary/20 bg-primary/[0.06]";
-    default:
-      return "border-border/70 bg-background/90";
-  }
-}
-
-function buildDecisionCardPlan(
-  data: WorkPageClientProps["initialData"],
-  copy: typeof DEFAULT_COPY,
-): DecisionCardPlan {
-  if (!data.currentRun) {
-    return {
-      status: "任务还没有开始执行。",
-      summary: getReadyDecisionSummary(data),
-      recommendation: "建议现在启动本次执行，或先补充说明再带着新约束进入理解阶段。",
-      steps: [
-        "读取当前任务背景与约束",
-        "进入理解阶段并拆解执行路径",
-        "生成第一轮结果并回到工作台同步",
-      ],
-      reminder: getReadyDecisionReminder(data),
-    };
-  }
-
-  switch (data.currentRun.status) {
+  switch (currentRun.status) {
     case "WaitingForApproval":
-      return {
-        status: "Agent 正等待你的审批。",
-        summary: data.currentIntervention?.description ?? data.scheduleImpact.summary,
-        recommendation: "建议先完成审批决定，再继续本次执行。",
-        steps: ["查看待审批内容", "选择批准、拒绝或修改后批准", "运行将从当前节点继续推进"],
-        reminder: data.currentIntervention?.whyNow,
-      };
+      return { label: "处理当前确认", href: "#pending-approvals" };
     case "WaitingForInput":
-      return {
-        status: "Agent 正等待你的补充说明。",
-        summary: data.currentIntervention?.description ?? data.scheduleImpact.summary,
-        recommendation: "先补充缺失背景或修改方向，再让任务继续。",
-        steps: ["补充新的限制条件", "说明你希望调整的方向", "发送后运行会继续处理"],
-        reminder: data.currentIntervention?.whyNow,
-      };
+      return { label: "补充说明后继续", href: "#work-composer" };
     case "Running":
-      return {
-        status: "任务正在执行中。",
-        summary: data.currentIntervention?.description ?? data.scheduleImpact.summary,
-        recommendation: "先看最新进展；只有在需要纠偏时，再补充新的说明。",
-        steps: ["查看协作里程碑", "确认是否需要纠偏", "如有必要再发送补充说明"],
-        reminder: data.currentIntervention?.whyNow,
-      };
+      return { label: "查看当前进展", href: "#collaboration-flow" };
     case "Completed":
-      return {
-        status: "最新结果已经生成。",
-        summary: data.currentIntervention?.description ?? data.latestOutput.body,
-        recommendation: "先确认结果是否可用，再决定继续下一轮还是收尾完成。",
-        steps: ["查看最新结果", "确认是否接受当前产出", "决定继续下一轮或结束任务"],
-        reminder: data.currentIntervention?.whyNow,
-      };
+      return { label: "确认结果", href: "#latest-result" };
     case "Failed":
     case "Cancelled":
-      return {
-        status: "上一轮执行已中断。",
-        summary: data.currentIntervention?.description ?? data.reliability.stopReason ?? data.scheduleImpact.summary,
-        recommendation: "补充恢复指令后重试，比直接重新开始更稳妥。",
-        steps: ["查看阻塞原因", "补充恢复要求", "重新发起执行"],
-        reminder: data.currentIntervention?.whyNow ?? data.reliability.stopReason ?? undefined,
-      };
+      return { label: "从这一步恢复", href: "#work-composer" };
     default:
-      return {
-        status: data.currentIntervention?.title ?? copy.currentKeyDecision,
-        summary: data.currentIntervention?.description ?? data.scheduleImpact.summary,
-        recommendation: data.currentIntervention?.whyNow ?? data.scheduleImpact.summary,
-        steps: ["查看当前状态", "确认下一步动作", "在工作台继续推进"],
-        reminder: data.currentIntervention?.whyNow,
-      };
+      return { label: "查看当前动作", href: "#current-key-decision" };
   }
+}
+
+function buildConversationFeed(data: WorkPageClientProps["initialData"]): CollaborationFeedItem[] {
+  return [...data.conversation]
+    .sort((a, b) => (a.runtimeTs ?? "").localeCompare(b.runtimeTs ?? ""))
+    .map((entry) => {
+      const isAgent = entry.role.toLowerCase().includes("agent") || entry.role.toLowerCase().includes("assistant");
+
+      return {
+        id: entry.id,
+        kind: isAgent ? "agent" : "user",
+        eyebrow: isAgent ? "Agent" : "你",
+        title: isAgent ? "Agent" : "你",
+        body: entry.content,
+        meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
+      };
+    });
 }
 
 function getScheduleSourceSummary(taskShell: WorkPageClientProps["initialData"]["taskShell"], copy: typeof DEFAULT_COPY) {
@@ -905,7 +676,9 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     taskFailedSummary: DEFAULT_COPY.taskFailedSummary,
     currentKeyDecision: DEFAULT_COPY.currentKeyDecision,
     collaborationFlow: DEFAULT_COPY.collaborationFlow,
+    collaborationFlowDescription: DEFAULT_COPY.collaborationFlowDescription,
     latestResult: DEFAULT_COPY.latestResult,
+    inputArea: DEFAULT_COPY.inputArea,
     allTasks: DEFAULT_COPY.allTasks,
     openInbox: DEFAULT_COPY.openInbox,
     openMemory: DEFAULT_COPY.openMemory,
@@ -935,7 +708,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const [data, setData] = useState(initialData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
-  const [activeTab, setActiveTab] = useState<WorkstreamTab>("workstream");
   const [composerResetKey, setComposerResetKey] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -976,22 +748,28 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   }, [data.currentRun, refresh]);
 
   const currentRun = data.currentRun;
-  const hasPendingApprovals = data.currentIntervention?.kind === "approval" && (data.currentIntervention.approvals?.length ?? 0) > 0;
-  const stageLabel = getStageLabel(currentRun, data.closure);
+  const taskStatusMeta = getTaskStatusMeta(data);
+  const phaseLabel = getCurrentPhaseLabel(currentRun, data.closure);
+  const currentException = getCurrentException(data);
   const taskSummary = getTaskSummary(data, copy);
   const sourceSummary = getScheduleSourceSummary(data.taskShell, copy);
-  const lifecycleSteps = getLifecycleSteps(currentRun, data.closure, copy);
-  const stageSteps = getStageSteps(currentRun, data.closure);
-  const decisionCardPlan = buildDecisionCardPlan(data, copy);
-  const collaborationStageSummary = getCollaborationStageSummary(currentRun, data.closure);
   const workbenchComposer = getWorkbenchComposer(
     currentRun,
     data.currentIntervention,
     data.taskShell,
     copy,
   );
+  const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan);
   const quickPrompts = getQuickPrompts(workbenchComposer, currentRun);
-  const collaborationFeed = useMemo(() => buildCollaborationFeed(data), [data]);
+  const collaborationFeed = useMemo(() => buildConversationFeed(data), [data]);
+  const collaborationStreamItems = collaborationFeed.map((item) => ({
+    id: item.id,
+    kind: item.kind,
+    eyebrow: item.eyebrow,
+    title: item.title,
+    body: item.body,
+    meta: item.meta,
+  }));
   const [composerValue, setComposerValue] = useState(workbenchComposer.defaultValue);
 
   useEffect(() => {
@@ -1073,182 +851,113 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             </div>
           </div>
 
-          <SurfaceCard>
+          <SurfaceCard variant="highlight">
             <SurfaceCardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <SurfaceCardTitle>{copy.taskStages}</SurfaceCardTitle>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <StatusBadge tone="info">{currentRun?.status ?? data.taskShell.status}</StatusBadge>
-                  <span>{copy.currentStage}: {stageLabel}</span>
                   <span>{sourceSummary}</span>
                   <span>{copy.duePrefix}: {formatDate(data.taskShell.dueAt)}</span>
                 </div>
               </div>
             </SurfaceCardHeader>
 
-            <div className="mt-2 space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">{copy.taskLifecycle}</p>
-                <div className="flex flex-wrap gap-2">
-                  {lifecycleSteps.map((step) => (
-                    <div
-                      key={step.label}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium",
-                        step.state === "done"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : step.state === "current"
-                            ? "border-primary/30 bg-primary/5 text-foreground"
-                            : "border-border bg-background text-muted-foreground",
-                      )}
-                    >
-                      <p>{step.label}</p>
-                    </div>
-                  ))}
+            <div className={cn("mt-2 grid gap-3", currentException ? "md:grid-cols-3" : "md:grid-cols-2")}>
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-xs font-medium text-muted-foreground">任务状态</p>
+                <div className="mt-2">
+                  <StatusBadge tone={taskStatusMeta.tone}>{taskStatusMeta.label}</StatusBadge>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {copy.collaborationStage}
-                  <span className="ml-2 font-normal text-foreground">{collaborationStageSummary}</span>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {stageSteps.map((stage, index) => (
-                    <div
-                      key={stage.label}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs",
-                        stage.state === "done"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : stage.state === "current"
-                            ? "border-primary/30 bg-primary/5 text-foreground"
-                            : "border-border bg-background text-muted-foreground",
-                      )}
-                    >
-                      <span className="inline-flex size-5 items-center justify-center rounded-full border text-[10px] font-semibold">
-                        {stage.state === "done" ? "✓" : index + 1}
-                      </span>
-                      <span>{stage.label}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-xs font-medium text-muted-foreground">{copy.currentStage}</p>
+                <p className="mt-2 text-sm font-medium text-foreground">{phaseLabel}</p>
               </div>
+
+              {currentException ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                  <p className="text-xs font-medium text-amber-700">当前异常</p>
+                  <p className="mt-2 text-sm font-medium text-foreground">{currentException}</p>
+                </div>
+              ) : null}
             </div>
           </SurfaceCard>
 
-          <SurfaceCard id="current-key-decision">
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.currentKeyDecision}</SurfaceCardTitle>
-          </SurfaceCardHeader>
-
-          <div className="mt-3 space-y-4">
-            {errorMessage ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
-
-            <div className="rounded-[28px] border border-primary/15 bg-primary/[0.035] p-5 text-sm text-muted-foreground shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{copy.decisionStatus}</p>
-                  <p className="text-lg font-semibold text-foreground">{decisionCardPlan.status}</p>
-                  <p>{decisionCardPlan.summary}</p>
+        <CollaborationStream
+          title={copy.collaborationFlow}
+          description={copy.collaborationFlowDescription}
+          emptyState={copy.fallbackNoOperatorInput}
+          composerTitle={copy.inputArea}
+          composerLabel={copy.taskArrangement}
+          composerHint={workbenchComposer.description || copy.workbenchDescription}
+          composerSectionId="current-key-decision"
+          fixedHeightClassName="h-[760px]"
+          items={collaborationStreamItems}
+          composer={(
+            <form
+              key={`workbench-${composerResetKey}-${currentRun?.id ?? "none"}-${workbenchComposer.mode}`}
+              action={handleWorkbenchSubmit}
+              className="min-w-0 space-y-3"
+            >
+              {errorMessage ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
+              <p className="text-xs text-muted-foreground">{copy.taskArrangementHint}</p>
+              <textarea
+                aria-label={workbenchComposer.inputLabel}
+                name="message"
+                rows={6}
+                required
+                value={composerValue}
+                placeholder={workbenchComposer.placeholder}
+                onChange={(event) => setComposerValue(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                className={cn(textareaClassName, "min-h-32 w-full min-w-0 resize-y")}
+              />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  {quickPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      onClick={() => setComposerValue((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt))}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
                 </div>
-                <StatusBadge tone="info">{currentRun?.status ?? data.taskShell.status}</StatusBadge>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <p className="font-medium text-foreground">{decisionCardPlan.recommendation}</p>
-
-                <div className="flex flex-wrap gap-2">
-                  {!currentRun ? (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}
-                        onClick={() => {
-                          void runAction(async () => {
-                            await startRun({
-                              taskId: data.taskShell.id,
-                              prompt: data.taskShell.prompt ?? getStartRunDefaultValue(data.taskShell.title),
-                            });
-                          });
-                        }}
-                      >
-                        {copy.startRunHere}
-                      </button>
-                      <a href="#work-composer" className={buttonVariants({ variant: "outline" })}>
-                        {copy.modifyBeforeStart}
-                      </a>
-                    </>
-                  ) : null}
-
-                  {currentRun?.status === "Running" ? (
-                    <a href="#collaboration-flow" className={buttonVariants({ variant: "default" })}>
-                      {getNextActionLabel(currentRun.status)}
-                    </a>
-                  ) : null}
-
-                  {currentRun?.status === "Completed" ? (
-                    <a href="#latest-result" className={buttonVariants({ variant: "default" })}>
-                      {getNextActionLabel(currentRun.status)}
-                    </a>
-                  ) : null}
-
-                  {currentRun?.status === "WaitingForApproval" ? (
-                    <a href="#pending-approvals" className={buttonVariants({ variant: "default" })}>
-                      {getNextActionLabel(currentRun.status)}
-                    </a>
-                  ) : null}
-
-                  {(currentRun?.status === "WaitingForInput" || currentRun?.status === "Failed" || currentRun?.status === "Cancelled") ? (
-                    <a href="#work-composer" className={buttonVariants({ variant: "default" })}>
-                      {getNextActionLabel(currentRun.status)}
-                    </a>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{copy.secondaryActions}</span>
-                  <LocalizedLink href="/schedule" className="underline-offset-4 hover:text-foreground hover:underline">
-                    {copy.adjustSchedule}
-                  </LocalizedLink>
-                  <LocalizedLink
-                    href={`/workspaces/${data.taskShell.workspaceId}/tasks/${data.taskShell.id}`}
-                    className="underline-offset-4 hover:text-foreground hover:underline"
+                <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                  <p className="text-xs text-muted-foreground">{workbenchComposer.statusHint} · {copy.keyboardHint}</p>
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className={buttonVariants({ variant: workbenchComposer.submitVariant ?? "default", size: "lg", className: "disabled:opacity-60" })}
                   >
-                    {copy.notNow}
-                  </LocalizedLink>
+                    {workbenchComposer.submitLabel}
+                  </button>
                 </div>
               </div>
+            </form>
+          )}
+        />
 
-              <div className="rounded-2xl border border-border/50 bg-card/80 p-4 text-sm text-muted-foreground">
-                <p className="text-sm font-medium text-foreground">{copy.decisionReminder}</p>
-                {decisionCardPlan.reminder ? <p className="mt-2">{decisionCardPlan.reminder}</p> : null}
-                {data.currentIntervention?.whyNow && data.currentIntervention.whyNow !== decisionCardPlan.reminder ? (
-                  <p className="mt-2">{data.currentIntervention.whyNow}</p>
-                ) : null}
-                {data.currentIntervention?.evidence.length ? (
-                  <div className="mt-3 space-y-2">
-                    {data.currentIntervention.evidence.map((item) => (
-                      <p key={`${item.label}-${item.value}`} className="leading-6">
-                        <span className="font-medium text-foreground">{item.label}：</span>
-                        <span>{item.value}</span>
-                      </p>
-                    ))}
+        {(data.currentIntervention?.approvals ?? []).length > 0 ? (
+          <SurfaceCard id="pending-approvals">
+            <SurfaceCardHeader>
+              <SurfaceCardTitle>待确认卡</SurfaceCardTitle>
+            </SurfaceCardHeader>
+
+            <div className="mt-3 space-y-4">
+              {(data.currentIntervention?.approvals ?? []).map((approval) => (
+                <div key={approval.id} className="rounded-2xl border border-amber-200/90 bg-amber-50/90 p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-foreground">{approval.title}</p>
+                    <StatusBadge tone="warning">{approval.status}</StatusBadge>
                   </div>
-                ) : null}
-              </div>
-            </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{approval.summary ?? "Review the approval request before resuming the run."}</p>
 
-            {hasPendingApprovals ? (
-              <div id="pending-approvals" className="space-y-3">
-                {(data.currentIntervention?.approvals ?? []).map((approval) => (
-                  <div key={approval.id} className="rounded-2xl border border-amber-200/80 bg-amber-50/60 p-4 text-sm text-amber-950">
-                    <div className="space-y-1">
-                      <p className="font-medium text-foreground">{approval.title}</p>
-                      <p className="text-amber-900/80">{approval.summary ?? "Review the approval request before resuming the run."}</p>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-4 space-y-3">
+                    <div className="flex flex-wrap gap-2">
                       <form
                         action={async () => {
                           await runAction(async () => {
@@ -1271,108 +980,73 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                           {copy.reject}
                         </button>
                       </form>
-                      <form
-                        action={async (formData) => {
-                          await runAction(async () => {
-                            await editAndApproveApproval(formData);
-                          });
-                        }}
-                        className="flex flex-wrap gap-2"
-                      >
-                        <input type="hidden" name="approvalId" value={approval.id} />
-                        <input
-                          type="text"
-                          name="editedContent"
-                          placeholder={copy.editedInstruction}
-                          className={cn(inputClassName, "min-w-48")}
-                        />
-                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                          {copy.editAndApprove}
-                        </button>
-                      </form>
                     </div>
+                    <form
+                      action={async (formData) => {
+                        await runAction(async () => {
+                          await editAndApproveApproval(formData);
+                        });
+                      }}
+                      className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                    >
+                      <input type="hidden" name="approvalId" value={approval.id} />
+                      <input
+                        type="text"
+                        name="editedContent"
+                        placeholder={copy.editedInstruction}
+                        className={cn(inputClassName, "min-w-0 w-full")}
+                      />
+                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                        {copy.editAndApprove}
+                      </button>
+                    </form>
                   </div>
-                ))}
-              </div>
-            ) : null}
-
-            {!hasPendingApprovals && data.currentIntervention && currentRun ? (
-              <div className="flex flex-wrap gap-2">
-                {data.currentIntervention.kind === "input" || data.currentIntervention.kind === "retry" ? (
-                  <a href="#work-composer" className={buttonVariants({ variant: "default" })}>
-                    {data.currentIntervention.actionLabel}
-                  </a>
-                ) : null}
-              </div>
-            ) : null}
-
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard id="work-composer">
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.taskArrangement}</SurfaceCardTitle>
-          </SurfaceCardHeader>
-
-          <form
-            key={`workbench-${composerResetKey}-${currentRun?.id ?? "none"}-${workbenchComposer.mode}`}
-            action={handleWorkbenchSubmit}
-            className="space-y-3 rounded-3xl border border-primary/15 bg-primary/[0.03] p-4 shadow-sm"
-          >
-            <p className="text-sm text-muted-foreground">{workbenchComposer.description || copy.workbenchDescription}</p>
-            <p className="text-xs text-muted-foreground">{copy.taskArrangementHint}</p>
-            <textarea
-              aria-label={workbenchComposer.inputLabel}
-              name="message"
-              rows={6}
-              required
-              value={composerValue}
-              placeholder={workbenchComposer.placeholder}
-              onChange={(event) => setComposerValue(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              className={cn(textareaClassName, "min-h-32 resize-y")}
-            />
-            <div className="flex flex-wrap gap-2">
-              {quickPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                  onClick={() => setComposerValue((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt))}
-                >
-                  {prompt}
-                </button>
+                </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                disabled={isPending}
-                className={buttonVariants({ variant: workbenchComposer.submitVariant ?? "default", size: "lg", className: "disabled:opacity-60" })}
-              >
-                {workbenchComposer.submitLabel}
-              </button>
-              <p className="text-xs text-muted-foreground">{workbenchComposer.statusHint} · {copy.keyboardHint}</p>
-            </div>
-          </form>
-        </SurfaceCard>
+          </SurfaceCard>
+        ) : null}
 
         <SurfaceCard id="latest-result">
           <SurfaceCardHeader>
             <SurfaceCardTitle>{copy.latestResult}</SurfaceCardTitle>
           </SurfaceCardHeader>
 
-          {!data.latestOutput.empty ? (
-            <div className="mt-3 rounded-2xl border border-border/60 bg-background/80 p-4 text-sm text-muted-foreground">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
-                {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
-                  <StatusBadge tone="info">{copy.usedByNextAction}</StatusBadge>
-                ) : null}
-                {data.latestOutput.timestamp ? <span>{copy.updated} {formatDateTime(data.latestOutput.timestamp)}</span> : null}
+          <div className="mt-3 rounded-2xl border border-sky-200/90 bg-sky-50/85 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium text-foreground">{data.latestOutput.empty ? copy.resultEmptyTitle : data.latestOutput.title}</p>
+              {!data.latestOutput.empty && data.latestOutput.timestamp ? (
+                <span className="text-xs text-muted-foreground">{copy.updated} {formatDateTime(data.latestOutput.timestamp)}</span>
+              ) : null}
+            </div>
+
+            {data.latestOutput.empty ? (
+              <div className="mt-3 text-sm text-muted-foreground">
+                <p>{copy.resultEmptyDescription}</p>
+                <div className="mt-3 rounded-2xl bg-card/70 p-3">
+                  <p className="text-xs font-medium text-foreground">{copy.resultPreviewTitle}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                    <li>{copy.resultPreviewUnderstanding}</li>
+                    <li>{copy.resultPreviewPlan}</li>
+                    <li>{copy.resultPreviewDraft}</li>
+                    <li>{copy.resultPreviewQuestions}</li>
+                  </ul>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">{data.latestOutput.body}</p>
               </div>
-              <p className="mt-3 font-medium text-foreground">{data.latestOutput.title}</p>
-              <p className="mt-2 whitespace-pre-wrap">{data.latestOutput.body}</p>
+            ) : (
+              <div className="mt-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
+                  {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
+                    <StatusBadge tone="info">{copy.usedByNextAction}</StatusBadge>
+                  ) : null}
+                </div>
+                <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{data.latestOutput.body}</p>
+              </div>
+            )}
+
+            {!data.latestOutput.empty ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {data.closure.canAcceptResult ? (
                   <form
@@ -1411,190 +1085,20 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                   </a>
                 ) : null}
               </div>
-            </div>
-          ) : (
-            <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">{copy.resultEmptyTitle}</p>
-              <p className="mt-2">{copy.resultEmptyDescription}</p>
-              <div className="mt-3 rounded-2xl bg-card/70 p-3">
-                <p className="text-xs font-medium text-foreground">{copy.resultPreviewTitle}</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                  <li>{copy.resultPreviewUnderstanding}</li>
-                  <li>{copy.resultPreviewPlan}</li>
-                  <li>{copy.resultPreviewDraft}</li>
-                  <li>{copy.resultPreviewQuestions}</li>
-                </ul>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">{data.latestOutput.body}</p>
-            </div>
-          )}
-        </SurfaceCard>
-
-        <SurfaceCard id="collaboration-flow">
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.collaborationFlow}</SurfaceCardTitle>
-          </SurfaceCardHeader>
-
-          <div className="mt-3 space-y-3">
-            {collaborationFeed.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                {copy.fallbackNoOperatorInput}
-              </div>
-            ) : (
-              collaborationFeed.map((item) => (
-                <div key={item.id} className={cn("rounded-3xl border p-4 text-sm shadow-sm", getFeedItemClasses(item.kind))}>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{item.eyebrow}</span>
-                    {item.meta ? <span className="text-xs text-muted-foreground">{item.meta}</span> : null}
-                  </div>
-                  <p className="mt-2 font-medium text-foreground">{item.title}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{item.body}</p>
-                </div>
-              ))
-            )}
-
-            <details className="rounded-2xl border border-border/60 bg-background p-4">
-              <summary className="cursor-pointer list-none text-sm font-medium text-foreground">{copy.executionWorkstream}</summary>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("workstream")}
-                  className={cn(
-                    buttonVariants({ variant: activeTab === "workstream" ? "secondary" : "outline", size: "sm" }),
-                    "rounded-full",
-                  )}
-                >
-                  {copy.workstream}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("conversation")}
-                  className={cn(
-                    buttonVariants({ variant: activeTab === "conversation" ? "secondary" : "outline", size: "sm" }),
-                    "rounded-full",
-                  )}
-                >
-                  {copy.conversation}
-                </button>
-              </div>
-
-              <div className="mt-4">
-                {activeTab === "workstream" ? (
-                  <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
-                ) : (
-                  <ConversationPanel
-                    embedded
-                    title={copy.conversationEvidence}
-                    description={undefined}
-                    entries={data.conversation}
-                  />
-                )}
-              </div>
-            </details>
+            ) : null}
           </div>
         </SurfaceCard>
 
-        {currentRun?.status === "Completed" ? (
-          <SurfaceCard>
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>{copy.resultActionsTitle}</SurfaceCardTitle>
-            </SurfaceCardHeader>
+        <SurfaceCard>
+          <SurfaceCardHeader>
+            <SurfaceCardTitle>{copy.executionWorkstream}</SurfaceCardTitle>
+          </SurfaceCardHeader>
 
-            <div className="mt-3 space-y-4 text-sm text-muted-foreground">
-              <div className="flex flex-wrap gap-2 text-xs">
-                {data.closure.resultAccepted && data.closure.acceptedAt ? (
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
-                    {copy.resultAccepted} · {formatDateTime(data.closure.acceptedAt)}
-                  </span>
-                ) : null}
-                {data.closure.isDone && data.closure.doneAt ? (
-                  <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">
-                    {copy.taskDone} · {formatDateTime(data.closure.doneAt)}
-                  </span>
-                ) : null}
-                {data.closure.latestFollowUp ? (
-                  <span className="rounded-full border border-border bg-background px-3 py-1 text-muted-foreground">
-                    {copy.latestFollowUp} · {data.closure.latestFollowUp.title}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {data.closure.canMarkDone ? (
-                    <form
-                      action={async () => {
-                        await runAction(async () => {
-                          await markTaskDone({ taskId: data.taskShell.id });
-                        });
-                      }}
-                    >
-                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
-                        {copy.markTaskDone}
-                      </button>
-                    </form>
-                  ) : null}
-
-                  {data.closure.canReopen ? (
-                    <form
-                      action={async () => {
-                        await runAction(async () => {
-                          await reopenTask({ taskId: data.taskShell.id });
-                        });
-                      }}
-                    >
-                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                        {copy.reopenTask}
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-
-              {data.closure.canCreateFollowUp ? (
-                  <details className="rounded-2xl border border-border/60 bg-background p-4">
-                    <summary className="cursor-pointer list-none font-medium text-foreground">{copy.followUpOptional}</summary>
-                    <form
-                      action={async (formData) => {
-                        const title = String(formData.get("title") ?? "").trim();
-                        const dueAtValue = String(formData.get("dueAt") ?? "").trim();
-
-                        if (!title) {
-                          throw new Error("title is required");
-                        }
-
-                        await runAction(async () => {
-                          await createFollowUpTask({
-                            taskId: data.taskShell.id,
-                            title,
-                            dueAt: dueAtValue ? new Date(`${dueAtValue}T00:00:00.000Z`) : null,
-                          });
-                        });
-                      }}
-                      className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]"
-                    >
-                      <Field label={copy.followUpTitle}>
-                        <input
-                          type="text"
-                          name="title"
-                          required
-                          defaultValue={`Follow up: ${data.taskShell.title}`}
-                          className={inputClassName}
-                        />
-                      </Field>
-                      <Field label={copy.followUpDue}>
-                        <input type="date" name="dueAt" className={inputClassName} />
-                      </Field>
-                      <div className="flex items-end">
-                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "secondary", className: "w-full disabled:opacity-60" })}>
-                          {copy.createFollowUp}
-                        </button>
-                      </div>
-                    </form>
-                  </details>
-              ) : null}
-            </div>
-          </SurfaceCard>
-        ) : null}
+          <div className="mt-1 text-xs text-muted-foreground">{copy.executionWorkstreamDescription}</div>
+          <div className="mt-4">
+            <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
+          </div>
+        </SurfaceCard>
 
         </div>
 
@@ -1615,6 +1119,8 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             plan={data.taskPlan}
             isPending={isPending}
             onGenerate={handleGenerateTaskPlan}
+            currentAction={currentPlanAction}
+            currentException={currentException}
           />
         </div>
       </div>

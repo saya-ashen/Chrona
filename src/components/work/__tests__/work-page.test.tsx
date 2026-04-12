@@ -142,7 +142,20 @@ describe("WorkPageClient", () => {
               runtimeTs: "2026-04-16T10:14:00.000Z",
             },
           ],
-          conversation: [],
+          conversation: [
+            {
+              id: "msg_agent_1",
+              role: "assistant",
+              content: "I need approval before editing files.",
+              runtimeTs: "2026-04-16T10:13:00.000Z",
+            },
+            {
+              id: "msg_user_1",
+              role: "user",
+              content: "Use the safer option and keep the change small.",
+              runtimeTs: "2026-04-16T10:13:30.000Z",
+            },
+          ],
           inspector: {
             approvals: [{ id: "approval_1", title: "Approve tool execution", status: "Pending", summary: "Allow the agent to edit files." }],
             artifacts: [],
@@ -152,36 +165,32 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    const decisionCard = screen.getByRole("heading", { name: "当前需要你决定" }).closest("section");
-    const stageCard = screen.getByRole("heading", { name: "任务阶段" }).closest("section");
-    const composerHeading = screen.getByRole("heading", { name: "给 Agent 补充要求" });
-    const resultHeading = screen.getByRole("heading", { name: "最新结果" });
+    const statusCard = screen.getByRole("heading", { name: "任务状态" }).closest("section");
+    const collaborationHeading = screen.getByRole("heading", { name: "对话记录" });
+    const inputHeading = screen.getByRole("heading", { name: "输入区" });
 
-    expect(decisionCard).not.toBeNull();
-    expect(stageCard).not.toBeNull();
-    const decisionScope = within(decisionCard as HTMLElement);
-    const stageScope = within(stageCard as HTMLElement);
+    expect(statusCard).not.toBeNull();
+    const statusScope = within(statusCard as HTMLElement);
 
-    expect(decisionScope.getByText("Agent 正等待你的审批。")).toBeInTheDocument();
-    expect(decisionScope.getByText("建议先完成审批决定，再继续本次执行。")).toBeInTheDocument();
-    expect(decisionScope.getByRole("link", { name: "处理审批" })).toHaveAttribute("href", "#pending-approvals");
-    expect(screen.getByRole("heading", { name: "任务阶段" })).toBeInTheDocument();
-    expect(stageScope.getByText("任务生命周期")).toBeInTheDocument();
-    expect(stageScope.getByText("当前协作阶段")).toBeInTheDocument();
-    expect(stageScope.getByText("进行中")).toBeInTheDocument();
-    expect(stageScope.getAllByText("等待确认").length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "当前需要你决定" })).toBeInTheDocument();
-    expect(composerHeading).toBeInTheDocument();
-    expect(resultHeading).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "任务历史" })).toBeInTheDocument();
+    expect(statusScope.getByRole("heading", { name: "任务状态" })).toBeInTheDocument();
+    expect(statusScope.getByText("当前阶段")).toBeInTheDocument();
+    expect(statusScope.getByText("当前异常")).toBeInTheDocument();
+    expect(statusScope.getByText("进行中")).toBeInTheDocument();
+    expect(statusScope.getByText("等待确认")).toBeInTheDocument();
+    expect(statusScope.getByText("Approve / Reject / Edit and Approve")).toBeInTheDocument();
+    expect(collaborationHeading).toBeInTheDocument();
+    expect(inputHeading).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "当前需要你决定" })).not.toBeInTheDocument();
     expect(screen.queryByText("Q2 growth recap")).not.toBeInTheDocument();
     expect(screen.getByText("日程信息")).toBeInTheDocument();
-    expect(screen.getByText("当前执行")).toBeInTheDocument();
+    expect(screen.getByText("任务背景")).toBeInTheDocument();
     expect(screen.getByText("当前阻塞")).toBeInTheDocument();
-    expect(screen.getByText("任务计划")).toBeInTheDocument();
+    expect(screen.getByText("运行信息")).toBeInTheDocument();
+    expect(screen.getByText("当前步骤")).toBeInTheDocument();
+    expect(screen.getByText("重新规划后继续")).toBeInTheDocument();
     expect(screen.getByText("推进首轮产出")).toBeInTheDocument();
     expect(screen.getAllByText("等待你确认").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "重新生成占位计划" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重新规划后继续" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "打开日程" })).toHaveAttribute(
       "href",
       "/en/schedule",
@@ -191,11 +200,19 @@ describe("WorkPageClient", () => {
       "/en/workspaces/ws_1/tasks/task_1",
     );
     expect(screen.getByText("已超时")).toBeInTheDocument();
-    expect(screen.getAllByText("Approve tool execution").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Approve tool execution").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Conversation output")).toBeInTheDocument();
-    expect(screen.getAllByText("任务记录").length).toBeGreaterThan(0);
-    expect(screen.getByText("当前阶段: 等待审批")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Execution Timeline" })).toBeInTheDocument();
+    expect(screen.getAllByRole("group").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Write projection" })).toBeInTheDocument();
+    expect(screen.getByText("I need approval before editing files.")).toBeInTheDocument();
+    expect(screen.getByText("Use the safer option and keep the change small.")).toBeInTheDocument();
+    const agentMessage = screen.getByText("I need approval before editing files.").closest("article");
+    const userMessage = screen.getByText("Use the safer option and keep the change small.").closest("article");
+    expect(agentMessage?.className).toContain("mr-auto");
+    expect(userMessage?.className).toContain("ml-auto");
+    expect(screen.getByText("待确认卡")).toBeInTheDocument();
+    expect(screen.getByText("最新结果")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批准" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "修改后批准" })).toBeInTheDocument();
@@ -206,6 +223,7 @@ describe("WorkPageClient", () => {
     expect(screen.queryByRole("button", { name: "计划" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "工具记录" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "产出" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "对话往来" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Work draft" })).not.toBeInTheDocument();
   });
 
@@ -404,19 +422,18 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    const stageCard = screen.getByRole("heading", { name: "任务阶段" }).closest("section");
-    expect(stageCard).not.toBeNull();
-    const stageScope = within(stageCard as HTMLElement);
+    const statusCard = screen.getByRole("heading", { name: "任务状态" }).closest("section");
+    expect(statusCard).not.toBeNull();
+    const statusScope = within(statusCard as HTMLElement);
 
     expect(screen.getByDisplayValue("继续处理：Draft rollout note")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "启动并继续" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "立即启动" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "先补充说明再启动" })).toHaveAttribute("href", "#work-composer");
     expect(screen.getByRole("button", { name: "生成占位计划" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "给 Agent 补充要求" })).toBeInTheDocument();
-    expect(screen.getByText("任务还没有开始执行。")).toBeInTheDocument();
-    expect(stageScope.getByText("未开始")).toBeInTheDocument();
-    expect(stageScope.getAllByText("理解任务").length).toBeGreaterThan(0);
+    expect(statusScope.getByRole("heading", { name: "任务状态" })).toBeInTheDocument();
+    expect(statusScope.getByText("当前阶段")).toBeInTheDocument();
+    expect(statusScope.getByText("待开始")).toBeInTheDocument();
+    expect(statusScope.getAllByText("待开始").length).toBeGreaterThan(0);
     expect(screen.getByText("尚未生成结果")).toBeInTheDocument();
     expect(screen.getByText("第一轮任务理解")).toBeInTheDocument();
     expect(screen.getByText("执行建议")).toBeInTheDocument();
@@ -524,10 +541,10 @@ describe("WorkPageClient", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "确认结果" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "标记任务完成" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "创建后续任务" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重新执行" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "后续任务标题" })).toBeInTheDocument();
+    expect(screen.queryByText("后续动作")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "标记任务完成" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "创建后续任务" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "后续任务标题" })).not.toBeInTheDocument();
   });
 });

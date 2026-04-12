@@ -1,0 +1,51 @@
+[ 2713236ms] PrismaClientKnownRequestError: 
+Invalid `prisma.task.findUniqueOrThrow()` invocation:
+
+
+An operation failed because it depends on one or more records that were required but not found. No record was found for a query.
+    at  getTaskPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?364:3872:18)
+    at  TaskDetailPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?365:4016:18)
+    at resolveErrorDev (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:1919:150)
+    at processFullStringRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2434:29)
+    at processFullBinaryRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2393:9)
+    at processBinaryChunk (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2502:221)
+    at progress (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2689:13)
+[ 2762278ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3201/en/workspaces/cmnsb8i470007bvfuob9uzajt/tasks/cmnsb8i4b0008bvfu7ud4hzz5:0
+[ 2762407ms] PrismaClientKnownRequestError: 
+Invalid `prisma.task.findUniqueOrThrow()` invocation:
+
+
+An operation failed because it depends on one or more records that were required but not found. No record was found for a query.
+    at  getTaskPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?0:3872:18)
+    at  TaskDetailPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?1:4016:18)
+    at resolveErrorDev (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:1919:105)
+    at processFullStringRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2434:29)
+    at processFullBinaryRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2393:9)
+    at processBinaryChunk (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2502:221)
+    at progress (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2689:13)
+[ 3061582ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[ 3061872ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3201/en/workspaces/cmnsb8i470007bvfuob9uzajt/tasks/cmnsb8i4b0008bvfu7ud4hzz5:0
+[ 3062048ms] PrismaClientKnownRequestError: 
+Invalid `prisma.task.findUniqueOrThrow()` invocation:
+
+
+An operation failed because it depends on one or more records that were required but not found. No record was found for a query.
+    at  getTaskPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?0:3872:18)
+    at  TaskDetailPage (about://React/Server/file:///home/saya/workspace/AgentDashboard/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__0q_nuhb._.js?1:4016:18)
+    at resolveErrorDev (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:1919:105)
+    at processFullStringRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2434:29)
+    at processFullBinaryRow (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2393:9)
+    at processBinaryChunk (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2502:221)
+    at progress (http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js:2689:13)
+[ 4461625ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4462627ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4463629ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4464631ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4465634ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4470639ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4475646ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4480667ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4485697ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4490776ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4495931ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
+[ 4501047ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3201/_next/webpack-hmr?id=IUMilHcD0PUDmHGZiASkf' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3201/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js:13299
