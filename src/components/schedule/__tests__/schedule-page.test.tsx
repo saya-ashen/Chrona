@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock, fetchMock, createTaskFromScheduleMock, updateTaskConfigFromScheduleMock, applyScheduleMock } = vi.hoisted(() => ({
@@ -28,6 +29,9 @@ vi.mock("@/app/actions/task-actions", () => ({
 
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+import { I18nProvider } from "@/i18n/client";
+import enMessages from "@/i18n/messages/en.json";
+import zhMessages from "@/i18n/messages/zh.json";
 
 const OPENCLAW_RUNTIME_ADAPTER: TaskConfigRuntimeAdapter = {
   key: "openclaw",
@@ -226,8 +230,26 @@ function buildBaseData() {
   };
 }
 
+function renderSchedulePage(
+  ui: Parameters<typeof render>[0],
+  {
+    locale = "en",
+    messages = enMessages,
+  }: {
+    locale?: "en" | "zh";
+    messages?: typeof enMessages;
+  } = {},
+) {
+  return render(
+    <I18nProvider locale={locale} messages={messages}>
+      {ui}
+    </I18nProvider>,
+  );
+}
+
 describe("SchedulePage", () => {
   beforeEach(() => {
+    cleanup();
     pushMock.mockReset();
     fetchMock.mockReset();
     createTaskFromScheduleMock.mockReset();
@@ -235,22 +257,35 @@ describe("SchedulePage", () => {
     applyScheduleMock.mockReset();
   });
 
-  it("renders the schedule surfaces with compact secondary planning", () => {
+  it("renders the planning header, action rail, and week strip hierarchy", () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
 
-    render(
+    renderSchedulePage(
       <SchedulePage workspaceId="ws_1" selectedDay="2026-04-16" selectedTaskId="task_scheduled" data={buildBaseData()} />,
     );
 
+    const planningHeader = screen.getByRole("region", { name: "Schedule" });
+    expect(planningHeader).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Schedule" })).toBeInTheDocument();
+    expect(within(planningHeader).getByText("Thu, Apr 16")).toBeInTheDocument();
+    expect(within(planningHeader).getByRole("link", { name: "Today" })).toHaveAttribute("href", "/en/schedule?day=2026-04-13");
+    expect(within(planningHeader).getByRole("link", { name: "Today" })).not.toHaveAttribute("aria-current");
+    expect(within(planningHeader).getByRole("link", { name: "Tomorrow" })).toHaveAttribute("href", "/en/schedule?day=2026-04-14");
+    expect(within(planningHeader).getByRole("link", { name: "Current Plan" })).toHaveAttribute("href", "/en/schedule?day=2026-04-16");
+    expect(within(planningHeader).getByRole("link", { name: "Current Plan" })).toHaveAttribute("aria-current", "date");
+    expect(screen.getByRole("link", { name: "Timeline" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Timeline" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "List" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "List" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Scheduled Timeline" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Unscheduled Queue" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Unscheduled Queue" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Unscheduled Queue" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "AI Proposals" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Week Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Week Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "AI Proposals" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Week Overview" })).not.toBeInTheDocument();
     expect(screen.queryByText("Planning Guide")).not.toBeInTheDocument();
     expect(screen.queryByText("Secondary planning info")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ship projection cleanup").length).toBeGreaterThanOrEqual(2);
@@ -258,12 +293,12 @@ describe("SchedulePage", () => {
     expect(screen.getByText("Click any slot or drag to adjust")).toBeInTheDocument();
     expect(screen.getByText(/quiet hours compressed/i)).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Task Details" })).toBeInTheDocument();
-    expect(screen.getAllByText("Queue follow-up docs")).toHaveLength(1);
+    const actionRail = screen.getByRole("complementary", { name: "Unscheduled Queue" });
+    expect(within(actionRail).getByRole("link", { name: "Queue follow-up docs" })).toBeInTheDocument();
+    expect(within(actionRail).getByRole("heading", { name: "Unscheduled Queue" })).toBeInTheDocument();
     expect(screen.getAllByText("Ready to run").length).toBeGreaterThan(0);
     expect(screen.getByText("Needs model and prompt")).toBeInTheDocument();
-    expect(screen.getAllByText("Recover overdue adapter run").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Planning surface")).toBeInTheDocument();
-    expect(screen.queryByText("Pending proposals")).not.toBeInTheDocument();
+    expect(within(actionRail).queryByRole("link", { name: "Recover overdue adapter run" })).not.toBeInTheDocument();
     expect(
       screen
         .getAllByLabelText("Drag Queue follow-up docs to the timeline")
@@ -276,13 +311,23 @@ describe("SchedulePage", () => {
         .getAllByRole("link", { name: "Open Workbench" })
         .some((link) => link.getAttribute("href") === "/en/workspaces/ws_1/work/task_scheduled"),
     ).toBe(true);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Conflicts / Overdue Risks" }));
+    expect(screen.getByRole("tab", { name: "Conflicts / Overdue Risks" })).toHaveAttribute("aria-selected", "true");
+    expect(within(actionRail).getByRole("link", { name: "Recover overdue adapter run" })).toBeInTheDocument();
+    expect(within(actionRail).queryByRole("link", { name: "Queue follow-up docs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Week Overview" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "AI Proposals" }));
+    expect(screen.getByRole("tab", { name: "AI Proposals" })).toHaveAttribute("aria-selected", "true");
+    expect(within(actionRail).getByText("Plan this for tomorrow morning")).toBeInTheDocument();
   });
 
   it("keeps the timeline visible even when no tasks are scheduled", () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
 
-    render(
+    renderSchedulePage(
       <SchedulePage
         workspaceId="ws_1"
         selectedDay="2026-04-18"
@@ -375,6 +420,8 @@ describe("SchedulePage", () => {
     );
 
     expect(screen.getAllByText("Week Overview").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
+    expect(screen.getByText("Nothing urgent is blocking today. Use the queue to place the next meaningful block.")).toBeInTheDocument();
     expect(screen.getByText("Empty day lane")).toBeInTheDocument();
     expect(screen.getByText("Drop a queued task anywhere on this lane to create the first block.")).toBeInTheDocument();
     expect(screen.getAllByText("Create Task Block").length).toBeGreaterThan(0);
@@ -385,12 +432,49 @@ describe("SchedulePage", () => {
     ).toBe(true);
   });
 
+  it("keeps the schedule reading order focused on the timeline before the action rail", () => {
+    renderSchedulePage(<SchedulePage workspaceId="ws_1" selectedDay="2026-04-16" data={buildBaseData()} />);
+
+    const planningHeader = screen.getByRole("region", { name: "Schedule" });
+    const timelineHeading = screen.getByRole("heading", { name: "Scheduled Timeline" });
+    const actionRail = screen.getByRole("complementary", { name: "Unscheduled Queue" });
+    const weekOverview = screen.getByRole("heading", { name: "Week Overview" });
+
+    expect(planningHeader.compareDocumentPosition(timelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(timelineHeading.compareDocumentPosition(actionRail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(actionRail.compareDocumentPosition(weekOverview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("prioritizes risks in the action rail when the queue is empty", () => {
+    const data = buildBaseData();
+
+    renderSchedulePage(
+      <SchedulePage
+        workspaceId="ws_1"
+        selectedDay="2026-04-16"
+        data={{
+          ...data,
+          unscheduled: [],
+          summary: {
+            ...data.summary,
+            unscheduledCount: 0,
+          },
+        }}
+      />,
+    );
+
+    const actionRail = screen.getByRole("complementary", { name: "Conflicts / Overdue Risks" });
+    expect(screen.getByRole("tab", { name: "Conflicts / Overdue Risks" })).toHaveAttribute("aria-selected", "true");
+    expect(within(actionRail).getByRole("tabpanel", { name: "Conflicts / Overdue Risks" })).toBeInTheDocument();
+    expect(within(actionRail).getByRole("link", { name: "Recover overdue adapter run" })).toBeInTheDocument();
+  });
+
   it("shows a newly created block immediately on the timeline", async () => {
     createTaskFromScheduleMock.mockResolvedValue({ taskId: "task_created", workspaceId: "ws_1" });
     applyScheduleMock.mockResolvedValue(undefined);
     fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
-    render(
+    renderSchedulePage(
       <SchedulePage
         workspaceId="ws_1"
         selectedDay="2026-04-18"
@@ -452,7 +536,7 @@ describe("SchedulePage", () => {
     applyScheduleMock.mockResolvedValue(undefined);
     fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
-    render(
+    renderSchedulePage(
       <SchedulePage
         workspaceId="ws_1"
         selectedDay="2026-04-18"
@@ -508,7 +592,7 @@ describe("SchedulePage", () => {
     updateTaskConfigFromScheduleMock.mockResolvedValue(undefined);
     fetchMock.mockResolvedValue({ ok: true, json: async () => buildBaseData() });
 
-    render(
+    renderSchedulePage(
       <SchedulePage
         workspaceId="ws_1"
         selectedDay="2026-04-16"
@@ -558,5 +642,93 @@ describe("SchedulePage", () => {
         );
       });
       expect(fetchMock).toHaveBeenCalledWith("/api/schedule/projection?workspaceId=ws_1", { cache: "no-store" });
+  });
+
+  it("keeps queue task edits mounted when switching rail tabs", async () => {
+    const user = userEvent.setup();
+
+    renderSchedulePage(<SchedulePage workspaceId="ws_1" selectedDay="2026-04-16" data={buildBaseData()} />);
+
+    const actionRail = screen.getByRole("complementary", { name: "Unscheduled Queue" });
+    const toggleButton = within(actionRail)
+      .getAllByRole("button")
+      .find((button) => button.getAttribute("role") !== "tab");
+
+    if (!(toggleButton instanceof HTMLButtonElement)) {
+      throw new Error("Queue toggle button not found");
+    }
+
+    await user.click(toggleButton);
+    const modelInput = within(actionRail).getByLabelText("Model");
+    const promptInput = within(actionRail).getByLabelText("Prompt / instructions");
+
+    await user.type(modelInput, "gpt-5.4");
+    await user.type(promptInput, "Write the follow-up note");
+
+    await user.click(screen.getByRole("tab", { name: "Conflicts / Overdue Risks" }));
+    await user.click(screen.getByRole("tab", { name: "Unscheduled Queue" }));
+
+    const queuePanel = within(actionRail).getByRole("tabpanel", { name: "Unscheduled Queue" });
+    expect(within(queuePanel).getByRole("link", { name: "Queue follow-up docs" })).toBeInTheDocument();
+    expect(within(queuePanel).getByLabelText("Model")).toHaveValue("gpt-5.4");
+    expect(within(queuePanel).getByLabelText("Prompt / instructions")).toHaveValue("Write the follow-up note");
+  });
+
+  it("supports keyboard navigation for the action rail tabs", async () => {
+    const user = userEvent.setup();
+
+    renderSchedulePage(<SchedulePage workspaceId="ws_1" selectedDay="2026-04-16" data={buildBaseData()} />);
+
+    const queueTab = screen.getByRole("tab", { name: "Unscheduled Queue" });
+    const risksTab = screen.getByRole("tab", { name: "Conflicts / Overdue Risks" });
+    const proposalsTab = screen.getByRole("tab", { name: "AI Proposals" });
+
+    expect(queueTab).toHaveAttribute("tabindex", "0");
+    expect(risksTab).toHaveAttribute("tabindex", "-1");
+    expect(proposalsTab).toHaveAttribute("tabindex", "-1");
+
+    queueTab.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(risksTab).toHaveFocus();
+    expect(risksTab).toHaveAttribute("aria-selected", "true");
+    expect(risksTab).toHaveAttribute("tabindex", "0");
+
+    await user.keyboard("{End}");
+    expect(proposalsTab).toHaveFocus();
+    expect(proposalsTab).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Home}");
+    expect(queueTab).toHaveFocus();
+    expect(queueTab).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowLeft}");
+    expect(proposalsTab).toHaveFocus();
+    expect(proposalsTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("uses localized planning header and rail labels", () => {
+    renderSchedulePage(<SchedulePage workspaceId="ws_1" selectedDay="2026-04-16" data={buildBaseData()} />, {
+      locale: "zh",
+      messages: zhMessages,
+    });
+
+    const planningHeader = screen.getByRole("region", { name: "日程" });
+    expect(planningHeader).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "待安排队列" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "待安排队列" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "今天" })).toHaveAttribute("href", "/zh/schedule?day=2026-04-13");
+    expect(screen.getByRole("link", { name: "明天" })).toHaveAttribute("href", "/zh/schedule?day=2026-04-14");
+    expect(screen.getByRole("link", { name: "当前计划" })).toHaveAttribute("href", "/zh/schedule?day=2026-04-16");
+    expect(screen.getByRole("link", { name: "当前计划" })).toHaveAttribute("aria-current", "date");
+    expect(screen.getByRole("link", { name: "时间轴" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "时间轴" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "列表" })).toBeInTheDocument();
+    expect(within(planningHeader).getByText("4月16日周四")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "待安排队列" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "冲突 / 逾期风险" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "AI 建议" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Timeline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "List" })).not.toBeInTheDocument();
   });
 });

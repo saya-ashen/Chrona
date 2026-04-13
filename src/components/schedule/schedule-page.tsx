@@ -20,6 +20,8 @@ import {
   type TaskConfigPreset,
   type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
+import { PlanningHeader } from "@/components/schedule/planning-header";
+import { ScheduleActionRail } from "@/components/schedule/schedule-action-rail";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -133,7 +135,7 @@ type ScheduledItem = SchedulePageProps["data"]["scheduled"][number];
 type UnscheduledItem = SchedulePageProps["data"]["unscheduled"][number];
 type ListItem = SchedulePageProps["data"]["listItems"][number];
 type ScheduleViewMode = "timeline" | "list";
-type SecondaryPlanningView = "week" | "risks" | "proposals";
+type SecondaryPlanningView = "queue" | "risks" | "proposals";
 
 type TodayFocusItem = {
   taskId: string;
@@ -351,9 +353,6 @@ const DEFAULT_COPY = {
   queueReady: "Queue ready",
   needsAttention: "Needs attention",
   aiProposalsCompactEmpty: "No pending AI proposals.",
-  secondaryWeek: "Week",
-  secondaryRisks: "Risks",
-  secondaryProposals: "AI Proposals",
 } as const;
 
 type SchedulePageCopy = Record<keyof typeof DEFAULT_COPY, string>;
@@ -673,6 +672,8 @@ function buildWeekGroups(
   proposals: SchedulePageProps["data"]["proposals"],
   risks: SchedulePageProps["data"]["risks"],
   referenceDay: string | undefined,
+  locale: string,
+  copy: SchedulePageCopy,
 ) {
   const anchorDate = parseDayKey(referenceDay) ?? startOfDay(new Date());
   const weekStart = startOfWeek(anchorDate);
@@ -682,7 +683,7 @@ function buildWeekGroups(
     return {
       key: formatDateKey(date),
       date,
-      label: formatDayHeading(date),
+      label: formatDayHeading(date, locale, copy),
       items: [],
       proposalCount: 0,
       riskCount: 0,
@@ -923,9 +924,11 @@ function buildTodayFocusItems(
 
 function TodayFocusCard({
   items,
+  emptyMessage,
   copy,
 }: {
   items: TodayFocusItem[];
+  emptyMessage: string;
   copy: SchedulePageCopy;
 }) {
   return (
@@ -934,18 +937,24 @@ function TodayFocusCard({
         <SurfaceCardTitle>{copy.todayFocus}</SurfaceCardTitle>
       </SurfaceCardHeader>
 
-      <div className="flex flex-wrap items-center gap-2 px-6 pb-6 text-sm">
-        {items.map((item) => (
-          <LocalizedLink
-            key={item.taskId}
-            href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
-            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-          >
-            <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
-            <span className="max-w-[18rem] truncate">{item.title}</span>
-          </LocalizedLink>
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <div className="px-6 pb-6">
+          <EmptyState>{emptyMessage}</EmptyState>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 px-6 pb-6 text-sm">
+          {items.map((item) => (
+            <LocalizedLink
+              key={item.taskId}
+              href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
+              <span className="max-w-[18rem] truncate">{item.title}</span>
+            </LocalizedLink>
+          ))}
+        </div>
+      )}
     </SurfaceCard>
   );
 }
@@ -1910,19 +1919,32 @@ export function SchedulePage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string>("");
   const [isPending, setIsPending] = useState(false);
-  const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("week");
+  const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("queue");
+  const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
 
   const refreshProjection = useCallback(async () => {
-    const response = await fetch(`/api/schedule/projection?workspaceId=${workspaceId}`, { cache: "no-store" });
+    const requestId = ++refreshRequestIdRef.current;
 
-    if (!response.ok) {
-      return;
+    try {
+      const response = await fetch(`/api/schedule/projection?workspaceId=${workspaceId}`, { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error(messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      }
+
+      const next = (await response.json()) as SchedulePageProps["data"];
+
+      if (requestId !== refreshRequestIdRef.current) {
+        return;
+      }
+
+      startTransition(() => setViewData(next));
+    } catch (error) {
+      router.refresh();
+      throw error instanceof Error ? error : new Error(messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
     }
-
-    const next = (await response.json()) as SchedulePageProps["data"];
-    startTransition(() => setViewData(next));
-  }, [workspaceId]);
+  }, [messages.components?.scheduleEditorForm?.actionFailed, router, workspaceId]);
 
   useEffect(() => {
     setViewData(data);
@@ -1932,12 +1954,43 @@ export function SchedulePage({
     setLocalSelectedTaskId(selectedTaskId);
   }, [selectedTaskId]);
 
+  useEffect(() => {
+    setSecondaryView((current) => {
+      if (current === "queue" && viewData.unscheduled.length > 0) {
+        return current;
+      }
+
+      if (current === "risks" && viewData.risks.length > 0) {
+        return current;
+      }
+
+      if (current === "proposals" && viewData.proposals.length > 0) {
+        return current;
+      }
+
+      if (viewData.risks.length > 0) {
+        return "risks";
+      }
+
+      if (viewData.unscheduled.length > 0) {
+        return "queue";
+      }
+
+      if (viewData.proposals.length > 0) {
+        return "proposals";
+      }
+
+      return "queue";
+    });
+  }, [viewData.proposals.length, viewData.risks.length, viewData.unscheduled.length]);
+
   const scheduledGroups = useMemo(
-    () => buildWeekGroups(viewData.scheduled, viewData.proposals, viewData.risks, selectedDay),
-    [selectedDay, viewData.proposals, viewData.risks, viewData.scheduled],
+    () => buildWeekGroups(viewData.scheduled, viewData.proposals, viewData.risks, selectedDay, locale, copy),
+    [copy, locale, selectedDay, viewData.proposals, viewData.risks, viewData.scheduled],
   );
 
   const todayKey = getTodayKey();
+  const tomorrowKey = formatDateKey(addDays(parseDayKey(todayKey) ?? startOfDay(new Date()), 1));
   const selectedGroupKey = scheduledGroups.find((group) => group.key === selectedDay)?.key;
   const todayGroupKey = scheduledGroups.find((group) => group.key === todayKey)?.key;
   const todayGroup = scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
@@ -1954,8 +2007,12 @@ export function SchedulePage({
   const activeGroup = scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
   const selectedItem = activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ?? null;
-  const tomorrowKey = formatDateKey(addDays(startOfDay(new Date()), 1));
   const todayFocusItems = useMemo(() => buildTodayFocusItems(viewData, activeGroup, copy), [activeGroup, copy, viewData]);
+  const activeRailLabel = secondaryView === "risks"
+    ? copy.conflictsTitle
+    : secondaryView === "proposals"
+      ? copy.aiProposalsTitle
+      : copy.unscheduledQueue;
   const draggedQueueItem =
     draggedTask?.kind === "queue" ? viewData.unscheduled.find((item) => item.taskId === draggedTask.taskId) ?? null : null;
   const draggedScheduledItem =
@@ -2197,93 +2254,82 @@ export function SchedulePage({
         {announcement}
       </p>
 
-      <div className="space-y-4">
-        <SurfaceCard variant="highlight" className="space-y-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">{copy.pageTitle}</h1>
-          </div>
+      <PlanningHeader
+        ariaLabel={copy.pageTitle}
+        title={copy.pageTitle}
+        activeDayLabel={activeGroup?.label ?? activeDay}
+        dateSwitcherLabel={copy.dateSwitcher}
+        dayLinks={[
+          {
+            label: copy.today,
+            href: buildScheduleViewHref(todayKey, activeView),
+            current: activeDay === todayKey,
+          },
+          {
+            label: copy.tomorrow,
+            href: buildScheduleViewHref(tomorrowKey, activeView),
+            current: activeDay === tomorrowKey,
+          },
+          {
+            label: copy.currentPlanButton,
+            href: buildScheduleViewHref(activeDay, activeView),
+            current: activeDay !== todayKey && activeDay !== tomorrowKey,
+          },
+        ]}
+        activeView={activeView}
+        timelineHref={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
+        listHref={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
+        timelineLabel={copy.timeline}
+        listLabel={copy.list}
+        metrics={[
+          { label: copy.todayBlocks, value: activeGroup?.items.length ?? 0 },
+          { label: copy.queueReady, value: viewData.summary.unscheduledCount, tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined },
+          { label: copy.needsAttention, value: viewData.summary.riskCount, tone: viewData.summary.riskCount > 0 ? "critical" : undefined },
+          { label: copy.aiProposalsMetric, value: viewData.summary.proposalCount, tone: viewData.summary.proposalCount > 0 ? "info" : undefined },
+        ]}
+      />
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.dateSwitcher}</span>
-              <div className="flex flex-wrap gap-2 rounded-2xl border border-border/60 bg-background/70 p-1">
-                <LocalizedLink href={buildScheduleViewHref(todayKey, activeView)} className={buttonVariants({ variant: activeDay === todayKey ? "default" : "ghost", size: "sm" })}>
-                  {copy.today}
-                </LocalizedLink>
-                <LocalizedLink href={buildScheduleViewHref(tomorrowKey, activeView)} className={buttonVariants({ variant: activeDay === tomorrowKey ? "default" : "ghost", size: "sm" })}>
-                  {copy.tomorrow}
-                </LocalizedLink>
-                <LocalizedLink href={buildScheduleViewHref(activeDay, activeView)} className={buttonVariants({ variant: activeDay !== todayKey && activeDay !== tomorrowKey ? "default" : "ghost", size: "sm" })}>
-                  {copy.currentPlanButton}
-                </LocalizedLink>
-              </div>
-            </div>
-
-          </div>
-
-          {errorMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge>{copy.todayBlocks}: {activeGroup?.items.length ?? 0}</StatusBadge>
-            <StatusBadge tone={viewData.summary.unscheduledCount > 0 ? "info" : "neutral"}>{copy.queueReady}: {viewData.summary.unscheduledCount}</StatusBadge>
-            <StatusBadge tone={viewData.summary.riskCount > 0 ? "critical" : "neutral"}>{copy.needsAttention}: {viewData.summary.riskCount}</StatusBadge>
-            {viewData.summary.proposalCount > 0 ? (
-              <StatusBadge tone="info">{copy.aiProposalsMetric}: {viewData.summary.proposalCount}</StatusBadge>
-            ) : null}
-          </div>
-        </SurfaceCard>
-      </div>
+      {errorMessage ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
+      ) : null}
 
       <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
-        {todayFocusItems.length > 0 ? <TodayFocusCard items={todayFocusItems} copy={copy} /> : null}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_360px] xl:items-start">
+          <div className="space-y-4">
+            <TodayFocusCard items={todayFocusItems} emptyMessage={copy.todayFocusEmpty} copy={copy} />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2.9fr)_minmax(340px,1fr)] xl:items-start">
-          <SurfaceCard variant="highlight">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <SurfaceCardHeader>
-                <SurfaceCardTitle>{copy.scheduledTimeline}</SurfaceCardTitle>
-              </SurfaceCardHeader>
-              <div className="flex flex-wrap items-center gap-2">
-                {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
-                <StatusBadge>{copy.planningSurface}</StatusBadge>
-                <LocalizedLink
-                  href={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
-                  className={buttonVariants({ variant: activeView === "timeline" ? "default" : "outline", size: "sm" })}
-                >
-                  {copy.timeline}
-                </LocalizedLink>
-                <LocalizedLink
-                  href={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
-                  className={buttonVariants({ variant: activeView === "list" ? "default" : "outline", size: "sm" })}
-                >
-                  {copy.list}
-                </LocalizedLink>
+            <SurfaceCard variant="highlight">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <SurfaceCardHeader>
+                  <SurfaceCardTitle>{copy.scheduledTimeline}</SurfaceCardTitle>
+                </SurfaceCardHeader>
+                <div className="flex flex-wrap items-center gap-2">
+                  {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
+                  <StatusBadge>{copy.planningSurface}</StatusBadge>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 space-y-4">
-              {activeView === "timeline" ? (
-                activeGroup ? (
-                  <DayTimeline
-                    items={activeGroup.items}
-                    dayDate={activeGroup.date}
-                    selectedDay={activeGroup.key}
-                    selectedTaskId={selectedTaskId}
-                    draggedItem={draggedItem}
-                    runtimeAdapters={data.runtimeAdapters}
-                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                    isPending={isPending}
-                    onScheduleDrop={handleScheduleDrop}
-                    onCreateTaskBlock={handleCreateTaskBlock}
-                    onScheduledDragStart={handleScheduledDragStart}
-                    onDragEnd={handleQueueDragEnd}
-                  />
+              <div className="mt-4 space-y-4">
+                {activeView === "timeline" ? (
+                  activeGroup ? (
+                    <DayTimeline
+                      items={activeGroup.items}
+                      dayDate={activeGroup.date}
+                      selectedDay={activeGroup.key}
+                      selectedTaskId={selectedTaskId}
+                      draggedItem={draggedItem}
+                      runtimeAdapters={data.runtimeAdapters}
+                      defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                      isPending={isPending}
+                      onScheduleDrop={handleScheduleDrop}
+                      onCreateTaskBlock={handleCreateTaskBlock}
+                      onScheduledDragStart={handleScheduledDragStart}
+                      onDragEnd={handleQueueDragEnd}
+                    />
+                  ) : (
+                    <EmptyState>{copy.noTimelineDay}</EmptyState>
+                  )
                 ) : (
-                  <EmptyState>{copy.noTimelineDay}</EmptyState>
-                )
-              ) : (
                   <ScheduleTaskList
                     items={viewData.listItems}
                     runtimeAdapters={data.runtimeAdapters}
@@ -2291,83 +2337,84 @@ export function SchedulePage({
                     onSaveTaskConfigAction={handleTaskConfigSave}
                     isPending={isPending}
                   />
-              )}
-            </div>
-          </SurfaceCard>
+                )}
+              </div>
+            </SurfaceCard>
+          </div>
 
-          <SurfaceCard className="xl:sticky xl:top-4 xl:self-start">
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
-            </SurfaceCardHeader>
-
-            <div className="mt-4 max-h-[70vh] space-y-3 overflow-y-auto pr-1 text-sm text-muted-foreground">
-              {viewData.unscheduled.length === 0 ? (
-                <EmptyState>
-                  {copy.noUnscheduledWork}
-                </EmptyState>
-              ) : (
-                viewData.unscheduled.map((item) => (
-                  <QueueCard
-                    key={item.taskId}
-                    item={item}
-                    runtimeAdapters={data.runtimeAdapters}
-                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                    isPending={isPending}
-                    isDragging={draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId}
-                    isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                    onToggle={() => toggleQueueCard(item.taskId)}
-                    onMutatedAction={refreshProjection}
-                    onSaveTaskConfigAction={handleTaskConfigSave}
-                    onDragStart={handleQueueDragStart}
-                    onDragEnd={handleQueueDragEnd}
-                  />
-                ))
-              )}
-            </div>
-          </SurfaceCard>
+          <ScheduleActionRail
+            ariaLabel={activeRailLabel}
+            tablistAriaLabel={activeRailLabel}
+            activeTab={secondaryView}
+            onTabChange={setSecondaryView}
+            sections={[
+              {
+                value: "queue",
+                label: copy.unscheduledQueue,
+                title: copy.unscheduledQueue,
+                description: copy.unscheduledQueueDescription,
+                body:
+                  viewData.unscheduled.length === 0 ? (
+                    <EmptyState>{copy.noUnscheduledWork}</EmptyState>
+                  ) : (
+                    viewData.unscheduled.map((item) => (
+                      <QueueCard
+                        key={item.taskId}
+                        item={item}
+                        runtimeAdapters={data.runtimeAdapters}
+                        defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                        isPending={isPending}
+                        isDragging={draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId}
+                        isExpanded={expandedQueueTaskIds.includes(item.taskId)}
+                        onToggle={() => toggleQueueCard(item.taskId)}
+                        onMutatedAction={refreshProjection}
+                        onSaveTaskConfigAction={handleTaskConfigSave}
+                        onDragStart={handleQueueDragStart}
+                        onDragEnd={handleQueueDragEnd}
+                      />
+                    ))
+                  ),
+              },
+              {
+                value: "risks",
+                label: copy.conflictsTitle,
+                title: copy.conflictsTitle,
+                body:
+                  viewData.risks.length === 0 ? (
+                    <EmptyState>{copy.noScheduleRisks}</EmptyState>
+                  ) : (
+                    viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)
+                  ),
+              },
+              {
+                value: "proposals",
+                label: copy.aiProposalsTitle,
+                title: copy.aiProposalsTitle,
+                body:
+                  viewData.proposals.length === 0 ? (
+                    <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
+                  ) : (
+                    viewData.proposals.slice(0, 2).map((proposal) => (
+                      <ProposalCard
+                        key={proposal.proposalId}
+                        proposal={proposal}
+                        isPending={isPending}
+                        onAccept={handleAcceptProposal}
+                        onReject={handleRejectProposal}
+                      />
+                    ))
+                  ),
+              },
+            ]}
+          />
         </div>
 
         <SurfaceCard>
           <SurfaceCardHeader>
             <SurfaceCardTitle>{copy.weekOverview}</SurfaceCardTitle>
           </SurfaceCardHeader>
-          <div className="px-6 pb-4">
-            <div className="flex flex-wrap gap-2">
-              {[
-                ["week", copy.weekOverview],
-                ["risks", copy.conflictsTitle],
-                ["proposals", copy.aiProposalsTitle],
-              ].map(([value, label]) => (
-                <button key={value} type="button" onClick={() => setSecondaryView(value as SecondaryPlanningView)} className={buttonVariants({ variant: secondaryView === value ? "default" : "ghost", size: "sm" })}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="px-6 pb-6">
-            {secondaryView === "week" ? (
-              <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
-            ) : secondaryView === "risks" ? (
-              <div className="space-y-3">
-                {viewData.risks.length === 0 ? <EmptyState>{copy.noScheduleRisks}</EmptyState> : viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {viewData.proposals.length === 0 ? (
-                  <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
-                ) : (
-                  viewData.proposals.slice(0, 2).map((proposal) => (
-                    <ProposalCard
-                      key={proposal.proposalId}
-                      proposal={proposal}
-                      isPending={isPending}
-                      onAccept={handleAcceptProposal}
-                      onReject={handleRejectProposal}
-                    />
-                  ))
-                )}
-              </div>
-            )}
+            <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
           </div>
         </SurfaceCard>
       </div>
