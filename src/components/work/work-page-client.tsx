@@ -1,14 +1,18 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import {
   acceptTaskResult,
   approveApproval,
+  createFollowUpTask,
   editAndApproveApproval,
   generateTaskPlan,
+  markTaskDone,
   provideInput,
   rejectApproval,
+  reopenTask,
   retryRun,
   sendOperatorMessage,
   startRun,
@@ -17,15 +21,11 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { inputClassName, textareaClassName } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  SurfaceCard,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
-import { CollaborationStream } from "@/components/work/collaboration-stream";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
-import { RunSidePanel } from "@/components/work/run-side-panel";
-import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
+import { LatestResultPanel } from "@/components/work/latest-result-panel";
+import { NextActionHero } from "@/components/work/next-action-hero";
+import { TaskShell } from "@/components/work/task-shell";
+import { WorkInspector } from "@/components/work/work-inspector";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
@@ -315,6 +315,7 @@ const DEFAULT_COPY = {
   taskWaitingInputSummary: "Agent 正在等待你的补充说明，才能继续当前任务。",
   taskWaitingApprovalSummary: "Agent 正在等待你的决定，审批后才能继续。",
   taskCompletedSummary: "最新一轮已经完成。先确认结果，再决定是否继续推进。",
+  taskAwaitingReviewLabel: "待确认",
   taskFailedSummary: "上一轮执行已中断。现在要决定是恢复、重试，还是改方向。",
   currentKeyDecision: "当前需要你决定",
   collaborationFlow: "对话记录",
@@ -353,6 +354,57 @@ const DEFAULT_COPY = {
   secondaryActions: "次操作",
   decisionReminder: "补充提醒",
   milestoneWaitingStart: "等待你决定是否启动",
+  taskShellAria: "任务概览",
+  nextActionHeroAria: "当前重点区域",
+  latestResultAria: "最新结果区域",
+  executionStreamAria: "任务记录区域",
+  workInspectorAria: "工作检查区",
+  scheduleCrumb: "日程",
+  currentBlocker: "当前阻塞",
+  deadline: "截止时间",
+  nextActionBadge: "当前重点",
+  latestResultEyebrow: "最新结果",
+  taskPlan: "任务计划",
+  planReadySummary: "计划会随当前运行状态更新。",
+  planEmptySummary: "生成后会在这里显示当前步骤与恢复入口。",
+  noTaskPlan: "还没有任务计划",
+  generatePlaceholderPlan: "生成占位计划",
+  currentStep: "当前步骤",
+  resumeFromPlan: "重新规划后继续",
+  pendingApprovals: "待处理审批",
+  noPendingApprovals: "当前没有待处理审批。",
+  currentArtifacts: "当前产出",
+  noArtifacts: "当前没有产出。",
+  toolLog: "工具记录",
+  noToolLog: "当前没有工具调用记录。",
+  toolArguments: "参数",
+  toolResult: "结果",
+  toolError: "错误",
+  taskContext: "任务背景",
+  priorityLabel: "优先级",
+  dueAtLabel: "截止时间",
+  scheduledWindowLabel: "计划时间窗",
+  scheduleStatusLabel: "日程状态",
+  runStatusLabel: "运行状态",
+  syncStatusLabel: "同步状态",
+  lastUpdatedLabel: "最近更新",
+  lastSyncedLabel: "最近同步",
+  stopReasonLabel: "停止原因",
+  invalidFollowUpDate: "后续任务截止时间无效",
+  invalidFollowUpTitle: "后续任务标题不能为空",
+  noValue: "暂无",
+  pendingStep: "待开始",
+  inProgressStep: "进行中",
+  waitingForUserStep: "等待你确认",
+  doneStep: "已完成",
+  blockedStep: "阻塞",
+  closureStatusTitle: "任务生命周期",
+  closureAcceptedAt: "结果确认时间",
+  closureDoneAt: "任务完成时间",
+  latestFollowUpStatus: "任务状态",
+  latestFollowUpSchedule: "日程状态",
+  latestFollowUpCreatedAt: "创建时间",
+  approvalSummaryFallback: "Review the approval request before resuming the run.",
 } as const;
 
 function formatDate(value: string | null | undefined) {
@@ -385,7 +437,7 @@ function getTaskSummary(data: WorkPageClientProps["initialData"], copy: typeof D
   }
 }
 
-function getTaskStatusMeta(data: WorkPageClientProps["initialData"]) {
+function getTaskStatusMeta(data: WorkPageClientProps["initialData"], copy: typeof DEFAULT_COPY) {
   if (data.closure.isDone) {
     return { label: "已完成", tone: "success" as const };
   }
@@ -398,29 +450,11 @@ function getTaskStatusMeta(data: WorkPageClientProps["initialData"]) {
     return { label: "已中断", tone: "critical" as const };
   }
 
+  if (data.currentRun.status === "Completed") {
+    return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
+  }
+
   return { label: "进行中", tone: "info" as const };
-}
-
-function getCurrentPhaseLabel(
-  currentRun: WorkPageClientProps["initialData"]["currentRun"],
-  closure: WorkPageClientProps["initialData"]["closure"],
-) {
-  if (closure.isDone) {
-    return "收尾完成";
-  }
-
-  switch (currentRun?.status) {
-    case "Running":
-    case "Failed":
-    case "Cancelled":
-      return "执行中";
-    case "WaitingForApproval":
-    case "WaitingForInput":
-    case "Completed":
-      return "等待确认";
-    default:
-      return "理解任务";
-  }
 }
 
 function getCurrentException(data: WorkPageClientProps["initialData"]) {
@@ -457,23 +491,59 @@ function getCurrentPlanAction(
   }
 
   if (!currentRun) {
-    return { label: "从这一步启动", href: "#current-key-decision" };
+    return { label: "从这一步启动", href: "#next-action-hero" };
   }
 
   switch (currentRun.status) {
     case "WaitingForApproval":
-      return { label: "处理当前确认", href: "#pending-approvals" };
+      return { label: "处理当前确认", href: "#next-action-hero" };
     case "WaitingForInput":
-      return { label: "补充说明后继续", href: "#work-composer" };
+      return { label: "补充说明后继续", href: "#next-action-hero" };
     case "Running":
-      return { label: "查看当前进展", href: "#collaboration-flow" };
+      return { label: "查看当前进展", href: "#execution-stream" };
     case "Completed":
       return { label: "确认结果", href: "#latest-result" };
     case "Failed":
     case "Cancelled":
-      return { label: "从这一步恢复", href: "#work-composer" };
+      return { label: "从这一步恢复", href: "#next-action-hero" };
     default:
-      return { label: "查看当前动作", href: "#current-key-decision" };
+      return { label: "查看当前动作", href: "#next-action-hero" };
+  }
+}
+
+function getScheduleStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "AtRisk":
+      return "有风险";
+    case "Overdue":
+      return "已超时";
+    case "OnTrack":
+      return "按计划进行";
+    case "Unscheduled":
+      return "未安排";
+    case "Completed":
+      return "已完成";
+    default:
+      return status || "暂无";
+  }
+}
+
+function getRunStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "Running":
+      return "执行中";
+    case "WaitingForApproval":
+      return "等待审批";
+    case "WaitingForInput":
+      return "等待补充说明";
+    case "Completed":
+      return "已完成";
+    case "Failed":
+      return "执行中断";
+    case "Cancelled":
+      return "已取消";
+    default:
+      return "暂无运行";
   }
 }
 
@@ -510,16 +580,99 @@ function getStartRunDefaultValue(taskTitle: string) {
   return `继续处理：${taskTitle}`;
 }
 
-function getContinueRunPlaceholder(taskTitle: string) {
-  return `基于最新结果继续推进：${taskTitle}`;
+function getFollowUpDefaultTitle(taskTitle: string) {
+  return `${taskTitle} - follow-up`;
+}
+
+function getPassiveHeroGuidance(
+  currentRun: WorkPageClientProps["initialData"]["currentRun"],
+  closure: WorkPageClientProps["initialData"]["closure"],
+  copy: typeof DEFAULT_COPY,
+) {
+  if (currentRun?.status === "Completed") {
+    const actions = [
+      closure.canAcceptResult ? copy.acceptResult : null,
+      closure.canMarkDone ? copy.markTaskDone : null,
+      closure.canCreateFollowUp ? copy.createFollowUp : null,
+      closure.canReopen ? copy.reopenTask : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return {
+      description: copy.taskCompletedSummary,
+      actions: actions.length > 0 ? actions.join(" / ") : copy.latestResult,
+    };
+  }
+
+  if (currentRun?.status === "Failed" || currentRun?.status === "Cancelled") {
+    const actions = [
+      closure.canReopen ? copy.reopenTask : null,
+      closure.canCreateFollowUp ? copy.createFollowUp : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return {
+      description: copy.taskFailedSummary,
+      actions: actions.length > 0 ? actions.join(" / ") : copy.latestResult,
+    };
+  }
+
+  if (closure.isDone) {
+    return {
+      description: copy.taskCompletedSummary,
+      actions: closure.canReopen ? copy.reopenTask : copy.latestResult,
+    };
+  }
+
+  return {
+    description: copy.workbenchDescription,
+    actions: copy.latestResult,
+  };
+}
+
+export function parseDateInputForSubmission(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  const parsedYear = Number(year);
+  const parsedMonth = Number(month);
+  const parsedDay = Number(day);
+  const parsedDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, parsedDay, 12));
+
+  if (
+    Number.isNaN(parsedDate.getTime())
+    || parsedDate.getUTCFullYear() !== parsedYear
+    || parsedDate.getUTCMonth() !== parsedMonth - 1
+    || parsedDate.getUTCDate() !== parsedDay
+  ) {
+    return null;
+  }
+
+  return parsedDate;
+}
+
+function isSafeExternalHref(href: string) {
+  try {
+    const protocol = new URL(href).protocol;
+    return protocol === "http:" || protocol === "https:" || protocol === "mailto:" || protocol === "tel:";
+  } catch {
+    return false;
+  }
+}
+
+function isInternalAppHref(href: string) {
+  return href.startsWith("/") && !href.startsWith("//");
 }
 
 function getWorkbenchComposer(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   currentIntervention: WorkPageClientProps["initialData"]["currentIntervention"],
+  closure: WorkPageClientProps["initialData"]["closure"],
   taskShell: WorkPageClientProps["initialData"]["taskShell"],
   copy: WorkbenchCopy,
-): WorkbenchComposer {
+): WorkbenchComposer | null {
   if (!currentRun) {
     return {
       mode: "start",
@@ -569,19 +722,26 @@ function getWorkbenchComposer(
   }
 
   if (currentRun.status === "Completed") {
+    if (!closure.canRetry) {
+      return null;
+    }
+
     return {
-      mode: "continue",
-      description: copy.continueRunDescription,
+      mode: "retry",
+      description: copy.taskCompletedSummary,
       inputLabel: copy.taskArrangement,
-      submitLabel: copy.continueRun,
-      defaultValue: "",
-      placeholder: getContinueRunPlaceholder(taskShell.title),
+      submitLabel: copy.retryRun,
+      defaultValue: taskShell.prompt ?? getStartRunDefaultValue(taskShell.title),
       statusHint: `${copy.currentRun}: ${currentRun.status}`,
       submitVariant: "default",
     };
   }
 
   if (currentRun.status === "Failed" || currentRun.status === "Cancelled") {
+    if (!closure.canRetry) {
+      return null;
+    }
+
     return {
       mode: "retry",
       description: currentIntervention?.description ?? copy.workbenchDescription,
@@ -623,161 +783,98 @@ function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
 }
 
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
+  const router = useRouter();
   const { messages } = useI18n();
   const workPageMessages = messages.components?.workPage ?? {};
   const copy = {
     ...DEFAULT_COPY,
     ...workPageMessages,
-    openSchedule: DEFAULT_COPY.openSchedule,
-    viewTaskDetail: DEFAULT_COPY.viewTaskDetail,
-    duePrefix: DEFAULT_COPY.duePrefix,
-    workbenchTitle: DEFAULT_COPY.workbenchTitle,
-    workbenchDescription: DEFAULT_COPY.workbenchDescription,
-    workbenchStatus: DEFAULT_COPY.workbenchStatus,
-    nextAction: DEFAULT_COPY.nextAction,
-    whyNow: DEFAULT_COPY.whyNow,
-    evidence: DEFAULT_COPY.evidence,
-    taskArrangement: DEFAULT_COPY.taskArrangement,
-    taskArrangementHint: DEFAULT_COPY.taskArrangementHint,
-    conversationInput: DEFAULT_COPY.conversationInput,
-    sendAndContinue: DEFAULT_COPY.sendAndContinue,
-    sendNoteToAgent: DEFAULT_COPY.sendNoteToAgent,
-    currentRun: DEFAULT_COPY.currentRun,
-    approve: DEFAULT_COPY.approve,
-    reject: DEFAULT_COPY.reject,
-    editedInstruction: DEFAULT_COPY.editedInstruction,
-    editAndApprove: DEFAULT_COPY.editAndApprove,
-    retryRun: DEFAULT_COPY.retryRun,
-    acceptResult: DEFAULT_COPY.acceptResult,
-    markTaskDone: DEFAULT_COPY.markTaskDone,
-    createFollowUp: DEFAULT_COPY.createFollowUp,
-    followUpTitle: DEFAULT_COPY.followUpTitle,
-    followUpDue: DEFAULT_COPY.followUpDue,
-    reopenTask: DEFAULT_COPY.reopenTask,
-    startRunHere: DEFAULT_COPY.startRunHere,
-    noActiveRunYet: DEFAULT_COPY.noActiveRunYet,
-    resultActionsTitle: DEFAULT_COPY.resultActionsTitle,
-    sharedOutput: DEFAULT_COPY.sharedOutput,
-    usedByNextAction: DEFAULT_COPY.usedByNextAction,
-    updated: DEFAULT_COPY.updated,
-    executionWorkstream: DEFAULT_COPY.executionWorkstream,
-    workstream: DEFAULT_COPY.workstream,
-    conversation: DEFAULT_COPY.conversation,
-    latestExecutionMilestones: DEFAULT_COPY.latestExecutionMilestones,
-    conversationEvidence: DEFAULT_COPY.conversationEvidence,
-    keyboardHint: DEFAULT_COPY.keyboardHint,
-    currentStage: DEFAULT_COPY.currentStage,
-    sourceSchedule: DEFAULT_COPY.sourceSchedule,
-    taskReadySummary: DEFAULT_COPY.taskReadySummary,
-    taskRunningSummary: DEFAULT_COPY.taskRunningSummary,
-    taskWaitingInputSummary: DEFAULT_COPY.taskWaitingInputSummary,
-    taskWaitingApprovalSummary: DEFAULT_COPY.taskWaitingApprovalSummary,
-    taskCompletedSummary: DEFAULT_COPY.taskCompletedSummary,
-    taskFailedSummary: DEFAULT_COPY.taskFailedSummary,
-    currentKeyDecision: DEFAULT_COPY.currentKeyDecision,
-    collaborationFlow: DEFAULT_COPY.collaborationFlow,
-    collaborationFlowDescription: DEFAULT_COPY.collaborationFlowDescription,
-    latestResult: DEFAULT_COPY.latestResult,
-    inputArea: DEFAULT_COPY.inputArea,
-    allTasks: DEFAULT_COPY.allTasks,
-    openInbox: DEFAULT_COPY.openInbox,
-    openMemory: DEFAULT_COPY.openMemory,
-    taskStages: DEFAULT_COPY.taskStages,
-    taskLifecycle: DEFAULT_COPY.taskLifecycle,
-    collaborationStage: DEFAULT_COPY.collaborationStage,
-    lifecycleNotStarted: DEFAULT_COPY.lifecycleNotStarted,
-    lifecycleInProgress: DEFAULT_COPY.lifecycleInProgress,
-    lifecycleCompleted: DEFAULT_COPY.lifecycleCompleted,
-    workbenchCrumb: DEFAULT_COPY.workbenchCrumb,
-    decisionStatus: DEFAULT_COPY.decisionStatus,
-    decisionPlan: DEFAULT_COPY.decisionPlan,
-    decisionOptions: DEFAULT_COPY.decisionOptions,
-    modifyBeforeStart: DEFAULT_COPY.modifyBeforeStart,
-    adjustSchedule: DEFAULT_COPY.adjustSchedule,
-    notNow: DEFAULT_COPY.notNow,
-    resultEmptyTitle: DEFAULT_COPY.resultEmptyTitle,
-    resultEmptyDescription: DEFAULT_COPY.resultEmptyDescription,
-    resultPreviewTitle: DEFAULT_COPY.resultPreviewTitle,
-    resultPreviewUnderstanding: DEFAULT_COPY.resultPreviewUnderstanding,
-    resultPreviewPlan: DEFAULT_COPY.resultPreviewPlan,
-    resultPreviewDraft: DEFAULT_COPY.resultPreviewDraft,
-    resultPreviewQuestions: DEFAULT_COPY.resultPreviewQuestions,
-    secondaryActions: DEFAULT_COPY.secondaryActions,
-    decisionReminder: DEFAULT_COPY.decisionReminder,
   };
   const [data, setData] = useState(initialData);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [heroErrorMessage, setHeroErrorMessage] = useState<string | null>(null);
+  const [resultErrorMessage, setResultErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [composerResetKey, setComposerResetKey] = useState(0);
+  const refreshEpochRef = useRef(0);
 
-  const refresh = useCallback(async () => {
-    const response = await fetch(`/api/work/${data.taskShell.id}/projection`, { cache: "no-store" });
+  const refresh = useCallback(async ({ silent = false, epoch = refreshEpochRef.current }: { silent?: boolean; epoch?: number } = {}) => {
+    try {
+      const response = await fetch(`/api/work/${data.taskShell.id}/projection`, { cache: "no-store" });
 
-    if (!response.ok) {
-      return;
+      if (!response.ok) {
+        throw new Error(copy.actionFailed);
+      }
+
+      const next = (await response.json()) as WorkPageClientProps["initialData"];
+
+      if (epoch !== refreshEpochRef.current) {
+        return true;
+      }
+
+      startTransition(() => setData(next));
+      return true;
+    } catch (error) {
+      if (silent) {
+        return false;
+      }
+
+      router.refresh();
+      throw error instanceof Error ? error : new Error(copy.actionFailed);
     }
+  }, [copy.actionFailed, data.taskShell.id, router]);
 
-    const next = (await response.json()) as WorkPageClientProps["initialData"];
-    startTransition(() => setData(next));
-  }, [data.taskShell.id]);
-
-  const runAction = useCallback(async (action: () => Promise<void>) => {
+  const runAction = useCallback(async (action: () => Promise<void>, setScopedErrorMessage: (message: string | null) => void) => {
     try {
       setIsPending(true);
-      setErrorMessage(null);
+      setScopedErrorMessage(null);
+      const actionEpoch = ++refreshEpochRef.current;
       await action();
-      await refresh();
+      await refresh({ epoch: actionEpoch });
+      return true;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
+      setScopedErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
+      return false;
     } finally {
       setIsPending(false);
     }
   }, [copy.actionFailed, refresh]);
 
   useEffect(() => {
-    if (!data.currentRun) {
+    if (isPending || !data.currentRun || !["Running", "WaitingForInput", "WaitingForApproval"].includes(data.currentRun.status)) {
       return;
     }
 
     const intervalMs = Number(process.env.NEXT_PUBLIC_WORK_POLL_INTERVAL_MS ?? 10000);
     const interval = window.setInterval(() => {
-      void refresh();
+      void refresh({ silent: true });
     }, intervalMs);
 
     return () => window.clearInterval(interval);
-  }, [data.currentRun, refresh]);
+  }, [data.currentRun, isPending, refresh]);
 
   const currentRun = data.currentRun;
-  const taskStatusMeta = getTaskStatusMeta(data);
-  const phaseLabel = getCurrentPhaseLabel(currentRun, data.closure);
+  const taskStatusMeta = getTaskStatusMeta(data, copy);
   const currentException = getCurrentException(data);
   const taskSummary = getTaskSummary(data, copy);
   const sourceSummary = getScheduleSourceSummary(data.taskShell, copy);
   const workbenchComposer = getWorkbenchComposer(
     currentRun,
     data.currentIntervention,
+    data.closure,
     data.taskShell,
     copy,
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan);
-  const quickPrompts = getQuickPrompts(workbenchComposer, currentRun);
+  const quickPrompts = workbenchComposer ? getQuickPrompts(workbenchComposer, currentRun) : [];
   const collaborationFeed = useMemo(() => buildConversationFeed(data), [data]);
-  const collaborationStreamItems = collaborationFeed.map((item) => ({
-    id: item.id,
-    kind: item.kind,
-    eyebrow: item.eyebrow,
-    title: item.title,
-    body: item.body,
-    meta: item.meta,
-  }));
-  const [composerValue, setComposerValue] = useState(workbenchComposer.defaultValue);
+  const [composerValue, setComposerValue] = useState(workbenchComposer?.defaultValue ?? "");
 
   useEffect(() => {
-    setComposerValue(workbenchComposer.defaultValue);
-  }, [workbenchComposer.defaultValue, workbenchComposer.mode, currentRun?.id]);
+    setComposerValue(workbenchComposer?.defaultValue ?? "");
+  }, [workbenchComposer?.defaultValue, workbenchComposer?.mode, currentRun?.id]);
 
   async function submitWorkbenchInput(inputText: string) {
-    await runAction(async () => {
+    const didSucceed = await runAction(async () => {
       if (!currentRun) {
         await startRun({ taskId: data.taskShell.id, prompt: inputText });
         return;
@@ -799,16 +896,21 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
       }
 
       throw new Error(copy.currentRunCannotAcceptMessages);
-    });
+    }, setHeroErrorMessage);
 
-    setComposerResetKey((value) => value + 1);
+    if (didSucceed) {
+      setComposerValue("");
+      setComposerResetKey((value) => value + 1);
+    }
   }
 
   async function handleWorkbenchSubmit(formData: FormData) {
-    const inputText = String(formData.get("message") ?? "").trim();
+    const rawInputText = String(formData.get("message") ?? "");
+    const inputText = rawInputText.trim();
 
     if (!inputText) {
-      throw new Error(copy.composerRequired);
+      setHeroErrorMessage(copy.composerRequired);
+      return;
     }
 
     await submitWorkbenchInput(inputText);
@@ -817,310 +919,523 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   function handleGenerateTaskPlan() {
     void runAction(async () => {
       await generateTaskPlan({ taskId: data.taskShell.id });
-    });
+    }, setHeroErrorMessage);
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_300px] 2xl:grid-cols-[260px_minmax(0,1fr)_320px]">
-        <div className="space-y-4 xl:order-2">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <LocalizedLink href="/schedule" className="font-medium text-foreground hover:underline">日程</LocalizedLink>
-              <span>/</span>
-              <span className="max-w-[260px] truncate">{data.taskShell.title}</span>
-              <span>/</span>
-              <span className="font-medium text-foreground">{copy.workbenchCrumb}</span>
-              <div className="ml-auto flex flex-wrap gap-2">
-                <LocalizedLink href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>{copy.allTasks}</LocalizedLink>
-                <LocalizedLink href="/inbox" className={buttonVariants({ variant: "ghost", size: "sm" })}>{copy.openInbox}</LocalizedLink>
-                <LocalizedLink href="/memory" className={buttonVariants({ variant: "ghost", size: "sm" })}>{copy.openMemory}</LocalizedLink>
-              </div>
-            </div>
+  const blockerSummary = data.taskShell.blockReason?.actionRequired
+    ?? data.reliability.stopReason
+    ?? currentException
+    ?? "当前没有明确阻塞，任务可以继续推进。";
+  const runLabel = getRunStatusLabel(currentRun?.status);
+  const scheduleLabel = getScheduleStatusLabel(data.scheduleImpact.status);
+  const heroTitle = data.currentIntervention?.title ?? copy.nextAction;
+  const passiveHeroGuidance = getPassiveHeroGuidance(currentRun, data.closure, copy);
+  const heroDescription = data.currentIntervention?.description ?? workbenchComposer?.description ?? passiveHeroGuidance.description;
+  const heroWhyNow = data.currentIntervention?.whyNow ?? taskSummary;
+  const heroActionLabel = data.currentIntervention?.actionLabel ?? copy.nextAction;
+  const heroEvidence = data.currentIntervention?.evidence ?? [];
+  const heroModeLabel = currentRun ? getRunStatusLabel(currentRun.status) : copy.noActiveRunYet;
 
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{data.taskShell.title}</h1>
-                <p className="text-sm text-muted-foreground">{taskSummary}</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <LocalizedLink href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>{copy.openSchedule}</LocalizedLink>
-                <LocalizedLink href={`/workspaces/${data.taskShell.workspaceId}/tasks/${data.taskShell.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>{copy.viewTaskDetail}</LocalizedLink>
-              </div>
-            </div>
+  const heroApprovals = (data.currentIntervention?.approvals ?? []).length > 0 ? (
+    <div className="space-y-3">
+      {(data.currentIntervention?.approvals ?? []).map((approval) => (
+        <div key={approval.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium text-primary-foreground">{approval.title}</p>
+            <StatusBadge tone="warning">{approval.status}</StatusBadge>
           </div>
-
-          <SurfaceCard variant="highlight">
-            <SurfaceCardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <SurfaceCardTitle>{copy.taskStages}</SurfaceCardTitle>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>{sourceSummary}</span>
-                  <span>{copy.duePrefix}: {formatDate(data.taskShell.dueAt)}</span>
-                </div>
-              </div>
-            </SurfaceCardHeader>
-
-            <div className={cn("mt-2 grid gap-3", currentException ? "md:grid-cols-3" : "md:grid-cols-2")}>
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <p className="text-xs font-medium text-muted-foreground">任务状态</p>
-                <div className="mt-2">
-                  <StatusBadge tone={taskStatusMeta.tone}>{taskStatusMeta.label}</StatusBadge>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <p className="text-xs font-medium text-muted-foreground">{copy.currentStage}</p>
-                <p className="mt-2 text-sm font-medium text-foreground">{phaseLabel}</p>
-              </div>
-
-              {currentException ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                  <p className="text-xs font-medium text-amber-700">当前异常</p>
-                  <p className="mt-2 text-sm font-medium text-foreground">{currentException}</p>
-                </div>
-              ) : null}
+          <p className="mt-2 text-sm text-primary-foreground/75">
+            {approval.summary ?? copy.approvalSummaryFallback}
+          </p>
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <form
+                action={async () => {
+                  await runAction(async () => {
+                    await approveApproval(approval.id);
+                  }, setHeroErrorMessage);
+                }}
+              >
+                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
+                  {copy.approve}
+                </button>
+              </form>
+              <form
+                action={async () => {
+                  await runAction(async () => {
+                    await rejectApproval(approval.id);
+                  }, setHeroErrorMessage);
+                }}
+              >
+                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "destructive", className: "disabled:opacity-60" })}>
+                  {copy.reject}
+                </button>
+              </form>
             </div>
-          </SurfaceCard>
-
-        <CollaborationStream
-          title={copy.collaborationFlow}
-          description={copy.collaborationFlowDescription}
-          emptyState={copy.fallbackNoOperatorInput}
-          composerTitle={copy.inputArea}
-          composerLabel={copy.taskArrangement}
-          composerHint={workbenchComposer.description || copy.workbenchDescription}
-          composerSectionId="current-key-decision"
-          fixedHeightClassName="h-[760px]"
-          items={collaborationStreamItems}
-          composer={(
             <form
-              key={`workbench-${composerResetKey}-${currentRun?.id ?? "none"}-${workbenchComposer.mode}`}
-              action={handleWorkbenchSubmit}
-              className="min-w-0 space-y-3"
+              action={async (formData) => {
+                await runAction(async () => {
+                  await editAndApproveApproval(formData);
+                }, setHeroErrorMessage);
+              }}
+              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
             >
-              {errorMessage ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
-              <p className="text-xs text-muted-foreground">{copy.taskArrangementHint}</p>
-              <textarea
-                aria-label={workbenchComposer.inputLabel}
-                name="message"
-                rows={6}
-                required
-                value={composerValue}
-                placeholder={workbenchComposer.placeholder}
-                onChange={(event) => setComposerValue(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                className={cn(textareaClassName, "min-h-32 w-full min-w-0 resize-y")}
+              <input type="hidden" name="approvalId" value={approval.id} />
+              <label htmlFor={`approval-edit-${approval.id}`} className="sr-only">
+                {copy.editedInstruction}
+              </label>
+              <input
+                id={`approval-edit-${approval.id}`}
+                type="text"
+                name="editedContent"
+                placeholder={copy.editedInstruction}
+                className={cn(inputClassName, "min-w-0 w-full border-white/12 bg-white/[0.06] text-primary-foreground placeholder:text-primary-foreground/45")}
               />
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 flex-wrap gap-2">
-                  {quickPrompts.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                      onClick={() => setComposerValue((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt))}
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                  <p className="text-xs text-muted-foreground">{workbenchComposer.statusHint} · {copy.keyboardHint}</p>
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className={buttonVariants({ variant: workbenchComposer.submitVariant ?? "default", size: "lg", className: "disabled:opacity-60" })}
-                  >
-                    {workbenchComposer.submitLabel}
-                  </button>
-                </div>
-              </div>
+              <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "border-white/15 bg-white/[0.04] text-primary-foreground hover:bg-white/[0.08] disabled:opacity-60" })}>
+                {copy.editAndApprove}
+              </button>
             </form>
-          )}
-        />
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : null;
 
-        {(data.currentIntervention?.approvals ?? []).length > 0 ? (
-          <SurfaceCard id="pending-approvals">
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>待确认卡</SurfaceCardTitle>
-            </SurfaceCardHeader>
+  const heroComposer = workbenchComposer ? (
+    <form
+      key={`workbench-${composerResetKey}-${currentRun?.id ?? "none"}-${workbenchComposer.mode}`}
+      action={handleWorkbenchSubmit}
+      className="min-w-0 space-y-4"
+    >
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary-foreground/65">{copy.inputArea}</p>
+        <p className="text-sm text-primary-foreground/78">{workbenchComposer.description || copy.workbenchDescription}</p>
+      </div>
+      {heroErrorMessage ? <p role="alert" className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-100">{heroErrorMessage}</p> : null}
+      <p className="text-xs text-primary-foreground/60">{copy.taskArrangementHint}</p>
+      <textarea
+        aria-label={workbenchComposer.inputLabel}
+        name="message"
+        rows={6}
+        required
+        value={composerValue}
+        placeholder={workbenchComposer.placeholder}
+        onChange={(event) => setComposerValue(event.target.value)}
+        onKeyDown={handleComposerKeyDown}
+        className={cn(textareaClassName, "min-h-32 w-full min-w-0 resize-y border-white/12 bg-black/20 text-primary-foreground placeholder:text-primary-foreground/35")}
+      />
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-wrap gap-2">
+          {quickPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className={buttonVariants({ variant: "outline", size: "sm", className: "border-white/12 bg-white/[0.04] text-primary-foreground hover:bg-white/[0.08]" })}
+              onClick={() => setComposerValue((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt))}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-primary-foreground/60">{workbenchComposer.statusHint} · {copy.keyboardHint}</p>
+          <button
+            type="submit"
+            disabled={isPending}
+            className={buttonVariants({ variant: workbenchComposer.submitVariant ?? "default", size: "lg", className: cn("disabled:opacity-60", workbenchComposer.submitVariant === "outline" ? "border-white/12 bg-white/[0.04] text-primary-foreground hover:bg-white/[0.08]" : "") })}
+          >
+            {workbenchComposer.submitLabel}
+          </button>
+        </div>
+      </div>
+    </form>
+  ) : (
+    <div className="space-y-3">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary-foreground/65">{copy.inputArea}</p>
+      <p className="text-sm leading-7 text-primary-foreground/78">{passiveHeroGuidance.description}</p>
+      <p className="text-xs text-primary-foreground/60">{passiveHeroGuidance.actions}</p>
+    </div>
+  );
 
-            <div className="mt-3 space-y-4">
-              {(data.currentIntervention?.approvals ?? []).map((approval) => (
-                <div key={approval.id} className="rounded-2xl border border-amber-200/90 bg-amber-50/90 p-4 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-foreground">{approval.title}</p>
-                    <StatusBadge tone="warning">{approval.status}</StatusBadge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{approval.summary ?? "Review the approval request before resuming the run."}</p>
+  const latestResultClosure = (
+    data.closure.resultAccepted
+    || data.closure.isDone
+    || data.closure.canMarkDone
+    || data.closure.canCreateFollowUp
+    || data.closure.canReopen
+    || data.closure.latestFollowUp
+  ) ? (
+    <div className="space-y-4">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{copy.closureStatusTitle}</p>
 
-                  <div className="mt-4 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <form
-                        action={async () => {
-                          await runAction(async () => {
-                            await approveApproval(approval.id);
-                          });
-                        }}
-                      >
-                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
-                          {copy.approve}
-                        </button>
-                      </form>
-                      <form
-                        action={async () => {
-                          await runAction(async () => {
-                            await rejectApproval(approval.id);
-                          });
-                        }}
-                      >
-                        <button type="submit" disabled={isPending} className={buttonVariants({ variant: "destructive", className: "disabled:opacity-60" })}>
-                          {copy.reject}
-                        </button>
-                      </form>
-                    </div>
-                    <form
-                      action={async (formData) => {
-                        await runAction(async () => {
-                          await editAndApproveApproval(formData);
-                        });
-                      }}
-                      className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-                    >
-                      <input type="hidden" name="approvalId" value={approval.id} />
-                      <input
-                        type="text"
-                        name="editedContent"
-                        placeholder={copy.editedInstruction}
-                        className={cn(inputClassName, "min-w-0 w-full")}
-                      />
-                      <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                        {copy.editAndApprove}
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              ))}
+      {(data.closure.resultAccepted || data.closure.isDone) ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {data.closure.resultAccepted ? (
+            <div className="rounded-[22px] border border-border/60 bg-background/70 p-4 text-sm">
+              <p className="font-medium text-foreground">{copy.resultAccepted}</p>
+              <p className="mt-2 text-muted-foreground">{copy.closureAcceptedAt}: {formatDateTime(data.closure.acceptedAt)}</p>
             </div>
-          </SurfaceCard>
-        ) : null}
-
-        <SurfaceCard id="latest-result">
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.latestResult}</SurfaceCardTitle>
-          </SurfaceCardHeader>
-
-          <div className="mt-3 rounded-2xl border border-sky-200/90 bg-sky-50/85 p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium text-foreground">{data.latestOutput.empty ? copy.resultEmptyTitle : data.latestOutput.title}</p>
-              {!data.latestOutput.empty && data.latestOutput.timestamp ? (
-                <span className="text-xs text-muted-foreground">{copy.updated} {formatDateTime(data.latestOutput.timestamp)}</span>
-              ) : null}
+          ) : null}
+          {data.closure.isDone ? (
+            <div className="rounded-[22px] border border-border/60 bg-background/70 p-4 text-sm">
+              <p className="font-medium text-foreground">{copy.taskDone}</p>
+              <p className="mt-2 text-muted-foreground">{copy.closureDoneAt}: {formatDateTime(data.closure.doneAt)}</p>
             </div>
+          ) : null}
+        </div>
+      ) : null}
 
-            {data.latestOutput.empty ? (
-              <div className="mt-3 text-sm text-muted-foreground">
-                <p>{copy.resultEmptyDescription}</p>
-                <div className="mt-3 rounded-2xl bg-card/70 p-3">
-                  <p className="text-xs font-medium text-foreground">{copy.resultPreviewTitle}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                    <li>{copy.resultPreviewUnderstanding}</li>
-                    <li>{copy.resultPreviewPlan}</li>
-                    <li>{copy.resultPreviewDraft}</li>
-                    <li>{copy.resultPreviewQuestions}</li>
-                  </ul>
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">{data.latestOutput.body}</p>
-              </div>
-            ) : (
-              <div className="mt-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <StatusBadge>{data.latestOutput.sourceLabel}</StatusBadge>
-                  {data.currentIntervention && data.currentIntervention.kind !== "observe" ? (
-                    <StatusBadge tone="info">{copy.usedByNextAction}</StatusBadge>
-                  ) : null}
-                </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{data.latestOutput.body}</p>
-              </div>
-            )}
+      {data.closure.latestFollowUp ? (
+        <div className="rounded-[22px] border border-border/60 bg-background/70 p-4 text-sm">
+          <p className="font-medium text-foreground">{copy.latestFollowUp}</p>
+          <p className="mt-2 text-foreground">{data.closure.latestFollowUp.title}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <StatusBadge>{`${copy.latestFollowUpStatus}: ${data.closure.latestFollowUp.status}`}</StatusBadge>
+            <StatusBadge>{`${copy.latestFollowUpSchedule}: ${getScheduleStatusLabel(data.closure.latestFollowUp.scheduleStatus)}`}</StatusBadge>
+          </div>
+          {data.closure.latestFollowUp.createdAt ? (
+            <p className="mt-3 text-muted-foreground">{copy.latestFollowUpCreatedAt}: {formatDateTime(data.closure.latestFollowUp.createdAt)}</p>
+          ) : null}
+        </div>
+      ) : null}
 
-            {!data.latestOutput.empty ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {data.closure.canAcceptResult ? (
-                  <form
-                    action={async () => {
-                      await runAction(async () => {
-                        await acceptTaskResult({ taskId: data.taskShell.id });
-                      });
-                    }}
-                  >
-                    <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
-                      {copy.acceptResult}
-                    </button>
-                  </form>
-                ) : null}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {(data.closure.canMarkDone || data.closure.canReopen) ? (
+          <div className="space-y-3 rounded-[22px] border border-border/60 bg-background/70 p-4">
+            {data.closure.canMarkDone ? (
+              <form
+                action={async () => {
+                  await runAction(async () => {
+                    await markTaskDone({ taskId: data.taskShell.id });
+                  }, setResultErrorMessage);
+                }}
+              >
+                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                  {copy.markTaskDone}
+                </button>
+              </form>
+            ) : null}
 
-                {data.closure.canRetry ? (
-                  <form
-                    action={async () => {
-                      await runAction(async () => {
-                        await retryRun({
-                          taskId: data.taskShell.id,
-                          prompt: data.taskShell.prompt ?? getStartRunDefaultValue(data.taskShell.title),
-                        });
-                      });
-                    }}
-                  >
-                    <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
-                      {copy.retryRun}
-                    </button>
-                  </form>
-                ) : null}
-
-                {data.latestOutput.href ? (
-                  <a href={data.latestOutput.href} className={buttonVariants({ variant: "outline" })}>
-                    {copy.openArtifact}
-                  </a>
-                ) : null}
-              </div>
+            {data.closure.canReopen ? (
+              <form
+                action={async () => {
+                  await runAction(async () => {
+                    await reopenTask({ taskId: data.taskShell.id });
+                  }, setResultErrorMessage);
+                }}
+              >
+                <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+                  {copy.reopenTask}
+                </button>
+              </form>
             ) : null}
           </div>
-        </SurfaceCard>
+        ) : null}
 
-        <SurfaceCard>
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.executionWorkstream}</SurfaceCardTitle>
-          </SurfaceCardHeader>
+        {data.closure.canCreateFollowUp ? (
+          <form
+            action={async (formData) => {
+              const title = String(formData.get("title") ?? "").trim();
+              const dueAtValue = String(formData.get("dueAt") ?? "").trim();
 
-          <div className="mt-1 text-xs text-muted-foreground">{copy.executionWorkstreamDescription}</div>
-          <div className="mt-4">
-            <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
-          </div>
-        </SurfaceCard>
+              await runAction(async () => {
+                await createFollowUpTask({
+                  taskId: data.taskShell.id,
+                  title,
+                  dueAt: (() => {
+                    if (!title) {
+                      throw new Error(copy.invalidFollowUpTitle);
+                    }
 
-        </div>
+                    if (!dueAtValue) {
+                      return null;
+                    }
 
-        <div className="xl:order-1 xl:sticky xl:top-4 xl:self-start">
-          <RunSidePanel
-            taskShell={data.taskShell}
-            scheduleImpact={data.scheduleImpact}
-            currentRun={currentRun}
-            reliability={data.reliability}
-            approvals={data.inspector.approvals}
-            artifacts={data.inspector.artifacts}
-            toolCalls={data.inspector.toolCalls}
+                    const parsedDueAt = parseDateInputForSubmission(dueAtValue);
+
+                    if (!parsedDueAt) {
+                      throw new Error(copy.invalidFollowUpDate);
+                    }
+
+                    return parsedDueAt;
+                  })(),
+                });
+              }, setResultErrorMessage);
+            }}
+            className="space-y-3 rounded-[22px] border border-border/60 bg-background/70 p-4"
+          >
+            <p className="text-sm font-medium text-foreground">{copy.followUpOptional}</p>
+            <p className="text-sm text-muted-foreground">{copy.followUpOptionalDescription}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="follow-up-title" className="text-sm font-medium text-foreground">{copy.followUpTitle}</label>
+                <input
+                  id="follow-up-title"
+                  type="text"
+                  name="title"
+                  required
+                  defaultValue={getFollowUpDefaultTitle(data.taskShell.title)}
+                  className={inputClassName}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="follow-up-due" className="text-sm font-medium text-foreground">{copy.followUpDue}</label>
+                <input id="follow-up-due" type="date" name="dueAt" className={inputClassName} />
+              </div>
+            </div>
+            <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+              {copy.createFollowUp}
+            </button>
+          </form>
+        ) : null}
+      </div>
+    </div>
+  ) : null;
+
+  const latestResultActions = (
+    data.closure.canAcceptResult
+    || data.closure.canRetry
+    || data.latestOutput.href
+  ) ? (
+    <>
+      {data.closure.canAcceptResult ? (
+        <form
+          action={async () => {
+            await runAction(async () => {
+              await acceptTaskResult({ taskId: data.taskShell.id });
+            }, setResultErrorMessage);
+          }}
+        >
+          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", className: "disabled:opacity-60" })}>
+            {copy.acceptResult}
+          </button>
+        </form>
+      ) : null}
+
+      {data.closure.canRetry ? (
+        <form
+          action={async () => {
+            await runAction(async () => {
+              await retryRun({
+                taskId: data.taskShell.id,
+                prompt: data.taskShell.prompt ?? getStartRunDefaultValue(data.taskShell.title),
+              });
+            }, setResultErrorMessage);
+          }}
+        >
+          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline", className: "disabled:opacity-60" })}>
+            {copy.retryRun}
+          </button>
+        </form>
+      ) : null}
+
+      {data.latestOutput.href && isInternalAppHref(data.latestOutput.href) ? (
+        <LocalizedLink href={data.latestOutput.href} className={buttonVariants({ variant: "outline" })}>
+          {copy.openArtifact}
+        </LocalizedLink>
+      ) : data.latestOutput.href && isSafeExternalHref(data.latestOutput.href) ? (
+        <a href={data.latestOutput.href} className={buttonVariants({ variant: "outline" })}>
+          {copy.openArtifact}
+        </a>
+      ) : null}
+    </>
+  ) : null;
+
+  return (
+    <div className="space-y-6">
+      <TaskShell
+        title={data.taskShell.title}
+        summary={taskSummary}
+        taskStatus={taskStatusMeta}
+        runLabel={runLabel}
+        scheduleLabel={scheduleLabel}
+        blockerSummary={blockerSummary}
+        sourceSummary={sourceSummary}
+        dueLabel={`${copy.duePrefix}: ${formatDate(data.taskShell.dueAt)}`}
+        taskId={data.taskShell.id}
+        workspaceId={data.taskShell.workspaceId}
+        statusMeta={currentException ? <StatusBadge tone="warning">{currentException}</StatusBadge> : null}
+        labels={{
+          ariaLabel: copy.taskShellAria,
+          breadcrumbRoot: copy.scheduleCrumb,
+          breadcrumbCurrent: copy.workbenchCrumb,
+          taskList: copy.allTasks,
+          inbox: copy.openInbox,
+          memory: copy.openMemory,
+          openSchedule: copy.openSchedule,
+          viewTaskDetail: copy.viewTaskDetail,
+          currentBlocker: copy.currentBlocker,
+          plannedWindow: copy.plannedWindow,
+          deadline: copy.deadline,
+        }}
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_320px] xl:items-start">
+        <div className="space-y-6">
+          <NextActionHero
+            title={heroTitle}
+            description={heroDescription}
+            whyNow={heroWhyNow}
+            actionLabel={heroActionLabel}
+            evidence={heroEvidence}
+            approvals={heroApprovals}
+            composer={heroComposer}
+            modeLabel={heroModeLabel}
+            labels={{
+              ariaLabel: copy.nextActionHeroAria,
+              badge: copy.nextActionBadge,
+              whyNow: copy.whyNow,
+              evidence: copy.evidence,
+            }}
           />
+
+          <LatestResultPanel
+            output={data.latestOutput}
+            updatedLabel={copy.updated}
+            emptyTitle={copy.resultEmptyTitle}
+            emptyDescription={copy.resultEmptyDescription}
+            previewTitle={copy.resultPreviewTitle}
+            previewItems={[
+              copy.resultPreviewUnderstanding,
+              copy.resultPreviewPlan,
+              copy.resultPreviewDraft,
+              copy.resultPreviewQuestions,
+            ]}
+            error={resultErrorMessage ? <p role="alert" className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-700">{resultErrorMessage}</p> : null}
+            closure={latestResultClosure}
+            actions={latestResultActions}
+            usedByNextAction={Boolean(data.currentIntervention && data.currentIntervention.kind !== "observe")}
+            labels={{
+              ariaLabel: copy.latestResultAria,
+              eyebrow: copy.latestResultEyebrow,
+              usedByNextAction: copy.usedByNextAction,
+              actionsTitle: copy.resultActionsTitle,
+            }}
+          />
+
+          <section aria-label={copy.executionStreamAria} id="execution-stream" className="rounded-[30px] border bg-card p-5 shadow-sm sm:p-6">
+            <div className="border-b border-border/60 pb-4">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.workstream}</p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{copy.executionWorkstream}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{copy.executionWorkstreamDescription}</p>
+            </div>
+
+            <div className="mt-5 space-y-6">
+              <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">{copy.conversationEvidence}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{copy.conversationEvidenceDescription}</p>
+                </div>
+
+                {collaborationFeed.length === 0 ? (
+                  <div className="rounded-[24px] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
+                    {copy.fallbackNoOperatorInput}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {collaborationFeed.map((item) => {
+                      const alignClass = item.kind === "user" ? "ml-auto" : "mr-auto";
+                      const toneClass = item.kind === "user"
+                        ? "border-primary/15 bg-primary/[0.05]"
+                        : item.kind === "agent"
+                          ? "border-emerald-200/70 bg-emerald-50/60"
+                          : "border-border/60 bg-background/80";
+
+                      return (
+                        <article key={item.id} className={cn("max-w-[92%]", alignClass)}>
+                          <div className={cn("rounded-[24px] border px-4 py-4 text-sm shadow-sm", toneClass)}>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{item.eyebrow}</span>
+                              {item.meta ? <span className="text-xs text-muted-foreground">{item.meta}</span> : null}
+                            </div>
+                            <p className="mt-2 font-medium text-foreground">{item.title}</p>
+                            <div className="mt-2 whitespace-pre-wrap text-muted-foreground">{item.body}</div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         </div>
 
-        <div className="xl:order-3 xl:sticky xl:top-4 xl:self-start">
-          <TaskPlanSidePanel
+        <div className="xl:sticky xl:top-4 xl:self-start">
+          <WorkInspector
             plan={data.taskPlan}
             isPending={isPending}
             onGenerate={handleGenerateTaskPlan}
             currentAction={currentPlanAction}
             currentException={currentException}
+            approvals={data.inspector.approvals}
+            artifacts={data.inspector.artifacts}
+            toolCalls={data.inspector.toolCalls}
+            context={{
+              priority: data.taskShell.priority,
+              dueAt: data.taskShell.dueAt,
+              scheduledStartAt: data.taskShell.scheduledStartAt,
+              scheduledEndAt: data.taskShell.scheduledEndAt,
+              scheduleStatus: scheduleLabel,
+              scheduleSummary: data.scheduleImpact.summary,
+              runStatus: runLabel,
+              syncStatus: data.reliability.syncStatus,
+              isStale: data.reliability.isStale,
+              lastUpdatedAt: data.reliability.lastUpdatedAt ?? data.reliability.lastSyncedAt ?? data.reliability.refreshedAt,
+              lastSyncedAt: data.reliability.lastSyncedAt,
+              stopReason: data.reliability.stopReason,
+              blockerSummary,
+            }}
+            labels={{
+              ariaLabel: copy.workInspectorAria,
+              sections: {
+                plan: copy.taskPlan,
+                approvals: copy.pendingApprovals,
+                artifacts: copy.currentArtifacts,
+                tools: copy.toolLog,
+                context: copy.taskContext,
+              },
+              emptyValue: copy.noValue,
+              emptyScheduleWindow: copy.noScheduleWindow,
+              stepStatuses: {
+                pending: { label: copy.pendingStep, tone: "neutral" },
+                in_progress: { label: copy.inProgressStep, tone: "info" },
+                waiting_for_user: { label: copy.waitingForUserStep, tone: "warning" },
+                done: { label: copy.doneStep, tone: "success" },
+                blocked: { label: copy.blockedStep, tone: "critical" },
+              },
+              planTitle: copy.taskPlan,
+              planReadySummary: copy.planReadySummary,
+              planEmptySummary: copy.planEmptySummary,
+              planEmptyTitle: copy.noTaskPlan,
+              generatePlan: copy.generatePlaceholderPlan,
+              currentStep: copy.currentStep,
+              currentBlocker: copy.currentBlocker,
+              resumePlan: copy.resumeFromPlan,
+              approvalsTitle: copy.pendingApprovals,
+              noApprovals: copy.noPendingApprovals,
+              artifactsTitle: copy.currentArtifacts,
+              noArtifacts: copy.noArtifacts,
+              toolsTitle: copy.toolLog,
+              noTools: copy.noToolLog,
+              toolArguments: copy.toolArguments,
+              toolResult: copy.toolResult,
+              toolError: copy.toolError,
+              contextTitle: copy.taskContext,
+              priority: copy.priorityLabel,
+              dueAt: copy.dueAtLabel,
+              scheduledWindow: copy.scheduledWindowLabel,
+              scheduleStatus: copy.scheduleStatusLabel,
+              runStatus: copy.runStatusLabel,
+              syncStatus: copy.syncStatusLabel,
+              staleSync: copy.staleSync,
+              healthySync: copy.healthySync,
+              lastUpdated: copy.lastUpdatedLabel,
+              lastSynced: copy.lastSyncedLabel,
+              stopReason: copy.stopReasonLabel,
+            }}
           />
         </div>
       </div>
