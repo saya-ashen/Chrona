@@ -255,7 +255,6 @@
       "reviewScheduleImpact": "查看日程影响",
       "openInbox": "打开收件箱",
       "pageTitle": "日程",
-      "pageDescription": "把日程作为默认工作区的全局规划台：安排未上板的工作、审阅 AI 建议，并在执行偏离前处理日程风险。",
       "today": "今天",
       "tomorrow": "明天",
       "currentPlanButton": "当前计划",
@@ -303,7 +302,6 @@
       "aiProposalsCompactEmpty": "当前没有待处理的 AI 建议。"
     },
     "workPage": {
-      "pageDescription": "把执行推进放在这里，把规划修改留在日程中，并把任务详情页视为参考信息。",
       "openSchedule": "打开日程",
       "viewTaskDetail": "查看任务详情",
       "runPrefix": "运行",
