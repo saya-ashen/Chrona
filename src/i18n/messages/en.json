@@ -255,7 +255,6 @@
       "reviewScheduleImpact": "Review schedule impact",
       "openInbox": "Open Inbox",
       "pageTitle": "Schedule",
-      "pageDescription": "Use Schedule as the global planning workbench for the default workspace: place unscheduled work, review AI suggestions, and resolve schedule risks before execution drifts.",
       "today": "Today",
       "tomorrow": "Tomorrow",
       "currentPlanButton": "Current Plan",
@@ -291,7 +290,6 @@
       "noUnscheduledWork": "No unscheduled work. New tasks that lose their plan or need initial placement will appear here."
     },
     "workPage": {
-      "pageDescription": "Keep execution moving here, keep planning edits in Schedule, and treat task detail as reference-only.",
       "openSchedule": "Open Schedule",
       "viewTaskDetail": "View task detail",
       "runPrefix": "Run",

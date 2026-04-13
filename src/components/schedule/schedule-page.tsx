@@ -2,7 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { ChevronDown, GripVertical, Move, Plus } from "lucide-react";
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+} from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import type { Prisma } from "@/generated/prisma/client";
 import {
@@ -13,7 +22,10 @@ import {
   updateTaskConfigFromSchedule,
 } from "@/app/actions/task-actions";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
-import { ScheduleTaskList, type ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
+import {
+  ScheduleTaskList,
+  type ScheduleTaskListItem,
+} from "@/components/schedule/schedule-task-list";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
@@ -210,7 +222,8 @@ const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
       runtimeAdapterKey: "openclaw",
       runtimeInput: {
         model: "gpt-5.4",
-        prompt: "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
+        prompt:
+          "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
         temperature: 0.2,
       },
     },
@@ -218,7 +231,8 @@ const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
   {
     id: "bug-investigation",
     label: "Bug investigation",
-    description: "Reproduce the issue, identify root cause, and propose the safest fix.",
+    description:
+      "Reproduce the issue, identify root cause, and propose the safest fix.",
     values: {
       priority: "High",
       runtimeAdapterKey: "openclaw",
@@ -272,14 +286,16 @@ const DEFAULT_COPY = {
   timelineCompressedPrefix: "Timeline compressed: 24h shown as",
   quietHoursCompressedSuffix: "quiet hours compressed",
   emptyDayLane: "Empty day lane",
-  emptyDayLaneDescription: "Drop a queued task anywhere on this lane to create the first block.",
+  emptyDayLaneDescription:
+    "Drop a queued task anywhere on this lane to create the first block.",
   dropToSchedule: "Drop to schedule",
   dropToMoveBlock: "Drop to move block",
   overdue: "Overdue",
   approvalPending: "Approval pending",
   closeTaskDetails: "Close task details",
   taskDetails: "Task Details",
-  taskDetailsDescription: "Review the selected block in a floating panel, then return to the timeline.",
+  taskDetailsDescription:
+    "Review the selected block in a floating panel, then return to the timeline.",
   close: "Close",
   due: "Due",
   currentPlan: "Current plan",
@@ -294,7 +310,8 @@ const DEFAULT_COPY = {
   placeOnTimeline: "Place on timeline",
   scheduleTask: "Schedule Task",
   schedulingUpdating: "Scheduling is updating.",
-  dragHint: "Drag to the timeline or expand for details and fallback scheduling.",
+  dragHint:
+    "Drag to the timeline or expand for details and fallback scheduling.",
   pendingProposals: "Pending proposals",
   runnable: "Runnable",
   model: "Model",
@@ -311,7 +328,7 @@ const DEFAULT_COPY = {
   plannedWindow: "Planned window",
   openInbox: "Open Inbox",
   pageTitle: "Schedule",
-  pageDescription: "Use Schedule as the global planning workbench for the default workspace: place unscheduled work, review AI suggestions, and resolve schedule risks before execution drifts.",
+  // pageDescription: "Use Schedule as the global planning workbench for the default workspace: place unscheduled work, review AI suggestions, and resolve schedule risks before execution drifts.",
   today: "Today",
   tomorrow: "Tomorrow",
   currentPlanButton: "Current Plan",
@@ -331,19 +348,24 @@ const DEFAULT_COPY = {
   planningSurface: "Planning surface",
   conflictsTitle: "Conflicts / Overdue Risks",
   conflictsDescription: "",
-  noScheduleRisks: "No schedule risks detected. Blocked, overdue, or interrupted work will surface here.",
+  noScheduleRisks:
+    "No schedule risks detected. Blocked, overdue, or interrupted work will surface here.",
   aiProposalsTitle: "AI Proposals",
   aiProposalsDescription: "",
-  noAiProposals: "No pending AI proposals. When planner automation suggests a new block, it will appear here for review.",
+  noAiProposals:
+    "No pending AI proposals. When planner automation suggests a new block, it will appear here for review.",
   openTaskCenter: "Open Task Center",
   weekOverview: "Week Overview",
   noTimelineDay: "No timeline day is available right now.",
   unscheduledQueue: "Unscheduled Queue",
-  unscheduledQueueDescription: "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
-  noUnscheduledWork: "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
+  unscheduledQueueDescription:
+    "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
+  noUnscheduledWork:
+    "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
   dateSwitcher: "Date",
   todayFocus: "Today Focus",
-  todayFocusEmpty: "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
+  todayFocusEmpty:
+    "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
   focusOverdue: "Overdue",
   focusAtRisk: "At risk",
   focusWaitingForInput: "Waiting for input",
@@ -381,7 +403,11 @@ function formatTime(value: Date | null | undefined, locale: string) {
   }).format(value);
 }
 
-function formatDayHeading(value: Date | null | undefined, locale = "en", copy: SchedulePageCopy = DEFAULT_COPY) {
+function formatDayHeading(
+  value: Date | null | undefined,
+  locale = "en",
+  copy: SchedulePageCopy = DEFAULT_COPY,
+) {
   if (!value) {
     return copy.noScheduledStart;
   }
@@ -393,15 +419,26 @@ function formatDayHeading(value: Date | null | undefined, locale = "en", copy: S
   }).format(value);
 }
 
-function describeOwner(ownerType: string, assigneeAgentId: string | null, copy: SchedulePageCopy) {
+function describeOwner(
+  ownerType: string,
+  assigneeAgentId: string | null,
+  copy: SchedulePageCopy,
+) {
   if (ownerType === "agent") {
-    return assigneeAgentId ? `${copy.agentPrefix} · ${assigneeAgentId}` : copy.agentAssigned;
+    return assigneeAgentId
+      ? `${copy.agentPrefix} · ${assigneeAgentId}`
+      : copy.agentAssigned;
   }
 
   return copy.humanOwned;
 }
 
-function formatTimeRange(start: Date | null | undefined, end: Date | null | undefined, locale: string, copy: SchedulePageCopy) {
+function formatTimeRange(
+  start: Date | null | undefined,
+  end: Date | null | undefined,
+  locale: string,
+  copy: SchedulePageCopy,
+) {
   if (!start && !end) {
     return copy.timeNotSet;
   }
@@ -488,11 +525,19 @@ function formatLocalDateKeyParts(year: number, month: number, day: number) {
 
 function getDayKey(value: Date | null | undefined) {
   return value
-    ? formatLocalDateKeyParts(value.getFullYear(), value.getMonth() + 1, value.getDate())
+    ? formatLocalDateKeyParts(
+        value.getFullYear(),
+        value.getMonth() + 1,
+        value.getDate(),
+      )
     : "unspecified";
 }
 
-function formatShortDay(value: Date | null | undefined, locale: string, copy: SchedulePageCopy) {
+function formatShortDay(
+  value: Date | null | undefined,
+  locale: string,
+  copy: SchedulePageCopy,
+) {
   if (!value) {
     return copy.unscheduled;
   }
@@ -504,7 +549,11 @@ function formatShortDay(value: Date | null | undefined, locale: string, copy: Sc
 }
 
 function formatDateKey(value: Date) {
-  return formatLocalDateKeyParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  return formatLocalDateKeyParts(
+    value.getFullYear(),
+    value.getMonth() + 1,
+    value.getDate(),
+  );
 }
 
 function startOfDay(value: Date) {
@@ -567,10 +616,16 @@ function snapMinuteToGrid(minute: number) {
 }
 
 function clampScheduledStartMinute(minute: number) {
-  return Math.min(Math.max(minute, 0), 24 * 60 - DEFAULT_SCHEDULE_BLOCK_MINUTES);
+  return Math.min(
+    Math.max(minute, 0),
+    24 * 60 - DEFAULT_SCHEDULE_BLOCK_MINUTES,
+  );
 }
 
-function getBlockDurationMinutes(item: { scheduledStartAt?: Date | null; scheduledEndAt?: Date | null }) {
+function getBlockDurationMinutes(item: {
+  scheduledStartAt?: Date | null;
+  scheduledEndAt?: Date | null;
+}) {
   const start = item.scheduledStartAt ? item.scheduledStartAt.getTime() : null;
   const end = item.scheduledEndAt ? item.scheduledEndAt.getTime() : null;
 
@@ -590,7 +645,8 @@ function buildCompressedTimeline(items: ScheduledItem[]) {
 
   for (const item of items) {
     const start = item.scheduledStartAt
-      ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes()
+      ? item.scheduledStartAt.getHours() * 60 +
+        item.scheduledStartAt.getMinutes()
       : null;
     const end = item.scheduledEndAt
       ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
@@ -650,7 +706,9 @@ function buildCompressedTimeline(items: ScheduledItem[]) {
 
     const hour =
       hours.find(
-        (candidate) => safeY >= candidate.visualStart && safeY < candidate.visualStart + candidate.visualHeight,
+        (candidate) =>
+          safeY >= candidate.visualStart &&
+          safeY < candidate.visualStart + candidate.visualHeight,
       ) ?? hours[hours.length - 1];
 
     const relativeY = safeY - hour.visualStart;
@@ -731,7 +789,11 @@ function sortScheduledItems(items: ScheduledItem[]) {
   });
 }
 
-function createScheduledItemFromQueueItem(item: UnscheduledItem, startAt: Date, endAt: Date): ScheduledItem {
+function createScheduledItemFromQueueItem(
+  item: UnscheduledItem,
+  startAt: Date,
+  endAt: Date,
+): ScheduledItem {
   return {
     taskId: item.taskId,
     workspaceId: item.workspaceId,
@@ -820,7 +882,11 @@ function createListItemFromScheduledItem(item: ScheduledItem): ListItem {
   };
 }
 
-function applyScheduleToListItem(item: ListItem, startAt: Date, endAt: Date): ListItem {
+function applyScheduleToListItem(
+  item: ListItem,
+  startAt: Date,
+  endAt: Date,
+): ListItem {
   return {
     ...item,
     dueAt: item.dueAt,
@@ -832,10 +898,13 @@ function applyScheduleToListItem(item: ListItem, startAt: Date, endAt: Date): Li
   };
 }
 
-function applyTaskConfigToItem<T extends ScheduledItem | UnscheduledItem | ListItem | SchedulePageProps["data"]["risks"][number]>(
-  item: T,
-  input: TaskConfigFormInput,
-): T {
+function applyTaskConfigToItem<
+  T extends
+    | ScheduledItem
+    | UnscheduledItem
+    | ListItem
+    | SchedulePageProps["data"]["risks"][number],
+>(item: T, input: TaskConfigFormInput): T {
   const runtimeConfig = input.runtimeConfig ?? null;
   const runnability = deriveTaskRunnability({
     runtimeAdapterKey: input.runtimeAdapterKey,
@@ -866,7 +935,9 @@ function applyTaskConfigToItem<T extends ScheduledItem | UnscheduledItem | ListI
           ? "Ready"
           : "Draft"
         : item.persistedStatus,
-    actionRequired: runnability.isRunnable ? item.actionRequired : runnability.summary,
+    actionRequired: runnability.isRunnable
+      ? item.actionRequired
+      : runnability.summary,
   };
 }
 
@@ -877,7 +948,11 @@ function buildTodayFocusItems(
 ): TodayFocusItem[] {
   const focus = new Map<string, TodayFocusItem>();
 
-  function push(item: ScheduleCardItem, reason: string, tone: TodayFocusItem["tone"]) {
+  function push(
+    item: ScheduleCardItem,
+    reason: string,
+    tone: TodayFocusItem["tone"],
+  ) {
     if (focus.has(item.taskId)) {
       return;
     }
@@ -897,12 +972,18 @@ function buildTodayFocusItems(
       continue;
     }
 
-    if (item.latestRunStatus === "WaitingForInput" || item.displayState === "WaitingForInput") {
+    if (
+      item.latestRunStatus === "WaitingForInput" ||
+      item.displayState === "WaitingForInput"
+    ) {
       push(item, copy.focusWaitingForInput, "warning");
       continue;
     }
 
-    if (item.latestRunStatus === "WaitingForApproval" || item.displayState === "WaitingForApproval") {
+    if (
+      item.latestRunStatus === "WaitingForApproval" ||
+      item.displayState === "WaitingForApproval"
+    ) {
       push(item, copy.focusWaitingForApproval, "warning");
       continue;
     }
@@ -911,8 +992,11 @@ function buildTodayFocusItems(
   }
 
   for (const item of activeGroup?.items ?? []) {
-    const isHighPriority = item.priority === "High" || item.priority === "Urgent";
-    const hasStarted = Boolean(item.latestRunStatus && item.latestRunStatus !== "Pending");
+    const isHighPriority =
+      item.priority === "High" || item.priority === "Urgent";
+    const hasStarted = Boolean(
+      item.latestRunStatus && item.latestRunStatus !== "Pending",
+    );
 
     if (!hasStarted && isHighPriority) {
       push(item, copy.focusReadyToday, "info");
@@ -961,19 +1045,38 @@ function TodayFocusCard({
 
 function ItemMeta({ item }: { item: ScheduleCardItem }) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
     <div className="flex flex-wrap gap-2">
-      <StatusBadge tone={getPriorityTone(item.priority)}>{item.priority}</StatusBadge>
-      <StatusBadge>{describeOwner(item.ownerType, item.assigneeAgentId, copy)}</StatusBadge>
+      <StatusBadge tone={getPriorityTone(item.priority)}>
+        {item.priority}
+      </StatusBadge>
+      <StatusBadge>
+        {describeOwner(item.ownerType, item.assigneeAgentId, copy)}
+      </StatusBadge>
       {item.runnabilitySummary ? (
-        <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>{item.runnabilitySummary}</StatusBadge>
+        <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>
+          {item.runnabilitySummary}
+        </StatusBadge>
       ) : null}
       {item.scheduleStatus ? (
-        <StatusBadge tone={getScheduleTone(item.scheduleStatus)}>{copy.planPrefix}: {item.scheduleStatus}</StatusBadge>
+        <StatusBadge tone={getScheduleTone(item.scheduleStatus)}>
+          {copy.planPrefix}: {item.scheduleStatus}
+        </StatusBadge>
       ) : null}
-      {item.latestRunStatus ? <StatusBadge tone={getRunTone(item.latestRunStatus)}>{copy.runPrefix}: {item.latestRunStatus}</StatusBadge> : null}
-      {item.approvalPendingCount ? <StatusBadge tone="warning">{copy.approvalsPrefix}: {item.approvalPendingCount}</StatusBadge> : null}
+      {item.latestRunStatus ? (
+        <StatusBadge tone={getRunTone(item.latestRunStatus)}>
+          {copy.runPrefix}: {item.latestRunStatus}
+        </StatusBadge>
+      ) : null}
+      {item.approvalPendingCount ? (
+        <StatusBadge tone="warning">
+          {copy.approvalsPrefix}: {item.approvalPendingCount}
+        </StatusBadge>
+      ) : null}
     </div>
   );
 }
@@ -986,8 +1089,13 @@ function DetailGrid({
   return (
     <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
       {items.map((item) => (
-        <div key={item.label} className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
-          <dt className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</dt>
+        <div
+          key={item.label}
+          className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2"
+        >
+          <dt className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            {item.label}
+          </dt>
           <dd className="mt-1 text-sm text-foreground">{item.value ?? "-"}</dd>
         </div>
       ))}
@@ -1003,23 +1111,42 @@ function EmptyState({ children }: { children: string }) {
   );
 }
 
-function DayTimelineSummary({ items, dayDate }: { items: ScheduledItem[]; dayDate: Date }) {
+function DayTimelineSummary({
+  items,
+  dayDate,
+}: {
+  items: ScheduledItem[];
+  dayDate: Date;
+}) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   const starts = items
     .map((item) => item.scheduledStartAt?.getTime())
     .filter((value): value is number => value !== undefined);
-  const ends = items.map((item) => item.scheduledEndAt?.getTime()).filter((value): value is number => value !== undefined);
+  const ends = items
+    .map((item) => item.scheduledEndAt?.getTime())
+    .filter((value): value is number => value !== undefined);
 
   if (starts.length === 0 || ends.length === 0) {
-    return <span>{formatShortDay(dayDate, locale, copy)} {copy.dayOpenSuffix}</span>;
+    return (
+      <span>
+        {formatShortDay(dayDate, locale, copy)} {copy.dayOpenSuffix}
+      </span>
+    );
   }
 
   const earliest = new Date(Math.min(...starts));
   const latest = new Date(Math.max(...ends));
 
-  return <span>{formatTime(earliest, locale)} → {formatTime(latest, locale)}</span>;
+  return (
+    <span>
+      {formatTime(earliest, locale)} → {formatTime(latest, locale)}
+    </span>
+  );
 }
 
 function buildScheduleHref(day: string, taskId?: string) {
@@ -1033,7 +1160,11 @@ function buildScheduleHref(day: string, taskId?: string) {
   return `/schedule?${params.toString()}`;
 }
 
-function buildScheduleViewHref(day: string, view: ScheduleViewMode, taskId?: string) {
+function buildScheduleViewHref(
+  day: string,
+  view: ScheduleViewMode,
+  taskId?: string,
+) {
   const params = new URLSearchParams();
   params.set("day", day);
 
@@ -1097,10 +1228,19 @@ function TimelineCreateComposer({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   const composerTop = Math.min(
-    Math.max(draft.top + draft.height - TIMELINE_COMPOSER_HEIGHT, TIMELINE_COMPOSER_MARGIN),
-    Math.max(TIMELINE_COMPOSER_MARGIN, timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN),
+    Math.max(
+      draft.top + draft.height - TIMELINE_COMPOSER_HEIGHT,
+      TIMELINE_COMPOSER_MARGIN,
+    ),
+    Math.max(
+      TIMELINE_COMPOSER_MARGIN,
+      timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
+    ),
   );
 
   return (
@@ -1111,10 +1251,19 @@ function TimelineCreateComposer({
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">{copy.createTaskBlock}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{formatTimeRange(draft.startAt, draft.endAt, locale, copy)}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {copy.createTaskBlock}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatTimeRange(draft.startAt, draft.endAt, locale, copy)}
+          </p>
         </div>
-        <button type="button" disabled={isPending} onClick={onClose} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={onClose}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
           {copy.cancel}
         </button>
       </div>
@@ -1139,10 +1288,19 @@ function TimelineCreateComposer({
   );
 }
 
-function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selectedDay: string }) {
+function WeekStrip({
+  groups,
+  selectedDay,
+}: {
+  groups: ScheduledDayGroup[];
+  selectedDay: string;
+}) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
     <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
@@ -1155,22 +1313,34 @@ function WeekStrip({ groups, selectedDay }: { groups: ScheduledDayGroup[]; selec
               href={buildScheduleHref(group.key)}
               className={cn(
                 "rounded-2xl border px-3 py-3 transition-colors hover:border-primary/40 hover:bg-background",
-                isActive ? "border-primary/60 bg-primary/5 shadow-sm" : "border-border/60 bg-background/70",
+                isActive
+                  ? "border-primary/60 bg-primary/5 shadow-sm"
+                  : "border-border/60 bg-background/70",
               )}
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground">{formatShortDay(group.date, locale, copy)}</p>
-                  {group.riskCount > 0 ? <StatusBadge tone="critical">{copy.riskDay}</StatusBadge> : null}
+                  <p className="text-sm font-medium text-foreground">
+                    {formatShortDay(group.date, locale, copy)}
+                  </p>
+                  {group.riskCount > 0 ? (
+                    <StatusBadge tone="critical">{copy.riskDay}</StatusBadge>
+                  ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">{group.label}</p>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge>
-                    {group.items.length} {group.items.length === 1 ? copy.blockSingular : copy.blockPlural}
+                    {group.items.length}{" "}
+                    {group.items.length === 1
+                      ? copy.blockSingular
+                      : copy.blockPlural}
                   </StatusBadge>
                   {group.proposalCount > 0 ? (
                     <StatusBadge tone="info">
-                      {group.proposalCount} {group.proposalCount === 1 ? copy.proposalSingular : copy.proposalPlural}
+                      {group.proposalCount}{" "}
+                      {group.proposalCount === 1
+                        ? copy.proposalSingular
+                        : copy.proposalPlural}
                     </StatusBadge>
                   ) : null}
                 </div>
@@ -1205,15 +1375,25 @@ function DayTimeline({
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onScheduleDrop: (item: TimelineDragItem, startAt: Date, endAt: Date) => Promise<void>;
+  onScheduleDrop: (
+    item: TimelineDragItem,
+    startAt: Date,
+    endAt: Date,
+  ) => Promise<void>;
   onCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
   onScheduledDragStart: (item: ScheduledItem) => void;
   onDragEnd: () => void;
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
-  const compressedTimeline = useMemo(() => buildCompressedTimeline(items), [items]);
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
+  const compressedTimeline = useMemo(
+    () => buildCompressedTimeline(items),
+    [items],
+  );
   const timelineHeight = compressedTimeline.totalVisualHeight;
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -1227,8 +1407,14 @@ function DayTimeline({
 
     const scrollContainer = scrollContainerRef.current;
     const composerTop = Math.min(
-      Math.max(composerDraft.top + composerDraft.height - TIMELINE_COMPOSER_HEIGHT, TIMELINE_COMPOSER_MARGIN),
-      Math.max(TIMELINE_COMPOSER_MARGIN, timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN),
+      Math.max(
+        composerDraft.top + composerDraft.height - TIMELINE_COMPOSER_HEIGHT,
+        TIMELINE_COMPOSER_MARGIN,
+      ),
+      Math.max(
+        TIMELINE_COMPOSER_MARGIN,
+        timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
+      ),
     );
     const visibleTop = scrollContainer.scrollTop;
     const visibleBottom = visibleTop + scrollContainer.clientHeight;
@@ -1249,7 +1435,9 @@ function DayTimeline({
     }
 
     if (composerBottom > visibleBottom - TIMELINE_COMPOSER_MARGIN) {
-      setScrollTop(Math.max(composerBottom - scrollContainer.clientHeight + 16, 0));
+      setScrollTop(
+        Math.max(composerBottom - scrollContainer.clientHeight + 16, 0),
+      );
     }
   }, [composerDraft, timelineHeight]);
 
@@ -1270,11 +1458,17 @@ function DayTimeline({
   }
 
   function getDragPreview(clientY: number) {
-    const snappedStartMinute = clampScheduledStartMinute(snapMinuteToGrid(getMinuteFromClientY(clientY)));
-    const durationMinutes = draggedItem?.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES;
+    const snappedStartMinute = clampScheduledStartMinute(
+      snapMinuteToGrid(getMinuteFromClientY(clientY)),
+    );
+    const durationMinutes =
+      draggedItem?.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES;
     const endMinute = Math.min(snappedStartMinute + durationMinutes, 24 * 60);
     const top = compressedTimeline.mapMinuteToY(snappedStartMinute);
-    const height = Math.max(compressedTimeline.mapMinuteToY(endMinute) - top, 56);
+    const height = Math.max(
+      compressedTimeline.mapMinuteToY(endMinute) - top,
+      56,
+    );
 
     return {
       top,
@@ -1287,10 +1481,18 @@ function DayTimeline({
   }
 
   function createDraftAtMinute(minute: number) {
-    const snappedStartMinute = clampScheduledStartMinute(snapMinuteToGrid(minute));
-    const endMinute = Math.min(snappedStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES, 24 * 60);
+    const snappedStartMinute = clampScheduledStartMinute(
+      snapMinuteToGrid(minute),
+    );
+    const endMinute = Math.min(
+      snappedStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES,
+      24 * 60,
+    );
     const top = compressedTimeline.mapMinuteToY(snappedStartMinute);
-    const height = Math.max(compressedTimeline.mapMinuteToY(endMinute) - top, 56);
+    const height = Math.max(
+      compressedTimeline.mapMinuteToY(endMinute) - top,
+      56,
+    );
 
     return {
       top,
@@ -1349,7 +1551,10 @@ function DayTimeline({
 
     const target = event.target as HTMLElement;
 
-    if (target.closest("[data-timeline-block]") || target.closest("[data-timeline-composer]")) {
+    if (
+      target.closest("[data-timeline-block]") ||
+      target.closest("[data-timeline-composer]")
+    ) {
       return;
     }
 
@@ -1360,9 +1565,13 @@ function DayTimeline({
     <SurfaceCard as="div" variant="inset" className="rounded-2xl">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-3">
         <div>
-          <h3 className="text-base font-semibold text-foreground">{formatDayHeading(dayDate, locale, copy)}</h3>
+          <h3 className="text-base font-semibold text-foreground">
+            {formatDayHeading(dayDate, locale, copy)}
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            <DayTimelineSummary items={items} dayDate={dayDate} /> · {items.length} {items.length === 1 ? copy.blockSingular : copy.blockPlural}
+            <DayTimelineSummary items={items} dayDate={dayDate} /> ·{" "}
+            {items.length}{" "}
+            {items.length === 1 ? copy.blockSingular : copy.blockPlural}
           </p>
         </div>
         <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -1377,9 +1586,14 @@ function DayTimeline({
               {copy.createTaskBlock}
             </button>
           </div>
-          <p className="mt-2">{draggedItem ? copy.dropOntoLane : copy.clickOrDrag}</p>
+          <p className="mt-2">
+            {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
+          </p>
           <p className="mt-1 normal-case tracking-normal">
-            {copy.timelineCompressedPrefix} {formatDurationMinutes(Math.round(compressedTimeline.visualMinutes))}
+            {copy.timelineCompressedPrefix}{" "}
+            {formatDurationMinutes(
+              Math.round(compressedTimeline.visualMinutes),
+            )}
             {compressedTimeline.compressedGapCount > 0
               ? ` · ${compressedTimeline.compressedGapCount} ${copy.quietHoursCompressedSuffix}`
               : ""}
@@ -1387,19 +1601,31 @@ function DayTimeline({
         </div>
       </div>
 
-      <div ref={scrollContainerRef} className="max-h-[72vh] overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2">
+      <div
+        ref={scrollContainerRef}
+        className="max-h-[72vh] overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2"
+      >
         <div className="flex gap-3">
           <div className="sticky left-0 top-0 hidden w-16 shrink-0 self-start bg-background/95 py-2 sm:block">
             <div className="relative" style={{ height: `${timelineHeight}px` }}>
               {compressedTimeline.hours.map((hour) => (
-                <div key={hour.hour} className="absolute left-0 right-0" style={{ top: `${hour.visualStart}px` }}>
+                <div
+                  key={hour.hour}
+                  className="absolute left-0 right-0"
+                  style={{ top: `${hour.visualStart}px` }}
+                >
                   <span className="-translate-y-1/2 text-xs text-muted-foreground">
-                     {formatTime(new Date(2026, 0, 1, hour.hour, 0), locale)}
+                    {formatTime(new Date(2026, 0, 1, hour.hour, 0), locale)}
                   </span>
                 </div>
               ))}
-              <div className="absolute left-0 right-0" style={{ top: `${timelineHeight}px` }}>
-                <span className="-translate-y-1/2 text-xs text-muted-foreground">11:59 PM</span>
+              <div
+                className="absolute left-0 right-0"
+                style={{ top: `${timelineHeight}px` }}
+              >
+                <span className="-translate-y-1/2 text-xs text-muted-foreground">
+                  11:59 PM
+                </span>
               </div>
             </div>
           </div>
@@ -1425,17 +1651,27 @@ function DayTimeline({
               <div
                 key={hour.hour}
                 className="absolute inset-x-0"
-                style={{ top: `${hour.visualStart}px`, height: `${hour.visualHeight}px` }}
+                style={{
+                  top: `${hour.visualStart}px`,
+                  height: `${hour.visualHeight}px`,
+                }}
               >
                 <div className="absolute inset-x-0 top-0 border-t border-dashed border-border/70" />
-                {!hour.active ? <div className="absolute inset-x-3 inset-y-1 rounded-md bg-muted/35" /> : null}
+                {!hour.active ? (
+                  <div className="absolute inset-x-3 inset-y-1 rounded-md bg-muted/35" />
+                ) : null}
               </div>
             ))}
-            <div className="absolute inset-x-0 border-t border-dashed border-border/70" style={{ top: `${timelineHeight}px` }} />
+            <div
+              className="absolute inset-x-0 border-t border-dashed border-border/70"
+              style={{ top: `${timelineHeight}px` }}
+            />
 
             {items.length === 0 ? (
               <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-2xl border border-dashed border-primary/30 bg-background/92 p-4 text-sm text-muted-foreground shadow-sm">
-                <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
+                <p className="font-medium text-foreground">
+                  {copy.emptyDayLane}
+                </p>
                 <p className="mt-1">{copy.emptyDayLaneDescription}</p>
               </div>
             ) : null}
@@ -1458,14 +1694,29 @@ function DayTimeline({
             {draggedItem && dragPreview ? (
               <div
                 className="pointer-events-none absolute left-3 right-3 rounded-2xl border border-dashed border-primary/50 bg-primary/10 p-3 shadow-sm"
-                style={{ top: `${dragPreview.top}px`, minHeight: "56px", height: `${dragPreview.height}px` }}
+                style={{
+                  top: `${dragPreview.top}px`,
+                  minHeight: "56px",
+                  height: `${dragPreview.height}px`,
+                }}
               >
                 <div className="flex h-full gap-3 overflow-hidden">
                   <div className="w-1 shrink-0 rounded-full bg-primary" />
                   <div className="min-w-0 space-y-1">
-                    <p className="line-clamp-1 text-sm font-medium text-foreground">{draggedItem.title}</p>
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">
+                      {draggedItem.title}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatTimeRange(dragPreview.startAt, dragPreview.endAt, locale, copy)} · {draggedItem.kind === "queue" ? copy.dropToSchedule : copy.dropToMoveBlock}
+                      {formatTimeRange(
+                        dragPreview.startAt,
+                        dragPreview.endAt,
+                        locale,
+                        copy,
+                      )}{" "}
+                      ·{" "}
+                      {draggedItem.kind === "queue"
+                        ? copy.dropToSchedule
+                        : copy.dropToMoveBlock}
                     </p>
                   </div>
                 </div>
@@ -1475,14 +1726,19 @@ function DayTimeline({
             {items.map((item) => {
               const accent = getPriorityAccent(item.priority);
               const start = item.scheduledStartAt
-                ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes()
+                ? item.scheduledStartAt.getHours() * 60 +
+                  item.scheduledStartAt.getMinutes()
                 : 0;
               const end = item.scheduledEndAt
-                ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
+                ? item.scheduledEndAt.getHours() * 60 +
+                  item.scheduledEndAt.getMinutes()
                 : start + 60;
               const safeEnd = Math.max(end, start + 45);
               const top = compressedTimeline.mapMinuteToY(start);
-              const height = Math.max(compressedTimeline.mapMinuteToY(safeEnd) - top, 56);
+              const height = Math.max(
+                compressedTimeline.mapMinuteToY(safeEnd) - top,
+                56,
+              );
               const isSelected = selectedTaskId === item.taskId;
 
               return (
@@ -1498,37 +1754,69 @@ function DayTimeline({
                   }}
                   onDragEnd={onDragEnd}
                   className={`absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 ${
-                    isSelected ? "border-primary ring-1 ring-primary/30" : "border-border"
+                    isSelected
+                      ? "border-primary ring-1 ring-primary/30"
+                      : "border-border"
                   }`}
-                  style={{ top: `${top}px`, minHeight: "56px", height: `${height}px` }}
+                  style={{
+                    top: `${top}px`,
+                    minHeight: "56px",
+                    height: `${height}px`,
+                  }}
                 >
                   <div className="flex h-full gap-3 overflow-hidden">
                     <div className={`w-1 shrink-0 rounded-full ${accent}`} />
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                          <Move className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                          <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
+                          <Move
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <p className="line-clamp-1 text-sm font-medium text-foreground">
+                            {item.title}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1">
-                          <StatusBadge tone={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">
+                          <StatusBadge
+                            tone={getPriorityTone(item.priority)}
+                            className="px-2 py-0.5 text-[11px]"
+                          >
                             {item.priority}
                           </StatusBadge>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">{formatTimeRange(item.scheduledStartAt, item.scheduledEndAt, locale, copy)}</p>
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
-                        {describeOwner(item.ownerType, item.assigneeAgentId, copy)}
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimeRange(
+                          item.scheduledStartAt,
+                          item.scheduledEndAt,
+                          locale,
+                          copy,
+                        )}
                       </p>
-                      {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {describeOwner(
+                          item.ownerType,
+                          item.assigneeAgentId,
+                          copy,
+                        )}
+                      </p>
+                      {item.scheduleStatus === "Overdue" ||
+                      item.approvalPendingCount ? (
                         <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">
                           {item.scheduleStatus === "Overdue" ? (
-                            <StatusBadge tone="critical" className="px-2 py-0.5 text-[11px]">
+                            <StatusBadge
+                              tone="critical"
+                              className="px-2 py-0.5 text-[11px]"
+                            >
                               {copy.overdue}
                             </StatusBadge>
                           ) : null}
                           {item.approvalPendingCount ? (
-                            <StatusBadge tone="warning" className="px-2 py-0.5 text-[11px]">
+                            <StatusBadge
+                              tone="warning"
+                              className="px-2 py-0.5 text-[11px]"
+                            >
                               {copy.approvalPending}
                             </StatusBadge>
                           ) : null}
@@ -1560,12 +1848,18 @@ function SelectedBlockSheet({
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) => Promise<void>;
   onMutatedAction: () => Promise<void>;
 }) {
   const locale = useLocale();
   const { messages, t } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
 
   return (
     <>
@@ -1582,36 +1876,67 @@ function SelectedBlockSheet({
       >
         <div className="flex items-start justify-between gap-4 border-b pb-4">
           <div className="space-y-1">
-            <h2 id="schedule-task-sheet-title" className="text-sm font-semibold text-foreground">
+            <h2
+              id="schedule-task-sheet-title"
+              className="text-sm font-semibold text-foreground"
+            >
               {copy.taskDetails}
             </h2>
             <p className="text-sm text-muted-foreground">
               {copy.taskDetailsDescription}
             </p>
           </div>
-          <LocalizedLink href={buildScheduleHref(selectedDay)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <LocalizedLink
+            href={buildScheduleHref(selectedDay)}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
             {copy.close}
           </LocalizedLink>
         </div>
 
         <div className="mt-4 space-y-4 overflow-y-auto pr-1 text-sm text-muted-foreground md:max-h-[calc(100vh-9rem)]">
           <div className="space-y-2">
-            <p className="text-base font-medium text-foreground">{item.title}</p>
-            <p>{formatTimeRange(item.scheduledStartAt, item.scheduledEndAt, locale, copy)}</p>
+            <p className="text-base font-medium text-foreground">
+              {item.title}
+            </p>
+            <p>
+              {formatTimeRange(
+                item.scheduledStartAt,
+                item.scheduledEndAt,
+                locale,
+                copy,
+              )}
+            </p>
             <ItemMeta item={item} />
           </div>
 
           <DetailGrid
             items={[
               { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-              { label: copy.currentPlan, value: item.scheduleStatus ?? copy.scheduledMetric },
-              { label: copy.latestRun, value: item.latestRunStatus ?? copy.noActiveRun },
-              { label: copy.nextAction, value: item.actionRequired ?? copy.stayOnPlan },
+              {
+                label: copy.currentPlan,
+                value: item.scheduleStatus ?? copy.scheduledMetric,
+              },
+              {
+                label: copy.latestRun,
+                value: item.latestRunStatus ?? copy.noActiveRun,
+              },
+              {
+                label: copy.nextAction,
+                value: item.actionRequired ?? copy.stayOnPlan,
+              },
             ]}
           />
 
-          <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl border-dashed">
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.taskConfig}</p>
+          <SurfaceCard
+            as="div"
+            variant="inset"
+            padding="sm"
+            className="rounded-2xl border-dashed"
+          >
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {copy.taskConfig}
+            </p>
             <TaskConfigForm
               runtimeAdapters={runtimeAdapters}
               defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
@@ -1619,7 +1944,9 @@ function SelectedBlockSheet({
               initialValues={toTaskConfigInitialValues(item)}
               submitLabel={copy.saveTaskConfig}
               pendingLabel={copy.saving}
-              onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
+              onSubmitAction={(input) =>
+                onSaveTaskConfigAction(item.taskId, input)
+              }
             />
           </SurfaceCard>
 
@@ -1630,8 +1957,15 @@ function SelectedBlockSheet({
             workLabel={t("common.openWorkbench")}
           />
 
-          <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl border-dashed">
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.adjustBlock}</p>
+          <SurfaceCard
+            as="div"
+            variant="inset"
+            padding="sm"
+            className="rounded-2xl border-dashed"
+          >
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {copy.adjustBlock}
+            </p>
             <ScheduleEditorForm
               taskId={item.taskId}
               dueAt={item.dueAt}
@@ -1658,10 +1992,16 @@ function QueueTaskConfigEditor({
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) => Promise<void>;
 }) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
     <TaskConfigForm
       runtimeAdapters={runtimeAdapters}
@@ -1696,15 +2036,28 @@ function QueueCard({
   isExpanded: boolean;
   onToggle: () => void;
   onMutatedAction: () => Promise<void>;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) => Promise<void>;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
 }) {
   const locale = useLocale();
   const { messages, t } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
-    <SurfaceCard as="div" variant="inset" className={cn("rounded-2xl p-0", isDragging && "border-primary/40 bg-primary/5") }>
+    <SurfaceCard
+      as="div"
+      variant="inset"
+      className={cn(
+        "rounded-2xl p-0",
+        isDragging && "border-primary/40 bg-primary/5",
+      )}
+    >
       <div
         draggable={!isPending}
         aria-label={`Drag ${item.title} to the timeline`}
@@ -1729,14 +2082,35 @@ function QueueCard({
                 {item.title}
               </LocalizedLink>
               <div className="flex flex-wrap gap-2">
-                <StatusBadge tone={getPriorityTone(item.priority)}>{item.priority}</StatusBadge>
-                <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>{item.runnabilitySummary}</StatusBadge>
-                {item.dueAt ? <StatusBadge>{copy.due} {formatDateTime(item.dueAt, locale)}</StatusBadge> : null}
-                {item.actionRequired ? <StatusBadge tone="warning">{item.actionRequired}</StatusBadge> : null}
+                <StatusBadge tone={getPriorityTone(item.priority)}>
+                  {item.priority}
+                </StatusBadge>
+                <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>
+                  {item.runnabilitySummary}
+                </StatusBadge>
+                {item.dueAt ? (
+                  <StatusBadge>
+                    {copy.due} {formatDateTime(item.dueAt, locale)}
+                  </StatusBadge>
+                ) : null}
+                {item.actionRequired ? (
+                  <StatusBadge tone="warning">
+                    {item.actionRequired}
+                  </StatusBadge>
+                ) : null}
               </div>
             </div>
-            <button type="button" onClick={onToggle} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              <ChevronDown className={cn("size-4 transition-transform", isExpanded && "rotate-180")} />
+            <button
+              type="button"
+              onClick={onToggle}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              <ChevronDown
+                className={cn(
+                  "size-4 transition-transform",
+                  isExpanded && "rotate-180",
+                )}
+              />
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -1750,22 +2124,35 @@ function QueueCard({
           <DetailGrid
             items={[
               { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-              { label: copy.pendingProposals, value: String(item.scheduleProposalCount) },
+              {
+                label: copy.pendingProposals,
+                value: String(item.scheduleProposalCount),
+              },
               { label: copy.runnable, value: item.runnabilitySummary },
               { label: copy.model, value: item.runtimeModel ?? "-" },
-              { label: copy.latestRun, value: item.latestRunStatus ?? copy.noActiveRun },
+              {
+                label: copy.latestRun,
+                value: item.latestRunStatus ?? copy.noActiveRun,
+              },
             ]}
           />
 
-          <SurfaceCard as="div" variant="default" padding="sm" className="rounded-2xl border-dashed">
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.taskConfig}</p>
-              <QueueTaskConfigEditor
-                item={item}
-                runtimeAdapters={runtimeAdapters}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-                isPending={isPending}
-                onSaveTaskConfigAction={onSaveTaskConfigAction}
-              />
+          <SurfaceCard
+            as="div"
+            variant="default"
+            padding="sm"
+            className="rounded-2xl border-dashed"
+          >
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {copy.taskConfig}
+            </p>
+            <QueueTaskConfigEditor
+              item={item}
+              runtimeAdapters={runtimeAdapters}
+              defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+              isPending={isPending}
+              onSaveTaskConfigAction={onSaveTaskConfigAction}
+            />
           </SurfaceCard>
 
           <TaskContextLinks
@@ -1775,8 +2162,15 @@ function QueueCard({
             workLabel={t("common.openWorkbench")}
           />
 
-          <SurfaceCard as="div" variant="default" padding="sm" className="rounded-2xl border-dashed">
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.placeOnTimeline}</p>
+          <SurfaceCard
+            as="div"
+            variant="default"
+            padding="sm"
+            className="rounded-2xl border-dashed"
+          >
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {copy.placeOnTimeline}
+            </p>
             <ScheduleEditorForm
               taskId={item.taskId}
               dueAt={item.dueAt}
@@ -1804,9 +2198,17 @@ function ProposalCard({
 }) {
   const locale = useLocale();
   const { messages, t } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
-    <SurfaceCard key={proposal.proposalId} as="div" variant="inset" className="rounded-2xl">
+    <SurfaceCard
+      key={proposal.proposalId}
+      as="div"
+      variant="inset"
+      className="rounded-2xl"
+    >
       <div className="space-y-3 text-sm text-muted-foreground">
         <div className="space-y-2">
           <LocalizedLink
@@ -1820,16 +2222,23 @@ function ProposalCard({
         <p>{proposal.summary}</p>
         <DetailGrid
           items={[
-              { label: copy.proposedBy, value: proposal.proposedBy },
-              {
-                label: copy.candidateBlock,
-                value: `${formatDateTime(proposal.scheduledStartAt, locale)} → ${formatDateTime(proposal.scheduledEndAt, locale)}`,
-              },
-              { label: copy.dueImpact, value: formatDateTime(proposal.dueAt, locale) },
-              { label: copy.source, value: proposal.source },
-            ]}
-          />
-        <TaskContextLinks workspaceId={proposal.workspaceId} taskId={proposal.taskId} workLabel={t("common.openWorkbench")} />
+            { label: copy.proposedBy, value: proposal.proposedBy },
+            {
+              label: copy.candidateBlock,
+              value: `${formatDateTime(proposal.scheduledStartAt, locale)} → ${formatDateTime(proposal.scheduledEndAt, locale)}`,
+            },
+            {
+              label: copy.dueImpact,
+              value: formatDateTime(proposal.dueAt, locale),
+            },
+            { label: copy.source, value: proposal.source },
+          ]}
+        />
+        <TaskContextLinks
+          workspaceId={proposal.workspaceId}
+          taskId={proposal.taskId}
+          workLabel={t("common.openWorkbench")}
+        />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -1857,10 +2266,17 @@ function ProposalCard({
   );
 }
 
-function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }) {
+function RiskCard({
+  item,
+}: {
+  item: SchedulePageProps["data"]["risks"][number];
+}) {
   const locale = useLocale();
   const { messages, t } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.schedulePage ?? {}) };
+  const copy = {
+    ...DEFAULT_COPY,
+    ...(messages.components?.schedulePage ?? {}),
+  };
   return (
     <SurfaceCard as="div" variant="inset" className="rounded-2xl">
       <div className="space-y-3 text-sm text-muted-foreground">
@@ -1875,15 +2291,22 @@ function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }
         </div>
         <DetailGrid
           items={[
-             { label: copy.risk, value: item.scheduleStatus ?? item.persistedStatus ?? copy.needsReview },
-             { label: copy.action, value: item.actionRequired ?? copy.reviewScheduleImpact },
-             {
-               label: copy.plannedWindow,
-               value: `${formatDateTime(item.scheduledStartAt, locale)} → ${formatDateTime(item.scheduledEndAt, locale)}`,
-             },
-             { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-           ]}
-         />
+            {
+              label: copy.risk,
+              value:
+                item.scheduleStatus ?? item.persistedStatus ?? copy.needsReview,
+            },
+            {
+              label: copy.action,
+              value: item.actionRequired ?? copy.reviewScheduleImpact,
+            },
+            {
+              label: copy.plannedWindow,
+              value: `${formatDateTime(item.scheduledStartAt, locale)} → ${formatDateTime(item.scheduledEndAt, locale)}`,
+            },
+            { label: copy.due, value: formatDateTime(item.dueAt, locale) },
+          ]}
+        />
         <div className="flex flex-wrap gap-2">
           <TaskContextLinks
             workspaceId={item.workspaceId}
@@ -1891,7 +2314,10 @@ function RiskCard({ item }: { item: SchedulePageProps["data"]["risks"][number] }
             latestRunStatus={item.latestRunStatus}
             workLabel={t("common.openWorkbench")}
           />
-          <LocalizedLink href="/inbox" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <LocalizedLink
+            href="/inbox"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
             {copy.openInbox}
           </LocalizedLink>
         </div>
@@ -1906,20 +2332,35 @@ export function SchedulePage({
   selectedDay,
   selectedTaskId,
   selectedView,
-}: SchedulePageProps & { selectedDay?: string; selectedTaskId?: string; selectedView?: string }) {
+}: SchedulePageProps & {
+  selectedDay?: string;
+  selectedTaskId?: string;
+  selectedView?: string;
+}) {
   const router = useRouter();
   const locale = useLocale();
   const { messages } = useI18n();
   const schedulePageMessages = messages.components?.schedulePage;
-  const copy = useMemo(() => ({ ...DEFAULT_COPY, ...(schedulePageMessages ?? {}) }), [schedulePageMessages]);
+  const copy = useMemo(
+    () => ({ ...DEFAULT_COPY, ...(schedulePageMessages ?? {}) }),
+    [schedulePageMessages],
+  );
   const [viewData, setViewData] = useState<SchedulePageData>(data);
-  const [draggedTask, setDraggedTask] = useState<{ kind: TimelineDragItem["kind"]; taskId: string } | null>(null);
-  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>([]);
-  const [localSelectedTaskId, setLocalSelectedTaskId] = useState<string | undefined>(selectedTaskId);
+  const [draggedTask, setDraggedTask] = useState<{
+    kind: TimelineDragItem["kind"];
+    taskId: string;
+  } | null>(null);
+  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>(
+    [],
+  );
+  const [localSelectedTaskId, setLocalSelectedTaskId] = useState<
+    string | undefined
+  >(selectedTaskId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string>("");
   const [isPending, setIsPending] = useState(false);
-  const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("queue");
+  const [secondaryView, setSecondaryView] =
+    useState<SecondaryPlanningView>("queue");
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
 
@@ -1927,10 +2368,16 @@ export function SchedulePage({
     const requestId = ++refreshRequestIdRef.current;
 
     try {
-      const response = await fetch(`/api/schedule/projection?workspaceId=${workspaceId}`, { cache: "no-store" });
+      const response = await fetch(
+        `/api/schedule/projection?workspaceId=${workspaceId}`,
+        { cache: "no-store" },
+      );
 
       if (!response.ok) {
-        throw new Error(messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+        throw new Error(
+          messages.components?.scheduleEditorForm?.actionFailed ??
+            "Action failed",
+        );
       }
 
       const next = (await response.json()) as SchedulePageProps["data"];
@@ -1942,9 +2389,18 @@ export function SchedulePage({
       startTransition(() => setViewData(next));
     } catch (error) {
       router.refresh();
-      throw error instanceof Error ? error : new Error(messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      throw error instanceof Error
+        ? error
+        : new Error(
+            messages.components?.scheduleEditorForm?.actionFailed ??
+              "Action failed",
+          );
     }
-  }, [messages.components?.scheduleEditorForm?.actionFailed, router, workspaceId]);
+  }, [
+    messages.components?.scheduleEditorForm?.actionFailed,
+    router,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     setViewData(data);
@@ -1982,41 +2438,90 @@ export function SchedulePage({
 
       return "queue";
     });
-  }, [viewData.proposals.length, viewData.risks.length, viewData.unscheduled.length]);
+  }, [
+    viewData.proposals.length,
+    viewData.risks.length,
+    viewData.unscheduled.length,
+  ]);
 
   const scheduledGroups = useMemo(
-    () => buildWeekGroups(viewData.scheduled, viewData.proposals, viewData.risks, selectedDay, locale, copy),
-    [copy, locale, selectedDay, viewData.proposals, viewData.risks, viewData.scheduled],
+    () =>
+      buildWeekGroups(
+        viewData.scheduled,
+        viewData.proposals,
+        viewData.risks,
+        selectedDay,
+        locale,
+        copy,
+      ),
+    [
+      copy,
+      locale,
+      selectedDay,
+      viewData.proposals,
+      viewData.risks,
+      viewData.scheduled,
+    ],
   );
 
   const todayKey = getTodayKey();
-  const tomorrowKey = formatDateKey(addDays(parseDayKey(todayKey) ?? startOfDay(new Date()), 1));
-  const selectedGroupKey = scheduledGroups.find((group) => group.key === selectedDay)?.key;
-  const todayGroupKey = scheduledGroups.find((group) => group.key === todayKey)?.key;
-  const todayGroup = scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
+  const tomorrowKey = formatDateKey(
+    addDays(parseDayKey(todayKey) ?? startOfDay(new Date()), 1),
+  );
+  const selectedGroupKey = scheduledGroups.find(
+    (group) => group.key === selectedDay,
+  )?.key;
+  const todayGroupKey = scheduledGroups.find(
+    (group) => group.key === todayKey,
+  )?.key;
+  const todayGroup =
+    scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
   const firstPopulatedGroup =
-    scheduledGroups.find((group) => group.items.length > 0 || group.proposalCount > 0 || group.riskCount > 0)?.key ?? null;
+    scheduledGroups.find(
+      (group) =>
+        group.items.length > 0 ||
+        group.proposalCount > 0 ||
+        group.riskCount > 0,
+    )?.key ?? null;
   const activeDay =
     selectedGroupKey ??
-    (todayGroup && (todayGroup.items.length > 0 || todayGroup.proposalCount > 0 || todayGroup.riskCount > 0)
+    (todayGroup &&
+    (todayGroup.items.length > 0 ||
+      todayGroup.proposalCount > 0 ||
+      todayGroup.riskCount > 0)
       ? todayGroup.key
       : null) ??
     firstPopulatedGroup ??
     scheduledGroups[0]?.key ??
     todayKey;
-  const activeGroup = scheduledGroups.find((group) => group.key === activeDay) ?? null;
+  const activeGroup =
+    scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
-  const selectedItem = activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ?? null;
-  const todayFocusItems = useMemo(() => buildTodayFocusItems(viewData, activeGroup, copy), [activeGroup, copy, viewData]);
-  const activeRailLabel = secondaryView === "risks"
-    ? copy.conflictsTitle
-    : secondaryView === "proposals"
-      ? copy.aiProposalsTitle
-      : copy.unscheduledQueue;
+  const selectedItem =
+    activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ??
+    null;
+  const todayFocusItems = useMemo(
+    () => buildTodayFocusItems(viewData, activeGroup, copy),
+    [activeGroup, copy, viewData],
+  );
+  const activeRailLabel =
+    secondaryView === "risks"
+      ? copy.conflictsTitle
+      : secondaryView === "proposals"
+        ? copy.aiProposalsTitle
+        : copy.unscheduledQueue;
   const draggedQueueItem =
-    draggedTask?.kind === "queue" ? viewData.unscheduled.find((item) => item.taskId === draggedTask.taskId) ?? null : null;
+    draggedTask?.kind === "queue"
+      ? (viewData.unscheduled.find(
+          (item) => item.taskId === draggedTask.taskId,
+        ) ?? null)
+      : null;
   const draggedScheduledItem =
-    draggedTask?.kind === "scheduled" ? activeGroup?.items.find((item) => item.taskId === draggedTask.taskId) ?? null : null;
+    draggedTask?.kind === "scheduled"
+      ? (activeGroup?.items.find(
+          (item) => item.taskId === draggedTask.taskId,
+        ) ?? null)
+      : null;
   const draggedItem: TimelineDragItem | null = draggedQueueItem
     ? {
         kind: "queue",
@@ -2042,13 +2547,21 @@ export function SchedulePage({
       await action();
       await refreshProjection();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ??
+              "Action failed"),
+      );
     } finally {
       setIsPending(false);
     }
   }
 
-  function handleQueueDragStart(item: UnscheduledItem, event: DragEvent<HTMLElement>) {
+  function handleQueueDragStart(
+    item: UnscheduledItem,
+    event: DragEvent<HTMLElement>,
+  ) {
     if (isPending) {
       event.preventDefault();
       return;
@@ -2058,7 +2571,9 @@ export function SchedulePage({
     event.dataTransfer.setData("text/plain", item.taskId);
     setDraggedTask({ kind: "queue", taskId: item.taskId });
     setErrorMessage(null);
-    setAnnouncement(`Picked up ${item.title}. Move it to the timeline to create a block.`);
+    setAnnouncement(
+      `Picked up ${item.title}. Move it to the timeline to create a block.`,
+    );
   }
 
   function handleQueueDragEnd() {
@@ -2068,32 +2583,49 @@ export function SchedulePage({
   function handleScheduledDragStart(item: ScheduledItem) {
     setDraggedTask({ kind: "scheduled", taskId: item.taskId });
     setErrorMessage(null);
-    setAnnouncement(`Picked up scheduled block ${item.title}. Drop it on a new slot to move the block.`);
+    setAnnouncement(
+      `Picked up scheduled block ${item.title}. Drop it on a new slot to move the block.`,
+    );
   }
 
-  async function handleScheduleDrop(item: TimelineDragItem, startAt: Date, endAt: Date) {
-    setAnnouncement(`Dropped ${item.title} on ${formatDayHeading(startAt, locale, copy)} at ${formatTime(startAt, locale)}.`);
+  async function handleScheduleDrop(
+    item: TimelineDragItem,
+    startAt: Date,
+    endAt: Date,
+  ) {
+    setAnnouncement(
+      `Dropped ${item.title} on ${formatDayHeading(startAt, locale, copy)} at ${formatTime(startAt, locale)}.`,
+    );
 
     try {
       setIsPending(true);
       setErrorMessage(null);
 
-        if (item.kind === "queue" && draggedQueueItem) {
-          setViewData((current) => ({
-            ...current,
+      if (item.kind === "queue" && draggedQueueItem) {
+        setViewData((current) => ({
+          ...current,
           summary: {
             ...current.summary,
             scheduledCount: current.summary.scheduledCount + 1,
             unscheduledCount: Math.max(0, current.summary.unscheduledCount - 1),
-            },
-            scheduled: sortScheduledItems([...current.scheduled, createScheduledItemFromQueueItem(draggedQueueItem, startAt, endAt)]),
-            unscheduled: current.unscheduled.filter((queueItem) => queueItem.taskId !== draggedQueueItem.taskId),
-            listItems: current.listItems.map((listItem) =>
-              listItem.taskId === draggedQueueItem.taskId ? applyScheduleToListItem(listItem, startAt, endAt) : listItem,
-            ),
-          }));
-          setExpandedQueueTaskIds((current) => current.filter((taskId) => taskId !== draggedQueueItem.taskId));
-        }
+          },
+          scheduled: sortScheduledItems([
+            ...current.scheduled,
+            createScheduledItemFromQueueItem(draggedQueueItem, startAt, endAt),
+          ]),
+          unscheduled: current.unscheduled.filter(
+            (queueItem) => queueItem.taskId !== draggedQueueItem.taskId,
+          ),
+          listItems: current.listItems.map((listItem) =>
+            listItem.taskId === draggedQueueItem.taskId
+              ? applyScheduleToListItem(listItem, startAt, endAt)
+              : listItem,
+          ),
+        }));
+        setExpandedQueueTaskIds((current) =>
+          current.filter((taskId) => taskId !== draggedQueueItem.taskId),
+        );
+      }
 
       if (item.kind === "scheduled") {
         setViewData((current) => ({
@@ -2113,7 +2645,9 @@ export function SchedulePage({
             ),
           ),
           listItems: current.listItems.map((listItem) =>
-            listItem.taskId === item.taskId ? applyScheduleToListItem(listItem, startAt, endAt) : listItem,
+            listItem.taskId === item.taskId
+              ? applyScheduleToListItem(listItem, startAt, endAt)
+              : listItem,
           ),
         }));
         setLocalSelectedTaskId(item.taskId);
@@ -2129,7 +2663,12 @@ export function SchedulePage({
 
       await refreshProjection();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ??
+              "Action failed"),
+      );
       setViewData(data);
     } finally {
       setIsPending(false);
@@ -2138,7 +2677,9 @@ export function SchedulePage({
   }
 
   async function handleCreateTaskBlock(input: TimelineCreateInput) {
-    setAnnouncement(`Creating ${input.title} on ${formatDayHeading(input.scheduledStartAt, locale, copy)} at ${formatTime(input.scheduledStartAt, locale)}.`);
+    setAnnouncement(
+      `Creating ${input.title} on ${formatDayHeading(input.scheduledStartAt, locale, copy)} at ${formatTime(input.scheduledStartAt, locale)}.`,
+    );
 
     try {
       setIsPending(true);
@@ -2174,20 +2715,40 @@ export function SchedulePage({
         },
         scheduled: sortScheduledItems([
           ...current.scheduled,
-          createScheduledItemFromCreateInput(created.taskId, workspaceId, data.defaultRuntimeAdapterKey, input),
+          createScheduledItemFromCreateInput(
+            created.taskId,
+            workspaceId,
+            data.defaultRuntimeAdapterKey,
+            input,
+          ),
         ]),
         listItems: [
           ...current.listItems,
           createListItemFromScheduledItem(
-            createScheduledItemFromCreateInput(created.taskId, workspaceId, data.defaultRuntimeAdapterKey, input),
+            createScheduledItemFromCreateInput(
+              created.taskId,
+              workspaceId,
+              data.defaultRuntimeAdapterKey,
+              input,
+            ),
           ),
         ],
       }));
       setLocalSelectedTaskId(created.taskId);
-      router.push(localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)));
+      router.push(
+        localizeHref(
+          locale,
+          buildScheduleViewHref(activeDay, activeView, created.taskId),
+        ),
+      );
       await refreshProjection();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ??
+              "Action failed"),
+      );
       setViewData(data);
     } finally {
       setIsPending(false);
@@ -2208,21 +2769,34 @@ export function SchedulePage({
 
   function toggleQueueCard(taskId: string) {
     setExpandedQueueTaskIds((current) =>
-      current.includes(taskId) ? current.filter((id) => id !== taskId) : [...current, taskId],
+      current.includes(taskId)
+        ? current.filter((id) => id !== taskId)
+        : [...current, taskId],
     );
   }
 
-  async function handleTaskConfigSave(taskId: string, input: TaskConfigFormInput) {
+  async function handleTaskConfigSave(
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) {
     try {
       setIsPending(true);
       setErrorMessage(null);
 
       setViewData((current) => ({
         ...current,
-        scheduled: current.scheduled.map((item) => (item.taskId === taskId ? applyTaskConfigToItem(item, input) : item)),
-        unscheduled: current.unscheduled.map((item) => (item.taskId === taskId ? applyTaskConfigToItem(item, input) : item)),
-        risks: current.risks.map((item) => (item.taskId === taskId ? applyTaskConfigToItem(item, input) : item)),
-        listItems: current.listItems.map((item) => (item.taskId === taskId ? applyTaskConfigToItem(item, input) : item)),
+        scheduled: current.scheduled.map((item) =>
+          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        ),
+        unscheduled: current.unscheduled.map((item) =>
+          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        ),
+        risks: current.risks.map((item) =>
+          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        ),
+        listItems: current.listItems.map((item) =>
+          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        ),
       }));
 
       await updateTaskConfigFromSchedule({
@@ -2241,7 +2815,12 @@ export function SchedulePage({
 
       await refreshProjection();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ??
+              "Action failed"),
+      );
       setViewData(data);
     } finally {
       setIsPending(false);
@@ -2277,26 +2856,52 @@ export function SchedulePage({
           },
         ]}
         activeView={activeView}
-        timelineHref={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
-        listHref={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
+        timelineHref={buildScheduleViewHref(
+          activeDay,
+          "timeline",
+          activeSelectedTaskId,
+        )}
+        listHref={buildScheduleViewHref(
+          activeDay,
+          "list",
+          activeSelectedTaskId,
+        )}
         timelineLabel={copy.timeline}
         listLabel={copy.list}
         metrics={[
           { label: copy.todayBlocks, value: activeGroup?.items.length ?? 0 },
-          { label: copy.queueReady, value: viewData.summary.unscheduledCount, tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined },
-          { label: copy.needsAttention, value: viewData.summary.riskCount, tone: viewData.summary.riskCount > 0 ? "critical" : undefined },
-          { label: copy.aiProposalsMetric, value: viewData.summary.proposalCount, tone: viewData.summary.proposalCount > 0 ? "info" : undefined },
+          {
+            label: copy.queueReady,
+            value: viewData.summary.unscheduledCount,
+            tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined,
+          },
+          {
+            label: copy.needsAttention,
+            value: viewData.summary.riskCount,
+            tone: viewData.summary.riskCount > 0 ? "critical" : undefined,
+          },
+          {
+            label: copy.aiProposalsMetric,
+            value: viewData.summary.proposalCount,
+            tone: viewData.summary.proposalCount > 0 ? "info" : undefined,
+          },
         ]}
       />
 
       {errorMessage ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
       ) : null}
 
       <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_360px] xl:items-start">
           <div className="space-y-4">
-            <TodayFocusCard items={todayFocusItems} emptyMessage={copy.todayFocusEmpty} copy={copy} />
+            <TodayFocusCard
+              items={todayFocusItems}
+              emptyMessage={copy.todayFocusEmpty}
+              copy={copy}
+            />
 
             <SurfaceCard variant="highlight">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2304,7 +2909,9 @@ export function SchedulePage({
                   <SurfaceCardTitle>{copy.scheduledTimeline}</SurfaceCardTitle>
                 </SurfaceCardHeader>
                 <div className="flex flex-wrap items-center gap-2">
-                  {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
+                  {draggedItem ? (
+                    <StatusBadge tone="info">{copy.dropMode}</StatusBadge>
+                  ) : null}
                   <StatusBadge>{copy.planningSurface}</StatusBadge>
                 </div>
               </div>
@@ -2364,7 +2971,10 @@ export function SchedulePage({
                         runtimeAdapters={data.runtimeAdapters}
                         defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
                         isPending={isPending}
-                        isDragging={draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId}
+                        isDragging={
+                          draggedTask?.kind === "queue" &&
+                          draggedTask.taskId === item.taskId
+                        }
                         isExpanded={expandedQueueTaskIds.includes(item.taskId)}
                         onToggle={() => toggleQueueCard(item.taskId)}
                         onMutatedAction={refreshProjection}
@@ -2383,7 +2993,9 @@ export function SchedulePage({
                   viewData.risks.length === 0 ? (
                     <EmptyState>{copy.noScheduleRisks}</EmptyState>
                   ) : (
-                    viewData.risks.slice(0, 2).map((item) => <RiskCard key={item.taskId} item={item} />)
+                    viewData.risks
+                      .slice(0, 2)
+                      .map((item) => <RiskCard key={item.taskId} item={item} />)
                   ),
               },
               {
@@ -2394,15 +3006,17 @@ export function SchedulePage({
                   viewData.proposals.length === 0 ? (
                     <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
                   ) : (
-                    viewData.proposals.slice(0, 2).map((proposal) => (
-                      <ProposalCard
-                        key={proposal.proposalId}
-                        proposal={proposal}
-                        isPending={isPending}
-                        onAccept={handleAcceptProposal}
-                        onReject={handleRejectProposal}
-                      />
-                    ))
+                    viewData.proposals
+                      .slice(0, 2)
+                      .map((proposal) => (
+                        <ProposalCard
+                          key={proposal.proposalId}
+                          proposal={proposal}
+                          isPending={isPending}
+                          onAccept={handleAcceptProposal}
+                          onReject={handleRejectProposal}
+                        />
+                      ))
                   ),
               },
             ]}
