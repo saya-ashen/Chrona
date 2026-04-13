@@ -724,11 +724,12 @@ describe("SchedulePage", () => {
     expect(screen.getByRole("link", { name: "时间轴" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "列表" })).toBeInTheDocument();
     expect(within(planningHeader).getByText("4月16日周四")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Today Focus" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "今日重点" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "待安排队列" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "冲突 / 逾期风险" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "AI 建议" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Timeline" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "List" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Today Focus" })).not.toBeInTheDocument();
   });
 });

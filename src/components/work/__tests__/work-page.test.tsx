@@ -1219,9 +1219,54 @@ describe("WorkPageClient", () => {
     });
 
     const submission = actionMocks.createFollowUpTask.mock.calls[0]?.[0];
-    expect(submission.title).toBe("Close rollout checklist - follow-up");
+    expect(submission.title).toBe("Close rollout checklist - 后续任务");
     expect(submission.dueAt).toBeInstanceOf(Date);
     expect(submission.dueAt?.toISOString()).toBe("2026-04-23T12:00:00.000Z");
+  });
+
+  it("removes non-user-facing workstream copy and localizes the remaining fallback chrome", () => {
+    i18nMocks.useI18n.mockReturnValue({
+      messages: {
+        components: {
+          workPage: {
+            executionWorkstreamDescription: "把工作流轨迹放在工作区下方，让执行记录和对话区分清楚，但仍然紧密衔接。",
+            conversationEvidenceDescription: "当里程碑摘要不够时，再展开查看完整对话。",
+          },
+        },
+      },
+    });
+
+    render(
+      <WorkPageClient
+        initialData={buildInitialData({
+          currentRun: { id: "run_approval_fallback", status: "WaitingForApproval", pendingInputPrompt: null },
+          currentIntervention: {
+            kind: "approval",
+            title: "处理审批",
+            description: "确认后才能继续执行。",
+            whyNow: "当前卡在审批上。",
+            actionLabel: "处理审批",
+            evidence: [],
+            approvals: [{ id: "approval_1", title: "允许修改文件", status: "Pending" }],
+          },
+          conversation: [
+            {
+              id: "msg_1",
+              role: "assistant",
+              content: "I am ready to continue.",
+              runtimeTs: "2026-04-16T10:13:00.000Z",
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText("把工作流轨迹放在工作区下方，让执行记录和对话区分清楚，但仍然紧密衔接。")).not.toBeInTheDocument();
+    expect(screen.queryByText("当里程碑摘要不够时，再展开查看完整对话。")).not.toBeInTheDocument();
+    expect(screen.queryByText("Review the approval request before resuming the run.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.getAllByText("智能体").length).toBeGreaterThan(0);
+    expect(screen.getByText("继续运行前，请先查看这条审批。")).toBeInTheDocument();
   });
 
   it("rejects whitespace-only follow-up titles in the latest-result panel", async () => {
