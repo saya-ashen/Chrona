@@ -41,9 +41,13 @@ export function useWorkPageController(
   initialData: WorkPageData,
   copy: WorkbenchCopy,
 ) {
+  const normalizedInitialData = {
+    ...initialData,
+    composerValue: initialData.composerValue ?? "",
+  };
   const router = useRouter();
 
-  const [data, setData] = useState<WorkPageData>(initialData);
+  const [data, setData] = useState<WorkPageData>(normalizedInitialData);
   const [heroErrorMessage, setHeroErrorMessage] = useState<string | null>(null);
   const [resultErrorMessage, setResultErrorMessage] = useState<string | null>(
     null,
@@ -52,6 +56,11 @@ export function useWorkPageController(
   const [composerResetKey, setComposerResetKey] = useState(0);
 
   const refreshEpochRef = useRef(0);
+  const composerValueRef = useRef(normalizedInitialData.composerValue);
+
+  useEffect(() => {
+    composerValueRef.current = data.composerValue ?? "";
+  }, [data.composerValue]);
 
   const refresh = useCallback(
     async ({
@@ -76,7 +85,12 @@ export function useWorkPageController(
           return true;
         }
 
-        startTransition(() => setData(next));
+        startTransition(() =>
+          setData((current) => ({
+            ...next,
+            composerValue: composerValueRef.current,
+          })),
+        );
         return true;
       } catch (error) {
         if (silent) {
@@ -139,6 +153,8 @@ export function useWorkPageController(
   }, [data.currentRun, isPending, refresh]);
 
   const resetComposer = useCallback(() => {
+    composerValueRef.current = "";
+    setData((current) => ({ ...current, composerValue: "" }));
     setComposerResetKey((value) => value + 1);
   }, []);
 

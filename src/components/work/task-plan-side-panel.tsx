@@ -3,11 +3,13 @@
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
+import type { WorkbenchCopy } from "./work-page/work-page-types";
 
 type TaskPlanSidePanelProps = {
+  copy: WorkbenchCopy;
   plan: {
     state: "empty" | "ready";
-    revision: "generated" | "updated" | null;
+    revision: string | null;
     generatedBy: string | null;
     isMock: boolean;
     summary: string | null;
@@ -32,38 +34,46 @@ type TaskPlanSidePanelProps = {
   currentException?: string | null;
 };
 
-function formatDateTime(value: string | null | undefined) {
-  return value ? value.slice(0, 16).replace("T", " ") : "暂无";
+function formatDateTime(value: string | null | undefined, fallback: string) {
+  return value ? value.slice(0, 16).replace("T", " ") : fallback;
 }
 
-function getStepStatusMeta(status: TaskPlanSidePanelProps["plan"]["steps"][number]["status"]) {
+function getStepStatusMeta(
+  status: TaskPlanSidePanelProps["plan"]["steps"][number]["status"],
+  copy: WorkbenchCopy,
+) {
   switch (status) {
     case "in_progress":
-      return { label: "进行中", tone: "info" as const };
+      return { label: copy.inProgressStep, tone: "info" as const };
     case "waiting_for_user":
-      return { label: "等待你确认", tone: "warning" as const };
+      return { label: copy.waitingForUserStep, tone: "warning" as const };
     case "done":
-      return { label: "已完成", tone: "success" as const };
+      return { label: copy.doneStep, tone: "success" as const };
     case "blocked":
-      return { label: "阻塞", tone: "critical" as const };
+      return { label: copy.blockedStep, tone: "critical" as const };
     default:
-      return { label: "待开始", tone: "neutral" as const };
+      return { label: copy.pendingStep, tone: "neutral" as const };
   }
 }
 
-function getPlanSummary(plan: TaskPlanSidePanelProps["plan"]) {
-  if (plan.isMock) {
-    return `当前为占位计划 · ${plan.steps.length} 步`;
+function getRevisionLabel(revision: string | null) {
+  if (!revision) {
+    return null;
   }
 
-  if (plan.revision === "updated") {
-    return `已根据当前上下文更新 · ${plan.steps.length} 步`;
+  if (revision === "updated") {
+    return "最近更新";
   }
 
-  return `已生成任务计划 · ${plan.steps.length} 步`;
+  if (revision === "generated") {
+    return "初次生成";
+  }
+
+  return revision;
 }
 
 export function TaskPlanSidePanel({
+  copy,
   plan,
   isPending = false,
   onGenerate,
@@ -73,61 +83,61 @@ export function TaskPlanSidePanel({
   const currentStep = plan.steps.find((step) => step.id === plan.currentStepId) ?? null;
 
   return (
-    <aside className="space-y-3">
-      <div className="rounded-[28px] border bg-card p-4 shadow-sm">
+    <div className="space-y-2 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+      <div className="rounded-[24px] border border-border/80 bg-card p-4 shadow-[0_16px_36px_rgba(15,23,42,0.07)] xl:flex xl:h-full xl:min-h-0 xl:flex-col">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-base font-semibold text-foreground">任务计划</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {plan.state === "ready" ? getPlanSummary(plan) : "生成后会在右侧固定展示当前步骤与恢复入口。"}
+            <p className="text-sm font-semibold text-foreground">{copy.taskPlan}</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {plan.state === "ready" ? copy.planReadySummary : copy.planEmptySummary}
             </p>
           </div>
           {plan.state === "ready" ? (
             <div className="flex flex-wrap gap-2">
-              {plan.revision ? <StatusBadge tone="info">{plan.revision === "updated" ? "最近更新" : "初次生成"}</StatusBadge> : null}
+              {plan.revision ? <StatusBadge tone="info">{getRevisionLabel(plan.revision)}</StatusBadge> : null}
               {plan.isMock ? <StatusBadge tone="warning">占位计划</StatusBadge> : null}
             </div>
           ) : null}
         </div>
 
         {plan.state === "empty" ? (
-          <div className="mt-4 rounded-3xl border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">还没有任务计划</p>
-            <p className="mt-2">生成后会先给出一版占位推进计划，并按当前运行状态同步当前步骤。</p>
+          <div className="mt-4 rounded-[22px] border border-dashed border-border/70 bg-muted/[0.22] p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">{copy.noTaskPlan}</p>
+            <p className="mt-2">{copy.planEmptySummary}</p>
             <button
               type="button"
               disabled={isPending}
               onClick={onGenerate}
               className={cn(buttonVariants({ variant: "default", size: "sm" }), "mt-4 disabled:opacity-60")}
             >
-              生成占位计划
+              {copy.generatePlaceholderPlan}
             </button>
           </div>
         ) : (
-          <div className="mt-4 space-y-4 text-sm">
-            <div className="rounded-3xl border bg-background/80 p-4">
+          <div className="mt-4 space-y-3 text-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+            <div className="rounded-[20px] border border-border/70 bg-muted/[0.24] p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone="info">计划整体状态</StatusBadge>
                 {plan.generatedBy ? <span className="text-xs text-muted-foreground">来源：{plan.generatedBy}</span> : null}
               </div>
               {plan.summary ? <p className="mt-3 text-muted-foreground">{plan.summary}</p> : null}
               {plan.changeSummary ? <p className="mt-3 text-xs text-muted-foreground">{plan.changeSummary}</p> : null}
-              <p className="mt-3 text-xs text-muted-foreground">更新时间：{formatDateTime(plan.updatedAt)}</p>
+              <p className="mt-3 text-xs text-muted-foreground">{copy.lastUpdatedLabel}：{formatDateTime(plan.updatedAt, copy.noValue)}</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
               {currentStep ? (() => {
-                const statusMeta = getStepStatusMeta(currentStep.status);
+                const statusMeta = getStepStatusMeta(currentStep.status, copy);
 
                 return (
-                  <div className="rounded-3xl border border-primary/30 bg-primary/[0.06] p-4 shadow-sm">
+                  <div className="rounded-[20px] border border-primary/25 bg-primary/[0.07] p-4 shadow-[0_10px_24px_rgba(59,130,246,0.1)]">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-background text-xs font-semibold text-foreground">
+                      <div className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-background text-xs font-semibold text-foreground">
                         {plan.steps.findIndex((step) => step.id === currentStep.id) + 1}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge tone="info">当前步骤</StatusBadge>
+                          <StatusBadge tone="info">{copy.currentStep}</StatusBadge>
                           <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
                           <span className="text-xs text-muted-foreground">{currentStep.phase}</span>
                         </div>
@@ -146,7 +156,7 @@ export function TaskPlanSidePanel({
                             onClick={onGenerate}
                             className={cn(buttonVariants({ variant: "outline", size: "sm" }), "disabled:opacity-60")}
                           >
-                            重新规划后继续
+                            {copy.resumeFromPlan}
                           </button>
                         </div>
                       </div>
@@ -156,7 +166,7 @@ export function TaskPlanSidePanel({
               })() : null}
 
               {plan.steps.map((step, index) => {
-                const statusMeta = getStepStatusMeta(step.status);
+                const statusMeta = getStepStatusMeta(step.status, copy);
 
                 if (step.id === currentStep?.id) {
                   return null;
@@ -165,9 +175,7 @@ export function TaskPlanSidePanel({
                 return (
                   <div
                     key={step.id}
-                    className={cn(
-                      "rounded-3xl border border-border/60 bg-background/70 p-4",
-                    )}
+                    className={cn("rounded-[20px] border border-border/70 bg-muted/[0.24] p-4")}
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold text-muted-foreground">
@@ -193,12 +201,12 @@ export function TaskPlanSidePanel({
                 onClick={onGenerate}
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full disabled:opacity-60")}
               >
-                重新生成占位计划
+                {copy.generatePlaceholderPlan}
               </button>
             ) : null}
           </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
