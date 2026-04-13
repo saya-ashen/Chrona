@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
@@ -38,21 +38,58 @@ export function WorkConversationWorkbench({
   labels,
 }: WorkConversationWorkbenchProps) {
   const [activeTabId, setActiveTabId] = useState(defaultTabId ?? tabs[0]?.id ?? "conversation");
+  const [desktopWorkbenchHeight, setDesktopWorkbenchHeight] = useState<number | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null;
   const isConversationTab = activeTab?.id === "conversation";
 
+  useEffect(() => {
+    const updateDesktopWorkbenchHeight = () => {
+      if (typeof window === "undefined" || window.innerWidth < 1280) {
+        setDesktopWorkbenchHeight(null);
+        return;
+      }
+
+      const shell = shellRef.current;
+      if (!shell) {
+        return;
+      }
+
+      const viewportBottomGap = 16;
+      const nextHeight = Math.max(window.innerHeight - shell.getBoundingClientRect().top - viewportBottomGap, 480);
+      setDesktopWorkbenchHeight(nextHeight);
+    };
+
+    updateDesktopWorkbenchHeight();
+    window.addEventListener("resize", updateDesktopWorkbenchHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateDesktopWorkbenchHeight);
+    };
+  }, []);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 xl:h-full">
+    <div
+      ref={shellRef}
+      data-slot="workbench-shell"
+      className="flex min-h-0 flex-1 flex-col gap-4 xl:h-full xl:flex-none"
+      style={
+        desktopWorkbenchHeight
+          ? {
+              height: `${desktopWorkbenchHeight}px`,
+              flex: `0 0 ${desktopWorkbenchHeight}px`,
+            }
+          : undefined
+      }
+    >
       {header ?? null}
 
-      <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1.72fr)_320px] xl:items-start 2xl:grid-cols-[minmax(0,1.86fr)_336px]">
+      <div className="grid gap-4 xl:min-h-0 xl:h-full xl:flex-1 xl:grid-cols-[minmax(0,1.72fr)_320px] 2xl:grid-cols-[minmax(0,1.86fr)_336px]">
         <section
           aria-label={labels.workbenchAria}
           className={cn(
-            "overflow-hidden rounded-[26px] border border-border/80 bg-card shadow-[0_18px_44px_rgba(15,23,42,0.08)]",
-            isConversationTab
-              ? "flex flex-col self-start"
-              : "grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] xl:h-full",
+            "overflow-hidden rounded-[26px] border border-border/80 bg-card shadow-[0_18px_44px_rgba(15,23,42,0.08)] grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] xl:h-full xl:min-h-0",
+            isConversationTab ? "" : "",
           )}
         >
           <div
@@ -123,10 +160,8 @@ export function WorkConversationWorkbench({
           <div
             data-slot="workbench-thread"
             className={cn(
-              "bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,1))]",
-              isConversationTab
-                ? "px-4 py-3 sm:px-5"
-                : "min-h-0 overflow-y-auto px-5 py-4 sm:px-6",
+              "min-h-0 overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,1))]",
+              isConversationTab ? "px-4 py-3 sm:px-5" : "px-5 py-4 sm:px-6",
             )}
           >
             {activeTab ? (
@@ -144,10 +179,8 @@ export function WorkConversationWorkbench({
           <div
             data-slot="workbench-composer-dock"
             className={cn(
-              "border-t border-border/70 bg-muted/[0.18] shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur",
-              isConversationTab
-                ? "px-4 py-2 sm:px-5"
-                : "sticky bottom-0 px-5 py-3 sm:px-6",
+              "sticky bottom-0 border-t border-border/70 bg-muted/[0.18] shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur",
+              isConversationTab ? "px-4 py-2 sm:px-5" : "px-5 py-3 sm:px-6",
             )}
           >
             {composer}
@@ -156,7 +189,7 @@ export function WorkConversationWorkbench({
 
         <aside
           aria-label={labels.planRailAria}
-          className="space-y-3 xl:h-full xl:min-h-0 xl:overflow-hidden"
+          className="space-y-3 xl:min-h-0 xl:self-start xl:overflow-visible xl:pb-3"
         >
           {planRail}
         </aside>

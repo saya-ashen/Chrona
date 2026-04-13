@@ -1,13 +1,20 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { textareaClassName } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
-import type { WorkbenchComposer, WorkbenchCopy } from "./work-page-types";
+import type {
+  WorkbenchComposer,
+  WorkbenchCopy,
+  WorkPageData,
+} from "./work-page-types";
 
 type WorkbenchComposerCardProps = {
   composer: WorkbenchComposer | null;
+  currentIntervention?: WorkPageData["currentIntervention"] | null;
+  currentStepTitle?: string | null;
   composerValue: string;
   onComposerChange: (value: string) => void;
   onSubmit: (value: string) => Promise<boolean | void> | boolean | void;
@@ -40,8 +47,111 @@ function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
   return true;
 }
 
+function renderActionWorkspace(
+  currentIntervention: WorkPageData["currentIntervention"],
+  currentStepTitle: string | null,
+) {
+  if (!currentIntervention) {
+    return null;
+  }
+
+  const evidence = currentIntervention.evidence ?? [];
+
+  const shell = (title: string, body: ReactNode) => (
+    <div className="rounded-[18px] border border-border/70 bg-background/75 px-3.5 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge tone="info">当前动作</StatusBadge>
+        {currentStepTitle ? <StatusBadge tone="warning">{currentStepTitle}</StatusBadge> : null}
+      </div>
+      <p className="mt-2 text-sm font-medium text-foreground">{currentIntervention.actionLabel}</p>
+      <div className="mt-3 space-y-3">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <div className="mt-2">{body}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  switch (currentIntervention.kind) {
+    case "input":
+      return shell(
+        "这次需要补充",
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>{currentIntervention.description}</p>
+          {evidence.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {evidence.map((item) => (
+                <div
+                  key={`${item.label}-${item.value}`}
+                  className="rounded-full border border-border/70 bg-muted/[0.24] px-3 py-1.5 text-xs text-foreground"
+                >
+                  <span className="font-medium">{item.label}：</span>
+                  <span>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>,
+      );
+    case "approval":
+      return shell(
+        "审批焦点",
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>{currentIntervention.description}</p>
+          {(currentIntervention.approvals?.length ?? 0) > 0 ? (
+            <div className="space-y-2">
+              {currentIntervention.approvals?.map((approval) => (
+                <div
+                  key={approval.id}
+                  className="rounded-2xl border border-border/70 bg-muted/[0.24] px-3 py-2"
+                >
+                  <p className="font-medium text-foreground">{approval.title}</p>
+                  {approval.summary ? <p className="mt-1 text-sm text-muted-foreground">{approval.summary}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>{currentIntervention.whyNow}</p>
+          )}
+        </div>,
+      );
+    case "retry":
+      return shell(
+        "恢复建议",
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>{currentIntervention.whyNow}</p>
+          {evidence.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5">
+              {evidence.map((item) => (
+                <li key={`${item.label}-${item.value}`}>{item.label}：{item.value}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>,
+      );
+    case "review":
+      return shell(
+        "确认这轮产出",
+        <p className="text-sm text-muted-foreground">{currentIntervention.whyNow}</p>,
+      );
+    case "observe":
+      return shell(
+        "当前协作方式",
+        <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
+      );
+    default:
+      return shell(
+        "当前动作说明",
+        <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
+      );
+  }
+}
+
 export function WorkbenchComposerCard({
   composer,
+  currentIntervention = null,
+  currentStepTitle = null,
   composerValue,
   onComposerChange,
   onSubmit,
@@ -82,6 +192,8 @@ export function WorkbenchComposerCard({
         <span>{composer.statusHint}</span>
         <span>{copy.keyboardHint}</span>
       </div>
+
+      {renderActionWorkspace(currentIntervention, currentStepTitle)}
 
       {errorMessage ? (
         <p

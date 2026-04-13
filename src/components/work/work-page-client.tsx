@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 
 import { ConversationFeed } from "./work-page/conversation-feed";
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page/work-page-copy";
-import { HeroApprovals } from "./work-page/hero-approvals";
 import { LatestResultClosure } from "./work-page/latest-result-closure";
 import { useWorkPageController } from "./work-page/use-work-page-controller";
 import { WorkConversationWorkbench } from "./work-page/work-conversation-workbench";
@@ -106,8 +105,11 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     copy,
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan);
+  const currentPlanStep = data.taskPlan.steps.find(
+    (step) => step.id === data.taskPlan.currentStepId,
+  ) ?? null;
   const quickPrompts = workbenchComposer
-    ? getQuickPrompts(workbenchComposer, currentRun)
+    ? getQuickPrompts(workbenchComposer, currentRun, data.currentIntervention)
     : [];
   const collaborationFeed = buildConversationFeed(data, copy);
   const passiveHeroGuidance = getPassiveHeroGuidance(
@@ -135,15 +137,10 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     eyebrow: copy.conversation,
     title: copy.conversationEvidence,
     content: (
-      <section className="space-y-4">
-        <p className="text-sm leading-6 text-muted-foreground">
-          {copy.conversationEvidenceDescription}
-        </p>
-        <ConversationFeed
-          items={collaborationFeed}
-          emptyText={copy.fallbackNoOperatorInput}
-        />
-      </section>
+      <ConversationFeed
+        items={collaborationFeed}
+        emptyText={copy.fallbackNoOperatorInput}
+      />
     ),
   };
 
@@ -235,6 +232,8 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
       composer={
         <WorkbenchComposerCard
           composer={workbenchComposer}
+          currentIntervention={data.currentIntervention}
+          currentStepTitle={currentPlanStep?.title ?? null}
           composerValue={composerValue}
           onComposerChange={setComposerValue}
           onSubmit={submitWorkbenchInput}

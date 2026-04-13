@@ -20,6 +20,7 @@ export function ConversationFeed({ items, emptyText }: ConversationFeedProps) {
   return (
     <div className="space-y-4">
       {items.map((item) => {
+        const isMessage = item.kind === "user" || item.kind === "agent";
         const alignClass = item.kind === "user" ? "ml-auto" : "mr-auto";
         const toneClass =
           item.kind === "user"
@@ -47,8 +48,10 @@ export function ConversationFeed({ items, emptyText }: ConversationFeedProps) {
                 ) : null}
               </div>
 
-              <p className="mt-2 text-sm font-medium text-foreground/95">{item.title}</p>
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/80">
+              {!isMessage && item.title ? (
+                <p className="mt-2 text-sm font-medium text-foreground/95">{item.title}</p>
+              ) : null}
+              <div className={cn("whitespace-pre-wrap text-sm leading-6 text-foreground/80", isMessage ? "mt-2" : "mt-2")}>
                 {item.body}
               </div>
             </div>
