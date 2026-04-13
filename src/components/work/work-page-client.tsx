@@ -1,30 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { useEffect, useState } from "react";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { LatestResultPanel } from "@/components/work/latest-result-panel";
-import { NextActionHero } from "@/components/work/next-action-hero";
-import { TaskShell } from "@/components/work/task-shell";
-import { WorkInspector } from "@/components/work/work-inspector";
+import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
 import { useI18n } from "@/i18n/client";
+import { cn } from "@/lib/utils";
 
 import { ConversationFeed } from "./work-page/conversation-feed";
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page/work-page-copy";
 import { HeroApprovals } from "./work-page/hero-approvals";
 import { LatestResultClosure } from "./work-page/latest-result-closure";
 import { useWorkPageController } from "./work-page/use-work-page-controller";
+import { WorkConversationWorkbench } from "./work-page/work-conversation-workbench";
 import { WorkbenchComposerCard } from "./work-page/workbench-composer-card";
 import {
-  formatDate,
-  getApprovalStatusLabel,
-  getArtifactTypeLabel,
   getRunStatusLabel,
   getScheduleStatusLabel,
-  getSyncStatusLabel,
-  getToolCallStatusLabel,
-  isInternalAppHref,
-  isSafeExternalHref,
+  parseDateInputForSubmission,
 } from "./work-page/work-page-formatters";
 import {
   buildConversationFeed,
@@ -32,12 +25,56 @@ import {
   getCurrentPlanAction,
   getPassiveHeroGuidance,
   getQuickPrompts,
-  getScheduleSourceSummary,
   getTaskStatusMeta,
   getTaskSummary,
   getWorkbenchComposer,
 } from "./work-page/work-page-selectors";
-import type { WorkPageClientProps } from "./work-page/work-page-types";
+import type {
+  WorkConversationSection,
+  WorkPageClientProps,
+} from "./work-page/work-page-types";
+
+function renderWorkbenchSections(sections: WorkConversationSection[]) {
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      {sections.map((section) =>
+        section.tone === "accent" ? (
+          <article
+            key={section.id}
+            className="overflow-hidden rounded-[24px] border border-slate-900/75 bg-[linear-gradient(180deg,rgba(15,23,42,0.97),rgba(15,23,42,0.93))] text-primary-foreground shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
+          >
+            <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-primary-foreground/[0.62]">
+                {section.eyebrow}
+              </p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight">{section.title}</h3>
+            </div>
+
+            <div className="px-5 py-5 sm:px-6">{section.content}</div>
+          </article>
+        ) : (
+          <article
+            key={section.id}
+            className={cn(
+              "border-t border-border/50 pt-6 first:border-t-0 first:pt-0",
+            )}
+          >
+            <div className="mb-3 space-y-1.5">
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/[0.85]">
+                {section.eyebrow}
+              </p>
+              <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                {section.title}
+              </h3>
+            </div>
+
+            <div>{section.content}</div>
+          </article>
+        ),
+      )}
+    </div>
+  );
+}
 
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const { messages } = useI18n();
@@ -53,6 +90,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     heroErrorMessage,
     resultErrorMessage,
     composerResetKey,
+    submitWorkbenchInput,
     actions,
   } = useWorkPageController(initialData, copy);
 
@@ -60,7 +98,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const taskStatusMeta = getTaskStatusMeta(data, copy);
   const currentException = getCurrentException(data);
   const taskSummary = getTaskSummary(data, copy);
-  const sourceSummary = getScheduleSourceSummary(data.taskShell, copy);
   const workbenchComposer = getWorkbenchComposer(
     currentRun,
     data.currentIntervention,
@@ -79,33 +116,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     copy,
   );
 
-  const inspectorApprovals = useMemo(
-    () =>
-      data.inspector.approvals.map((approval) => ({
-        ...approval,
-        status: getApprovalStatusLabel(approval.status),
-      })),
-    [data.inspector.approvals],
-  );
-
-  const inspectorArtifacts = useMemo(
-    () =>
-      data.inspector.artifacts.map((artifact) => ({
-        ...artifact,
-        type: getArtifactTypeLabel(artifact.type),
-      })),
-    [data.inspector.artifacts],
-  );
-
-  const inspectorToolCalls = useMemo(
-    () =>
-      data.inspector.toolCalls.map((tool) => ({
-        ...tool,
-        status: getToolCallStatusLabel(tool.status),
-      })),
-    [data.inspector.toolCalls],
-  );
-
   const [composerValue, setComposerValue] = useState(
     workbenchComposer?.defaultValue ?? "",
   );
@@ -118,311 +128,143 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     currentRun?.id,
   ]);
 
-  const blockerSummary =
-    data.taskShell.blockReason?.actionRequired ??
-    data.reliability.stopReason ??
-    currentException ??
-    "当前没有明确阻塞，任务可以继续推进。";
-
   const runLabel = getRunStatusLabel(currentRun?.status);
   const scheduleLabel = getScheduleStatusLabel(data.scheduleImpact.status);
-  const heroTitle = data.currentIntervention?.title ?? copy.nextAction;
-  const heroDescription =
-    data.currentIntervention?.description ??
-    workbenchComposer?.description ??
-    passiveHeroGuidance.description;
-  const heroWhyNow = data.currentIntervention?.whyNow ?? taskSummary;
-  const heroActionLabel =
-    data.currentIntervention?.actionLabel ?? copy.nextAction;
-  const heroEvidence = data.currentIntervention?.evidence ?? [];
-  const heroModeLabel = currentRun
-    ? getRunStatusLabel(currentRun.status)
-    : copy.noActiveRunYet;
+  const conversationSection: WorkConversationSection = {
+    id: "conversation",
+    eyebrow: copy.conversation,
+    title: copy.conversationEvidence,
+    content: (
+      <section className="space-y-4">
+        <p className="text-sm leading-6 text-muted-foreground">
+          {copy.conversationEvidenceDescription}
+        </p>
+        <ConversationFeed
+          items={collaborationFeed}
+          emptyText={copy.fallbackNoOperatorInput}
+        />
+      </section>
+    ),
+  };
 
-  const latestResultActions =
-    data.closure.canAcceptResult ||
-    data.closure.canRetry ||
-    data.latestOutput.href ? (
-      <>
-        {data.closure.canAcceptResult ? (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => void actions.acceptResult()}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {copy.acceptResult}
-          </button>
-        ) : null}
-
-        {data.closure.canRetry ? (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => void actions.retryResult()}
-            className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-60"
-          >
-            {copy.retryRun}
-          </button>
-        ) : null}
-
-        {data.latestOutput.href && isInternalAppHref(data.latestOutput.href) ? (
-          <LocalizedLink
-            href={data.latestOutput.href}
-            className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium"
-          >
-            {copy.openArtifact}
-          </LocalizedLink>
-        ) : null}
-
-        {data.latestOutput.href &&
-        !isInternalAppHref(data.latestOutput.href) &&
-        isSafeExternalHref(data.latestOutput.href) ? (
-          <a
-            href={data.latestOutput.href}
-            className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium"
-          >
-            {copy.openArtifact}
-          </a>
-        ) : null}
-      </>
-    ) : null;
+  const fullFlowSections: WorkConversationSection[] = [
+    {
+      id: "latest-result",
+      eyebrow: copy.latestResultEyebrow,
+      title: copy.latestResult,
+      content: (
+        <LatestResultPanel
+          output={data.latestOutput}
+          updatedLabel={copy.updated}
+          emptyTitle={copy.resultEmptyTitle}
+          emptyDescription={copy.resultEmptyDescription}
+          previewTitle={copy.resultPreviewTitle}
+          previewItems={[
+            copy.resultPreviewUnderstanding,
+            copy.resultPreviewPlan,
+            copy.resultPreviewDraft,
+            copy.resultPreviewQuestions,
+          ]}
+          error={
+            resultErrorMessage ? (
+              <p
+                role="alert"
+                className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-700"
+              >
+                {resultErrorMessage}
+              </p>
+            ) : null
+          }
+          closure={
+            <LatestResultClosure
+              data={data}
+              copy={copy}
+              isPending={isPending}
+              onAcceptResult={actions.acceptResult}
+              onRetry={actions.retryResult}
+              onMarkTaskDone={actions.markTaskDone}
+              onReopenTask={actions.reopenTask}
+              onCreateFollowUp={actions.createFollowUpTask}
+            />
+          }
+          usedByNextAction={Boolean(
+            data.currentIntervention && data.currentIntervention.kind !== "observe",
+          )}
+          labels={{
+            ariaLabel: copy.latestResultAria,
+            eyebrow: copy.latestResultEyebrow,
+            usedByNextAction: copy.usedByNextAction,
+            actionsTitle: copy.resultActionsTitle,
+          }}
+        />
+      ),
+    },
+    {
+      id: "timeline",
+      eyebrow: copy.workstream,
+      title: copy.latestExecutionMilestones,
+      content: (
+        <section id="execution-stream" aria-label={copy.executionStreamAria}>
+          <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
+        </section>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <TaskShell
-        title={data.taskShell.title}
-        summary={taskSummary}
-        taskStatus={taskStatusMeta}
-        runLabel={runLabel}
-        scheduleLabel={scheduleLabel}
-        blockerSummary={blockerSummary}
-        sourceSummary={sourceSummary}
-        dueLabel={`${copy.duePrefix}: ${formatDate(data.taskShell.dueAt)}`}
-        taskId={data.taskShell.id}
-        workspaceId={data.taskShell.workspaceId}
-        statusMeta={currentException ? <span>{currentException}</span> : null}
-        labels={{
-          ariaLabel: copy.taskShellAria,
-          breadcrumbRoot: copy.scheduleCrumb,
-          breadcrumbCurrent: copy.workbenchCrumb,
-          taskList: copy.allTasks,
-          inbox: copy.openInbox,
-          memory: copy.openMemory,
-          openSchedule: copy.openSchedule,
-          viewTaskDetail: copy.viewTaskDetail,
-          currentBlocker: copy.currentBlocker,
-          plannedWindow: copy.plannedWindow,
-          deadline: copy.deadline,
-        }}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_320px] xl:items-start">
-        <div className="space-y-6">
-          <NextActionHero
-            title={heroTitle}
-            description={heroDescription}
-            whyNow={heroWhyNow}
-            actionLabel={heroActionLabel}
-            evidence={heroEvidence}
-            approvals={
-              <HeroApprovals
-                approvals={data.currentIntervention?.approvals ?? []}
-                isPending={isPending}
-                copy={copy}
-                onApprove={actions.approveApproval}
-                onReject={actions.rejectApproval}
-                onEditAndApprove={actions.editAndApproveApproval}
-              />
-            }
-            composer={
-              <WorkbenchComposerCard
-                composer={workbenchComposer}
-                composerValue={composerValue}
-                onComposerChange={setComposerValue}
-                onSubmit={actions.submitWorkbenchInput}
-                quickPrompts={quickPrompts}
-                errorMessage={heroErrorMessage}
-                isPending={isPending}
-                passiveDescription={passiveHeroGuidance.description}
-                passiveActions={passiveHeroGuidance.actions}
-                copy={copy}
-                composerResetKey={composerResetKey}
-                runId={currentRun?.id ?? null}
-              />
-            }
-            modeLabel={heroModeLabel}
-            labels={{
-              ariaLabel: copy.nextActionHeroAria,
-              badge: copy.nextActionBadge,
-              whyNow: copy.whyNow,
-              evidence: copy.evidence,
-            }}
-          />
-
-          <LatestResultPanel
-            output={data.latestOutput}
-            updatedLabel={copy.updated}
-            emptyTitle={copy.resultEmptyTitle}
-            emptyDescription={copy.resultEmptyDescription}
-            previewTitle={copy.resultPreviewTitle}
-            previewItems={[
-              copy.resultPreviewUnderstanding,
-              copy.resultPreviewPlan,
-              copy.resultPreviewDraft,
-              copy.resultPreviewQuestions,
-            ]}
-            error={
-              resultErrorMessage ? (
-                <p
-                  role="alert"
-                  className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-700"
-                >
-                  {resultErrorMessage}
-                </p>
-              ) : null
-            }
-            closure={
-              <LatestResultClosure
-                data={data}
-                copy={copy}
-                isPending={isPending}
-                onMarkTaskDone={actions.markTaskDone}
-                onReopenTask={actions.reopenTask}
-                onCreateFollowUp={actions.createFollowUp}
-              />
-            }
-            actions={latestResultActions}
-            usedByNextAction={Boolean(
-              data.currentIntervention &&
-                data.currentIntervention.kind !== "observe",
-            )}
-            labels={{
-              ariaLabel: copy.latestResultAria,
-              eyebrow: copy.latestResultEyebrow,
-              usedByNextAction: copy.usedByNextAction,
-              actionsTitle: copy.resultActionsTitle,
-            }}
-          />
-
-          <section
-            aria-label={copy.executionStreamAria}
-            id="execution-stream"
-            className="rounded-[30px] border bg-card p-5 shadow-sm sm:p-6"
-          >
-            <div className="border-b border-border/60 pb-4">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                {copy.workstream}
-              </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                {copy.executionWorkstream}
-              </h2>
-            </div>
-
-            <div className="mt-5 space-y-6">
-              <ExecutionTimeline
-                title={copy.latestExecutionMilestones}
-                events={data.workstreamItems}
-              />
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {copy.conversationEvidence}
-                  </h3>
-                </div>
-
-                <ConversationFeed
-                  items={collaborationFeed}
-                  emptyText={copy.fallbackNoOperatorInput}
-                />
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="xl:sticky xl:top-4 xl:self-start">
-          <WorkInspector
-            plan={data.taskPlan}
-            isPending={isPending}
-            onGenerate={actions.generateTaskPlan}
-            currentAction={currentPlanAction}
-            currentException={currentException}
-            approvals={inspectorApprovals}
-            artifacts={inspectorArtifacts}
-            toolCalls={inspectorToolCalls}
-            context={{
-              priority: data.taskShell.priority,
-              dueAt: data.taskShell.dueAt,
-              scheduledStartAt: data.taskShell.scheduledStartAt,
-              scheduledEndAt: data.taskShell.scheduledEndAt,
-              scheduleStatus: scheduleLabel,
-              scheduleSummary: data.scheduleImpact.summary,
-              runStatus: runLabel,
-              syncStatus: getSyncStatusLabel(data.reliability.syncStatus, copy),
-              isStale: data.reliability.isStale,
-              lastUpdatedAt:
-                data.reliability.lastUpdatedAt ??
-                data.reliability.lastSyncedAt ??
-                data.reliability.refreshedAt,
-              lastSyncedAt: data.reliability.lastSyncedAt,
-              stopReason: data.reliability.stopReason,
-              blockerSummary,
-            }}
-            labels={{
-              ariaLabel: copy.workInspectorAria,
-              sections: {
-                plan: copy.taskPlan,
-                approvals: copy.pendingApprovals,
-                artifacts: copy.currentArtifacts,
-                tools: copy.toolLog,
-                context: copy.taskContext,
-              },
-              emptyValue: copy.noValue,
-              emptyScheduleWindow: copy.noScheduleWindow,
-              stepStatuses: {
-                pending: { label: copy.pendingStep, tone: "neutral" },
-                in_progress: { label: copy.inProgressStep, tone: "info" },
-                waiting_for_user: {
-                  label: copy.waitingForUserStep,
-                  tone: "warning",
-                },
-                done: { label: copy.doneStep, tone: "success" },
-                blocked: { label: copy.blockedStep, tone: "critical" },
-              },
-              planTitle: copy.taskPlan,
-              planReadySummary: copy.planReadySummary,
-              planEmptySummary: copy.planEmptySummary,
-              planEmptyTitle: copy.noTaskPlan,
-              generatePlan: copy.generatePlaceholderPlan,
-              currentStep: copy.currentStep,
-              currentBlocker: copy.currentBlocker,
-              resumePlan: copy.resumeFromPlan,
-              approvalsTitle: copy.pendingApprovals,
-              noApprovals: copy.noPendingApprovals,
-              artifactsTitle: copy.currentArtifacts,
-              noArtifacts: copy.noArtifacts,
-              toolsTitle: copy.toolLog,
-              noTools: copy.noToolLog,
-              toolArguments: copy.toolArguments,
-              toolResult: copy.toolResult,
-              toolError: copy.toolError,
-              contextTitle: copy.taskContext,
-              priority: copy.priorityLabel,
-              dueAt: copy.dueAtLabel,
-              scheduledWindow: copy.scheduledWindowLabel,
-              scheduleStatus: copy.scheduleStatusLabel,
-              runStatus: copy.runStatusLabel,
-              syncStatus: copy.syncStatusLabel,
-              staleSync: copy.staleSync,
-              healthySync: copy.healthySync,
-              lastUpdated: copy.lastUpdatedLabel,
-              lastSynced: copy.lastSyncedLabel,
-              stopReason: copy.stopReasonLabel,
-            }}
-          />
-        </div>
-      </div>
-    </div>
+    <WorkConversationWorkbench
+      conversationHeader={{
+        eyebrow: copy.currentTask,
+        title: data.taskShell.title,
+        summary: taskSummary,
+        badges: [taskStatusMeta.label, runLabel, scheduleLabel],
+      }}
+      tabs={[
+        {
+          id: "conversation",
+          label: copy.conversationTab,
+          content: <div className="mx-auto max-w-4xl">{conversationSection.content}</div>,
+        },
+        {
+          id: "full-flow",
+          label: copy.fullFlowTab,
+          content: renderWorkbenchSections(fullFlowSections),
+        },
+      ]}
+      defaultTabId="conversation"
+      composer={
+        <WorkbenchComposerCard
+          composer={workbenchComposer}
+          composerValue={composerValue}
+          onComposerChange={setComposerValue}
+          onSubmit={submitWorkbenchInput}
+          quickPrompts={quickPrompts}
+          errorMessage={heroErrorMessage}
+          isPending={isPending}
+          passiveDescription={passiveHeroGuidance.description}
+          passiveActions={passiveHeroGuidance.actions}
+          copy={copy}
+          composerResetKey={composerResetKey}
+          runId={currentRun?.id ?? null}
+        />
+      }
+      planRail={
+        <TaskPlanSidePanel
+          plan={data.taskPlan}
+          copy={copy}
+          isPending={isPending}
+          onGenerate={actions.generateTaskPlan}
+          currentAction={currentPlanAction}
+          currentException={currentException}
+        />
+      }
+      labels={{
+        workbenchAria: copy.conversationWorkbenchAria,
+        planRailAria: copy.planRailAria,
+        tabsAria: copy.workbenchViewTabs,
+      }}
+    />
   );
 }
+
+export { parseDateInputForSubmission };

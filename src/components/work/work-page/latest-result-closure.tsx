@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
+
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { inputClassName } from "@/components/ui/field";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { cn } from "@/lib/utils";
 
-import type { WorkPageData } from "./work-page-types";
+import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
 import {
   formatDateTime,
@@ -19,22 +21,22 @@ import {
 
 type LatestResultClosureProps = {
   data: WorkPageData;
-  copy?: typeof DEFAULT_WORK_PAGE_COPY;
+  copy?: WorkbenchCopy;
   isPending: boolean;
   errorMessage?: string | null;
-  onAcceptResult: () => Promise<void>;
-  onRetry: () => Promise<void>;
-  onMarkTaskDone: () => Promise<void>;
-  onReopenTask: () => Promise<void>;
+  onAcceptResult: () => Promise<boolean | void>;
+  onRetry: () => Promise<boolean | void>;
+  onMarkTaskDone: () => Promise<boolean | void>;
+  onReopenTask: () => Promise<boolean | void>;
   onCreateFollowUp: (input: {
     title: string;
-    dueAt: Date | null;
-  }) => Promise<void>;
+    dueAtValue?: string | null;
+  }) => Promise<boolean | void>;
 };
 
 function getFollowUpDefaultTitle(
   taskTitle: string,
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   return `${taskTitle} - ${copy.followUpDefaultSuffix}`;
 }
@@ -50,6 +52,11 @@ export function LatestResultClosure({
   onReopenTask,
   onCreateFollowUp,
 }: LatestResultClosureProps) {
+  const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
+  const [followUpTitle, setFollowUpTitle] = useState(() =>
+    getFollowUpDefaultTitle(data.taskShell.title, copy),
+  );
+  const [followUpDueAt, setFollowUpDueAt] = useState("");
   const hasClosureContent =
     data.closure.resultAccepted ||
     data.closure.isDone ||
@@ -63,35 +70,38 @@ export function LatestResultClosure({
     data.closure.canRetry ||
     Boolean(data.latestOutput.href);
 
-  async function handleCreateFollowUp(formData: FormData) {
-    const title = String(formData.get("title") ?? "").trim();
-    const dueAtValue = String(formData.get("dueAt") ?? "").trim();
+  async function handleCreateFollowUp() {
+    const title = followUpTitle.trim();
+    const dueAtValue = followUpDueAt.trim();
 
     if (!title) {
-      throw new Error(copy.invalidFollowUpTitle);
+      setLocalErrorMessage(copy.invalidFollowUpTitle);
+      return;
     }
-
-    let dueAt: Date | null = null;
 
     if (dueAtValue) {
       const parsedDueAt = parseDateInputForSubmission(dueAtValue);
       if (!parsedDueAt) {
-        throw new Error(copy.invalidFollowUpDate);
+        setLocalErrorMessage(copy.invalidFollowUpDate);
+        return;
       }
-      dueAt = parsedDueAt;
     }
 
-    await onCreateFollowUp({ title, dueAt });
+    setLocalErrorMessage(null);
+    await onCreateFollowUp({
+      title,
+      dueAtValue: dueAtValue || null,
+    });
   }
 
   return (
     <div className="space-y-5">
-      {errorMessage ? (
+      {errorMessage ?? localErrorMessage ? (
         <p
           role="alert"
           className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-700"
         >
-          {errorMessage}
+          {errorMessage ?? localErrorMessage}
         </p>
       ) : null}
 
@@ -161,14 +171,13 @@ export function LatestResultClosure({
             {data.closure.canMarkDone || data.closure.canReopen ? (
               <div className="space-y-3 rounded-[22px] border border-border/60 bg-background/70 p-4">
                 {data.closure.canMarkDone ? (
-                  <form
-                    action={async () => {
-                      await onMarkTaskDone();
-                    }}
-                  >
+                  <form>
                     <button
-                      type="submit"
+                      type="button"
                       disabled={isPending}
+                      onClick={() => {
+                        void onMarkTaskDone();
+                      }}
                       className={buttonVariants({
                         variant: "outline",
                         className: "disabled:opacity-60",
@@ -180,14 +189,13 @@ export function LatestResultClosure({
                 ) : null}
 
                 {data.closure.canReopen ? (
-                  <form
-                    action={async () => {
-                      await onReopenTask();
-                    }}
-                  >
+                  <form>
                     <button
-                      type="submit"
+                      type="button"
                       disabled={isPending}
+                      onClick={() => {
+                        void onReopenTask();
+                      }}
                       className={buttonVariants({
                         variant: "outline",
                         className: "disabled:opacity-60",
@@ -201,10 +209,7 @@ export function LatestResultClosure({
             ) : null}
 
             {data.closure.canCreateFollowUp ? (
-              <form
-                action={handleCreateFollowUp}
-                className="space-y-3 rounded-[22px] border border-border/60 bg-background/70 p-4"
-              >
+              <form className="space-y-3 rounded-[22px] border border-border/60 bg-background/70 p-4">
                 <p className="text-sm font-medium text-foreground">
                   {copy.followUpOptional}
                 </p>
@@ -225,10 +230,8 @@ export function LatestResultClosure({
                       type="text"
                       name="title"
                       required
-                      defaultValue={getFollowUpDefaultTitle(
-                        data.taskShell.title,
-                        copy,
-                      )}
+                      value={followUpTitle}
+                      onChange={(event) => setFollowUpTitle(event.target.value)}
                       className={inputClassName}
                     />
                   </div>
@@ -244,14 +247,19 @@ export function LatestResultClosure({
                       id="follow-up-due"
                       type="date"
                       name="dueAt"
+                      value={followUpDueAt}
+                      onChange={(event) => setFollowUpDueAt(event.target.value)}
                       className={inputClassName}
                     />
                   </div>
                 </div>
 
                 <button
-                  type="submit"
+                  type="button"
                   disabled={isPending}
+                  onClick={() => {
+                    void handleCreateFollowUp();
+                  }}
                   className={buttonVariants({
                     variant: "outline",
                     className: "disabled:opacity-60",
@@ -273,14 +281,13 @@ export function LatestResultClosure({
 
           <div className="flex flex-wrap gap-2">
             {data.closure.canAcceptResult ? (
-              <form
-                action={async () => {
-                  await onAcceptResult();
-                }}
-              >
+              <form>
                 <button
-                  type="submit"
+                  type="button"
                   disabled={isPending}
+                  onClick={() => {
+                    void onAcceptResult();
+                  }}
                   className={buttonVariants({
                     variant: "default",
                     className: "disabled:opacity-60",
@@ -292,14 +299,13 @@ export function LatestResultClosure({
             ) : null}
 
             {data.closure.canRetry ? (
-              <form
-                action={async () => {
-                  await onRetry();
-                }}
-              >
+              <form>
                 <button
-                  type="submit"
+                  type="button"
                   disabled={isPending}
+                  onClick={() => {
+                    void onRetry();
+                  }}
                   className={buttonVariants({
                     variant: "outline",
                     className: "disabled:opacity-60",

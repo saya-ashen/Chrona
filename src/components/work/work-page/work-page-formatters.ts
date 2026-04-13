@@ -82,7 +82,7 @@ export function getTaskLifecycleLabel(status: string | null | undefined) {
 
 export function getSyncStatusLabel(
   status: string | null | undefined,
-  copy: typeof DEFAULT_COPY,
+  copy: Pick<WorkbenchCopy, "healthySync" | "staleSync">,
 ) {
   switch (status) {
     case "healthy":
@@ -170,3 +170,4 @@ export function isSafeExternalHref(href: string) {
 export function isInternalAppHref(href: string) {
   return href.startsWith("/") && !href.startsWith("//");
 }
+import type { WorkbenchCopy } from "./work-page-types";

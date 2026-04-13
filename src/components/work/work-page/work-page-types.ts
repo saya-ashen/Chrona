@@ -1,3 +1,7 @@
+import type { ReactNode } from "react";
+
+import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
+
 export type WorkPageClientProps = {
   initialData: {
     taskShell: {
@@ -96,7 +100,7 @@ export type WorkPageClientProps = {
     };
     taskPlan: {
       state: "empty" | "ready";
-      revision: "generated" | "updated" | null;
+      revision: string | null;
       generatedBy: string | null;
       isMock: boolean;
       summary: string | null;
@@ -125,7 +129,7 @@ export type WorkPageClientProps = {
           taskId: string;
           title: string;
           statusLabel: string;
-          tone: "active" | "waiting" | "done";
+          tone: string;
           isCurrent: boolean;
         }>;
       }>;
@@ -148,6 +152,7 @@ export type WorkPageClientProps = {
       content: string;
       runtimeTs?: string | null;
     }>;
+    composerValue?: string;
     inspector: {
       approvals: Array<{
         id: string;
@@ -194,26 +199,15 @@ export type CollaborationFeedItem = {
   meta?: string | null;
 };
 
+export type WorkConversationSection = {
+  id: string;
+  eyebrow: string;
+  title: string;
+  content: ReactNode;
+  tone?: "default" | "accent";
+};
+
 export type WorkbenchCopy = {
-  actionFailed: string | undefined;
-  taskCompletedSummary: string;
-  workbenchTitle: string;
-  workbenchDescription: string;
-  workbenchStatus: string;
-  taskArrangement: string;
-  taskArrangementHint: string;
-  conversationInput: string;
-  operatorNote: string;
-  sendAndContinue: string;
-  sendNoteToAgent: string;
-  retryRun: string;
-  continueRun: string;
-  continueRunDescription: string;
-  responseRequiredDescription: string;
-  noteQueuedForCheckpoint: string;
-  noteWhileRunningDescription: string;
-  noteWhileAwaitingApprovalDescription: string;
-  currentRun: string;
-  noActiveRunYet: string;
+  [Key in keyof typeof DEFAULT_WORK_PAGE_COPY]: string;
 };
 export type WorkPageData = WorkPageClientProps["initialData"];

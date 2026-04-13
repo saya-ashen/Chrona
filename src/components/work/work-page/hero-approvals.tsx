@@ -25,9 +25,9 @@ type HeroApprovalsProps = {
   approvals: HeroApprovalItem[];
   isPending: boolean;
   copy: HeroApprovalsCopy;
-  onApprove: (approvalId: string) => Promise<void>;
-  onReject: (approvalId: string) => Promise<void>;
-  onEditAndApprove: (formData: FormData) => Promise<void>;
+  onApprove: (approvalId: string) => Promise<boolean | void>;
+  onReject: (approvalId: string) => Promise<boolean | void>;
+  onEditAndApprove: (formData: FormData) => Promise<boolean | void>;
 };
 
 export function HeroApprovals({

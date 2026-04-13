@@ -135,6 +135,7 @@ export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliabilit
   const { messages } = useI18n();
   const panelMessages = messages.components?.runSidePanel ?? {};
   const copy = {
+    ...panelMessages,
     context: "背景",
     tools: "工具记录",
     outputs: "产出",
@@ -163,7 +164,6 @@ export function RunSidePanel({ taskShell, scheduleImpact, currentRun, reliabilit
     blockerSummary: "当前没有明确阻塞，任务可以继续推进。",
     approvals: "待处理审批",
     artifacts: "当前产出",
-    ...panelMessages,
   };
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("context");
   const blockerText = taskShell.blockReason?.actionRequired ?? reliability.stopReason ?? copy.blockerSummary;

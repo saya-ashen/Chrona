@@ -18,26 +18,26 @@ export function ConversationFeed({ items, emptyText }: ConversationFeedProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {items.map((item) => {
         const alignClass = item.kind === "user" ? "ml-auto" : "mr-auto";
         const toneClass =
           item.kind === "user"
-            ? "border-primary/15 bg-primary/[0.05]"
+            ? "border-primary/[0.18] bg-primary/[0.08] shadow-sm"
             : item.kind === "agent"
-              ? "border-emerald-200/70 bg-emerald-50/60"
-              : "border-border/60 bg-background/80";
+              ? "border-border/80 bg-card shadow-sm"
+              : "border-border/70 bg-muted/[0.2]";
 
         return (
-          <article key={item.id} className={cn("max-w-[92%]", alignClass)}>
+          <article key={item.id} className={cn("max-w-[80%]", alignClass)}>
             <div
               className={cn(
-                "rounded-[24px] border px-4 py-4 text-sm shadow-sm",
+                "rounded-[18px] border px-4 py-3 text-sm",
                 toneClass,
               )}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                   {item.eyebrow}
                 </span>
                 {item.meta ? (
@@ -47,8 +47,8 @@ export function ConversationFeed({ items, emptyText }: ConversationFeedProps) {
                 ) : null}
               </div>
 
-              <p className="mt-2 font-medium text-foreground">{item.title}</p>
-              <div className="mt-2 whitespace-pre-wrap text-muted-foreground">
+              <p className="mt-2 text-sm font-medium text-foreground/95">{item.title}</p>
+              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/80">
                 {item.body}
               </div>
             </div>

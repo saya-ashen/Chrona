@@ -9,11 +9,9 @@ import {
   getRunStatusLabel,
   isOverdueScheduleStatus,
 } from "./work-page-formatters";
-import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
-
 export function getTaskSummary(
   data: WorkPageClientProps["initialData"],
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   switch (data.currentRun?.status) {
     case "WaitingForApproval":
@@ -34,7 +32,7 @@ export function getTaskSummary(
 
 export function getTaskStatusMeta(
   data: WorkPageClientProps["initialData"],
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   if (data.closure.isDone) {
     return { label: "已完成", tone: "success" as const };
@@ -129,7 +127,7 @@ export function getCurrentPlanAction(
 }
 export function buildConversationFeed(
   data: WorkPageClientProps["initialData"],
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ): CollaborationFeedItem[] {
   return [...data.conversation]
     .sort((a, b) => (a.runtimeTs ?? "").localeCompare(b.runtimeTs ?? ""))
@@ -151,7 +149,7 @@ export function buildConversationFeed(
 
 export function getScheduleSourceSummary(
   taskShell: WorkPageClientProps["initialData"]["taskShell"],
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   if (taskShell.scheduledStartAt && taskShell.scheduledEndAt) {
     return `${copy.sourceSchedule}: ${formatDateTime(taskShell.scheduledStartAt)} → ${formatDateTime(taskShell.scheduledEndAt)}`;
@@ -173,7 +171,7 @@ export function getStartRunDefaultValue(taskTitle: string) {
 
 export function getFollowUpDefaultTitle(
   taskTitle: string,
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   return `${taskTitle} - ${copy.followUpDefaultSuffix}`;
 }
@@ -181,7 +179,7 @@ export function getFollowUpDefaultTitle(
 export function getPassiveHeroGuidance(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   closure: WorkPageClientProps["initialData"]["closure"],
-  copy: typeof DEFAULT_WORK_PAGE_COPY,
+  copy: WorkbenchCopy,
 ) {
   if (currentRun?.status === "Completed") {
     const actions = [

@@ -17,6 +17,8 @@ export const DEFAULT_WORK_PAGE_COPY = {
   workbenchTitle: "给 Agent 补充要求",
   workbenchDescription: "补充约束、修改方向、指定输出格式，或提供缺失背景。",
   workbenchStatus: "下一步",
+  conversationWorkbenchAria: "工作对话区",
+  planRailAria: "任务计划侧栏",
   nextAction: "建议动作",
   whyNow: "为什么现在处理",
   evidence: "相关背景",
@@ -101,6 +103,9 @@ export const DEFAULT_WORK_PAGE_COPY = {
   collaborationFlow: "对话记录",
   collaborationFlowDescription:
     "输入后，下面按时间顺序显示对话消息：Agent 在左，你在右。",
+  conversationTab: "对话流",
+  fullFlowTab: "完整流程",
+  workbenchViewTabs: "工作区视图切换",
   latestResult: "最新结果",
   inputArea: "输入区",
   quickPrompts: "快捷补充",

@@ -10,7 +10,7 @@ type WorkbenchComposerCardProps = {
   composer: WorkbenchComposer | null;
   composerValue: string;
   onComposerChange: (value: string) => void;
-  onSubmit: (value: string) => Promise<void> | void;
+  onSubmit: (value: string) => Promise<boolean | void> | boolean | void;
   quickPrompts: string[];
   errorMessage: string | null;
   isPending: boolean;
@@ -21,9 +21,9 @@ type WorkbenchComposerCardProps = {
   runId?: string | null;
 };
 
-function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
   if (event.key !== "Enter" || event.shiftKey) {
-    return;
+    return false;
   }
 
   const nativeEvent =
@@ -33,11 +33,11 @@ function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     };
 
   if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
-    return;
+    return false;
   }
 
   event.preventDefault();
-  event.currentTarget.form?.requestSubmit();
+  return true;
 }
 
 export function WorkbenchComposerCard({
@@ -54,73 +54,70 @@ export function WorkbenchComposerCard({
   composerResetKey,
   runId,
 }: WorkbenchComposerCardProps) {
+  async function handleSubmit() {
+    const inputText = composerValue.trim();
+    const didSucceed = await onSubmit(inputText);
+
+    if (didSucceed) {
+      onComposerChange("");
+    }
+  }
+
   if (!composer) {
     return (
-      <div className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary-foreground/65">
-          {copy.inputArea}
-        </p>
-        <p className="text-sm leading-7 text-primary-foreground/78">
-          {passiveDescription}
-        </p>
-        <p className="text-xs text-primary-foreground/60">{passiveActions}</p>
+      <div className="space-y-1 text-sm text-muted-foreground">
+        <p>{passiveDescription}</p>
+        <p className="text-xs text-muted-foreground/80">{passiveActions}</p>
       </div>
     );
   }
 
   return (
     <form
+      aria-label={copy.inputArea}
       key={`workbench-${composerResetKey}-${runId ?? "none"}-${composer.mode}`}
-      action={async () => {
-        const inputText = composerValue.trim();
-
-        if (!inputText) {
-          return;
-        }
-
-        await onSubmit(inputText);
-      }}
-      className="min-w-0 space-y-4"
+      className="min-w-0 space-y-1.5"
     >
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary-foreground/65">
-          {copy.inputArea}
-        </p>
-        <p className="text-sm text-primary-foreground/78">
-          {composer.description || copy.workbenchDescription}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{composer.statusHint}</span>
+        <span>{copy.keyboardHint}</span>
       </div>
 
       {errorMessage ? (
         <p
           role="alert"
-          className="rounded-md border border-red-300/60 bg-red-500/10 px-3 py-2 text-sm text-red-100"
+          className="rounded-md border border-red-300/70 bg-red-500/10 px-3 py-2 text-sm text-red-700"
         >
           {errorMessage}
         </p>
       ) : null}
 
-      <p className="text-xs text-primary-foreground/60">
-        {copy.taskArrangementHint}
-      </p>
-
       <textarea
         aria-label={composer.inputLabel}
         name="message"
-        rows={6}
+        rows={2}
         required
         value={composerValue}
         placeholder={composer.placeholder}
         onChange={(event) => onComposerChange(event.target.value)}
-        onKeyDown={handleComposerKeyDown}
+        onKeyDown={(event) => {
+          if (shouldSubmitFromEnter(event)) {
+            void handleSubmit();
+          }
+        }}
         className={cn(
           textareaClassName,
-          "min-h-32 w-full min-w-0 resize-y border-white/12 bg-black/20 text-primary-foreground placeholder:text-primary-foreground/35",
+          "min-h-16 w-full min-w-0 resize-none border-border/80 bg-background px-3 py-2.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70",
         )}
       />
 
-      <div className="flex flex-col gap-3">
-        <div className="flex min-w-0 flex-wrap gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          {quickPrompts.length > 0 ? (
+            <span className="flex items-center pr-1 text-xs text-muted-foreground">
+              {copy.quickPrompts}
+            </span>
+          ) : null}
           {quickPrompts.map((prompt) => (
             <button
               key={prompt}
@@ -129,7 +126,7 @@ export function WorkbenchComposerCard({
                 variant: "outline",
                 size: "sm",
                 className:
-                  "border-white/12 bg-white/[0.04] text-primary-foreground hover:bg-white/[0.08]",
+                  "border-border/70 bg-muted/[0.2] text-foreground hover:bg-muted/50",
               })}
               onClick={() =>
                 onComposerChange(
@@ -144,21 +141,20 @@ export function WorkbenchComposerCard({
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-primary-foreground/60">
-            {composer.statusHint} · {copy.keyboardHint}
-          </p>
-
+        <div className="shrink-0">
           <button
-            type="submit"
+            type="button"
             disabled={isPending}
+            onClick={() => {
+              void handleSubmit();
+            }}
             className={buttonVariants({
               variant: composer.submitVariant ?? "default",
-              size: "lg",
+              size: "sm",
               className: cn(
                 "disabled:opacity-60",
                 composer.submitVariant === "outline"
-                  ? "border-white/12 bg-white/[0.04] text-primary-foreground hover:bg-white/[0.08]"
+                  ? "border-border/70 bg-background text-foreground hover:bg-muted/40"
                   : "",
               ),
             })}
