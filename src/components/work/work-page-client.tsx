@@ -404,7 +404,9 @@ const DEFAULT_COPY = {
   latestFollowUpStatus: "任务状态",
   latestFollowUpSchedule: "日程状态",
   latestFollowUpCreatedAt: "创建时间",
-  approvalSummaryFallback: "Review the approval request before resuming the run.",
+  approvalSummaryFallback: "继续运行前，请先查看这条审批。",
+  agentLabel: "智能体",
+  followUpDefaultSuffix: "后续任务",
 } as const;
 
 function formatDate(value: string | null | undefined) {
@@ -547,7 +549,86 @@ function getRunStatusLabel(status: string | null | undefined) {
   }
 }
 
-function buildConversationFeed(data: WorkPageClientProps["initialData"]): CollaborationFeedItem[] {
+function getApprovalStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "Pending":
+      return "待处理";
+    case "Approved":
+      return "已批准";
+    case "Rejected":
+      return "已拒绝";
+    case "Cancelled":
+      return "已取消";
+    default:
+      return status || "暂无";
+  }
+}
+
+function getTaskLifecycleLabel(status: string | null | undefined) {
+  switch (status) {
+    case "Ready":
+      return "待开始";
+    case "Running":
+    case "InProgress":
+      return "进行中";
+    case "Blocked":
+      return "阻塞";
+    case "Done":
+    case "Completed":
+      return "已完成";
+    case "Cancelled":
+      return "已取消";
+    default:
+      return status || "暂无";
+  }
+}
+
+function getSyncStatusLabel(status: string | null | undefined, copy: typeof DEFAULT_COPY) {
+  switch (status) {
+    case "healthy":
+      return copy.healthySync;
+    case "stale":
+    case "delayed":
+      return copy.staleSync;
+    default:
+      return status ?? null;
+  }
+}
+
+function getArtifactTypeLabel(type: string | null | undefined) {
+  switch (type) {
+    case "document":
+      return "文档";
+    case "file":
+      return "文件";
+    case "link":
+      return "链接";
+    case "image":
+      return "图片";
+    default:
+      return type || "暂无";
+  }
+}
+
+function getToolCallStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "completed":
+    case "success":
+      return "已完成";
+    case "running":
+    case "pending":
+      return "进行中";
+    case "failed":
+    case "error":
+      return "失败";
+    case "cancelled":
+      return "已取消";
+    default:
+      return status || "暂无";
+  }
+}
+
+function buildConversationFeed(data: WorkPageClientProps["initialData"], copy: typeof DEFAULT_COPY): CollaborationFeedItem[] {
   return [...data.conversation]
     .sort((a, b) => (a.runtimeTs ?? "").localeCompare(b.runtimeTs ?? ""))
     .map((entry) => {
@@ -556,8 +637,8 @@ function buildConversationFeed(data: WorkPageClientProps["initialData"]): Collab
       return {
         id: entry.id,
         kind: isAgent ? "agent" : "user",
-        eyebrow: isAgent ? "Agent" : "你",
-        title: isAgent ? "Agent" : "你",
+        eyebrow: isAgent ? copy.agentLabel : "你",
+        title: isAgent ? copy.agentLabel : "你",
         body: entry.content,
         meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
       };
@@ -580,8 +661,8 @@ function getStartRunDefaultValue(taskTitle: string) {
   return `继续处理：${taskTitle}`;
 }
 
-function getFollowUpDefaultTitle(taskTitle: string) {
-  return `${taskTitle} - follow-up`;
+function getFollowUpDefaultTitle(taskTitle: string, copy: typeof DEFAULT_COPY) {
+  return `${taskTitle} - ${copy.followUpDefaultSuffix}`;
 }
 
 function getPassiveHeroGuidance(
@@ -692,7 +773,7 @@ function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.sendAndContinue,
       defaultValue: currentIntervention?.defaultMessage ?? getComposerDefaultValue(taskShell.title, currentRun),
-      statusHint: `${copy.currentRun}: ${currentRun.status}`,
+      statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };
   }
@@ -704,7 +785,7 @@ function getWorkbenchComposer(
       inputLabel: copy.conversationInput,
       submitLabel: copy.sendNoteToAgent,
       defaultValue: "",
-      statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+      statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)} · ${copy.noteQueuedForCheckpoint}`,
       submitVariant: "outline",
     };
   }
@@ -716,7 +797,7 @@ function getWorkbenchComposer(
       inputLabel: copy.conversationInput,
       submitLabel: copy.sendNoteToAgent,
       defaultValue: "",
-      statusHint: `${copy.currentRun}: ${currentRun.status} · ${copy.noteQueuedForCheckpoint}`,
+      statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)} · ${copy.noteQueuedForCheckpoint}`,
       submitVariant: "outline",
     };
   }
@@ -732,7 +813,7 @@ function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
       defaultValue: taskShell.prompt ?? getStartRunDefaultValue(taskShell.title),
-      statusHint: `${copy.currentRun}: ${currentRun.status}`,
+      statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };
   }
@@ -748,7 +829,7 @@ function getWorkbenchComposer(
         inputLabel: copy.taskArrangement,
         submitLabel: copy.retryRun,
         defaultValue: taskShell.prompt ?? `恢复任务：${taskShell.title}`,
-        statusHint: `${copy.currentRun}: ${currentRun.status}`,
+        statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
         submitVariant: "default",
       };
   }
@@ -759,7 +840,7 @@ function getWorkbenchComposer(
     inputLabel: copy.conversationInput,
     submitLabel: copy.sendNoteToAgent,
     defaultValue: "",
-    statusHint: `${copy.currentRun}: ${currentRun.status}`,
+    statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
     submitVariant: "outline",
   };
 }
@@ -866,7 +947,28 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan);
   const quickPrompts = workbenchComposer ? getQuickPrompts(workbenchComposer, currentRun) : [];
-  const collaborationFeed = useMemo(() => buildConversationFeed(data), [data]);
+  const collaborationFeed = buildConversationFeed(data, copy);
+  const inspectorApprovals = useMemo(
+    () => data.inspector.approvals.map((approval) => ({
+      ...approval,
+      status: getApprovalStatusLabel(approval.status),
+    })),
+    [data.inspector.approvals],
+  );
+  const inspectorArtifacts = useMemo(
+    () => data.inspector.artifacts.map((artifact) => ({
+      ...artifact,
+      type: getArtifactTypeLabel(artifact.type),
+    })),
+    [data.inspector.artifacts],
+  );
+  const inspectorToolCalls = useMemo(
+    () => data.inspector.toolCalls.map((tool) => ({
+      ...tool,
+      status: getToolCallStatusLabel(tool.status),
+    })),
+    [data.inspector.toolCalls],
+  );
   const [composerValue, setComposerValue] = useState(workbenchComposer?.defaultValue ?? "");
 
   useEffect(() => {
@@ -942,7 +1044,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         <div key={approval.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-medium text-primary-foreground">{approval.title}</p>
-            <StatusBadge tone="warning">{approval.status}</StatusBadge>
+            <StatusBadge tone="warning">{getApprovalStatusLabel(approval.status)}</StatusBadge>
           </div>
           <p className="mt-2 text-sm text-primary-foreground/75">
             {approval.summary ?? copy.approvalSummaryFallback}
@@ -1090,7 +1192,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
           <p className="font-medium text-foreground">{copy.latestFollowUp}</p>
           <p className="mt-2 text-foreground">{data.closure.latestFollowUp.title}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <StatusBadge>{`${copy.latestFollowUpStatus}: ${data.closure.latestFollowUp.status}`}</StatusBadge>
+            <StatusBadge>{`${copy.latestFollowUpStatus}: ${getTaskLifecycleLabel(data.closure.latestFollowUp.status)}`}</StatusBadge>
             <StatusBadge>{`${copy.latestFollowUpSchedule}: ${getScheduleStatusLabel(data.closure.latestFollowUp.scheduleStatus)}`}</StatusBadge>
           </div>
           {data.closure.latestFollowUp.createdAt ? (
@@ -1174,7 +1276,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                   type="text"
                   name="title"
                   required
-                  defaultValue={getFollowUpDefaultTitle(data.taskShell.title)}
+                  defaultValue={getFollowUpDefaultTitle(data.taskShell.title, copy)}
                   className={inputClassName}
                 />
               </div>
@@ -1317,7 +1419,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             <div className="border-b border-border/60 pb-4">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.workstream}</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{copy.executionWorkstream}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{copy.executionWorkstreamDescription}</p>
             </div>
 
             <div className="mt-5 space-y-6">
@@ -1326,7 +1427,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">{copy.conversationEvidence}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{copy.conversationEvidenceDescription}</p>
                 </div>
 
                 {collaborationFeed.length === 0 ? (
@@ -1370,9 +1470,9 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             onGenerate={handleGenerateTaskPlan}
             currentAction={currentPlanAction}
             currentException={currentException}
-            approvals={data.inspector.approvals}
-            artifacts={data.inspector.artifacts}
-            toolCalls={data.inspector.toolCalls}
+            approvals={inspectorApprovals}
+            artifacts={inspectorArtifacts}
+            toolCalls={inspectorToolCalls}
             context={{
               priority: data.taskShell.priority,
               dueAt: data.taskShell.dueAt,
@@ -1381,7 +1481,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
               scheduleStatus: scheduleLabel,
               scheduleSummary: data.scheduleImpact.summary,
               runStatus: runLabel,
-              syncStatus: data.reliability.syncStatus,
+              syncStatus: getSyncStatusLabel(data.reliability.syncStatus, copy),
               isStale: data.reliability.isStale,
               lastUpdatedAt: data.reliability.lastUpdatedAt ?? data.reliability.lastSyncedAt ?? data.reliability.refreshedAt,
               lastSyncedAt: data.reliability.lastSyncedAt,

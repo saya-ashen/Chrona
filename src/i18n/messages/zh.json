@@ -288,7 +288,19 @@
       "noTimelineDay": "当前没有可用的时间轴日期。",
       "unscheduledQueue": "待安排队列",
       "unscheduledQueueDescription": "折叠的任务卡会停留在侧栏中。仅在需要时展开，或直接拖到时间轴上。",
-      "noUnscheduledWork": "当前没有待安排的工作。失去计划或需要首次安排的新任务会出现在这里。"
+      "noUnscheduledWork": "当前没有待安排的工作。失去计划或需要首次安排的新任务会出现在这里。",
+      "dateSwitcher": "日期",
+      "todayFocus": "今日重点",
+      "todayFocusEmpty": "今天没有需要立刻处理的阻塞项。可以从待安排队列里放入下一个有效时间块。",
+      "focusOverdue": "已逾期",
+      "focusAtRisk": "有风险",
+      "focusWaitingForInput": "等待补充说明",
+      "focusWaitingForApproval": "等待审批",
+      "focusReadyToday": "今天可开始",
+      "todayBlocks": "今日时间块",
+      "queueReady": "队列就绪",
+      "needsAttention": "需要关注",
+      "aiProposalsCompactEmpty": "当前没有待处理的 AI 建议。"
     },
     "workPage": {
       "pageDescription": "把执行推进放在这里，把规划修改留在日程中，并把任务详情页视为参考信息。",
