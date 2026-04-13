@@ -83,11 +83,11 @@ export function TaskPlanSidePanel({
   const currentStep = plan.steps.find((step) => step.id === plan.currentStepId) ?? null;
 
   return (
-    <div className="space-y-2 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
-      <div className="rounded-[24px] border border-border/80 bg-card p-4 shadow-[0_16px_36px_rgba(15,23,42,0.07)] xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+    <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:max-h-[calc(100vh-15rem)]">
+      <div className="rounded-[24px] border border-border/80 bg-card p-4 shadow-[0_16px_36px_rgba(15,23,42,0.07)] xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-foreground">{copy.taskPlan}</p>
+            <p className="text-sm font-semibold text-foreground">{copy.taskPath}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               {plan.state === "ready" ? copy.planReadySummary : copy.planEmptySummary}
             </p>
@@ -165,33 +165,41 @@ export function TaskPlanSidePanel({
                 );
               })() : null}
 
-              {plan.steps.map((step, index) => {
-                const statusMeta = getStepStatusMeta(step.status, copy);
+              {plan.steps.some((step) => step.id !== currentStep?.id) ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground/[0.9]">
+                    {copy.upcomingSteps}
+                  </p>
 
-                if (step.id === currentStep?.id) {
-                  return null;
-                }
+                  {plan.steps.map((step, index) => {
+                    const statusMeta = getStepStatusMeta(step.status, copy);
 
-                return (
-                  <div
-                    key={step.id}
-                    className={cn("rounded-[20px] border border-border/70 bg-muted/[0.24] p-4")}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold text-muted-foreground">
-                        {index + 1}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-foreground">{step.title}</p>
-                          <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                    if (step.id === currentStep?.id) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={step.id}
+                        className={cn("rounded-[20px] border border-border/70 bg-muted/[0.24] p-4")}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold text-muted-foreground">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-foreground">{step.title}</p>
+                              <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                            </div>
+                            <p className="mt-2 text-muted-foreground">{step.objective}</p>
+                          </div>
                         </div>
-                        <p className="mt-2 text-muted-foreground">{step.objective}</p>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
             {!currentStep ? (

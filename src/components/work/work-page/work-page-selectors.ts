@@ -87,13 +87,32 @@ export function getCurrentException(data: WorkPageClientProps["initialData"]) {
 export function getQuickPrompts(
   workbenchComposer: WorkbenchComposer,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
+  currentIntervention?: WorkPageClientProps["initialData"]["currentIntervention"] | null,
 ) {
-  if (workbenchComposer.mode === "start")
+  switch (currentIntervention?.kind) {
+    case "input":
+      return ["直接回答缺失信息", "先说明不可变约束", "如果有假设请标出来"];
+    case "approval":
+      return ["解释为什么这样做", "给出更安全的替代方案", "总结审批后的下一步"];
+    case "retry":
+      return ["先定位失败原因", "给出恢复方案", "缩小这轮变更范围"];
+    case "review":
+      return ["先总结这轮产出", "指出仍未覆盖的风险", "给出建议的下一步"];
+    case "observe":
+      return ["只补充必要背景", "保持输出简洁", "发现风险就重点提示"];
+    default:
+      break;
+  }
+
+  if (workbenchComposer.mode === "start") {
     return ["先给出简洁计划", "明确关键假设", "先提出澄清问题"];
-  if (currentRun?.status === "Running")
+  }
+  if (currentRun?.status === "Running") {
     return ["只补充必要背景", "保持输出简洁", "发现风险就重点提示"];
-  if (currentRun?.status === "WaitingForApproval")
+  }
+  if (currentRun?.status === "WaitingForApproval") {
     return ["解释当前阻塞", "给出更安全的改法", "总结接下来的步骤"];
+  }
   return ["基于最新结果继续", "收紧下一步动作", "记录这次决策"];
 }
 
@@ -135,12 +154,13 @@ export function buildConversationFeed(
       const isAgent =
         entry.role.toLowerCase().includes("agent") ||
         entry.role.toLowerCase().includes("assistant");
+      const kind: CollaborationFeedItem["kind"] = isAgent ? "agent" : "user";
 
       return {
         id: entry.id,
-        kind: isAgent ? "agent" : "user",
+        kind,
         eyebrow: isAgent ? copy.agentLabel : "你",
-        title: isAgent ? copy.agentLabel : "你",
+        title: "",
         body: entry.content,
         meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
       };
