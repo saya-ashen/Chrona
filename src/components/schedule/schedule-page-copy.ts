@@ -1,0 +1,191 @@
+import type { TaskConfigPreset } from "@/components/schedule/task-config-form";
+
+export const TIMELINE_SLOT_MINUTES = 30;
+export const DEFAULT_SCHEDULE_BLOCK_MINUTES = 60;
+export const TIMELINE_COMPOSER_HEIGHT = 356;
+export const TIMELINE_COMPOSER_MARGIN = 12;
+
+export const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
+  {
+    id: "requirements-brief",
+    label: "Requirements brief",
+    description: "Clarify goals, constraints, and the first execution plan.",
+    values: {
+      priority: "Medium",
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt:
+          "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
+        temperature: 0.2,
+      },
+    },
+  },
+  {
+    id: "bug-investigation",
+    label: "Bug investigation",
+    description:
+      "Reproduce the issue, identify root cause, and propose the safest fix.",
+    values: {
+      priority: "High",
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt:
+          "Reproduce the issue, identify the root cause, describe the impact, and suggest the safest fix before making broader changes.",
+        temperature: 0.1,
+      },
+    },
+  },
+  {
+    id: "shipping-pass",
+    label: "Shipping pass",
+    description: "Complete the change, verify it, and summarize what shipped.",
+    values: {
+      priority: "Medium",
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: {
+        model: "gpt-5.4",
+        prompt:
+          "Implement the change, verify the result with the smallest reliable test loop, and summarize the final outcome and any follow-up.",
+        temperature: 0.2,
+      },
+    },
+  },
+];
+
+export const DEFAULT_SCHEDULE_PAGE_COPY = {
+  planPrefix: "Plan",
+  runPrefix: "Run",
+  approvalsPrefix: "Approvals",
+  blockSingular: "block",
+  blockPlural: "blocks",
+  proposalSingular: "proposal",
+  proposalPlural: "proposals",
+  noScheduledStart: "No scheduled start",
+  agentAssigned: "Agent-assigned",
+  agentPrefix: "Agent",
+  humanOwned: "Human-owned",
+  timeNotSet: "Time not set",
+  unscheduled: "Unscheduled",
+  dayOpenSuffix: "is open for new blocks",
+  riskDay: "Risk day",
+  createTaskBlock: "Create Task Block",
+  cancel: "Cancel",
+  createAndSchedule: "Create and schedule",
+  creating: "Creating…",
+  dropOntoLane: "Drop work onto the lane",
+  clickOrDrag: "Click any slot or drag to adjust",
+  timelineCompressedPrefix: "Timeline compressed: 24h shown as",
+  quietHoursCompressedSuffix: "quiet hours compressed",
+  emptyDayLane: "Empty day lane",
+  emptyDayLaneDescription:
+    "Drop a queued task anywhere on this lane to create the first block.",
+  dropToSchedule: "Drop to schedule",
+  dropToMoveBlock: "Drop to move block",
+  overdue: "Overdue",
+  approvalPending: "Approval pending",
+  conflictPreviewLabel: "Conflict — resolve overlap before committing this block.",
+  resizePreviewLabel: "Resize block",
+  resizeHandleLabel: "Resize",
+  quickCreatePlaceholder: "Task title, @ 14:30, for 90m, !high",
+  quickCreateSubmit: "Add block",
+  quickCreateHint:
+    "Examples: 'Write weekly report @ 14:30 for 90m !high' or just type a title for the next open slot.",
+  closeTaskDetails: "Close task details",
+  taskDetails: "Task Details",
+  taskDetailsDescription:
+    "Review the selected block in a floating panel, then return to the timeline.",
+  close: "Close",
+  due: "Due",
+  currentPlan: "Current plan",
+  latestRun: "Latest run",
+  nextAction: "Next action",
+  noActiveRun: "No active run",
+  stayOnPlan: "Stay on plan",
+  taskConfig: "Task config",
+  saveTaskConfig: "Save task config",
+  saving: "Saving…",
+  adjustBlock: "Adjust block",
+  placeOnTimeline: "Place on timeline",
+  scheduleTask: "Schedule Task",
+  schedulingUpdating: "Scheduling is updating.",
+  dragHint:
+    "Drag to the timeline or expand for details and fallback scheduling.",
+  pendingProposals: "Pending proposals",
+  runnable: "Runnable",
+  model: "Model",
+  proposedBy: "Proposed by",
+  candidateBlock: "Candidate block",
+  dueImpact: "Due impact",
+  source: "Source",
+  acceptProposal: "Accept Proposal",
+  rejectProposal: "Reject Proposal",
+  risk: "Risk",
+  action: "Action",
+  needsReview: "Needs review",
+  reviewScheduleImpact: "Review schedule impact",
+  plannedWindow: "Planned window",
+  openInbox: "Open Inbox",
+  pageTitle: "Schedule",
+  today: "Today",
+  tomorrow: "Tomorrow",
+  currentPlanButton: "Current Plan",
+  timeline: "Timeline",
+  list: "List",
+  scheduledMetric: "Scheduled",
+  scheduledMetricHint: "Committed blocks on the current plan.",
+  queueMetric: "Queue",
+  queueMetricHint: "Tasks still waiting to enter the timeline.",
+  aiProposalsMetric: "AI Proposals",
+  aiProposalsMetricHint: "Pending suggestions that need a decision.",
+  risksMetric: "Risks",
+  risksMetricHint: "At-risk, overdue, or interrupted work.",
+  scheduledTimeline: "Scheduled Timeline",
+  scheduledTimelineDescription: "",
+  dropMode: "Drop mode",
+  planningSurface: "Planning surface",
+  conflictsTitle: "Conflicts / Overdue Risks",
+  conflictsDescription: "",
+  noScheduleRisks:
+    "No schedule risks detected. Blocked, overdue, or interrupted work will surface here.",
+  aiProposalsTitle: "AI Proposals",
+  aiProposalsDescription: "",
+  noAiProposals:
+    "No pending AI proposals. When planner automation suggests a new block, it will appear here for review.",
+  openTaskCenter: "Open Task Center",
+  weekOverview: "Week Overview",
+  noTimelineDay: "No timeline day is available right now.",
+  unscheduledQueue: "Unscheduled Queue",
+  unscheduledQueueDescription:
+    "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
+  noUnscheduledWork:
+    "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
+  dateSwitcher: "Date",
+  todayFocus: "Today Focus",
+  todayFocusEmpty:
+    "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
+  focusOverdue: "Overdue",
+  focusAtRisk: "At risk",
+  focusWaitingForInput: "Waiting for input",
+  focusWaitingForApproval: "Waiting for approval",
+  focusReadyToday: "Ready to start today",
+  todayBlocks: "Today blocks",
+  queueReady: "Queue ready",
+  needsAttention: "Needs attention",
+  aiProposalsCompactEmpty: "No pending AI proposals.",
+} as const;
+
+export type SchedulePageCopy = Record<
+  keyof typeof DEFAULT_SCHEDULE_PAGE_COPY,
+  string
+>;
+
+export function getSchedulePageCopy(
+  messages?: Partial<SchedulePageCopy> | null,
+): SchedulePageCopy {
+  return {
+    ...DEFAULT_SCHEDULE_PAGE_COPY,
+    ...(messages ?? {}),
+  };
+}

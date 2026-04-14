@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { buildPlanningSummary } from "@/components/schedule/schedule-page-utils";
 import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/runtime/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
@@ -140,6 +141,13 @@ export async function getSchedulePage(workspaceId: string) {
     scheduledEndAt: proposal.scheduledEndAt,
   }));
 
+  const planningSummary = buildPlanningSummary({
+    scheduled,
+    unscheduled,
+    risks,
+    proposals: mappedProposals,
+  });
+
   return {
     defaultRuntimeAdapterKey: workspace.defaultRuntime,
     runtimeAdapters,
@@ -149,6 +157,7 @@ export async function getSchedulePage(workspaceId: string) {
       proposalCount: mappedProposals.length,
       riskCount: risks.length,
     },
+    planningSummary,
     scheduled,
     unscheduled,
     risks,
