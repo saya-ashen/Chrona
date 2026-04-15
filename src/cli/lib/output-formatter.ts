@@ -1,12 +1,16 @@
 /**
  * Output formatting utilities for the AgentDashboard CLI.
  * Supports JSON and table output modes using chalk and cli-table3.
+ *
+ * Default output is JSON (optimized for AI-agent consumption).
  */
 
 import chalk from "chalk";
 import Table = require("cli-table3");
 
 export type OutputFormat = "json" | "table";
+
+// ── Generic Formatters ───────────────────────────────────────────────
 
 /**
  * Pretty-print data as indented JSON.
@@ -35,13 +39,85 @@ export function formatTable(
 }
 
 /**
- * Format conflict analysis results.
+ * Universal output: returns JSON or passes to a table formatter callback.
  */
-export function formatConflicts(data: unknown, format: OutputFormat): string {
+export function output(
+  data: unknown,
+  format: OutputFormat,
+  tableFormatter?: (data: unknown) => string,
+): string {
   if (format === "json") {
     return formatJson(data);
   }
+  if (tableFormatter) {
+    return tableFormatter(data);
+  }
+  return formatJson(data);
+}
 
+// ── Task Formatters ──────────────────────────────────────────────────
+
+/**
+ * Format a single task detail for table output.
+ */
+export function formatTaskDetail(data: unknown): string {
+  const t = data as Record<string, unknown>;
+  const lines: string[] = [];
+  lines.push(chalk.bold.underline("Task Details"));
+  lines.push(`  ID:          ${t.id ?? t.taskId ?? "—"}`);
+  lines.push(`  Title:       ${t.title ?? "—"}`);
+  lines.push(`  Status:      ${t.status ?? "—"}`);
+  lines.push(`  Priority:    ${t.priority ?? "—"}`);
+  lines.push(`  Description: ${t.description ?? "—"}`);
+  lines.push(`  Due:         ${t.dueAt ?? "—"}`);
+  lines.push(`  Model:       ${t.runtimeModel ?? "—"}`);
+  lines.push(`  Prompt:      ${t.prompt ? String(t.prompt).slice(0, 80) : "—"}`);
+  lines.push(`  Scheduled:   ${t.scheduledStartAt ?? "—"} → ${t.scheduledEndAt ?? "—"}`);
+  lines.push(`  Created:     ${t.createdAt ?? "—"}`);
+  lines.push(`  Updated:     ${t.updatedAt ?? "—"}`);
+  return lines.join("\n");
+}
+
+/**
+ * Format a list of tasks for table output.
+ */
+export function formatTaskList(data: unknown): string {
+  const items = (Array.isArray(data) ? data : (data as { tasks?: unknown[] })?.tasks ?? []) as Record<string, unknown>[];
+  if (items.length === 0) {
+    return chalk.dim("No tasks found.");
+  }
+  const rows = items.map((t) => [
+    String(t.id ?? t.taskId ?? "").slice(0, 12),
+    String(t.title ?? "").slice(0, 40),
+    t.status as string | null,
+    t.priority as string | null,
+    t.dueAt ? String(t.dueAt).slice(0, 10) : null,
+    t.scheduledStartAt ? String(t.scheduledStartAt).slice(0, 16) : null,
+  ]);
+  return formatTable(["ID", "Title", "Status", "Priority", "Due", "Scheduled"], rows);
+}
+
+// ── Run Formatters ───────────────────────────────────────────────────
+
+/**
+ * Format a run result for table output.
+ */
+export function formatRunResult(data: unknown): string {
+  const r = data as Record<string, unknown>;
+  const lines: string[] = [];
+  lines.push(chalk.bold.underline("Run Result"));
+  for (const [key, val] of Object.entries(r)) {
+    lines.push(`  ${key}: ${val == null ? "—" : typeof val === "object" ? JSON.stringify(val) : String(val)}`);
+  }
+  return lines.join("\n");
+}
+
+// ── Conflict Formatters ──────────────────────────────────────────────
+
+/**
+ * Format conflict analysis results.
+ */
+export function formatConflicts(data: unknown): string {
   const result = data as {
     conflicts: Array<{
       id: string;
@@ -68,7 +144,6 @@ export function formatConflicts(data: unknown, format: OutputFormat): string {
 
   const lines: string[] = [];
 
-  // Summary
   const s = result.summary;
   lines.push(chalk.bold.underline("Conflict Analysis Summary"));
   lines.push(
@@ -80,8 +155,7 @@ export function formatConflicts(data: unknown, format: OutputFormat): string {
   lines.push(`  Affected tasks:  ${chalk.yellow(String(s.affectedTaskCount))}`);
   lines.push("");
 
-  // Conflicts table
-  if (result.conflicts.length > 0) {
+  if (result.conflicts?.length > 0) {
     lines.push(chalk.bold("Conflicts:"));
     const conflictRows = result.conflicts.map((c) => {
       const severityColor =
@@ -96,36 +170,29 @@ export function formatConflicts(data: unknown, format: OutputFormat): string {
         c.description.slice(0, 50),
       ];
     });
-    lines.push(
-      formatTable(["ID", "Type", "Severity", "Tasks", "Description"], conflictRows),
-    );
+    lines.push(formatTable(["ID", "Type", "Severity", "Tasks", "Description"], conflictRows));
   }
 
-  // Suggestions table
-  if (result.suggestions.length > 0) {
+  if (result.suggestions?.length > 0) {
     lines.push(chalk.bold("Suggestions:"));
-    const suggestionRows = result.suggestions.map((s) => [
-      s.id.slice(0, 8),
-      s.type,
-      s.description.slice(0, 40),
-      s.reason.slice(0, 40),
+    const suggestionRows = result.suggestions.map((sg) => [
+      sg.id.slice(0, 8),
+      sg.type,
+      sg.description.slice(0, 40),
+      sg.reason.slice(0, 40),
     ]);
-    lines.push(
-      formatTable(["ID", "Type", "Description", "Reason"], suggestionRows),
-    );
+    lines.push(formatTable(["ID", "Type", "Description", "Reason"], suggestionRows));
   }
 
   return lines.join("\n");
 }
 
+// ── Automation Formatters ────────────────────────────────────────────
+
 /**
  * Format automation suggestion results.
  */
-export function formatAutomation(data: unknown, format: OutputFormat): string {
-  if (format === "json") {
-    return formatJson(data);
-  }
-
+export function formatAutomation(data: unknown): string {
   const result = data as {
     executionMode: string;
     reminderStrategy: {
@@ -149,30 +216,26 @@ export function formatAutomation(data: unknown, format: OutputFormat): string {
   lines.push(`  Confidence:     ${confidenceColor(result.confidence)}`);
   lines.push("");
 
-  // Reminder strategy
   lines.push(chalk.bold("Reminder Strategy:"));
   lines.push(`  Advance:   ${result.reminderStrategy.advanceMinutes} minutes`);
   lines.push(`  Frequency: ${result.reminderStrategy.frequency}`);
   lines.push(`  Channels:  ${result.reminderStrategy.channels.join(", ")}`);
   lines.push("");
 
-  // Preparation steps
-  if (result.preparationSteps.length > 0) {
+  if (result.preparationSteps?.length > 0) {
     lines.push(chalk.bold("Preparation Steps:"));
     for (let i = 0; i < result.preparationSteps.length; i++) {
-      const step = result.preparationSteps[i];
-      lines.push(`  ${chalk.dim(String(i + 1) + ".")} ${step}`);
+      lines.push(`  ${chalk.dim(String(i + 1) + ".")} ${result.preparationSteps[i]}`);
     }
     lines.push("");
   }
 
-  // Context sources
-  if (result.contextSources.length > 0) {
+  if (result.contextSources?.length > 0) {
     lines.push(chalk.bold("Context Sources:"));
     lines.push(
       formatTable(
         ["Type", "Description"],
-        result.contextSources.map((s) => [s.type, s.description]),
+        result.contextSources.map((cs) => [cs.type, cs.description]),
       ),
     );
   }
@@ -180,14 +243,12 @@ export function formatAutomation(data: unknown, format: OutputFormat): string {
   return lines.join("\n");
 }
 
-/**
- * Format suggestions / apply-suggestion results.
- */
-export function formatSuggestions(data: unknown, format: OutputFormat): string {
-  if (format === "json") {
-    return formatJson(data);
-  }
+// ── Suggestion / Apply Formatters ────────────────────────────────────
 
+/**
+ * Format apply-suggestion results.
+ */
+export function formatSuggestions(data: unknown): string {
   const result = data as {
     success?: boolean;
     appliedChanges?: number;
@@ -211,18 +272,15 @@ export function formatSuggestions(data: unknown, format: OutputFormat): string {
     return lines.join("\n");
   }
 
-  // Generic fallback
   return formatJson(data);
 }
+
+// ── Workspace / Schedule Formatters ──────────────────────────────────
 
 /**
  * Format workspace schedule projection data.
  */
-export function formatWorkspace(data: unknown, format: OutputFormat): string {
-  if (format === "json") {
-    return formatJson(data);
-  }
-
+export function formatWorkspace(data: unknown): string {
   const result = data as {
     summary: {
       scheduledCount: number;
@@ -252,7 +310,6 @@ export function formatWorkspace(data: unknown, format: OutputFormat): string {
 
   const lines: string[] = [];
 
-  // Summary
   const s = result.summary;
   lines.push(chalk.bold.underline("Workspace Schedule Overview"));
   lines.push(
@@ -263,8 +320,7 @@ export function formatWorkspace(data: unknown, format: OutputFormat): string {
   );
   lines.push("");
 
-  // Scheduled tasks table
-  if (result.scheduled && result.scheduled.length > 0) {
+  if (result.scheduled?.length > 0) {
     lines.push(chalk.bold("Scheduled Tasks:"));
     const rows = result.scheduled.slice(0, 20).map((t) => [
       t.taskId.slice(0, 8),
@@ -274,19 +330,13 @@ export function formatWorkspace(data: unknown, format: OutputFormat): string {
       t.scheduledEndAt ?? null,
       t.scheduleStatus,
     ]);
-    lines.push(
-      formatTable(
-        ["ID", "Title", "Priority", "Start", "End", "Status"],
-        rows,
-      ),
-    );
+    lines.push(formatTable(["ID", "Title", "Priority", "Start", "End", "Status"], rows));
     if (result.scheduled.length > 20) {
       lines.push(chalk.dim(`  ... and ${result.scheduled.length - 20} more`));
     }
   }
 
-  // Risks
-  if (result.risks && result.risks.length > 0) {
+  if (result.risks?.length > 0) {
     lines.push(chalk.bold("At-Risk Tasks:"));
     const riskRows = result.risks.map((t) => [
       t.taskId.slice(0, 8),
@@ -298,6 +348,8 @@ export function formatWorkspace(data: unknown, format: OutputFormat): string {
 
   return lines.join("\n");
 }
+
+// ── Error Utility ────────────────────────────────────────────────────
 
 /**
  * Print an error message in red and exit.
