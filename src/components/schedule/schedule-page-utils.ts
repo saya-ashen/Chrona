@@ -65,6 +65,12 @@ export function formatDayHeading(
   }).format(value);
 }
 
+export function formatWeekdayShort(value: Date, locale: string) {
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
+    weekday: "short",
+  }).format(value);
+}
+
 export function describeOwner(
   ownerType: string,
   assigneeAgentId: string | null,

@@ -1,6 +1,5 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -13,11 +12,11 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   getSchedulePageCopy,
-  TASK_CONFIG_PRESETS,
   TIMELINE_COMPOSER_HEIGHT,
   TIMELINE_COMPOSER_MARGIN,
   TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
+import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
 import { DayTimelineSummary } from "@/components/schedule/schedule-page-panels";
 import {
   ScheduledTimelineBlock,
@@ -48,89 +47,55 @@ import {
   snapMinuteToGrid,
   toDateForDay,
 } from "@/components/schedule/schedule-page-utils";
-import {
-  TaskConfigForm,
-  type TaskConfigRuntimeAdapter,
-} from "@/components/schedule/task-config-form";
+import { type TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-
-function TimelineCreateComposer({
+function TimelineComposer({
   draft,
   timelineHeight,
-  runtimeAdapters,
+  selectedDay,
   defaultRuntimeAdapterKey,
+  defaultRuntimeInputVersion,
   isPending,
   onClose,
   onCreate,
 }: {
-  draft: DragPreview;
+  draft: { top: number; height: number; startAt: Date; endAt: Date; startMinute: number; endMinute: number };
   timelineHeight: number;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  selectedDay: string;
   defaultRuntimeAdapterKey: string;
+  defaultRuntimeInputVersion: string;
   isPending: boolean;
   onClose: () => void;
   onCreate: (input: TimelineCreateInput) => Promise<void>;
 }) {
-  const locale = useLocale();
-  const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
-  const composerTop = Math.min(
-    Math.max(
-      draft.top + draft.height - TIMELINE_COMPOSER_HEIGHT,
-      TIMELINE_COMPOSER_MARGIN,
-    ),
-    Math.max(
-      TIMELINE_COMPOSER_MARGIN,
-      timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
-    ),
-  );
-
   return (
-    <div
-      data-timeline-composer
-      className="absolute left-3 z-20 max-h-[384px] w-[min(420px,calc(100%-1.5rem))] overflow-y-auto rounded-2xl border border-primary/30 bg-background/98 p-4 shadow-xl"
-      style={{ top: `${composerTop}px` }}
-    >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-foreground">
-            {copy.createTaskBlock}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {formatTimeRange(draft.startAt, draft.endAt, locale, copy)}
-          </p>
-        </div>
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={onClose}
-          className={buttonVariants({ variant: "ghost", size: "sm" })}
-        >
-          {copy.cancel}
-        </button>
-      </div>
-
-      <TaskConfigForm
-        runtimeAdapters={runtimeAdapters}
-        defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-        compact
-        isPending={isPending}
-        presets={TASK_CONFIG_PRESETS}
-        submitLabel={copy.createAndSchedule}
-        pendingLabel={copy.creating}
-        onSubmitAction={async (input) => {
-          await onCreate({
-            ...input,
-            scheduledStartAt: draft.startAt,
-            scheduledEndAt: draft.endAt,
-          });
-        }}
-      />
-    </div>
+    <TaskCreateDialog
+      isOpen={true}
+      initialStartAt={draft.startAt}
+      initialEndAt={draft.endAt}
+      isPending={isPending}
+      onClose={onClose}
+      onSubmit={async (input) => {
+        await onCreate({
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          dueAt: input.dueAt,
+          runtimeAdapterKey: defaultRuntimeAdapterKey,
+          runtimeInput: {},
+          runtimeInputVersion: defaultRuntimeInputVersion,
+          runtimeModel: null,
+          prompt: null,
+          runtimeConfig: null,
+          scheduledStartAt: input.scheduledStartAt,
+          scheduledEndAt: input.scheduledEndAt,
+        });
+      }}
+    />
   );
 }
 
@@ -235,6 +200,9 @@ export function DayTimeline({
     () => buildCompressedTimeline(items),
     [items],
   );
+  const defaultRuntimeInputVersion =
+    runtimeAdapters.find((adapter) => adapter.key === defaultRuntimeAdapterKey)?.spec.version ??
+    `${defaultRuntimeAdapterKey}-v1`;
   const timelineHeight = compressedTimeline.totalVisualHeight;
   const isToday = selectedDay === getTodayKey();
   const currentTimeMarker = useMemo(() => {
@@ -535,7 +503,7 @@ export function DayTimeline({
           dueAt: item.dueAt,
           durationMinutes: finalDraft.endMinute - finalDraft.startMinute,
         },
-        item.scheduledStartAt,
+        item.scheduledStartAt ?? finalDraft.startAt,
         finalDraft.endAt,
       );
     }
@@ -568,7 +536,7 @@ export function DayTimeline({
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
+    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-2xl">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">
@@ -580,33 +548,20 @@ export function DayTimeline({
           </p>
         </div>
         <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => openComposerAtMinute(9 * 60)}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <Plus className="size-3.5" />
-              {copy.createTaskBlock}
-            </button>
-          </div>
-          <p className="mt-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em]">
             {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
           </p>
-          <p className="mt-1 normal-case tracking-normal">
-            {copy.timelineCompressedPrefix} {" "}
-            {formatDurationMinutes(Math.round(compressedTimeline.visualMinutes))}
-            {compressedTimeline.compressedGapCount > 0
-              ? ` · ${compressedTimeline.compressedGapCount} ${copy.quietHoursCompressedSuffix}`
-              : ""}
-          </p>
+          {compressedTimeline.compressedGapCount > 0 ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {compressedTimeline.compressedGapCount} {copy.quietHoursCompressedSuffix}
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div
         ref={scrollContainerRef}
-        className="max-h-[72vh] overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2"
+        className="flex-1 overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2"
       >
         <div className="flex gap-3">
           <div className="sticky left-0 top-0 hidden w-16 shrink-0 self-start bg-background/95 py-2 sm:block">
@@ -694,11 +649,12 @@ export function DayTimeline({
             ) : null}
 
             {composerDraft ? (
-              <TimelineCreateComposer
+              <TimelineComposer
                 draft={composerDraft}
                 timelineHeight={timelineHeight}
-                runtimeAdapters={runtimeAdapters}
+                selectedDay={selectedDay}
                 defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                defaultRuntimeInputVersion={defaultRuntimeInputVersion}
                 isPending={isPending}
                 onClose={closeComposer}
                 onCreate={async (input) => {

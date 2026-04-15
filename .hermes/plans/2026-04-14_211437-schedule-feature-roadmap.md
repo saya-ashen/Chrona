@@ -52,10 +52,23 @@
 
 推荐严格按 5 个里程碑推进，避免一口气做完导致模型、调度、UI 一起失控。
 
-### Milestone 1：补齐时间轴基础交互
+## 已完成进度快照（updated）
+
+- [completed] Milestone 1 / 1.1：已排程 block 拖动改期 已完成。
+- [completed] Milestone 1 / 1.2：block resize 第一版已完成（尾部 resize）。
+- [completed] Milestone 1 / 1.3：顶部 command bar quick create 已完成，并支持命令式解析与 selected-day anchoring。
+- [partial] Milestone 1 / 1.4：UI/交互优化 已完成关键部分（冲突预览、current-time line、timeline polish、keyboard scheduling），但更完整的 queue CTA / overload badges / richer hierarchy 仍未做。
+- [pending] Milestone 2：自然语言创建任务 未开始；当前 command bar 仅完成规则/命令式 quick create，不是 review-first 的 NL parser。
+- [pending] Milestone 3：任务智能细化 未开始。
+- [pending] Milestone 4：自动执行 未开始。
+- [pending] Milestone 5：提醒与通知 未开始。
+
+---
+
+### Milestone 1：补齐时间轴基础交互 [completed/partial as noted below]
 目标：把 schedule 变成“真能排”的页面。
 
-#### 1.1 已排程 block 拖动改期
+#### 1.1 已排程 block 拖动改期 [completed]
 现状：
 - `DayTimeline` 已支持 `onScheduledDragStart`
 - 但需要确保 scheduled item 拖回时间轴时会真正更新 `scheduledStartAt/scheduledEndAt`
@@ -82,7 +95,7 @@
 - 拖完后 UI 立即更新，再 refresh 校正
 - 冲突时有明确提示，不是静默失败
 
-#### 1.2 block resize（延长/缩短时长）
+#### 1.2 block resize（延长/缩短时长）[completed first version]
 这是基础功能中最重要但现在缺失的一块。
 
 实现建议：
@@ -100,7 +113,7 @@
 - 用户可以把 block 拉长/缩短
 - 时间轴高度、文本标签、summary 同步变化
 
-#### 1.3 快速创建任务
+#### 1.3 快速创建任务 [completed]
 现状已有 timeline composer，但还不够“快”。
 
 建议补两个入口：
@@ -121,7 +134,7 @@
 - 用户在 1 个输入框内就能完成“今天下午 3 点做 xx”类创建
 - 无需展开完整 `TaskConfigForm` 才能创建简单任务
 
-#### 1.4 UI/交互优化
+#### 1.4 UI/交互优化 [partial]
 建议一起做，不然功能有了但体验还是“工具感太重”。
 
 建议点：
@@ -139,7 +152,7 @@
 
 ---
 
-### Milestone 2：自然语言创建任务
+### Milestone 2：自然语言创建任务 [pending]
 目标：让用户不用手动填表，也能高效创建任务和日程。
 
 #### 2.1 先做“受控解析”，不要一上来直接自动落库
@@ -195,7 +208,7 @@
 
 ---
 
-### Milestone 3：任务智能细化
+### Milestone 3：任务智能细化 [pending]
 目标：把“一个大任务”变成“可排程、可执行、可推进”的子步骤。
 
 #### 3.1 升级 `generateTaskPlan`
@@ -251,7 +264,7 @@
 
 ---
 
-### Milestone 4：自动执行
+### Milestone 4：自动执行 [pending]
 目标：让 schedule 不只是看板，而是真正的“任务发车台”。
 
 #### 4.1 引入 execution policy
@@ -304,7 +317,7 @@
 
 ---
 
-### Milestone 5：提醒与通知
+### Milestone 5：提醒与通知 [pending]
 目标：让 schedule 真正承担“提醒中枢”职责。
 
 #### 5.1 先定义 reminder domain

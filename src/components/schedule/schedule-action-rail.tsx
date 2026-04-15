@@ -18,12 +18,14 @@ type RailSection = {
 };
 
 export function ScheduleActionRail({
+  id,
   ariaLabel,
   tablistAriaLabel,
   activeTab,
   onTabChange,
   sections,
 }: {
+  id?: string;
   ariaLabel: string;
   tablistAriaLabel: string;
   activeTab: ActionRailTab;
@@ -77,7 +79,12 @@ export function ScheduleActionRail({
   }
 
   return (
-    <SurfaceCard as="aside" aria-label={ariaLabel} className="xl:sticky xl:top-4 xl:self-start">
+    <SurfaceCard
+      id={id}
+      as="aside"
+      aria-label={ariaLabel}
+      className="xl:sticky xl:top-4 xl:self-start"
+    >
       <div role="tablist" aria-label={tablistAriaLabel} className="flex flex-wrap gap-2">
         {sections.map((section, index) => (
           <button
