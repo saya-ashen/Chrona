@@ -6,7 +6,7 @@ import { AutomationSuggestionPanel } from "@/components/schedule/automation-sugg
 import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
 import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
-import { suggestAutomation } from "@/modules/ai/automation-suggester";
+import { useSmartAutomation } from "@/hooks/use-ai";
 import type { ScheduleSlot } from "@/modules/ai/types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
@@ -720,20 +720,17 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
 }
 
 function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
-  const suggestion = useMemo(() => {
-    return suggestAutomation({
-      taskId: item.taskId,
-      title: item.title,
-      description: item.description ?? "",
-      priority: item.priority,
-      dueAt: item.dueAt,
-      scheduledStartAt: item.scheduledStartAt,
-      scheduledEndAt: item.scheduledEndAt,
-      isRunnable: item.isRunnable,
-      runnabilityState: item.runnabilityState,
-      ownerType: item.ownerType,
-    });
-  }, [item]);
+  const { suggestion, isLoading } = useSmartAutomation({
+    title: item.title,
+    description: item.description ?? undefined,
+    priority: item.priority,
+    dueAt: item.dueAt,
+    scheduledStartAt: item.scheduledStartAt,
+    scheduledEndAt: item.scheduledEndAt,
+    isRunnable: item.isRunnable,
+    runnabilityState: item.runnabilityState,
+    ownerType: item.ownerType,
+  });
 
   const preparationSteps: PreparationStep[] = useMemo(() => {
     if (!suggestion) return [];
@@ -746,7 +743,7 @@ function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
 
   return (
     <div className="space-y-3">
-      <AutomationSuggestionPanel suggestion={suggestion} />
+      <AutomationSuggestionPanel suggestion={suggestion} isLoading={isLoading} />
       {preparationSteps.length > 0 ? (
         <PreparationChecklist steps={preparationSteps} />
       ) : null}
