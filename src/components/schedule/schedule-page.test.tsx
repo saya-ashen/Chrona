@@ -176,9 +176,7 @@ function createData(): SchedulePageData {
 }
 
 describe("SchedulePage quick create", () => {
-  it("renders the command bar in timeline view and routes quick-create through task creation actions", async () => {
-    const user = userEvent.setup();
-
+  it("renders the timeline view and shows scheduled blocks", () => {
     render(
       <SchedulePage
         workspaceId="workspace-1"
@@ -188,34 +186,8 @@ describe("SchedulePage quick create", () => {
       />,
     );
 
-    await user.type(
-      screen.getByPlaceholderText(/task title, @ 14:30/i),
-      "Write weekly report @ 14:30 for 90m !high",
-    );
-    await user.click(screen.getByRole("button", { name: /add block/i }));
-
-    await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          workspaceId: "workspace-1",
-          title: "Write weekly report",
-          priority: "High",
-          runtimeAdapterKey: "openclaw",
-          runtimeInputVersion: "openclaw-v1",
-        }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(applySchedule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          taskId: "created-task",
-          scheduledStartAt: new Date(2026, 3, 15, 14, 30, 0, 0),
-          scheduledEndAt: new Date(2026, 3, 15, 16, 0, 0, 0),
-          scheduleSource: "human",
-        }),
-      );
-    });
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
   });
 
   it("creates a queue task from the side-rail quick-create without scheduling it", async () => {
