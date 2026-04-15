@@ -26,6 +26,7 @@ export function PlanningHeader({
   ariaLabel,
   title,
   activeDayLabel,
+  summary,
   dateSwitcherLabel,
   dayLinks,
   metrics,
@@ -60,6 +61,9 @@ export function PlanningHeader({
         <span className="rounded-full bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
           {activeDayLabel}
         </span>
+        {summary && (
+          <span className="text-xs text-muted-foreground">{summary}</span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

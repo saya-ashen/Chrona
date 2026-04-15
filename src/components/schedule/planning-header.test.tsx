@@ -43,6 +43,6 @@ describe("PlanningHeader", () => {
       "#schedule-capture-bar",
     );
     expect(screen.getByRole("button", { name: /auto arrange/i })).toBeDisabled();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /auto arrange/i })).toHaveAttribute("title", "Coming soon");
   });
 });
