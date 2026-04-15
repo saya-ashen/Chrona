@@ -52,6 +52,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe("DayTimeline", () => {
@@ -85,6 +86,52 @@ describe("DayTimeline", () => {
     });
 
     expect(screen.getByText(/conflict/i)).toBeInTheDocument();
+  });
+
+  it("shows a current-time marker when the selected day is today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
+
+    render(
+      <DayTimeline
+        items={[createScheduledItem()]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        draggedItem={null}
+        runtimeAdapters={[]}
+        defaultRuntimeAdapterKey="mock"
+        isPending={false}
+        onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText(/current time/i)).toBeInTheDocument();
+  });
+
+  it("does not show a current-time marker for a non-today day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
+
+    render(
+      <DayTimeline
+        items={[createScheduledItem()]}
+        dayDate={new Date(2026, 3, 16, 0, 0, 0, 0)}
+        selectedDay="2026-04-16"
+        draggedItem={null}
+        runtimeAdapters={[]}
+        defaultRuntimeAdapterKey="mock"
+        isPending={false}
+        onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText(/current time/i)).not.toBeInTheDocument();
   });
 
   it("resizes a scheduled block from its end handle and commits the new end time", async () => {
@@ -129,5 +176,74 @@ describe("DayTimeline", () => {
       new Date(2026, 3, 15, 9, 0, 0, 0),
       new Date(2026, 3, 15, 10, 30, 0, 0),
     );
+  });
+
+  it("nudges the selected scheduled block down by one slot when ArrowDown is pressed", async () => {
+    const onScheduleDrop = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <DayTimeline
+        items={[createScheduledItem({ title: "Keyboard task" })]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        selectedTaskId="task-1"
+        draggedItem={null}
+        runtimeAdapters={[]}
+        defaultRuntimeAdapterKey="mock"
+        isPending={false}
+        onScheduleDrop={onScheduleDrop}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    const block = screen.getByRole("link", { name: /keyboard task/i });
+    fireEvent.keyDown(block, { key: "ArrowDown" });
+
+    expect(onScheduleDrop).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: "task-1", kind: "scheduled" }),
+      new Date(2026, 3, 15, 9, 30, 0, 0),
+      new Date(2026, 3, 15, 10, 30, 0, 0),
+    );
+  });
+
+  it("does not commit a keyboard nudge when the adjusted slot conflicts with another block", async () => {
+    const onScheduleDrop = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <DayTimeline
+        items={[
+          createScheduledItem({
+            taskId: "task-1",
+            title: "Selected task",
+            scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
+            scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
+          }),
+          createScheduledItem({
+            taskId: "task-2",
+            title: "Blocking task",
+            scheduledStartAt: new Date(2026, 3, 15, 10, 0, 0, 0),
+            scheduledEndAt: new Date(2026, 3, 15, 11, 0, 0, 0),
+          }),
+        ]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        selectedTaskId="task-1"
+        draggedItem={null}
+        runtimeAdapters={[]}
+        defaultRuntimeAdapterKey="mock"
+        isPending={false}
+        onScheduleDrop={onScheduleDrop}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    const block = screen.getByRole("link", { name: /selected task/i });
+    fireEvent.keyDown(block, { key: "ArrowDown" });
+
+    expect(onScheduleDrop).not.toHaveBeenCalled();
   });
 });

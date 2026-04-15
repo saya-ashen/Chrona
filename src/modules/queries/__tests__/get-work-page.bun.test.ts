@@ -245,6 +245,85 @@ describe("getWorkPage", () => {
     ]);
   });
 
+  it("includes conversation history from earlier runs in the collaboration feed", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Work History",
+        defaultRuntime: "openclaw",
+        status: WorkspaceStatus.Active,
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Show full conversation history",
+        status: TaskStatus.Running,
+        priority: TaskPriority.High,
+        ownerType: "human",
+      },
+    });
+
+    const olderRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        status: RunStatus.Completed,
+        triggeredBy: "user",
+        createdAt: new Date("2026-04-19T09:00:00.000Z"),
+      },
+    });
+    const latestRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        status: RunStatus.Running,
+        triggeredBy: "user",
+        createdAt: new Date("2026-04-20T09:00:00.000Z"),
+      },
+    });
+
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: latestRun.id },
+    });
+
+    await db.conversationEntry.createMany({
+      data: [
+        {
+          runId: olderRun.id,
+          role: "assistant",
+          content: "这是更早一轮的任务理解。",
+          sequence: 1,
+          runtimeTs: new Date("2026-04-19T09:01:00.000Z"),
+        },
+        {
+          runId: olderRun.id,
+          role: "user",
+          content: "先别改 schedule，只看 work 页面。",
+          sequence: 2,
+          runtimeTs: new Date("2026-04-19T09:02:00.000Z"),
+        },
+        {
+          runId: latestRun.id,
+          role: "assistant",
+          content: "这是最新一轮的继续推进。",
+          sequence: 1,
+          runtimeTs: new Date("2026-04-20T09:01:00.000Z"),
+        },
+      ],
+    });
+
+    const page = await getWorkPage(task.id);
+
+    expect(page.currentRun?.id).toBe(latestRun.id);
+    expect(page.conversation.map((entry) => entry.content)).toEqual([
+      "这是更早一轮的任务理解。",
+      "先别改 schedule，只看 work 页面。",
+      "这是最新一轮的继续推进。",
+    ]);
+  });
+
   it("returns reliability and closure metadata for completed runs", async () => {
     const workspace = await db.workspace.create({
       data: {

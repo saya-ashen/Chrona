@@ -16,6 +16,7 @@ import {
   TASK_CONFIG_PRESETS,
   TIMELINE_COMPOSER_HEIGHT,
   TIMELINE_COMPOSER_MARGIN,
+  TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
 import { DayTimelineSummary } from "@/components/schedule/schedule-page-panels";
 import {
@@ -43,6 +44,7 @@ import {
   formatShortDay,
   formatTime,
   formatTimeRange,
+  getTodayKey,
   snapMinuteToGrid,
   toDateForDay,
 } from "@/components/schedule/schedule-page-utils";
@@ -234,6 +236,20 @@ export function DayTimeline({
     [items],
   );
   const timelineHeight = compressedTimeline.totalVisualHeight;
+  const isToday = selectedDay === getTodayKey();
+  const currentTimeMarker = useMemo(() => {
+    if (!isToday) {
+      return null;
+    }
+
+    const now = new Date();
+    const minute = now.getHours() * 60 + now.getMinutes();
+
+    return {
+      top: compressedTimeline.mapMinuteToY(minute),
+      label: formatTime(now, locale),
+    };
+  }, [compressedTimeline, isToday, locale]);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const [interactionMode, setInteractionMode] = useState<TimelineInteractionMode>("idle");
@@ -391,6 +407,87 @@ export function DayTimeline({
     }
 
     await onScheduleDrop(draggedItem, preview.startAt, preview.endAt);
+  }
+
+  async function commitKeyboardAdjustment(
+    item: ScheduledItem,
+    adjustment: {
+      startMinute: number;
+      endMinute: number;
+    },
+  ) {
+    if (isPending || draggedItem) {
+      return;
+    }
+
+    const preview = buildPlacementPreview(
+      adjustment.startMinute,
+      adjustment.endMinute,
+      "resize",
+      item.taskId,
+    );
+
+    if (preview.hasConflict) {
+      return;
+    }
+
+    await onScheduleDrop(
+      {
+        kind: "scheduled",
+        taskId: item.taskId,
+        title: item.title,
+        dueAt: item.dueAt,
+        durationMinutes: preview.endMinute - preview.startMinute,
+      },
+      preview.startAt,
+      preview.endAt,
+    );
+  }
+
+  async function handleKeyboardAdjust(
+    item: ScheduledItem,
+    key: "ArrowUp" | "ArrowDown",
+    mode: "move" | "resize",
+  ) {
+    if (!item.scheduledStartAt) {
+      return;
+    }
+
+    const step = key === "ArrowUp" ? -TIMELINE_SLOT_MINUTES : TIMELINE_SLOT_MINUTES;
+    const currentStartMinute =
+      item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes();
+    const currentEndMinute = item.scheduledEndAt
+      ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
+      : currentStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES;
+
+    if (mode === "move") {
+      const duration = Math.max(
+        currentEndMinute - currentStartMinute,
+        TIMELINE_SLOT_MINUTES,
+      );
+      const nextStartMinute = clampScheduledStartMinute(currentStartMinute + step);
+      const nextEndMinute = Math.min(nextStartMinute + duration, 24 * 60);
+
+      await commitKeyboardAdjustment(item, {
+        startMinute: nextStartMinute,
+        endMinute: nextEndMinute,
+      });
+      return;
+    }
+
+    const nextEndMinute = clampScheduledEndMinute(
+      currentStartMinute,
+      currentEndMinute + step,
+    );
+
+    if (nextEndMinute === currentEndMinute) {
+      return;
+    }
+
+    await commitKeyboardAdjustment(item, {
+      startMinute: currentStartMinute,
+      endMinute: nextEndMinute,
+    });
   }
 
   function handleResizeStart(item: ScheduledItem, _clientY: number) {
@@ -573,6 +670,22 @@ export function DayTimeline({
               style={{ top: `${timelineHeight}px` }}
             />
 
+            {currentTimeMarker ? (
+              <div
+                aria-label={`Current time ${currentTimeMarker.label}`}
+                className="pointer-events-none absolute inset-x-0 z-10"
+                style={{ top: `${currentTimeMarker.top}px` }}
+              >
+                <div className="flex items-center gap-2 -translate-y-1/2 px-3">
+                  <span className="size-2 rounded-full bg-primary" />
+                  <div className="h-px flex-1 bg-primary/80" />
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    {currentTimeMarker.label}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
             {items.length === 0 ? (
               <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-2xl border border-dashed border-primary/30 bg-background/92 p-4 text-sm text-muted-foreground shadow-sm">
                 <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
@@ -638,6 +751,7 @@ export function DayTimeline({
                   onDragStart={onScheduledDragStart}
                   onDragEnd={onDragEnd}
                   onResizeStart={handleResizeStart}
+                  onKeyboardAdjust={handleKeyboardAdjust}
                 />
               );
             })}

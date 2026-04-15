@@ -5,7 +5,6 @@ import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { LatestResultPanel } from "@/components/work/latest-result-panel";
 import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
 import { useI18n } from "@/i18n/client";
-import { cn } from "@/lib/utils";
 
 import { ConversationFeed } from "./work-page/conversation-feed";
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page/work-page-copy";
@@ -14,8 +13,10 @@ import { useWorkPageController } from "./work-page/use-work-page-controller";
 import { WorkConversationWorkbench } from "./work-page/work-conversation-workbench";
 import { WorkbenchComposerCard } from "./work-page/workbench-composer-card";
 import {
+  formatDateTime,
   getRunStatusLabel,
   getScheduleStatusLabel,
+  getSyncStatusLabel,
   parseDateInputForSubmission,
 } from "./work-page/work-page-formatters";
 import {
@@ -28,52 +29,7 @@ import {
   getTaskSummary,
   getWorkbenchComposer,
 } from "./work-page/work-page-selectors";
-import type {
-  WorkConversationSection,
-  WorkPageClientProps,
-} from "./work-page/work-page-types";
-
-function renderWorkbenchSections(sections: WorkConversationSection[]) {
-  return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {sections.map((section) =>
-        section.tone === "accent" ? (
-          <article
-            key={section.id}
-            className="overflow-hidden rounded-[24px] border border-slate-900/75 bg-[linear-gradient(180deg,rgba(15,23,42,0.97),rgba(15,23,42,0.93))] text-primary-foreground shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
-          >
-            <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-primary-foreground/[0.62]">
-                {section.eyebrow}
-              </p>
-              <h3 className="mt-2 text-xl font-semibold tracking-tight">{section.title}</h3>
-            </div>
-
-            <div className="px-5 py-5 sm:px-6">{section.content}</div>
-          </article>
-        ) : (
-          <article
-            key={section.id}
-            className={cn(
-              "border-t border-border/50 pt-6 first:border-t-0 first:pt-0",
-            )}
-          >
-            <div className="mb-3 space-y-1.5">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/[0.85]">
-                {section.eyebrow}
-              </p>
-              <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                {section.title}
-              </h3>
-            </div>
-
-            <div>{section.content}</div>
-          </article>
-        ),
-      )}
-    </div>
-  );
-}
+import type { WorkPageClientProps } from "./work-page/work-page-types";
 
 export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const { messages } = useI18n();
@@ -132,24 +88,123 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
   const runLabel = getRunStatusLabel(currentRun?.status);
   const scheduleLabel = getScheduleStatusLabel(data.scheduleImpact.status);
-  const conversationSection: WorkConversationSection = {
-    id: "conversation",
-    eyebrow: copy.conversation,
-    title: copy.conversationEvidence,
-    content: (
-      <ConversationFeed
-        items={collaborationFeed}
-        emptyText={copy.fallbackNoOperatorInput}
-      />
-    ),
-  };
+  const syncLabel = getSyncStatusLabel(data.reliability.syncStatus, copy) ?? copy.noValue;
+  const blockerSummary =
+    currentException ??
+    data.reliability.stopReason ??
+    data.taskShell.blockReason?.actionRequired ??
+    copy.noBlockingAction;
+  const suggestedAction =
+    data.currentIntervention?.actionLabel ?? currentPlanAction?.label ?? copy.noSuggestedAction;
+  const recentOutputSummary = data.latestOutput.empty
+    ? copy.noRecentOutput
+    : data.latestOutput.title || data.latestOutput.body || copy.noRecentOutput;
+  const latestEventSummary = data.workstreamItems.at(-1)?.title ?? copy.fallbackNoOperatorInput;
+  const riskSummary = [
+    data.reliability.isStale ? copy.staleSync : syncLabel,
+    data.reliability.stuckFor ? `${copy.stuckFor}: ${data.reliability.stuckFor}` : null,
+    data.reliability.lastSyncedAt
+      ? `${copy.lastSyncedLabel}: ${formatDateTime(data.reliability.lastSyncedAt)}`
+      : null,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
+  const fullFlowContent = (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,360px)] xl:items-start">
+      <section aria-label={copy.executionRecordMain} className="min-w-0 space-y-6">
+        <article
+          id="execution-stream"
+          aria-label={copy.executionStreamAria}
+          className="rounded-[24px] border border-border/70 bg-background/[0.9] p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)] sm:p-5"
+        >
+          <ExecutionTimeline
+            title={copy.latestExecutionMilestones}
+            events={data.workstreamItems}
+            currentRunId={currentRun?.id ?? null}
+          />
+        </article>
+      </section>
 
-  const fullFlowSections: WorkConversationSection[] = [
-    {
-      id: "latest-result",
-      eyebrow: copy.latestResultEyebrow,
-      title: copy.latestResult,
-      content: (
+      <aside aria-label={copy.executionRecordSidebar} className="space-y-4 xl:sticky xl:top-0">
+        <section className="rounded-[24px] border border-border/70 bg-muted/[0.2] p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)] sm:p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            {copy.taskCockpit}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{copy.taskCockpitDescription}</p>
+
+          <div className="mt-4 space-y-4">
+            <section className="rounded-2xl border border-border/70 bg-background/[0.86] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.currentBlocker}
+              </p>
+              <p className="mt-2 text-sm text-foreground">{blockerSummary}</p>
+            </section>
+
+            <section className="rounded-2xl border border-border/70 bg-background/[0.86] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.nextAction}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">{suggestedAction}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.currentIntervention?.description ?? taskSummary}
+              </p>
+            </section>
+
+            <section className="rounded-2xl border border-border/70 bg-background/[0.86] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.recentOutput}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">{recentOutputSummary}</p>
+              {!data.latestOutput.empty && data.latestOutput.timestamp ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {copy.updated} {formatDateTime(data.latestOutput.timestamp)}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-border/70 bg-background/[0.86] p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.riskAndSync}
+              </p>
+              <p className="mt-2 text-sm text-foreground">{riskSummary || syncLabel}</p>
+            </section>
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border border-border/70 bg-background/[0.9] p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)] sm:p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            {copy.executionSnapshot}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{copy.executionSnapshotDescription}</p>
+
+          <dl className="mt-4 space-y-4 text-sm">
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.currentStage}
+              </dt>
+              <dd className="mt-1 font-medium text-foreground">{runLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.currentFocusSummary}
+              </dt>
+              <dd className="mt-1 text-foreground">{data.currentIntervention?.title ?? taskSummary}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.latestEvent}
+              </dt>
+              <dd className="mt-1 text-foreground">{latestEventSummary}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/85">
+                {copy.scheduleStatusLabel}
+              </dt>
+              <dd className="mt-1 text-foreground">{scheduleLabel}</dd>
+            </div>
+          </dl>
+        </section>
+
         <LatestResultPanel
           output={data.latestOutput}
           updatedLabel={copy.updated}
@@ -194,19 +249,9 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
             actionsTitle: copy.resultActionsTitle,
           }}
         />
-      ),
-    },
-    {
-      id: "timeline",
-      eyebrow: copy.workstream,
-      title: copy.latestExecutionMilestones,
-      content: (
-        <section id="execution-stream" aria-label={copy.executionStreamAria}>
-          <ExecutionTimeline title={copy.latestExecutionMilestones} events={data.workstreamItems} />
-        </section>
-      ),
-    },
-  ];
+      </aside>
+    </div>
+  );
 
   return (
     <WorkConversationWorkbench
@@ -220,12 +265,19 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         {
           id: "conversation",
           label: copy.conversationTab,
-          content: <div className="mx-auto max-w-4xl">{conversationSection.content}</div>,
+          content: (
+            <div className="mx-auto max-w-4xl">
+              <ConversationFeed
+                items={collaborationFeed}
+                emptyText={copy.fallbackNoOperatorInput}
+              />
+            </div>
+          ),
         },
         {
           id: "full-flow",
           label: copy.fullFlowTab,
-          content: renderWorkbenchSections(fullFlowSections),
+          content: fullFlowContent,
         },
       ]}
       defaultTabId="conversation"

@@ -145,6 +145,7 @@ export type WorkPageClientProps = {
       linkedEvidenceLabel?: string | null;
       payload: Record<string, unknown>;
       runtimeTs?: string | null;
+      runId?: string | null;
     }>;
     conversation: Array<{
       id: string;

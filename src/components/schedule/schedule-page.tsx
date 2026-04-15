@@ -217,6 +217,29 @@ export function SchedulePage({
         ? copy.aiProposalsTitle
         : copy.unscheduledQueue;
 
+  function patchScheduledWindow(taskId: string, startAt: Date, endAt: Date, dueAt?: Date | null) {
+    setViewData((current) => ({
+      ...current,
+      scheduled: sortScheduledItems(
+        current.scheduled.map((item) =>
+          item.taskId === taskId
+            ? {
+                ...item,
+                dueAt: dueAt ?? item.dueAt,
+                scheduledStartAt: startAt,
+                scheduledEndAt: endAt,
+                scheduleStatus: "Scheduled",
+                scheduleSource: "human",
+              }
+            : item,
+        ),
+      ),
+      listItems: current.listItems.map((item) =>
+        item.taskId === taskId ? applyScheduleToListItem(item, startAt, endAt) : item,
+      ),
+    }));
+  }
+
   const draggedQueueItem =
     draggedTask?.kind === "queue"
       ? (viewData.unscheduled.find((item) => item.taskId === draggedTask.taskId) ?? null)
@@ -325,28 +348,7 @@ export function SchedulePage({
       }
 
       if (item.kind === "scheduled") {
-        setViewData((current) => ({
-          ...current,
-          scheduled: sortScheduledItems(
-            current.scheduled.map((scheduledItem) =>
-              scheduledItem.taskId === item.taskId
-                ? {
-                    ...scheduledItem,
-                    dueAt: item.dueAt ?? scheduledItem.dueAt,
-                    scheduledStartAt: startAt,
-                    scheduledEndAt: endAt,
-                    scheduleStatus: "Scheduled",
-                    scheduleSource: "human",
-                  }
-                : scheduledItem,
-            ),
-          ),
-          listItems: current.listItems.map((listItem) =>
-            listItem.taskId === item.taskId
-              ? applyScheduleToListItem(listItem, startAt, endAt)
-              : listItem,
-          ),
-        }));
+        patchScheduledWindow(item.taskId, startAt, endAt, item.dueAt);
         setLocalSelectedTaskId(item.taskId);
       }
 

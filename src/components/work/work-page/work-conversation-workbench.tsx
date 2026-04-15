@@ -92,44 +92,20 @@ export function WorkConversationWorkbench({
             isConversationTab ? "" : "",
           )}
         >
-          <div
-            className={cn(
-              "border-b border-border/70 bg-muted/[0.24]",
-              isConversationTab ? "px-4 py-2.5 sm:px-5" : "px-5 py-3 sm:px-6",
-            )}
-          >
+          <div className="border-b border-border/70 bg-muted/[0.24] px-5 py-3 sm:px-6">
             <div className="flex flex-wrap items-center gap-2">
               {conversationHeader.badges.map((badge, index) => (
                 <StatusBadge key={`${badge}-${index}`}>{badge}</StatusBadge>
               ))}
             </div>
 
-            {!isConversationTab && conversationHeader.eyebrow ? (
-              <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/[0.85]">
-                {conversationHeader.eyebrow}
-              </p>
-            ) : null}
-            <h2
-              className={cn(
-                "font-semibold tracking-tight text-foreground",
-                isConversationTab ? "mt-2 text-[1.35rem]" : "mt-1.5 text-xl sm:text-[1.5rem]",
-              )}
-            >
+            <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-foreground sm:text-[1.5rem]">
               {conversationHeader.title}
             </h2>
-            {!isConversationTab && conversationHeader.summary ? (
-              <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
-                {conversationHeader.summary}
-              </p>
-            ) : null}
-
             <div
               role="tablist"
               aria-label={labels.tabsAria}
-              className={cn(
-                "inline-flex rounded-full border border-border/70 bg-background/80 p-1 shadow-sm",
-                isConversationTab ? "mt-2" : "mt-3",
-              )}
+              className="mt-3 inline-flex rounded-full border border-border/70 bg-background/80 p-1 shadow-sm"
             >
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTabId;

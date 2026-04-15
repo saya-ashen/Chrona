@@ -93,7 +93,26 @@ function createData(): SchedulePageData {
       overloadedDayCount: 0,
       proposalCount: 0,
       riskCount: 0,
+      todayLoadMinutes: 60,
+      overdueCount: 0,
+      atRiskCount: 0,
+      readyToScheduleCount: 0,
+      autoRunnableCount: 0,
+      waitingOnUserCount: 0,
+      dueSoonUnscheduledCount: 0,
+      largestIdleWindowMinutes: 0,
+      overloadedMinutes: 0,
     },
+    focusZones: [
+      {
+        dayKey: "2026-04-15",
+        totalMinutes: 60,
+        deepWorkMinutes: 0,
+        fragmentedMinutes: 60,
+        riskLevel: "low",
+      },
+    ],
+    automationCandidates: [],
     scheduled: [
       {
         taskId: "task-1",

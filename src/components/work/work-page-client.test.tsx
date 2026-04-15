@@ -355,8 +355,101 @@ describe("WorkPageClient", () => {
       value: 633,
     });
 
+    const groupedExecutionData: WorkPageData = {
+      ...baseData,
+      currentRun: {
+        ...baseData.currentRun!,
+        id: "run_current",
+        status: "WaitingForInput",
+        pendingInputPrompt: "请确认不可变范围",
+      },
+      currentIntervention: {
+        kind: "input",
+        title: "确认不可变范围",
+        description: "Agent 正等待你确认哪些区域不能改动。",
+        whyNow: "不明确边界会导致本轮返工。",
+        actionLabel: "给出不可变约束",
+        evidence: [
+          {
+            label: "当前阻塞",
+            value: "需要明确不可改动模块",
+            tone: "warning",
+          },
+        ],
+      },
+      latestOutput: {
+        kind: "message",
+        title: "当前执行草稿",
+        body: "我先把 work 页面拆成协作区与执行区。",
+        timestamp: "2026-04-20T09:22:00.000Z",
+        href: null,
+        empty: false,
+        sourceLabel: "Conversation",
+      },
+      reliability: {
+        ...baseData.reliability,
+        syncStatus: "delayed",
+        isStale: true,
+        stuckFor: "18 分钟",
+        stopReason: "等待你的范围确认",
+      },
+      workstreamItems: [
+        {
+          id: "event_prev_1",
+          runId: "run_previous",
+          eventType: "run.output_generated",
+          title: "上一轮输出首稿",
+          summary: "上一轮先产出基础草图。",
+          kind: "output",
+          badge: "新产出",
+          whyItMatters: "可以作为这一轮的参考输入。",
+          linkedEvidenceLabel: null,
+          payload: {},
+          runtimeTs: "2026-04-20T09:05:00.000Z",
+        },
+        {
+          id: "event_current_1",
+          runId: "run_current",
+          eventType: "run.input_requested",
+          title: "等待补充约束",
+          summary: "请确认不可变范围。",
+          kind: "input",
+          badge: "待补充",
+          whyItMatters: "确认后才能继续。",
+          linkedEvidenceLabel: null,
+          payload: {},
+          runtimeTs: "2026-04-20T09:21:00.000Z",
+        },
+        {
+          id: "event_current_2",
+          runId: "run_current",
+          eventType: "task.synced",
+          title: "同步当前进展",
+          summary: "记录当前等待状态。",
+          kind: "progress",
+          badge: "进展",
+          whyItMatters: "仅供追踪。",
+          linkedEvidenceLabel: null,
+          payload: {},
+          runtimeTs: "2026-04-20T09:20:00.000Z",
+        },
+        {
+          id: "event_task_1",
+          eventType: "task.plan_updated",
+          title: "任务计划已更新",
+          summary: "当前进入协作面板整理。",
+          kind: "progress",
+          badge: "进展",
+          whyItMatters: "说明任务级别的规划变化。",
+          linkedEvidenceLabel: null,
+          payload: {},
+          runtimeTs: "2026-04-20T09:02:00.000Z",
+        },
+      ],
+    };
+
     vi.mocked(useWorkPageController).mockReturnValue({
-      data: baseData,
+      data: groupedExecutionData,
       isPending: false,
       heroErrorMessage: null,
       resultErrorMessage: null,
@@ -375,18 +468,31 @@ describe("WorkPageClient", () => {
       },
     });
 
-    render(<WorkPageClient initialData={baseData} />);
+    render(<WorkPageClient initialData={groupedExecutionData} />);
 
     await user.click(screen.getAllByRole("tab", { name: "执行记录" })[0]!);
 
     const [workbench] = screen.getAllByLabelText(DEFAULT_WORK_PAGE_COPY.conversationWorkbenchAria);
     const shell = workbench.closest('[data-slot="workbench-shell"]') as HTMLElement | null;
     const thread = workbench.querySelector('[data-slot="workbench-thread"]');
+    const mainRegion = screen.getByRole("region", { name: "执行记录主区域" });
+    const sidebar = screen.getByRole("complementary", { name: "执行记录侧栏" });
 
     expect(shell).not.toBeNull();
     expect(workbench.className).toContain("xl:h-full");
     expect(thread?.className).toContain("overflow-y-auto");
     expect(screen.getByRole("tabpanel", { name: "执行记录" })).toBeInTheDocument();
+    expect(mainRegion).toBeInTheDocument();
+    expect(sidebar).toBeInTheDocument();
+    expect(within(sidebar).getByText("任务驾驶舱")).toBeInTheDocument();
+    expect(within(sidebar).getByText("当前阻塞")).toBeInTheDocument();
+    expect(within(sidebar).getByText("当前没有记录阻塞动作。")).toBeInTheDocument();
+    expect(within(sidebar).getByText("建议动作")).toBeInTheDocument();
+    expect(within(sidebar).getByText("补充执行要求")).toBeInTheDocument();
+    expect(within(sidebar).getByText("最近产出")).toBeInTheDocument();
+    expect(within(sidebar).getAllByText("首轮任务理解").length).toBeGreaterThan(0);
+    expect(within(sidebar).getByText("风险与同步")).toBeInTheDocument();
+    expect(within(sidebar).getByText(/同步正常/)).toBeInTheDocument();
 
     rectSpy.mockRestore();
     Object.defineProperty(window, "innerWidth", {
