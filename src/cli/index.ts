@@ -2,36 +2,42 @@
 /**
  * AgentDashboard CLI — agentdash
  *
- * A command-line interface for interacting with the AgentDashboard backend API.
+ * A comprehensive command-line interface for interacting with the
+ * AgentDashboard backend API. Designed to be AI-agent-friendly with
+ * structured JSON output by default.
  *
  * Usage:
- *   bun src/cli/index.ts <command> [options]
+ *   bun src/cli/index.ts <group> <command> [options]
  *
- * Commands:
- *   analyze-conflicts    Analyze scheduling conflicts for a workspace
- *   suggest-automation   Get automation suggestions for a task
- *   apply-suggestion     Apply a scheduling suggestion
- *   get-workspace        Get workspace schedule projection
+ * Command Groups:
+ *   task       Task management (list, get, create, update, done, reopen, plan)
+ *   run        Run management (start, message, input)
+ *   schedule   Schedule management (apply, clear, view, conflicts, suggest-time)
+ *   ai         AI-powered features (decompose, suggest-automation, apply-suggestion)
  *
  * Global options:
  *   --base-url <url>     Override the API base URL (default: http://localhost:3000)
+ *
+ * All commands support:
+ *   -o, --output <format>   Output format: json (default) or table
  */
 
 import { Command } from "commander";
 import { ApiClient } from "./lib/api-client.js";
-import { registerAnalyzeConflicts } from "./commands/analyze-conflicts.js";
-import { registerSuggestAutomation } from "./commands/suggest-automation.js";
-import { registerApplySuggestion } from "./commands/apply-suggestion.js";
-import { registerDecomposeTask } from "./commands/decompose-task.js";
-import { registerSuggestTimeslot } from "./commands/suggest-timeslot.js";
-import { registerGetWorkspace } from "./commands/get-workspace.js";
+import { registerTaskCommands } from "./commands/task.js";
+import { registerRunCommands } from "./commands/run.js";
+import { registerScheduleCommands } from "./commands/schedule.js";
+import { registerAiCommands } from "./commands/ai.js";
 
 const program = new Command();
 
 program
   .name("agentdash")
-  .description("AgentDashboard CLI — manage schedules, analyze conflicts, and automate tasks")
-  .version("0.1.0")
+  .description(
+    "AgentDashboard CLI — manage tasks, runs, schedules, and AI features.\n" +
+    "Outputs structured JSON by default for AI-agent integration.",
+  )
+  .version("0.2.0")
   .option("--base-url <url>", "API base URL", "http://localhost:3000");
 
 /**
@@ -44,13 +50,11 @@ function getClient(): ApiClient {
   return new ApiClient(opts.baseUrl);
 }
 
-// Register subcommands
-registerAnalyzeConflicts(program, getClient);
-registerSuggestAutomation(program, getClient);
-registerApplySuggestion(program, getClient);
-registerDecomposeTask(program, getClient);
-registerSuggestTimeslot(program, getClient);
-registerGetWorkspace(program, getClient);
+// Register command groups
+registerTaskCommands(program, getClient);
+registerRunCommands(program, getClient);
+registerScheduleCommands(program, getClient);
+registerAiCommands(program, getClient);
 
 // Parse argv and run
 program.parseAsync(process.argv);
