@@ -91,6 +91,30 @@ export class ApiClient {
   }
 
   /**
+   * Decompose a task into subtasks.
+   * POST /api/ai/decompose-task
+   */
+  async decomposeTask(taskId: string): Promise<unknown> {
+    return this.request("POST", "/api/ai/decompose-task", { taskId });
+  }
+
+  /**
+   * Get suggested time slots for a task.
+   * POST /api/ai/suggest-timeslot
+   */
+  async suggestTimeslot(
+    workspaceId: string,
+    taskId: string,
+    date?: string,
+  ): Promise<unknown> {
+    const body: Record<string, string> = { workspaceId, taskId };
+    if (date) {
+      body.date = date;
+    }
+    return this.request("POST", "/api/ai/suggest-timeslot", body);
+  }
+
+  /**
    * Get workspace schedule projection.
    * GET /api/schedule/projection?workspaceId=xxx
    */

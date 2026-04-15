@@ -22,6 +22,8 @@ import { ApiClient } from "./lib/api-client.js";
 import { registerAnalyzeConflicts } from "./commands/analyze-conflicts.js";
 import { registerSuggestAutomation } from "./commands/suggest-automation.js";
 import { registerApplySuggestion } from "./commands/apply-suggestion.js";
+import { registerDecomposeTask } from "./commands/decompose-task.js";
+import { registerSuggestTimeslot } from "./commands/suggest-timeslot.js";
 import { registerGetWorkspace } from "./commands/get-workspace.js";
 
 const program = new Command();
@@ -46,6 +48,8 @@ function getClient(): ApiClient {
 registerAnalyzeConflicts(program, getClient);
 registerSuggestAutomation(program, getClient);
 registerApplySuggestion(program, getClient);
+registerDecomposeTask(program, getClient);
+registerSuggestTimeslot(program, getClient);
 registerGetWorkspace(program, getClient);
 
 // Parse argv and run
