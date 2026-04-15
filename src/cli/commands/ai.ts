@@ -5,6 +5,8 @@
  *   ai decompose            - Decompose a task into subtasks
  *   ai suggest-automation   - Get automation suggestions for a task
  *   ai apply-suggestion     - Apply a scheduling suggestion
+ *   ai batch-decompose      - Decompose and create subtasks in one step
+ *   ai auto-complete        - Get title auto-complete suggestions
  */
 
 import { Command } from "commander";
@@ -81,6 +83,38 @@ export function registerAiCommands(
           parsedChanges,
         );
         console.log(output(data, opts.output as OutputFormat, formatSuggestions));
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+      }
+    });
+
+  // ── ai batch-decompose ──────────────────────────────────────────────
+  ai
+    .command("batch-decompose")
+    .description("Decompose a task and create subtasks in one step")
+    .requiredOption("-t, --task-id <id>", "Task ID to decompose")
+    .option("-o, --output <format>", "Output format: json or table", "json")
+    .action(async (opts: { taskId: string; output: string }) => {
+      try {
+        const client = getClient();
+        const data = await client.batchDecompose(opts.taskId);
+        console.log(output(data, opts.output as OutputFormat, formatRunResult));
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+      }
+    });
+
+  // ── ai auto-complete ────────────────────────────────────────────────
+  ai
+    .command("auto-complete")
+    .description("Get title auto-complete suggestions")
+    .requiredOption("--title <partial-title>", "Partial title to auto-complete")
+    .option("-o, --output <format>", "Output format: json or table", "json")
+    .action(async (opts: { title: string; output: string }) => {
+      try {
+        const client = getClient();
+        const data = await client.autoComplete(opts.title);
+        console.log(output(data, opts.output as OutputFormat, formatRunResult));
       } catch (err) {
         printError(err instanceof Error ? err.message : String(err));
       }
