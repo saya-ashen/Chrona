@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/modules/db";
+import { db } from "@/lib/db";
 import type { TaskChange } from "@/modules/ai/types";
 
 export async function POST(request: Request) {

@@ -99,3 +99,47 @@ export interface ScheduledTaskInfo {
   estimatedMinutes: number;
   dependencies: string[]; // 依赖的任务 ID 列表
 }
+
+// --- Automation Suggester Types ---
+
+/**
+ * 自動化提案の入力タスク情報
+ */
+export interface TaskAutomationInput {
+  taskId: string;
+  title: string;
+  description: string;
+  priority: string;
+  dueAt: Date | null;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
+  isRunnable: boolean;
+  runnabilityState: string;
+  ownerType: string;
+  tags?: string[];
+}
+
+/**
+ * 実行モード
+ */
+export type ExecutionMode = "immediate" | "scheduled" | "recurring" | "manual";
+
+/**
+ * リマインダー戦略
+ */
+export interface ReminderStrategy {
+  advanceMinutes: number;
+  frequency: "once" | "recurring";
+  channels: string[];
+}
+
+/**
+ * 自動化提案の結果
+ */
+export interface AutomationSuggestion {
+  executionMode: ExecutionMode;
+  reminderStrategy: ReminderStrategy;
+  preparationSteps: string[];
+  contextSources: Array<{ type: string; description: string }>;
+  confidence: "low" | "medium" | "high";
+}
