@@ -143,3 +143,92 @@ export interface AutomationSuggestion {
   contextSources: Array<{ type: string; description: string }>;
   confidence: "low" | "medium" | "high";
 }
+
+// --- Task Decomposition Types ---
+
+/**
+ * タスク分解の入力情報
+ */
+export interface TaskDecompositionInput {
+  taskId?: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  dueAt?: Date | string | null;
+  estimatedMinutes?: number;
+}
+
+/**
+ * サブタスク提案
+ */
+export interface SubtaskSuggestion {
+  title: string;
+  description?: string;
+  estimatedMinutes: number;
+  priority: string;
+  order: number;
+  dependsOnPrevious: boolean;
+}
+
+/**
+ * タスク分解の結果
+ */
+export interface TaskDecompositionResult {
+  subtasks: SubtaskSuggestion[];
+  totalEstimatedMinutes: number;
+  feasibilityScore: number;
+  warnings: string[];
+}
+
+// --- Timeslot Suggestion Types ---
+
+/**
+ * A scheduled slot in the calendar (existing task)
+ */
+export interface ScheduleSlot {
+  taskId: string;
+  title: string;
+  startAt: Date;
+  endAt: Date;
+}
+
+/**
+ * Input for the timeslot suggestion engine
+ */
+export interface TimeslotSuggestionInput {
+  taskId: string;
+  title: string;
+  priority: string;
+  estimatedMinutes: number;
+  dueAt?: Date | null;
+  currentSchedule: ScheduleSlot[];
+}
+
+/**
+ * Options for timeslot suggestion
+ */
+export interface TimeslotOptions {
+  workdayStartHour?: number; // default 9
+  workdayEndHour?: number;   // default 18
+  bufferMinutes?: number;    // default 15
+  maxSuggestions?: number;   // default 5
+}
+
+/**
+ * A single timeslot suggestion with scoring
+ */
+export interface TimeslotSuggestion {
+  startAt: Date;
+  endAt: Date;
+  score: number;
+  reasons: string[];
+  conflicts: string[];
+}
+
+/**
+ * Result of timeslot suggestion analysis
+ */
+export interface TimeslotSuggestionResult {
+  suggestions: TimeslotSuggestion[];
+  bestMatch: TimeslotSuggestion | null;
+}
