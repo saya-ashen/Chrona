@@ -170,6 +170,8 @@ function createData(): SchedulePageData {
     proposals: [],
     risks: [],
     listItems: [],
+    conflicts: [],
+    suggestions: [],
   };
 }
 

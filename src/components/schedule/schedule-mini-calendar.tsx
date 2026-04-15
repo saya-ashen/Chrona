@@ -78,7 +78,7 @@ export function CompactTodayFocus({
   emptyMessage,
 }: {
   title: string;
-  items: Array<{ taskId: string; title: string; reason: string; tone?: "neutral" | "info" | "warning" | "critical" }>;
+  items: Array<{ taskId: string; title: string; reason: string; tone?: "neutral" | "info" | "warning" | "critical" | "success" }>;
   emptyMessage: string;
 }) {
   return (

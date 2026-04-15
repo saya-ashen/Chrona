@@ -7,7 +7,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 
-type ActionRailTab = "queue" | "risks" | "proposals";
+type ActionRailTab = "queue" | "risks" | "proposals" | "conflicts";
 
 type RailSection = {
   value: ActionRailTab;
@@ -36,6 +36,7 @@ export function ScheduleActionRail({
     queue: null,
     risks: null,
     proposals: null,
+    conflicts: null,
   });
 
   function focusTab(nextIndex: number) {

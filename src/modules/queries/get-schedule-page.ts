@@ -7,6 +7,9 @@ import {
 import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/runtime/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
+import type { ScheduledTaskInfo } from "@/modules/ai/types";
+import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
 
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
   id: string;
@@ -125,7 +128,7 @@ function buildFocusZones(items: Array<ReturnType<typeof mapProjectionItem>>) {
       const hasHighRisk = dayItems.some(
         (item) => item.scheduleStatus === "Overdue" || item.scheduleStatus === "AtRisk",
       );
-      const riskLevel = hasHighRisk
+      const riskLevel: "low" | "medium" | "high" = hasHighRisk
         ? "high"
         : fragmentedMinutes >= 120 || totalMinutes > 8 * 60
           ? "medium"
@@ -307,6 +310,24 @@ export async function getSchedulePage(workspaceId: string) {
     proposals,
   });
 
+  // 分析冲突
+  const scheduledTasks: ScheduledTaskInfo[] = scheduled
+    .filter((s) => s.scheduledStartAt !== null && s.scheduledEndAt !== null)
+    .map((s) => ({
+      taskId: s.taskId,
+      title: s.title,
+      priority: s.priority,
+      scheduledStartAt: s.scheduledStartAt!,
+      scheduledEndAt: s.scheduledEndAt!,
+      dueAt: s.dueAt,
+      estimatedMinutes: Math.round(
+        (s.scheduledEndAt!.getTime() - s.scheduledStartAt!.getTime()) / 60000,
+      ),
+      dependencies: [], // TODO: 从数据库读取依赖关系
+    }));
+
+  const conflictAnalysis = analyzeConflicts(scheduledTasks);
+
   return {
     defaultRuntimeAdapterKey: workspace.defaultRuntime,
     runtimeAdapters,
@@ -324,5 +345,7 @@ export async function getSchedulePage(workspaceId: string) {
     risks,
     listItems,
     proposals: mappedProposals,
+    conflicts: conflictAnalysis.conflicts as unknown as ScheduleConflict[],
+    suggestions: conflictAnalysis.suggestions as unknown as ScheduleSuggestion[],
   };
 }
