@@ -286,9 +286,20 @@ export function SelectedBlockSheet({
             description={item.description}
             priority={item.priority}
             dueAt={item.dueAt}
-            onApply={(result) => {
-              // Placeholder: actual subtask creation will be wired later
-              console.log("[TaskDecomposition] Apply decomposition for task", item.taskId, result);
+            onApply={async () => {
+              // Call batch-decompose API to persist subtasks in DB
+              try {
+                const res = await fetch("/api/ai/batch-decompose", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ taskId: item.taskId }),
+                });
+                if (!res.ok) throw new Error("Batch decompose failed");
+                // Refresh parent data
+                await onMutatedAction();
+              } catch (err) {
+                console.error("[TaskDecomposition] Failed to apply:", err);
+              }
             }}
           />
 
