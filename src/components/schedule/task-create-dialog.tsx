@@ -1,9 +1,12 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { AutomationSuggestion } from "@/modules/ai/types";
+import { suggestAutomation } from "@/modules/ai/automation-suggester";
 
 type TaskCreateDialogProps = {
   isOpen: boolean;
@@ -37,6 +40,44 @@ export function TaskCreateDialog({
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [aiSuggestion, setAiSuggestion] = useState<AutomationSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fetchAiSuggestion = useCallback((currentTitle: string, currentPriority: string) => {
+    if (!currentTitle.trim() || currentTitle.trim().length < 3) {
+      setAiSuggestion(null);
+      return;
+    }
+
+    setAiLoading(true);
+    // Use client-side suggestion (no API call needed - pure logic)
+    try {
+      const suggestion = suggestAutomation({
+        taskId: "preview",
+        title: currentTitle.trim(),
+        description: description,
+        priority: currentPriority,
+        dueAt: null,
+        scheduledStartAt: initialStartAt,
+        scheduledEndAt: initialEndAt,
+        isRunnable: false,
+        runnabilityState: "not_configured",
+        ownerType: "human",
+      });
+      setAiSuggestion(suggestion);
+    } catch {
+      setAiSuggestion(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [description, initialStartAt, initialEndAt]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchAiSuggestion(title, priority);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [title, priority, fetchAiSuggestion]);
 
   useEffect(() => {
     if (isOpen) {
@@ -223,6 +264,12 @@ export function TaskCreateDialog({
               ))}
             </div>
           </div>
+
+          {/* AI Suggestion */}
+          <AutomationSuggestionPanel
+            suggestion={aiSuggestion}
+            isLoading={aiLoading}
+          />
         </div>
 
         {/* Footer */}

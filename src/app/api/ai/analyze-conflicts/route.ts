@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/modules/db";
+import { db } from "@/lib/db";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";
 
