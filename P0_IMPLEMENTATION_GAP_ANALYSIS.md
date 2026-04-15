@@ -534,9 +534,9 @@ agentdash apply-suggestion \
 4. [ ] 集成到任务详情页
 
 ### Phase 7: CLI 客户端（后续补充）
-1. [ ] 创建 CLI 基础框架（Commander.js）
-2. [ ] 实现 `agentdash analyze-conflicts` 命令
-3. [ ] 实现 `agentdash suggest-automation` 命令
-4. [ ] 实现 `agentdash apply-suggestion` 命令
-5. [ ] 编写 skill 文档：`agentdashboard-ai-operations.md`
-6. [ ] 测试 CLI → API 完整流程
+1. [x] 创建 CLI 基础框架（Commander.js）
+2. [x] 实现 `agentdash analyze-conflicts` 命令
+3. [x] 实现 `agentdash suggest-automation` 命令
+4. [x] 实现 `agentdash apply-suggestion` 命令
+5. [x] 编写 skill 文档：`agentdashboard-ai-operations.md`
+6. [x] 测试 CLI → API 完整流程
