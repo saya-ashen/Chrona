@@ -4,6 +4,11 @@ import type {
   ReminderStrategy,
   AutomationSuggestion,
 } from "./types";
+import {
+  chatCompletionJSON,
+  isLLMAvailable,
+  automationSuggestionSystemPrompt,
+} from "./llm-service";
 
 /**
  * タスクが定期的なものかどうかをタイトルと説明から判定する
@@ -248,6 +253,51 @@ export function suggestAutomation(
     contextSources,
     confidence,
   };
+}
+
+// ─── LLM-powered suggestion ────────────────────────────
+
+/**
+ * Suggest automation using LLM intelligence. Falls back to rule-based if LLM unavailable.
+ */
+export async function suggestAutomationSmart(
+  task: TaskAutomationInput,
+): Promise<AutomationSuggestion> {
+  if (isLLMAvailable()) {
+    try {
+      const result = await suggestAutomationWithLLM(task);
+      if (result) return result;
+    } catch (err) {
+      console.warn("[automation-suggester] LLM suggestion failed, falling back to rules:", err);
+    }
+  }
+  return suggestAutomation(task);
+}
+
+async function suggestAutomationWithLLM(
+  task: TaskAutomationInput,
+): Promise<AutomationSuggestion | null> {
+  const userPrompt = [
+    `Task Title: ${task.title}`,
+    task.description ? `Description: ${task.description}` : null,
+    `Priority: ${task.priority}`,
+    task.dueAt ? `Due: ${task.dueAt instanceof Date ? task.dueAt.toISOString() : task.dueAt}` : null,
+    task.scheduledStartAt ? `Scheduled Start: ${task.scheduledStartAt instanceof Date ? task.scheduledStartAt.toISOString() : task.scheduledStartAt}` : null,
+    `Runnable: ${task.isRunnable}`,
+    `Owner Type: ${task.ownerType}`,
+    task.tags?.length ? `Tags: ${task.tags.join(", ")}` : null,
+  ].filter(Boolean).join("\n");
+
+  const result = await chatCompletionJSON<AutomationSuggestion>({
+    messages: [
+      { role: "system", content: automationSuggestionSystemPrompt() },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    maxTokens: 1000,
+  });
+
+  return result;
 }
 
 export type {
