@@ -1,10 +1,13 @@
 "use client";
 
-import { ChevronDown, GripVertical } from "lucide-react";
-import { type DragEvent, useMemo } from "react";
+import { Calendar, ChevronDown, GripVertical } from "lucide-react";
+import { type DragEvent, useMemo, useState } from "react";
 import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
 import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
+import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
 import { suggestAutomation } from "@/modules/ai/automation-suggester";
+import type { ScheduleSlot } from "@/modules/ai/types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
@@ -277,6 +280,18 @@ export function SelectedBlockSheet({
 
           <AutomationSuggestionForItem item={item} />
 
+          <TaskDecompositionPanel
+            taskId={item.taskId}
+            title={item.title}
+            description={item.description}
+            priority={item.priority}
+            dueAt={item.dueAt}
+            onApply={(result) => {
+              // Placeholder: actual subtask creation will be wired later
+              console.log("[TaskDecomposition] Apply decomposition for task", item.taskId, result);
+            }}
+          />
+
           <SurfaceCard
             as="div"
             variant="inset"
@@ -378,9 +393,11 @@ export function QueueCard({
   isDragging,
   isPending,
   isExpanded,
+  currentSchedule,
   onToggle,
   onMutatedAction,
   onSaveTaskConfigAction,
+  onScheduleSlot,
   onDragStart,
   onDragEnd,
 }: {
@@ -390,12 +407,14 @@ export function QueueCard({
   isDragging: boolean;
   isPending: boolean;
   isExpanded: boolean;
+  currentSchedule?: ScheduleSlot[];
   onToggle: () => void;
   onMutatedAction: () => Promise<void>;
   onSaveTaskConfigAction: (
     taskId: string,
     input: TaskConfigFormInput,
   ) => Promise<void>;
+  onScheduleSlot?: (taskId: string, startAt: Date, endAt: Date) => void;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
 }) {
@@ -403,6 +422,7 @@ export function QueueCard({
   const { messages, t } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const suggestedDurationMinutes = getQueueSuggestedDuration(item);
+  const [showTimeslots, setShowTimeslots] = useState(false);
 
   return (
     <SurfaceCard
@@ -474,6 +494,21 @@ export function QueueCard({
           <p className="text-xs text-muted-foreground">
             {isPending ? copy.schedulingUpdating : copy.dragHint}
           </p>
+          {suggestedDurationMinutes ? (
+            <button
+              type="button"
+              onClick={() => setShowTimeslots((v) => !v)}
+              className={cn(
+                "mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition",
+                showTimeslots
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-primary",
+              )}
+            >
+              <Calendar className="size-3" />
+              {showTimeslots ? "Hide Suggestions" : "Suggest Time"}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -519,6 +554,20 @@ export function QueueCard({
             latestRunStatus={item.latestRunStatus}
             workLabel={t("common.openWorkbench")}
           />
+
+          {showTimeslots && suggestedDurationMinutes ? (
+            <TimeslotSuggestionPanel
+              taskId={item.taskId}
+              title={item.title}
+              priority={item.priority}
+              estimatedMinutes={suggestedDurationMinutes}
+              dueAt={item.dueAt}
+              currentSchedule={currentSchedule ?? []}
+              onSchedule={(startAt, endAt) =>
+                onScheduleSlot?.(item.taskId, startAt, endAt)
+              }
+            />
+          ) : null}
 
           <SurfaceCard
             as="div"
