@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
+import { analyzeConflictsSmart } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";
 
 export async function POST(request: Request) {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       }));
 
     // 分析冲突
-    const result = analyzeConflicts(tasks);
+    const result = await analyzeConflictsSmart(tasks);
 
     return NextResponse.json(result);
   } catch (error) {

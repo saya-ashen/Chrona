@@ -3,6 +3,11 @@ import type {
   SubtaskSuggestion,
   TaskDecompositionResult,
 } from "./types";
+import {
+  chatCompletionJSON,
+  isLLMAvailable,
+  taskDecompositionSystemPrompt,
+} from "./llm-service";
 
 // --- Conjunction / keyword patterns ---
 
@@ -466,6 +471,89 @@ export function decomposeTask(input: TaskDecompositionInput): TaskDecompositionR
     feasibilityScore,
     warnings,
   };
+}
+
+// ─── LLM-powered decomposition ─────────────────────────
+
+/**
+ * Decompose a task using LLM intelligence. Falls back to rule-based if LLM unavailable.
+ * This is the preferred entry point for API routes.
+ */
+export async function decomposeTaskSmart(
+  input: TaskDecompositionInput,
+): Promise<TaskDecompositionResult> {
+  // Try LLM first
+  if (isLLMAvailable()) {
+    try {
+      const result = await decomposeTaskWithLLM(input);
+      if (result && result.subtasks.length > 0) {
+        return result;
+      }
+    } catch (err) {
+      console.warn("[task-decomposer] LLM decomposition failed, falling back to rules:", err);
+    }
+  }
+
+  // Fall back to rule-based
+  return decomposeTask(input);
+}
+
+/**
+ * Decompose using LLM. Returns null if LLM is not available.
+ */
+async function decomposeTaskWithLLM(
+  input: TaskDecompositionInput,
+): Promise<TaskDecompositionResult | null> {
+  const userPrompt = buildDecompositionPrompt(input);
+
+  const result = await chatCompletionJSON<{
+    subtasks: Array<{
+      title: string;
+      description?: string;
+      estimatedMinutes: number;
+      priority: string;
+      order: number;
+      dependsOnPrevious: boolean;
+    }>;
+    totalEstimatedMinutes: number;
+    feasibilityScore: number;
+    warnings: string[];
+  }>({
+    messages: [
+      { role: "system", content: taskDecompositionSystemPrompt() },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    maxTokens: 2000,
+  });
+
+  if (!result) return null;
+
+  return {
+    subtasks: result.subtasks.map((s) => ({
+      title: s.title,
+      description: s.description,
+      estimatedMinutes: s.estimatedMinutes,
+      priority: s.priority,
+      order: s.order,
+      dependsOnPrevious: s.dependsOnPrevious,
+    })),
+    totalEstimatedMinutes: result.totalEstimatedMinutes,
+    feasibilityScore: result.feasibilityScore,
+    warnings: result.warnings ?? [],
+  };
+}
+
+function buildDecompositionPrompt(input: TaskDecompositionInput): string {
+  const parts = [`Task Title: ${input.title}`];
+  if (input.description) parts.push(`Description: ${input.description}`);
+  if (input.priority) parts.push(`Priority: ${input.priority}`);
+  if (input.estimatedMinutes) parts.push(`Estimated Duration: ${input.estimatedMinutes} minutes`);
+  if (input.dueAt) {
+    const d = input.dueAt instanceof Date ? input.dueAt.toISOString() : String(input.dueAt);
+    parts.push(`Due Date: ${d}`);
+  }
+  return parts.join("\n");
 }
 
 export type {

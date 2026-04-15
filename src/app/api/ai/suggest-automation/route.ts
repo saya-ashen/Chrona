@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { suggestAutomation } from "@/modules/ai/automation-suggester";
+import { suggestAutomationSmart } from "@/modules/ai/automation-suggester";
 
 export async function POST(request: Request) {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const suggestion = suggestAutomation({
+    const suggestion = await suggestAutomationSmart({
       id: task.id,
       title: task.title,
       description: task.description,

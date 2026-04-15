@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { chatCompletionJSON, isLLMAvailable, taskPlanSystemPrompt } from "@/modules/ai/llm-service";
 
 function buildMockTaskPlanPayload(task: {
   title: string;
@@ -18,7 +19,7 @@ function buildMockTaskPlanPayload(task: {
 
   return {
     revision,
-    generated_by: "work-plan-agent",
+    generated_by: "work-plan-agent" as const,
     is_mock: true,
     summary: `先澄清目标与背景，再执行首轮产出，并把需要你确认的节点收束到工作台右侧的任务计划中。`,
     change_summary:
@@ -55,6 +56,97 @@ function buildMockTaskPlanPayload(task: {
   };
 }
 
+// ---------- LLM-powered plan generation ----------
+
+interface TaskPlanPayload {
+  revision: "generated" | "updated";
+  generated_by: "work-plan-agent";
+  is_mock: boolean;
+  summary: string;
+  change_summary: string;
+  notes: string[];
+  steps: Array<{ id: string; title: string; objective: string; phase: string }>;
+  [key: string]: unknown;
+}
+
+interface LLMPlanResponse {
+  summary: string;
+  change_summary: string;
+  notes: string[];
+  steps: Array<{ id: string; title: string; objective: string; phase: string }>;
+}
+
+async function buildSmartTaskPlanPayload(
+  task: {
+    title: string;
+    prompt: string | null;
+    status: string;
+    blockReason: unknown;
+  },
+  revision: "generated" | "updated",
+): Promise<TaskPlanPayload> {
+  // If LLM is not available, fall back immediately
+  if (!isLLMAvailable()) {
+    return buildMockTaskPlanPayload(task, revision);
+  }
+
+  try {
+    const blockSummary =
+      task.blockReason && typeof task.blockReason === "object" && !Array.isArray(task.blockReason)
+        ? (task.blockReason as { actionRequired?: string }).actionRequired
+        : null;
+
+    const userMessage = [
+      `Task title: ${task.title}`,
+      task.prompt ? `Task prompt/description: ${task.prompt}` : null,
+      `Current status: ${task.status}`,
+      blockSummary ? `Current blocker: ${blockSummary}` : null,
+      `Revision type: ${revision === "updated" ? "This is an update to an existing plan" : "This is the initial plan"}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const llmResult = await chatCompletionJSON<LLMPlanResponse>({
+      messages: [
+        { role: "system", content: taskPlanSystemPrompt() },
+        { role: "user", content: userMessage },
+      ],
+      temperature: 0.4,
+      maxTokens: 1500,
+    });
+
+    // Validate the LLM response has required fields
+    if (
+      llmResult &&
+      typeof llmResult.summary === "string" &&
+      Array.isArray(llmResult.steps) &&
+      llmResult.steps.length > 0
+    ) {
+      return {
+        revision,
+        generated_by: "work-plan-agent",
+        is_mock: false,
+        summary: llmResult.summary,
+        change_summary: llmResult.change_summary ?? "",
+        notes: Array.isArray(llmResult.notes) ? llmResult.notes : [],
+        steps: llmResult.steps.map((step) => ({
+          id: step.id ?? `step-${Math.random().toString(36).slice(2, 8)}`,
+          title: step.title ?? "",
+          objective: step.objective ?? "",
+          phase: step.phase ?? "",
+        })),
+      };
+    }
+
+    // LLM returned null or invalid structure — fall back
+    console.warn("[generate-task-plan] LLM returned invalid structure, falling back to mock plan");
+    return buildMockTaskPlanPayload(task, revision);
+  } catch (error) {
+    console.warn("[generate-task-plan] LLM plan generation failed, falling back to mock plan:", error);
+    return buildMockTaskPlanPayload(task, revision);
+  }
+}
+
 export async function generateTaskPlan(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
@@ -88,7 +180,7 @@ export async function generateTaskPlan(input: { taskId: string }) {
     actorType: "agent",
     actorId: "work-plan-agent",
     source: "planner",
-    payload: buildMockTaskPlanPayload(task, revision),
+    payload: await buildSmartTaskPlanPayload(task, revision),
     dedupeKey: `${eventType}:${task.id}:${runtimeTs.toISOString()}`,
     runtimeTs,
   });

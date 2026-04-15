@@ -533,10 +533,30 @@ agentdash apply-suggestion \
 3. [ ] 实现资源可用性检查
 4. [ ] 集成到任务详情页
 
-### Phase 7: CLI 客户端（后续补充）
+### Phase 7: CLI 客户端 ✅ 完成
 1. [x] 创建 CLI 基础框架（Commander.js）
 2. [x] 实现 `agentdash analyze-conflicts` 命令
 3. [x] 实现 `agentdash suggest-automation` 命令
 4. [x] 实现 `agentdash apply-suggestion` 命令
 5. [x] 编写 skill 文档：`agentdashboard-ai-operations.md`
 6. [x] 测试 CLI → API 完整流程
+
+### Phase 8: AI Agent 化重构 ✅ 完成
+1. [x] 后端任务管理 REST API 完整覆盖
+   - GET/POST /api/tasks, GET/PATCH /api/tasks/[taskId]
+   - POST /api/tasks/[taskId]/run, /done, /reopen, /message, /input, /plan
+   - POST/DELETE /api/tasks/[taskId]/schedule
+2. [x] CLI 重新设计为 AI Agent 友好的分组命令
+   - task 组: list, get, create, update, done, reopen, plan
+   - run 组: start, message, input
+   - schedule 组: apply, clear, view, conflicts, suggest-time
+   - ai 组: decompose, suggest-automation, apply-suggestion
+3. [x] OpenClaw 适配器增强
+   - 有状态 Mock 适配器支持完整 session 生命周期
+   - 支持 approval 工作流和多轮对话
+   - 可配置 completionDelay, autoComplete, failRate, requireApproval
+4. [x] 端到端集成测试
+   - 31 个 mock adapter 单元测试
+   - 12 个任务生命周期集成测试
+   - 全量测试通过: vitest 31 files, bun 123 tests
+5. [x] 综合 Skill 文档更新（821 行完整参考）

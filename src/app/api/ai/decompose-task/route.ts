@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { decomposeTask } from "@/modules/ai/task-decomposer";
+import { decomposeTaskSmart } from "@/modules/ai/task-decomposer";
 import type { TaskDecompositionInput } from "@/modules/ai/types";
 
 export async function POST(request: Request) {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       };
     }
 
-    const result = decomposeTask(input);
+    const result = await decomposeTaskSmart(input);
 
     return NextResponse.json(result);
   } catch (error) {
