@@ -142,6 +142,7 @@ function buildFocusZones(items: Array<ReturnType<typeof mapProjectionItem>>) {
 }
 
 function buildAutomationCandidates(input: {
+  scheduled: Array<ReturnType<typeof mapProjectionItem>>;
   unscheduled: Array<ReturnType<typeof mapProjectionItem>>;
   risks: Array<ReturnType<typeof mapProjectionItem>>;
   proposals: Awaited<ReturnType<typeof db.scheduleProposal.findMany>>;
@@ -149,6 +150,7 @@ function buildAutomationCandidates(input: {
   const today = startOfDay(new Date());
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
   const proposalTaskIds = new Set(input.proposals.map((proposal) => proposal.taskId));
+  const riskTaskIds = new Set(input.risks.map((item) => item.taskId));
   const candidates: Array<{
     taskId: string;
     kind: "auto_schedule" | "decompose" | "remind" | "auto_run";
@@ -200,6 +202,24 @@ function buildAutomationCandidates(input: {
           item.scheduleStatus === "Overdue" || item.scheduleStatus === "AtRisk"
             ? "high"
             : "medium",
+      });
+    }
+  }
+
+  for (const item of input.scheduled) {
+    const blockedByApproval = item.approvalPendingCount > 0;
+    const blockedByUser =
+      item.latestRunStatus === "WaitingForInput" ||
+      item.latestRunStatus === "WaitingForApproval" ||
+      item.actionRequired === "Schedule task" ||
+      item.actionRequired === "Reschedule task";
+
+    if (item.isRunnable && !blockedByApproval && !blockedByUser && !riskTaskIds.has(item.taskId)) {
+      candidates.push({
+        taskId: item.taskId,
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: item.priority === "Urgent" || item.priority === "High" ? "high" : "medium",
       });
     }
   }
@@ -281,6 +301,7 @@ export async function getSchedulePage(workspaceId: string) {
   });
   const focusZones = buildFocusZones(scheduled);
   const automationCandidates = buildAutomationCandidates({
+    scheduled,
     unscheduled,
     risks,
     proposals,

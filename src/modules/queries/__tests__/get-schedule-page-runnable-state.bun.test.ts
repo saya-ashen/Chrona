@@ -44,6 +44,9 @@ describe("getSchedulePage runnable state", () => {
         status: "Ready",
         priority: "High",
         ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {},
+        runtimeInputVersion: "1",
         runtimeModel: "gpt-5.4",
         prompt: "Execute the configured task",
         runtimeConfig: { temperature: 0.2 },
@@ -62,8 +65,12 @@ describe("getSchedulePage runnable state", () => {
         status: "Draft",
         priority: "Medium",
         ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {},
+        runtimeInputVersion: "1",
         runtimeModel: "gpt-5.4",
         prompt: null,
+        runtimeConfig: {},
         scheduleStatus: "Unscheduled",
       },
     });
@@ -113,5 +120,20 @@ describe("getSchedulePage runnable state", () => {
       runnabilityState: "missing_prompt",
       runnabilitySummary: "Needs prompt",
     });
+
+    expect(page.automationCandidates).toEqual([
+      {
+        taskId: draftTask.id,
+        kind: "decompose",
+        reason: "Task needs execution details before it can run.",
+        priority: "medium",
+      },
+      {
+        taskId: readyTask.id,
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: "high",
+      },
+    ]);
   });
 });

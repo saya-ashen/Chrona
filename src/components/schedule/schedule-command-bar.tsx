@@ -13,10 +13,12 @@ import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 export function ScheduleCommandBar({
+  id,
   selectedDay,
   isPending,
   onSubmit,
 }: {
+  id?: string;
   selectedDay: string;
   isPending: boolean;
   onSubmit: (draft: QuickCreateDraft) => Promise<void>;
@@ -56,7 +58,7 @@ export function ScheduleCommandBar({
   }
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/70 p-3 shadow-sm">
+    <div id={id} className="rounded-2xl border border-border/60 bg-background/70 p-3 shadow-sm">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
         <input
           value={value}

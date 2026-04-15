@@ -1,19 +1,25 @@
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
-import { SurfaceCard } from "@/components/ui/surface-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-
-type PlanningMetric = {
-  label: string;
-  value: number;
-  tone?: "neutral" | "info" | "critical";
-};
 
 type PlanningDayLink = {
   label: string;
   href: string;
   current?: boolean;
+};
+
+type PlanningAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  description?: string;
+  disabled?: boolean;
+};
+
+export type ScheduleCockpitMetric = {
+  label: string;
+  value: string;
+  hint: string;
+  tone?: "neutral" | "info" | "critical";
 };
 
 export function PlanningHeader({
@@ -23,6 +29,7 @@ export function PlanningHeader({
   dateSwitcherLabel,
   dayLinks,
   metrics,
+  actions,
   activeView,
   timelineHref,
   listHref,
@@ -32,9 +39,11 @@ export function PlanningHeader({
   ariaLabel: string;
   title: string;
   activeDayLabel: string;
+  summary: string;
   dateSwitcherLabel: string;
   dayLinks: PlanningDayLink[];
-  metrics: PlanningMetric[];
+  metrics: ScheduleCockpitMetric[];
+  actions: PlanningAction[];
   activeView: "timeline" | "list";
   timelineHref: string;
   listHref: string;
@@ -42,60 +51,137 @@ export function PlanningHeader({
   listLabel: string;
 }) {
   return (
-    <SurfaceCard as="section" variant="highlight" aria-label={ariaLabel} className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-          <p className="text-sm text-muted-foreground">{activeDayLabel}</p>
-        </div>
+    <header
+      aria-label={ariaLabel}
+      className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm"
+    >
+      <div className="flex items-center gap-2">
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+        <span className="rounded-full bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
+          {activeDayLabel}
+        </span>
+      </div>
 
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{dateSwitcherLabel}</span>
-            <div className="flex flex-wrap gap-2 rounded-2xl border border-border/60 bg-background/70 p-1">
-              {dayLinks.map((dayLink) => (
-                <LocalizedLink
-                  key={dayLink.label}
-                  href={dayLink.href}
-                  aria-current={dayLink.current ? "date" : undefined}
-                  className={buttonVariants({ variant: dayLink.current ? "default" : "ghost", size: "sm" })}
-                >
-                  {dayLink.label}
-                </LocalizedLink>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 rounded-2xl border border-border/60 bg-background/70 p-1">
-            <LocalizedLink
-              href={timelineHref}
-              aria-current={activeView === "timeline" ? "page" : undefined}
-              className={buttonVariants({ variant: activeView === "timeline" ? "default" : "ghost", size: "sm" })}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {dateSwitcherLabel}
+        </span>
+        <div className="flex gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
+          {dayLinks.map((dayLink) => (
+            <a
+              key={dayLink.label}
+              href={dayLink.href}
+              aria-current={dayLink.current ? "date" : undefined}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                dayLink.current
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+              )}
             >
-              {timelineLabel}
-            </LocalizedLink>
-            <LocalizedLink
-              href={listHref}
-              aria-current={activeView === "list" ? "page" : undefined}
-              className={buttonVariants({ variant: activeView === "list" ? "default" : "ghost", size: "sm" })}
-            >
-              {listLabel}
-            </LocalizedLink>
-          </div>
+              {dayLink.label}
+            </a>
+          ))}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
+        <a
+          href={timelineHref}
+          aria-current={activeView === "timeline" ? "page" : undefined}
+          className={cn(
+            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            activeView === "timeline"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+          )}
+        >
+          {timelineLabel}
+        </a>
+        <a
+          href={listHref}
+          aria-current={activeView === "list" ? "page" : undefined}
+          className={cn(
+            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            activeView === "list"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+          )}
+        >
+          {listLabel}
+        </a>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
         {metrics.map((metric) => (
-          <StatusBadge
+          <div
             key={metric.label}
-            tone={metric.tone}
-            className={cn("px-3 py-1.5 text-xs", metric.tone === undefined && "border-border/70 bg-background text-muted-foreground")}
+            title={metric.hint}
+            className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-2.5 py-1"
           >
-            {metric.label}: {metric.value}
-          </StatusBadge>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {metric.label}
+            </span>
+            <span
+              className={cn(
+                "text-sm font-semibold",
+                metric.tone === "critical"
+                  ? "text-red-600"
+                  : metric.tone === "info"
+                    ? "text-blue-600"
+                    : "text-foreground",
+              )}
+            >
+              {metric.value}
+            </span>
+          </div>
         ))}
       </div>
-    </SurfaceCard>
+
+      <div className="flex gap-2">
+        {actions.map((action, index) =>
+          action.onClick ? (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              disabled={action.disabled}
+              title={action.description}
+              className={cn(
+                buttonVariants({ variant: index === 0 ? "default" : "outline", size: "sm" }),
+                "h-8 rounded-lg text-xs",
+              )}
+            >
+              {action.label}
+            </button>
+          ) : action.href && !action.disabled ? (
+            <a
+              key={action.label}
+              href={action.href}
+              title={action.description}
+              className={cn(
+                buttonVariants({ variant: index === 0 ? "default" : "outline", size: "sm" }),
+                "h-8 rounded-lg text-xs",
+              )}
+            >
+              {action.label}
+            </a>
+          ) : (
+            <button
+              key={action.label}
+              type="button"
+              disabled
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "h-8 rounded-lg text-xs",
+              )}
+              title={action.description}
+            >
+              {action.label}
+            </button>
+          ),
+        )}
+      </div>
+    </header>
   );
 }

@@ -355,6 +355,17 @@ function QueueTaskConfigEditor({
   );
 }
 
+function getQueueSuggestedDuration(item: UnscheduledItem) {
+  const value = (item.runtimeConfig as { suggestedDurationMinutes?: unknown } | null)
+    ?.suggestedDurationMinutes;
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(15, Math.round(value / 15) * 15);
+}
+
 export function QueueCard({
   item,
   runtimeAdapters,
@@ -386,6 +397,7 @@ export function QueueCard({
   const locale = useLocale();
   const { messages, t } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const suggestedDurationMinutes = getQueueSuggestedDuration(item);
 
   return (
     <SurfaceCard
@@ -433,6 +445,11 @@ export function QueueCard({
                 ) : null}
                 {item.actionRequired ? (
                   <StatusBadge tone="warning">{item.actionRequired}</StatusBadge>
+                ) : null}
+                {suggestedDurationMinutes ? (
+                  <StatusBadge>
+                    {suggestedDurationMinutes}m
+                  </StatusBadge>
                 ) : null}
               </div>
             </div>

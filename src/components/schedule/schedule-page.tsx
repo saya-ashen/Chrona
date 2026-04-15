@@ -10,22 +10,23 @@ import {
   updateTaskConfigFromSchedule,
 } from "@/app/actions/task-actions";
 import { PlanningHeader } from "@/components/schedule/planning-header";
+import { CompactTodayFocus, ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
 import {
   EmptyState,
   ProposalCard,
   QueueCard,
   RiskCard,
   SelectedBlockSheet,
-  TodayFocusCard,
 } from "@/components/schedule/schedule-page-panels";
 import {
   getSchedulePageCopy,
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
+import { ScheduleInlineQuickCreate } from "@/components/schedule/schedule-inline-quick-create";
+import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
 import { ScheduleActionRail } from "@/components/schedule/schedule-action-rail";
-import { ScheduleCommandBar } from "@/components/schedule/schedule-command-bar";
 import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
-import { DayTimeline, WeekStrip } from "@/components/schedule/schedule-page-timeline";
+import { DayTimeline } from "@/components/schedule/schedule-page-timeline";
 import type {
   SchedulePageData,
   SchedulePageProps,
@@ -49,21 +50,19 @@ import {
   createScheduledItemFromQueueItem,
   formatDateKey,
   formatDayHeading,
+  formatDurationMinutes,
   formatTime,
+  formatWeekdayShort,
   getBlockDurationMinutes,
   getTodayKey,
   normalizeScheduleView,
   parseDayKey,
   sortScheduledItems,
   startOfDay,
+  startOfWeek,
 } from "@/components/schedule/schedule-page-utils";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  SurfaceCard,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
+import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 
@@ -98,6 +97,7 @@ export function SchedulePage({
   const [announcement, setAnnouncement] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("queue");
+  const [showQuickAddDialog, setShowQuickAddDialog] = useState(false);
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
 
@@ -216,6 +216,60 @@ export function SchedulePage({
       : secondaryView === "proposals"
         ? copy.aiProposalsTitle
         : copy.unscheduledQueue;
+  const activeDayDate = parseDayKey(activeDay) ?? startOfDay(new Date());
+  const calendarMonthDate = startOfDay(new Date(activeDayDate.getFullYear(), activeDayDate.getMonth(), 1));
+  const calendarGridStart = startOfWeek(calendarMonthDate);
+  const calendarDays = Array.from({ length: 35 }, (_, index) => {
+    const date = addDays(calendarGridStart, index);
+    const dayKey = formatDateKey(date);
+    const dayGroup = scheduledGroups.find((group) => group.key === dayKey);
+
+    return {
+      key: dayKey,
+      label: formatDayHeading(date, locale, copy),
+      shortLabel: formatWeekdayShort(date, locale),
+      dateNumber: String(date.getDate()),
+      href: localizeHref(locale, buildScheduleViewHref(dayKey, activeView, activeSelectedTaskId)),
+      isCurrentMonth: date.getMonth() === activeDayDate.getMonth(),
+      isToday: dayKey === todayKey,
+      isSelected: dayKey === activeDay,
+      scheduledCount: dayGroup?.items.length ?? 0,
+      riskCount: dayGroup?.riskCount ?? 0,
+    };
+  });
+  const calendarMonthLabel = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
+    month: "long",
+    year: "numeric",
+  }).format(activeDayDate);
+  const cockpitSummary = copy.cockpitSummaryTemplate
+    .replace("{scheduled}", formatDurationMinutes(viewData.planningSummary.todayLoadMinutes))
+    .replace("{queue}", String(viewData.planningSummary.readyToScheduleCount))
+    .replace("{risks}", String(viewData.planningSummary.riskCount))
+    .replace("{automation}", String(viewData.automationCandidates.length));
+
+  function getQuickCreateDefaults() {
+    const selectedAdapter =
+      data.runtimeAdapters.find((adapter) => adapter.key === data.defaultRuntimeAdapterKey) ??
+      data.runtimeAdapters[0] ??
+      null;
+
+    return {
+      runtimeAdapterKey: selectedAdapter?.key ?? data.defaultRuntimeAdapterKey,
+      runtimeInputVersion:
+        selectedAdapter?.spec.version ?? `${data.defaultRuntimeAdapterKey}-v1`,
+    };
+  }
+
+  function getSuggestedDurationMinutes(
+    value: unknown,
+    fallback = DEFAULT_SCHEDULE_BLOCK_MINUTES,
+  ) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return fallback;
+    }
+
+    return Math.max(15, Math.round(value / 15) * 15);
+  }
 
   function patchScheduledWindow(taskId: string, startAt: Date, endAt: Date, dueAt?: Date | null) {
     setViewData((current) => ({
@@ -254,7 +308,10 @@ export function SchedulePage({
         taskId: draggedQueueItem.taskId,
         title: draggedQueueItem.title,
         dueAt: draggedQueueItem.dueAt,
-        durationMinutes: DEFAULT_SCHEDULE_BLOCK_MINUTES,
+        durationMinutes: getSuggestedDurationMinutes(
+          (draggedQueueItem.runtimeConfig as { suggestedDurationMinutes?: unknown } | null)
+            ?.suggestedDurationMinutes,
+        ),
       }
     : draggedScheduledItem
       ? {
@@ -439,20 +496,16 @@ export function SchedulePage({
   }
 
   async function handleQuickCreate(draft: QuickCreateDraft) {
-    const selectedAdapter =
-      data.runtimeAdapters.find((adapter) => adapter.key === data.defaultRuntimeAdapterKey) ??
-      data.runtimeAdapters[0] ??
-      null;
+    const defaults = getQuickCreateDefaults();
 
     const input: TimelineCreateInput = {
       title: draft.title,
       description: "",
       priority: draft.priority,
       dueAt: draft.dueAt,
-      runtimeAdapterKey: selectedAdapter?.key ?? data.defaultRuntimeAdapterKey,
+      runtimeAdapterKey: defaults.runtimeAdapterKey,
       runtimeInput: {},
-      runtimeInputVersion:
-        selectedAdapter?.spec.version ?? `${data.defaultRuntimeAdapterKey}-v1`,
+      runtimeInputVersion: defaults.runtimeInputVersion,
       runtimeModel: null,
       prompt: null,
       runtimeConfig: null,
@@ -466,6 +519,46 @@ export function SchedulePage({
     };
 
     await handleCreateTaskBlock(input);
+  }
+
+  async function handleQueueQuickCreate(
+    draft: QuickCreateDraft & { durationMinutes: number },
+  ) {
+    const defaults = getQuickCreateDefaults();
+
+    setAnnouncement(`Adding ${draft.title} to the queue.`);
+
+    try {
+      setIsPending(true);
+      setErrorMessage(null);
+
+      await createTaskFromSchedule({
+        workspaceId,
+        title: draft.title,
+        description: null,
+        priority: draft.priority,
+        dueAt: draft.dueAt,
+        runtimeAdapterKey: defaults.runtimeAdapterKey,
+        runtimeInput: {},
+        runtimeInputVersion: defaults.runtimeInputVersion,
+        runtimeModel: null,
+        prompt: null,
+        runtimeConfig: {
+          suggestedDurationMinutes: draft.durationMinutes,
+        },
+      });
+
+      await refreshProjection();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
+      );
+      setViewData(data);
+    } finally {
+      setIsPending(false);
+    }
   }
 
   async function handleAcceptProposal(proposalId: string) {
@@ -537,7 +630,7 @@ export function SchedulePage({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex h-full flex-col overflow-hidden">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -546,103 +639,131 @@ export function SchedulePage({
         ariaLabel={copy.pageTitle}
         title={copy.pageTitle}
         activeDayLabel={activeGroup?.label ?? activeDay}
+        summary={cockpitSummary}
         dateSwitcherLabel={copy.dateSwitcher}
         dayLinks={[
           {
             label: copy.today,
-            href: buildScheduleViewHref(todayKey, activeView),
+            href: localizeHref(locale, buildScheduleViewHref(todayKey, activeView)),
             current: activeDay === todayKey,
           },
           {
             label: copy.tomorrow,
-            href: buildScheduleViewHref(tomorrowKey, activeView),
+            href: localizeHref(locale, buildScheduleViewHref(tomorrowKey, activeView)),
             current: activeDay === tomorrowKey,
-          },
-          {
-            label: copy.currentPlanButton,
-            href: buildScheduleViewHref(activeDay, activeView),
-            current: activeDay !== todayKey && activeDay !== tomorrowKey,
           },
         ]}
         activeView={activeView}
-        timelineHref={buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId)}
-        listHref={buildScheduleViewHref(activeDay, "list", activeSelectedTaskId)}
+        timelineHref={localizeHref(locale, buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId))}
+        listHref={localizeHref(locale, buildScheduleViewHref(activeDay, "list", activeSelectedTaskId))}
         timelineLabel={copy.timeline}
         listLabel={copy.list}
         metrics={[
-          { label: copy.todayBlocks, value: activeGroup?.items.length ?? 0 },
           {
-            label: copy.queueReady,
-            value: viewData.summary.unscheduledCount,
+            label: copy.cockpitTodayLoad,
+            value: formatDurationMinutes(viewData.planningSummary.todayLoadMinutes),
+            hint: copy.cockpitTodayLoadHint,
+          },
+          {
+            label: copy.queueMetric,
+            value: String(viewData.planningSummary.readyToScheduleCount),
+            hint: copy.cockpitQueueHint,
             tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined,
           },
           {
-            label: copy.needsAttention,
-            value: viewData.summary.riskCount,
+            label: copy.risksMetric,
+            value: String(viewData.summary.riskCount),
+            hint: copy.cockpitRisksHint,
             tone: viewData.summary.riskCount > 0 ? "critical" : undefined,
           },
           {
-            label: copy.aiProposalsMetric,
-            value: viewData.summary.proposalCount,
-            tone: viewData.summary.proposalCount > 0 ? "info" : undefined,
+            label: copy.cockpitSuggestions,
+            value: String(viewData.summary.proposalCount + viewData.automationCandidates.length),
+            hint: copy.cockpitSuggestionsHint,
+            tone:
+              viewData.summary.proposalCount > 0 || viewData.automationCandidates.length > 0
+                ? "info"
+                : undefined,
+          },
+        ]}
+        actions={[
+          {
+            label: copy.cockpitQuickAdd,
+            onClick: () => setShowQuickAddDialog(true),
+            description: copy.cockpitQuickAddHint,
+          },
+          {
+            label: copy.cockpitReviewSuggestions,
+            href: "#schedule-cockpit-sidebar",
+            description: copy.cockpitReviewSuggestionsHint,
+          },
+          {
+            label: copy.cockpitAutoArrange,
+            description: copy.cockpitAutoArrangeHint,
+            disabled: true,
+          },
+          {
+            label: copy.cockpitPlanWithAi,
+            description: copy.cockpitPlanWithAiHint,
+            disabled: true,
           },
         ]}
       />
 
       {errorMessage ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {errorMessage}
         </div>
       ) : null}
 
-      <div className="space-y-4 xl:min-h-[calc(100vh-16rem)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_360px] xl:items-start">
-          <div className="space-y-4">
-            <TodayFocusCard
-              items={todayFocusItems}
-              emptyMessage={copy.todayFocusEmpty}
-              copy={copy}
-            />
+      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
+        <div className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto">
+          <ScheduleMiniCalendar monthLabel={calendarMonthLabel} days={calendarDays} />
 
-            <SurfaceCard variant="highlight">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <SurfaceCardHeader>
-                  <SurfaceCardTitle>{copy.scheduledTimeline}</SurfaceCardTitle>
-                </SurfaceCardHeader>
-                <div className="flex flex-wrap items-center gap-2">
-                  {draggedItem ? <StatusBadge tone="info">{copy.dropMode}</StatusBadge> : null}
-                  <StatusBadge>{copy.planningSurface}</StatusBadge>
-                </div>
+          <CompactTodayFocus
+            title={copy.todayFocus}
+            items={todayFocusItems}
+            emptyMessage={copy.todayFocusEmpty}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{copy.scheduledTimeline}</h2>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {draggedItem ? (
+                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {copy.dropMode}
+                  </span>
+                ) : null}
+              </div>
+            </div>
 
-              <div className="mt-4 space-y-4">
-                {activeView === "timeline" ? (
-                  activeGroup ? (
-                    <>
-                      <ScheduleCommandBar
-                        selectedDay={activeGroup.key}
-                        isPending={isPending}
-                        onSubmit={handleQuickCreate}
-                      />
-                      <DayTimeline
-                        items={activeGroup.items}
-                        dayDate={activeGroup.date}
-                        selectedDay={activeGroup.key}
-                        selectedTaskId={activeSelectedTaskId}
-                        draggedItem={draggedItem}
-                        runtimeAdapters={data.runtimeAdapters}
-                        defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                        isPending={isPending}
-                        onScheduleDrop={handleScheduleDrop}
-                        onCreateTaskBlock={handleCreateTaskBlock}
-                        onScheduledDragStart={handleScheduledDragStart}
-                        onDragEnd={handleQueueDragEnd}
-                      />
-                    </>
-                  ) : (
-                    <EmptyState>{copy.noTimelineDay}</EmptyState>
-                  )
+            <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+              {activeView === "timeline" ? (
+                activeGroup ? (
+                  <DayTimeline
+                    items={activeGroup.items}
+                    dayDate={activeGroup.date}
+                    selectedDay={activeGroup.key}
+                    selectedTaskId={activeSelectedTaskId}
+                    draggedItem={draggedItem}
+                    runtimeAdapters={data.runtimeAdapters}
+                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                    isPending={isPending}
+                    onScheduleDrop={handleScheduleDrop}
+                    onCreateTaskBlock={handleCreateTaskBlock}
+                    onScheduledDragStart={handleScheduledDragStart}
+                    onDragEnd={handleQueueDragEnd}
+                  />
                 ) : (
+                  <EmptyState>{copy.noTimelineDay}</EmptyState>
+                )
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto">
                   <ScheduleTaskList
                     items={viewData.listItems}
                     runtimeAdapters={data.runtimeAdapters}
@@ -650,12 +771,15 @@ export function SchedulePage({
                     onSaveTaskConfigAction={handleTaskConfigSave}
                     isPending={isPending}
                   />
-                )}
-              </div>
-            </SurfaceCard>
-          </div>
+                </div>
+              )}
+            </div>
+          </SurfaceCard>
+        </div>
 
+        <div className="w-[340px] shrink-0 overflow-y-auto">
           <ScheduleActionRail
+            id="schedule-cockpit-sidebar"
             ariaLabel={activeRailLabel}
             tablistAriaLabel={activeRailLabel}
             activeTab={secondaryView}
@@ -666,29 +790,41 @@ export function SchedulePage({
                 label: copy.unscheduledQueue,
                 title: copy.unscheduledQueue,
                 description: copy.unscheduledQueueDescription,
-                body:
-                  viewData.unscheduled.length === 0 ? (
-                    <EmptyState>{copy.noUnscheduledWork}</EmptyState>
-                  ) : (
-                    viewData.unscheduled.map((item) => (
-                      <QueueCard
-                        key={item.taskId}
-                        item={item}
-                        runtimeAdapters={data.runtimeAdapters}
-                        defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                        isPending={isPending}
-                        isDragging={
-                          draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId
-                        }
-                        isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                        onToggle={() => toggleQueueCard(item.taskId)}
-                        onMutatedAction={refreshProjection}
-                        onSaveTaskConfigAction={handleTaskConfigSave}
-                        onDragStart={handleQueueDragStart}
-                        onDragEnd={handleQueueDragEnd}
-                      />
-                    ))
-                  ),
+                body: (
+                  <div className="space-y-3">
+                    <ScheduleInlineQuickCreate
+                      mode="queue"
+                      selectedDay={activeDay}
+                      isPending={isPending}
+                      submitLabel={copy.quickCreateQueueSubmit}
+                      hint={copy.quickCreateQueueHint}
+                      compact
+                      onSubmit={handleQueueQuickCreate}
+                    />
+                    {viewData.unscheduled.length === 0 ? (
+                      <EmptyState>{copy.noUnscheduledWork}</EmptyState>
+                    ) : (
+                      viewData.unscheduled.map((item) => (
+                        <QueueCard
+                          key={item.taskId}
+                          item={item}
+                          runtimeAdapters={data.runtimeAdapters}
+                          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                          isPending={isPending}
+                          isDragging={
+                            draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId
+                          }
+                          isExpanded={expandedQueueTaskIds.includes(item.taskId)}
+                          onToggle={() => toggleQueueCard(item.taskId)}
+                          onMutatedAction={refreshProjection}
+                          onSaveTaskConfigAction={handleTaskConfigSave}
+                          onDragStart={handleQueueDragStart}
+                          onDragEnd={handleQueueDragEnd}
+                        />
+                      ))
+                    )}
+                  </div>
+                ),
               },
               {
                 value: "risks",
@@ -725,15 +861,6 @@ export function SchedulePage({
             ]}
           />
         </div>
-
-        <SurfaceCard>
-          <SurfaceCardHeader>
-            <SurfaceCardTitle>{copy.weekOverview}</SurfaceCardTitle>
-          </SurfaceCardHeader>
-          <div className="px-6 pb-6">
-            <WeekStrip groups={scheduledGroups} selectedDay={activeDay} />
-          </div>
-        </SurfaceCard>
       </div>
 
       {activeView === "timeline" && selectedItem && activeDay ? (
@@ -746,6 +873,33 @@ export function SchedulePage({
           onSaveTaskConfigAction={handleTaskConfigSave}
           onMutatedAction={refreshProjection}
           buildScheduleHref={buildScheduleHref}
+        />
+      ) : null}
+
+      {showQuickAddDialog ? (
+        <TaskCreateDialog
+          isOpen={showQuickAddDialog}
+          initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
+          initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
+          isPending={isPending}
+          onClose={() => setShowQuickAddDialog(false)}
+          onSubmit={async (input) => {
+            await handleCreateTaskBlock({
+              title: input.title,
+              description: input.description,
+              priority: input.priority,
+              dueAt: input.dueAt,
+              runtimeAdapterKey: data.defaultRuntimeAdapterKey,
+              runtimeInput: {},
+              runtimeInputVersion: `${data.defaultRuntimeAdapterKey}-v1`,
+              runtimeModel: null,
+              prompt: null,
+              runtimeConfig: null,
+              scheduledStartAt: input.scheduledStartAt,
+              scheduledEndAt: input.scheduledEndAt,
+            });
+            setShowQuickAddDialog(false);
+          }}
         />
       ) : null}
     </div>

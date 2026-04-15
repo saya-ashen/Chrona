@@ -2,6 +2,8 @@
 
 Goal: turn the schedule page into a real planning cockpit with strong baseline scheduling UX and a second layer of agent-native planning features, while keeping scope focused on the schedule page plus its directly supporting schedule/query/action modules.
 
+Current execution revision (2026-04-15): stay in P0 and prioritize frontend UI/UX polish over backend expansion. If a capability is important to the intended final cockpit but backend support is missing, build the frontend structure/placeholder first instead of blocking on server work.
+
 Reviewed entry and directly relevant files:
 - `src/app/schedule/page.tsx`
 - `src/components/schedule/schedule-page.tsx`
@@ -112,11 +114,37 @@ This lets the page evolve from “a task placement screen” into “the control
 
 ## 3. Implementation roadmap
 
+### Active execution focus (revised)
+
+For the next implementation pass, use `.hermes/plans/2026-04-15_115746-schedule-p0-ui-polish-plan.md` as the active execution plan.
+
+This means:
+- prioritize schedule-page UI hierarchy, quick-create usability, timeline polish, and cockpit sidebar UX
+- allow frontend-only placeholders for natural language create / auto arrange / automation actions
+- defer deeper backend work unless a UI improvement strictly requires it
+
+## Execution status snapshot (updated)
+
+当前对照代码库的执行进度：
+
+- [completed] Phase A / A1: baseline timeline interactions 已完成核心落地：scheduled drag move、bottom-edge resize、冲突预览、keyboard nudge、current-time line。
+- [completed] Phase A / A2: quick-create flow 已完成，`schedule-command-bar.tsx` 已接入页面 orchestration，并支持命令式解析。
+- [partial] Phase A / A3: layout polish 已完成一部分（timeline/card polish、current-time line、交互反馈），但更完整的 planning header / action rail 结构尚未落地。
+- [partial] Phase A / A4: queue/block operational actions 仅部分完成；当前已有 selected block/queue 基础，但 inline presets、split/duplicate/follow-up 等未完成。
+- [completed] Phase B / B1: normalized schedule dashboard model 已落地，query/type 已补齐 `planningSummary`、`focusZones`、`automationCandidates`。
+- [completed] Phase B / B2: conflict/capacity derivation 已落地到 read model，包括 due-soon unscheduled、largest idle window、overloaded minutes 等指标。
+- [partial] Phase B / B3: proposal model richer types 尚未扩展；当前完成的是 automation/read-model 层，proposal category 仍未做。
+- [pending] Phase C: natural-language scheduling review flow 未开始。
+- [pending] Phase D: task decomposition for schedule 未开始。
+- [pending] Phase E: execution policy / auto-run scheduler 未开始。
+
+---
+
 ## Phase A — Baseline UX fixes first
 
 These are the highest-value improvements because they solve the most obvious shortcomings without requiring heavy backend AI changes.
 
-### A1. Upgrade timeline drag interactions
+### A1. Upgrade timeline drag interactions [completed core scope]
 
 Objective: make the timeline feel like a real scheduler rather than a drop target.
 
@@ -154,7 +182,7 @@ Recommended data additions:
   - `isConflict`
   - `conflictsWithTaskIds`
 
-### A2. Add a true quick-create flow
+### A2. Add a true quick-create flow [completed]
 
 Objective: make it possible to create a task in under 10 seconds.
 
@@ -190,7 +218,7 @@ Recommended new action:
 Why this matters:
 The current composer is useful for power users but too heavy for capture-first planning.
 
-### A3. Improve information hierarchy / layout polish
+### A3. Improve information hierarchy / layout polish [partial]
 
 Objective: make the page read like a planning cockpit, not a stack of utility cards.
 
@@ -223,7 +251,7 @@ Visual improvements:
 - clearer due/priority/runnable indicators
 - more opinionated spacing and sticky controls
 
-### A4. Make queue and block editing more operational
+### A4. Make queue and block editing more operational [partial]
 
 Objective: reduce navigation and sheet friction.
 
@@ -256,7 +284,7 @@ Improvements:
 
 The current `getSchedulePage()` is good for rendering lists, but not enough for intelligent planning UX.
 
-### B1. Add a normalized schedule dashboard model
+### B1. Add a normalized schedule dashboard model [completed]
 
 Files:
 - `src/modules/queries/get-schedule-page.ts`
@@ -295,7 +323,7 @@ This powers:
 - focus recommendations
 - smarter quick actions
 
-### B2. Add conflict/capacity derivation
+### B2. Add conflict/capacity derivation [completed]
 
 Files:
 - `src/modules/queries/get-schedule-page.ts`
@@ -312,7 +340,7 @@ Derive:
 Why this matters:
 Advanced schedule features should not depend on the UI manually recomputing planning health.
 
-### B3. Add richer proposal types
+### B3. Add richer proposal types [pending]
 
 Right now proposals are plain schedule proposals.
 

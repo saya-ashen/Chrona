@@ -1,9 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const refresh = vi.fn();
+const fetchScheduleProjection = vi.fn();
 const createTaskFromSchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const acceptScheduleProposal = vi.fn();
@@ -45,7 +46,13 @@ vi.mock("@/components/schedule/schedule-page-panels", () => ({
 }));
 
 vi.mock("@/components/schedule/schedule-action-rail", () => ({
-  ScheduleActionRail: () => <div data-testid="schedule-action-rail" />,
+  ScheduleActionRail: ({
+    activeTab,
+    sections,
+  }: {
+    activeTab: string;
+    sections: Array<{ value: string; body: React.ReactNode }>;
+  }) => <div data-testid="schedule-action-rail">{sections.find((section) => section.value === activeTab)?.body}</div>,
 }));
 
 vi.mock("@/components/schedule/schedule-task-list", () => ({
@@ -60,9 +67,23 @@ vi.mock("@/components/schedule/schedule-page-timeline", () => ({
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import type { SchedulePageData } from "@/components/schedule/schedule-page-types";
 
+Object.defineProperty(globalThis, "fetch", {
+  configurable: true,
+  value: (...args: Parameters<typeof fetch>) => fetchScheduleProjection(...args),
+});
+
+fetchScheduleProjection.mockResolvedValue({
+  ok: true,
+  json: async () => createData(),
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  fetchScheduleProjection.mockResolvedValue({
+    ok: true,
+    json: async () => createData(),
+  });
 });
 
 function createData(): SchedulePageData {
@@ -166,7 +187,7 @@ describe("SchedulePage quick create", () => {
     );
 
     await user.type(
-      screen.getByPlaceholderText(/task title/i),
+      screen.getByPlaceholderText(/task title, @ 14:30/i),
       "Write weekly report @ 14:30 for 90m !high",
     );
     await user.click(screen.getByRole("button", { name: /add block/i }));
@@ -193,5 +214,37 @@ describe("SchedulePage quick create", () => {
         }),
       );
     });
+  });
+
+  it("creates a queue task from the side-rail quick-create without scheduling it", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SchedulePage
+        workspaceId="workspace-1"
+        data={createData()}
+        selectedDay="2026-04-15"
+        selectedView="timeline"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /quick create/i }));
+    await user.type(screen.getByPlaceholderText(/add a task to the queue/i), "Inbox triage");
+    fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: "90" } });
+    await user.click(screen.getByRole("button", { name: /^high$/i }));
+    await user.click(screen.getByRole("button", { name: /add to queue/i }));
+
+    await waitFor(() => {
+      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          title: "Inbox triage",
+          priority: "High",
+          runtimeConfig: { suggestedDurationMinutes: 90 },
+        }),
+      );
+    });
+
+    expect(applySchedule).not.toHaveBeenCalled();
   });
 });
