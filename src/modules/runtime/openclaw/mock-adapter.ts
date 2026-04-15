@@ -6,8 +6,11 @@ import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
 import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
+  OpenClawExecuteTaskInput,
+  OpenClawExecuteTaskResult,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
+  OpenClawSessionStatus,
 } from "@/modules/runtime/openclaw/types";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +75,34 @@ export function createMockOpenClawAdapter(options?: {
     },
     async resumeRun() {
       return { accepted: true };
+    },
+    async executeTask(input) {
+      const startTime = Date.now();
+      const sessionKey = input.runtimeSessionKey ?? fixture.snapshot.runtimeSessionKey;
+      return {
+        success: fixture.snapshot.status === "Completed",
+        status: fixture.snapshot.status,
+        runtimeRunRef: fixture.snapshot.runtimeRunRef,
+        runtimeSessionKey: sessionKey,
+        runtimeSessionRef: fixture.snapshot.runtimeSessionRef,
+        lastMessage: fixture.snapshot.lastMessage,
+        history: fixture.history,
+        attempts: 1,
+        elapsedMs: Date.now() - startTime,
+      };
+    },
+    async getSessionStatus(runtimeSessionKey) {
+      const approvals = fixture.approvals.filter(
+        (a) => a.sessionKey === runtimeSessionKey,
+      );
+      return {
+        runtimeSessionKey,
+        exists: true,
+        activeRunRef: fixture.snapshot.runtimeRunRef,
+        activeRunStatus: fixture.snapshot.status,
+        pendingApprovals: approvals,
+        lastMessage: fixture.snapshot.lastMessage,
+      };
     },
   };
 }
@@ -450,6 +481,103 @@ export function createStatefulMockAdapter(
       }
 
       return { accepted: true };
+    },
+
+    async executeTask(input) {
+      const startTime = Date.now();
+      const sessionKey = input.runtimeSessionKey ?? `session_${randomUUID()}`;
+      const session = ensureSession(sessionKey);
+      const run = createRun(session, input.prompt);
+      const maxRetries = input.maxRetries ?? 3;
+      const approvalStrategy = input.approvalStrategy ?? "auto-approve";
+      let attempts = 1;
+
+      // Simulate retry logic: if run failed with transient error and retries left, retry
+      while (
+        run.status === "Failed" &&
+        attempts <= maxRetries &&
+        run.lastMessage?.toLowerCase().includes("timeout")
+      ) {
+        attempts++;
+        run.status = "Running";
+        scheduleCompletion(run, session);
+      }
+
+      // Handle approvals automatically if configured
+      if (run.status === "WaitingForApproval" && approvalStrategy !== "skip") {
+        const pendingApprovals = session.approvals.filter(
+          (a) => session.approvalDecisions[a.approvalId] === null,
+        );
+        for (const approval of pendingApprovals) {
+          const decision: OpenClawApprovalDecision =
+            approvalStrategy === "auto-approve" ? "allow-once" : "deny";
+          internals.setApprovalDecision(approval.approvalId, decision);
+        }
+      }
+
+      const history: OpenClawChatHistory = {
+        messages: session.messages.map((msg) => ({
+          role: msg.role,
+          content: [{ type: "text", text: msg.content }],
+          timestamp: msg.ts,
+          __openclaw: { id: msg.id, seq: 0 },
+        })),
+      };
+
+      const result: OpenClawExecuteTaskResult = {
+        success: run.status === "Completed",
+        status: run.status,
+        runtimeRunRef: run.runId,
+        runtimeSessionKey: session.sessionKey,
+        runtimeSessionRef: session.sessionRef,
+        lastMessage: run.lastMessage,
+        history,
+        attempts,
+        elapsedMs: Date.now() - startTime,
+        error: run.status === "Failed" ? run.lastMessage : undefined,
+      };
+
+      input.onProgress?.({
+        status: run.status,
+        runtimeRunRef: run.runId,
+        runtimeSessionKey: session.sessionKey,
+        message: run.lastMessage,
+        attempt: attempts,
+        elapsedMs: Date.now() - startTime,
+      });
+
+      return result;
+    },
+
+    async getSessionStatus(runtimeSessionKey) {
+      const session = sessions.get(runtimeSessionKey);
+      if (!session) {
+        return {
+          runtimeSessionKey,
+          exists: false,
+          pendingApprovals: [],
+        } satisfies OpenClawSessionStatus;
+      }
+
+      const activeRun = session.runs.find(
+        (r) => r.status === "Running" || r.status === "Pending" ||
+               r.status === "WaitingForApproval" || r.status === "WaitingForInput",
+      );
+
+      const pendingApprovals = session.approvals.filter(
+        (a) => session.approvalDecisions[a.approvalId] === null,
+      );
+
+      const lastRun = session.runs[session.runs.length - 1];
+
+      return {
+        runtimeSessionKey,
+        exists: true,
+        activeRunRef: activeRun?.runId,
+        activeRunStatus: activeRun?.status,
+        pendingApprovals,
+        lastMessage: lastRun?.lastMessage,
+      } satisfies OpenClawSessionStatus;
     },
   };
 

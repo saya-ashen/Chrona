@@ -41,6 +41,30 @@ describe("createMockOpenClawAdapter (fixture-based)", () => {
 
     expect(snapshot.status).toBe("Completed");
   });
+
+  it("executeTask returns a result based on fixture", async () => {
+    const adapter = createMockOpenClawAdapter({ fixtureName: "run-completed" });
+    const result = await adapter.executeTask({
+      prompt: "test prompt",
+      runtimeInput: {},
+      runtimeSessionKey: "et_key",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.status).toBe("Completed");
+    expect(result.runtimeSessionKey).toBe("et_key");
+    expect(result.attempts).toBe(1);
+    expect(result.history).toBeDefined();
+  });
+
+  it("getSessionStatus returns session info", async () => {
+    const adapter = createMockOpenClawAdapter();
+    const status = await adapter.getSessionStatus("some_key");
+
+    expect(status.runtimeSessionKey).toBe("some_key");
+    expect(status.exists).toBe(true);
+    expect(Array.isArray(status.pendingApprovals)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -637,6 +661,159 @@ describe("createStatefulMockAdapter", () => {
       });
 
       expect(result).toEqual({ accepted: false });
+    });
+  });
+
+  // -- executeTask (stateful mock) -------------------------------------------
+
+  describe("executeTask", () => {
+    it("creates a run and returns result with history", async () => {
+      const adapter = createAdapter({ autoComplete: true, completionDelay: 0 });
+      const result = await adapter.executeTask({
+        prompt: "Execute this task",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:1",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe("Completed");
+      expect(result.runtimeRunRef).toMatch(/^run_/);
+      expect(result.runtimeSessionKey).toBe("exec:1");
+      expect(result.attempts).toBe(1);
+      expect(result.history.messages.length).toBeGreaterThan(0);
+    });
+
+    it("handles approval auto-approve", async () => {
+      const adapter = createAdapter({ requireApproval: true });
+      const result = await adapter.executeTask({
+        prompt: "Needs approval",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:2",
+        approvalStrategy: "auto-approve",
+      });
+
+      expect(result.status).toBe("Completed");
+      expect(result.runtimeRunRef).toBeTruthy();
+    });
+
+    it("handles approval auto-reject", async () => {
+      const adapter = createAdapter({ requireApproval: true });
+      const result = await adapter.executeTask({
+        prompt: "Needs approval",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:3",
+        approvalStrategy: "auto-reject",
+      });
+
+      expect(result.status).toBe("Failed");
+    });
+
+    it("skips approval handling when strategy is skip", async () => {
+      const adapter = createAdapter({ requireApproval: true });
+      const result = await adapter.executeTask({
+        prompt: "Needs approval",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:4",
+        approvalStrategy: "skip",
+      });
+
+      expect(result.status).toBe("WaitingForApproval");
+      expect(result.success).toBe(false);
+    });
+
+    it("generates session key when none provided", async () => {
+      const adapter = createAdapter();
+      const result = await adapter.executeTask({
+        prompt: "No key",
+        runtimeInput: {},
+      });
+
+      expect(result.runtimeSessionKey).toMatch(/^session_/);
+      expect(result.success).toBe(true);
+    });
+
+    it("calls onProgress callback", async () => {
+      const progressEvents: unknown[] = [];
+      const adapter = createAdapter();
+      await adapter.executeTask({
+        prompt: "Progress test",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:5",
+        onProgress: (event) => progressEvents.push(event),
+      });
+
+      expect(progressEvents.length).toBeGreaterThan(0);
+    });
+
+    it("returns failure info when run fails", async () => {
+      const adapter = createAdapter({ failRate: 1 });
+      const result = await adapter.executeTask({
+        prompt: "Will fail",
+        runtimeInput: {},
+        runtimeSessionKey: "exec:6",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe("Failed");
+      expect(result.error).toBeTruthy();
+    });
+  });
+
+  // -- getSessionStatus (stateful mock) --------------------------------------
+
+  describe("getSessionStatus", () => {
+    it("returns exists=false for unknown session", async () => {
+      const adapter = createAdapter();
+      const status = await adapter.getSessionStatus("unknown");
+
+      expect(status.runtimeSessionKey).toBe("unknown");
+      expect(status.exists).toBe(false);
+      expect(status.pendingApprovals).toEqual([]);
+    });
+
+    it("returns session info for existing session", async () => {
+      const adapter = createAdapter({ autoComplete: true, completionDelay: 0 });
+      await adapter.createRun({
+        prompt: "Test",
+        runtimeInput: {},
+        runtimeSessionKey: "status:1",
+      });
+
+      const status = await adapter.getSessionStatus("status:1");
+
+      expect(status.exists).toBe(true);
+      expect(status.runtimeSessionKey).toBe("status:1");
+      expect(status.lastMessage).toBeTruthy();
+    });
+
+    it("returns active run info for running session", async () => {
+      const adapter = createAdapter({ autoComplete: false });
+      await adapter.createRun({
+        prompt: "Running task",
+        runtimeInput: {},
+        runtimeSessionKey: "status:2",
+      });
+
+      const status = await adapter.getSessionStatus("status:2");
+
+      expect(status.exists).toBe(true);
+      expect(status.activeRunRef).toMatch(/^run_/);
+      expect(status.activeRunStatus).toBe("Running");
+    });
+
+    it("returns pending approvals", async () => {
+      const adapter = createAdapter({ requireApproval: true });
+      await adapter.createRun({
+        prompt: "Approval task",
+        runtimeInput: {},
+        runtimeSessionKey: "status:3",
+      });
+
+      const status = await adapter.getSessionStatus("status:3");
+
+      expect(status.exists).toBe(true);
+      expect(status.pendingApprovals.length).toBe(1);
+      expect(status.activeRunStatus).toBe("WaitingForApproval");
     });
   });
 });

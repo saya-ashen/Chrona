@@ -11,10 +11,14 @@ import type { RuntimeInput } from "@/modules/runtime/types";
 import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
+  OpenClawExecuteTaskInput,
+  OpenClawExecuteTaskResult,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
   OpenClawSendInputResult,
+  OpenClawSessionStatus,
 } from "@/modules/runtime/openclaw/types";
+import { OpenClawOrchestrator } from "@/modules/runtime/openclaw/orchestrator";
 
 export {
   getOpenClawTaskConfigSpec,
@@ -52,6 +56,19 @@ export type OpenClawAdapter = {
     decision?: "approve" | "reject";
     inputText?: string;
   }): Promise<OpenClawSendInputResult | { accepted: boolean }>;
+
+  /**
+   * High-level method that orchestrates the full task lifecycle:
+   * create/reuse session -> start run -> poll -> handle approvals -> return result.
+   * Retries on transient failures with exponential backoff.
+   */
+  executeTask(input: OpenClawExecuteTaskInput): Promise<OpenClawExecuteTaskResult>;
+
+  /**
+   * Returns current session state including active run status and pending approvals.
+   * Useful for CLI status checks and dashboard displays.
+   */
+  getSessionStatus(runtimeSessionKey: string): Promise<OpenClawSessionStatus>;
 };
 
 function resolveGatewayAuth(deviceToken?: string) {
@@ -88,42 +105,58 @@ export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
 }
 
 export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenClawAdapter {
-  return {
-    async createRun(input) {
+  const baseAdapter = {
+    async createRun(input: {
+      prompt: string;
+      runtimeInput: RuntimeInput;
+      runtimeSessionKey?: string;
+    }) {
       return client.createRun({
         prompt: input.prompt,
         runtimeSessionKey: input.runtimeSessionKey,
       });
     },
-    async sendOperatorMessage(input) {
+    async sendOperatorMessage(input: {
+      runtimeSessionKey: string;
+      message: string;
+    }) {
       return client.sendInput({
         runtimeSessionKey: input.runtimeSessionKey,
         message: input.message,
       });
     },
-    async getRunSnapshot(input) {
+    async getRunSnapshot(input: {
+      runtimeRunRef: string;
+      runtimeSessionKey?: string;
+      timeoutMs?: number;
+    }) {
       return client.waitForRun({
         runtimeRunRef: input.runtimeRunRef,
         runtimeSessionKey: input.runtimeSessionKey,
         timeoutMs: input.timeoutMs ?? 1000,
       });
     },
-    async readHistory(input) {
+    async readHistory(input: { runtimeSessionKey: string }) {
       return client.readOutputs(input.runtimeSessionKey);
     },
-    async listApprovals(input) {
+    async listApprovals(input: { runtimeSessionKey: string }) {
       return (await client.listApprovals()).filter(
         (approval) => approval.sessionKey === input.runtimeSessionKey,
       );
     },
-    async waitForApprovalDecision(approvalId) {
+    async waitForApprovalDecision(approvalId: string) {
       try {
         return await client.waitForApprovalDecision(approvalId);
       } catch {
         return null;
       }
     },
-    async resumeRun(input) {
+    async resumeRun(input: {
+      runtimeSessionKey: string;
+      approvalId?: string;
+      decision?: "approve" | "reject";
+      inputText?: string;
+    }) {
       if (input.approvalId) {
         const approvalResolution = await client.resolveApproval({
           approvalId: input.approvalId,
@@ -154,4 +187,21 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
       return { accepted: false };
     },
   };
+
+  // Build the full adapter with orchestration methods
+  const orchestrator = new OpenClawOrchestrator({ adapter: baseAdapter as OpenClawAdapter });
+
+  const adapter: OpenClawAdapter = {
+    ...baseAdapter,
+
+    async executeTask(input: OpenClawExecuteTaskInput) {
+      return orchestrator.executeTask(input);
+    },
+
+    async getSessionStatus(runtimeSessionKey: string) {
+      return orchestrator.getSessionStatus(runtimeSessionKey);
+    },
+  };
+
+  return adapter;
 }

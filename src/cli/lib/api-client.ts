@@ -24,6 +24,12 @@ export interface CreateTaskBody {
   runtimeConfig?: Record<string, unknown>;
 }
 
+export interface CreateSubtaskBody {
+  title: string;
+  description?: string;
+  priority?: string;
+}
+
 export interface UpdateTaskBody {
   title?: string;
   description?: string;
@@ -163,6 +169,43 @@ export class ApiClient {
   }
 
   /**
+   * Delete a task.
+   * DELETE /api/tasks/[taskId]
+   */
+  async deleteTask(taskId: string): Promise<unknown> {
+    return this.request(
+      "DELETE",
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+    );
+  }
+
+  /**
+   * List subtasks of a task.
+   * GET /api/tasks/[taskId]/subtasks
+   */
+  async listSubtasks(taskId: string): Promise<unknown> {
+    return this.request(
+      "GET",
+      `/api/tasks/${encodeURIComponent(taskId)}/subtasks`,
+    );
+  }
+
+  /**
+   * Create a subtask under a parent task.
+   * POST /api/tasks/[taskId]/subtasks
+   */
+  async createSubtask(
+    taskId: string,
+    body: CreateSubtaskBody,
+  ): Promise<unknown> {
+    return this.request(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/subtasks`,
+      body,
+    );
+  }
+
+  /**
    * Mark a task as done.
    * POST /api/tasks/[taskId]/done
    */
@@ -264,6 +307,22 @@ export class ApiClient {
    */
   async decomposeTask(taskId: string): Promise<unknown> {
     return this.request("POST", "/api/ai/decompose-task", { taskId });
+  }
+
+  /**
+   * Batch-decompose a task: decompose and create subtasks in one step.
+   * POST /api/ai/batch-decompose
+   */
+  async batchDecompose(taskId: string): Promise<unknown> {
+    return this.request("POST", "/api/ai/batch-decompose", { taskId });
+  }
+
+  /**
+   * Get title auto-complete suggestions.
+   * POST /api/ai/auto-complete
+   */
+  async autoComplete(title: string): Promise<unknown> {
+    return this.request("POST", "/api/ai/auto-complete", { title });
   }
 
   /**

@@ -9,6 +9,9 @@
  *   task done      - Mark a task as done
  *   task reopen    - Reopen a completed task
  *   task plan      - Generate a plan for a task
+ *   task delete    - Delete a task
+ *   task subtasks  - List subtasks of a task
+ *   task add-subtask - Create a subtask under a task
  */
 
 import { Command } from "commander";
@@ -190,6 +193,68 @@ export function registerTaskCommands(
         const client = getClient();
         const data = await client.generatePlan(opts.taskId);
         console.log(output(data, opts.output as OutputFormat, formatRunResult));
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+      }
+    });
+
+  // ── task delete ─────────────────────────────────────────────────────
+  task
+    .command("delete")
+    .description("Delete a task")
+    .requiredOption("-t, --task-id <id>", "Task ID")
+    .option("-o, --output <format>", "Output format: json or table", "json")
+    .action(async (opts: { taskId: string; output: string }) => {
+      try {
+        const client = getClient();
+        const data = await client.deleteTask(opts.taskId);
+        console.log(output(data, opts.output as OutputFormat, formatRunResult));
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+      }
+    });
+
+  // ── task subtasks ───────────────────────────────────────────────────
+  task
+    .command("subtasks")
+    .description("List subtasks of a task")
+    .requiredOption("-t, --task-id <id>", "Parent task ID")
+    .option("-o, --output <format>", "Output format: json or table", "json")
+    .action(async (opts: { taskId: string; output: string }) => {
+      try {
+        const client = getClient();
+        const data = await client.listSubtasks(opts.taskId);
+        console.log(output(data, opts.output as OutputFormat, formatTaskList));
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+      }
+    });
+
+  // ── task add-subtask ────────────────────────────────────────────────
+  task
+    .command("add-subtask")
+    .description("Create a subtask under a parent task")
+    .requiredOption("-t, --task-id <id>", "Parent task ID")
+    .requiredOption("--title <title>", "Subtask title")
+    .option("--description <desc>", "Subtask description")
+    .option("--priority <priority>", "Priority: Low, Medium, High, or Urgent")
+    .option("-o, --output <format>", "Output format: json or table", "json")
+    .action(async (opts: {
+      taskId: string;
+      title: string;
+      description?: string;
+      priority?: string;
+      output: string;
+    }) => {
+      try {
+        const client = getClient();
+        const body: { title: string; description?: string; priority?: string } = {
+          title: opts.title,
+        };
+        if (opts.description) body.description = opts.description;
+        if (opts.priority) body.priority = opts.priority;
+        const data = await client.createSubtask(opts.taskId, body);
+        console.log(output(data, opts.output as OutputFormat, formatTaskDetail));
       } catch (err) {
         printError(err instanceof Error ? err.message : String(err));
       }
