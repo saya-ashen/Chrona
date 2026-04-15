@@ -1,7 +1,10 @@
 "use client";
 
 import { ChevronDown, GripVertical } from "lucide-react";
-import type { DragEvent } from "react";
+import { type DragEvent, useMemo } from "react";
+import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
+import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
+import { suggestAutomation } from "@/modules/ai/automation-suggester";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
@@ -271,6 +274,8 @@ export function SelectedBlockSheet({
               },
             ]}
           />
+
+          <AutomationSuggestionForItem item={item} />
 
           <SurfaceCard
             as="div"
@@ -662,5 +667,40 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
         </div>
       </div>
     </SurfaceCard>
+  );
+}
+
+function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
+  const suggestion = useMemo(() => {
+    return suggestAutomation({
+      taskId: item.taskId,
+      title: item.title,
+      description: item.description ?? "",
+      priority: item.priority,
+      dueAt: item.dueAt,
+      scheduledStartAt: item.scheduledStartAt,
+      scheduledEndAt: item.scheduledEndAt,
+      isRunnable: item.isRunnable,
+      runnabilityState: item.runnabilityState,
+      ownerType: item.ownerType,
+    });
+  }, [item]);
+
+  const preparationSteps: PreparationStep[] = useMemo(() => {
+    if (!suggestion) return [];
+    return suggestion.preparationSteps.map((step, index) => ({
+      id: `${item.taskId}-prep-${index}`,
+      text: step,
+      completed: false,
+    }));
+  }, [suggestion, item.taskId]);
+
+  return (
+    <div className="space-y-3">
+      <AutomationSuggestionPanel suggestion={suggestion} />
+      {preparationSteps.length > 0 ? (
+        <PreparationChecklist steps={preparationSteps} />
+      ) : null}
+    </div>
   );
 }
