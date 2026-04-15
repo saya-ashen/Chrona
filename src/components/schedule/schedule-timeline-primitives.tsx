@@ -1,6 +1,6 @@
 "use client";
 
-import { Move } from "lucide-react";
+import { AlertTriangle, Move } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type {
@@ -77,6 +77,7 @@ export function ScheduledTimelineBlock({
   top,
   height,
   isSelected,
+  hasConflict,
   isPending,
   isHidden,
   onDragStart,
@@ -89,6 +90,7 @@ export function ScheduledTimelineBlock({
   top: number;
   height: number;
   isSelected: boolean;
+  hasConflict?: boolean;
   isPending: boolean;
   isHidden?: boolean;
   onDragStart: (item: ScheduledItem) => void;
@@ -131,7 +133,11 @@ export function ScheduledTimelineBlock({
       aria-label={item.title}
       className={cn(
         "absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-        isSelected ? "border-primary ring-1 ring-primary/30" : "border-border",
+        hasConflict
+          ? "border-red-400 bg-red-50/80 ring-1 ring-red-300/50"
+          : isSelected
+            ? "border-primary ring-1 ring-primary/30"
+            : "border-border",
         isHidden && "opacity-40",
       )}
       style={{
@@ -149,6 +155,12 @@ export function ScheduledTimelineBlock({
               <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
             </div>
             <div className="flex items-center gap-1">
+              {hasConflict ? (
+                <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700" title={copy.conflictPreviewLabel}>
+                  <AlertTriangle className="size-3" aria-hidden="true" />
+                  {copy.conflictPreviewLabel}
+                </span>
+              ) : null}
               <StatusBadge tone={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">
                 {item.priority}
               </StatusBadge>

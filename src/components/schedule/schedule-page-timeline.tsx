@@ -167,6 +167,7 @@ export function DayTimeline({
   dayDate,
   selectedDay,
   selectedTaskId,
+  conflictTaskIds,
   draggedItem,
   runtimeAdapters,
   defaultRuntimeAdapterKey,
@@ -180,6 +181,7 @@ export function DayTimeline({
   dayDate: Date;
   selectedDay: string;
   selectedTaskId?: string;
+  conflictTaskIds?: Set<string>;
   draggedItem: TimelineDragItem | null;
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
@@ -702,6 +704,7 @@ export function DayTimeline({
                   top={top}
                   height={height}
                   isSelected={selectedTaskId === item.taskId}
+                  hasConflict={conflictTaskIds?.has(item.taskId) ?? false}
                   isPending={isPending}
                   isHidden={interactionMode === "resizing" && resizeDraft?.taskId === item.taskId}
                   onDragStart={onScheduledDragStart}

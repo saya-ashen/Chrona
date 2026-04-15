@@ -18,6 +18,7 @@ import {
   RiskCard,
   SelectedBlockSheet,
 } from "@/components/schedule/schedule-page-panels";
+import { ConflictCard } from "@/components/schedule/conflict-card";
 import {
   getSchedulePageCopy,
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
@@ -36,6 +37,7 @@ import type {
   TimelineCreateInput,
   TimelineDragItem,
   UnscheduledItem,
+  ScheduleSuggestion,
 } from "@/components/schedule/schedule-page-types";
 import {
   addDays,
@@ -241,6 +243,16 @@ export function SchedulePage({
     month: "long",
     year: "numeric",
   }).format(activeDayDate);
+  const conflictTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const conflict of viewData.conflicts) {
+      for (const taskId of conflict.taskIds) {
+        ids.add(taskId);
+      }
+    }
+    return ids;
+  }, [viewData.conflicts]);
+
   const cockpitSummary = copy.cockpitSummaryTemplate
     .replace("{scheduled}", formatDurationMinutes(viewData.planningSummary.todayLoadMinutes))
     .replace("{queue}", String(viewData.planningSummary.readyToScheduleCount))
@@ -573,6 +585,39 @@ export function SchedulePage({
     });
   }
 
+  async function handleApplySuggestion(suggestion: ScheduleSuggestion) {
+    try {
+      setIsPending(true);
+      setErrorMessage(null);
+
+      // 调用 API 应用建议
+      const response = await fetch("/api/ai/apply-suggestion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          suggestionId: suggestion.id,
+          changes: suggestion.changes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to apply suggestion");
+      }
+
+      // 刷新数据
+      await refreshProjection();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
+      );
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   function toggleQueueCard(taskId: string) {
     setExpandedQueueTaskIds((current) =>
       current.includes(taskId)
@@ -750,6 +795,7 @@ export function SchedulePage({
                     dayDate={activeGroup.date}
                     selectedDay={activeGroup.key}
                     selectedTaskId={activeSelectedTaskId}
+                    conflictTaskIds={conflictTaskIds}
                     draggedItem={draggedItem}
                     runtimeAdapters={data.runtimeAdapters}
                     defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
@@ -837,6 +883,27 @@ export function SchedulePage({
                     viewData.risks
                       .slice(0, 2)
                       .map((item) => <RiskCard key={item.taskId} item={item} />)
+                  ),
+              },
+              {
+                value: "conflicts",
+                label: "AI 冲突检测",
+                title: "AI 冲突检测",
+                body:
+                  viewData.conflicts.length === 0 ? (
+                    <EmptyState>未检测到冲突</EmptyState>
+                  ) : (
+                    <div className="space-y-3">
+                      {viewData.conflicts.slice(0, 3).map((conflict) => (
+                        <ConflictCard
+                          key={conflict.id}
+                          conflict={conflict}
+                          suggestions={viewData.suggestions}
+                          onApplySuggestion={handleApplySuggestion}
+                          isPending={isPending}
+                        />
+                      ))}
+                    </div>
                   ),
               },
               {

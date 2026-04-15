@@ -104,6 +104,8 @@ export type SchedulePageData = {
   proposals: ScheduleProposal[];
   risks: ScheduleRecord[];
   listItems: ScheduleTaskListItem[];
+  conflicts: ScheduleConflict[];
+  suggestions: ScheduleSuggestion[];
 };
 
 export type SchedulePageProps = {
@@ -143,7 +145,76 @@ export type ScheduledItem = SchedulePageData["scheduled"][number];
 export type UnscheduledItem = SchedulePageData["unscheduled"][number];
 export type ListItem = SchedulePageData["listItems"][number];
 export type ScheduleViewMode = "timeline" | "list";
-export type SecondaryPlanningView = "queue" | "risks" | "proposals";
+export type SecondaryPlanningView = "queue" | "risks" | "proposals" | "conflicts";
+
+/**
+ * 冲突类型
+ */
+export type ConflictType =
+  | "time_overlap"
+  | "overload"
+  | "fragmentation"
+  | "dependency";
+
+/**
+ * 冲突严重程度
+ */
+export type ConflictSeverity = "low" | "medium" | "high";
+
+/**
+ * 冲突详情
+ */
+export type ScheduleConflict = {
+  id: string;
+  type: ConflictType;
+  severity: ConflictSeverity;
+  taskIds: string[];
+  description: string;
+  timeRange?: {
+    start: Date;
+    end: Date;
+  };
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * 建议类型
+ */
+export type SuggestionType =
+  | "reschedule"
+  | "split"
+  | "merge"
+  | "defer"
+  | "reorder";
+
+/**
+ * 任务变更
+ */
+export type TaskChange = {
+  taskId: string;
+  scheduledStartAt?: Date;
+  scheduledEndAt?: Date;
+  priority?: string;
+  dueAt?: Date;
+};
+
+/**
+ * 建议详情
+ */
+export type ScheduleSuggestion = {
+  id: string;
+  conflictId: string;
+  type: SuggestionType;
+  description: string;
+  reason: string;
+  affectedTaskIds: string[];
+  changes: TaskChange[];
+  estimatedImpact: {
+    resolvedConflicts: number;
+    movedTasks: number;
+    timeShiftMinutes: number;
+  };
+};
 
 export type TodayFocusItem = {
   taskId: string;
