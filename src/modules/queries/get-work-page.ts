@@ -1066,13 +1066,46 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       status: approval.status,
       summary: approval.summary,
     })) ?? [];
-  const conversation =
-    currentRun?.conversationEntries.map((entry) => ({
+  const allConversationEntries = await db.conversationEntry.findMany({
+    where: { run: { taskId: task.id } },
+    include: {
+      run: {
+        select: {
+          id: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: [{ runtimeTs: "asc" }, { createdAt: "asc" }, { sequence: "asc" }],
+  });
+  const conversation = allConversationEntries
+    .slice()
+    .sort((left, right) => {
+      const leftRuntimeTs = left.runtimeTs?.getTime() ?? Number.POSITIVE_INFINITY;
+      const rightRuntimeTs = right.runtimeTs?.getTime() ?? Number.POSITIVE_INFINITY;
+
+      if (leftRuntimeTs !== rightRuntimeTs) {
+        return leftRuntimeTs - rightRuntimeTs;
+      }
+
+      const leftRunCreatedAt = left.run.createdAt.getTime();
+      const rightRunCreatedAt = right.run.createdAt.getTime();
+      if (leftRunCreatedAt !== rightRunCreatedAt) {
+        return leftRunCreatedAt - rightRunCreatedAt;
+      }
+
+      if (left.runId !== right.runId) {
+        return left.runId.localeCompare(right.runId);
+      }
+
+      return left.sequence - right.sequence;
+    })
+    .map((entry) => ({
       id: entry.id,
       role: entry.role,
       content: entry.content,
       runtimeTs: toIsoString(entry.runtimeTs),
-    })) ?? [];
+    }));
   const artifacts =
     currentRun?.artifacts.map((artifact) => ({
       id: artifact.id,
@@ -1100,6 +1133,7 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       summary: summarizePayload(event.payload as Record<string, unknown>),
       payload: event.payload as Record<string, unknown>,
       runtimeTs: toIsoString(event.runtimeTs),
+      runId: event.runId,
       kind: eventInfo.kind,
       badge: eventInfo.badge,
       whyItMatters: eventInfo.whyItMatters,

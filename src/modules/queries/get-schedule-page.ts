@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
-import { buildPlanningSummary } from "@/components/schedule/schedule-page-utils";
+import {
+  buildPlanningSummary,
+  formatDateKey,
+  startOfDay,
+} from "@/components/schedule/schedule-page-utils";
 import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/runtime/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
@@ -75,6 +79,134 @@ function mapTaskRunnability(task: {
   };
 }
 
+function getScheduledMinutes(item: {
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
+}) {
+  if (!item.scheduledStartAt || !item.scheduledEndAt) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.round((item.scheduledEndAt.getTime() - item.scheduledStartAt.getTime()) / 60000),
+  );
+}
+
+function buildFocusZones(items: Array<ReturnType<typeof mapProjectionItem>>) {
+  const byDay = new Map<string, Array<ReturnType<typeof mapProjectionItem>>>();
+
+  for (const item of items) {
+    if (!item.scheduledStartAt || !item.scheduledEndAt) {
+      continue;
+    }
+
+    const dayKey = formatDateKey(startOfDay(item.scheduledStartAt));
+    const group = byDay.get(dayKey) ?? [];
+    group.push(item);
+    byDay.set(dayKey, group);
+  }
+
+  return Array.from(byDay.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([dayKey, dayItems]) => {
+      const totalMinutes = dayItems.reduce(
+        (sum, item) => sum + getScheduledMinutes(item),
+        0,
+      );
+      const deepWorkMinutes = dayItems.reduce((sum, item) => {
+        const isDeepWork = item.priority === "High" || item.priority === "Urgent";
+        return isDeepWork ? sum + getScheduledMinutes(item) : sum;
+      }, 0);
+      const fragmentedMinutes = dayItems.reduce((sum, item) => {
+        const minutes = getScheduledMinutes(item);
+        return minutes < 90 ? sum + minutes : sum;
+      }, 0);
+      const hasHighRisk = dayItems.some(
+        (item) => item.scheduleStatus === "Overdue" || item.scheduleStatus === "AtRisk",
+      );
+      const riskLevel = hasHighRisk
+        ? "high"
+        : fragmentedMinutes >= 120 || totalMinutes > 8 * 60
+          ? "medium"
+          : "low";
+
+      return {
+        dayKey,
+        totalMinutes,
+        deepWorkMinutes,
+        fragmentedMinutes,
+        riskLevel,
+      };
+    });
+}
+
+function buildAutomationCandidates(input: {
+  unscheduled: Array<ReturnType<typeof mapProjectionItem>>;
+  risks: Array<ReturnType<typeof mapProjectionItem>>;
+  proposals: Awaited<ReturnType<typeof db.scheduleProposal.findMany>>;
+}) {
+  const today = startOfDay(new Date());
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const proposalTaskIds = new Set(input.proposals.map((proposal) => proposal.taskId));
+  const candidates: Array<{
+    taskId: string;
+    kind: "auto_schedule" | "decompose" | "remind" | "auto_run";
+    reason: string;
+    priority: "low" | "medium" | "high";
+  }> = [];
+
+  for (const item of input.unscheduled) {
+    const isDueSoon =
+      item.dueAt !== null &&
+      item.dueAt.getTime() >= today.getTime() &&
+      item.dueAt.getTime() < tomorrow.getTime();
+
+    if (isDueSoon && proposalTaskIds.has(item.taskId)) {
+      candidates.push({
+        taskId: item.taskId,
+        kind: "auto_schedule",
+        reason: "Due soon and already has a pending proposal.",
+        priority: "high",
+      });
+      continue;
+    }
+
+    if (!item.isRunnable && (!item.prompt || item.runnabilityState !== "ready")) {
+      candidates.push({
+        taskId: item.taskId,
+        kind: "decompose",
+        reason: "Task needs execution details before it can run.",
+        priority: isDueSoon ? "high" : "medium",
+      });
+    }
+  }
+
+  for (const item of input.risks) {
+    if (
+      item.actionRequired === "Schedule task" ||
+      item.actionRequired === "Reschedule task" ||
+      item.latestRunStatus === "WaitingForInput" ||
+      item.latestRunStatus === "WaitingForApproval"
+    ) {
+      candidates.push({
+        taskId: item.taskId,
+        kind: "remind",
+        reason:
+          item.actionRequired === "Reschedule task"
+            ? "Risk item is waiting on user rescheduling."
+            : "Task is blocked on user follow-up.",
+        priority:
+          item.scheduleStatus === "Overdue" || item.scheduleStatus === "AtRisk"
+            ? "high"
+            : "medium",
+      });
+    }
+  }
+
+  return candidates;
+}
+
 export async function getSchedulePage(workspaceId: string) {
   await syncStaleWorkspaceRunsForRead(workspaceId);
 
@@ -147,6 +279,12 @@ export async function getSchedulePage(workspaceId: string) {
     risks,
     proposals: mappedProposals,
   });
+  const focusZones = buildFocusZones(scheduled);
+  const automationCandidates = buildAutomationCandidates({
+    unscheduled,
+    risks,
+    proposals,
+  });
 
   return {
     defaultRuntimeAdapterKey: workspace.defaultRuntime,
@@ -158,6 +296,8 @@ export async function getSchedulePage(workspaceId: string) {
       riskCount: risks.length,
     },
     planningSummary,
+    focusZones,
+    automationCandidates,
     scheduled,
     unscheduled,
     risks,

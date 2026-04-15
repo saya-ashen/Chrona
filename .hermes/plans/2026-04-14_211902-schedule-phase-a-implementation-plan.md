@@ -10,6 +10,27 @@
 
 ---
 
+## Execution status snapshot (updated)
+
+当前对照代码库的执行进度：
+
+- [completed] Task 1: schedule timeline 共享类型已补齐
+- [completed] Task 2: collision / move / preview / quick-create 相关纯函数与测试已完成
+- [completed] Task 3: scheduled block 已抽到独立 primitives 组件中
+- [completed] Task 4: drag / resize / create preview 已统一为共享 placement card
+- [completed] Task 5: scheduled block drag move 已完成，并带冲突预览
+- [completed] Task 6: bottom-edge resize 已完成
+- [completed] Task 7: top command bar quick create 已完成并接入 page orchestration
+- [completed] Task 8: page-level orchestration 已完成一轮收敛，scheduled optimistic patch 已抽成局部 helper
+- [completed] Task 9: 已补齐 current-time line，并完成冲突/resize/空状态等关键 timeline polish
+- [completed] Task 10: targeted schedule vitest 已通过；schedule query tests 已用正确的 `bun test` runner 通过；全局 TypeScript 路径因既有约束未重试
+
+实现与原计划有两处轻微偏差，但方向一致：
+- 原计划中的 `timeline-block-card.tsx` / `timeline-drop-indicator.tsx` 最终落成了复用更高的 `schedule-timeline-primitives.tsx`
+- quick create 比原计划更进一步，已经支持命令式解析（如 `@ 14:30 for 90m !high`），而不是只做 preset 表单
+
+---
+
 ## Current grounded context
 
 已经确认的现状：
@@ -72,7 +93,7 @@
 
 ---
 
-## Task 1: Add missing schedule timeline types
+## Task 1: Add missing schedule timeline types [completed]
 
 **Objective:** 给 drag / resize / quick create 引入稳定的共享类型，避免临时对象散落在页面和 timeline 文件中。
 
@@ -132,7 +153,7 @@ Check that new types are generic and do not import component-level details.
 
 ---
 
-## Task 2: Add pure scheduling helpers for collision, move, and resize
+## Task 2: Add pure scheduling helpers for collision, move, and resize [completed]
 
 **Objective:** 把所有 minute/window 计算都放进纯函数，避免 timeline 组件继续膨胀。
 
@@ -255,7 +276,7 @@ Expected:
 
 ---
 
-## Task 3: Extract scheduled block into `timeline-block-card.tsx`
+## Task 3: Extract scheduled block into `timeline-block-card.tsx` [completed with implementation deviation]
 
 **Objective:** 把 `schedule-page-timeline.tsx` 底部内联 block 渲染抽出来，为拖动和 resize handle 做准备。
 
@@ -311,7 +332,7 @@ type TimelineBlockCardProps = {
 
 ---
 
-## Task 4: Add drag + resize preview indicator
+## Task 4: Add drag + resize preview indicator [completed with implementation deviation]
 
 **Objective:** 统一渲染拖放预览和 resize 预览，不要在 timeline 主文件里重复写绝对定位 overlay。
 
@@ -355,7 +376,7 @@ type TimelineBlockCardProps = {
 
 ---
 
-## Task 5: Implement scheduled block drag move completely
+## Task 5: Implement scheduled block drag move completely [completed]
 
 **Objective:** 把已排程 block 拖动改期做完整，包括 optimistic update、conflict preview、失败回滚。
 
@@ -420,7 +441,7 @@ Expected:
 
 ---
 
-## Task 6: Implement bottom-edge resize
+## Task 6: Implement bottom-edge resize [completed]
 
 **Objective:** 让 scheduled block 支持通过底部 handle 延长/缩短时长。
 
@@ -486,7 +507,7 @@ onScheduleDrop(
 
 ---
 
-## Task 7: Add top command bar quick create
+## Task 7: Add top command bar quick create [completed]
 
 **Objective:** 让用户能不用点击时间轴也能快速创建并安排任务。
 
@@ -548,7 +569,7 @@ Expected:
 
 ---
 
-## Task 8: Integrate page-level orchestration cleanly
+## Task 8: Integrate page-level orchestration cleanly [partial]
 
 **Objective:** 把 quick create、drag move、resize 全部接进 `schedule-page.tsx`，但不让该文件重新膨胀。
 
@@ -598,7 +619,7 @@ function patchScheduledWindow(taskId: string, startAt: Date, endAt: Date) {
 
 ---
 
-## Task 9: Add user-visible polish
+## Task 9: Add user-visible polish [partial]
 
 **Objective:** 提升基础 UI 反馈，让时间轴更像 cockpit 而不是 demo。
 
@@ -629,7 +650,7 @@ function patchScheduledWindow(taskId: string, startAt: Date, endAt: Date) {
 
 ---
 
-## Task 10: Full verification
+## Task 10: Full verification [partial]
 
 **Objective:** 确认 schedule Phase A 改动在 schedule import chain 内可编译、可测试。
 

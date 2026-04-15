@@ -82,6 +82,7 @@ export function ScheduledTimelineBlock({
   onDragStart,
   onDragEnd,
   onResizeStart,
+  onKeyboardAdjust,
 }: {
   item: ScheduledItem;
   selectedDay: string;
@@ -93,6 +94,11 @@ export function ScheduledTimelineBlock({
   onDragStart: (item: ScheduledItem) => void;
   onDragEnd: () => void;
   onResizeStart: (item: ScheduledItem, clientY: number) => void;
+  onKeyboardAdjust: (
+    item: ScheduledItem,
+    key: "ArrowUp" | "ArrowDown",
+    mode: "move" | "resize",
+  ) => Promise<void>;
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
@@ -110,8 +116,21 @@ export function ScheduledTimelineBlock({
         onDragStart(item);
       }}
       onDragEnd={onDragEnd}
+      onKeyDown={(event) => {
+        if (!isSelected || isPending) {
+          return;
+        }
+
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+          return;
+        }
+
+        event.preventDefault();
+        void onKeyboardAdjust(item, event.key, event.shiftKey ? "resize" : "move");
+      }}
+      aria-label={item.title}
       className={cn(
-        "absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50",
+        "absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         isSelected ? "border-primary ring-1 ring-primary/30" : "border-border",
         isHidden && "opacity-40",
       )}

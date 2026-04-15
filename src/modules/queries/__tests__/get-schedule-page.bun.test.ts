@@ -66,7 +66,22 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Medium",
         ownerType: "human",
+        dueAt: new Date("2026-04-15T20:00:00.000Z"),
         scheduleStatus: "Unscheduled",
+      },
+    });
+
+    const reviewTask = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Review launch checklist",
+        status: "Ready",
+        priority: "Low",
+        ownerType: "human",
+        scheduledStartAt: new Date("2026-04-15T13:00:00.000Z"),
+        scheduledEndAt: new Date("2026-04-15T14:00:00.000Z"),
+        scheduleStatus: "Scheduled",
+        scheduleSource: "human",
       },
     });
 
@@ -105,10 +120,23 @@ describe("getSchedulePage", () => {
           workspaceId: workspace.id,
           persistedStatus: "Ready",
           displayState: "Ready",
+          dueAt: new Date("2026-04-15T20:00:00.000Z"),
           scheduleStatus: "Unscheduled",
           scheduleProposalCount: 1,
           actionRequired: "Schedule task",
           lastActivityAt: new Date("2026-04-15T12:05:00.000Z"),
+        },
+        {
+          taskId: reviewTask.id,
+          workspaceId: workspace.id,
+          persistedStatus: "Ready",
+          displayState: "Ready",
+          scheduledStartAt: new Date("2026-04-15T13:00:00.000Z"),
+          scheduledEndAt: new Date("2026-04-15T14:00:00.000Z"),
+          scheduleStatus: "Scheduled",
+          scheduleSource: "human",
+          scheduleProposalCount: 0,
+          lastActivityAt: new Date("2026-04-15T12:20:00.000Z"),
         },
         {
           taskId: riskTask.id,
@@ -168,7 +196,7 @@ describe("getSchedulePage", () => {
 
     const page = await getSchedulePage(workspace.id);
 
-    expect(page.scheduled).toHaveLength(2);
+    expect(page.scheduled).toHaveLength(3);
     expect(page.scheduled.find((item) => item.taskId === scheduledTask.id)).toMatchObject({
       taskId: scheduledTask.id,
       title: "Ship projection cleanup",
@@ -181,6 +209,12 @@ describe("getSchedulePage", () => {
       title: "Recover overdue adapter run",
       priority: "Urgent",
       scheduleStatus: "Overdue",
+    });
+    expect(page.scheduled.find((item) => item.taskId === reviewTask.id)).toMatchObject({
+      taskId: reviewTask.id,
+      title: "Review launch checklist",
+      priority: "Low",
+      scheduleStatus: "Scheduled",
     });
 
     expect(page.unscheduled).toHaveLength(1);
@@ -210,15 +244,62 @@ describe("getSchedulePage", () => {
     });
 
     expect(page.summary).toEqual({
-      scheduledCount: 2,
+      scheduledCount: 3,
       unscheduledCount: 1,
       proposalCount: 1,
       riskCount: 1,
     });
+    expect(page.planningSummary).toEqual({
+      scheduledMinutes: 300,
+      runnableQueueCount: 0,
+      conflictCount: 0,
+      overloadedDayCount: 0,
+      proposalCount: 1,
+      riskCount: 1,
+      todayLoadMinutes: 180,
+      overdueCount: 1,
+      atRiskCount: 0,
+      readyToScheduleCount: 1,
+      autoRunnableCount: 0,
+      waitingOnUserCount: 1,
+      dueSoonUnscheduledCount: 1,
+      largestIdleWindowMinutes: 120,
+      overloadedMinutes: 0,
+    });
+    expect(page.focusZones).toEqual([
+      {
+        dayKey: "2026-04-15",
+        totalMinutes: 180,
+        deepWorkMinutes: 120,
+        fragmentedMinutes: 60,
+        riskLevel: "high",
+      },
+      {
+        dayKey: "2026-04-16",
+        totalMinutes: 120,
+        deepWorkMinutes: 120,
+        fragmentedMinutes: 0,
+        riskLevel: "low",
+      },
+    ]);
+    expect(page.automationCandidates).toEqual([
+      {
+        taskId: unscheduledTask.id,
+        kind: "auto_schedule",
+        reason: "Due soon and already has a pending proposal.",
+        priority: "high",
+      },
+      {
+        taskId: riskTask.id,
+        kind: "remind",
+        reason: "Risk item is waiting on user rescheduling.",
+        priority: "high",
+      },
+    ]);
 
-    expect(page.listItems).toHaveLength(3);
+    expect(page.listItems).toHaveLength(4);
     expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
-      [riskTask.id, scheduledTask.id, unscheduledTask.id].sort(),
+      [reviewTask.id, riskTask.id, scheduledTask.id, unscheduledTask.id].sort(),
     );
     expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({
       scheduleStatus: "Unscheduled",

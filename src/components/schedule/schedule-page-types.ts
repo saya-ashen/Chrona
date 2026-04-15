@@ -16,6 +16,30 @@ export type SchedulePlanningSummary = {
   overloadedDayCount: number;
   proposalCount: number;
   riskCount: number;
+  todayLoadMinutes: number;
+  overdueCount: number;
+  atRiskCount: number;
+  readyToScheduleCount: number;
+  autoRunnableCount: number;
+  waitingOnUserCount: number;
+  dueSoonUnscheduledCount: number;
+  largestIdleWindowMinutes: number;
+  overloadedMinutes: number;
+};
+
+export type ScheduleFocusZone = {
+  dayKey: string;
+  totalMinutes: number;
+  deepWorkMinutes: number;
+  fragmentedMinutes: number;
+  riskLevel: "low" | "medium" | "high";
+};
+
+export type ScheduleAutomationCandidate = {
+  taskId: string;
+  kind: "auto_schedule" | "decompose" | "remind" | "auto_run";
+  reason: string;
+  priority: "low" | "medium" | "high";
 };
 
 export type ScheduleRuntimeFields = {
@@ -73,6 +97,8 @@ export type SchedulePageData = {
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   summary: SchedulePageSummary;
   planningSummary: SchedulePlanningSummary;
+  focusZones: ScheduleFocusZone[];
+  automationCandidates: ScheduleAutomationCandidate[];
   scheduled: ScheduleRecord[];
   unscheduled: ScheduleRecord[];
   proposals: ScheduleProposal[];
