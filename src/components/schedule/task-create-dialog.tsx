@@ -1,12 +1,21 @@
 "use client";
 
-import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AutomationSuggestion } from "@/modules/ai/types";
-import { suggestAutomation } from "@/modules/ai/automation-suggester";
+import { useAutoComplete, useSmartAutomation } from "@/hooks/use-ai";
+
+/* ------------------------------------------------------------------ */
+/*  Priority badge color map                                          */
+/* ------------------------------------------------------------------ */
+const priorityBadgeColors: Record<string, string> = {
+  Low: "bg-green-100 text-green-700",
+  Medium: "bg-amber-100 text-amber-700",
+  High: "bg-orange-100 text-orange-700",
+  Urgent: "bg-red-100 text-red-700",
+};
 
 type TaskCreateDialogProps = {
   isOpen: boolean;
@@ -40,45 +49,48 @@ export function TaskCreateDialog({
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [aiSuggestion, setAiSuggestion] = useState<AutomationSuggestion | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
-  const fetchAiSuggestion = useCallback((currentTitle: string, currentPriority: string) => {
-    if (!currentTitle.trim() || currentTitle.trim().length < 3) {
-      setAiSuggestion(null);
-      return;
-    }
+  /* ---- Auto-complete state ---- */
+  const [showAutoComplete, setShowAutoComplete] = useState(false);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    setAiLoading(true);
-    // Use client-side suggestion (no API call needed - pure logic)
-    try {
-      const suggestion = suggestAutomation({
-        taskId: "preview",
-        title: currentTitle.trim(),
-        description: description,
-        priority: currentPriority,
-        dueAt: null,
-        scheduledStartAt: initialStartAt,
-        scheduledEndAt: initialEndAt,
-        isRunnable: false,
-        runnabilityState: "not_configured",
-        ownerType: "human",
-      });
-      setAiSuggestion(suggestion);
-    } catch {
-      setAiSuggestion(null);
-    } finally {
-      setAiLoading(false);
-    }
-  }, [description, initialStartAt, initialEndAt]);
+  /* ---- AI hooks ---- */
+  const { suggestions: autoCompleteSuggestions } = useAutoComplete(
+    title.trim().length >= 3 ? title.trim() : null,
+  );
 
+  const automationInput =
+    title.trim().length >= 3
+      ? {
+          title: title.trim(),
+          description,
+          priority,
+          dueAt: null as Date | null,
+          scheduledStartAt: initialStartAt,
+          scheduledEndAt: initialEndAt,
+          isRunnable: false,
+          runnabilityState: "not_configured" as const,
+          ownerType: "human" as const,
+        }
+      : null;
+
+  const { suggestion: aiSuggestion, isLoading: aiLoading } =
+    useSmartAutomation(automationInput);
+
+  /* ---- Show dropdown when we have suggestions & title is long enough ---- */
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchAiSuggestion(title, priority);
-    }, 500);
-    return () => clearTimeout(timeout);
-  }, [title, priority, fetchAiSuggestion]);
+    if (
+      title.trim().length >= 3 &&
+      autoCompleteSuggestions &&
+      autoCompleteSuggestions.length > 0
+    ) {
+      setShowAutoComplete(true);
+    } else {
+      setShowAutoComplete(false);
+    }
+  }, [title, autoCompleteSuggestions]);
 
+  /* ---- Reset form state when dialog opens ---- */
   useEffect(() => {
     if (isOpen) {
       const formatDate = (date: Date) => {
@@ -100,6 +112,7 @@ export function TaskCreateDialog({
       setTitle(initialTitle);
       setDescription("");
       setPriority("Medium");
+      setShowAutoComplete(false);
     }
   }, [isOpen, initialStartAt, initialEndAt, initialTitle]);
 
@@ -167,17 +180,102 @@ export function TaskCreateDialog({
 
         {/* Content */}
         <div className="space-y-4 px-6 py-5">
-          {/* Title */}
-          <div>
+          {/* Title with auto-complete */}
+          <div className="relative">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onFocus={() => {
+                if (
+                  title.trim().length >= 3 &&
+                  autoCompleteSuggestions &&
+                  autoCompleteSuggestions.length > 0
+                ) {
+                  setShowAutoComplete(true);
+                }
+              }}
+              onBlur={() => {
+                // Delay hide so click on suggestion can fire first
+                blurTimeoutRef.current = setTimeout(() => {
+                  setShowAutoComplete(false);
+                }, 200);
+              }}
               placeholder="Add title"
               disabled={isPending}
               autoFocus
               className="w-full border-0 border-b border-border/60 bg-transparent px-0 py-2 text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60"
             />
+
+            {/* Auto-complete dropdown */}
+            {showAutoComplete &&
+              autoCompleteSuggestions &&
+              autoCompleteSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border/60 bg-background shadow-lg">
+                  <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5">
+                    <Sparkles className="size-3 text-primary" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      AI Suggestions
+                    </span>
+                  </div>
+                  {autoCompleteSuggestions.slice(0, 5).map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition hover:bg-muted/50"
+                      onMouseDown={(e) => {
+                        // Prevent the input blur from hiding dropdown before click fires
+                        e.preventDefault();
+                      }}
+                      onClick={() => {
+                        // Clear any pending blur timeout
+                        if (blurTimeoutRef.current) {
+                          clearTimeout(blurTimeoutRef.current);
+                          blurTimeoutRef.current = null;
+                        }
+                        // Fill in fields from the suggestion
+                        setTitle(suggestion.title);
+                        if (suggestion.description) {
+                          setDescription(suggestion.description);
+                        }
+                        if (suggestion.priority) {
+                          setPriority(
+                            suggestion.priority as "Low" | "Medium" | "High" | "Urgent",
+                          );
+                        }
+                        setShowAutoComplete(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">
+                          {suggestion.title}
+                        </span>
+                        {suggestion.priority && (
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                              priorityBadgeColors[suggestion.priority] ??
+                                "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {suggestion.priority}
+                          </span>
+                        )}
+                        {suggestion.estimatedMinutes != null && (
+                          <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">
+                            ~{suggestion.estimatedMinutes}m
+                          </span>
+                        )}
+                      </div>
+                      {suggestion.description && (
+                        <span className="line-clamp-1 text-xs text-muted-foreground">
+                          {suggestion.description}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
           </div>
 
           {/* Date and Time */}

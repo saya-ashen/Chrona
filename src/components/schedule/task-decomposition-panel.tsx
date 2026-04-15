@@ -1,19 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
 import {
   Scissors,
   Clock,
   AlertTriangle,
   ChevronDown,
   Check,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  decomposeTask,
   type TaskDecompositionResult,
   type SubtaskSuggestion,
 } from "@/modules/ai/task-decomposer";
+import { useSmartDecomposition } from "@/hooks/use-ai";
 
 export interface TaskDecompositionPanelProps {
   taskId: string;
@@ -55,19 +55,47 @@ export function TaskDecompositionPanel({
   estimatedMinutes,
   onApply,
 }: TaskDecompositionPanelProps) {
-  const result = useMemo(() => {
-    return decomposeTask({
-      taskId,
-      title,
-      description: description ?? undefined,
-      priority,
-      dueAt: dueAt ?? undefined,
-      estimatedMinutes,
-    });
-  }, [taskId, title, description, priority, dueAt, estimatedMinutes]);
+  const { result, isLoading, error } = useSmartDecomposition({
+    taskId,
+    title,
+    description: description ?? undefined,
+    priority,
+    dueAt,
+    estimatedMinutes,
+  });
+
+  // Loading state – animated skeleton similar to AutomationSuggestionPanel
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2 text-sm text-primary">
+          <Bot className="size-4 animate-pulse" />
+          <span className="font-medium">AI is decomposing your task...</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          <div className="h-3 animate-pulse rounded bg-primary/10" />
+          <div className="h-3 w-3/4 animate-pulse rounded bg-primary/10" />
+          <div className="h-3 w-1/2 animate-pulse rounded bg-primary/10" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertTriangle className="size-4" />
+          <span className="font-medium">Failed to decompose task</span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
 
   // Don't render if decomposition produced no subtasks
-  if (result.subtasks.length === 0) {
+  if (!result || result.subtasks.length === 0) {
     return null;
   }
 
