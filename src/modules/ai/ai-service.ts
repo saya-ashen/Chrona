@@ -56,25 +56,18 @@ export function initAIService(): void {
   aiAdapterRegistry.registerFactory("llm", (config) => new LLMAdapter(config));
 
   // Auto-register adapters based on environment
-  const openclawUrl =
-    process.env.OPENCLAW_GATEWAY_URL ?? process.env.OPENCLAW_BASE_URL;
-  const openclawAuth =
-    process.env.OPENCLAW_AUTH_TOKEN ??
-    process.env.OPENCLAW_API_KEY ??
-    process.env.OPENCLAW_AUTH_PASSWORD;
+  const bridgeUrl = process.env.OPENCLAW_BRIDGE_URL ?? "http://localhost:7677";
+  const bridgeEnabled = process.env.OPENCLAW_BRIDGE_ENABLED !== "false";
 
-  if (openclawUrl && openclawAuth && process.env.OPENCLAW_MODE !== "mock") {
+  if (bridgeEnabled) {
     aiAdapterRegistry.register(
       "openclaw",
       {
         id: "openclaw-default",
-        name: "OpenClaw Gateway",
+        name: "OpenClaw CLI Bridge",
         options: {
-          gatewayUrl: openclawUrl,
-          authToken:
-            process.env.OPENCLAW_AUTH_TOKEN ?? process.env.OPENCLAW_API_KEY,
-          authPassword: process.env.OPENCLAW_AUTH_PASSWORD,
-          identityDir: process.env.OPENCLAW_IDENTITY_DIR,
+          bridgeUrl,
+          timeoutSeconds: Number(process.env.OPENCLAW_BRIDGE_TIMEOUT ?? 120),
         } satisfies OpenClawAdapterOptions,
       },
       10, // highest priority
