@@ -38,6 +38,20 @@ export default async function SettingsPage(props: { params?: Promise<{ lang?: st
         </dl>
         <div className="rounded-xl border bg-muted/30 p-4">
           <div className="space-y-1">
+            <h2 className="text-sm font-medium text-foreground">AI Clients</h2>
+            <p className="text-sm text-muted-foreground">管理 AI 客户端，配置各智能功能使用的 Client</p>
+          </div>
+          <div className="mt-3">
+            <LocalizedLink
+              href="/settings/ai-clients"
+              className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              管理 AI Clients
+            </LocalizedLink>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-muted/30 p-4">
+          <div className="space-y-1">
             <h2 className="text-sm font-medium text-foreground">{t.advancedTitle}</h2>
             <p className="text-sm text-muted-foreground">{t.advancedDescription}</p>
           </div>
