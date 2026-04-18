@@ -1,16 +1,18 @@
 /**
- * OpenClaw Adapter — Agentic AI via OpenClaw Gateway.
+ * OpenClaw Adapter — AI via OpenClaw CLI Bridge HTTP service.
  *
- * This adapter connects to OpenClaw Gateway via WebSocket and uses
- * agentic sessions with tool-calling capabilities. The OpenClaw agent
- * can fetch schedule context, inspect tasks, and generate richer
- * suggestions than a raw LLM.
+ * Instead of connecting to OpenClaw Gateway via WebSocket, this adapter
+ * calls the OpenClaw CLI Bridge (a lightweight HTTP server that spawns
+ * `openclaw agent --local --json` subprocesses).
  *
- * Key advantages over LLM adapter:
- *   - Tool calling: agent can query schedule data in real-time
- *   - Persistent sessions: accumulates context across requests
- *   - Code execution: can run analysis scripts
- *   - Multi-step reasoning with intermediate tool calls
+ * The bridge should be running on the same machine as OpenClaw.
+ * Default URL: http://localhost:7677
+ *
+ * Advantages:
+ *   - Simple HTTP — no WebSocket connection management
+ *   - CLI has full local access to OpenClaw tools
+ *   - Session persistence via --session-id
+ *   - Works without gateway configuration
  */
 
 import { randomUUID } from "node:crypto";
@@ -35,41 +37,45 @@ import type {
   TimeslotOption,
 } from "./types";
 import { AIAdapterError } from "./types";
-import {
-  OpenClawGatewayClient,
-  type OpenClawRuntimeClient,
-} from "../../runtime/openclaw/client";
-import { loadOpenClawPersistedDeviceIdentity } from "../../runtime/openclaw/device-identity";
 
 // ────────────────────────────────────────────────────────────────────
-// OpenClaw-specific config
+// Config
 // ────────────────────────────────────────────────────────────────────
 
 export interface OpenClawAdapterOptions {
-  gatewayUrl?: string;
-  authToken?: string;
-  authPassword?: string;
-  identityDir?: string;
-  /** Timeout for agent responses in ms (default: 30000) */
-  timeoutMs?: number;
+  /** Bridge HTTP URL (default: http://localhost:7677) */
+  bridgeUrl?: string;
+  /** Default timeout in seconds for CLI execution */
+  timeoutSeconds?: number;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Bridge response type
+// ────────────────────────────────────────────────────────────────────
+
+interface BridgeChatResponse {
+  sessionId: string;
+  output: string;
+  toolCalls: Array<{
+    tool: string;
+    callId: string;
+    input: Record<string, unknown>;
+    result?: string;
+    status: string;
+  }>;
+  usage: { inputTokens: number; outputTokens: number } | null;
+  error: string | null;
+  durationMs: number;
 }
 
 // ────────────────────────────────────────────────────────────────────
 // Session naming
 // ────────────────────────────────────────────────────────────────────
 
-type SessionPurpose =
-  | "suggest"
-  | "decompose"
-  | "conflicts"
-  | "timeslots"
-  | "chat";
+type SessionPurpose = "suggest" | "decompose" | "conflicts" | "timeslots" | "chat";
 
-function buildSessionKey(
-  purpose: SessionPurpose,
-  workspaceId: string,
-): string {
-  return `ai-adapter::${purpose}::${workspaceId}`;
+function buildSessionKey(purpose: SessionPurpose, scope: string): string {
+  return `ai::${purpose}::${scope}`;
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -77,69 +83,27 @@ function buildSessionKey(
 // ────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPTS: Record<SessionPurpose, string> = {
-  suggest: `You are a smart scheduling assistant embedded in a task planning application.
+  suggest: `You are a smart scheduling assistant for a task planning application.
 When given a partial task title and context, generate 2-4 task suggestions.
+You have access to tools — use them to check existing tasks and schedule load.
+Return valid JSON only (no markdown wrapping):
+{"suggestions":[{"title":"...","description":"...","priority":"Low|Medium|High|Urgent","estimatedMinutes":N,"tags":[],"suggestedSlot":{"startAt":"ISO","endAt":"ISO"}}]}
+Respond in the same language as the input.`,
 
-You have access to tools:
-- schedule.list_tasks: lists existing tasks
-- schedule.get_health: schedule health metrics
-- schedule.check_conflicts: check time window conflicts
+  decompose: `You are a task decomposition assistant. Break the given task into 2-8 actionable subtasks.
+Return JSON only:
+{"subtasks":[{"title":"...","description":"...","estimatedMinutes":N,"priority":"...","order":N,"dependsOn":[]}],"reasoning":"..."}
+Respond in the same language as the input.`,
 
-Rules:
-1. Return valid JSON with "suggestions" array
-2. Each: { title, description, priority (Low/Medium/High/Urgent), estimatedMinutes, tags[], suggestedSlot?: { startAt, endAt } }
-3. Use tools only when genuinely helpful (avoid duplicates, assess load)
-4. Respond in the same language as input
-5. No markdown wrapping — raw JSON only`,
+  conflicts: `You are a schedule conflict analyzer. Find conflicts and suggest resolutions.
+Return JSON only:
+{"conflicts":[{"id":"...","type":"time_overlap|overload|fragmentation|dependency","severity":"low|medium|high","taskIds":[],"description":"..."}],"resolutions":[{"conflictId":"...","type":"reschedule|split|merge|defer|reorder","description":"...","reason":"...","changes":[{"taskId":"...","scheduledStartAt":"...","scheduledEndAt":"..."}]}],"summary":"..."}`,
 
-  decompose: `You are a task decomposition assistant for a scheduling application.
-Break tasks into 2-8 actionable subtasks.
-
-You have access to tools to query existing tasks and dependencies.
-
-Return JSON:
-{
-  "subtasks": [{ "title", "description", "estimatedMinutes", "priority", "order", "dependsOn": [] }],
-  "reasoning": "why this decomposition"
-}
-
-Rules:
-- Subtasks must be specific and actionable
-- Estimate realistic durations
-- Mark dependencies by order number
-- Respond in the same language as input`,
-
-  conflicts: `You are a schedule conflict analyzer for a task planning application.
-Analyze task schedules to find conflicts and suggest resolutions.
-
-You have access to tools to query the full schedule and task details.
-
-Return JSON:
-{
-  "conflicts": [{ "id", "type" (time_overlap|overload|fragmentation|dependency), "severity" (low|medium|high), "taskIds": [], "description", "timeRange"?: { "start", "end" } }],
-  "resolutions": [{ "conflictId", "type" (reschedule|split|merge|defer|reorder), "description", "reason", "changes": [{ "taskId", "scheduledStartAt"?, "scheduledEndAt"?, "priority"? }] }],
-  "summary": "overall assessment"
-}`,
-
-  timeslots: `You are a scheduling optimizer for a task planning application.
-Given a task and current schedule, suggest optimal time slots.
-
-You have access to tools to query the full schedule.
-
-Return JSON:
-{
-  "slots": [{ "startAt": "ISO", "endAt": "ISO", "score": 0.0-1.0, "reason" }],
-  "reasoning": "overall logic"
-}
-
-Rules:
-- Suggest 2-5 slots, sorted by score
-- Avoid conflicts
-- Consider work hours and buffer time`,
+  timeslots: `You are a scheduling optimizer. Suggest optimal time slots for a task.
+Return JSON only:
+{"slots":[{"startAt":"ISO","endAt":"ISO","score":0.0-1.0,"reason":"..."}],"reasoning":"..."}`,
 
   chat: `You are a helpful scheduling assistant with access to the user's task and schedule data.
-Answer questions about scheduling, help organize tasks, and provide planning advice.
-When the user asks about their schedule, use your tools to fetch current data.
 Respond in the same language as the user.`,
 };
 
@@ -148,9 +112,6 @@ Respond in the same language as the user.`,
 // ────────────────────────────────────────────────────────────────────
 
 export class OpenClawAdapter extends AIAdapter {
-  private client: OpenClawRuntimeClient | null = null;
-  private connectPromise: Promise<void> | null = null;
-  private initializedSessions = new Set<string>();
   private options: OpenClawAdapterOptions;
 
   constructor(config: AIAdapterConfig) {
@@ -160,6 +121,14 @@ export class OpenClawAdapter extends AIAdapter {
 
   get type(): string {
     return "openclaw";
+  }
+
+  private get bridgeUrl(): string {
+    return (
+      this.options.bridgeUrl ??
+      process.env.OPENCLAW_BRIDGE_URL ??
+      "http://localhost:7677"
+    );
   }
 
   capabilities(): AIAdapterCapabilities {
@@ -174,173 +143,70 @@ export class OpenClawAdapter extends AIAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    const gatewayUrl = this.resolveGatewayUrl();
-    const auth = this.resolveAuth();
-    return Boolean(gatewayUrl) && Boolean(auth);
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // Connection Management
-  // ──────────────────────────────────────────────────────────────────
-
-  private resolveGatewayUrl(): string {
-    return (
-      this.options.gatewayUrl ??
-      process.env.OPENCLAW_GATEWAY_URL ??
-      process.env.OPENCLAW_BASE_URL ??
-      ""
-    );
-  }
-
-  private resolveAuth(): Record<string, string> | null {
-    if (this.options.authToken) {
-      return { token: this.options.authToken };
+    try {
+      const res = await fetch(`${this.bridgeUrl}/v1/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { status: string };
+      return body.status === "ok";
+    } catch {
+      return false;
     }
-    const token =
-      process.env.OPENCLAW_AUTH_TOKEN ?? process.env.OPENCLAW_API_KEY;
-    if (token) return { token };
-
-    const password =
-      this.options.authPassword ?? process.env.OPENCLAW_AUTH_PASSWORD;
-    if (password) return { password };
-
-    return null;
-  }
-
-  private async getClient(): Promise<OpenClawRuntimeClient> {
-    if (this.client) return this.client;
-
-    const deviceIdentity = await loadOpenClawPersistedDeviceIdentity({
-      identityDir: this.options.identityDir ?? process.env.OPENCLAW_IDENTITY_DIR,
-    });
-
-    const auth = deviceIdentity?.deviceToken
-      ? { deviceToken: deviceIdentity.deviceToken }
-      : (this.resolveAuth() as Record<string, string>) ?? {};
-
-    const client = new OpenClawGatewayClient({
-      gatewayUrl: this.resolveGatewayUrl(),
-      auth,
-      deviceIdentity,
-      client: {
-        id: `agentdashboard-ai-${this.config.id}`,
-        version: "0.1.0",
-        platform: process.platform,
-        mode: "probe" as const,
-      },
-    });
-
-    this.client = client;
-    return client;
-  }
-
-  private async ensureConnected(): Promise<OpenClawRuntimeClient> {
-    const client = await this.getClient();
-    if (!this.connectPromise) {
-      this.connectPromise = client
-        .connect()
-        .then(() => {})
-        .catch((err) => {
-          this.client = null;
-          this.connectPromise = null;
-          throw err;
-        });
-    }
-    await this.connectPromise;
-    return client;
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Core request pattern: send prompt, wait, extract response
+  // Bridge communication
   // ──────────────────────────────────────────────────────────────────
 
-  private async sendAndWait(
+  private async callBridge(
     purpose: SessionPurpose,
-    workspaceId: string,
+    scope: string,
     userMessage: string,
   ): Promise<string> {
-    const sessionKey = buildSessionKey(purpose, workspaceId);
-    const timeoutMs = this.options.timeoutMs ?? 30_000;
+    const sessionId = buildSessionKey(purpose, scope);
+    const timeout = this.options.timeoutSeconds ?? 120;
 
-    let client: OpenClawRuntimeClient;
-    try {
-      client = await this.ensureConnected();
-    } catch (err) {
+    const res = await fetch(`${this.bridgeUrl}/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        message: userMessage,
+        systemPrompt: SYSTEM_PROMPTS[purpose],
+        timeout,
+      }),
+      signal: AbortSignal.timeout((timeout + 15) * 1000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
       throw new AIAdapterError(
-        `Failed to connect to OpenClaw Gateway: ${err}`,
+        `Bridge returned ${res.status}: ${errText.slice(0, 200)}`,
         this.type,
-        "unavailable",
-        err,
+        "internal",
       );
     }
 
-    // Prepend system prompt on first use of this session
-    const isFirst = !this.initializedSessions.has(sessionKey);
-    const prompt = isFirst
-      ? `${SYSTEM_PROMPTS[purpose]}\n\n---\n\n${userMessage}`
-      : userMessage;
+    const result = (await res.json()) as BridgeChatResponse;
 
-    const runResult = await client.createRun({
-      prompt,
-      runtimeSessionKey: sessionKey,
-    });
-
-    this.initializedSessions.add(sessionKey);
-
-    if (!runResult.runtimeRunRef) {
-      throw new AIAdapterError(
-        "OpenClaw did not return a run reference",
-        this.type,
-        "invalid_response",
-      );
+    if (result.error) {
+      throw new AIAdapterError(result.error, this.type, "internal");
     }
 
-    // Wait for completion
-    await client.waitForRun({
-      runtimeRunRef: runResult.runtimeRunRef,
-      runtimeSessionKey: sessionKey,
-      timeoutMs,
-    });
-
-    // Read the latest assistant message
-    const history = await client.readOutputs(sessionKey);
-    return this.extractLastAssistantMessage(history.messages);
-  }
-
-  private extractLastAssistantMessage(
-    messages: Array<Record<string, unknown>>,
-  ): string {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      const role = msg.role ?? msg.stream ?? msg.type;
-      if (role !== "assistant" && role !== "agent") continue;
-
-      const content =
-        typeof msg.content === "string"
-          ? msg.content
-          : typeof msg.message === "string"
-            ? msg.message
-            : typeof msg.text === "string"
-              ? msg.text
-              : null;
-
-      if (content) return content;
-    }
-    return "";
+    return result.output;
   }
 
   private parseJSON<T>(raw: string): T {
-    // Try direct parse, then extract from markdown code block
     const jsonMatch =
       raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ??
       raw.match(/(\{[\s\S]*\})/);
     const jsonStr = jsonMatch?.[1] ?? raw;
-
     try {
       return JSON.parse(jsonStr.trim()) as T;
     } catch {
       throw new AIAdapterError(
-        `Failed to parse JSON from OpenClaw response: ${raw.slice(0, 200)}`,
+        `Failed to parse JSON: ${raw.slice(0, 200)}`,
         this.type,
         "invalid_response",
       );
@@ -353,7 +219,7 @@ export class OpenClawAdapter extends AIAdapter {
 
   async suggest(request: SmartSuggestRequest): Promise<SmartSuggestResponse> {
     const requestId = randomUUID();
-    const workspaceId = request.workspaceId ?? "ws_default";
+    const scope = request.workspaceId ?? "default";
 
     const contextParts: string[] = [];
     if (request.context?.selectedDay) {
@@ -375,15 +241,11 @@ export class OpenClawAdapter extends AIAdapter {
     }
 
     const userMessage = `Suggest task completions for: "${request.input}"${
-      contextParts.length
-        ? `\n\nContext:\n${contextParts.join("\n")}`
-        : ""
+      contextParts.length ? `\n\nContext:\n${contextParts.join("\n")}` : ""
     }\n\nReturn JSON: { "suggestions": [...] }`;
 
-    const raw = await this.sendAndWait("suggest", workspaceId, userMessage);
-    const parsed = this.parseJSON<{
-      suggestions?: Array<Partial<SmartSuggestion>>;
-    }>(raw);
+    const raw = await this.callBridge("suggest", scope, userMessage);
+    const parsed = this.parseJSON<{ suggestions?: Array<Partial<SmartSuggestion>> }>(raw);
 
     return {
       suggestions: (parsed.suggestions ?? [])
@@ -405,22 +267,12 @@ export class OpenClawAdapter extends AIAdapter {
   // Task Decomposition
   // ──────────────────────────────────────────────────────────────────
 
-  async decompose(
-    request: DecomposeTaskRequest,
-  ): Promise<DecomposeTaskResponse> {
+  async decompose(request: DecomposeTaskRequest): Promise<DecomposeTaskResponse> {
     const userMessage = `Decompose this task:\nTitle: "${request.title}"${
       request.description ? `\nDescription: ${request.description}` : ""
-    }${
-      request.estimatedMinutes
-        ? `\nEstimated: ${request.estimatedMinutes} minutes`
-        : ""
-    }\n\nReturn JSON: { "subtasks": [...], "reasoning": "..." }`;
+    }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}\n\nReturn JSON.`;
 
-    const raw = await this.sendAndWait(
-      "decompose",
-      "ws_default",
-      userMessage,
-    );
+    const raw = await this.callBridge("decompose", "default", userMessage);
     const parsed = this.parseJSON<{
       subtasks?: Array<Partial<SubtaskSuggestion>>;
       reasoning?: string;
@@ -444,25 +296,16 @@ export class OpenClawAdapter extends AIAdapter {
   // Conflict Analysis
   // ──────────────────────────────────────────────────────────────────
 
-  async analyzeConflicts(
-    request: AnalyzeConflictsRequest,
-  ): Promise<AnalyzeConflictsResponse> {
+  async analyzeConflicts(request: AnalyzeConflictsRequest): Promise<AnalyzeConflictsResponse> {
     const taskList = request.tasks
-      .map(
-        (t) =>
-          `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`,
-      )
+      .map((t) => `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`)
       .join("\n");
 
-    const userMessage = `Analyze conflicts in this schedule:\n${taskList}${
-      request.focusDate ? `\n\nFocus date: ${request.focusDate}` : ""
-    }\n\nYou can also use tools to get additional context. Return JSON.`;
+    const userMessage = `Analyze conflicts:\n${taskList}${
+      request.focusDate ? `\nFocus date: ${request.focusDate}` : ""
+    }\n\nReturn JSON.`;
 
-    const raw = await this.sendAndWait(
-      "conflicts",
-      request.workspaceId ?? "ws_default",
-      userMessage,
-    );
+    const raw = await this.callBridge("conflicts", request.workspaceId ?? "default", userMessage);
     const parsed = this.parseJSON<{
       conflicts?: ConflictInfo[];
       resolutions?: ResolutionSuggestion[];
@@ -481,27 +324,18 @@ export class OpenClawAdapter extends AIAdapter {
   // Timeslot Suggestion
   // ──────────────────────────────────────────────────────────────────
 
-  async suggestTimeslots(
-    request: SuggestTimeslotRequest,
-  ): Promise<SuggestTimeslotResponse> {
+  async suggestTimeslots(request: SuggestTimeslotRequest): Promise<SuggestTimeslotResponse> {
     const scheduleList = request.currentSchedule
       .filter((t) => t.scheduledStartAt)
       .map((t) => `- "${t.title}" ${t.scheduledStartAt}~${t.scheduledEndAt}`)
       .join("\n");
 
-    const userMessage = `Find optimal time slots for:\nTask: "${request.taskTitle}" (${request.estimatedMinutes} min, ${request.priority ?? "Medium"})${
+    const userMessage = `Find time slots for:\nTask: "${request.taskTitle}" (${request.estimatedMinutes} min, ${request.priority ?? "Medium"})${
       request.deadline ? `\nDeadline: ${request.deadline}` : ""
-    }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\nBuffer: ${request.preferences?.bufferMinutes ?? 15} min\n\nCurrent schedule:\n${scheduleList || "(empty)"}\n\nYou can also use tools to check for conflicts. Return JSON.`;
+    }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\n\nCurrent schedule:\n${scheduleList || "(empty)"}\n\nReturn JSON.`;
 
-    const raw = await this.sendAndWait(
-      "timeslots",
-      "ws_default",
-      userMessage,
-    );
-    const parsed = this.parseJSON<{
-      slots?: TimeslotOption[];
-      reasoning?: string;
-    }>(raw);
+    const raw = await this.callBridge("timeslots", "default", userMessage);
+    const parsed = this.parseJSON<{ slots?: TimeslotOption[]; reasoning?: string }>(raw);
 
     return {
       slots: parsed.slots ?? [],
@@ -515,39 +349,14 @@ export class OpenClawAdapter extends AIAdapter {
   // ──────────────────────────────────────────────────────────────────
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const lastUserMsg =
-      [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const raw = await this.sendAndWait("chat", "ws_default", lastUserMsg);
+    const lastUserMsg = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const raw = await this.callBridge("chat", "default", lastUserMsg);
 
     if (request.jsonMode) {
       const parsed = this.parseJSON<unknown>(raw);
-      return {
-        content: raw,
-        parsed,
-        source: this.type,
-      };
+      return { content: raw, parsed, source: this.type };
     }
 
-    return {
-      content: raw,
-      source: this.type,
-    };
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // Lifecycle
-  // ──────────────────────────────────────────────────────────────────
-
-  async dispose(): Promise<void> {
-    if (this.client) {
-      try {
-        (this.client as OpenClawGatewayClient).close?.();
-      } catch {
-        // Best effort
-      }
-      this.client = null;
-      this.connectPromise = null;
-      this.initializedSessions.clear();
-    }
+    return { content: raw, source: this.type };
   }
 }
