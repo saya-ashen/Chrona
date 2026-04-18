@@ -66,8 +66,8 @@ export function ScheduleCommandBar({
 
     // If the suggestion has a scheduled slot, use it
     if (action.scheduledStartAt && action.scheduledEndAt) {
-      draft.scheduledStartAt = action.scheduledStartAt;
-      draft.scheduledEndAt = action.scheduledEndAt;
+      draft.scheduledStartAt = new Date(action.scheduledStartAt);
+      draft.scheduledEndAt = new Date(action.scheduledEndAt);
     }
 
     void onSubmit(draft).then(() => setValue(""));
