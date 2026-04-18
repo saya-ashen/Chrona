@@ -4,19 +4,17 @@ import {
   isLLMAvailable,
   taskAutoCompleteSystemPrompt,
 } from "@/modules/ai/llm-service";
+import {
+  isOpenClawSuggestAvailable,
+  suggestViaOpenClaw,
+  type AutoCompleteSuggestion,
+} from "@/modules/ai/openclaw-suggest";
 
 // ---------- Types ----------
 
-interface AutoCompleteSuggestion {
-  title: string;
-  description: string;
-  priority: "Low" | "Medium" | "High" | "Urgent";
-  estimatedMinutes: number;
-  tags: string[];
-}
-
 interface AutoCompleteResponse {
   suggestions: AutoCompleteSuggestion[];
+  source?: "openclaw" | "llm" | "rules";
 }
 
 // ---------- Keyword-based fallback ----------
@@ -28,7 +26,7 @@ interface KeywordRule {
 
 const keywordRules: KeywordRule[] = [
   {
-    keywords: ["meeting", "meet", "call", "sync", "standup", "stand-up"],
+    keywords: ["meeting", "meet", "call", "sync", "standup", "stand-up", "会议", "开会", "同步"],
     suggestions: [
       {
         title: "Team sync meeting",
@@ -47,7 +45,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["review", "pr", "code review", "feedback"],
+    keywords: ["review", "pr", "code review", "feedback", "审查", "评审", "代码审查"],
     suggestions: [
       {
         title: "Code review",
@@ -66,7 +64,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["write", "draft", "document", "doc", "blog", "article"],
+    keywords: ["write", "draft", "document", "doc", "blog", "article", "写", "文档", "草稿", "撰写"],
     suggestions: [
       {
         title: "Write documentation",
@@ -85,7 +83,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["fix", "bug", "debug", "issue", "error", "broken"],
+    keywords: ["fix", "bug", "debug", "issue", "error", "broken", "修复", "调试", "问题", "错误"],
     suggestions: [
       {
         title: "Fix bug",
@@ -104,7 +102,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["test", "testing", "qa", "quality"],
+    keywords: ["test", "testing", "qa", "quality", "测试", "质量"],
     suggestions: [
       {
         title: "Write tests",
@@ -123,7 +121,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["deploy", "release", "ship", "publish", "launch"],
+    keywords: ["deploy", "release", "ship", "publish", "launch", "部署", "发布", "上线"],
     suggestions: [
       {
         title: "Deploy to production",
@@ -142,7 +140,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["design", "ui", "ux", "mockup", "wireframe", "prototype"],
+    keywords: ["design", "ui", "ux", "mockup", "wireframe", "prototype", "设计", "界面", "原型"],
     suggestions: [
       {
         title: "Design UI mockup",
@@ -161,7 +159,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["research", "explore", "investigate", "learn", "study"],
+    keywords: ["research", "explore", "investigate", "learn", "study", "研究", "调研", "学习", "探索"],
     suggestions: [
       {
         title: "Research and exploration",
@@ -180,7 +178,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["plan", "planning", "roadmap", "strategy", "brainstorm"],
+    keywords: ["plan", "planning", "roadmap", "strategy", "brainstorm", "计划", "规划", "策略", "头脑风暴"],
     suggestions: [
       {
         title: "Planning session",
@@ -199,7 +197,7 @@ const keywordRules: KeywordRule[] = [
     ],
   },
   {
-    keywords: ["email", "respond", "reply", "message", "follow up", "followup"],
+    keywords: ["email", "respond", "reply", "message", "follow up", "followup", "邮件", "回复", "跟进"],
     suggestions: [
       {
         title: "Respond to emails",
@@ -214,6 +212,37 @@ const keywordRules: KeywordRule[] = [
         priority: "Medium",
         estimatedMinutes: 15,
         tags: ["communication", "follow-up"],
+      },
+    ],
+  },
+  {
+    keywords: ["论文", "答辩", "thesis", "paper", "毕业"],
+    suggestions: [
+      {
+        title: "论文写作",
+        description: "撰写论文章节，完善内容和格式。",
+        priority: "High",
+        estimatedMinutes: 120,
+        tags: ["thesis", "writing"],
+      },
+      {
+        title: "论文答辩准备",
+        description: "准备答辩PPT，整理关键论点和演示材料。",
+        priority: "Urgent",
+        estimatedMinutes: 90,
+        tags: ["thesis", "defense"],
+      },
+    ],
+  },
+  {
+    keywords: ["PPT", "slides", "presentation", "演示", "幻灯片"],
+    suggestions: [
+      {
+        title: "制作演示文稿",
+        description: "设计和制作演示文稿，确保内容清晰有吸引力。",
+        priority: "Medium",
+        estimatedMinutes: 60,
+        tags: ["presentation", "slides"],
       },
     ],
   },
@@ -234,7 +263,6 @@ function generateFallbackSuggestions(title: string): AutoCompleteSuggestion[] {
     let score = 0;
     for (const keyword of rule.keywords) {
       if (lowerTitle.includes(keyword)) {
-        // Longer keyword matches are more specific, score higher
         score += keyword.length;
       }
     }
@@ -245,10 +273,8 @@ function generateFallbackSuggestions(title: string): AutoCompleteSuggestion[] {
   }
 
   if (bestMatch) {
-    // Customize matched suggestions with the user's title prefix
     return bestMatch.suggestions.map((s) => ({
       ...s,
-      // If the user's title is more specific, incorporate it
       title: title.length > 3 ? `${title} — ${s.title}` : s.title,
     }));
   }
@@ -298,7 +324,32 @@ export async function POST(request: Request) {
 
     const trimmedTitle = title.trim();
 
-    // Try LLM-powered suggestions first
+    // Priority 1: Try OpenClaw Gateway (native tool-augmented suggestions)
+    if (isOpenClawSuggestAvailable()) {
+      try {
+        const result = await suggestViaOpenClaw({
+          title: trimmedTitle,
+          workspaceId,
+        });
+
+        if (result.suggestions.length > 0) {
+          return NextResponse.json({
+            suggestions: result.suggestions,
+            source: "openclaw",
+            requestId: result.requestId,
+          });
+        }
+      } catch (openclawError) {
+        console.warn(
+          "OpenClaw suggest failed, falling back:",
+          openclawError instanceof Error
+            ? openclawError.message
+            : openclawError,
+        );
+      }
+    }
+
+    // Priority 2: Try direct LLM (OpenAI-compatible)
     if (isLLMAvailable()) {
       try {
         const userMessage = workspaceId
@@ -321,7 +372,6 @@ export async function POST(request: Request) {
         });
 
         if (llmResult?.suggestions && llmResult.suggestions.length > 0) {
-          // Normalize the LLM response to match expected shape (strip reasoning if present)
           const suggestions: AutoCompleteSuggestion[] =
             llmResult.suggestions.map((s) => ({
               title: s.title,
@@ -331,17 +381,16 @@ export async function POST(request: Request) {
               tags: s.tags ?? [],
             }));
 
-          return NextResponse.json({ suggestions });
+          return NextResponse.json({ suggestions, source: "llm" });
         }
       } catch (llmError) {
-        // LLM call failed; fall through to rule-based fallback
         console.warn("LLM auto-complete failed, using fallback:", llmError);
       }
     }
 
-    // Fallback: rule-based keyword suggestions
+    // Priority 3: Rule-based keyword fallback
     const suggestions = generateFallbackSuggestions(trimmedTitle);
-    return NextResponse.json({ suggestions });
+    return NextResponse.json({ suggestions, source: "rules" });
   } catch (error) {
     console.error("Error in auto-complete:", error);
     return NextResponse.json(
