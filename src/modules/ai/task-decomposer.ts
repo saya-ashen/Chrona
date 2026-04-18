@@ -3,11 +3,7 @@ import type {
   SubtaskSuggestion,
   TaskDecompositionResult,
 } from "./types";
-import {
-  chatCompletionJSON,
-  isLLMAvailable,
-  taskDecompositionSystemPrompt,
-} from "./llm-service";
+import { aiChat } from "./ai-service";
 
 // --- Conjunction / keyword patterns ---
 
@@ -482,16 +478,14 @@ export function decomposeTask(input: TaskDecompositionInput): TaskDecompositionR
 export async function decomposeTaskSmart(
   input: TaskDecompositionInput,
 ): Promise<TaskDecompositionResult> {
-  // Try LLM first
-  if (isLLMAvailable()) {
-    try {
-      const result = await decomposeTaskWithLLM(input);
-      if (result && result.subtasks.length > 0) {
-        return result;
-      }
-    } catch (err) {
-      console.warn("[task-decomposer] LLM decomposition failed, falling back to rules:", err);
+  // Try AI first
+  try {
+    const result = await decomposeTaskWithAI(input);
+    if (result && result.subtasks.length > 0) {
+      return result;
     }
+  } catch (err) {
+    console.warn("[task-decomposer] AI decomposition failed, falling back to rules:", err);
   }
 
   // Fall back to rule-based
@@ -499,14 +493,31 @@ export async function decomposeTaskSmart(
 }
 
 /**
- * Decompose using LLM. Returns null if LLM is not available.
+ * Decompose using AI. Returns null if AI is not available.
  */
-async function decomposeTaskWithLLM(
+async function decomposeTaskWithAI(
   input: TaskDecompositionInput,
 ): Promise<TaskDecompositionResult | null> {
   const userPrompt = buildDecompositionPrompt(input);
 
-  const result = await chatCompletionJSON<{
+  const systemPrompt = `You are a task decomposition assistant that breaks tasks into actionable subtasks.
+Return valid JSON only:
+{"subtasks":[{"title":"...","description":"...","estimatedMinutes":N,"priority":"Low|Medium|High|Urgent","order":N,"dependsOnPrevious":true|false}],"totalEstimatedMinutes":N,"feasibilityScore":0.0-1.0,"warnings":["..."]}
+Respond in the same language as the input.`;
+
+  const chatResult = await aiChat({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    jsonMode: true,
+    temperature: 0.3,
+    maxTokens: 2000,
+  });
+
+  if (!chatResult?.parsed) return null;
+
+  const result = chatResult.parsed as {
     subtasks: Array<{
       title: string;
       description?: string;
@@ -518,16 +529,9 @@ async function decomposeTaskWithLLM(
     totalEstimatedMinutes: number;
     feasibilityScore: number;
     warnings: string[];
-  }>({
-    messages: [
-      { role: "system", content: taskDecompositionSystemPrompt() },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.3,
-    maxTokens: 2000,
-  });
+  };
 
-  if (!result) return null;
+  if (!Array.isArray(result.subtasks)) return null;
 
   return {
     subtasks: result.subtasks.map((s) => ({

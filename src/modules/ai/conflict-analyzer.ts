@@ -6,11 +6,7 @@ import type {
 } from "./types";
 import { detectAllConflicts } from "./conflict-detector";
 import { generateSuggestions } from "./suggestion-generator";
-import {
-  chatCompletionJSON,
-  isLLMAvailable,
-  conflictResolutionSystemPrompt,
-} from "./llm-service";
+import { aiChat } from "./ai-service";
 
 /**
  * 分析日程冲突并生成建议
@@ -196,24 +192,31 @@ export async function analyzeConflictsSmart(
     };
   }
 
-  // Step 2: Try LLM-enhanced suggestions if available
-  if (isLLMAvailable()) {
-    try {
-      const context = buildScheduleContext(tasks, conflicts);
+  // Step 2: Try AI-enhanced suggestions
+  try {
+    const context = buildScheduleContext(tasks, conflicts);
 
-      const llmResult = await chatCompletionJSON<LLMConflictResolutionResponse>({
-        messages: [
-          { role: "system", content: conflictResolutionSystemPrompt() },
-          {
-            role: "user",
-            content:
-              `Analyze the following schedule conflicts and suggest resolutions:\n\n${context}`,
-          },
-        ],
-        temperature: 0.4,
-        maxTokens: 2048,
-      });
+    const systemPrompt = `You are a schedule conflict analyzer. Given conflicts and schedule data, suggest concrete resolutions.
+Return valid JSON only:
+{"suggestions":[{"conflictId":"...","type":"reschedule|split|defer|reorder","description":"...","reason":"...","changes":[{"taskId":"...","scheduledStartAt":"ISO","scheduledEndAt":"ISO"}],"estimatedImpact":{"resolvedConflicts":N,"movedTasks":N,"timeShiftMinutes":N}}]}
+Respond in the same language as the input.`;
 
+    const chatResult = await aiChat({
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content:
+            `Analyze the following schedule conflicts and suggest resolutions:\n\n${context}`,
+        },
+      ],
+      jsonMode: true,
+      temperature: 0.4,
+      maxTokens: 2048,
+    });
+
+    if (chatResult?.parsed) {
+      const llmResult = chatResult.parsed as LLMConflictResolutionResponse;
       if (llmResult?.suggestions && Array.isArray(llmResult.suggestions)) {
         const suggestions = convertLLMSuggestions(llmResult.suggestions, conflicts);
 
@@ -225,10 +228,9 @@ export async function analyzeConflictsSmart(
           };
         }
       }
-      // If LLM returned empty or invalid suggestions, fall through to rule-based
-    } catch {
-      // LLM call failed — fall back to rule-based suggestions
     }
+  } catch {
+    // AI call failed — fall back to rule-based suggestions
   }
 
   // Step 3: Fallback to rule-based suggestions

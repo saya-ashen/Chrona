@@ -111,3 +111,13 @@ export type ScheduleProposal = Prisma.ScheduleProposalModel
  * 
  */
 export type RuntimeCursor = Prisma.RuntimeCursorModel
+/**
+ * Model AiClient
+ * 
+ */
+export type AiClient = Prisma.AiClientModel
+/**
+ * Model AiFeatureBinding
+ * 
+ */
+export type AiFeatureBinding = Prisma.AiFeatureBindingModel

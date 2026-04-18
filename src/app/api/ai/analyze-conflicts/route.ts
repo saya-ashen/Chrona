@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { aiAnalyzeConflicts } from "@/modules/ai/ai-service";
 import { analyzeConflictsSmart } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";
-import type { TaskSnapshot } from "@/modules/ai/adapters/types";
+import type { TaskSnapshot } from "@/modules/ai/ai-service";
 
 export async function POST(request: Request) {
   try {

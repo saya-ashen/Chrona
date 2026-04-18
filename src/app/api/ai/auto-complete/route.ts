@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { aiSuggest } from "@/modules/ai/ai-service";
-import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/adapters/types";
+import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/ai-service";
 import { db } from "@/lib/db";
 import type { StructuredSuggestion } from "@/hooks/use-ai";
 

@@ -1,123 +1,76 @@
 /**
- * AI Service — Backend layer's unified entry point for all AI operations.
+ * AI Service — Backend layer's entry point for all AI operations.
  *
- * This is the ONLY module the backend layer (API routes, commands) should
- * import for AI features. It handles:
- *   1. Adapter discovery and fallback
- *   2. Graceful degradation to rule-based logic
- *   3. Request validation and error normalization
- *
- * Architecture:
- *   API Route → AIService.suggest() → adapter.suggest()
- *                                      ↓ fallback
- *                                    → next adapter.suggest()
- *                                      ↓ all failed
- *                                    → rule-based fallback
+ * Loads AI client configs from database. Routes each feature request
+ * to the client bound to that feature (via AiFeatureBinding).
+ * No fallback chain — each feature uses exactly one configured client.
  */
 
-import { AIAdapter } from "./adapters/base";
-import { LLMAdapter } from "./adapters/llm-adapter";
+import { db } from "@/lib/db";
 import {
-  OpenClawAdapter,
-  type OpenClawAdapterOptions,
-} from "./adapters/openclaw-adapter";
-import { aiAdapterRegistry } from "./adapters/registry";
-import type {
-  AIAdapterConfig,
-  AnalyzeConflictsRequest,
-  AnalyzeConflictsResponse,
-  ChatRequest,
-  ChatResponse,
-  DecomposeTaskRequest,
-  DecomposeTaskResponse,
-  SmartSuggestRequest,
-  SmartSuggestResponse,
-  SuggestTimeslotRequest,
-  SuggestTimeslotResponse,
-} from "./adapters/types";
-import { AIAdapterError } from "./adapters/types";
+  type AiClientRecord,
+  type AiClientType,
+  type AiFeature,
+  type SmartSuggestRequest,
+  type SmartSuggestResponse,
+  type DecomposeTaskRequest,
+  type DecomposeTaskResponse,
+  type AnalyzeConflictsRequest,
+  type AnalyzeConflictsResponse,
+  type SuggestTimeslotRequest,
+  type SuggestTimeslotResponse,
+  type ChatRequest,
+  type ChatResponse,
+  AiClientError,
+  suggest,
+  decompose,
+  analyzeConflicts,
+  suggestTimeslots,
+  chat,
+  checkClientHealth,
+} from "./ai-client";
 
 // ────────────────────────────────────────────────────────────────────
-// Initialization
+// Client Resolution
 // ────────────────────────────────────────────────────────────────────
-
-let initialized = false;
 
 /**
- * Initialize the AI service with available adapters.
- * Called lazily on first use. Safe to call multiple times.
+ * Get the client bound to a specific feature.
+ * Falls back to the default client if no binding exists.
+ * Returns null if no client is configured.
  */
-export function initAIService(): void {
-  if (initialized) return;
-  initialized = true;
+async function getClientForFeature(feature: AiFeature): Promise<AiClientRecord | null> {
+  // Check feature binding first
+  const binding = await db.aiFeatureBinding.findUnique({
+    where: { feature },
+    include: { client: true },
+  });
 
-  // Register factories
-  aiAdapterRegistry.registerFactory("openclaw", (config) => new OpenClawAdapter(config));
-  aiAdapterRegistry.registerFactory("llm", (config) => new LLMAdapter(config));
-
-  // Auto-register adapters based on environment
-  const bridgeUrl = process.env.OPENCLAW_BRIDGE_URL ?? "http://localhost:7677";
-  const bridgeEnabled = process.env.OPENCLAW_BRIDGE_ENABLED !== "false";
-
-  if (bridgeEnabled) {
-    aiAdapterRegistry.register(
-      "openclaw",
-      {
-        id: "openclaw-default",
-        name: "OpenClaw CLI Bridge",
-        options: {
-          bridgeUrl,
-          timeoutSeconds: Number(process.env.OPENCLAW_BRIDGE_TIMEOUT ?? 120),
-        } satisfies OpenClawAdapterOptions,
-      },
-      10, // highest priority
-    );
+  if (binding?.client?.enabled) {
+    return {
+      id: binding.client.id,
+      name: binding.client.name,
+      type: binding.client.type as AiClientType,
+      config: binding.client.config as unknown as AiClientRecord["config"],
+      isDefault: binding.client.isDefault,
+      enabled: binding.client.enabled,
+    };
   }
 
-  if (process.env.AI_PROVIDER_BASE_URL && process.env.AI_PROVIDER_API_KEY) {
-    aiAdapterRegistry.register(
-      "llm",
-      {
-        id: "llm-default",
-        name: "LLM (OpenAI-compatible)",
-        options: {},
-      },
-      50,
-    );
-  }
-}
+  // Fall back to default client
+  const defaultClient = await db.aiClient.findFirst({
+    where: { isDefault: true, enabled: true },
+  });
 
-// ────────────────────────────────────────────────────────────────────
-// Adapter Resolution with Fallback
-// ────────────────────────────────────────────────────────────────────
-
-type AIOperation = "suggest" | "decompose" | "analyzeConflicts" | "suggestTimeslots" | "chat";
-
-async function withFallback<T>(
-  operation: AIOperation,
-  fn: (adapter: AIAdapter) => Promise<T>,
-): Promise<T | null> {
-  initAIService();
-
-  const adapters = aiAdapterRegistry.all();
-  const errors: Array<{ adapter: string; error: unknown }> = [];
-
-  for (const adapter of adapters) {
-    try {
-      const available = await adapter.isAvailable();
-      if (!available) continue;
-      return await fn(adapter);
-    } catch (err) {
-      errors.push({ adapter: adapter.type, error: err });
-      // Continue to next adapter
-    }
-  }
-
-  if (errors.length > 0) {
-    console.warn(
-      `[AIService] All adapters failed for ${operation}:`,
-      errors.map((e) => `${e.adapter}: ${e.error}`).join("; "),
-    );
+  if (defaultClient) {
+    return {
+      id: defaultClient.id,
+      name: defaultClient.name,
+      type: defaultClient.type as AiClientType,
+      config: defaultClient.config as unknown as AiClientRecord["config"],
+      isDefault: defaultClient.isDefault,
+      enabled: defaultClient.enabled,
+    };
   }
 
   return null;
@@ -127,90 +80,78 @@ async function withFallback<T>(
 // Public API
 // ────────────────────────────────────────────────────────────────────
 
-/**
- * Generate smart suggestions for task creation / scheduling.
- * Returns null if no AI adapter is available.
- */
-export async function aiSuggest(
-  request: SmartSuggestRequest,
-): Promise<SmartSuggestResponse | null> {
-  return withFallback("suggest", (adapter) => adapter.suggest(request));
+export async function aiSuggest(request: SmartSuggestRequest): Promise<SmartSuggestResponse | null> {
+  const client = await getClientForFeature("suggest");
+  if (!client) return null;
+  return suggest(client, request);
 }
 
-/**
- * Decompose a task into subtasks.
- * Returns null if no AI adapter is available.
- */
-export async function aiDecompose(
-  request: DecomposeTaskRequest,
-): Promise<DecomposeTaskResponse | null> {
-  return withFallback("decompose", (adapter) => adapter.decompose(request));
+export async function aiDecompose(request: DecomposeTaskRequest): Promise<DecomposeTaskResponse | null> {
+  const client = await getClientForFeature("decompose");
+  if (!client) return null;
+  return decompose(client, request);
 }
 
-/**
- * Analyze schedule conflicts and suggest resolutions.
- * Returns null if no AI adapter is available.
- */
-export async function aiAnalyzeConflicts(
-  request: AnalyzeConflictsRequest,
-): Promise<AnalyzeConflictsResponse | null> {
-  return withFallback("analyzeConflicts", (adapter) =>
-    adapter.analyzeConflicts(request),
-  );
+export async function aiAnalyzeConflicts(request: AnalyzeConflictsRequest): Promise<AnalyzeConflictsResponse | null> {
+  const client = await getClientForFeature("conflicts");
+  if (!client) return null;
+  return analyzeConflicts(client, request);
 }
 
-/**
- * Suggest optimal time slots for a task.
- * Returns null if no AI adapter is available.
- */
-export async function aiSuggestTimeslots(
-  request: SuggestTimeslotRequest,
-): Promise<SuggestTimeslotResponse | null> {
-  return withFallback("suggestTimeslots", (adapter) =>
-    adapter.suggestTimeslots(request),
-  );
+export async function aiSuggestTimeslots(request: SuggestTimeslotRequest): Promise<SuggestTimeslotResponse | null> {
+  const client = await getClientForFeature("timeslots");
+  if (!client) return null;
+  return suggestTimeslots(client, request);
 }
 
-/**
- * General-purpose chat completion.
- * Returns null if no AI adapter is available.
- */
-export async function aiChat(
-  request: ChatRequest,
-): Promise<ChatResponse | null> {
-  return withFallback("chat", (adapter) => adapter.chat(request));
+export async function aiChat(request: ChatRequest): Promise<ChatResponse | null> {
+  const client = await getClientForFeature("chat");
+  if (!client) return null;
+  return chat(client, request);
 }
 
-/**
- * Check if any AI adapter is available.
- */
 export async function isAIAvailable(): Promise<boolean> {
-  initAIService();
-  const best = await aiAdapterRegistry.getBestAvailable();
-  return best !== null;
+  const clients = await db.aiClient.findMany({ where: { enabled: true } });
+  if (clients.length === 0) return false;
+  // Check at least one is healthy
+  for (const c of clients) {
+    const record: AiClientRecord = {
+      id: c.id,
+      name: c.name,
+      type: c.type as AiClientType,
+      config: c.config as unknown as AiClientRecord["config"],
+      isDefault: c.isDefault,
+      enabled: c.enabled,
+    };
+    if (await checkClientHealth(record)) return true;
+  }
+  return false;
 }
 
-/**
- * Get info about available adapters (for diagnostics / UI).
- */
-export function getAIAdapterInfo(): Array<{
-  type: string;
+export async function getAIClientInfo(): Promise<Array<{
+  id: string;
   name: string;
-  capabilities: ReturnType<AIAdapter["capabilities"]>;
-}> {
-  initAIService();
-  return aiAdapterRegistry.all().map((a) => ({
-    type: a.type,
-    name: a.name,
-    capabilities: a.capabilities(),
+  type: string;
+  isDefault: boolean;
+  enabled: boolean;
+  bindings: string[];
+}>> {
+  const clients = await db.aiClient.findMany({
+    include: { bindings: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return clients.map((c) => ({
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    isDefault: c.isDefault,
+    enabled: c.enabled,
+    bindings: c.bindings.map((b) => b.feature),
   }));
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Re-exports for convenience
-// ────────────────────────────────────────────────────────────────────
-
-export { AIAdapterError } from "./adapters/types";
+// Re-exports
+export { AiClientError } from "./ai-client";
 export type {
   SmartSuggestRequest,
   SmartSuggestResponse,
@@ -223,5 +164,9 @@ export type {
   SuggestTimeslotResponse,
   ChatRequest,
   ChatResponse,
-  AIAdapterCapabilities,
-} from "./adapters/types";
+  TaskSnapshot,
+  ScheduleHealthSnapshot,
+  AiClientRecord,
+  AiClientType,
+  AiFeature,
+} from "./ai-client";

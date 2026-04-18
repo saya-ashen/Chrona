@@ -432,3 +432,37 @@ model RuntimeCursor {
   lastError    String?
   run          Run       @relation(fields: [runId], references: [id])
 }
+
+// ────────────────────────────────────────────────────────────────────
+// AI Client Configuration
+// ────────────────────────────────────────────────────────────────────
+
+enum AiClientType {
+  openclaw
+  llm
+}
+
+model AiClient {
+  id          String       @id @default(cuid())
+  name        String
+  type        AiClientType
+  /// JSON config — shape depends on type:
+  ///   openclaw: { bridgeUrl, timeoutSeconds }
+  ///   llm: { baseUrl, apiKey, model, temperature }
+  config      Json
+  isDefault   Boolean      @default(false)
+  enabled     Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  bindings    AiFeatureBinding[]
+}
+
+model AiFeatureBinding {
+  id          String   @id @default(cuid())
+  feature     String   /// e.g. "suggest", "decompose", "conflicts", "timeslots", "chat"
+  clientId    String
+  client      AiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([feature])
+}
