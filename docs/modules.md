@@ -1,688 +1,600 @@
-# 模块参考文档
+# 核心模块文档
 
-本文档详细描述 `src/modules/` 下每个模块的功能、导出函数、参数和副作用。
+本文档详细介绍 `src/modules/` 下的核心业务逻辑模块。
 
----
+## 模块概览
 
-## 目录
-
-- [1. commands/ — 命令层（写操作）](#1-commands--命令层写操作)
-- [2. queries/ — 查询层（读操作）](#2-queries--查询层读操作)
-- [3. ai/ — AI 智能层](#3-ai--ai-智能层)
-- [4. tasks/ — 领域逻辑层](#4-tasks--领域逻辑层)
-- [5. runtime/ — 运行时适配器层](#5-runtime--运行时适配器层)
-- [6. projections/ — 投影层（读模型）](#6-projections--投影层读模型)
-- [7. events/ — 事件层](#7-events--事件层)
-- [8. workspaces/ — 工作空间](#8-workspaces--工作空间)
-- [9. ui/ — UI 配置](#9-ui--ui-配置)
-
----
-
-## 1. commands/ — 命令层（写操作）
-
-CQRS 架构的写入端。每个命令执行以下标准流程：
-1. 验证输入
-2. 通过 Prisma 变更数据库状态
-3. 调用 `appendCanonicalEvent()` 追加不可变事件
-4. 调用 `rebuildTaskProjection()` 重建读模型
-
-### createTask
-
-```typescript
-async function createTask(input: {
-  workspaceId: string
-  title: string
-  description?: string
-  priority?: TaskPriority
-  dueAt?: Date | string
-  runtimeAdapterKey?: string
-  runtimeModel?: string
-  prompt?: string
-  runtimeConfig?: Record<string, unknown>
-  parentTaskId?: string
-}): Promise<Task>
-```
-
-创建新任务。如果提供了 `parentTaskId`，同时创建 `child_of` 类型的 `TaskDependency`。
-- **副作用**：写入 Task 表，追加 `task.created` 事件，重建投影
-
-### updateTask
-
-```typescript
-async function updateTask(input: {
-  taskId: string
-  title?: string
-  description?: string
-  priority?: TaskPriority
-  dueAt?: Date | string | null
-  runtimeModel?: string
-  prompt?: string
-  runtimeConfig?: Record<string, unknown>
-}): Promise<Task>
-```
-
-更新现有任务的字段。支持部分更新。
-- **副作用**：更新 Task 记录，追加 `task.updated` 事件，重建投影
-
-### startRun
-
-```typescript
-async function startRun(input: {
-  taskId: string
-  prompt?: string
-}): Promise<Run>
-```
-
-为任务启动一次 AI 运行。通过 Runtime Adapter 创建运行时会话，发送 prompt 到 AI 后端。
-- **副作用**：创建 Run 记录，更新 Task 状态为 Running，追加 `run.started` 事件，重建投影
-- **前置条件**：任务必须已配置运行时适配器
-
-### retryRun
-
-```typescript
-async function retryRun(input: {
-  taskId: string
-  prompt?: string
-}): Promise<Run>
-```
-
-重试失败的运行。创建新的 Run 记录并重新执行。
-- **副作用**：创建新 Run，追加 `run.retried` 事件，重建投影
-
-### resumeRun
-
-```typescript
-async function resumeRun(input: {
-  taskId: string
-  prompt?: string
-}): Promise<Run>
-```
-
-恢复暂停/等待中的运行。
-- **副作用**：更新 Run 状态，追加 `run.resumed` 事件，重建投影
-
-### resolveApproval
-
-```typescript
-async function resolveApproval(input: {
-  approvalId: string
-  decision: "Approved" | "Rejected" | "EditedAndApproved"
-  feedback?: string
-}): Promise<Approval>
-```
-
-处理审批请求（批准/拒绝/编辑后批准）。
-- **副作用**：更新 Approval 记录，追加 `approval.resolved` 事件，重建关联任务的投影
-
-### provideInput
-
-```typescript
-async function provideInput(input: {
-  taskId: string
-  inputText: string
-}): Promise<void>
-```
-
-向等待输入的 Agent 提供文本输入。
-- **副作用**：通过 Runtime Adapter 发送输入，追加 `input.provided` 事件，重建投影
-
-### markTaskDone
-
-```typescript
-async function markTaskDone(input: { taskId: string }): Promise<Task>
-```
-
-将任务标记为完成。
-- **副作用**：更新 Task 状态为 Done，追加 `task.done` 事件，重建投影
-
-### acceptTaskResult
-
-```typescript
-async function acceptTaskResult(input: { taskId: string }): Promise<Task>
-```
-
-接受任务的执行结果。将任务状态从 Completed 推进到 Done。
-- **副作用**：更新 Task 状态，追加 `task.result.accepted` 事件，重建投影
-
-### reopenTask
-
-```typescript
-async function reopenTask(input: { taskId: string }): Promise<Task>
-```
-
-重新打开已完成的任务，使其可以再次执行。
-- **副作用**：更新 Task 状态为 Ready，追加 `task.reopened` 事件，重建投影
-
-### createFollowUpTask
-
-```typescript
-async function createFollowUpTask(input: {
-  parentTaskId: string
-  workspaceId: string
-  title: string
-  description?: string
-  priority?: TaskPriority
-  prompt?: string
-}): Promise<Task>
-```
-
-基于现有任务创建后续任务，自动建立 `relates_to` 依赖关系。
-- **副作用**：创建 Task + TaskDependency，追加事件，重建投影
-
-### proposeSchedule
-
-```typescript
-async function proposeSchedule(input: {
-  taskId: string
-  scheduledStartAt: Date | string
-  scheduledEndAt: Date | string
-  source: ScheduleSource  // "human" | "ai" | "system"
-  reason?: string
-}): Promise<ScheduleProposal>
-```
-
-为任务提出日程安排建议（不直接应用）。
-- **副作用**：创建 ScheduleProposal 记录，追加 `schedule.proposed` 事件
-
-### decideScheduleProposal
-
-```typescript
-async function decideScheduleProposal(input: {
-  proposalId: string
-  decision: "Accepted" | "Rejected"
-}): Promise<ScheduleProposal>
-```
-
-决定是否接受日程建议。如果接受，自动调用 `applySchedule`。
-- **副作用**：更新 ScheduleProposal，可能应用日程，追加事件，重建投影
-
-### applySchedule
-
-```typescript
-async function applySchedule(input: {
-  taskId: string
-  scheduledStartAt: Date | string
-  scheduledEndAt: Date | string
-}): Promise<Task>
-```
-
-直接为任务应用日程安排。
-- **副作用**：更新 Task 的 scheduledStartAt/scheduledEndAt 字段，追加 `schedule.applied` 事件，重建投影
-
-### clearSchedule
-
-```typescript
-async function clearSchedule(input: { taskId: string }): Promise<Task>
-```
-
-清除任务的日程安排。
-- **副作用**：清空 scheduledStartAt/scheduledEndAt，追加 `schedule.cleared` 事件，重建投影
-
-### generateTaskPlan
-
-```typescript
-async function generateTaskPlan(input: { taskId: string }): Promise<object>
-```
-
-为任务生成 AI 驱动的执行计划。使用 LLM（如可用）或规则降级生成分步计划。
-- **副作用**：追加 `task.plan.generated` 事件（纯查询+事件，不直接变更任务状态）
-
-### sendOperatorMessage
-
-```typescript
-async function sendOperatorMessage(input: {
-  taskId: string
-  message: string
-}): Promise<void>
-```
-
-向正在运行的 Agent 发送操作员消息。
-- **副作用**：通过 Runtime Adapter 发送消息，创建 ConversationEntry 记录，追加事件
-
-### invalidateMemory
-
-```typescript
-async function invalidateMemory(input: { memoryId: string }): Promise<Memory>
-```
-
-将记忆条目标记为失效。
-- **副作用**：更新 Memory 状态为 Inactive，追加 `memory.invalidated` 事件
+| 模块 | 职责 | 文件数 |
+|------|------|--------|
+| `commands/` | 写入操作（命令处理器） | 16 |
+| `queries/` | 读取操作（页面数据组装） | 8 |
+| `events/` | 事件追加（不可变日志） | 1 |
+| `projections/` | 投影重建（物化视图） | 2 |
+| `tasks/` | 任务领域逻辑（纯函数） | 4 |
+| `runtime/` | 运行时适配器（OpenClaw） | 15+ |
+| `ai/` | AI 智能服务（冲突/分解/建议） | 10 |
+| `workspaces/` | 工作空间管理 | 1 |
+| `ui/` | UI 导航配置 | 1 |
 
 ---
 
-## 2. queries/ — 查询层（读操作）
+## 1. commands/ — 命令处理器
 
-CQRS 的读取端。每个查询从数据库读取数据并组装为页面视图模型。
+命令层实现所有状态变更操作。每个命令遵循统一模式：
 
-### getSchedulePage
-
-```typescript
-async function getSchedulePage(workspaceId: string): Promise<SchedulePageData>
+```
+验证输入 → 数据库变更 → 追加规范事件 → 重建任务投影 → 返回结果
 ```
 
-获取日程页面的完整数据。这是最复杂的查询之一（~230+ 行），返回：
-- `listItems` — 所有任务的日程列表项（含派生的调度状态、可运行性等）
-- `planningSummary` — 规划摘要（已调度数量、总分钟数、冲突数、过载天数等）
-- `focusZones` — 按日分组的专注区域（深度工作分钟、碎片分钟、风险等级）
-- `conflicts` — AI 检测到的日程冲突
-- `suggestions` — 冲突解决建议
-- `proposals` — 待决的日程提案
-- `risks` — 风险项
-- `automationCandidates` — 自动化候选（auto_schedule/decompose/remind/auto_run）
+### 任务生命周期命令
 
-### getWorkPage
+#### `createTask(input)`
+创建新任务。
 
 ```typescript
-async function getWorkPage(
-  taskId: string,
-  copyOverrides?: Partial<WorkPageCopy>
-): Promise<WorkPageData>
+interface CreateTaskInput {
+  workspaceId: string;
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  dueAt?: Date;
+  runtimeAdapterKey?: string;
+  runtimeInput?: string;
+  runtimeInputVersion?: string;
+  runtimeModel?: string;
+  prompt?: string;
+  runtimeConfig?: string;
+  parentTaskId?: string;
+}
 ```
 
-获取工作（执行）页面的数据。这是项目中最大的查询（~1200 行），返回：
-- `taskShell` — 任务基础信息、状态、优先级
-- `runs` — 所有运行记录
-- `conversation` — 跨所有 Run 聚合的对话记录
-- `approvals` — 审批请求
-- `artifacts` — 产出物
-- `progress` — 执行进度
-- `scheduling` — 日程信息
-- **特殊行为**：自动同步过期的运行时状态（通过 Runtime Adapter）
+**行为：**
+- 验证运行时配置规格（如果提供了 adapter）
+- 检查任务可运行性（deriveTaskRunnability）
+- 创建数据库记录
+- 追加 `TaskCreated` 事件
+- 重建投影
 
-### getTaskPage
+#### `updateTask(taskId, input)`
+更新任务字段。支持运行时配置的增量合并。
+
+**特殊逻辑：**
+- 如果更新了运行时配置相关字段，会重新计算可运行性
+- 支持 `runtimeConfig` 的深度合并（不是覆盖）
+
+#### `markTaskDone(taskId)`
+将已完成执行的任务标记为最终完成。
+
+#### `reopenTask(taskId)`
+重新打开已完成的任务。
+
+#### `acceptTaskResult(taskId)`
+接受任务执行结果。
+
+#### `createFollowUpTask(taskId, input)`
+基于当前任务创建后续任务。
+
+### 执行管理命令
+
+#### `startRun(taskId, options?)`
+启动 AI 智能体执行。
 
 ```typescript
-async function getTaskPage(taskId: string): Promise<TaskPageData>
+interface StartRunOptions {
+  prompt?: string;  // 覆盖任务的默认 prompt
+}
 ```
 
-获取任务详情页数据，包含任务配置、运行历史、依赖关系。
+**行为：**
+1. 验证任务可运行性
+2. 获取/创建运行时会话（TaskSession）
+3. 调用运行时适配器创建执行（RuntimeExecutionAdapter.createRun）
+4. 在数据库创建 Run 记录
+5. 追加 `RunStarted` 事件
+6. 更新任务的 latestRunId
+7. 重建投影
 
-### getInbox
+#### `resumeRun(runId)`
+恢复暂停的执行（需要运行时支持 `resumeSupported`）。
+
+#### `retryRun(runId)`
+重试失败的执行（需要 `retryable` 为 true）。
+
+#### `resolveApproval(approvalId, decision)`
+处理审批请求。
 
 ```typescript
-async function getInbox(workspaceId: string): Promise<InboxData>
+type Decision = {
+  action: "approve" | "reject" | "edit_and_approve";
+  resolution?: string;  // 决议说明
+  editedContent?: string;  // 编辑后的内容（edit_and_approve 时）
+}
 ```
 
-获取收件箱数据 — 需要人工干预的事项（待审批、等待输入、失败的运行等）。
+**行为：**
+- 更新审批状态
+- 通过运行时适配器将决议传达给智能体
+- 追加 `ApprovalResolved` 事件
+- 重建投影
 
-### getTaskCenter
+#### `sendOperatorMessage(taskId, message, runId?)`
+向正在运行的智能体发送消息。如未指定 runId，自动查找最新活跃执行。
+
+#### `provideInput(taskId, inputText, runId?)`
+为等待输入的执行提供输入。自动查找状态为 `WaitingForInput` 的执行。
+
+### 排期命令
+
+#### `applySchedule(taskId, window)`
+直接应用排期窗口。
 
 ```typescript
-async function getTaskCenter(
-  workspaceId: string,
-  filter?: string
-): Promise<TaskCenterData>
+interface ScheduleWindow {
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+  dueAt?: Date;
+  scheduleSource?: ScheduleSource;
+}
 ```
 
-获取任务中心数据，支持按状态过滤（Running、WaitingForApproval、Blocked、Failed、Unscheduled、Overdue）。
+**行为：**
+- 验证时间窗口（validateScheduleWindow）
+- 更新任务的排期字段
+- 派生排期状态（deriveScheduleState）
+- 追加 `ScheduleApplied` 事件
+- 重建投影
 
-### getWorkspaceOverview
+#### `clearSchedule(taskId)`
+清除任务的排期。
 
-```typescript
-async function getWorkspaceOverview(workspaceId: string): Promise<WorkspaceOverviewData>
-```
+#### `proposeSchedule(taskId, proposal)`
+创建排期建议（不直接应用）。
 
-获取工作空间概览（任务统计、最近活动等）。
+#### `decideScheduleProposal(proposalId, decision)`
+接受或拒绝排期建议。接受时自动调用 `applySchedule`。
 
-### getMemoryConsole
+### 其他命令
 
-```typescript
-async function getMemoryConsole(workspaceId: string): Promise<MemoryConsoleData>
-```
+#### `generateTaskPlan(taskId)`
+使用 LLM 为任务生成执行计划。无 LLM 时回退到模拟计划。
 
-获取记忆管理控制台数据 — 所有活跃的记忆条目。
-
-### getWorkspaces
-
-```typescript
-async function getWorkspaces(): Promise<Workspace[]>
-```
-
-获取所有工作空间列表。
+#### `invalidateMemory(memoryId)`
+使记忆条目失效。
 
 ---
 
-## 3. ai/ — AI 智能层
+## 2. queries/ — 查询处理器
 
-所有 AI 功能采用 **双模式架构**：优先使用 LLM，LLM 不可用时降级到规则引擎。
+查询层负责组装各页面所需的完整数据结构。每个查询对应一个 UI 页面。
 
-### llm-service.ts — LLM 服务抽象
+### `getSchedulePage(workspaceId, selectedDay)`
 
-```typescript
-function isLLMAvailable(): boolean
-```
-检查 LLM 是否可用（需要 `AI_PROVIDER_BASE_URL` 和 `AI_PROVIDER_API_KEY` 环境变量）。
+**返回类型：** `SchedulePageData`
 
-```typescript
-async function chatCompletion(options: {
-  messages: Array<{ role: string; content: string }>
-  model?: string
-  temperature?: number
-  maxTokens?: number
-}): Promise<string>
-```
-通用 LLM 对话补全（OpenAI 兼容 API）。
+排期页面是数据最丰富的查询，组装以下数据：
 
 ```typescript
-async function chatCompletionJSON<T>(options): Promise<T>
+interface SchedulePageData {
+  // 基础列表
+  scheduled: ScheduleRecord[];        // 已排期任务
+  unscheduled: ScheduleRecord[];      // 未排期任务
+  risks: RiskItem[];                  // 风险项
+
+  // 分析数据
+  focusZones: FocusZone[];            // 专注区域
+  automationCandidates: AutomationCandidate[];  // 自动化候选
+  conflicts: ScheduleConflict[];      // 冲突检测结果
+  suggestions: ScheduleSuggestion[];  // 改进建议
+
+  // 汇总
+  planningSummary: PlanningSummary;    // 规划摘要
+  proposals: ScheduleProposal[];      // 待处理建议
+  listItems: ScheduleListItem[];      // 扁平列表
+
+  // 衍生统计
+  // scheduledMinutes, runnableQueueCount, conflictCount,
+  // overloadedDayCount, proposalCount, riskCount,
+  // dueSoonUnscheduledCount, largestIdleWindowMinutes, overloadedMinutes
+}
 ```
-带 JSON 解析的 LLM 补全，适用于结构化输出。
 
-还导出多个系统提示词生成函数：
-- `taskDecompositionSystemPrompt()` — 任务分解
-- `automationSuggestionSystemPrompt()` — 自动化建议
-- `conflictResolutionSystemPrompt()` — 冲突解决
-- `timeslotSuggestionSystemPrompt()` — 时间段建议
-- `taskAutoCompleteSystemPrompt()` — 标题自动补全
-- `taskPlanSystemPrompt()` — 任务计划
+**专注区域 (FocusZone) 计算：**
+- 按天分组已排期任务
+- 计算 totalMinutes、deepWorkMinutes（高优先级任务）、fragmentedMinutes（<90分钟任务）
+- 评估 riskLevel（high/medium/low）
 
-### conflict-detector.ts — 规则引擎冲突检测
+**自动化候选 (AutomationCandidate) 规则：**
+- `auto_schedule`：未排期但有待处理的 AI 排期建议
+- `decompose`：未排期且不可运行的任务（缺少 prompt/runtime）
+- `remind`：风险项需要用户跟进
+- `auto_run`：已排期、可运行、无审批阻塞的任务
 
-纯规则逻辑，不使用 LLM：
+### `getWorkPage(taskId)`
+
+**返回类型：** `WorkPageData`
+
+工作台页面查询，组装任务执行的深度视图：
 
 ```typescript
-function detectTimeOverlaps(tasks: ScheduledTaskInfo[]): Conflict[]
-function detectOverload(tasks: ScheduledTaskInfo[]): Conflict[]
-function detectFragmentation(tasks: ScheduledTaskInfo[]): Conflict[]
-function detectDependencyConflicts(tasks: ScheduledTaskInfo[]): Conflict[]
-function detectAllConflicts(tasks: ScheduledTaskInfo[]): Conflict[]
+interface WorkPageData {
+  task: TaskWithDetails;
+  interventions: Intervention[];      // 待处理的干预
+  taskPlan: TaskPlan | null;          // 执行计划
+  conversation: ConversationMessage[];// 对话历史（跨所有执行）
+  workstream: WorkstreamEvent[];      // 工作流事件时间线
+  evidence: Evidence[];               // 证据/产出物
+  scheduleImpact: ScheduleImpact;     // 排期影响评估
+  runnability: TaskRunnabilityResult; // 可运行性状态
+}
 ```
 
-- `detectTimeOverlaps` — 检测时间重叠冲突
-- `detectOverload` — 检测日过载（单日超过 8 小时）
-- `detectFragmentation` — 检测时间碎片化（过多短间隔任务）
-- `detectDependencyConflicts` — 检测依赖关系违反
-- `detectAllConflicts` — 组合运行所有检测器
+**特殊行为：**
+- 对话历史聚合所有执行的 ConversationEntry（不只是最新一次）
+- 工作流事件包含执行状态变更、审批、工具调用等
 
-### conflict-analyzer.ts — 智能冲突分析
+### `getTaskCenter(workspaceId, filters?)`
 
-```typescript
-function analyzeConflicts(input): ConflictAnalysisResult
-async function analyzeConflictsSmart(input): Promise<ConflictAnalysisResult>
-```
+任务列表查询，支持按状态、优先级筛选。
 
-- `analyzeConflicts` — 规则引擎版本：检测冲突 + 生成建议
-- `analyzeConflictsSmart` — 智能版本：先用 LLM 分析，降级到规则引擎
+### `getInbox(workspaceId)`
 
-### suggestion-generator.ts — 建议生成器
+收件箱查询，聚合以下待处理项：
+- 待审批请求（Pending Approvals）
+- 待处理的排期建议
+- 等待输入的执行
+- 需要恢复的失败执行
 
-```typescript
-function generateSuggestions(conflicts: Conflict[], tasks: ScheduledTaskInfo[]): Suggestion[]
-```
+### `getWorkspaceOverview(workspaceId)`
 
-根据检测到的冲突生成解决方案建议（重新调度、拆分、优先级调整等）。
+工作空间概览，包含运行中/阻塞/风险任务数、近期截止、最近活动。
 
-### task-decomposer.ts — 任务分解
+### `getTaskPage(taskId)`
 
-```typescript
-function decomposeTask(input: TaskDecompositionInput): TaskDecompositionResult
-async function decomposeTaskSmart(input): Promise<TaskDecompositionResult>
-```
+单任务详情，包含执行历史、审批记录、产出物、依赖关系。
 
-- `decomposeTask` — 规则引擎分解：根据标题/描述的关键词匹配生成子任务
-- `decomposeTaskSmart` — LLM 驱动分解：使用 AI 理解任务并智能拆分
-- 返回：`{ subtasks, totalEstimatedMinutes, feasibilityScore, warnings }`
+### `getMemoryConsole(workspaceId)`
 
-### automation-suggester.ts — 自动化建议
-
-```typescript
-function suggestAutomation(input): AutomationSuggestion
-async function suggestAutomationSmart(input): Promise<AutomationSuggestion>
-```
-
-推荐任务的执行模式、提醒策略和准备步骤。
-- 返回：`{ executionMode, reminderStrategy, preparationSteps, contextSources, confidence }`
-
-### timeslot-suggester.ts — 时间段推荐
-
-```typescript
-function suggestTimeslots(input): TimeslotSuggestionResult
-async function suggestTimeslotsSmart(input): Promise<TimeslotSuggestionResult>
-```
-
-基于现有日程、优先级和时间偏好推荐最佳时间段。
-- 返回排名的时间段列表，每个含评分和理由
-
-### test-analyzer.ts — 测试分析
-
-用于分析测试结果的辅助模块。
+记忆控制台数据，列出工作空间的所有活跃记忆条目。
 
 ---
 
-## 4. tasks/ — 领域逻辑层
+## 3. events/ — 事件存储
 
-纯函数，无副作用，不访问数据库。
+### `appendCanonicalEvent(event)`
 
-### deriveTaskState
-
-```typescript
-function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateResult
-```
-
-从任务状态、运行记录和审批记录推导出显示状态。
-- 输入：`{ status, runs, approvals }`
-- 返回：`{ displayState, blockReasons, latestRunStatus, approvalPendingCount }`
-
-### deriveTaskRunnability
+追加不可变的规范事件。
 
 ```typescript
-function deriveTaskRunnability(input): TaskRunnabilityState
+interface CanonicalEventInput {
+  eventType: string;      // 事件类型（如 "TaskCreated"）
+  workspaceId: string;
+  taskId?: string;
+  runId?: string;
+  actorType: string;      // "human" | "agent" | "system"
+  actorId?: string;
+  source: string;         // 来源标识
+  payload?: object;       // 事件负载
+  dedupeKey: string;      // 去重键（唯一）
+}
 ```
 
-判断任务是否具备运行条件。检查运行时配置（适配器、模型、prompt、必填字段）。
-- 返回：`{ isRunnable, missingFields, runnabilityState }`
+**行为：**
+- 使用 upsert 实现幂等写入（基于 dedupeKey）
+- 自动分配递增的 ingestSequence
+- 创建时间自动设置
 
-### deriveScheduleState
-
-```typescript
-function deriveScheduleState(input): ScheduleStatus
-```
-
-从时间数据推导日程状态：
-- `Unscheduled` — 未安排
-- `Scheduled` — 已安排，未开始
-- `InProgress` — 进行中
-- `AtRisk` — 即将超时
-- `Overdue` — 已超时
-- `Completed` — 已完成
-
-### validateScheduleWindow
-
-```typescript
-function validateScheduleWindow(input: {
-  scheduledStartAt: Date | string
-  scheduledEndAt: Date | string
-}): { valid: boolean; errors: string[] }
-```
-
-验证日程时间窗口的合法性（结束时间晚于开始时间等）。
+**常见事件类型：**
+- `TaskCreated`, `TaskUpdated`, `TaskCompleted`, `TaskReopened`
+- `RunStarted`, `RunCompleted`, `RunFailed`
+- `ApprovalRequested`, `ApprovalResolved`
+- `ScheduleApplied`, `ScheduleCleared`, `ScheduleProposed`
+- `OperatorMessageSent`, `InputProvided`
+- `PlanGenerated`
 
 ---
 
-## 5. runtime/ — 运行时适配器层
+## 4. projections/ — 投影重建
 
-### 顶层文件
+### `rebuildTaskProjection(taskId)`
 
-**registry.ts** — 适配器注册中心
+从任务当前状态重建物化投影。
 
-```typescript
-function getRuntimeAdapterDefinition(key: string): RuntimeAdapterDefinition
-function resolveRuntimeAdapterKey(input): string
-function getRuntimeTaskConfigSpec(key: string): RuntimeTaskConfigSpec
-function validateRuntimeTaskConfig(key: string, input): RuntimeInput
-function listRuntimeAdapterKeys(): string[]
-```
+**计算逻辑：**
+1. 读取 Task + 最新 Run + Approval 计数
+2. 调用 `deriveTaskState()` 计算显示状态
+3. 调用 `deriveScheduleState()` 计算排期状态
+4. 组装 TaskProjection 并 upsert
 
-支持的适配器：`openclaw`（OpenClaw AI 网关）、`research`（研究型适配器）
+**触发时机：** 每个命令处理器执行后自动调用。
 
-**task-config.ts** — 运行时任务配置
+### `getWorkProjection(taskId)`
 
-```typescript
-function isRuntimeInput(value): boolean
-function extractLegacyRuntimeFields(runtimeInput): object
-function buildCompatRuntimeInput(input): RuntimeInput
-function resolveTaskRuntimeConfig(input): ResolvedConfig
-function validateTaskRuntimeConfig(input): ValidationResult
-```
-
-处理运行时配置的序列化/反序列化和兼容性转换。
-
-**execution-registry.ts** — 执行适配器工厂
-
-```typescript
-async function createRuntimeExecutionAdapter(key: string): Promise<RuntimeExecutionAdapter>
-```
-
-根据适配器 key 创建实际的运行时执行适配器实例。
-
-**task-sessions.ts** — 任务会话管理
-
-```typescript
-function buildDefaultTaskSessionKey(input): string
-function resolveTaskSessionKey(input): string | null
-async function ensureDefaultTaskSession(input): Promise<TaskSession>
-async function updateTaskSessionStateFromRun(input): Promise<void>
-```
-
-管理任务与运行时会话的映射关系。每个任务关联一个运行时会话，多次 Run 共享同一会话（上下文累积）。
-
-### openclaw/ — OpenClaw 适配器
-
-**adapter.ts** — 适配器入口，实现 `RuntimeExecutionAdapter` 接口：
-- `createRun()` — 创建运行
-- `getRunSnapshot()` — 获取运行快照
-- `sendMessage()` — 发送消息
-- `provideInput()` — 提供输入
-
-**client.ts** — WebSocket 网关客户端
-- 连接 OpenClaw Gateway（WebSocket 协议）
-- 支持方法：`sessions.create`、`agent`、`agent.wait`、`chat.history`、`exec.approval.list`、`exec.approval.resolve`
-- 自动重连、设备身份验证
-
-**orchestrator.ts** — 高级编排器
-- `executeTask()` — 完整生命周期编排（创建运行 -> 等待完成 -> 处理审批）
-- 支持策略：`wait-for-completion`、`fire-and-forget`、`interactive`
-- 指数退避重试，自动审批处理
-
-**mock-adapter.ts** — 模拟适配器
-- `createStatefulMockAdapter()` — 创建有状态模拟器，用于测试
-- 支持：自动完成、延迟、失败率、审批模拟
-
-**其他文件**：
-- `config.ts` — OpenClaw 配置规格
-- `freshness.ts` — 运行新鲜度检测
-- `sync-run.ts` — 运行状态同步
-- `probe.ts` — 连通性探测
-- `device-identity.ts` — 设备身份管理
-- `evaluate-gate.ts` — 可行性门控评估
-- `mapper.ts` — 数据映射
-
-### research/ — 研究型适配器
-
-**adapter.ts** — 研究型运行时适配器（用于实验性 AI 任务）
-**config.ts** — 研究适配器配置规格
+工作台页面的投影辅助查询。
 
 ---
 
-## 6. projections/ — 投影层（读模型）
+## 5. tasks/ — 任务领域逻辑
 
-### rebuildTaskProjection
+纯函数模块，无数据库依赖。
+
+### `deriveTaskState(task, latestRun?, approvalCounts?)`
+
+从多维度派生任务的显示状态。
+
+**状态派生优先级：**
+1. `SyncStale` — 同步过期
+2. `WaitingForApproval` — 有待审批项
+3. `WaitingForInput` — 等待用户输入
+4. `AttentionNeeded` — 需要关注（多种条件）
+5. 直接映射 task.status
+
+### `deriveTaskRunnability(task, configSpec?)`
+
+检查任务是否具备运行条件。
 
 ```typescript
-async function rebuildTaskProjection(taskId: string): Promise<void>
+interface TaskRunnabilityResult {
+  isRunnable: boolean;
+  missingFields: string[];       // 缺少的必填字段
+  runnabilityState: string;      // "ready" | "missing_runtime" | "missing_fields" | ...
+}
 ```
 
-重建任务的反规范化投影。从 Task + Run + Approval 数据派生：
-- 显示状态（通过 `deriveTaskState`）
-- 日程状态（通过 `deriveScheduleState`）
-- 阻塞原因
-- 最新运行信息
-- Upsert 到 `TaskProjection` 表
+**检查项：**
+- 是否有 runtimeAdapterKey
+- 是否有 prompt
+- 是否有 runtimeModel（如果 configSpec 要求）
+- 是否满足 configSpec 定义的所有必填字段
 
-每个 Command 执行后自动调用此函数。
+### `deriveScheduleState(task)`
 
-### getWorkProjection
+从排期窗口和执行状态派生排期状态。
 
-```typescript
-async function getWorkProjection(taskId: string): Promise<WorkProjection>
-```
+**状态映射：**
+- 无排期 → `Unscheduled`
+- 有排期但未到时间 → `Scheduled`
+- 正在排期窗口内 → `InProgress`
+- 已完成 → `Completed`
+- 超过结束时间未完成 → `Overdue`
+- 执行中断 → `Interrupted`
+- 接近截止日期 → `AtRisk`
 
-获取工作视图的投影数据。包含任务本体 + 所有关联的 Run、Event、Approval、Artifact。
+### `validateScheduleWindow(window)`
+
+验证排期时间窗口的合法性（开始 < 结束，时间合理性等）。
 
 ---
 
-## 7. events/ — 事件层
+## 6. runtime/ — 运行时适配器
 
-### appendCanonicalEvent
+运行时层提供可插拔的 AI 执行引擎抽象。
+
+### 核心接口
 
 ```typescript
-async function appendCanonicalEvent(input: {
-  taskId: string
-  type: string        // e.g. "task.created", "run.started", "schedule.applied"
-  actor?: string      // "human" | "agent" | "system"
-  source?: string
-  payload?: object
-  runtimeTimestamp?: Date
-  dedupeKey?: string  // 幂等键，防止重复事件
-}): Promise<Event>
+interface RuntimeExecutionAdapter {
+  createRun(task, session, options?): Promise<RunResult>;
+  sendOperatorMessage(run, message): Promise<void>;
+  getRunSnapshot(run): Promise<RunSnapshot>;
+  readHistory(run, cursor?): Promise<HistoryPage>;
+  listApprovals(run): Promise<Approval[]>;
+  resumeRun(run): Promise<void>;
+}
+
+interface RuntimeAdapterDefinition {
+  key: string;              // 适配器标识 (如 "openclaw")
+  displayName: string;
+  configSpec: RuntimeTaskConfigSpec;  // 配置规格
+}
 ```
 
-追加不可变事件到事件日志。
-- 自动递增 `ingestSequence`
-- 使用 `dedupeKey` 进行 upsert 实现幂等性
-- 事件一旦写入不可修改（Event Sourcing 核心原则）
+### 注册表 (registry.ts)
+
+```typescript
+// 当前注册的适配器
+listRuntimeAdapterKeys();  // ["openclaw", "research"]
+
+// 获取配置规格
+getRuntimeTaskConfigSpec("openclaw");
+// → { fields: [{ key: "model", required: true }, ...] }
+
+// 解析适配器
+resolveRuntimeAdapterKey("openclaw");
+// → RuntimeAdapterDefinition
+```
+
+### OpenClaw 适配器 (`runtime/openclaw/`)
+
+OpenClaw 是主要的 AI 智能体运行时，通过 WebSocket 与 OpenClaw Gateway 通信。
+
+#### 文件结构
+
+| 文件 | 职责 |
+|------|------|
+| `client.ts` | WebSocket 客户端，管理连接和消息收发 |
+| `adapter.ts` | 创建 OpenClawAdapter 实例（live 或 mock） |
+| `orchestrator.ts` | 高层编排：任务启动、重试、回退 |
+| `sync-run.ts` | 从运行时同步执行状态到本地数据库 |
+| `freshness.ts` | 过期检测和自动同步（读取查询时触发） |
+| `mapper.ts` | 运行时数据到本地模型的映射 |
+| `evaluate-gate.ts` | 审批门控评估 |
+| `device-identity.ts` | 设备身份管理 |
+| `probe.ts` | 运行时健康探测 |
+| `types.ts` | OpenClaw 特定类型定义 |
+| `config.ts` | 配置常量 |
+| `mock-adapter.ts` | 测试用的模拟适配器 |
+
+#### 同步机制
+
+```
+OpenClaw Gateway ←→ sync-run.ts ←→ 本地 DB
+                                     │
+                  freshness.ts ──────┘
+                  (查询时自动检查过期)
+```
+
+### 配置规格 (config-spec.ts)
+
+定义运行时适配器需要的配置字段：
+
+```typescript
+interface RuntimeTaskConfigField {
+  key: string;
+  label: string;
+  type: "string" | "text" | "number" | "boolean" | "select";
+  required: boolean;
+  options?: string[];
+  default?: unknown;
+}
+
+interface RuntimeTaskConfigSpec {
+  fields: RuntimeTaskConfigField[];
+}
+```
 
 ---
 
-## 8. workspaces/ — 工作空间
+## 7. ai/ — AI 智能服务
 
-### getDefaultWorkspace
+AI 模块提供规则引擎 + LLM 双引擎的智能功能。
+
+### LLM 服务 (llm-service.ts)
+
+OpenAI 兼容的 LLM 抽象层。
 
 ```typescript
-const DEFAULT_WORKSPACE_ID = "ws_default"
+// 基本聊天补全
+chatCompletion(messages, options?): Promise<string>;
 
-async function getDefaultWorkspace(): Promise<DefaultWorkspace>
+// JSON 结构化输出
+chatCompletionJSON<T>(messages, schema, options?): Promise<T>;
+
+// 可用性检查
+isLLMAvailable(): boolean;
 ```
 
-获取默认工作空间。如果不存在则自动创建。
-- 返回：`{ id, name, status, taskCount? }`
-- 抛出：`DefaultWorkspaceError`（仅在创建也失败时）
+### 冲突检测 (conflict-detector.ts)
+
+检测排期中的 4 种冲突：
+
+1. **时间重叠 (time_overlap)**：两个已排期任务时间交叉
+2. **每日超载 (daily_overload)**：单日排期超过 8 小时
+3. **碎片化 (fragmentation)**：存在过多 < 90 分钟的任务块
+4. **依赖违反 (dependency_violation)**：被依赖的任务未完成但依赖方已排期
+
+```typescript
+detectAllConflicts(tasks: ScheduledTaskInfo[]): Conflict[];
+```
+
+### 建议生成 (suggestion-generator.ts)
+
+为检测到的冲突生成解决建议：
+- 重新排期
+- 延期
+- 合并类似任务
+- 调整优先级顺序
+
+### 冲突分析器 (conflict-analyzer.ts)
+
+编排冲突检测 + 建议生成：
+
+```typescript
+// 纯规则引擎
+analyzeConflicts(tasks): { conflicts, suggestions };
+
+// LLM 增强（规则引擎兜底）
+analyzeConflictsSmart(tasks): { conflicts, suggestions };
+```
+
+### 任务分解 (task-decomposer.ts)
+
+将复杂任务分解为子任务，支持 5 种策略：
+
+1. 描述列表识别
+2. 动词模式匹配
+3. 逗号列表分割
+4. 连词分割
+5. 按时长拆分
+
+```typescript
+// 规则引擎
+decomposeTask(task): TaskDecompositionResult;
+
+// LLM 增强
+decomposeTaskSmart(task): TaskDecompositionResult;
+```
+
+### 自动化建议 (automation-suggester.ts)
+
+为任务建议执行策略：
+
+```typescript
+suggestAutomation(task): AutomationSuggestion;
+// → { executionMode, reminderStrategy, prepSteps }
+```
+
+### 时间建议 (timeslot-suggester.ts)
+
+基于空闲时间、优先级、时间段偏好等因素推荐最佳排期时段：
+
+```typescript
+suggestTimeslots(input): TimeslotSuggestion[];
+```
+
+### OpenClaw 建议服务 (openclaw-suggest.ts)
+
+通过 OpenClaw Gateway WebSocket 会话获取 AI 建议：
+
+```typescript
+suggestViaOpenClaw(input): Promise<AutoCompleteSuggestion[]>;
+```
+
+**特性：**
+- 每个工作空间独立会话
+- 首次消息附带系统提示词
+- 结构化 JSON 响应解析
+
+### 排期建议插件 (schedule-suggest-plugin.ts)
+
+OpenClaw 智能体可调用的工具：
+
+```typescript
+// 可用工具
+"schedule.list_tasks"    // 列出工作空间任务
+"schedule.get_health"    // 获取排期健康状态
+"schedule.check_conflicts" // 检查排期冲突
+
+executeScheduleTool(toolName, args): Promise<ToolResult>;
+```
 
 ---
 
-## 9. ui/ — UI 配置
+## 8. workspaces/ — 工作空间管理
 
-### navigation.ts
+### `getDefaultWorkspace()`
+
+查找或自动创建默认工作空间。
 
 ```typescript
-const NAV_ITEMS: ControlPlaneNavItem[] = [
-  { label: "nav.workspaces", href: "/", icon: "..." },
-  { label: "nav.schedule", href: "/schedule", icon: "..." },
-  { label: "nav.inbox", href: "/inbox", icon: "..." },
-  { label: "nav.memory", href: "/memory", icon: "..." },
-  { label: "nav.settings", href: "/settings", icon: "..." },
-]
-```
+const DEFAULT_WORKSPACE_ID = "default";
 
-定义控制平面的导航结构，使用 i18n 翻译键作为标签。
+getDefaultWorkspace(): Promise<Workspace>;
+```
 
 ---
 
-## 模块间依赖关系
+## 9. ui/ — UI 导航
 
+### `NAV_ITEMS`
+
+定义应用导航结构：
+
+```typescript
+const NAV_ITEMS = [
+  { href: "/workspaces", label: "Workspaces", icon: ... },
+  { href: "/schedule",   label: "Schedule",   icon: ... },
+  { href: "/inbox",      label: "Inbox",      icon: ... },
+  { href: "/memory",     label: "Memory",     icon: ... },
+  { href: "/settings",   label: "Settings",   icon: ... },
+];
 ```
-API Routes
-    │
-    ├── Commands ──→ DB (Prisma) + Events + Projections
-    │                     │
-    │                     └── Runtime Adapters (OpenClaw / Research)
-    │
-    ├── Queries ──→ DB (Prisma) + Runtime sync
-    │
-    └── AI ──→ LLM Service (OpenAI-compatible) + Rule Engine
-
-Domain Logic (tasks/)
-    └── 被 Commands 和 Projections 引用，纯函数无外部依赖
-```
-
-命令和查询严格分离：命令负责写入，查询负责读取，投影层是二者之间的桥梁。
