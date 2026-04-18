@@ -146,7 +146,47 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
   return { suggestions, structuredSuggestions, isLoading, error };
 }
 
-// ---------- 2. useSmartAutomation ----------
+// ---------- 2. useApplySuggestion ----------
+
+/**
+ * Hook to apply a structured AI suggestion via the apply-suggestion API.
+ * Returns a function that sends the full suggestion to the backend.
+ */
+export function useApplySuggestion() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const apply = useCallback(
+    async (workspaceId: string, suggestion: StructuredSuggestion) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await fetchJSON<{
+          success: boolean;
+          taskId?: string;
+          suggestionId: string;
+          action?: string;
+          summary?: string;
+        }>("/api/ai/apply-suggestion", { workspaceId, suggestion });
+
+        setIsLoading(false);
+        return data;
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Failed to apply suggestion";
+        setError(message);
+        setIsLoading(false);
+        return undefined;
+      }
+    },
+    [],
+  );
+
+  return { apply, isLoading, error };
+}
+
+// ---------- 3. useSmartAutomation ----------
 
 export interface SmartAutomationTaskInput {
   title: string;
