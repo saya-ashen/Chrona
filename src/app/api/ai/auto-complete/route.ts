@@ -3,36 +3,14 @@ import { randomUUID } from "node:crypto";
 import { aiSuggest } from "@/modules/ai/ai-service";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/adapters/types";
 import { db } from "@/lib/db";
+import type { StructuredSuggestion } from "@/hooks/use-ai";
 
 // ────────────────────────────────────────────────────────────────────
-// Response type — structured suggestion with summary + actionable data
+// Response type
 // ────────────────────────────────────────────────────────────────────
 
-/**
- * Each suggestion has two parts:
- *   1. `summary` — one-line human-readable description of the suggestion
- *   2. `action`  — structured data that can be directly consumed by apply-suggestion
- */
-export interface StructuredSuggestion {
-  /** Unique ID for this suggestion */
-  id: string;
-  /** One-line human-readable summary, e.g. "创建30分钟的代码审查任务，优先级高" */
-  summary: string;
-  /** Structured actionable data — can be sent directly to apply-suggestion */
-  action: {
-    /** "create_task" | "reschedule" | "update_task" */
-    type: "create_task";
-    /** Fields for task creation / update */
-    title: string;
-    description: string;
-    priority: "Low" | "Medium" | "High" | "Urgent";
-    estimatedMinutes: number;
-    tags: string[];
-    /** Optional suggested schedule */
-    scheduledStartAt?: string;
-    scheduledEndAt?: string;
-  };
-}
+// Re-export for consumers of this route
+export type { StructuredSuggestion };
 
 export interface AutoCompleteAPIResponse {
   suggestions: StructuredSuggestion[];

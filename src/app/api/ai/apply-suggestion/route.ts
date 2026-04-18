@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
-import type { StructuredSuggestion } from "@/app/api/ai/auto-complete/route";
+import { db } from "@/lib/db";
+import type { StructuredSuggestion } from "@/hooks/use-ai";
 
 /**
  * Apply a structured AI suggestion.
@@ -101,8 +101,8 @@ async function handleCreateTask(
       title: action.title,
       description: action.description || null,
       priority: action.priority,
-      status: "open",
-      scheduleStatus: action.scheduledStartAt ? "scheduled" : "unscheduled",
+      status: "Draft",
+      scheduleStatus: action.scheduledStartAt ? "Scheduled" : "Unscheduled",
       scheduleSource: "ai",
       scheduledStartAt: action.scheduledStartAt
         ? new Date(action.scheduledStartAt)
@@ -118,12 +118,11 @@ async function handleCreateTask(
 
   // Create projection
   await db.taskProjection.upsert({
-    where: {
-      taskId_workspaceId: { taskId, workspaceId },
-    },
+    where: { taskId },
     create: {
       taskId,
       workspaceId,
+      persistedStatus: "Draft",
       scheduledStartAt: action.scheduledStartAt
         ? new Date(action.scheduledStartAt)
         : null,
@@ -199,10 +198,7 @@ async function handleLegacyApply(body: LegacyApplyRequest) {
 
     return db.taskProjection.update({
       where: {
-        taskId_workspaceId: {
-          taskId: change.taskId,
-          workspaceId,
-        },
+        taskId: change.taskId,
       },
       data: updateData,
     });
