@@ -12,7 +12,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-import { useAutoComplete, type AutoCompleteSuggestion } from "@/hooks/use-ai";
+import { useAutoComplete, type AutoCompleteSuggestion, type StructuredSuggestion } from "@/hooks/use-ai";
 
 const priorityBadgeColors: Record<string, string> = {
   Low: "bg-green-100 text-green-700",
@@ -42,12 +42,13 @@ export function ScheduleCommandBar({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ---- AI auto-complete ---- */
-  const { suggestions } = useAutoComplete(
+  const { suggestions, structuredSuggestions } = useAutoComplete(
     value.trim().length >= 3 ? value.trim() : null,
   );
 
-  function handleSelectSuggestion(suggestion: AutoCompleteSuggestion) {
-    setValue(suggestion.title);
+  function handleSelectSuggestion(structured: StructuredSuggestion) {
+    const { action } = structured;
+    setValue(action.title);
     setShowSuggestions(false);
 
     // Auto-submit with AI-suggested data
@@ -57,11 +58,18 @@ export function ScheduleCommandBar({
       now.getHours() * 60 + now.getMinutes(),
     );
     const draft = buildQuickCreateDraft({
-      title: suggestion.title,
+      title: action.title,
       selectedDay,
       now: referenceDate,
-      priority: suggestion.priority,
+      priority: action.priority,
     });
+
+    // If the suggestion has a scheduled slot, use it
+    if (action.scheduledStartAt && action.scheduledEndAt) {
+      draft.scheduledStartAt = action.scheduledStartAt;
+      draft.scheduledEndAt = action.scheduledEndAt;
+    }
+
     void onSubmit(draft).then(() => setValue(""));
   }
 
@@ -121,15 +129,15 @@ export function ScheduleCommandBar({
           />
 
           {/* AI Auto-complete dropdown */}
-          {showSuggestions && suggestions.length > 0 ? (
+          {showSuggestions && structuredSuggestions.length > 0 ? (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border/60 bg-background shadow-lg">
               <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <Sparkles className="size-3 text-primary" />
                 AI suggestions
               </div>
-              {suggestions.slice(0, 5).map((s, i) => (
+              {structuredSuggestions.slice(0, 5).map((s, i) => (
                 <button
-                  key={`${s.title}-${i}`}
+                  key={`${s.id}-${i}`}
                   type="button"
                   className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition hover:bg-muted/60"
                   onMouseDown={(e) => {
@@ -138,17 +146,15 @@ export function ScheduleCommandBar({
                   }}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">{s.title}</p>
-                    {s.description ? (
-                      <p className="truncate text-xs text-muted-foreground">{s.description}</p>
-                    ) : null}
+                    <p className="truncate font-medium text-foreground">{s.action.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{s.summary}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {s.estimatedMinutes ? (
-                      <span className="text-[10px] text-muted-foreground">{s.estimatedMinutes}m</span>
+                    {s.action.estimatedMinutes ? (
+                      <span className="text-[10px] text-muted-foreground">{s.action.estimatedMinutes}m</span>
                     ) : null}
-                    <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", priorityBadgeColors[s.priority] ?? "bg-muted text-muted-foreground")}>
-                      {s.priority}
+                    <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", priorityBadgeColors[s.action.priority] ?? "bg-muted text-muted-foreground")}>
+                      {s.action.priority}
                     </span>
                   </div>
                 </button>

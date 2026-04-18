@@ -34,6 +34,25 @@ async function fetchJSON<T>(
 
 // ---------- Types ----------
 
+/** Structured suggestion from the new adapter-backed API */
+export interface StructuredSuggestion {
+  id: string;
+  /** One-line human-readable summary */
+  summary: string;
+  /** Structured actionable data — can be sent to apply-suggestion */
+  action: {
+    type: "create_task";
+    title: string;
+    description: string;
+    priority: "Low" | "Medium" | "High" | "Urgent";
+    estimatedMinutes: number;
+    tags: string[];
+    scheduledStartAt?: string;
+    scheduledEndAt?: string;
+  };
+}
+
+/** Legacy flat shape — kept for backward compat in components */
 export interface AutoCompleteSuggestion {
   title: string;
   description: string;
@@ -43,7 +62,9 @@ export interface AutoCompleteSuggestion {
 }
 
 interface AutoCompleteResponse {
-  suggestions: AutoCompleteSuggestion[];
+  suggestions: StructuredSuggestion[];
+  source?: string;
+  requestId?: string;
 }
 
 interface BatchDecomposeResponse {
@@ -59,7 +80,7 @@ interface BatchDecomposeResponse {
 // ---------- 1. useAutoComplete ----------
 
 export function useAutoComplete(title: string | null, debounceMs = 500) {
-  const [suggestions, setSuggestions] = useState<AutoCompleteSuggestion[]>([]);
+  const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,7 +92,7 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
 
     // Don't fetch if title is too short or null
     if (!title || title.trim().length < 3) {
-      setSuggestions([]);
+      setStructuredSuggestions([]);
       setIsLoading(false);
       setError(null);
       return;
@@ -93,7 +114,7 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
       )
         .then((data) => {
           if (!controller.signal.aborted) {
-            setSuggestions(data.suggestions ?? []);
+            setStructuredSuggestions(data.suggestions ?? []);
             setIsLoading(false);
           }
         })
@@ -101,7 +122,7 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
           if (err instanceof DOMException && err.name === "AbortError") return;
           if (!controller.signal.aborted) {
             setError(err instanceof Error ? err.message : "Failed to fetch suggestions");
-            setSuggestions([]);
+            setStructuredSuggestions([]);
             setIsLoading(false);
           }
         });
@@ -113,7 +134,16 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
     };
   }, [title, debounceMs]);
 
-  return { suggestions, isLoading, error };
+  // Flatten to legacy shape for backward compat
+  const suggestions: AutoCompleteSuggestion[] = structuredSuggestions.map((s) => ({
+    title: s.action.title,
+    description: s.action.description,
+    priority: s.action.priority,
+    estimatedMinutes: s.action.estimatedMinutes,
+    tags: s.action.tags,
+  }));
+
+  return { suggestions, structuredSuggestions, isLoading, error };
 }
 
 // ---------- 2. useSmartAutomation ----------
