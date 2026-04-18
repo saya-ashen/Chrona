@@ -44,7 +44,10 @@ function determineExecutionMode(task: TaskAutomationInput): ExecutionMode {
     return "recurring";
   }
 
-  if (task.isRunnable && (task.priority === "High" || task.priority === "Urgent")) {
+  if (
+    task.isRunnable &&
+    (task.priority === "High" || task.priority === "Urgent")
+  ) {
     return "immediate";
   }
 
@@ -58,7 +61,9 @@ function determineExecutionMode(task: TaskAutomationInput): ExecutionMode {
 /**
  * リマインダー戦略を決定する
  */
-function determineReminderStrategy(task: TaskAutomationInput): ReminderStrategy {
+function determineReminderStrategy(
+  task: TaskAutomationInput,
+): ReminderStrategy {
   const isHighPriority = task.priority === "High" || task.priority === "Urgent";
   const isMediumPriority = task.priority === "Medium";
 
@@ -268,7 +273,10 @@ export async function suggestAutomationSmart(
       const result = await suggestAutomationWithLLM(task);
       if (result) return result;
     } catch (err) {
-      console.warn("[automation-suggester] LLM suggestion failed, falling back to rules:", err);
+      console.warn(
+        "[automation-suggester] LLM suggestion failed, falling back to rules:",
+        err,
+      );
     }
   }
   return suggestAutomation(task);
@@ -281,12 +289,18 @@ async function suggestAutomationWithLLM(
     `Task Title: ${task.title}`,
     task.description ? `Description: ${task.description}` : null,
     `Priority: ${task.priority}`,
-    task.dueAt ? `Due: ${task.dueAt instanceof Date ? task.dueAt.toISOString() : task.dueAt}` : null,
-    task.scheduledStartAt ? `Scheduled Start: ${task.scheduledStartAt instanceof Date ? task.scheduledStartAt.toISOString() : task.scheduledStartAt}` : null,
+    task.dueAt
+      ? `Due: ${task.dueAt instanceof Date ? task.dueAt.toISOString() : task.dueAt}`
+      : null,
+    task.scheduledStartAt
+      ? `Scheduled Start: ${task.scheduledStartAt instanceof Date ? task.scheduledStartAt.toISOString() : task.scheduledStartAt}`
+      : null,
     `Runnable: ${task.isRunnable}`,
     `Owner Type: ${task.ownerType}`,
     task.tags?.length ? `Tags: ${task.tags.join(", ")}` : null,
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const result = await chatCompletionJSON<AutomationSuggestion>({
     messages: [
