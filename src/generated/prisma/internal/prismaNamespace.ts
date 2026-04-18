@@ -397,7 +397,9 @@ export const ModelName = {
   ToolCallDetail: 'ToolCallDetail',
   TaskProjection: 'TaskProjection',
   ScheduleProposal: 'ScheduleProposal',
-  RuntimeCursor: 'RuntimeCursor'
+  RuntimeCursor: 'RuntimeCursor',
+  AiClient: 'AiClient',
+  AiFeatureBinding: 'AiFeatureBinding'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -413,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor"
+    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1453,6 +1455,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AiClient: {
+      payload: Prisma.$AiClientPayload<ExtArgs>
+      fields: Prisma.AiClientFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AiClientFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AiClientFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        findFirst: {
+          args: Prisma.AiClientFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AiClientFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        findMany: {
+          args: Prisma.AiClientFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>[]
+        }
+        create: {
+          args: Prisma.AiClientCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        createMany: {
+          args: Prisma.AiClientCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AiClientCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>[]
+        }
+        delete: {
+          args: Prisma.AiClientDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        update: {
+          args: Prisma.AiClientUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        deleteMany: {
+          args: Prisma.AiClientDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AiClientUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AiClientUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>[]
+        }
+        upsert: {
+          args: Prisma.AiClientUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiClientPayload>
+        }
+        aggregate: {
+          args: Prisma.AiClientAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAiClient>
+        }
+        groupBy: {
+          args: Prisma.AiClientGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiClientGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AiClientCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiClientCountAggregateOutputType> | number
+        }
+      }
+    }
+    AiFeatureBinding: {
+      payload: Prisma.$AiFeatureBindingPayload<ExtArgs>
+      fields: Prisma.AiFeatureBindingFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AiFeatureBindingFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AiFeatureBindingFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        findFirst: {
+          args: Prisma.AiFeatureBindingFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AiFeatureBindingFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        findMany: {
+          args: Prisma.AiFeatureBindingFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>[]
+        }
+        create: {
+          args: Prisma.AiFeatureBindingCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        createMany: {
+          args: Prisma.AiFeatureBindingCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AiFeatureBindingCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>[]
+        }
+        delete: {
+          args: Prisma.AiFeatureBindingDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        update: {
+          args: Prisma.AiFeatureBindingUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        deleteMany: {
+          args: Prisma.AiFeatureBindingDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AiFeatureBindingUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AiFeatureBindingUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>[]
+        }
+        upsert: {
+          args: Prisma.AiFeatureBindingUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiFeatureBindingPayload>
+        }
+        aggregate: {
+          args: Prisma.AiFeatureBindingAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAiFeatureBinding>
+        }
+        groupBy: {
+          args: Prisma.AiFeatureBindingGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiFeatureBindingGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AiFeatureBindingCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiFeatureBindingCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1756,6 +1906,30 @@ export const RuntimeCursorScalarFieldEnum = {
 export type RuntimeCursorScalarFieldEnum = (typeof RuntimeCursorScalarFieldEnum)[keyof typeof RuntimeCursorScalarFieldEnum]
 
 
+export const AiClientScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  config: 'config',
+  isDefault: 'isDefault',
+  enabled: 'enabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AiClientScalarFieldEnum = (typeof AiClientScalarFieldEnum)[keyof typeof AiClientScalarFieldEnum]
+
+
+export const AiFeatureBindingScalarFieldEnum = {
+  id: 'id',
+  feature: 'feature',
+  clientId: 'clientId',
+  createdAt: 'createdAt'
+} as const
+
+export type AiFeatureBindingScalarFieldEnum = (typeof AiFeatureBindingScalarFieldEnum)[keyof typeof AiFeatureBindingScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1956,6 +2130,13 @@ export type EnumMemoryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
 export type EnumScheduleProposalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ScheduleProposalStatus'>
     
 
+
+/**
+ * Reference to a field of type 'AiClientType'
+ */
+export type EnumAiClientTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AiClientType'>
+    
+
 /**
  * Batch Payload for updateMany & deleteMany & createMany
  */
@@ -2065,6 +2246,8 @@ export type GlobalOmitConfig = {
   taskProjection?: Prisma.TaskProjectionOmit
   scheduleProposal?: Prisma.ScheduleProposalOmit
   runtimeCursor?: Prisma.RuntimeCursorOmit
+  aiClient?: Prisma.AiClientOmit
+  aiFeatureBinding?: Prisma.AiFeatureBindingOmit
 }
 
 /* Types for Logging */

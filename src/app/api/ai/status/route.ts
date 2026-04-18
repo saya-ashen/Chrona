@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
-import { isAIAvailable, getAIAdapterInfo } from "@/modules/ai/ai-service";
+import { isAIAvailable, getAIClientInfo } from "@/modules/ai/ai-service";
 
 /**
- * GET /api/ai/status — returns available AI adapters and their capabilities.
- * Useful for frontend to know what AI features are available.
+ * GET /api/ai/status — returns available AI clients and their feature bindings.
  */
 export async function GET() {
   try {
     const available = await isAIAvailable();
-    const adapters = getAIAdapterInfo();
+    const clients = await getAIClientInfo();
 
     return NextResponse.json({
       available,
-      adapters,
+      clients,
     });
   } catch (error) {
     console.error("Error checking AI status:", error);
     return NextResponse.json(
-      { available: false, adapters: [], error: "Failed to check AI status" },
+      { available: false, clients: [], error: "Failed to check AI status" },
       { status: 500 },
     );
   }

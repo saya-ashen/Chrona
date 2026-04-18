@@ -4,11 +4,7 @@ import type {
   ReminderStrategy,
   AutomationSuggestion,
 } from "./types";
-import {
-  chatCompletionJSON,
-  isLLMAvailable,
-  automationSuggestionSystemPrompt,
-} from "./llm-service";
+import { aiChat } from "./ai-service";
 
 /**
  * タスクが定期的なものかどうかをタイトルと説明から判定する
@@ -263,26 +259,24 @@ export function suggestAutomation(
 // ─── LLM-powered suggestion ────────────────────────────
 
 /**
- * Suggest automation using LLM intelligence. Falls back to rule-based if LLM unavailable.
+ * Suggest automation using AI intelligence. Falls back to rule-based if AI unavailable.
  */
 export async function suggestAutomationSmart(
   task: TaskAutomationInput,
 ): Promise<AutomationSuggestion> {
-  if (isLLMAvailable()) {
-    try {
-      const result = await suggestAutomationWithLLM(task);
-      if (result) return result;
-    } catch (err) {
-      console.warn(
-        "[automation-suggester] LLM suggestion failed, falling back to rules:",
-        err,
-      );
-    }
+  try {
+    const result = await suggestAutomationWithAI(task);
+    if (result) return result;
+  } catch (err) {
+    console.warn(
+      "[automation-suggester] AI suggestion failed, falling back to rules:",
+      err,
+    );
   }
   return suggestAutomation(task);
 }
 
-async function suggestAutomationWithLLM(
+async function suggestAutomationWithAI(
   task: TaskAutomationInput,
 ): Promise<AutomationSuggestion | null> {
   const userPrompt = [
@@ -302,16 +296,22 @@ async function suggestAutomationWithLLM(
     .filter(Boolean)
     .join("\n");
 
-  const result = await chatCompletionJSON<AutomationSuggestion>({
+  const systemPrompt = `You are a task automation assistant. Analyze a task and suggest how to automate it.
+Return valid JSON only:
+{"executionMode":"immediate|scheduled|recurring|manual","reminderStrategy":{"advanceMinutes":N,"frequency":"once|recurring","channels":["push"]},"preparationSteps":["step1"],"automationNotes":"...","confidence":0.0-1.0}
+Respond in the same language as the input.`;
+
+  const chatResult = await aiChat({
     messages: [
-      { role: "system", content: automationSuggestionSystemPrompt() },
+      { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
+    jsonMode: true,
     temperature: 0.3,
     maxTokens: 1000,
   });
 
-  return result;
+  return (chatResult?.parsed as AutomationSuggestion) ?? null;
 }
 
 export type {

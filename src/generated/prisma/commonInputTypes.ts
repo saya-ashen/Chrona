@@ -562,6 +562,23 @@ export type EnumScheduleProposalStatusWithAggregatesFilter<$PrismaModel = never>
   _max?: Prisma.NestedEnumScheduleProposalStatusFilter<$PrismaModel>
 }
 
+export type EnumAiClientTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AiClientType | Prisma.EnumAiClientTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AiClientType[]
+  notIn?: $Enums.AiClientType[]
+  not?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel> | $Enums.AiClientType
+}
+
+export type EnumAiClientTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AiClientType | Prisma.EnumAiClientTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AiClientType[]
+  notIn?: $Enums.AiClientType[]
+  not?: Prisma.NestedEnumAiClientTypeWithAggregatesFilter<$PrismaModel> | $Enums.AiClientType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[]
@@ -1070,6 +1087,23 @@ export type NestedEnumScheduleProposalStatusWithAggregatesFilter<$PrismaModel = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumScheduleProposalStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumScheduleProposalStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumAiClientTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AiClientType | Prisma.EnumAiClientTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AiClientType[]
+  notIn?: $Enums.AiClientType[]
+  not?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel> | $Enums.AiClientType
+}
+
+export type NestedEnumAiClientTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AiClientType | Prisma.EnumAiClientTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AiClientType[]
+  notIn?: $Enums.AiClientType[]
+  not?: Prisma.NestedEnumAiClientTypeWithAggregatesFilter<$PrismaModel> | $Enums.AiClientType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
 }
 
 

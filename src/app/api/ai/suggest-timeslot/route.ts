@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { aiSuggestTimeslots } from "@/modules/ai/ai-service";
 import { suggestTimeslots } from "@/modules/ai/timeslot-suggester";
 import type { ScheduleSlot } from "@/modules/ai/types";
-import type { TaskSnapshot } from "@/modules/ai/adapters/types";
+import type { TaskSnapshot } from "@/modules/ai/ai-service";
 
 export async function POST(request: Request) {
   try {

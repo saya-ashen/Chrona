@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { chatCompletionJSON, isLLMAvailable, taskPlanSystemPrompt } from "@/modules/ai/llm-service";
+import { aiChat } from "@/modules/ai/ai-service";
 
 function buildMockTaskPlanPayload(task: {
   title: string;
@@ -85,11 +85,7 @@ async function buildSmartTaskPlanPayload(
   },
   revision: "generated" | "updated",
 ): Promise<TaskPlanPayload> {
-  // If LLM is not available, fall back immediately
-  if (!isLLMAvailable()) {
-    return buildMockTaskPlanPayload(task, revision);
-  }
-
+  // If AI chat is not available, fall back immediately
   try {
     const blockSummary =
       task.blockReason && typeof task.blockReason === "object" && !Array.isArray(task.blockReason)
@@ -106,43 +102,49 @@ async function buildSmartTaskPlanPayload(
       .filter(Boolean)
       .join("\n");
 
-    const llmResult = await chatCompletionJSON<LLMPlanResponse>({
+    const systemPrompt = `You are a task planning assistant. Given a task, generate a structured execution plan.
+Return valid JSON only:
+{"summary":"brief plan summary","change_summary":"what changed if update","notes":["note1"],"steps":[{"id":"step-1","title":"Step title","objective":"What this achieves","phase":"Phase name"}]}
+Respond in the same language as the task title.`;
+
+    const chatResult = await aiChat({
       messages: [
-        { role: "system", content: taskPlanSystemPrompt() },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
+      jsonMode: true,
       temperature: 0.4,
       maxTokens: 1500,
     });
 
-    // Validate the LLM response has required fields
-    if (
-      llmResult &&
-      typeof llmResult.summary === "string" &&
-      Array.isArray(llmResult.steps) &&
-      llmResult.steps.length > 0
-    ) {
-      return {
-        revision,
-        generated_by: "work-plan-agent",
-        is_mock: false,
-        summary: llmResult.summary,
-        change_summary: llmResult.change_summary ?? "",
-        notes: Array.isArray(llmResult.notes) ? llmResult.notes : [],
-        steps: llmResult.steps.map((step) => ({
-          id: step.id ?? `step-${Math.random().toString(36).slice(2, 8)}`,
-          title: step.title ?? "",
-          objective: step.objective ?? "",
-          phase: step.phase ?? "",
-        })),
-      };
+    if (chatResult?.parsed) {
+      const llmResult = chatResult.parsed as LLMPlanResponse;
+      if (
+        typeof llmResult.summary === "string" &&
+        Array.isArray(llmResult.steps) &&
+        llmResult.steps.length > 0
+      ) {
+        return {
+          revision,
+          generated_by: "work-plan-agent",
+          is_mock: false,
+          summary: llmResult.summary,
+          change_summary: llmResult.change_summary ?? "",
+          notes: Array.isArray(llmResult.notes) ? llmResult.notes : [],
+          steps: llmResult.steps.map((step) => ({
+            id: step.id ?? `step-${Math.random().toString(36).slice(2, 8)}`,
+            title: step.title ?? "",
+            objective: step.objective ?? "",
+            phase: step.phase ?? "",
+          })),
+        };
+      }
     }
 
-    // LLM returned null or invalid structure — fall back
-    console.warn("[generate-task-plan] LLM returned invalid structure, falling back to mock plan");
+    console.warn("[generate-task-plan] AI returned invalid structure, falling back to mock plan");
     return buildMockTaskPlanPayload(task, revision);
   } catch (error) {
-    console.warn("[generate-task-plan] LLM plan generation failed, falling back to mock plan:", error);
+    console.warn("[generate-task-plan] AI plan generation failed, falling back to mock plan:", error);
     return buildMockTaskPlanPayload(task, revision);
   }
 }

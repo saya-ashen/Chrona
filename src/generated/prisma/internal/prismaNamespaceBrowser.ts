@@ -64,7 +64,9 @@ export const ModelName = {
   ToolCallDetail: 'ToolCallDetail',
   TaskProjection: 'TaskProjection',
   ScheduleProposal: 'ScheduleProposal',
-  RuntimeCursor: 'RuntimeCursor'
+  RuntimeCursor: 'RuntimeCursor',
+  AiClient: 'AiClient',
+  AiFeatureBinding: 'AiFeatureBinding'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -345,6 +347,30 @@ export const RuntimeCursorScalarFieldEnum = {
 } as const
 
 export type RuntimeCursorScalarFieldEnum = (typeof RuntimeCursorScalarFieldEnum)[keyof typeof RuntimeCursorScalarFieldEnum]
+
+
+export const AiClientScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  config: 'config',
+  isDefault: 'isDefault',
+  enabled: 'enabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AiClientScalarFieldEnum = (typeof AiClientScalarFieldEnum)[keyof typeof AiClientScalarFieldEnum]
+
+
+export const AiFeatureBindingScalarFieldEnum = {
+  id: 'id',
+  feature: 'feature',
+  clientId: 'clientId',
+  createdAt: 'createdAt'
+} as const
+
+export type AiFeatureBindingScalarFieldEnum = (typeof AiFeatureBindingScalarFieldEnum)[keyof typeof AiFeatureBindingScalarFieldEnum]
 
 
 export const SortOrder = {
