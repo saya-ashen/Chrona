@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { aiDecompose } from "@/modules/ai/ai-service";
 import { decomposeTaskSmart } from "@/modules/ai/task-decomposer";
 import type { TaskDecompositionInput } from "@/modules/ai/types";
 
@@ -8,7 +9,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { taskId, title, description, priority, dueAt, estimatedMinutes } = body;
 
-    // Validate: need either taskId or title
     if (!taskId && !title) {
       return NextResponse.json(
         { error: "Either taskId or title is required" },
@@ -16,50 +16,55 @@ export async function POST(request: Request) {
       );
     }
 
-    let input: TaskDecompositionInput;
+    let resolvedTitle = title;
+    let resolvedDescription = description;
+    let resolvedEstimatedMinutes = estimatedMinutes;
 
     if (taskId) {
-      // Look up task from DB
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-      });
-
+      const task = await db.task.findUnique({ where: { id: taskId } });
       if (!task) {
-        return NextResponse.json(
-          { error: "Task not found" },
-          { status: 404 },
-        );
+        return NextResponse.json({ error: "Task not found" }, { status: 404 });
       }
-
-      // Compute estimatedMinutes from scheduled window if available
-      let taskEstimatedMinutes: number | undefined;
+      resolvedTitle = task.title;
+      resolvedDescription = task.description ?? undefined;
       if (task.scheduledStartAt && task.scheduledEndAt) {
-        taskEstimatedMinutes = Math.round(
+        resolvedEstimatedMinutes = Math.round(
           (task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000,
         );
       }
-
-      input = {
-        taskId: task.id,
-        title: task.title,
-        description: task.description ?? undefined,
-        priority: task.priority,
-        dueAt: task.dueAt,
-        estimatedMinutes: taskEstimatedMinutes,
-      };
-    } else {
-      // Use directly provided fields
-      input = {
-        title,
-        description: description ?? undefined,
-        priority: priority ?? "Medium",
-        dueAt: dueAt ? new Date(dueAt) : null,
-        estimatedMinutes: estimatedMinutes ?? undefined,
-      };
     }
 
-    const result = await decomposeTaskSmart(input);
+    // Try new adapter layer first
+    const adapterResult = await aiDecompose({
+      taskId: taskId ?? "",
+      title: resolvedTitle,
+      description: resolvedDescription,
+      estimatedMinutes: resolvedEstimatedMinutes,
+    });
 
+    if (adapterResult) {
+      return NextResponse.json({
+        subtasks: adapterResult.subtasks,
+        reasoning: adapterResult.reasoning,
+        source: adapterResult.source,
+        totalEstimatedMinutes: adapterResult.subtasks.reduce(
+          (sum, s) => sum + (s.estimatedMinutes ?? 0),
+          0,
+        ),
+      });
+    }
+
+    // Fallback to existing rule-based + LLM logic
+    const input: TaskDecompositionInput = {
+      taskId,
+      title: resolvedTitle,
+      description: resolvedDescription,
+      priority: priority ?? "Medium",
+      dueAt: dueAt ? new Date(dueAt) : null,
+      estimatedMinutes: resolvedEstimatedMinutes,
+    };
+
+    const result = await decomposeTaskSmart(input);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error decomposing task:", error);
