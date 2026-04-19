@@ -34,6 +34,7 @@ export interface TaskDecompositionPanelProps {
     revision?: number;
     summary?: string | null;
     updatedAt: string;
+    plan?: TaskPlanGraphData;
   } | null) => void;
 }
 

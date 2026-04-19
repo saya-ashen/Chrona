@@ -105,6 +105,7 @@ export async function getTaskPage(taskId: string) {
             revision: savedAiPlan.revision,
             summary: savedAiPlan.summary,
             updatedAt: savedAiPlan.updatedAt,
+            plan: savedAiPlan.plan,
           }
         : null,
       blockReason: readBlockReason(task),
