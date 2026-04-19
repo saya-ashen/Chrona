@@ -187,6 +187,8 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   planningSurface: "Planning surface",
   conflictsTitle: "Conflicts / Overdue Risks",
   conflictsDescription: "",
+  conflictDetectionTitle: "AI Conflict Detection",
+  conflictDetectionEmpty: "No conflicts detected.",
   noScheduleRisks:
     "No schedule risks detected. Blocked, overdue, or interrupted work will surface here.",
   aiProposalsTitle: "AI Proposals",

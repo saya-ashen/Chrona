@@ -55,7 +55,13 @@ type TaskPageProps = {
             title: string;
             objective: string;
             description: string | null;
-            status: "pending" | "in_progress" | "waiting_for_user" | "blocked" | "done" | "skipped";
+            status:
+              | "pending"
+              | "in_progress"
+              | "waiting_for_user"
+              | "blocked"
+              | "done"
+              | "skipped";
             phase: string | null;
             estimatedMinutes: number | null;
             priority: string | null;
@@ -71,14 +77,12 @@ type TaskPageProps = {
           }>;
         };
       } | null;
-      blockReason:
-        | {
-            blockType?: string;
-            actionRequired?: string;
-            scope?: string;
-            since?: string;
-          }
-        | null;
+      blockReason: {
+        blockType?: string;
+        actionRequired?: string;
+        scope?: string;
+        since?: string;
+      } | null;
       dependencies: Array<{
         id: string;
         dependencyType: string;
@@ -89,14 +93,12 @@ type TaskPageProps = {
         };
       }>;
     };
-    latestRunSummary:
-      | {
-          id: string;
-          status: string;
-          startedAt: string | null;
-          syncStatus: string;
-        }
-      | null;
+    latestRunSummary: {
+      id: string;
+      status: string;
+      startedAt: string | null;
+      syncStatus: string;
+    } | null;
     scheduleProposals: Array<{
       id: string;
       source: string;
@@ -126,7 +128,8 @@ type TaskPageProps = {
 
 const DEFAULT_COPY = {
   eyebrow: "Secondary task detail",
-  fallbackDescription: "Use this page for reference, deep links, and heavier context that would clutter Schedule.",
+  fallbackDescription:
+    "Use this page for reference, deep links, and heavier context that would clutter Schedule.",
   backToSchedule: "Back to Schedule",
   openWorkbench: "Open Workbench",
   returnToSchedule: "Return to Schedule",
@@ -156,7 +159,8 @@ const DEFAULT_COPY = {
   scheduleSource: "Schedule source",
   noBlockingAction: "No blocking action recorded.",
   dependenciesTitle: "Dependencies",
-  dependenciesDescription: "Track upstream work without pulling planning controls back into this page.",
+  dependenciesDescription:
+    "Track upstream work without pulling planning controls back into this page.",
   noDependencies: "No dependencies linked yet.",
   latestRunTitle: "Latest Run",
   status: "Status",
@@ -215,14 +219,19 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
                 <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                   {copy.eyebrow}
                 </p>
-                <h1 className="text-3xl font-semibold tracking-tight text-balance">{data.task.title}</h1>
+                <h1 className="text-3xl font-semibold tracking-tight text-balance">
+                  {data.task.title}
+                </h1>
                 <p className="text-sm leading-6 text-muted-foreground">
                   {data.task.description ?? copy.fallbackDescription}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <LocalizedLink href="/schedule" className={buttonVariants({ variant: "default" })}>
+                <LocalizedLink
+                  href="/schedule"
+                  className={buttonVariants({ variant: "default" })}
+                >
                   {copy.backToSchedule}
                 </LocalizedLink>
                 <LocalizedLink
@@ -236,32 +245,56 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Status</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Status
+                </p>
                 <div className="mt-2 flex items-center gap-2">
                   <StatusBadge tone="info">{data.task.status}</StatusBadge>
-                  <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
+                  <StatusBadge tone={priorityTone(data.task.priority)}>
+                    {data.task.priority}
+                  </StatusBadge>
                 </div>
               </div>
               <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Schedule</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Schedule
+                </p>
                 <div className="mt-2 flex items-center gap-2">
-                  <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">{data.task.scheduleSource ?? "Manual planning"}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Execution readiness</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <StatusBadge tone={data.task.isRunnable ? "success" : "warning"}>{data.task.runnabilitySummary}</StatusBadge>
+                  <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>
+                    {data.task.scheduleStatus}
+                  </StatusBadge>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {data.task.isRunnable ? "Ready for AI-assisted execution" : "Needs more setup before execution"}
+                  {data.task.scheduleSource ?? "Manual planning"}
                 </p>
               </div>
               <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Due</p>
-                <p className="mt-2 text-xl font-semibold text-foreground">{formatDate(data.task.dueAt)}</p>
-                <p className="mt-2 text-sm text-muted-foreground">{copy.dueBadgePrefix} date for this task</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Execution readiness
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusBadge
+                    tone={data.task.isRunnable ? "success" : "warning"}
+                  >
+                    {data.task.runnabilitySummary}
+                  </StatusBadge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {data.task.isRunnable
+                    ? "Ready for AI-assisted execution"
+                    : "Needs more setup before execution"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Due
+                </p>
+                <p className="mt-2 text-xl font-semibold text-foreground">
+                  {formatDate(data.task.dueAt)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {copy.dueBadgePrefix} date for this task
+                </p>
               </div>
             </div>
           </SurfaceCardHeader>
@@ -269,11 +302,16 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
           <SurfaceCard variant="inset" className="space-y-3">
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.primarySurfacesTitle}</SurfaceCardTitle>
-              <SurfaceCardDescription>{copy.primarySurfacesDescription}</SurfaceCardDescription>
+              <SurfaceCardDescription>
+                {copy.primarySurfacesDescription}
+              </SurfaceCardDescription>
             </SurfaceCardHeader>
 
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <LocalizedLink href="/schedule" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <LocalizedLink
+                href="/schedule"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
                 {copy.editPlanning}
               </LocalizedLink>
               <LocalizedLink
@@ -288,34 +326,50 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <SurfaceCard variant="inset" className="space-y-3">
               <SurfaceCardHeader>
-                <SurfaceCardTitle>{copy.runtimeConfigurationTitle}</SurfaceCardTitle>
-                <SurfaceCardDescription>{copy.runtimeConfigurationDescription}</SurfaceCardDescription>
+                <SurfaceCardTitle>
+                  {copy.runtimeConfigurationTitle}
+                </SurfaceCardTitle>
+                <SurfaceCardDescription>
+                  {copy.runtimeConfigurationDescription}
+                </SurfaceCardDescription>
               </SurfaceCardHeader>
 
               <dl className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between gap-4">
                   <dt>{copy.model}</dt>
-                  <dd className="text-right text-foreground">{data.task.runtimeModel ?? copy.needsModel}</dd>
+                  <dd className="text-right text-foreground">
+                    {data.task.runtimeModel ?? copy.needsModel}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt>{copy.runnability}</dt>
-                  <dd className="text-right text-foreground">{data.task.runnabilitySummary}</dd>
+                  <dd className="text-right text-foreground">
+                    {data.task.runnabilitySummary}
+                  </dd>
                 </div>
               </dl>
 
               <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.prompt}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  {copy.prompt}
+                </p>
                 <p className="whitespace-pre-wrap text-sm text-foreground">
                   {data.task.prompt ?? copy.noPrompt}
                 </p>
               </div>
 
               <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.runtimeParams}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  {copy.runtimeParams}
+                </p>
                 {runtimeConfigJson ? (
-                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-foreground">{runtimeConfigJson}</pre>
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-foreground">
+                    {runtimeConfigJson}
+                  </pre>
                 ) : (
-                  <p className="text-sm text-muted-foreground">{copy.noRuntimeParams}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {copy.noRuntimeParams}
+                  </p>
                 )}
               </div>
             </SurfaceCard>
@@ -323,7 +377,9 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
             <SurfaceCard variant="inset" className="space-y-3">
               <SurfaceCardHeader>
                 <SurfaceCardTitle>{copy.planningContextTitle}</SurfaceCardTitle>
-                <SurfaceCardDescription>{copy.planningContextDescription}</SurfaceCardDescription>
+                <SurfaceCardDescription>
+                  {copy.planningContextDescription}
+                </SurfaceCardDescription>
               </SurfaceCardHeader>
 
               <dl className="space-y-2 text-sm text-muted-foreground">
@@ -358,17 +414,28 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
           <SurfaceCard variant="inset" className="space-y-3">
             <SurfaceCardHeader>
               <SurfaceCardTitle>{copy.dependenciesTitle}</SurfaceCardTitle>
-              <SurfaceCardDescription>{copy.dependenciesDescription}</SurfaceCardDescription>
+              <SurfaceCardDescription>
+                {copy.dependenciesDescription}
+              </SurfaceCardDescription>
             </SurfaceCardHeader>
             <div className="space-y-3 text-sm text-muted-foreground">
               {data.task.dependencies.length === 0 ? (
                 <p>{copy.noDependencies}</p>
               ) : (
                 data.task.dependencies.map((dependency) => (
-                  <SurfaceCard key={dependency.id} as="div" variant="default" padding="sm" className="rounded-2xl">
-                    <p className="font-medium text-foreground">{dependency.dependsOnTask.title}</p>
+                  <SurfaceCard
+                    key={dependency.id}
+                    as="div"
+                    variant="default"
+                    padding="sm"
+                    className="rounded-2xl"
+                  >
+                    <p className="font-medium text-foreground">
+                      {dependency.dependsOnTask.title}
+                    </p>
                     <p>
-                      {dependency.dependencyType} · {dependency.dependsOnTask.status}
+                      {dependency.dependencyType} ·{" "}
+                      {dependency.dependsOnTask.status}
                     </p>
                   </SurfaceCard>
                 ))
@@ -405,9 +472,15 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
             {data.latestRunSummary ? (
               <>
-                <p>{copy.status}: {data.latestRunSummary.status}</p>
-                <p>{copy.started}: {formatDate(data.latestRunSummary.startedAt)}</p>
-                <p>{copy.sync}: {data.latestRunSummary.syncStatus}</p>
+                <p>
+                  {copy.status}: {data.latestRunSummary.status}
+                </p>
+                <p>
+                  {copy.started}: {formatDate(data.latestRunSummary.startedAt)}
+                </p>
+                <p>
+                  {copy.sync}: {data.latestRunSummary.syncStatus}
+                </p>
               </>
             ) : (
               <p>{copy.noRunStarted}</p>
@@ -416,18 +489,30 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
         </SurfaceCard>
 
         <SurfaceCard>
-          <SurfaceCardTitle>{copy.pendingScheduleProposalsTitle}</SurfaceCardTitle>
+          <SurfaceCardTitle>
+            {copy.pendingScheduleProposalsTitle}
+          </SurfaceCardTitle>
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             {data.scheduleProposals.length === 0 ? (
               <p>{copy.noPendingScheduleProposals}</p>
             ) : (
               data.scheduleProposals.map((proposal) => (
-                <SurfaceCard key={proposal.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
-                  <p className="font-medium text-foreground">{proposal.summary}</p>
+                <SurfaceCard
+                  key={proposal.id}
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  className="rounded-2xl"
+                >
+                  <p className="font-medium text-foreground">
+                    {proposal.summary}
+                  </p>
                   <p>
                     {proposal.source} {copy.via} {proposal.proposedBy}
                   </p>
-                  <p>{copy.status}: {proposal.status}</p>
+                  <p>
+                    {copy.status}: {proposal.status}
+                  </p>
                 </SurfaceCard>
               ))
             )}
@@ -441,8 +526,16 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
               <p>{copy.noRecentApprovals}</p>
             ) : (
               data.approvals.map((approval) => (
-                <SurfaceCard key={approval.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
-                  <p className="font-medium text-foreground">{approval.title}</p>
+                <SurfaceCard
+                  key={approval.id}
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  className="rounded-2xl"
+                >
+                  <p className="font-medium text-foreground">
+                    {approval.title}
+                  </p>
                   <p>{approval.status}</p>
                 </SurfaceCard>
               ))
@@ -457,8 +550,16 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
               <p>{copy.noArtifacts}</p>
             ) : (
               data.artifacts.map((artifact) => (
-                <SurfaceCard key={artifact.id} as="div" variant="inset" padding="sm" className="rounded-2xl">
-                  <p className="font-medium text-foreground">{artifact.title}</p>
+                <SurfaceCard
+                  key={artifact.id}
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  className="rounded-2xl"
+                >
+                  <p className="font-medium text-foreground">
+                    {artifact.title}
+                  </p>
                   <p>{artifact.type}</p>
                 </SurfaceCard>
               ))

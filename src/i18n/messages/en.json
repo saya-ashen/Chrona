@@ -287,7 +287,19 @@
       "noTimelineDay": "No timeline day is available right now.",
       "unscheduledQueue": "Unscheduled Queue",
       "unscheduledQueueDescription": "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
-      "noUnscheduledWork": "No unscheduled work. New tasks that lose their plan or need initial placement will appear here."
+      "noUnscheduledWork": "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
+      "aiProposalsCompactEmpty": "No pending AI suggestions.",
+      "dateSwitcher": "Date",
+      "focusAtRisk": "At Risk",
+      "focusOverdue": "Overdue",
+      "focusReadyToday": "Ready Today",
+      "focusWaitingForApproval": "Waiting for Approval",
+      "focusWaitingForInput": "Waiting for Input",
+      "needsAttention": "Needs Attention",
+      "queueReady": "Queue Ready",
+      "todayBlocks": "Today's Time Blocks",
+      "todayFocus": "Today's Focus",
+      "todayFocusEmpty": "No blocking items to handle today. You can pull the next time block from the unscheduled queue."
     },
     "workPage": {
       "openSchedule": "Open Schedule",
