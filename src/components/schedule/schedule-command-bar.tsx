@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { QuickCreateDraft } from "@/components/schedule/schedule-page-types";
@@ -12,7 +12,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-import { useAutoComplete, type AutoCompleteSuggestion, type StructuredSuggestion } from "@/hooks/use-ai";
+import { useAutoComplete, type StructuredSuggestion } from "@/hooks/use-ai";
 
 const priorityBadgeColors: Record<string, string> = {
   Low: "bg-green-100 text-green-700",
@@ -44,8 +44,19 @@ export function ScheduleCommandBar({
   const suppressRef = useRef(false);
 
   /* ---- AI auto-complete ---- */
-  const { suggestions, structuredSuggestions } = useAutoComplete(
+  const {
+    structuredSuggestions,
+    isLoading: aiLoading,
+    phase,
+    statusMessage,
+    toolCalls,
+  } = useAutoComplete(
     !suppressRef.current && value.trim().length >= 3 ? value.trim() : null,
+  );
+
+  const showPanel = showSuggestions && (
+    structuredSuggestions.length > 0 ||
+    (aiLoading && phase !== "idle")
   );
 
   function handleSelectSuggestion(structured: StructuredSuggestion) {
@@ -132,13 +143,39 @@ export function ScheduleCommandBar({
             className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none ring-0 transition focus:border-primary/50"
           />
 
-          {/* AI Auto-complete dropdown */}
-          {showSuggestions && structuredSuggestions.length > 0 ? (
+          {/* AI Auto-complete dropdown with streaming state */}
+          {showPanel ? (
             <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border/60 bg-background shadow-lg">
+              {/* Header */}
               <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <Sparkles className="size-3 text-primary" />
                 AI suggestions
+                {aiLoading && (
+                  <Loader2 className="ml-auto size-3 animate-spin text-muted-foreground" />
+                )}
               </div>
+
+              {/* Streaming status */}
+              {aiLoading && statusMessage && (
+                <div className="flex items-center gap-2 border-b border-border/20 px-3 py-1.5 text-[11px] text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>{statusMessage}</span>
+                </div>
+              )}
+
+              {/* Tool calls */}
+              {toolCalls.length > 0 && (
+                <div className="border-b border-border/20 px-3 py-1.5">
+                  {toolCalls.map((tc, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Wrench className="size-2.5 text-amber-500" />
+                      <span className="font-mono">{tc.tool}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Suggestion list */}
               {structuredSuggestions.slice(0, 5).map((s, i) => (
                 <button
                   key={`${s.id}-${i}`}
@@ -163,6 +200,13 @@ export function ScheduleCommandBar({
                   </div>
                 </button>
               ))}
+
+              {/* Loading placeholder when no suggestions yet */}
+              {structuredSuggestions.length === 0 && aiLoading && (
+                <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+                  正在生成建议...
+                </div>
+              )}
             </div>
           ) : null}
         </div>

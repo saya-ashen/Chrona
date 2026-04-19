@@ -16,7 +16,12 @@ import { randomUUID } from "node:crypto";
 // ────────────────────────────────────────────────────────────────────
 
 export type AiClientType = "openclaw" | "llm";
-export type AiFeature = "suggest" | "decompose" | "conflicts" | "timeslots" | "chat";
+export type AiFeature =
+  | "suggest"
+  | "decompose"
+  | "conflicts"
+  | "timeslots"
+  | "chat";
 
 export interface AiClientRecord {
   id: string;
@@ -131,7 +136,11 @@ export interface ResolutionSuggestion {
   type: "reschedule" | "split" | "merge" | "defer" | "reorder";
   description: string;
   reason: string;
-  changes: Array<{ taskId: string; scheduledStartAt?: string; scheduledEndAt?: string }>;
+  changes: Array<{
+    taskId: string;
+    scheduledStartAt?: string;
+    scheduledEndAt?: string;
+  }>;
 }
 
 export interface AnalyzeConflictsResponse {
@@ -190,7 +199,12 @@ export class AiClientError extends Error {
   constructor(
     message: string,
     public readonly clientType: string,
-    public readonly code: "unavailable" | "timeout" | "invalid_response" | "config_error" | "internal",
+    public readonly code:
+      | "unavailable"
+      | "timeout"
+      | "invalid_response"
+      | "config_error"
+      | "internal",
   ) {
     super(`[${clientType}] ${message}`);
     this.name = "AiClientError";
@@ -231,8 +245,7 @@ Respond in the same language as the user.`,
 
 function extractJSON<T>(raw: string, clientType: string): T {
   const jsonMatch =
-    raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ??
-    raw.match(/(\{[\s\S]*\})/);
+    raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? raw.match(/(\{[\s\S]*\})/);
   const jsonStr = jsonMatch?.[1] ?? raw;
   try {
     return JSON.parse(jsonStr.trim()) as T;
@@ -252,7 +265,13 @@ function extractJSON<T>(raw: string, clientType: string): T {
 interface BridgeChatResponse {
   sessionId: string;
   output: string;
-  toolCalls: Array<{ tool: string; callId: string; input: Record<string, unknown>; result?: string; status: string }>;
+  toolCalls: Array<{
+    tool: string;
+    callId: string;
+    input: Record<string, unknown>;
+    result?: string;
+    status: string;
+  }>;
   usage: { inputTokens: number; outputTokens: number } | null;
   error: string | null;
   durationMs: number;
@@ -281,7 +300,11 @@ async function openclawCall(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new AiClientError(`Bridge returned ${res.status}: ${errText.slice(0, 200)}`, "openclaw", "internal");
+    throw new AiClientError(
+      `Bridge returned ${res.status}: ${errText.slice(0, 200)}`,
+      "openclaw",
+      "internal",
+    );
   }
 
   const result = (await res.json()) as BridgeChatResponse;
@@ -291,7 +314,9 @@ async function openclawCall(
   return result.output;
 }
 
-async function openclawHealthCheck(config: OpenClawClientConfig): Promise<boolean> {
+async function openclawHealthCheck(
+  config: OpenClawClientConfig,
+): Promise<boolean> {
   try {
     const res = await fetch(`${config.bridgeUrl}/v1/health`, {
       signal: AbortSignal.timeout(3000),
@@ -310,7 +335,11 @@ async function openclawHealthCheck(config: OpenClawClientConfig): Promise<boolea
 
 interface LLMChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 async function llmCall(
@@ -346,7 +375,11 @@ async function llmCall(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new AiClientError(`LLM returned ${res.status}: ${errText.slice(0, 200)}`, "llm", "internal");
+    throw new AiClientError(
+      `LLM returned ${res.status}: ${errText.slice(0, 200)}`,
+      "llm",
+      "internal",
+    );
   }
 
   const data = (await res.json()) as LLMChatCompletionResponse;
@@ -368,7 +401,12 @@ async function dispatch(
   scope = "default",
 ): Promise<string> {
   if (client.type === "openclaw") {
-    return openclawCall(client.config as OpenClawClientConfig, feature, scope, userMessage);
+    return openclawCall(
+      client.config as OpenClawClientConfig,
+      feature,
+      scope,
+      userMessage,
+    );
   }
   return llmCall(
     client.config as LLMClientConfig,
@@ -384,7 +422,8 @@ async function dispatch(
 
 export function buildSuggestMessage(request: SmartSuggestRequest): string {
   const contextParts: string[] = [];
-  if (request.context?.selectedDay) contextParts.push(`Selected day: ${request.context.selectedDay}`);
+  if (request.context?.selectedDay)
+    contextParts.push(`Selected day: ${request.context.selectedDay}`);
   if (request.context?.existingTasks?.length) {
     contextParts.push(
       `Existing tasks (${request.context.existingTasks.length}):\n${request.context.existingTasks
@@ -395,17 +434,30 @@ export function buildSuggestMessage(request: SmartSuggestRequest): string {
   }
   if (request.context?.scheduleHealth) {
     const h = request.context.scheduleHealth;
-    contextParts.push(`Schedule: ${h.loadPercent}% load, ${h.conflictCount} conflicts, ${h.freeMinutesToday}min free`);
+    contextParts.push(
+      `Schedule: ${h.loadPercent}% load, ${h.conflictCount} conflicts, ${h.freeMinutesToday}min free`,
+    );
   }
   return `Suggest task completions for: "${request.input}"${
     contextParts.length ? `\n\nContext:\n${contextParts.join("\n")}` : ""
   }\n\nReturn JSON: { "suggestions": [...] }`;
 }
 
-export async function suggest(client: AiClientRecord, request: SmartSuggestRequest): Promise<SmartSuggestResponse> {
+export async function suggest(
+  client: AiClientRecord,
+  request: SmartSuggestRequest,
+): Promise<SmartSuggestResponse> {
   const requestId = randomUUID();
-  const raw = await dispatch(client, "suggest", buildSuggestMessage(request), request.workspaceId ?? "default");
-  const parsed = extractJSON<{ suggestions?: Array<Partial<SmartSuggestion>> }>(raw, client.type);
+  const raw = await dispatch(
+    client,
+    "suggest",
+    buildSuggestMessage(request),
+    request.workspaceId ?? "default",
+  );
+  const parsed = extractJSON<{ suggestions?: Array<Partial<SmartSuggestion>> }>(
+    raw,
+    client.type,
+  );
   return {
     suggestions: (parsed.suggestions ?? [])
       .filter((s) => s.title)
@@ -422,12 +474,18 @@ export async function suggest(client: AiClientRecord, request: SmartSuggestReque
   };
 }
 
-export async function decompose(client: AiClientRecord, request: DecomposeTaskRequest): Promise<DecomposeTaskResponse> {
+export async function decompose(
+  client: AiClientRecord,
+  request: DecomposeTaskRequest,
+): Promise<DecomposeTaskResponse> {
   const msg = `Decompose this task:\nTitle: "${request.title}"${
     request.description ? `\nDescription: ${request.description}` : ""
   }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}\n\nReturn JSON.`;
   const raw = await dispatch(client, "decompose", msg);
-  const parsed = extractJSON<{ subtasks?: Array<Partial<SubtaskSuggestion>>; reasoning?: string }>(raw, client.type);
+  const parsed = extractJSON<{
+    subtasks?: Array<Partial<SubtaskSuggestion>>;
+    reasoning?: string;
+  }>(raw, client.type);
   return {
     subtasks: (parsed.subtasks ?? []).map((s, i) => ({
       title: s.title ?? `Subtask ${i + 1}`,
@@ -442,13 +500,28 @@ export async function decompose(client: AiClientRecord, request: DecomposeTaskRe
   };
 }
 
-export async function analyzeConflicts(client: AiClientRecord, request: AnalyzeConflictsRequest): Promise<AnalyzeConflictsResponse> {
+export async function analyzeConflicts(
+  client: AiClientRecord,
+  request: AnalyzeConflictsRequest,
+): Promise<AnalyzeConflictsResponse> {
   const taskList = request.tasks
-    .map((t) => `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`)
+    .map(
+      (t) =>
+        `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`,
+    )
     .join("\n");
   const msg = `Analyze conflicts:\n${taskList}${request.focusDate ? `\nFocus date: ${request.focusDate}` : ""}\n\nReturn JSON.`;
-  const raw = await dispatch(client, "conflicts", msg, request.workspaceId ?? "default");
-  const parsed = extractJSON<{ conflicts?: ConflictInfo[]; resolutions?: ResolutionSuggestion[]; summary?: string }>(raw, client.type);
+  const raw = await dispatch(
+    client,
+    "conflicts",
+    msg,
+    request.workspaceId ?? "default",
+  );
+  const parsed = extractJSON<{
+    conflicts?: ConflictInfo[];
+    resolutions?: ResolutionSuggestion[];
+    summary?: string;
+  }>(raw, client.type);
   return {
     conflicts: parsed.conflicts ?? [],
     resolutions: parsed.resolutions ?? [],
@@ -457,7 +530,10 @@ export async function analyzeConflicts(client: AiClientRecord, request: AnalyzeC
   };
 }
 
-export async function suggestTimeslots(client: AiClientRecord, request: SuggestTimeslotRequest): Promise<SuggestTimeslotResponse> {
+export async function suggestTimeslots(
+  client: AiClientRecord,
+  request: SuggestTimeslotRequest,
+): Promise<SuggestTimeslotResponse> {
   const scheduleList = request.currentSchedule
     .filter((t) => t.scheduledStartAt)
     .map((t) => `- "${t.title}" ${t.scheduledStartAt}~${t.scheduledEndAt}`)
@@ -466,7 +542,10 @@ export async function suggestTimeslots(client: AiClientRecord, request: SuggestT
     request.deadline ? `\nDeadline: ${request.deadline}` : ""
   }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\n\nCurrent schedule:\n${scheduleList || "(empty)"}\n\nReturn JSON.`;
   const raw = await dispatch(client, "timeslots", msg);
-  const parsed = extractJSON<{ slots?: TimeslotOption[]; reasoning?: string }>(raw, client.type);
+  const parsed = extractJSON<{ slots?: TimeslotOption[]; reasoning?: string }>(
+    raw,
+    client.type,
+  );
   return {
     slots: parsed.slots ?? [],
     reasoning: parsed.reasoning,
@@ -474,9 +553,14 @@ export async function suggestTimeslots(client: AiClientRecord, request: SuggestT
   };
 }
 
-export async function chat(client: AiClientRecord, request: ChatRequest): Promise<ChatResponse> {
+export async function chat(
+  client: AiClientRecord,
+  request: ChatRequest,
+): Promise<ChatResponse> {
   if (client.type === "openclaw") {
-    const lastUserMsg = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const lastUserMsg =
+      [...request.messages].reverse().find((m) => m.role === "user")?.content ??
+      "";
     const raw = await dispatch(client, "chat", lastUserMsg);
     if (request.jsonMode) {
       const parsed = extractJSON<unknown>(raw, client.type);
@@ -500,18 +584,28 @@ export async function chat(client: AiClientRecord, request: ChatRequest): Promis
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60_000),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new AiClientError(`LLM returned ${res.status}: ${errText.slice(0, 200)}`, "llm", "internal");
+    throw new AiClientError(
+      `LLM returned ${res.status}: ${errText.slice(0, 200)}`,
+      "llm",
+      "internal",
+    );
   }
 
   const data = (await res.json()) as LLMChatCompletionResponse;
   const content = data.choices?.[0]?.message?.content ?? "";
+  console.log(
+    `[LLM Chat] User: ${request.messages.map((m) => `${m.role}: ${m.content}`).join(" | ")} => Assistant: ${content}`,
+  );
 
   if (request.jsonMode) {
     const parsed = extractJSON<unknown>(content, client.type);
@@ -521,10 +615,252 @@ export async function chat(client: AiClientRecord, request: ChatRequest): Promis
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Streaming Support
+// ────────────────────────────────────────────────────────────────────
+
+export type StreamEvent =
+  | { type: "status"; message: string }
+  | { type: "tool_call"; tool: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool: string; result: string }
+  | { type: "partial"; text: string }
+  | { type: "done"; text: string }
+  | { type: "error"; message: string };
+
+/**
+ * Stream from OpenClaw CLI Bridge.
+ * The bridge exposes /v1/chat/stream (SSE) alongside the blocking /v1/chat.
+ * Falls back to blocking call if stream endpoint is unavailable.
+ */
+export async function* openclawStream(
+  config: OpenClawClientConfig,
+  feature: AiFeature,
+  scope: string,
+  userMessage: string,
+): AsyncGenerator<StreamEvent> {
+  const timeout = config.timeoutSeconds ?? 120;
+  const sessionId = `ai::${feature}::${scope}`;
+
+  yield { type: "status", message: "正在连接 AI 服务..." };
+
+  // Try streaming endpoint first
+  try {
+    const res = await fetch(`${config.bridgeUrl}/v1/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        message: userMessage,
+        systemPrompt: SYSTEM_PROMPTS[feature],
+        timeout,
+      }),
+      signal: AbortSignal.timeout((timeout + 15) * 1000),
+    });
+
+    if (res.ok && res.body) {
+      yield { type: "status", message: "AI 正在思考..." };
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") {
+            yield { type: "done", text: fullText };
+            return;
+          }
+          try {
+            const evt = JSON.parse(raw) as {
+              type?: string;
+              content?: string;
+              tool?: string;
+              input?: Record<string, unknown>;
+              result?: string;
+              error?: string;
+            };
+            if (evt.type === "tool_call" && evt.tool) {
+              yield { type: "tool_call", tool: evt.tool, input: evt.input ?? {} };
+            } else if (evt.type === "tool_result" && evt.tool) {
+              yield { type: "tool_result", tool: evt.tool, result: evt.result ?? "" };
+            } else if (evt.type === "error") {
+              yield { type: "error", message: evt.error ?? "Unknown error" };
+              return;
+            } else if (evt.content) {
+              fullText += evt.content;
+              yield { type: "partial", text: evt.content };
+            }
+          } catch {
+            // skip unparseable lines
+          }
+        }
+      }
+      yield { type: "done", text: fullText };
+      return;
+    }
+  } catch {
+    // Stream endpoint not available, fall back to blocking
+  }
+
+  // Fallback: blocking call
+  yield { type: "status", message: "AI 正在生成建议..." };
+  try {
+    const text = await openclawCall(config, feature, scope, userMessage);
+    yield { type: "partial", text };
+    yield { type: "done", text };
+  } catch (e) {
+    yield { type: "error", message: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
+/**
+ * Stream from OpenAI-compatible LLM API (SSE streaming).
+ */
+export async function* llmStream(
+  config: LLMClientConfig,
+  systemPrompt: string,
+  userMessage: string,
+  options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number },
+): AsyncGenerator<StreamEvent> {
+  const model = config.model ?? "gpt-4o-mini";
+  const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+  yield { type: "status", message: "正在连接 LLM..." };
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    temperature: options?.temperature ?? config.temperature ?? 0.7,
+    stream: true,
+  };
+  if (options?.maxTokens) body.max_tokens = options.maxTokens;
+  if (options?.jsonMode) body.response_format = { type: "json_object" };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    yield {
+      type: "error",
+      message: `LLM returned ${res.status}: ${errText.slice(0, 200)}`,
+    };
+    return;
+  }
+
+  if (!res.body) {
+    yield { type: "error", message: "No response body" };
+    return;
+  }
+
+  yield { type: "status", message: "AI 正在生成..." };
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullText = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") {
+        yield { type: "done", text: fullText };
+        return;
+      }
+      try {
+        const chunk = JSON.parse(raw) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const content = chunk.choices?.[0]?.delta?.content;
+        if (content) {
+          fullText += content;
+          yield { type: "partial", text: content };
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+  yield { type: "done", text: fullText };
+}
+
+/**
+ * Unified streaming dispatch.
+ */
+export function dispatchStream(
+  client: AiClientRecord,
+  feature: AiFeature,
+  userMessage: string,
+  scope = "default",
+): AsyncGenerator<StreamEvent> {
+  if (client.type === "openclaw") {
+    return openclawStream(
+      client.config as OpenClawClientConfig,
+      feature,
+      scope,
+      userMessage,
+    );
+  }
+  return llmStream(
+    client.config as LLMClientConfig,
+    SYSTEM_PROMPTS[feature],
+    userMessage,
+    { jsonMode: feature !== "chat" },
+  );
+}
+
+/**
+ * Stream suggest — yields StreamEvents including parsed suggestions at the end.
+ */
+export async function* suggestStream(
+  client: AiClientRecord,
+  request: SmartSuggestRequest,
+): AsyncGenerator<StreamEvent> {
+  const gen = dispatchStream(
+    client,
+    "suggest",
+    buildSuggestMessage(request),
+    request.workspaceId ?? "default",
+  );
+
+  for await (const event of gen) {
+    yield event;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Health Check
 // ────────────────────────────────────────────────────────────────────
 
-export async function checkClientHealth(client: AiClientRecord): Promise<boolean> {
+export async function checkClientHealth(
+  client: AiClientRecord,
+): Promise<boolean> {
   if (!client.enabled) return false;
   if (client.type === "openclaw") {
     return openclawHealthCheck(client.config as OpenClawClientConfig);
