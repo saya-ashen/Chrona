@@ -91,11 +91,20 @@ export async function POST(request: Request) {
     const createdSubtasks = [];
 
     for (const suggestion of subtaskSuggestions) {
+      // Normalize priority to match enum (capitalize first letter)
+      let normalizedPriority: "Low" | "Medium" | "High" | "Urgent" = "Medium";
+      if (suggestion.priority) {
+        const p = suggestion.priority.charAt(0).toUpperCase() + suggestion.priority.slice(1).toLowerCase();
+        if (p === "Low" || p === "Medium" || p === "High" || p === "Urgent") {
+          normalizedPriority = p;
+        }
+      }
+
       const result = await createTask({
         workspaceId: task.workspaceId,
         title: suggestion.title,
         description: suggestion.description,
-        priority: suggestion.priority as "Low" | "Medium" | "High" | "Urgent" | undefined,
+        priority: normalizedPriority,
       });
 
       // Set parentTaskId on the created subtask
