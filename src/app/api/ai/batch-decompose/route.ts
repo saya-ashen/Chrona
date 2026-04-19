@@ -1,67 +1,62 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { decomposeTaskSmart } from "@/modules/ai/task-decomposer";
-import { createTask } from "@/modules/commands/create-task";
+import { materializeTaskPlan } from "@/modules/commands/materialize-task-plan";
+import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import type { TaskDecompositionInput } from "@/modules/ai/types";
 
 /**
- * POST /api/ai/batch-decompose — Decompose a task into subtasks and create them all in one call.
+ * POST /api/ai/batch-decompose — Decompose a task and materialize executable graph nodes.
  * Body: { taskId, subtasks? }
  *
  * If `subtasks` array is provided, uses those directly instead of calling AI.
- * Otherwise calls decomposeTaskSmart to generate subtask suggestions.
+ * The produced decomposition is saved as a task_plan_graph_v1 draft and then
+ * child_task nodes are materialized into real child tasks.
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { taskId, subtasks: providedSubtasks } = body;
-
-    if (!taskId) {
-      return NextResponse.json(
-        { error: "taskId is required" },
-        { status: 400 },
-      );
-    }
-
-    // Look up the parent task
-    const task = await db.task.findUnique({
-      where: { id: taskId },
-    });
-
-    if (!task) {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 },
-      );
-    }
-
-    // Use provided subtasks or generate via AI
-    let subtaskSuggestions: Array<{
-      title: string;
-      description?: string;
-      priority?: string;
-      estimatedMinutes?: number;
-      order?: number;
-    }>;
-    let decompositionMeta: {
-      totalEstimatedMinutes: number;
-      feasibilityScore: number;
-      warnings: string[];
+    const { taskId, subtasks: providedSubtasks } = body as {
+      taskId?: string;
+      subtasks?: Array<{
+        title: string;
+        description?: string;
+        priority?: string;
+        estimatedMinutes?: number;
+        order?: number;
+        dependsOnPrevious?: boolean;
+      }>;
     };
 
+    if (!taskId) {
+      return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+    }
+
+    const task = await db.task.findUnique({ where: { id: taskId } });
+    if (!task) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    let decompositionResult;
     if (providedSubtasks && Array.isArray(providedSubtasks) && providedSubtasks.length > 0) {
-      // Use pre-generated subtasks from the frontend
-      subtaskSuggestions = providedSubtasks;
-      decompositionMeta = {
-        totalEstimatedMinutes: providedSubtasks.reduce(
-          (sum: number, s: { estimatedMinutes?: number }) => sum + (s.estimatedMinutes ?? 0),
+      const orderedSubtasks = [...providedSubtasks]
+        .map((subtask, index) => ({
+          ...subtask,
+          order: subtask.order ?? index + 1,
+          dependsOnPrevious: subtask.dependsOnPrevious ?? index > 0,
+        }))
+        .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
+
+      decompositionResult = {
+        subtasks: orderedSubtasks,
+        totalEstimatedMinutes: orderedSubtasks.reduce(
+          (sum, subtask) => sum + (subtask.estimatedMinutes ?? 0),
           0,
         ),
         feasibilityScore: 80,
         warnings: [],
       };
     } else {
-      // Generate via AI
       let estimatedMinutes: number | undefined;
       if (task.scheduledStartAt && task.scheduledEndAt) {
         estimatedMinutes = Math.round(
@@ -78,50 +73,69 @@ export async function POST(request: Request) {
         estimatedMinutes,
       };
 
-      const decomposition = await decomposeTaskSmart(input);
-      subtaskSuggestions = decomposition.subtasks;
-      decompositionMeta = {
-        totalEstimatedMinutes: decomposition.totalEstimatedMinutes,
-        feasibilityScore: decomposition.feasibilityScore,
-        warnings: decomposition.warnings,
-      };
+      decompositionResult = await decomposeTaskSmart(input);
     }
 
-    // Create each subtask as a real task in the DB
-    const createdSubtasks = [];
+    const graphPlan = await saveTaskPlanGraph({
+      workspaceId: task.workspaceId,
+      taskId: task.id,
+      decompositionResult: {
+        ...decompositionResult,
+        subtasks: decompositionResult.subtasks.map((subtask, index) => ({
+          ...subtask,
+          order: subtask.order ?? index + 1,
+          dependsOnPrevious: subtask.dependsOnPrevious ?? index > 0,
+        })),
+      },
+      status: "draft",
+      source: "ai",
+      generatedBy: "batch-decompose",
+      summary: `${decompositionResult.subtasks.length} executable plan node${decompositionResult.subtasks.length === 1 ? "" : "s"}`,
+    });
 
-    for (const suggestion of subtaskSuggestions) {
-      // Normalize priority to match enum (capitalize first letter)
-      let normalizedPriority: "Low" | "Medium" | "High" | "Urgent" = "Medium";
-      if (suggestion.priority) {
-        const p = suggestion.priority.charAt(0).toUpperCase() + suggestion.priority.slice(1).toLowerCase();
-        if (p === "Low" || p === "Medium" || p === "High" || p === "Urgent") {
-          normalizedPriority = p;
-        }
-      }
+    const childTaskNodes = graphPlan.plan.nodes.map((node, index) => ({
+      ...node,
+      executionMode: "child_task" as const,
+      metadata: {
+        ...(node.metadata ?? {}),
+        order: typeof node.metadata?.order === "number" ? node.metadata.order : index + 1,
+      },
+    }));
 
-      const result = await createTask({
-        workspaceId: task.workspaceId,
-        title: suggestion.title,
-        description: suggestion.description,
-        priority: normalizedPriority,
-      });
+    await saveTaskPlanGraph({
+      workspaceId: graphPlan.workspaceId,
+      taskId: graphPlan.taskId!,
+      plan: {
+        ...graphPlan.plan,
+        nodes: childTaskNodes,
+      },
+      prompt: graphPlan.prompt,
+      status: graphPlan.status,
+      source: graphPlan.source,
+      generatedBy: graphPlan.generatedBy,
+      summary: graphPlan.summary,
+      changeSummary: graphPlan.changeSummary,
+    });
 
-      // Set parentTaskId on the created subtask
-      const subtask = await db.task.update({
-        where: { id: result.taskId },
-        data: { parentTaskId: taskId },
-        include: { projection: true },
-      });
+    const materialized = await materializeTaskPlan({ taskId: task.id });
+    const createdSubtasks = await db.task.findMany({
+      where: { id: { in: materialized.createdTaskIds } },
+      include: { projection: true },
+      orderBy: { createdAt: "asc" },
+    });
 
-      createdSubtasks.push(subtask);
-    }
-
-    return NextResponse.json({
-      parentTaskId: taskId,
-      subtasks: createdSubtasks,
-      decomposition: decompositionMeta,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        parentTaskId: taskId,
+        subtasks: createdSubtasks,
+        decomposition: {
+          totalEstimatedMinutes: decompositionResult.totalEstimatedMinutes,
+          feasibilityScore: decompositionResult.feasibilityScore,
+          warnings: decompositionResult.warnings,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to batch decompose task";
     console.error("POST /api/ai/batch-decompose error:", message);

@@ -28,6 +28,22 @@ describe("getSchedulePage", () => {
   });
 
   it("groups scheduled work, unscheduled work, pending AI proposals, and risks", async () => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const addMinutes = (base: Date, minutes: number) => new Date(base.getTime() + minutes * 60_000);
+    const todayNine = addMinutes(startOfToday, 9 * 60);
+    const todayEleven = addMinutes(startOfToday, 11 * 60);
+    const todayThirteen = addMinutes(startOfToday, 13 * 60);
+    const todayFourteen = addMinutes(startOfToday, 14 * 60);
+    const todayEighteen = addMinutes(startOfToday, 18 * 60);
+    const todayTwenty = addMinutes(startOfToday, 20 * 60);
+    const tomorrowNine = addMinutes(startOfToday, (24 + 9) * 60);
+    const tomorrowEleven = addMinutes(startOfToday, (24 + 11) * 60);
+    const dayAfterTomorrowNine = addMinutes(startOfToday, (48 + 9) * 60);
+    const dayAfterTomorrowTenThirty = addMinutes(startOfToday, (48 + 10) * 60 + 30);
+    const dayAfterTomorrowEighteen = addMinutes(startOfToday, (48 + 18) * 60);
+
     const workspace = await db.workspace.create({
       data: {
         name: "Schedule Query",
@@ -51,9 +67,9 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "High",
         ownerType: "human",
-        dueAt: new Date("2026-04-16T18:00:00.000Z"),
-        scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-16T11:00:00.000Z"),
+        dueAt: dayAfterTomorrowEighteen,
+        scheduledStartAt: tomorrowNine,
+        scheduledEndAt: tomorrowEleven,
         scheduleStatus: "Scheduled",
         scheduleSource: "human",
       },
@@ -66,8 +82,29 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Medium",
         ownerType: "human",
-        dueAt: new Date("2026-04-15T20:00:00.000Z"),
+        dueAt: todayTwenty,
         scheduleStatus: "Unscheduled",
+      },
+    });
+
+    const subtask = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        parentTaskId: unscheduledTask.id,
+        title: "Draft the follow-up outline",
+        status: "Ready",
+        priority: "Low",
+        ownerType: "human",
+        scheduleStatus: "Unscheduled",
+      },
+    });
+
+    await db.taskDependency.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: subtask.id,
+        dependsOnTaskId: unscheduledTask.id,
+        dependencyType: "child_of",
       },
     });
 
@@ -78,8 +115,8 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Low",
         ownerType: "human",
-        scheduledStartAt: new Date("2026-04-15T13:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-15T14:00:00.000Z"),
+        scheduledStartAt: todayThirteen,
+        scheduledEndAt: todayFourteen,
         scheduleStatus: "Scheduled",
         scheduleSource: "human",
       },
@@ -92,9 +129,9 @@ describe("getSchedulePage", () => {
         status: "Blocked",
         priority: "Urgent",
         ownerType: "human",
-        dueAt: new Date("2026-04-15T18:00:00.000Z"),
-        scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+        dueAt: todayEighteen,
+        scheduledStartAt: todayNine,
+        scheduledEndAt: todayEleven,
         scheduleStatus: "Overdue",
         scheduleSource: "human",
       },
@@ -107,9 +144,9 @@ describe("getSchedulePage", () => {
           workspaceId: workspace.id,
           persistedStatus: "Ready",
           displayState: "Ready",
-          dueAt: new Date("2026-04-16T18:00:00.000Z"),
-          scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
-          scheduledEndAt: new Date("2026-04-16T11:00:00.000Z"),
+          dueAt: dayAfterTomorrowEighteen,
+          scheduledStartAt: tomorrowNine,
+          scheduledEndAt: tomorrowEleven,
           scheduleStatus: "Scheduled",
           scheduleSource: "human",
           scheduleProposalCount: 0,
@@ -120,19 +157,28 @@ describe("getSchedulePage", () => {
           workspaceId: workspace.id,
           persistedStatus: "Ready",
           displayState: "Ready",
-          dueAt: new Date("2026-04-15T20:00:00.000Z"),
+          dueAt: todayTwenty,
           scheduleStatus: "Unscheduled",
           scheduleProposalCount: 1,
           actionRequired: "Schedule task",
           lastActivityAt: new Date("2026-04-15T12:05:00.000Z"),
         },
         {
+          taskId: subtask.id,
+          workspaceId: workspace.id,
+          persistedStatus: "Ready",
+          displayState: "Ready",
+          scheduleStatus: "Unscheduled",
+          scheduleProposalCount: 0,
+          lastActivityAt: new Date("2026-04-15T12:06:00.000Z"),
+        },
+        {
           taskId: reviewTask.id,
           workspaceId: workspace.id,
           persistedStatus: "Ready",
           displayState: "Ready",
-          scheduledStartAt: new Date("2026-04-15T13:00:00.000Z"),
-          scheduledEndAt: new Date("2026-04-15T14:00:00.000Z"),
+          scheduledStartAt: todayThirteen,
+          scheduledEndAt: todayFourteen,
           scheduleStatus: "Scheduled",
           scheduleSource: "human",
           scheduleProposalCount: 0,
@@ -143,9 +189,9 @@ describe("getSchedulePage", () => {
           workspaceId: workspace.id,
           persistedStatus: "Blocked",
           displayState: "Attention Needed",
-          dueAt: new Date("2026-04-15T18:00:00.000Z"),
-          scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
-          scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
+          dueAt: todayEighteen,
+          scheduledStartAt: todayNine,
+          scheduledEndAt: todayEleven,
           scheduleStatus: "Overdue",
           scheduleSource: "human",
           scheduleProposalCount: 0,
@@ -163,9 +209,9 @@ describe("getSchedulePage", () => {
         status: "Pending",
         proposedBy: "planner-agent",
         summary: "Plan this for tomorrow morning",
-        dueAt: new Date("2026-04-17T18:00:00.000Z"),
-        scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-17T10:30:00.000Z"),
+        dueAt: dayAfterTomorrowEighteen,
+        scheduledStartAt: dayAfterTomorrowNine,
+        scheduledEndAt: dayAfterTomorrowTenThirty,
       },
     });
 
@@ -268,14 +314,14 @@ describe("getSchedulePage", () => {
     });
     expect(page.focusZones).toEqual([
       {
-        dayKey: "2026-04-15",
+        dayKey: startOfToday.toISOString().slice(0, 10),
         totalMinutes: 180,
         deepWorkMinutes: 120,
         fragmentedMinutes: 60,
         riskLevel: "high",
       },
       {
-        dayKey: "2026-04-16",
+        dayKey: addMinutes(startOfToday, 24 * 60).toISOString().slice(0, 10),
         totalMinutes: 120,
         deepWorkMinutes: 120,
         fragmentedMinutes: 0,
@@ -301,6 +347,7 @@ describe("getSchedulePage", () => {
     expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
       [reviewTask.id, riskTask.id, scheduledTask.id, unscheduledTask.id].sort(),
     );
+    expect(page.listItems.some((item) => item.taskId === subtask.id)).toBe(false);
     expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({
       scheduleStatus: "Unscheduled",
       actionRequired: "Schedule task",

@@ -251,17 +251,6 @@ export class ApiClient {
     );
   }
 
-  /**
-   * Generate a plan for a task.
-   * POST /api/tasks/[taskId]/plan
-   */
-  async generatePlan(taskId: string): Promise<unknown> {
-    return this.request(
-      "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/plan`,
-    );
-  }
-
   // ── AI Endpoints ───────────────────────────────────────────────────
 
   /**

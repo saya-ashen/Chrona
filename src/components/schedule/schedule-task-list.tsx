@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 export type ScheduleTaskListItem = {
   taskId: string;
   workspaceId: string;
+  parentTaskId: string | null;
   title: string;
   description: string | null;
   priority: string;

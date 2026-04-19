@@ -156,6 +156,7 @@ export interface TaskDecompositionInput {
   priority?: string;
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
+  planningPrompt?: string;
 }
 
 /**
@@ -178,6 +179,102 @@ export interface TaskDecompositionResult {
   totalEstimatedMinutes: number;
   feasibilityScore: number;
   warnings: string[];
+}
+
+export type TaskPlanStatus = "draft" | "accepted" | "superseded" | "archived";
+
+export type TaskPlanNodeType =
+  | "step"
+  | "checkpoint"
+  | "decision"
+  | "user_input"
+  | "deliverable"
+  | "tool_action";
+
+export type TaskPlanNodeStatus =
+  | "pending"
+  | "in_progress"
+  | "waiting_for_user"
+  | "blocked"
+  | "done"
+  | "skipped";
+
+export type TaskPlanEdgeType =
+  | "sequential"
+  | "depends_on"
+  | "branches_to"
+  | "unblocks"
+  | "feeds_output";
+
+export type TaskPlanNodeExecutionMode = "none" | "child_task" | "inline_action";
+
+export type TaskPlanNode = {
+  id: string;
+  type: TaskPlanNodeType;
+  title: string;
+  objective: string;
+  description: string | null;
+  status: TaskPlanNodeStatus;
+  phase: string | null;
+  estimatedMinutes: number | null;
+  priority: "Low" | "Medium" | "High" | "Urgent" | null;
+  executionMode: TaskPlanNodeExecutionMode;
+  linkedTaskId: string | null;
+  needsUserInput: boolean;
+  metadata: Record<string, unknown> | null;
+};
+
+export type TaskPlanEdge = {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  type: TaskPlanEdgeType;
+  metadata: Record<string, unknown> | null;
+};
+
+export type TaskPlanGraph = {
+  id: string;
+  taskId: string;
+  status: TaskPlanStatus;
+  revision: number;
+  source: "ai" | "user" | "mixed";
+  generatedBy: string | null;
+  prompt: string | null;
+  summary: string | null;
+  changeSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+  nodes: TaskPlanNode[];
+  edges: TaskPlanEdge[];
+};
+
+export interface SavedTaskPlanGraph {
+  id: string;
+  taskId: string | null;
+  workspaceId: string;
+  status: TaskPlanStatus;
+  prompt: string | null;
+  revision: number;
+  summary: string | null;
+  changeSummary: string | null;
+  source: "ai" | "user" | "mixed";
+  generatedBy: string | null;
+  plan: TaskPlanGraph;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskPlanGraphResponse {
+  source: "saved" | string;
+  planGraph: TaskPlanGraph;
+  savedPlan?: {
+    id: string;
+    status: TaskPlanStatus;
+    prompt: string | null;
+    revision: number;
+    summary: string | null;
+    updatedAt: string;
+  };
 }
 
 // --- Timeslot Suggestion Types ---

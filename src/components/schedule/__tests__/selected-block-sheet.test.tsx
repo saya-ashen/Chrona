@@ -151,27 +151,28 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(screen.getByTestId("task-context-links")).toBeInTheDocument();
   });
 
-  it("renders sections in correct order: time → config → AI → links", () => {
+  it("renders a dedicated AI sidebar for the popup", () => {
     const { container } = render(<SelectedBlockSheet {...defaultSheetProps} />);
 
-    const scheduleEditor = container.querySelector("[data-testid='schedule-editor-form']");
-    const taskConfig = container.querySelector("[data-testid='task-config-form']");
-    const aiInsights = container.querySelector("[data-testid='ai-insights-panel']");
-    const contextLinks = container.querySelector("[data-testid='task-context-links']");
+    const mainColumn = container.querySelector("[data-testid='selected-block-main-column']");
+    const aiSidebar = container.querySelector("[data-testid='selected-block-ai-sidebar']");
 
-    // All should exist
-    expect(scheduleEditor).toBeTruthy();
-    expect(taskConfig).toBeTruthy();
-    expect(aiInsights).toBeTruthy();
-    expect(contextLinks).toBeTruthy();
+    expect(mainColumn).toBeTruthy();
+    expect(aiSidebar).toBeTruthy();
+    expect(aiSidebar).toContainElement(screen.getByTestId("ai-insights-panel"));
+    expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
+  });
 
-    // Check order via DOM position
-    const allElements = [scheduleEditor, taskConfig, aiInsights, contextLinks];
-    for (let i = 0; i < allElements.length - 1; i++) {
-      const pos = allElements[i]!.compareDocumentPosition(allElements[i + 1]!);
-      // DOCUMENT_POSITION_FOLLOWING = 4
-      expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    }
+  it("keeps schedule editing and task config in the main popup column while AI lives in the sidebar", () => {
+    const { container } = render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    const mainColumn = container.querySelector("[data-testid='selected-block-main-column']");
+    const aiSidebar = container.querySelector("[data-testid='selected-block-ai-sidebar']");
+
+    expect(mainColumn).toContainElement(screen.getByTestId("schedule-editor-form"));
+    expect(mainColumn).toContainElement(screen.getByTestId("task-config-form"));
+    expect(aiSidebar).toContainElement(screen.getByTestId("ai-insights-panel"));
+    expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
   });
 
   it("fetches subtasks for the task", async () => {

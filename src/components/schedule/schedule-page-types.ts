@@ -42,7 +42,26 @@ export type ScheduleAutomationCandidate = {
   priority: "low" | "medium" | "high";
 };
 
+export type ScheduleSubtask = {
+  id: string;
+  parentTaskId: string | null;
+  title: string;
+  description: string | null;
+  priority: string;
+  status: string;
+  persistedStatus: string;
+  scheduleStatus: string | null;
+  dueAt: Date | null;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
+  completedAt: Date | null;
+  isCompleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type ScheduleRuntimeFields = {
+  parentTaskId: string | null;
   runtimeAdapterKey: string | null;
   runtimeInput: unknown;
   runtimeInputVersion: string | null;

@@ -45,6 +45,7 @@ export async function createTask(input: {
   title: string;
   description?: string | null;
   priority?: "Low" | "Medium" | "High" | "Urgent";
+  parentTaskId?: string | null;
   dueAt?: Date | null;
   runtimeAdapterKey?: string | null;
   runtimeInput?: Prisma.InputJsonObject | null;
@@ -67,6 +68,18 @@ export async function createTask(input: {
     where: { id: input.workspaceId },
     select: { defaultRuntime: true },
   });
+
+  if (input.parentTaskId) {
+    const parentTask = await db.task.findUnique({
+      where: { id: input.parentTaskId },
+      select: { id: true, workspaceId: true },
+    });
+
+    if (!parentTask || parentTask.workspaceId !== input.workspaceId) {
+      throw new Error("parentTaskId must reference a task in the same workspace");
+    }
+  }
+
   const validatedRuntimeConfig = validateTaskRuntimeConfig({
     runtimeAdapterKey: input.runtimeAdapterKey,
     workspaceDefaultRuntime: workspace.defaultRuntime,
@@ -104,9 +117,30 @@ export async function createTask(input: {
       priority: input.priority ? TaskPriority[input.priority] : TaskPriority.Medium,
       status,
       ownerType: OwnerType.human,
+      parentTaskId: input.parentTaskId ?? null,
       dueAt: input.dueAt ?? null,
     },
   });
+
+  if (input.parentTaskId) {
+    await db.taskDependency.upsert({
+      where: {
+        taskId_dependsOnTaskId: {
+          taskId: task.id,
+          dependsOnTaskId: input.parentTaskId,
+        },
+      },
+      create: {
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        dependsOnTaskId: input.parentTaskId,
+        dependencyType: "child_of",
+      },
+      update: {
+        dependencyType: "child_of",
+      },
+    });
+  }
 
   await ensureDefaultTaskSession({
     taskId: task.id,
@@ -126,6 +160,7 @@ export async function createTask(input: {
       title: task.title,
       priority: task.priority,
       status: task.status,
+      parentTaskId: task.parentTaskId,
     },
     dedupeKey: `task.created:${task.id}`,
   });

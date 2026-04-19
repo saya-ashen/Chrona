@@ -13,7 +13,6 @@ import {
   approveApproval,
   createFollowUpTask,
   editAndApproveApproval,
-  generateTaskPlan,
   markTaskDone,
   provideInput,
   rejectApproval,
@@ -229,12 +228,6 @@ export function useWorkPageController(
   );
 
   const actions = {
-    async generateTaskPlan() {
-      return runScopedAction(async () => {
-        await generateTaskPlan({ taskId: data.taskShell.id });
-      }, "hero");
-    },
-
     async approveApproval(approvalId: string) {
       return runScopedAction(async () => {
         await approveApproval(approvalId);

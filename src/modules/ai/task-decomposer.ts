@@ -557,6 +557,9 @@ function buildDecompositionPrompt(input: TaskDecompositionInput): string {
     const d = input.dueAt instanceof Date ? input.dueAt.toISOString() : String(input.dueAt);
     parts.push(`Due Date: ${d}`);
   }
+  if (input.planningPrompt?.trim()) {
+    parts.push(`Planning Guidance: ${input.planningPrompt.trim()}`);
+  }
   return parts.join("\n");
 }
 

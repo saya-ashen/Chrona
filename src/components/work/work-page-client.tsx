@@ -304,7 +304,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
           plan={data.taskPlan}
           copy={copy}
           isPending={isPending}
-          onGenerate={actions.generateTaskPlan}
           currentAction={currentPlanAction}
           currentException={currentException}
         />

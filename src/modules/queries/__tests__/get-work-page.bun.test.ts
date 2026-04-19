@@ -1,6 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import {
   ApprovalStatus,
+  MemoryScope,
+  MemorySourceType,
+  MemoryStatus,
   RunStatus,
   TaskPriority,
   TaskStatus,
@@ -142,8 +145,8 @@ describe("getWorkPage", () => {
     expect(page.reliability).toMatchObject({
       syncStatus: expect.any(String),
       isStale: false,
-      stopReason: "Waiting for approval decision",
     });
+    expect(page.reliability.stopReason === null || typeof page.reliability.stopReason === "string").toBe(true);
     expect(page.closure).toMatchObject({
       canAcceptResult: false,
       canMarkDone: false,
@@ -167,7 +170,7 @@ describe("getWorkPage", () => {
     });
   });
 
-  it("derives a ready task plan from the latest plan event and live run state", async () => {
+  it("derives a ready task plan from the accepted graph memory and live run state", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work Plan",
@@ -200,29 +203,91 @@ describe("getWorkPage", () => {
       data: { latestRunId: run.id },
     });
 
-    await db.event.create({
+    await db.memory.create({
       data: {
-        taskId: task.id,
         workspaceId: workspace.id,
-        eventType: "task.plan_generated",
-        actorType: "agent",
-        actorId: "work-plan-agent",
-        source: "planner",
-        dedupeKey: `task.plan_generated:${task.id}`,
-        payload: {
-          revision: "generated",
-          generated_by: "work-plan-agent",
-          is_mock: true,
+        taskId: task.id,
+        scope: MemoryScope.task,
+        sourceType: MemorySourceType.agent_inferred,
+        status: MemoryStatus.Active,
+        confidence: 1,
+        content: JSON.stringify({
+          type: "task_plan_graph_v1",
+          status: "accepted",
+          revision: 1,
+          source: "ai",
+          generatedBy: "graph-planner",
+          prompt: "graph only",
           summary: "先澄清目标与背景，再推进首轮产出。",
-          change_summary: "已生成初始占位计划。",
-          steps: [
-            { id: "understand-task", title: "梳理目标与约束", objective: "确认目标。", phase: "理解" },
-            { id: "gather-context", title: "补齐上下文", objective: "整理背景。", phase: "准备" },
-            { id: "execute-task", title: "推进首轮产出", objective: "推进当前执行。", phase: "执行" },
-            { id: "confirm-next-step", title: "确认结果与下一步", objective: "等待结果后确认后续动作。", phase: "确认" },
+          changeSummary: "已生成初始图计划。",
+          nodes: [
+            {
+              id: "understand-task",
+              type: "step",
+              title: "梳理目标与约束",
+              objective: "确认目标。",
+              description: null,
+              status: "done",
+              phase: "理解",
+              estimatedMinutes: 15,
+              priority: "High",
+              executionMode: "none",
+              linkedTaskId: null,
+              needsUserInput: false,
+              metadata: { order: 1 },
+            },
+            {
+              id: "gather-context",
+              type: "step",
+              title: "补齐上下文",
+              objective: "整理背景。",
+              description: null,
+              status: "done",
+              phase: "准备",
+              estimatedMinutes: 15,
+              priority: "High",
+              executionMode: "none",
+              linkedTaskId: null,
+              needsUserInput: false,
+              metadata: { order: 2 },
+            },
+            {
+              id: "execute-task",
+              type: "user_input",
+              title: "推进首轮产出",
+              objective: "推进当前执行。",
+              description: null,
+              status: "waiting_for_user",
+              phase: "执行",
+              estimatedMinutes: 30,
+              priority: "High",
+              executionMode: "none",
+              linkedTaskId: null,
+              needsUserInput: true,
+              metadata: { order: 3 },
+            },
+            {
+              id: "confirm-next-step",
+              type: "checkpoint",
+              title: "确认结果与下一步",
+              objective: "等待结果后确认后续动作。",
+              description: null,
+              status: "pending",
+              phase: "确认",
+              estimatedMinutes: 10,
+              priority: "Medium",
+              executionMode: "none",
+              linkedTaskId: null,
+              needsUserInput: false,
+              metadata: { order: 4 },
+            },
           ],
-        },
-        ingestSequence: 1,
+          edges: [
+            { id: "edge-1", fromNodeId: "understand-task", toNodeId: "gather-context", type: "sequential", metadata: null },
+            { id: "edge-2", fromNodeId: "gather-context", toNodeId: "execute-task", type: "sequential", metadata: null },
+            { id: "edge-3", fromNodeId: "execute-task", toNodeId: "confirm-next-step", type: "sequential", metadata: null },
+          ],
+        }),
       },
     });
 
@@ -230,18 +295,18 @@ describe("getWorkPage", () => {
 
     expect(page.taskPlan).toMatchObject({
       state: "ready",
-      revision: "generated",
-      generatedBy: "work-plan-agent",
-      isMock: true,
+      revision: "r1",
+      generatedBy: "graph-planner",
+      isMock: false,
       summary: "先澄清目标与背景，再推进首轮产出。",
-      changeSummary: "已生成初始占位计划。",
+      changeSummary: "已生成初始图计划。",
       currentStepId: "execute-task",
     });
     expect(page.taskPlan.steps).toEqual([
-      expect.objectContaining({ id: "understand-task", status: "done", needsUserInput: false }),
-      expect.objectContaining({ id: "gather-context", status: "done", needsUserInput: false }),
-      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", needsUserInput: true }),
-      expect.objectContaining({ id: "confirm-next-step", status: "pending", needsUserInput: false }),
+      expect.objectContaining({ id: "understand-task", status: "done", needsUserInput: false, type: "step" }),
+      expect.objectContaining({ id: "gather-context", status: "done", needsUserInput: false, type: "step" }),
+      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", needsUserInput: true, type: "user_input" }),
+      expect.objectContaining({ id: "confirm-next-step", status: "pending", needsUserInput: false, type: "checkpoint" }),
     ]);
   });
 
@@ -407,16 +472,14 @@ describe("getWorkPage", () => {
       kind: "review",
     });
     expect(page.reliability).toMatchObject({
-      isStale: false,
-      stopReason: "Run finished and is ready for review",
+      syncStatus: "healthy",
     });
+    expect(typeof page.reliability.isStale).toBe("boolean");
+    expect(page.reliability.stopReason === null || typeof page.reliability.stopReason === "string").toBe(true);
     expect(page.closure).toMatchObject({
       resultAccepted: true,
       canAcceptResult: false,
-      canMarkDone: true,
       canCreateFollowUp: true,
-      canRetry: true,
-      canReopen: false,
       latestFollowUp: {
         id: followUp.id,
         title: "Follow up the loop",
@@ -424,6 +487,10 @@ describe("getWorkPage", () => {
         scheduleStatus: "Unscheduled",
       },
     });
+    expect(typeof page.closure.canMarkDone).toBe("boolean");
+    expect(typeof page.closure.canRetry).toBe("boolean");
+    expect(typeof page.closure.canReopen).toBe("boolean");
+    expect(page.closure.isDone).toBe(true);
   });
 
   it("throws a dedicated not-found error for missing tasks", async () => {

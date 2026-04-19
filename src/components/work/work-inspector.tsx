@@ -6,6 +6,7 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
+import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 
 const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
 
@@ -16,7 +17,7 @@ type PlanStep = WorkInspectorProps["plan"]["steps"][number];
 type WorkInspectorProps = {
   plan: {
     state: "empty" | "ready";
-    revision: "generated" | "updated" | null;
+    revision: string | null;
     generatedBy: string | null;
     isMock: boolean;
     summary: string | null;
@@ -30,11 +31,15 @@ type WorkInspectorProps = {
       phase: string;
       status: StepStatus;
       needsUserInput: boolean;
+      type?: string;
+      linkedTaskId?: string | null;
+      executionMode?: string | null;
+      estimatedMinutes?: number | null;
+      priority?: string | null;
     }>;
   };
   currentAction?: { label: string; href: string } | null;
   currentException?: string | null;
-  onGenerate: () => void;
   isPending?: boolean;
   approvals: Array<{ id: string; title: string; status: string; summary?: string }>;
   artifacts: Array<{ id: string; title: string; type: string; uri?: string | null; createdAt?: string | null }>;
@@ -64,10 +69,8 @@ type WorkInspectorProps = {
     planReadySummary: string;
     planEmptySummary: string;
     planEmptyTitle: string;
-    generatePlan: string;
     currentStep: string;
     currentBlocker: string;
-    resumePlan: string;
     approvalsTitle: string;
     noApprovals: string;
     artifactsTitle: string;
@@ -121,7 +124,6 @@ export function WorkInspector({
   plan,
   currentAction = null,
   currentException = null,
-  onGenerate,
   isPending = false,
   approvals,
   artifacts,
@@ -220,7 +222,6 @@ export function WorkInspector({
               currentStep,
               currentAction,
               currentException,
-              onGenerate,
               isPending,
               approvals,
               artifacts,
@@ -242,7 +243,6 @@ function renderSectionPanel(
     currentStep,
     currentAction,
     currentException,
-    onGenerate,
     isPending,
     approvals,
     artifacts,
@@ -254,7 +254,6 @@ function renderSectionPanel(
     currentStep: PlanStep | null;
     currentAction: WorkInspectorProps["currentAction"];
     currentException: WorkInspectorProps["currentException"];
-    onGenerate: WorkInspectorProps["onGenerate"];
     isPending: boolean;
     approvals: WorkInspectorProps["approvals"];
     artifacts: WorkInspectorProps["artifacts"];
@@ -263,82 +262,43 @@ function renderSectionPanel(
     labels: WorkInspectorProps["labels"];
   },
 ) {
-    if (section === "plan") {
-      return (
-        <div className="space-y-4">
-          <div>
-            <p className="text-base font-semibold text-foreground">{labels.planTitle}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {plan.state === "ready" ? plan.summary ?? labels.planReadySummary : labels.planEmptySummary}
-            </p>
-          </div>
-
-          {plan.state === "empty" ? (
-            <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4">
-              <p className="font-medium text-foreground">{labels.planEmptyTitle}</p>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={onGenerate}
-                className={cn(buttonVariants({ variant: "default", size: "sm" }), "mt-4 disabled:opacity-60")}
-              >
-                {labels.generatePlan}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {currentStep ? (
-                <div className="rounded-[22px] border border-primary/20 bg-primary/[0.05] p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge tone="info">{labels.currentStep}</StatusBadge>
-                    <StatusBadge tone={labels.stepStatuses[currentStep.status].tone}>{labels.stepStatuses[currentStep.status].label}</StatusBadge>
-                    <span className="text-xs text-muted-foreground">{currentStep.phase}</span>
-                  </div>
-                  <p className="mt-3 font-medium text-foreground">{currentStep.title}</p>
-                  <p className="mt-2 text-muted-foreground">{currentStep.objective}</p>
-                  {currentException ? <p className="mt-2 text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {currentAction ? (
-                      isInternalAppHref(currentAction.href) ? (
-                        <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
-                          {currentAction.label}
-                        </LocalizedLink>
-                      ) : currentAction.href.startsWith("#") ? (
-                        <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
-                          {currentAction.label}
-                        </a>
-                      ) : isSafeExternalHref(currentAction.href) ? (
-                        <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
-                          {currentAction.label}
-                        </a>
-                      ) : null
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={onGenerate}
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "disabled:opacity-60")}
-                    >
-                      {labels.resumePlan}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {plan.steps.filter((step) => step.id !== currentStep?.id).map((step) => (
-                <div key={step.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground">{step.title}</p>
-                    <StatusBadge tone={labels.stepStatuses[step.status].tone}>{labels.stepStatuses[step.status].label}</StatusBadge>
-                  </div>
-                  <p className="mt-2 text-muted-foreground">{step.objective}</p>
-                </div>
-              ))}
-            </div>
-          )}
+  if (section === "plan") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="text-base font-semibold text-foreground">{labels.planTitle}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {plan.state === "ready" ? plan.summary ?? labels.planReadySummary : labels.planEmptySummary}
+          </p>
         </div>
-      );
-    }
+
+        {currentException ? <p className="text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
+        {currentAction ? (
+          isInternalAppHref(currentAction.href) ? (
+            <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+              {currentAction.label}
+            </LocalizedLink>
+          ) : currentAction.href.startsWith("#") ? (
+            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+              {currentAction.label}
+            </a>
+          ) : isSafeExternalHref(currentAction.href) ? (
+            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+              {currentAction.label}
+            </a>
+          ) : null
+        ) : null}
+
+        {plan.state === "empty" ? (
+          <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4">
+            <p className="font-medium text-foreground">{labels.planEmptyTitle}</p>
+          </div>
+        ) : (
+          <TaskPlanGraph plan={plan} />
+        )}
+      </div>
+    );
+  }
 
     if (section === "approvals") {
       return (

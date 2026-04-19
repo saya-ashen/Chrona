@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS, syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
+import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
 export class WorkPageTaskNotFoundError extends Error {
   constructor(taskId: string) {
@@ -137,11 +138,36 @@ type EvidenceItem = {
 
 type TaskPlanStepStatus = "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
 
-type TaskPlanPayloadStep = {
+type TaskPlanProjectionStep = {
   id: string;
   title: string;
   objective: string;
   phase: string;
+  status: TaskPlanStepStatus;
+  needsUserInput: boolean;
+  type?: string;
+  linkedTaskId?: string | null;
+  executionMode?: string | null;
+  estimatedMinutes?: number | null;
+  priority?: string | null;
+};
+
+type TaskPlanProjection = {
+  state: "empty" | "ready";
+  revision: string | null;
+  generatedBy: string | null;
+  isMock: boolean;
+  summary: string | null;
+  updatedAt: string | null;
+  changeSummary: string | null;
+  currentStepId: string | null;
+  steps: TaskPlanProjectionStep[];
+  edges: Array<{
+    id: string;
+    fromNodeId: string;
+    toNodeId: string;
+    type: string;
+  }>;
 };
 
 function makeEvidence(item: EvidenceItem) {
@@ -295,53 +321,6 @@ function readBlockReason(
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function readTaskPlanPayload(payload: unknown) {
-  if (!isRecord(payload)) {
-    return null;
-  }
-
-  const steps = Array.isArray(payload.steps)
-    ? payload.steps.flatMap((step) => {
-        if (!isRecord(step)) {
-          return [];
-        }
-
-        if (
-          typeof step.id !== "string" ||
-          typeof step.title !== "string" ||
-          typeof step.objective !== "string" ||
-          typeof step.phase !== "string"
-        ) {
-          return [];
-        }
-
-        return [{
-          id: step.id,
-          title: step.title,
-          objective: step.objective,
-          phase: step.phase,
-        } satisfies TaskPlanPayloadStep];
-      })
-    : [];
-
-  if (steps.length === 0) {
-    return null;
-  }
-
-  return {
-    revision: payload.revision === "updated" ? "updated" : "generated",
-    generatedBy: typeof payload.generated_by === "string" ? payload.generated_by : null,
-    isMock: payload.is_mock !== false,
-    summary: typeof payload.summary === "string" ? payload.summary : null,
-    changeSummary: typeof payload.change_summary === "string" ? payload.change_summary : null,
-    steps,
-  };
-}
-
 function deriveTaskPlanStepStatus(
   stepId: string,
   currentRun: { status: string } | null,
@@ -377,7 +356,7 @@ function deriveTaskPlanStepStatus(
         return "in_progress";
       }
 
-      if (currentRun.status === "WaitingForApproval") {
+      if (currentRun.status === "WaitingForApproval" || currentRun.status === "WaitingForInput") {
         return "waiting_for_user";
       }
 
@@ -413,83 +392,56 @@ function deriveTaskPlanStepStatus(
         return "blocked";
       }
 
+      if (currentRun.status === "WaitingForInput" || currentRun.status === "WaitingForApproval") {
+        return "waiting_for_user";
+      }
+
       return "in_progress";
   }
 }
 
-function buildTaskPlan({
-  taskTitle,
-  latestPlanEvent,
-  currentRun,
-  closure,
+function buildTaskPlanFromGraph({
+  savedPlan,
 }: {
-  taskTitle: string;
-  latestPlanEvent:
-    | {
-        eventType: string;
-        payload: unknown;
-        createdAt: Date;
-        runtimeTs: Date | null;
-      }
-    | null;
-  currentRun: { status: string } | null;
-  closure: { isDone: boolean };
-}) {
-  if (!latestPlanEvent) {
-    return {
-      state: "empty" as const,
-      revision: null,
-      generatedBy: null,
-      isMock: true,
-      summary: null,
-      updatedAt: null,
-      changeSummary: null,
-      currentStepId: null,
-      steps: [],
-    };
+  savedPlan: Awaited<ReturnType<typeof getAcceptedTaskPlanGraph>> | Awaited<ReturnType<typeof getLatestTaskPlanGraph>>;
+}): TaskPlanProjection | null {
+  if (!savedPlan) {
+    return null;
   }
 
-  const parsed = readTaskPlanPayload(latestPlanEvent.payload);
+  const steps: TaskPlanProjectionStep[] = savedPlan.plan.nodes.map((node) => ({
+    id: node.id,
+    title: node.title,
+    objective: node.objective,
+    phase: node.phase ?? node.type,
+    status: node.status === "skipped" ? "done" : node.status,
+    needsUserInput: node.needsUserInput || node.status === "waiting_for_user",
+    type: node.type,
+    linkedTaskId: node.linkedTaskId,
+    executionMode: node.executionMode,
+    estimatedMinutes: node.estimatedMinutes,
+    priority: node.priority,
+  }));
 
-  if (!parsed) {
-    return {
-      state: "empty" as const,
-      revision: null,
-      generatedBy: null,
-      isMock: true,
-      summary: null,
-      updatedAt: null,
-      changeSummary: null,
-      currentStepId: null,
-      steps: [],
-    };
-  }
-
-  const steps = parsed.steps.map((step) => {
-    const status = deriveTaskPlanStepStatus(step.id, currentRun, closure);
-    return {
-      ...step,
-      status,
-      needsUserInput: status === "waiting_for_user",
-    };
-  });
+  const currentStepId =
+    steps.find((step) => ["in_progress", "waiting_for_user", "blocked"].includes(step.status))?.id ?? null;
 
   return {
-    state: "ready" as const,
-    revision:
-      latestPlanEvent.eventType === "task.plan_updated"
-        ? "updated"
-        : parsed.revision,
-    generatedBy: parsed.generatedBy,
-    isMock: parsed.isMock,
-    summary:
-      parsed.summary ??
-      `围绕「${taskTitle}」先澄清目标与背景，再推进首轮产出，并在关键节点回到工作台和你确认。`,
-    updatedAt: toIsoString(latestPlanEvent.runtimeTs ?? latestPlanEvent.createdAt),
-    changeSummary: parsed.changeSummary,
-    currentStepId:
-      steps.find((step) => ["in_progress", "waiting_for_user", "blocked"].includes(step.status))?.id ?? null,
+    state: "ready",
+    revision: `r${savedPlan.revision}`,
+    generatedBy: savedPlan.generatedBy,
+    isMock: false,
+    summary: savedPlan.summary,
+    updatedAt: savedPlan.updatedAt,
+    changeSummary: savedPlan.changeSummary,
+    currentStepId,
     steps,
+    edges: savedPlan.plan.edges.map((edge) => ({
+      id: edge.id,
+      fromNodeId: edge.fromNodeId,
+      toNodeId: edge.toNodeId,
+      type: edge.type,
+    })),
   };
 }
 
@@ -543,7 +495,7 @@ function buildCurrentIntervention({
   const sharedEvidence: EvidenceItem[] = [];
 
   if (!latestOutput.empty) {
-      sharedEvidence.push({
+    sharedEvidence.push({
       label: copy.latestOutput,
       value: latestOutput.title,
       tone: "neutral",
@@ -552,7 +504,7 @@ function buildCurrentIntervention({
   }
 
   if (latestWorkstreamItem) {
-      sharedEvidence.push({
+    sharedEvidence.push({
       label: copy.latestMilestone,
       value: latestWorkstreamItem.summary,
       tone: latestWorkstreamItem.kind === "failure" ? "critical" : "neutral",
@@ -560,7 +512,7 @@ function buildCurrentIntervention({
   }
 
   if (scheduleImpact.status === "AtRisk" || scheduleImpact.status === "Overdue") {
-      sharedEvidence.push({
+    sharedEvidence.push({
       label: copy.scheduleImpact,
       value: scheduleImpact.summary,
       tone: scheduleImpact.status === "Overdue" ? "critical" : "warning",
@@ -570,10 +522,10 @@ function buildCurrentIntervention({
   if (!currentRun) {
     return {
       kind: "idle",
-        title: copy.startExecution,
-        description: copy.noRunActiveDescription,
-        actionLabel: copy.startRunHere,
-        whyNow: blockReason?.actionRequired ?? copy.noActiveRunWhy,
+      title: copy.startExecution,
+      description: copy.noRunActiveDescription,
+      actionLabel: copy.startRunHere,
+      whyNow: blockReason?.actionRequired ?? copy.noActiveRunWhy,
       evidence: sharedEvidence,
     } as const;
   }
@@ -667,11 +619,11 @@ function buildCurrentIntervention({
       } as const;
     default:
       return {
-        kind: "idle",
+        kind: "observe",
         title: copy.checkRunState,
-        description: blockReason?.actionRequired ?? copy.inspectBeforeActing,
+        description: copy.inspectBeforeActing,
         actionLabel: copy.inspectRun,
-        whyNow: blockReason?.actionRequired ?? copy.stateNeedsInspection,
+        whyNow: copy.stateNeedsInspection,
         evidence: sharedEvidence.slice(0, 3),
       } as const;
   }
@@ -682,74 +634,63 @@ function buildLatestOutput({
   conversation,
   copy,
 }: {
-  artifacts: Array<{ id: string; title: string; type: string; uri?: string | null; createdAt?: Date | null }>;
-  conversation: Array<{ id: string; role: string; content: string; runtimeTs?: Date | null }>;
+  artifacts: Array<{
+    id: string;
+    title: string;
+    type: string;
+    uri?: string | null;
+    createdAt: Date;
+  }>;
+  conversation: Array<{
+    id: string;
+    role: string;
+    content: string;
+    runtimeTs?: Date | null;
+  }>;
   copy: WorkPageCopy;
 }) {
-  const latestArtifact = artifacts[0];
-
+  const latestArtifact = [...artifacts].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0] ?? null;
   if (latestArtifact) {
     return {
-      kind: "artifact",
+      kind: "artifact" as const,
       title: latestArtifact.title,
-      body: `Type: ${latestArtifact.type}`,
-      timestamp: toIsoString(latestArtifact.createdAt),
+      body: latestArtifact.type,
+      timestamp: latestArtifact.createdAt.toISOString(),
       href: latestArtifact.uri ?? null,
       empty: false,
-      sourceLabel: `Artifact · ${latestArtifact.type}`,
-    } as const;
+      sourceLabel: copy.latestAgentOutput,
+    };
   }
 
-  const latestAgentOutput = [...conversation].reverse().find((entry) => entry.role !== "user");
+  const latestConversation = [...conversation]
+    .filter((entry) => entry.role === "assistant")
+    .sort((left, right) => {
+      const leftTs = left.runtimeTs?.getTime() ?? 0;
+      const rightTs = right.runtimeTs?.getTime() ?? 0;
+      return rightTs - leftTs;
+    })[0] ?? null;
 
-  if (latestAgentOutput) {
+  if (latestConversation) {
     return {
-      kind: "message",
-      title: copy.latestAgentOutput,
-      body: latestAgentOutput.content,
-      timestamp: toIsoString(latestAgentOutput.runtimeTs),
+      kind: "message" as const,
+      title: copy.latestOutput,
+      body: latestConversation.content,
+      timestamp: latestConversation.runtimeTs?.toISOString() ?? null,
       href: null,
       empty: false,
       sourceLabel: copy.conversationOutput,
-    } as const;
+    };
   }
 
   return {
-    kind: "empty",
+    kind: "empty" as const,
     title: copy.noMappedOutputYet,
     body: copy.latestArtifactAppears,
     timestamp: null,
     href: null,
     empty: true,
     sourceLabel: copy.noOutputSource,
-  } as const;
-}
-
-function formatDuration(ms: number | null) {
-  if (ms === null || ms < 0) {
-    return null;
-  }
-
-  const minutes = Math.floor(ms / 60000);
-
-  if (minutes < 1) {
-    return "<1m";
-  }
-
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  if (hours < 24) {
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-  }
-
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  };
 }
 
 function buildReliability({
@@ -759,64 +700,34 @@ function buildReliability({
 }: {
   currentRun:
     | {
-        status: string;
-        startedAt: string | null;
-        endedAt: string | null;
-        updatedAt: string | null;
-        lastSyncedAt: string | null;
-        syncStatus: string | null;
-        errorSummary: string | null;
+        lastSyncedAt?: string | null;
+        updatedAt?: string | null;
+        syncStatus?: string | null;
+        errorSummary?: string | null;
       }
     | null;
   blockReason: ReturnType<typeof readBlockReason>;
   now: Date;
 }) {
-  if (!currentRun) {
-    return {
-      refreshedAt: now.toISOString(),
-      lastSyncedAt: null,
-      lastUpdatedAt: null,
-      syncStatus: null,
-      isStale: false,
-      stuckFor: null,
-      stopReason: blockReason?.actionRequired ?? null,
-    };
-  }
+  const lastSyncedAt = currentRun?.lastSyncedAt ?? null;
+  const lastUpdatedAt = currentRun?.updatedAt ?? null;
+  const lastSyncedAtMs = lastSyncedAt ? Date.parse(lastSyncedAt) : null;
+  const staleAgeMs = lastSyncedAtMs ? now.getTime() - lastSyncedAtMs : null;
+  const isStale = staleAgeMs !== null ? staleAgeMs > SYNC_STALE_MS : currentRun?.syncStatus === "stale";
 
-  const lastSyncedAt = currentRun.lastSyncedAt ? new Date(currentRun.lastSyncedAt) : null;
-  const lastUpdatedAt = currentRun.updatedAt ? new Date(currentRun.updatedAt) : null;
-  const activeStatuses = new Set(["Pending", "Running", "WaitingForInput", "WaitingForApproval"]);
-  const syncReference = lastSyncedAt ?? lastUpdatedAt;
-  const isStale = Boolean(
-    currentRun.syncStatus === "stale" ||
-      (activeStatuses.has(currentRun.status) && syncReference && now.getTime() - syncReference.getTime() > SYNC_STALE_MS),
-  );
-
-  let stopReason = currentRun.errorSummary ?? blockReason?.actionRequired ?? null;
-
-  if (!stopReason) {
-    if (currentRun.status === "WaitingForInput") {
-      stopReason = "Waiting for operator input";
-    } else if (currentRun.status === "WaitingForApproval") {
-      stopReason = "Waiting for approval decision";
-    } else if (currentRun.status === "Completed") {
-      stopReason = "Run finished and is ready for review";
-    } else if (currentRun.status === "Cancelled") {
-      stopReason = "Run was cancelled before completion";
-    }
-  }
+  const stuckFor =
+    staleAgeMs !== null && staleAgeMs > 0
+      ? `${Math.max(1, Math.round(staleAgeMs / 60000))} min`
+      : null;
 
   return {
     refreshedAt: now.toISOString(),
-    lastSyncedAt: currentRun.lastSyncedAt,
-    lastUpdatedAt: currentRun.updatedAt,
-    syncStatus: currentRun.syncStatus,
+    lastSyncedAt,
+    lastUpdatedAt,
+    syncStatus: currentRun?.syncStatus ?? null,
     isStale,
-    stuckFor:
-      activeStatuses.has(currentRun.status) && syncReference
-        ? formatDuration(now.getTime() - syncReference.getTime())
-        : null,
-    stopReason,
+    stuckFor,
+    stopReason: blockReason?.actionRequired ?? currentRun?.errorSummary ?? null,
   };
 }
 
@@ -827,38 +738,56 @@ function buildClosureState({
   latestFollowUp,
 }: {
   task: { status: string; completedAt: Date | null };
-  currentRun: { id: string; status: string } | null;
-  events: Array<{ eventType: string; runId: string | null; createdAt: Date }>;
+  currentRun:
+    | {
+        id: string;
+        status: string;
+        endedAt?: string | null;
+      }
+    | null;
+  events: Array<{ eventType: string; runId?: string | null; createdAt: Date }>;
   latestFollowUp:
-    | { id: string; title: string; status: string; scheduleStatus: string; createdAt: Date }
+    | {
+        id: string;
+        title: string;
+        status: string;
+        scheduleStatus: string;
+        createdAt: Date;
+      }
     | null;
 }) {
-  const latestReopenedAt =
-    [...events].reverse().find((event) => event.eventType === "task.reopened")?.createdAt ?? null;
-  const latestAcceptedEvent = [...events].reverse().find(
-    (event) =>
-      event.eventType === "task.result_accepted" &&
-      (!currentRun || event.runId === currentRun.id) &&
-      (!latestReopenedAt || event.createdAt > latestReopenedAt),
-  );
+  const acceptanceEvent = [...events]
+    .reverse()
+    .find((event) => event.eventType === "task.result_accepted" && (!currentRun || event.runId === currentRun.id));
+  const resultAccepted = Boolean(acceptanceEvent);
+  const acceptedAt = acceptanceEvent?.createdAt.toISOString() ?? null;
+  const isDone = task.status === "Completed";
+  const doneAt = task.completedAt?.toISOString() ?? currentRun?.endedAt ?? null;
+  const currentRunStatus = currentRun?.status ?? null;
+
+  const canReviewResult = currentRunStatus === "Completed" && !resultAccepted;
+  const canMarkDone = isDone ? false : currentRunStatus === "Completed" || resultAccepted;
+  const canRetry = ["Failed", "Cancelled"].includes(currentRunStatus ?? "");
+  const canReopen = isDone;
+  const canCreateFollowUp = currentRunStatus === "Completed" || resultAccepted || isDone;
 
   return {
-    resultAccepted: Boolean(latestAcceptedEvent),
-    acceptedAt: toIsoString(latestAcceptedEvent?.createdAt),
-    isDone: task.status === "Done",
-    doneAt: toIsoString(task.completedAt),
-    canAcceptResult: currentRun?.status === "Completed" && !latestAcceptedEvent,
-    canMarkDone: currentRun?.status === "Completed" && task.status !== "Done",
-    canCreateFollowUp: currentRun?.status === "Completed",
-    canRetry: currentRun ? ["Completed", "Failed", "Cancelled"].includes(currentRun.status) : false,
-    canReopen: task.status === "Done",
+    resultAccepted,
+    acceptedAt,
+    isDone,
+    doneAt,
+    canAcceptResult: canReviewResult,
+    canMarkDone,
+    canCreateFollowUp,
+    canRetry,
+    canReopen,
     latestFollowUp: latestFollowUp
       ? {
           id: latestFollowUp.id,
           title: latestFollowUp.title,
           status: latestFollowUp.status,
           scheduleStatus: latestFollowUp.scheduleStatus,
-          createdAt: toIsoString(latestFollowUp.createdAt),
+          createdAt: latestFollowUp.createdAt.toISOString(),
         }
       : null,
   };
@@ -869,114 +798,49 @@ function buildWorkspaceRail(
   projections: Array<{
     taskId: string;
     persistedStatus: string;
-    displayState: string | null;
-    lastActivityAt: Date | null;
-    updatedAt: Date;
+    displayState?: string | null;
     task: { id: string; title: string };
   }>,
-  currentTask?: {
+  currentTask: {
     title: string;
     persistedStatus: string;
-    displayState: string | null;
-    updatedAt: Date;
-    lastActivityAt?: Date | null;
+    displayState?: string | null;
   },
 ) {
-  const waitingStates = new Set(["WaitingForApproval", "WaitingForInput", "Attention Needed", "Sync Stale"]);
-
-  const baseItems = projections.map((item) => ({
-    taskId: item.taskId,
-    title: item.task.title,
-    persistedStatus: item.persistedStatus,
-    displayState: item.displayState,
-    updatedAt: item.updatedAt,
-    lastActivityAt: item.lastActivityAt,
-  }));
-
-  if (currentTask && !baseItems.some((item) => item.taskId === currentTaskId)) {
-    baseItems.unshift({
+  const items = [
+    {
       taskId: currentTaskId,
       title: currentTask.title,
-      persistedStatus: currentTask.persistedStatus,
-      displayState: currentTask.displayState,
-      updatedAt: currentTask.updatedAt,
-      lastActivityAt: currentTask.lastActivityAt ?? currentTask.updatedAt,
-    });
-  }
-
-  const mapped = baseItems.map((item) => {
-    const tone = waitingStates.has(item.displayState ?? "")
-      ? "waiting"
-      : item.persistedStatus === "Done" || item.persistedStatus === "Completed"
-        ? "done"
-        : "active";
-
-    return {
-      taskId: item.taskId,
-      title: item.title,
-      statusLabel: item.displayState ?? item.persistedStatus,
-      tone,
-      isCurrent: item.taskId === currentTaskId,
-      sortAt: item.lastActivityAt ?? item.updatedAt,
-    };
-  });
-
-  function takeWithCurrent(
-    items: typeof mapped,
-    limit: number,
-  ) {
-    const currentIndex = items.findIndex((item) => item.isCurrent);
-
-    if (currentIndex === -1 || currentIndex < limit) {
-      return items.slice(0, limit);
-    }
-
-    return [items[currentIndex], ...items.filter((_, index) => index !== currentIndex).slice(0, limit - 1)];
-  }
-
-  const sections = [
-    {
-      id: "in-progress",
-      title: "In progress",
-      items: takeWithCurrent(
-        mapped.filter((item) => item.tone === "active"),
-        6,
-      ),
+      statusLabel: currentTask.displayState ?? currentTask.persistedStatus,
+      tone: "current",
+      isCurrent: true,
     },
-    {
-      id: "waiting-on-me",
-      title: "Waiting on me",
-      items: takeWithCurrent(
-        mapped.filter((item) => item.tone === "waiting"),
-        6,
-      ),
-    },
-    {
-      id: "completed",
-      title: "Completed",
-      items: takeWithCurrent(
-        mapped.filter((item) => item.tone === "done"),
-        6,
-      ),
-    },
-  ].filter((section) => section.items.length > 0)
-    .map((section) => ({
-      id: section.id,
-      title: section.title,
-      items: section.items.map((item) => ({
-        taskId: item.taskId,
-        title: item.title,
-        statusLabel: item.statusLabel,
-        tone: item.tone,
-        isCurrent: item.isCurrent,
+    ...projections
+      .filter((projection) => projection.taskId !== currentTaskId)
+      .slice(0, 8)
+      .map((projection) => ({
+        taskId: projection.taskId,
+        title: projection.task.title,
+        statusLabel: projection.displayState ?? projection.persistedStatus,
+        tone: "default",
+        isCurrent: false,
       })),
-    }));
+  ];
 
-  return { sections };
+  return {
+    sections: [
+      {
+        id: "workspace-context",
+        title: "Workspace context",
+        items,
+      },
+    ],
+  };
 }
 
-export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPageCopy>) {
-  const copy = { ...DEFAULT_COPY, ...copyOverrides };
+export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = {}) {
+  const mergedCopy = { ...DEFAULT_COPY, ...copy };
+
   const taskExists = await db.task.findUnique({
     where: { id: taskId },
     select: { id: true },
@@ -1045,19 +909,7 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     where: { parentTaskId: task.id },
     orderBy: { createdAt: "desc" },
   });
-  const latestPlanEvent = await db.event.findFirst({
-    where: {
-      taskId: task.id,
-      eventType: { in: ["task.plan_generated", "task.plan_updated"] },
-    },
-    orderBy: [{ runtimeTs: "desc" }, { ingestSequence: "desc" }],
-    select: {
-      eventType: true,
-      payload: true,
-      createdAt: true,
-      runtimeTs: true,
-    },
-  });
+  const savedPlan = (await getAcceptedTaskPlanGraph(task.id)) ?? (await getLatestTaskPlanGraph(task.id));
   const blockReason = readBlockReason(task);
   const approvals =
     currentRun?.approvals.map((approval) => ({
@@ -1124,7 +976,7 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       errorSummary: tool.errorSummary,
     })) ?? [];
   const workstreamItems = task.events.map((event) => {
-    const eventInfo = classifyWorkstreamItem(event.eventType, copy);
+    const eventInfo = classifyWorkstreamItem(event.eventType, mergedCopy);
 
     return {
       id: event.id,
@@ -1169,9 +1021,9 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       content: entry.content,
       runtimeTs: entry.runtimeTs,
     })) ?? [],
-    copy,
+    copy: mergedCopy,
   });
-  const scheduleImpact = buildScheduleImpact(task, copy);
+  const scheduleImpact = buildScheduleImpact(task, mergedCopy);
   const reliability = buildReliability({
     currentRun: serializedRun,
     blockReason,
@@ -1190,12 +1042,18 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
     })),
     latestFollowUp,
   });
-  const taskPlan = buildTaskPlan({
-    taskTitle: task.title,
-    latestPlanEvent,
-    currentRun: serializedRun,
-    closure,
-  });
+  const taskPlan = buildTaskPlanFromGraph({ savedPlan }) ?? {
+    state: "empty" as const,
+    revision: null,
+    generatedBy: null,
+    isMock: false,
+    summary: null,
+    updatedAt: null,
+    changeSummary: null,
+    currentStepId: null,
+    steps: [],
+    edges: [],
+  };
 
   return {
     taskShell: {
@@ -1222,7 +1080,7 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       workstreamItems,
       toolCalls,
       scheduleImpact,
-      copy,
+      copy: mergedCopy,
     }),
     latestOutput,
     scheduleImpact,
@@ -1233,11 +1091,10 @@ export async function getWorkPage(taskId: string, copyOverrides?: Partial<WorkPa
       title: task.title,
       persistedStatus: task.status,
       displayState: task.projection?.displayState ?? null,
-      updatedAt: task.updatedAt,
-      lastActivityAt: task.projection?.lastActivityAt,
     }),
     workstreamItems,
     conversation,
+    composerValue: "",
     inspector: {
       approvals,
       artifacts,

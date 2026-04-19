@@ -1,4 +1,5 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { TaskAiSidebar } from "@/components/tasks/task-ai-sidebar";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -27,6 +28,16 @@ type TaskPageProps = {
       scheduleSource: string | null;
       isRunnable: boolean;
       runnabilitySummary: string;
+      runnabilityState?: string;
+      ownerType?: string;
+      savedAiPlan?: {
+        id: string;
+        status: "draft" | "accepted" | "superseded" | "archived";
+        prompt: string | null;
+        revision?: number;
+        summary?: string | null;
+        updatedAt: string;
+      } | null;
       blockReason:
         | {
             blockType?: string;
@@ -85,6 +96,7 @@ const DEFAULT_COPY = {
   fallbackDescription: "Use this page for reference, deep links, and heavier context that would clutter Schedule.",
   backToSchedule: "Back to Schedule",
   openWorkbench: "Open Workbench",
+  returnToSchedule: "Return to Schedule",
   dueBadgePrefix: "Due",
   primarySurfacesTitle: "Use the primary surfaces",
   primarySurfacesDescription:
@@ -161,12 +173,12 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
         <SurfaceCard className="space-y-6" padding="lg">
-          <SurfaceCardHeader className="space-y-4">
+          <SurfaceCardHeader className="space-y-5 border-b border-border/60 pb-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="max-w-3xl space-y-2">
+              <div className="max-w-3xl space-y-3">
                 <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                   {copy.eyebrow}
                 </p>
@@ -189,14 +201,35 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge tone="info">{data.task.status}</StatusBadge>
-              <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
-              <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
-              <StatusBadge tone={data.task.isRunnable ? "success" : "warning"}>{data.task.runnabilitySummary}</StatusBadge>
-              <StatusBadge>
-                {copy.dueBadgePrefix} {formatDate(data.task.dueAt)}
-              </StatusBadge>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Status</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusBadge tone="info">{data.task.status}</StatusBadge>
+                  <StatusBadge tone={priorityTone(data.task.priority)}>{data.task.priority}</StatusBadge>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Schedule</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusBadge tone={scheduleTone(data.task.scheduleStatus)}>{data.task.scheduleStatus}</StatusBadge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{data.task.scheduleSource ?? "Manual planning"}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Execution readiness</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusBadge tone={data.task.isRunnable ? "success" : "warning"}>{data.task.runnabilitySummary}</StatusBadge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {data.task.isRunnable ? "Ready for AI-assisted execution" : "Needs more setup before execution"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Due</p>
+                <p className="mt-2 text-xl font-semibold text-foreground">{formatDate(data.task.dueAt)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{copy.dueBadgePrefix} date for this task</p>
+              </div>
             </div>
           </SurfaceCardHeader>
 
@@ -312,7 +345,28 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
         </SurfaceCard>
       </div>
 
-      <aside className="space-y-4">
+      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+        <TaskAiSidebar
+          task={{
+            id: data.task.id,
+            workspaceId: data.task.workspaceId,
+            title: data.task.title,
+            description: data.task.description,
+            priority: data.task.priority,
+            status: data.task.status,
+            dueAt: data.task.dueAt,
+            scheduledStartAt: data.task.scheduledStartAt,
+            scheduledEndAt: data.task.scheduledEndAt,
+            scheduleStatus: data.task.scheduleStatus,
+            scheduleSource: data.task.scheduleSource,
+            isRunnable: data.task.isRunnable,
+            runnabilitySummary: data.task.runnabilitySummary,
+            runnabilityState: data.task.runnabilityState,
+            ownerType: data.task.ownerType,
+            savedAiPlan: data.task.savedAiPlan ?? null,
+          }}
+        />
+
         <SurfaceCard>
           <SurfaceCardTitle>{copy.latestRunTitle}</SurfaceCardTitle>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">

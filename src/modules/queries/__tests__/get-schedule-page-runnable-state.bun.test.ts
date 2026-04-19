@@ -75,6 +75,34 @@ describe("getSchedulePage runnable state", () => {
       },
     });
 
+    const childDraft = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        parentTaskId: draftTask.id,
+        title: "Child task should stay out of queue",
+        description: "Inherited from decomposition",
+        status: "Draft",
+        priority: "Low",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {},
+        runtimeInputVersion: "1",
+        runtimeModel: "gpt-5.4",
+        prompt: null,
+        runtimeConfig: {},
+        scheduleStatus: "Unscheduled",
+      },
+    });
+
+    await db.taskDependency.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: childDraft.id,
+        dependsOnTaskId: draftTask.id,
+        dependencyType: "child_of",
+      },
+    });
+
     await db.taskProjection.createMany({
       data: [
         {
@@ -98,6 +126,16 @@ describe("getSchedulePage runnable state", () => {
           actionRequired: "Configure task",
           lastActivityAt: new Date("2026-04-15T12:05:00.000Z"),
         },
+        {
+          taskId: childDraft.id,
+          workspaceId: workspace.id,
+          persistedStatus: "Draft",
+          displayState: "Draft",
+          scheduleStatus: "Unscheduled",
+          scheduleProposalCount: 0,
+          actionRequired: "Configure task",
+          lastActivityAt: new Date("2026-04-15T12:06:00.000Z"),
+        },
       ],
     });
 
@@ -112,6 +150,7 @@ describe("getSchedulePage runnable state", () => {
       runnabilitySummary: "Ready to run",
     });
 
+    expect(page.unscheduled).toHaveLength(1);
     expect(page.unscheduled[0]).toMatchObject({
       taskId: draftTask.id,
       runtimeModel: "gpt-5.4",
@@ -120,6 +159,8 @@ describe("getSchedulePage runnable state", () => {
       runnabilityState: "missing_prompt",
       runnabilitySummary: "Needs prompt",
     });
+    expect(page.unscheduled.some((item) => item.taskId === childDraft.id)).toBe(false);
+    expect(page.listItems.some((item) => item.taskId === childDraft.id)).toBe(false);
 
     expect(page.automationCandidates).toEqual([
       {

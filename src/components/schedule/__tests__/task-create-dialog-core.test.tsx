@@ -7,9 +7,14 @@ vi.mock("@/i18n/client", () => ({
   useLocale: () => "en",
 }));
 
+const mockUseAutoComplete = vi.fn(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
+const mockUseSmartAutomation = vi.fn(() => ({ suggestion: null, isLoading: false }));
+const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
+
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: () => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }),
-  useSmartAutomation: () => ({ suggestion: null, isLoading: false }),
+  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
+  useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
+  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
 }));
 
 vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
@@ -17,6 +22,7 @@ vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import type { TaskDecompositionResult } from "@/modules/ai/task-decomposer";
 
 const defaultProps = {
   isOpen: true,
@@ -31,6 +37,9 @@ const defaultProps = {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mockUseAutoComplete.mockImplementation(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
+  mockUseSmartAutomation.mockImplementation(() => ({ suggestion: null, isLoading: false }));
+  mockUseSmartDecomposition.mockImplementation(() => ({ result: null, isLoading: false, error: null }));
 });
 
 describe("TaskCreateDialog – Core functionality", () => {
@@ -131,6 +140,61 @@ describe("TaskCreateDialog – Core functionality", () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it("exposes merged AI planning UI only when handler is provided and preserves priorities on apply", async () => {
+    const user = userEvent.setup();
+    const onApplyDecomposition = vi.fn().mockResolvedValue(undefined);
+    const decompositionResult: TaskDecompositionResult = {
+      subtasks: [
+        {
+          title: "Draft legal filing checklist",
+          description: "Collect filing requirements",
+          estimatedMinutes: 30,
+          priority: "High",
+          order: 1,
+          dependsOnPrevious: false,
+        },
+        {
+          title: "Confirm state deadlines",
+          description: "Check every target state",
+          estimatedMinutes: 45,
+          priority: "Urgent",
+          order: 2,
+          dependsOnPrevious: true,
+        },
+      ],
+      totalEstimatedMinutes: 75,
+      feasibilityScore: 82,
+      warnings: [],
+    };
+
+    mockUseSmartDecomposition.mockImplementation((input) => ({
+      result: input ? decompositionResult : null,
+      isLoading: false,
+      error: null,
+    }));
+
+    const { rerender } = render(<TaskCreateDialog {...defaultProps} initialTitle="Campaign setup" />);
+
+    rerender(
+      <TaskCreateDialog
+        {...defaultProps}
+        initialTitle="Campaign setup"
+        onApplyDecomposition={onApplyDecomposition}
+      />,
+    );
+
+    expect(screen.getByText("AI 任务规划")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /apply plan/i }));
+
+    expect(onApplyDecomposition).toHaveBeenCalledWith(decompositionResult);
+    expect(onApplyDecomposition.mock.calls[0]?.[0]?.subtasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ priority: "High" }),
+        expect.objectContaining({ priority: "Urgent" }),
+      ]),
+    );
   });
 
   it("shows 'Saving...' when isPending", () => {

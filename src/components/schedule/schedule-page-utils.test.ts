@@ -40,6 +40,7 @@ import {
   toDateForDay,
   toTaskConfigInitialValues,
   toTimestamp,
+  hydrateSchedulePageData,
 } from "@/components/schedule/schedule-page-utils";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
@@ -215,6 +216,57 @@ describe("sortScheduledItems – with string dates", () => {
     const sorted = sortScheduledItems([late, early]);
     expect(sorted[0].taskId).toBe("early");
     expect(sorted[1].taskId).toBe("late");
+  });
+
+  it("hydrates schedule page data so string scheduled dates become real Date objects", () => {
+    const hydrated = hydrateSchedulePageData({
+      defaultRuntimeAdapterKey: "openclaw",
+      runtimeAdapters: [],
+      summary: {
+        scheduledCount: 1,
+        unscheduledCount: 0,
+        proposalCount: 0,
+        riskCount: 0,
+      },
+      planningSummary: {
+        scheduledMinutes: 60,
+        runnableQueueCount: 0,
+        conflictCount: 0,
+        overloadedDayCount: 0,
+        proposalCount: 0,
+        riskCount: 0,
+        todayLoadMinutes: 60,
+        overdueCount: 0,
+        atRiskCount: 0,
+        readyToScheduleCount: 0,
+        autoRunnableCount: 0,
+        waitingOnUserCount: 0,
+        dueSoonUnscheduledCount: 0,
+        largestIdleWindowMinutes: 0,
+        overloadedMinutes: 0,
+      },
+      focusZones: [],
+      automationCandidates: [],
+      scheduled: [
+        {
+          ...createScheduledItem({ taskId: "task-string-dates" }),
+          scheduledStartAt: "2026-04-15T09:00:00.000Z",
+          scheduledEndAt: "2026-04-15T10:00:00.000Z",
+          dueAt: "2026-04-15T12:00:00.000Z",
+        },
+      ],
+      unscheduled: [],
+      proposals: [],
+      risks: [],
+      listItems: [],
+      conflicts: [],
+      suggestions: [],
+    } as unknown as Parameters<typeof hydrateSchedulePageData>[0]);
+
+    expect(hydrated.scheduled[0]?.scheduledStartAt).toBeInstanceOf(Date);
+    expect(hydrated.scheduled[0]?.scheduledEndAt).toBeInstanceOf(Date);
+    expect(hydrated.scheduled[0]?.dueAt).toBeInstanceOf(Date);
+    expect(hydrated.scheduled[0]?.scheduledStartAt?.getHours()).toBeTypeOf("number");
   });
 
   it("sorts mixed Date and string dates", () => {

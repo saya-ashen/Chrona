@@ -95,7 +95,7 @@ const baseData: WorkPageData = {
   },
   taskPlan: {
     state: "ready",
-    revision: "updated",
+    revision: "r2",
     generatedBy: "agent",
     isMock: false,
     summary: "先对齐目标，再推进执行，再回到 work 页面确认结果。",
@@ -127,6 +127,10 @@ const baseData: WorkPageData = {
         status: "pending",
         needsUserInput: false,
       },
+    ],
+    edges: [
+      { id: "edge-1", fromNodeId: "step_1", toNodeId: "step_2", type: "sequential" },
+      { id: "edge-2", fromNodeId: "step_2", toNodeId: "step_3", type: "sequential" },
     ],
   },
   workspaceRail: {
@@ -177,7 +181,6 @@ describe("WorkPageClient", () => {
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
         createFollowUpTask: vi.fn(),
-        generateTaskPlan: vi.fn(),
         approveApproval: vi.fn(),
         rejectApproval: vi.fn(),
         editAndApproveApproval: vi.fn(),
@@ -209,7 +212,6 @@ describe("WorkPageClient", () => {
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
         createFollowUpTask: vi.fn(),
-        generateTaskPlan: vi.fn(),
         approveApproval: vi.fn(),
         rejectApproval: vi.fn(),
         editAndApproveApproval: vi.fn(),
@@ -223,7 +225,8 @@ describe("WorkPageClient", () => {
     });
 
     expect(within(planRail).getByText("任务路径")).toBeInTheDocument();
-    expect(within(planRail).getByText("后续步骤")).toBeInTheDocument();
+    expect(within(planRail).getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(within(planRail).getAllByText("sequential").length).toBeGreaterThan(0);
     expect(planRail.className).toContain("self-start");
     expect(planRail.className).toContain("pb-3");
     expect(planRail.parentElement?.className).not.toContain("items-start");
@@ -289,7 +292,6 @@ describe("WorkPageClient", () => {
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
         createFollowUpTask: vi.fn(),
-        generateTaskPlan: vi.fn(),
         approveApproval: vi.fn(),
         rejectApproval: vi.fn(),
         editAndApproveApproval: vi.fn(),
@@ -461,7 +463,6 @@ describe("WorkPageClient", () => {
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
         createFollowUpTask: vi.fn(),
-        generateTaskPlan: vi.fn(),
         approveApproval: vi.fn(),
         rejectApproval: vi.fn(),
         editAndApproveApproval: vi.fn(),
@@ -549,7 +550,6 @@ describe("WorkPageClient", () => {
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
         createFollowUpTask: vi.fn(),
-        generateTaskPlan: vi.fn(),
         approveApproval: vi.fn(),
         rejectApproval: vi.fn(),
         editAndApproveApproval: vi.fn(),

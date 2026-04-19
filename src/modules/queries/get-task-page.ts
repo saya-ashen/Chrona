@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
 function readBlockReason(
   task: {
@@ -35,6 +36,8 @@ function readBlockReason(
 
 export async function getTaskPage(taskId: string) {
   await syncTaskRunForRead(taskId);
+
+  const savedAiPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? (await getLatestTaskPlanGraph(taskId));
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -92,6 +95,18 @@ export async function getTaskPage(taskId: string) {
       scheduleSource: task.scheduleSource,
       isRunnable: runnability.isRunnable,
       runnabilitySummary: runnability.summary,
+      runnabilityState: runnability.state,
+      ownerType: task.ownerType,
+      savedAiPlan: savedAiPlan
+        ? {
+            id: savedAiPlan.id,
+            status: savedAiPlan.status,
+            prompt: savedAiPlan.prompt,
+            revision: savedAiPlan.revision,
+            summary: savedAiPlan.summary,
+            updatedAt: savedAiPlan.updatedAt,
+          }
+        : null,
       blockReason: readBlockReason(task),
       dependencies: task.dependencies.map((dependency) => ({
         id: dependency.id,
