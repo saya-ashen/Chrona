@@ -79,18 +79,12 @@ export function TaskCreateDialog({
   const { suggestion: aiSuggestion, isLoading: aiLoading } =
     useSmartAutomation(automationInput);
 
-  /* ---- Show dropdown when we have suggestions & title is long enough ---- */
-  useEffect(() => {
-    if (
-      title.trim().length >= 3 &&
-      autoCompleteSuggestions &&
-      autoCompleteSuggestions.length > 0
-    ) {
-      setShowAutoComplete(true);
-    } else {
-      setShowAutoComplete(false);
-    }
-  }, [title, autoCompleteSuggestions]);
+  /* ---- Derive dropdown visibility from data presence (no useEffect loop) ---- */
+  const hasAutoCompleteSuggestions =
+    !suppressRef.current &&
+    title.trim().length >= 3 &&
+    autoCompleteSuggestions != null &&
+    autoCompleteSuggestions.length > 0;
 
   /* ---- Reset form state when dialog opens ---- */
   useEffect(() => {
@@ -193,11 +187,7 @@ export function TaskCreateDialog({
                 setTitle(e.target.value);
               }}
               onFocus={() => {
-                if (
-                  title.trim().length >= 3 &&
-                  autoCompleteSuggestions &&
-                  autoCompleteSuggestions.length > 0
-                ) {
+                if (hasAutoCompleteSuggestions) {
                   setShowAutoComplete(true);
                 }
               }}
@@ -214,9 +204,7 @@ export function TaskCreateDialog({
             />
 
             {/* Auto-complete dropdown */}
-            {showAutoComplete &&
-              autoCompleteSuggestions &&
-              autoCompleteSuggestions.length > 0 && (
+            {showAutoComplete && hasAutoCompleteSuggestions && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border/60 bg-background shadow-lg">
                   <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5">
                     <Sparkles className="size-3 text-primary" />

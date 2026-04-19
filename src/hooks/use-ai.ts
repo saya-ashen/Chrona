@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { AutomationSuggestion, TimeslotSuggestionResult } from "@/modules/ai/types";
 import type { TaskDecompositionResult } from "@/modules/ai/task-decomposer";
 
@@ -78,23 +78,39 @@ interface BatchDecomposeResponse {
 }
 
 // ---------- 1. useAutoComplete ----------
+//
+// Timing policy:
+//   - Only fires when trimmed title length >= 3 characters
+//   - Debounce: 800ms after last keystroke (avoids spam while typing)
+//   - Dedup: skips fetch if trimmed title hasn't changed since last successful fetch
+//   - On title reset (< 3 chars): clears suggestions and resets dedup tracking
 
-export function useAutoComplete(title: string | null, debounceMs = 500) {
+export function useAutoComplete(title: string | null, debounceMs = 800) {
   const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Track the last fetched title to avoid re-fetching identical input */
+  const lastFetchedRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Clear previous debounce timer
     if (timerRef.current) clearTimeout(timerRef.current);
 
+    const trimmed = title?.trim() ?? "";
+
     // Don't fetch if title is too short or null
-    if (!title || title.trim().length < 3) {
+    if (!title || trimmed.length < 3) {
       setStructuredSuggestions([]);
       setIsLoading(false);
       setError(null);
+      lastFetchedRef.current = null;
+      return;
+    }
+
+    // Skip if we already fetched for this exact title
+    if (lastFetchedRef.current === trimmed) {
       return;
     }
 
@@ -109,13 +125,14 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
 
       fetchJSON<AutoCompleteResponse>(
         "/api/ai/auto-complete",
-        { title: title.trim() },
+        { title: trimmed },
         controller.signal,
       )
         .then((data) => {
           if (!controller.signal.aborted) {
             setStructuredSuggestions(data.suggestions ?? []);
             setIsLoading(false);
+            lastFetchedRef.current = trimmed;
           }
         })
         .catch((err: unknown) => {
@@ -135,13 +152,17 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
   }, [title, debounceMs]);
 
   // Flatten to legacy shape for backward compat
-  const suggestions: AutoCompleteSuggestion[] = structuredSuggestions.map((s) => ({
-    title: s.action.title,
-    description: s.action.description,
-    priority: s.action.priority,
-    estimatedMinutes: s.action.estimatedMinutes,
-    tags: s.action.tags,
-  }));
+  const suggestions: AutoCompleteSuggestion[] = useMemo(
+    () =>
+      structuredSuggestions.map((s) => ({
+        title: s.action.title,
+        description: s.action.description,
+        priority: s.action.priority,
+        estimatedMinutes: s.action.estimatedMinutes,
+        tags: s.action.tags,
+      })),
+    [structuredSuggestions],
+  );
 
   return { suggestions, structuredSuggestions, isLoading, error };
 }
@@ -206,14 +227,30 @@ export function useSmartAutomation(taskInput: SmartAutomationTaskInput | null) {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastFetchedRef = useRef<string | null>(null);
+
+  // Stabilize the dependency: serialize to a string key so object identity doesn't matter
+  const inputKey = taskInput
+    ? JSON.stringify({
+        title: taskInput.title.trim(),
+        description: taskInput.description,
+        priority: taskInput.priority,
+      })
+    : null;
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    if (!taskInput || taskInput.title.trim().length < 3) {
+    if (!taskInput || !inputKey || taskInput.title.trim().length < 3) {
       setSuggestion(null);
       setIsLoading(false);
       setError(null);
+      lastFetchedRef.current = null;
+      return;
+    }
+
+    // Skip if already fetched for this exact input
+    if (lastFetchedRef.current === inputKey) {
       return;
     }
 
@@ -234,6 +271,7 @@ export function useSmartAutomation(taskInput: SmartAutomationTaskInput | null) {
           if (!controller.signal.aborted) {
             setSuggestion(data);
             setIsLoading(false);
+            lastFetchedRef.current = inputKey;
           }
         })
         .catch((err: unknown) => {
@@ -244,18 +282,19 @@ export function useSmartAutomation(taskInput: SmartAutomationTaskInput | null) {
             setIsLoading(false);
           }
         });
-    }, 500);
+    }, 800);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (abortRef.current) abortRef.current.abort();
     };
-  }, [taskInput]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputKey]);
 
   return { suggestion, isLoading, error };
 }
 
-// ---------- 3. useSmartDecomposition ----------
+// ---------- 4. useSmartDecomposition ----------
 
 export interface SmartDecompositionTaskInput {
   taskId?: string;
@@ -272,8 +311,18 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Stabilize dependency
+  const inputKey = taskInput
+    ? JSON.stringify({
+        taskId: taskInput.taskId,
+        title: taskInput.title.trim(),
+        description: taskInput.description,
+        priority: taskInput.priority,
+      })
+    : null;
+
   useEffect(() => {
-    if (!taskInput || taskInput.title.trim().length < 3) {
+    if (!taskInput || !inputKey || taskInput.title.trim().length < 3) {
       setResult(null);
       setIsLoading(false);
       setError(null);
@@ -317,12 +366,13 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
     return () => {
       controller.abort();
     };
-  }, [taskInput]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputKey]);
 
   return { result, isLoading, error };
 }
 
-// ---------- 4. useBatchDecompose ----------
+// ---------- 5. useBatchDecompose ----------
 
 export function useBatchDecompose() {
   const [isLoading, setIsLoading] = useState(false);
@@ -366,7 +416,7 @@ export function useBatchDecompose() {
   return { decompose, isLoading, error };
 }
 
-// ---------- 5. useSmartTimeslot ----------
+// ---------- 6. useSmartTimeslot ----------
 
 export interface SmartTimeslotTaskInput {
   workspaceId: string;
@@ -380,8 +430,16 @@ export function useSmartTimeslot(taskInput: SmartTimeslotTaskInput | null) {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const inputKey = taskInput
+    ? JSON.stringify({
+        workspaceId: taskInput.workspaceId,
+        taskId: taskInput.taskId,
+        date: taskInput.date,
+      })
+    : null;
+
   useEffect(() => {
-    if (!taskInput) {
+    if (!taskInput || !inputKey) {
       setResult(null);
       setIsLoading(false);
       setError(null);
@@ -422,7 +480,8 @@ export function useSmartTimeslot(taskInput: SmartTimeslotTaskInput | null) {
     return () => {
       controller.abort();
     };
-  }, [taskInput]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputKey]);
 
   return { result, isLoading, error };
 }
