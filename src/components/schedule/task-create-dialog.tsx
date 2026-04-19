@@ -237,7 +237,7 @@ export function TaskCreateDialog({
                 )}
 
                 {/* Tool calls */}
-                {toolCalls.length > 0 && (
+                {toolCalls?.length > 0 && (
                   <div className="border-b border-border/20 px-3 py-1.5">
                     {toolCalls.map((tc, i) => (
                       <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">

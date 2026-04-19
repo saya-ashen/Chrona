@@ -189,6 +189,27 @@ export function getDayKey(value: Date | string | null | undefined) {
   );
 }
 
+/**
+ * Safely extract a Unix-ms timestamp from a Date or ISO string.
+ * Returns `null` for nullish / invalid inputs.
+ */
+export function toTimestamp(value: Date | string | null | undefined): number | null {
+  if (!value) return null;
+  const d = typeof value === "string" ? new Date(value) : value;
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Safely convert a Date-or-string into a real Date object.
+ * Returns `null` for nullish / invalid inputs.
+ */
+export function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = typeof value === "string" ? new Date(value) : value;
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 export function formatShortDay(
   value: Date | null | undefined,
   locale: string,
@@ -290,8 +311,8 @@ export function getBlockDurationMinutes(item: {
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
 }) {
-  const start = item.scheduledStartAt ? item.scheduledStartAt.getTime() : null;
-  const end = item.scheduledEndAt ? item.scheduledEndAt.getTime() : null;
+  const start = toTimestamp(item.scheduledStartAt);
+  const end = toTimestamp(item.scheduledEndAt);
 
   if (start === null || end === null) {
     return DEFAULT_SCHEDULE_BLOCK_MINUTES;
@@ -437,8 +458,8 @@ export function buildWeekGroups(
   return groups.map((group) => ({
     ...group,
     items: [...group.items].sort((a, b) => {
-      const aTime = a.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const bTime = b.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const aTime = toTimestamp(a.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
+      const bTime = toTimestamp(b.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
       return aTime - bTime;
     }),
   }));
@@ -446,8 +467,8 @@ export function buildWeekGroups(
 
 export function sortScheduledItems(items: ScheduledItem[]) {
   return [...items].sort((a, b) => {
-    const aTime = a.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const bTime = b.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const aTime = toTimestamp(a.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
+    const bTime = toTimestamp(b.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
     return aTime - bTime;
   });
 }
@@ -926,7 +947,7 @@ function getScheduledMinutesForItem(item: {
   }
 
   return Math.max(
-    Math.round((item.scheduledEndAt.getTime() - item.scheduledStartAt.getTime()) / 60000),
+    Math.round(((toTimestamp(item.scheduledEndAt) ?? 0) - (toTimestamp(item.scheduledStartAt) ?? 0)) / 60000),
     TIMELINE_SLOT_MINUTES,
   );
 }
@@ -945,14 +966,14 @@ function countScheduleConflicts(items: ScheduledItem[]) {
 
   for (const dayItems of byDay.values()) {
     const sorted = [...dayItems].sort((left, right) => {
-      const leftStart = left.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const rightStart = right.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const leftStart = toTimestamp(left.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
+      const rightStart = toTimestamp(right.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
       return leftStart - rightStart;
     });
 
     for (let index = 1; index < sorted.length; index += 1) {
-      const previousEnd = sorted[index - 1].scheduledEndAt?.getTime() ?? 0;
-      const currentStart = sorted[index].scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const previousEnd = toTimestamp(sorted[index - 1].scheduledEndAt) ?? 0;
+      const currentStart = toTimestamp(sorted[index].scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
 
       if (currentStart < previousEnd) {
         conflicts += 1;
@@ -1009,14 +1030,14 @@ function getLargestIdleWindowMinutes(items: ScheduledItem[]) {
 
   for (const dayItems of byDay.values()) {
     const sorted = [...dayItems].sort((left, right) => {
-      const leftStart = left.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const rightStart = right.scheduledStartAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const leftStart = toTimestamp(left.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
+      const rightStart = toTimestamp(right.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
       return leftStart - rightStart;
     });
 
     for (let index = 1; index < sorted.length; index += 1) {
-      const previousEnd = sorted[index - 1].scheduledEndAt?.getTime() ?? 0;
-      const currentStart = sorted[index].scheduledStartAt?.getTime() ?? previousEnd;
+      const previousEnd = toTimestamp(sorted[index - 1].scheduledEndAt) ?? 0;
+      const currentStart = toTimestamp(sorted[index].scheduledStartAt) ?? previousEnd;
       largestGap = Math.max(largestGap, Math.round((currentStart - previousEnd) / 60000));
     }
   }
@@ -1033,7 +1054,8 @@ function countDueSoonUnscheduledItems(items: UnscheduledItem[]) {
       return false;
     }
 
-    const dueAt = item.dueAt.getTime();
+    const dueAt = toTimestamp(item.dueAt);
+    if (dueAt === null) return false;
     return dueAt >= today.getTime() && dueAt < tomorrow;
   }).length;
 }

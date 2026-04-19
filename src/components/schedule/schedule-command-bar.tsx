@@ -55,7 +55,7 @@ export function ScheduleCommandBar({
   );
 
   const showPanel = showSuggestions && (
-    structuredSuggestions.length > 0 ||
+    (structuredSuggestions?.length ?? 0) > 0 ||
     (aiLoading && phase !== "idle")
   );
 
@@ -164,7 +164,7 @@ export function ScheduleCommandBar({
               )}
 
               {/* Tool calls */}
-              {toolCalls.length > 0 && (
+              {toolCalls?.length > 0 && (
                 <div className="border-b border-border/20 px-3 py-1.5">
                   {toolCalls.map((tc, i) => (
                     <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -176,7 +176,7 @@ export function ScheduleCommandBar({
               )}
 
               {/* Suggestion list */}
-              {structuredSuggestions.slice(0, 5).map((s, i) => (
+              {(structuredSuggestions ?? []).slice(0, 5).map((s, i) => (
                 <button
                   key={`${s.id}-${i}`}
                   type="button"
@@ -202,7 +202,7 @@ export function ScheduleCommandBar({
               ))}
 
               {/* Loading placeholder when no suggestions yet */}
-              {structuredSuggestions.length === 0 && aiLoading && (
+              {(structuredSuggestions?.length ?? 0) === 0 && aiLoading && (
                 <div className="px-3 py-3 text-center text-xs text-muted-foreground">
                   正在生成建议...
                 </div>

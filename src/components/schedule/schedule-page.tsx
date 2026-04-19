@@ -62,6 +62,7 @@ import {
   sortScheduledItems,
   startOfDay,
   startOfWeek,
+  toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 import { SurfaceCard } from "@/components/ui/surface-card";
@@ -525,7 +526,7 @@ export function SchedulePage({
       scheduledEndAt:
         draft.scheduledEndAt ??
         new Date(
-          (draft.scheduledStartAt ?? new Date()).getTime() +
+          (toTimestamp(draft.scheduledStartAt) ?? Date.now()) +
             DEFAULT_SCHEDULE_BLOCK_MINUTES * 60 * 1000,
         ),
     };
