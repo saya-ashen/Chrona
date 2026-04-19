@@ -1,7 +1,7 @@
 "use client";
 
-import { Bot, Calendar, ChevronDown, GripVertical } from "lucide-react";
-import { type DragEvent, useMemo, useState } from "react";
+import { Bot, Calendar, ChevronDown, GripVertical, ListTree } from "lucide-react";
+import { type DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
 import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
 import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
@@ -247,9 +247,23 @@ export function SelectedBlockSheet({
         </div>
 
         <div className="mt-4 space-y-4 overflow-y-auto pr-1 text-sm text-muted-foreground md:max-h-[calc(100vh-9rem)]">
+          {/* ── Title + meta ── */}
           <div className="space-y-2">
             <p className="text-base font-medium text-foreground">{item.title}</p>
-            <p>
+            <ItemMeta item={item} />
+          </div>
+
+          {/* ── 1. Time adjustment (top) ── */}
+          <SurfaceCard
+            as="div"
+            variant="inset"
+            padding="sm"
+            className="rounded-2xl border-dashed"
+          >
+            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {copy.adjustBlock}
+            </p>
+            <p className="mb-2 text-xs text-muted-foreground">
               {formatTimeRange(
                 item.scheduledStartAt,
                 item.scheduledEndAt,
@@ -257,9 +271,17 @@ export function SelectedBlockSheet({
                 copy,
               )}
             </p>
-            <ItemMeta item={item} />
-          </div>
+            <ScheduleEditorForm
+              taskId={item.taskId}
+              dueAt={item.dueAt}
+              scheduledStartAt={item.scheduledStartAt}
+              scheduledEndAt={item.scheduledEndAt}
+              submitLabel={copy.scheduleTask}
+              onMutatedAction={onMutatedAction}
+            />
+          </SurfaceCard>
 
+          {/* ── 2. Status grid ── */}
           <DetailGrid
             items={[
               { label: copy.due, value: formatDateTime(item.dueAt, locale) },
@@ -278,31 +300,7 @@ export function SelectedBlockSheet({
             ]}
           />
 
-          <AutomationSuggestionForItem item={item} />
-
-          <TaskDecompositionPanel
-            taskId={item.taskId}
-            title={item.title}
-            description={item.description}
-            priority={item.priority}
-            dueAt={item.dueAt}
-            onApply={async () => {
-              // Call batch-decompose API to persist subtasks in DB
-              try {
-                const res = await fetch("/api/ai/batch-decompose", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ taskId: item.taskId }),
-                });
-                if (!res.ok) throw new Error("Batch decompose failed");
-                // Refresh parent data
-                await onMutatedAction();
-              } catch (err) {
-                console.error("[TaskDecomposition] Failed to apply:", err);
-              }
-            }}
-          />
-
+          {/* ── 3. Task config (description in main, adapter/model/prompt in advanced) ── */}
           <SurfaceCard
             as="div"
             variant="inset"
@@ -323,31 +321,44 @@ export function SelectedBlockSheet({
             />
           </SurfaceCard>
 
+          {/* ── 4. Subtasks list ── */}
+          <SubtasksList parentTaskId={item.taskId} workspaceId={item.workspaceId} />
+
+          {/* ── 5. AI panels ── */}
+          <AutomationSuggestionForItem item={item} />
+
+          <TaskDecompositionPanel
+            taskId={item.taskId}
+            title={item.title}
+            description={item.description}
+            priority={item.priority}
+            dueAt={item.dueAt}
+            onApply={async (result) => {
+              // Pass pre-generated subtasks to batch-decompose
+              try {
+                const res = await fetch("/api/ai/batch-decompose", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    taskId: item.taskId,
+                    subtasks: result.subtasks,
+                  }),
+                });
+                if (!res.ok) throw new Error("Batch decompose failed");
+                await onMutatedAction();
+              } catch (err) {
+                console.error("[TaskDecomposition] Failed to apply:", err);
+              }
+            }}
+          />
+
+          {/* ── 6. Workbench link ── */}
           <TaskContextLinks
             workspaceId={item.workspaceId}
             taskId={item.taskId}
             latestRunStatus={item.latestRunStatus}
             workLabel={t("common.openWorkbench")}
           />
-
-          <SurfaceCard
-            as="div"
-            variant="inset"
-            padding="sm"
-            className="rounded-2xl border-dashed"
-          >
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {copy.adjustBlock}
-            </p>
-            <ScheduleEditorForm
-              taskId={item.taskId}
-              dueAt={item.dueAt}
-              scheduledStartAt={item.scheduledStartAt}
-              scheduledEndAt={item.scheduledEndAt}
-              submitLabel={copy.scheduleTask}
-              onMutatedAction={onMutatedAction}
-            />
-          </SurfaceCard>
         </div>
       </section>
     </>
@@ -727,6 +738,77 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
         </div>
       </div>
     </SurfaceCard>
+  );
+}
+
+type SubtaskData = {
+  id: string;
+  title: string;
+  priority: string;
+  persistedStatus: string | null;
+};
+
+function SubtasksList({
+  parentTaskId,
+  workspaceId,
+}: {
+  parentTaskId: string;
+  workspaceId: string;
+}) {
+  const [subtasks, setSubtasks] = useState<SubtaskData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSubtasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
+      if (!res.ok) {
+        setSubtasks([]);
+        return;
+      }
+      const data = await res.json();
+      setSubtasks(Array.isArray(data) ? data : data.tasks ?? []);
+    } catch {
+      setSubtasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [parentTaskId]);
+
+  useEffect(() => {
+    void fetchSubtasks();
+  }, [fetchSubtasks]);
+
+  if (loading) return null;
+  if (subtasks.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        <ListTree className="size-3" />
+        <span>子任务 ({subtasks.length})</span>
+      </div>
+      <div className="space-y-1">
+        {subtasks.map((sub) => (
+          <LocalizedLink
+            key={sub.id}
+            href={`/workspaces/${workspaceId}/work/${sub.id}`}
+            className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 text-sm transition hover:border-primary/40 hover:bg-primary/5"
+          >
+            <span className="truncate font-medium text-foreground">
+              {sub.title}
+            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <StatusBadge tone={getPriorityTone(sub.priority)}>
+                {sub.priority}
+              </StatusBadge>
+              {sub.persistedStatus ? (
+                <StatusBadge>{sub.persistedStatus}</StatusBadge>
+              ) : null}
+            </div>
+          </LocalizedLink>
+        ))}
+      </div>
+    </div>
   );
 }
 

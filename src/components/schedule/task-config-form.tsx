@@ -630,62 +630,52 @@ export function TaskConfigForm({
         </Field>
 
         {!compact ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Field label={copy.priority} className="text-xs text-muted-foreground">
-              <select
-                name="priority"
-                value={formState.priority}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  priority: event.target.value as TaskConfigFormInput["priority"],
-                }))
-              }
-              className={selectClassName}
-            >
-              {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
-                <option key={priority} value={priority}>
-                  {copy.priorities[priority]}
-                </option>
-              ))}
-            </select>
-            </Field>
-
-            <Field label={copy.dueDate} className="text-xs text-muted-foreground">
-              <input
-                name="dueAt"
-                type="datetime-local"
-                value={formState.dueAt}
-                onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
-                className={inputClassName}
+          <>
+            <Field label={copy.description} className="text-xs text-muted-foreground">
+              <textarea
+                name="description"
+                rows={3}
+                value={formState.description}
+                onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                placeholder={copy.descriptionPlaceholder}
+                className={textareaClassName}
               />
             </Field>
-          </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={copy.priority} className="text-xs text-muted-foreground">
+                <select
+                  name="priority"
+                  value={formState.priority}
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    priority: event.target.value as TaskConfigFormInput["priority"],
+                  }))
+                }
+                className={selectClassName}
+              >
+                {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
+                  <option key={priority} value={priority}>
+                    {copy.priorities[priority]}
+                  </option>
+                ))}
+              </select>
+              </Field>
+
+              <Field label={copy.dueDate} className="text-xs text-muted-foreground">
+                <input
+                  name="dueAt"
+                  type="datetime-local"
+                  value={formState.dueAt}
+                  onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
+                  className={inputClassName}
+                />
+              </Field>
+            </div>
+          </>
         ) : null}
 
-        {runtimeAdapters.length > 1 && !compact ? (
-          <Field label={copy.adapter} className="text-xs text-muted-foreground">
-            <select
-              name="runtimeAdapterKey"
-              value={formState.runtimeAdapterKey}
-              onChange={(event) =>
-                setFormState((current) =>
-                  applyRuntimeAdapterChange(
-                    current,
-                    resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
-                  ),
-                )
-              }
-              className={selectClassName}
-            >
-              {runtimeAdapters.map((adapter) => (
-                <option key={adapter.key} value={adapter.key}>
-                  {adapter.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : null}
 
         {(compact ? requiredRuntimeFields : visibleStandardFields).map((field) => {
           const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
@@ -859,16 +849,31 @@ export function TaskConfigForm({
                 </Field>
               </>
             ) : (
-              <Field label={copy.description} className="text-xs text-muted-foreground">
-                <textarea
-                  name="description"
-                  rows={3}
-                  value={formState.description}
-                  onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
-                  placeholder={copy.descriptionPlaceholder}
-                  className={textareaClassName}
-                />
-              </Field>
+              <>
+                {runtimeAdapters.length > 1 ? (
+                  <Field label={copy.adapter} className="text-xs text-muted-foreground">
+                    <select
+                      name="runtimeAdapterKey"
+                      value={formState.runtimeAdapterKey}
+                      onChange={(event) =>
+                        setFormState((current) =>
+                          applyRuntimeAdapterChange(
+                            current,
+                            resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
+                          ),
+                        )
+                      }
+                      className={selectClassName}
+                    >
+                      {runtimeAdapters.map((adapter) => (
+                        <option key={adapter.key} value={adapter.key}>
+                          {adapter.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+              </>
             )}
 
             {(compact ? [...optionalRuntimeFields, ...visibleAdvancedFields] : visibleAdvancedFields).map((field) => {

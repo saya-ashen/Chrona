@@ -6,15 +6,15 @@ import type { TaskDecompositionInput } from "@/modules/ai/types";
 
 /**
  * POST /api/ai/batch-decompose — Decompose a task into subtasks and create them all in one call.
- * Body: { taskId }
+ * Body: { taskId, subtasks? }
  *
- * Calls decomposeTaskSmart to generate subtask suggestions, then creates each
- * as a real Task record with parentTaskId set to the original task.
+ * If `subtasks` array is provided, uses those directly instead of calling AI.
+ * Otherwise calls decomposeTaskSmart to generate subtask suggestions.
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { taskId } = body;
+    const { taskId, subtasks: providedSubtasks } = body;
 
     if (!taskId) {
       return NextResponse.json(
@@ -35,30 +35,62 @@ export async function POST(request: Request) {
       );
     }
 
-    // Compute estimatedMinutes from scheduled window if available
-    let estimatedMinutes: number | undefined;
-    if (task.scheduledStartAt && task.scheduledEndAt) {
-      estimatedMinutes = Math.round(
-        (task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000,
-      );
-    }
-
-    // Decompose the task using AI
-    const input: TaskDecompositionInput = {
-      taskId: task.id,
-      title: task.title,
-      description: task.description ?? undefined,
-      priority: task.priority,
-      dueAt: task.dueAt,
-      estimatedMinutes,
+    // Use provided subtasks or generate via AI
+    let subtaskSuggestions: Array<{
+      title: string;
+      description?: string;
+      priority?: string;
+      estimatedMinutes?: number;
+      order?: number;
+    }>;
+    let decompositionMeta: {
+      totalEstimatedMinutes: number;
+      feasibilityScore: number;
+      warnings: string[];
     };
 
-    const decomposition = await decomposeTaskSmart(input);
+    if (providedSubtasks && Array.isArray(providedSubtasks) && providedSubtasks.length > 0) {
+      // Use pre-generated subtasks from the frontend
+      subtaskSuggestions = providedSubtasks;
+      decompositionMeta = {
+        totalEstimatedMinutes: providedSubtasks.reduce(
+          (sum: number, s: { estimatedMinutes?: number }) => sum + (s.estimatedMinutes ?? 0),
+          0,
+        ),
+        feasibilityScore: 80,
+        warnings: [],
+      };
+    } else {
+      // Generate via AI
+      let estimatedMinutes: number | undefined;
+      if (task.scheduledStartAt && task.scheduledEndAt) {
+        estimatedMinutes = Math.round(
+          (task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000,
+        );
+      }
 
-    // Create each suggested subtask as a real task in the DB
+      const input: TaskDecompositionInput = {
+        taskId: task.id,
+        title: task.title,
+        description: task.description ?? undefined,
+        priority: task.priority,
+        dueAt: task.dueAt,
+        estimatedMinutes,
+      };
+
+      const decomposition = await decomposeTaskSmart(input);
+      subtaskSuggestions = decomposition.subtasks;
+      decompositionMeta = {
+        totalEstimatedMinutes: decomposition.totalEstimatedMinutes,
+        feasibilityScore: decomposition.feasibilityScore,
+        warnings: decomposition.warnings,
+      };
+    }
+
+    // Create each subtask as a real task in the DB
     const createdSubtasks = [];
 
-    for (const suggestion of decomposition.subtasks) {
+    for (const suggestion of subtaskSuggestions) {
       const result = await createTask({
         workspaceId: task.workspaceId,
         title: suggestion.title,
@@ -79,11 +111,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       parentTaskId: taskId,
       subtasks: createdSubtasks,
-      decomposition: {
-        totalEstimatedMinutes: decomposition.totalEstimatedMinutes,
-        feasibilityScore: decomposition.feasibilityScore,
-        warnings: decomposition.warnings,
-      },
+      decomposition: decompositionMeta,
     }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to batch decompose task";
