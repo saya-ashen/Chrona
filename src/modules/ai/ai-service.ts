@@ -21,6 +21,7 @@ import {
   type SuggestTimeslotResponse,
   type ChatRequest,
   type ChatResponse,
+  type StreamEvent,
   AiClientError,
   suggest,
   decompose,
@@ -28,6 +29,7 @@ import {
   suggestTimeslots,
   chat,
   checkClientHealth,
+  suggestStream,
 } from "./ai-client";
 
 // ────────────────────────────────────────────────────────────────────
@@ -110,6 +112,15 @@ export async function aiChat(request: ChatRequest): Promise<ChatResponse | null>
   return chat(client, request);
 }
 
+export async function* aiSuggestStream(request: SmartSuggestRequest): AsyncGenerator<StreamEvent> {
+  const client = await getClientForFeature("suggest");
+  if (!client) {
+    yield { type: "error", message: "No AI client configured for suggestions" };
+    return;
+  }
+  yield* suggestStream(client, request);
+}
+
 export async function isAIAvailable(): Promise<boolean> {
   const clients = await db.aiClient.findMany({ where: { enabled: true } });
   if (clients.length === 0) return false;
@@ -169,4 +180,5 @@ export type {
   AiClientRecord,
   AiClientType,
   AiFeature,
+  StreamEvent,
 } from "./ai-client";

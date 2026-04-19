@@ -1,13 +1,8 @@
-import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { aiSuggest } from "@/modules/ai/ai-service";
+import { aiSuggestStream } from "@/modules/ai/ai-service";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/ai-service";
 import { db } from "@/lib/db";
 import type { StructuredSuggestion } from "@/hooks/use-ai";
-
-// ────────────────────────────────────────────────────────────────────
-// Response type
-// ────────────────────────────────────────────────────────────────────
 
 // Re-export for consumers of this route
 export type { StructuredSuggestion };
@@ -112,7 +107,60 @@ function ruleBasedSuggest(title: string): StructuredSuggestion[] {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Route handler
+// JSON extraction from LLM output
+// ────────────────────────────────────────────────────────────────────
+
+function tryExtractSuggestions(text: string): StructuredSuggestion[] | null {
+  const jsonMatch =
+    text.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  const jsonStr = jsonMatch?.[1] ?? text;
+  try {
+    const parsed = JSON.parse(jsonStr.trim()) as {
+      suggestions?: Array<{
+        title?: string;
+        description?: string;
+        priority?: string;
+        estimatedMinutes?: number;
+        tags?: string[];
+        suggestedSlot?: { startAt: string; endAt: string };
+      }>;
+    };
+    if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) return null;
+    return parsed.suggestions
+      .filter((s) => s.title)
+      .map((s) => ({
+        id: randomUUID(),
+        summary: generateSummary({
+          title: s.title!,
+          priority: s.priority ?? "Medium",
+          estimatedMinutes: s.estimatedMinutes ?? 30,
+        }),
+        action: {
+          type: "create_task" as const,
+          title: s.title!,
+          description: s.description ?? "",
+          priority: (s.priority ?? "Medium") as "Low" | "Medium" | "High" | "Urgent",
+          estimatedMinutes: s.estimatedMinutes ?? 30,
+          tags: s.tags ?? [],
+          scheduledStartAt: s.suggestedSlot?.startAt,
+          scheduledEndAt: s.suggestedSlot?.endAt,
+        },
+      }));
+  } catch {
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// SSE helper
+// ────────────────────────────────────────────────────────────────────
+
+function sseEncode(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Route handler — SSE streaming
 // ────────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -121,27 +169,25 @@ export async function POST(request: Request) {
     const { title, workspaceId } = body;
 
     if (!title || typeof title !== "string" || title.trim().length < 2) {
-      return NextResponse.json(
-        { error: "title is required (min 2 characters)" },
-        { status: 400 },
-      );
+      return new Response(JSON.stringify({ error: "title is required (min 2 characters)" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const trimmedTitle = title.trim();
+    const requestId = randomUUID();
 
-    // Try AI adapter first
+    // Build context
     let context: { existingTasks?: TaskSnapshot[]; scheduleHealth?: ScheduleHealthSnapshot } | undefined;
-
     if (workspaceId) {
       try {
-        // Fetch lightweight context for AI
         const recentTasks = await db.taskProjection.findMany({
           where: { workspaceId },
           take: 10,
           orderBy: { updatedAt: "desc" },
           include: { task: { select: { title: true, status: true, priority: true } } },
         });
-
         context = {
           existingTasks: recentTasks.map((p) => ({
             id: p.taskId,
@@ -153,54 +199,121 @@ export async function POST(request: Request) {
           })),
         };
       } catch {
-        // Non-critical, proceed without context
+        // Non-critical
       }
     }
 
-    const aiResult = await aiSuggest({
-      input: trimmedTitle,
-      kind: "auto-complete",
-      workspaceId,
-      context,
+    // Create SSE stream
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Send rule-based suggestions immediately as a fast first response
+          const ruleSuggestions = ruleBasedSuggest(trimmedTitle);
+          if (ruleSuggestions.length > 0) {
+            controller.enqueue(
+              encoder.encode(sseEncode("suggestions", {
+                suggestions: ruleSuggestions,
+                source: "rules",
+                requestId,
+                isFinal: false,
+              })),
+            );
+          }
+
+          // Stream AI suggestions
+          let fullText = "";
+          const gen = aiSuggestStream({
+            input: trimmedTitle,
+            kind: "auto-complete",
+            workspaceId,
+            context,
+          });
+
+          for await (const event of gen) {
+            switch (event.type) {
+              case "status":
+                controller.enqueue(
+                  encoder.encode(sseEncode("status", { message: event.message })),
+                );
+                break;
+              case "tool_call":
+                controller.enqueue(
+                  encoder.encode(sseEncode("tool_call", { tool: event.tool, input: event.input })),
+                );
+                break;
+              case "tool_result":
+                controller.enqueue(
+                  encoder.encode(sseEncode("tool_result", { tool: event.tool, result: event.result })),
+                );
+                break;
+              case "partial":
+                fullText += event.text;
+                controller.enqueue(
+                  encoder.encode(sseEncode("partial", { text: event.text })),
+                );
+                break;
+              case "done":
+                fullText = event.text;
+                // Try to parse final suggestions
+                const aiSuggestions = tryExtractSuggestions(fullText);
+                if (aiSuggestions && aiSuggestions.length > 0) {
+                  controller.enqueue(
+                    encoder.encode(sseEncode("suggestions", {
+                      suggestions: aiSuggestions,
+                      source: "ai",
+                      requestId,
+                      isFinal: true,
+                    })),
+                  );
+                }
+                break;
+              case "error":
+                controller.enqueue(
+                  encoder.encode(sseEncode("error", { message: event.message })),
+                );
+                break;
+            }
+          }
+
+          // If no AI suggestions were generated, ensure we mark as final
+          if (!fullText) {
+            controller.enqueue(
+              encoder.encode(sseEncode("suggestions", {
+                suggestions: ruleSuggestions,
+                source: "rules",
+                requestId,
+                isFinal: true,
+              })),
+            );
+          }
+
+          controller.enqueue(encoder.encode(sseEncode("done", { requestId })));
+          controller.close();
+        } catch (error) {
+          console.error("Stream error:", error);
+          controller.enqueue(
+            encoder.encode(sseEncode("error", {
+              message: error instanceof Error ? error.message : "Unknown error",
+            })),
+          );
+          controller.close();
+        }
+      },
     });
 
-    if (aiResult && aiResult.suggestions.length > 0) {
-      const structured: StructuredSuggestion[] = aiResult.suggestions.map((s) => ({
-        id: randomUUID(),
-        summary: generateSummary(s),
-        action: {
-          type: "create_task" as const,
-          title: s.title,
-          description: s.description,
-          priority: s.priority,
-          estimatedMinutes: s.estimatedMinutes,
-          tags: s.tags,
-          scheduledStartAt: s.suggestedSlot?.startAt,
-          scheduledEndAt: s.suggestedSlot?.endAt,
-        },
-      }));
-
-      const response: AutoCompleteAPIResponse = {
-        suggestions: structured,
-        source: aiResult.source,
-        requestId: aiResult.requestId,
-      };
-      return NextResponse.json(response);
-    }
-
-    // Fallback to rule-based
-    const ruleSuggestions = ruleBasedSuggest(trimmedTitle);
-    const response: AutoCompleteAPIResponse = {
-      suggestions: ruleSuggestions,
-      source: "rules",
-      requestId: randomUUID(),
-    };
-    return NextResponse.json(response);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     console.error("Error in auto-complete:", error);
-    return NextResponse.json(
-      { error: "Failed to generate suggestions" },
-      { status: 500 },
-    );
+    return new Response(JSON.stringify({ error: "Failed to generate suggestions" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
