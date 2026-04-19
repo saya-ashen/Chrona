@@ -777,7 +777,7 @@ export function TaskConfigForm({
           );
         })}
 
-        <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3" open={!compact}>
+        <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
           <summary className="cursor-pointer text-sm font-medium text-foreground">{compact ? copy.moreOptions : copy.advancedFields}</summary>
 
           <div className="mt-3 space-y-3">

@@ -15,6 +15,7 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
       label: "Model",
       description: "Choose the model used for this run",
       required: true,
+      advanced: true,
       constraints: {
         maxLength: 200,
       },
@@ -26,6 +27,7 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
       label: "Prompt / instructions",
       description: "Describe the task, constraints, and expected output",
       required: true,
+      advanced: true,
       constraints: {
         maxLength: 20000,
       },

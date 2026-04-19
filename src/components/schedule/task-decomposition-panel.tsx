@@ -24,6 +24,7 @@ export interface TaskDecompositionPanelProps {
   priority: string;
   dueAt?: Date | null;
   estimatedMinutes?: number;
+  autoRequest?: boolean;
   onApply?: (result: TaskDecompositionResult) => void;
 }
 
@@ -55,10 +56,11 @@ export function TaskDecompositionPanel({
   priority,
   dueAt,
   estimatedMinutes,
+  autoRequest = false,
   onApply,
 }: TaskDecompositionPanelProps) {
   // Only trigger AI when user explicitly requests it
-  const [requested, setRequested] = useState(false);
+  const [requested, setRequested] = useState(autoRequest);
 
   const { result, isLoading, error } = useSmartDecomposition(
     requested
