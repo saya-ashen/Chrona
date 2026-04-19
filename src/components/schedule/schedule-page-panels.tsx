@@ -1,12 +1,9 @@
 "use client";
 
-import { Bot, Calendar, ChevronDown, GripVertical, ListTree } from "lucide-react";
-import { type DragEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
-import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
-import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { Calendar, ChevronDown, GripVertical, ListTree } from "lucide-react";
+import { type DragEvent, useCallback, useEffect, useState } from "react";
+import { AiInsightsPanel } from "@/components/schedule/ai-insights-panel";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
-import { useSmartAutomation } from "@/hooks/use-ai";
 import type { ScheduleSlot } from "@/modules/ai/types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
@@ -324,17 +321,10 @@ export function SelectedBlockSheet({
           {/* ── 4. Subtasks list ── */}
           <SubtasksList parentTaskId={item.taskId} workspaceId={item.workspaceId} />
 
-          {/* ── 5. AI panels ── */}
-          <AutomationSuggestionForItem item={item} />
-
-          <TaskDecompositionPanel
-            taskId={item.taskId}
-            title={item.title}
-            description={item.description}
-            priority={item.priority}
-            dueAt={item.dueAt}
-            onApply={async (result) => {
-              // Pass pre-generated subtasks to batch-decompose
+          {/* ── 5. AI insights (tabbed: automation + decomposition) ── */}
+          <AiInsightsPanel
+            item={item}
+            onApplyDecomposition={async (result) => {
               try {
                 const res = await fetch("/api/ai/batch-decompose", {
                   method: "POST",
@@ -812,53 +802,3 @@ function SubtasksList({
   );
 }
 
-function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
-  const [requested, setRequested] = useState(false);
-
-  const { suggestion, isLoading } = useSmartAutomation(
-    requested
-      ? {
-          title: item.title,
-          description: item.description ?? undefined,
-          priority: item.priority,
-          dueAt: item.dueAt,
-          scheduledStartAt: item.scheduledStartAt,
-          scheduledEndAt: item.scheduledEndAt,
-          isRunnable: item.isRunnable,
-          runnabilityState: item.runnabilityState,
-          ownerType: item.ownerType,
-        }
-      : null,
-  );
-
-  const preparationSteps: PreparationStep[] = useMemo(() => {
-    if (!suggestion) return [];
-    return suggestion.preparationSteps.map((step, index) => ({
-      id: `${item.taskId}-prep-${index}`,
-      text: step,
-      completed: false,
-    }));
-  }, [suggestion, item.taskId]);
-
-  return (
-    <div className="space-y-3">
-      {!requested && !suggestion ? (
-        <button
-          type="button"
-          onClick={() => setRequested(true)}
-          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-        >
-          <Bot className="size-4" />
-          <span>AI 自动化建议</span>
-        </button>
-      ) : (
-        <>
-          <AutomationSuggestionPanel suggestion={suggestion} isLoading={isLoading} />
-          {preparationSteps.length > 0 ? (
-            <PreparationChecklist steps={preparationSteps} />
-          ) : null}
-        </>
-      )}
-    </div>
-  );
-}
