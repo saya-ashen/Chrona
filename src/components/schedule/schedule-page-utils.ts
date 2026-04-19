@@ -178,14 +178,15 @@ function formatLocalDateKeyParts(year: number, month: number, day: number) {
   return `${year}-${padDatePart(month)}-${padDatePart(day)}`;
 }
 
-export function getDayKey(value: Date | null | undefined) {
-  return value
-    ? formatLocalDateKeyParts(
-        value.getFullYear(),
-        value.getMonth() + 1,
-        value.getDate(),
-      )
-    : "unspecified";
+export function getDayKey(value: Date | string | null | undefined) {
+  if (!value) return "unspecified";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (isNaN(d.getTime())) return "unspecified";
+  return formatLocalDateKeyParts(
+    d.getFullYear(),
+    d.getMonth() + 1,
+    d.getDate(),
+  );
 }
 
 export function formatShortDay(
