@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         revision: savedPlan.revision,
         summary: savedPlan.summary,
         updatedAt: savedPlan.updatedAt,
+        plan: savedPlan.plan,
       },
     });
   } catch (error) {
