@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Scissors,
   Clock,
@@ -7,6 +8,7 @@ import {
   ChevronDown,
   Check,
   Bot,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -55,22 +57,44 @@ export function TaskDecompositionPanel({
   estimatedMinutes,
   onApply,
 }: TaskDecompositionPanelProps) {
-  const { result, isLoading, error } = useSmartDecomposition({
-    taskId,
-    title,
-    description: description ?? undefined,
-    priority,
-    dueAt,
-    estimatedMinutes,
-  });
+  // Only trigger AI when user explicitly requests it
+  const [requested, setRequested] = useState(false);
 
-  // Loading state – animated skeleton similar to AutomationSuggestionPanel
+  const { result, isLoading, error } = useSmartDecomposition(
+    requested
+      ? {
+          taskId,
+          title,
+          description: description ?? undefined,
+          priority,
+          dueAt,
+          estimatedMinutes,
+        }
+      : null,
+  );
+
+  // Not requested yet — show trigger button
+  if (!requested) {
+    return (
+      <button
+        type="button"
+        onClick={() => setRequested(true)}
+        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+      >
+        <Scissors className="size-4" />
+        <span>AI 任务分解</span>
+        <Sparkles className="ml-auto size-3" />
+      </button>
+    );
+  }
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2 text-sm text-primary">
           <Bot className="size-4 animate-pulse" />
-          <span className="font-medium">AI is decomposing your task...</span>
+          <span className="font-medium">AI 正在分解任务...</span>
         </div>
         <div className="mt-3 space-y-2">
           <div className="h-3 animate-pulse rounded bg-primary/10" />
@@ -81,23 +105,15 @@ export function TaskDecompositionPanel({
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-        <div className="flex items-center gap-2 text-sm text-destructive">
-          <AlertTriangle className="size-4" />
-          <span className="font-medium">Failed to decompose task</span>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <p>Failed to decompose: {error}</p>
       </div>
     );
   }
 
-  // Don't render if decomposition produced no subtasks
-  if (!result || result.subtasks.length === 0) {
-    return null;
-  }
+  if (!result) return null;
 
   return (
     <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -105,38 +121,24 @@ export function TaskDecompositionPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Scissors className="size-4" />
-          AI Decomposition
+          Task Decomposition
         </div>
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-            feasibilityColor(result.feasibilityScore),
-          )}
-        >
-          {result.feasibilityScore}% feasibility
-        </span>
+        {result.feasibilityScore != null && (
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-medium",
+              feasibilityColor(result.feasibilityScore),
+            )}
+          >
+            {result.feasibilityScore}% feasible
+          </span>
+        )}
       </div>
 
-      {/* Subtask list */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Suggested Subtasks
-        </p>
-        <ul className="space-y-0">
-          {result.subtasks.map((subtask, index) => (
-            <SubtaskItem
-              key={`${subtask.order}-${subtask.title}`}
-              subtask={subtask}
-              isLast={index === result.subtasks.length - 1}
-            />
-          ))}
-        </ul>
-      </div>
-
-      {/* Total estimated time */}
-      <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-sm">
-        <Clock className="size-4 text-primary" />
-        <span className="font-medium text-foreground">
+      {/* Summary */}
+      <div className="flex items-center gap-3 text-xs">
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Clock className="size-3" />
           Total: {result.totalEstimatedMinutes} min
         </span>
         <span className="text-xs text-muted-foreground">
@@ -145,7 +147,7 @@ export function TaskDecompositionPanel({
       </div>
 
       {/* Warnings */}
-      {result.warnings.length > 0 ? (
+      {result.warnings && result.warnings.length > 0 ? (
         <div className="space-y-1">
           {result.warnings.map((warning, index) => (
             <div
@@ -159,67 +161,66 @@ export function TaskDecompositionPanel({
         </div>
       ) : null}
 
+      {/* Subtask list */}
+      <div className="space-y-1.5">
+        {result.subtasks.map((subtask: SubtaskSuggestion, index: number) => (
+          <SubtaskRow key={index} subtask={subtask} />
+        ))}
+      </div>
+
       {/* Apply button */}
-      <button
-        type="button"
-        onClick={() => onApply?.(result)}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/20"
-      >
-        <Check className="size-4" />
-        Apply Decomposition
-      </button>
+      {onApply ? (
+        <button
+          type="button"
+          onClick={() => onApply(result)}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition hover:bg-primary/20"
+        >
+          <Check className="size-4" />
+          Apply Decomposition
+        </button>
+      ) : null}
     </div>
   );
 }
 
-function SubtaskItem({
-  subtask,
-  isLast,
-}: {
-  subtask: SubtaskSuggestion;
-  isLast: boolean;
-}) {
+function SubtaskRow({ subtask }: { subtask: SubtaskSuggestion }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <li className="relative">
-      <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-sm">
-        {/* Order number */}
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-          {subtask.order}
+    <div className="rounded-lg border border-border/40 bg-background/60">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+      >
+        <ChevronDown
+          className={cn(
+            "size-3 shrink-0 text-muted-foreground transition",
+            expanded && "rotate-180",
+          )}
+        />
+        <span className="flex-1 truncate font-medium text-foreground">
+          {subtask.title}
         </span>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">{subtask.title}</p>
-          {subtask.description ? (
-            <p className="text-xs text-muted-foreground">
-              {subtask.description}
-            </p>
-          ) : null}
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-              <Clock className="size-2.5" />
-              {subtask.estimatedMinutes}m
-            </span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0 text-[10px] font-medium",
-                priorityTone(subtask.priority),
-              )}
-            >
-              {subtask.priority}
-            </span>
-          </div>
+        <span
+          className={cn(
+            "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+            priorityTone(subtask.priority ?? "Medium"),
+          )}
+        >
+          {subtask.priority ?? "Medium"}
+        </span>
+        {subtask.estimatedMinutes != null && (
+          <span className="text-[10px] text-muted-foreground">
+            {subtask.estimatedMinutes}m
+          </span>
+        )}
+      </button>
+      {expanded && subtask.description ? (
+        <div className="border-t border-border/30 px-3 py-2 text-xs text-muted-foreground">
+          {subtask.description}
         </div>
-      </div>
-
-      {/* Sequential dependency arrow */}
-      {!isLast && subtask.dependsOnPrevious ? (
-        <div className="flex justify-center py-0.5">
-          <ChevronDown className="size-3 text-primary/50" />
-        </div>
-      ) : !isLast ? (
-        <div className="h-1" />
       ) : null}
-    </li>
+    </div>
   );
 }

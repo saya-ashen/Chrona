@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ChevronDown, GripVertical } from "lucide-react";
+import { Bot, Calendar, ChevronDown, GripVertical } from "lucide-react";
 import { type DragEvent, useMemo, useState } from "react";
 import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
 import { PreparationChecklist, type PreparationStep } from "@/components/schedule/preparation-checklist";
@@ -731,17 +731,23 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
 }
 
 function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
-  const { suggestion, isLoading } = useSmartAutomation({
-    title: item.title,
-    description: item.description ?? undefined,
-    priority: item.priority,
-    dueAt: item.dueAt,
-    scheduledStartAt: item.scheduledStartAt,
-    scheduledEndAt: item.scheduledEndAt,
-    isRunnable: item.isRunnable,
-    runnabilityState: item.runnabilityState,
-    ownerType: item.ownerType,
-  });
+  const [requested, setRequested] = useState(false);
+
+  const { suggestion, isLoading } = useSmartAutomation(
+    requested
+      ? {
+          title: item.title,
+          description: item.description ?? undefined,
+          priority: item.priority,
+          dueAt: item.dueAt,
+          scheduledStartAt: item.scheduledStartAt,
+          scheduledEndAt: item.scheduledEndAt,
+          isRunnable: item.isRunnable,
+          runnabilityState: item.runnabilityState,
+          ownerType: item.ownerType,
+        }
+      : null,
+  );
 
   const preparationSteps: PreparationStep[] = useMemo(() => {
     if (!suggestion) return [];
@@ -754,10 +760,23 @@ function AutomationSuggestionForItem({ item }: { item: ScheduledItem }) {
 
   return (
     <div className="space-y-3">
-      <AutomationSuggestionPanel suggestion={suggestion} isLoading={isLoading} />
-      {preparationSteps.length > 0 ? (
-        <PreparationChecklist steps={preparationSteps} />
-      ) : null}
+      {!requested && !suggestion ? (
+        <button
+          type="button"
+          onClick={() => setRequested(true)}
+          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+        >
+          <Bot className="size-4" />
+          <span>AI 自动化建议</span>
+        </button>
+      ) : (
+        <>
+          <AutomationSuggestionPanel suggestion={suggestion} isLoading={isLoading} />
+          {preparationSteps.length > 0 ? (
+            <PreparationChecklist steps={preparationSteps} />
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
