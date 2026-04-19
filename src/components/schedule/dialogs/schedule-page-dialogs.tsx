@@ -1,0 +1,95 @@
+import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import type {
+  SchedulePageData,
+  ScheduleViewMode,
+  TimelineCreateInput,
+} from "@/components/schedule/schedule-page-types";
+import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
+import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+
+export function SchedulePageDialogs({
+  showQuickAddDialog,
+  isPending,
+  dialogDefaults,
+  data,
+  viewModel,
+  activeView,
+  workspaceId,
+  routerPush,
+  locale,
+  localizeHref,
+  buildScheduleViewHref,
+  actionFailedMessage,
+  onCloseQuickAdd,
+  handleCreateTaskBlock,
+  handleApplyDecompositionFromDialog,
+}: {
+  showQuickAddDialog: boolean;
+  isPending: boolean;
+  dialogDefaults: {
+    runtimeAdapterKey: string;
+    runtimeInputVersion: string;
+  };
+  data: SchedulePageData;
+  viewModel: SchedulePageViewModel;
+  activeView: ScheduleViewMode;
+  workspaceId: string;
+  routerPush: (href: string) => void;
+  locale: string;
+  localizeHref: (locale: string, href: string) => string;
+  buildScheduleViewHref: (
+    selectedDay?: string,
+    selectedView?: string,
+    selectedTaskId?: string,
+  ) => string;
+  actionFailedMessage: string;
+  onCloseQuickAdd: () => void;
+  handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
+  handleApplyDecompositionFromDialog: (payload: {
+    result: TaskPlanGraphResponse;
+    title: string;
+    description: string;
+    priority: "Low" | "Medium" | "High" | "Urgent";
+    dueAt: Date | null;
+  }) => Promise<void>;
+}) {
+  if (!showQuickAddDialog) {
+    return null;
+  }
+
+  void data;
+  void workspaceId;
+  void routerPush;
+  void locale;
+  void localizeHref;
+  void buildScheduleViewHref;
+  void actionFailedMessage;
+
+  return (
+    <TaskCreateDialog
+      isOpen={showQuickAddDialog}
+      initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
+      initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
+      isPending={isPending}
+      onClose={onCloseQuickAdd}
+      onSubmit={async (input) => {
+        await handleCreateTaskBlock({
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          dueAt: input.dueAt,
+          runtimeAdapterKey: dialogDefaults.runtimeAdapterKey,
+          runtimeInput: {},
+          runtimeInputVersion: dialogDefaults.runtimeInputVersion,
+          runtimeModel: null,
+          prompt: null,
+          runtimeConfig: null,
+          scheduledStartAt: input.scheduledStartAt,
+          scheduledEndAt: input.scheduledEndAt,
+        });
+        onCloseQuickAdd();
+      }}
+      onApplyDecomposition={handleApplyDecompositionFromDialog}
+    />
+  );
+}

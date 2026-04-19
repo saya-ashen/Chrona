@@ -1,33 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
-  acceptScheduleProposal,
-  applySchedule,
-  createTaskFromSchedule,
-  rejectScheduleProposal,
-  updateTaskConfigFromSchedule,
-} from "@/app/actions/task-actions";
-import { PlanningHeader } from "@/components/schedule/planning-header";
-import { CompactTodayFocus, ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
-import {
-  EmptyState,
-  ProposalCard,
-  QueueCard,
-  RiskCard,
-  SelectedBlockSheet,
-} from "@/components/schedule/schedule-page-panels";
-import { ConflictCard } from "@/components/schedule/conflict-card";
-import {
-  getSchedulePageCopy,
-  DEFAULT_SCHEDULE_BLOCK_MINUTES,
-} from "@/components/schedule/schedule-page-copy";
-import { ScheduleInlineQuickCreate } from "@/components/schedule/schedule-inline-quick-create";
-import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
-import { ScheduleActionRail } from "@/components/schedule/schedule-action-rail";
-import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
-import { DayTimeline } from "@/components/schedule/schedule-page-timeline";
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import type {
   SchedulePageData,
   SchedulePageProps,
@@ -35,38 +17,35 @@ import type {
   QuickCreateDraft,
   ScheduledItem,
   TimelineCreateInput,
-  TimelineDragItem,
   UnscheduledItem,
-  ScheduleSuggestion,
 } from "@/components/schedule/schedule-page-types";
 import {
-  addDays,
-  applyScheduleToListItem,
-  applyTaskConfigToItem,
   buildScheduleHref,
   buildScheduleViewHref,
-  buildTodayFocusItems,
-  buildWeekGroups,
-  createListItemFromScheduledItem,
-  createScheduledItemFromCreateInput,
-  createScheduledItemFromQueueItem,
-  formatDateKey,
-  formatDayHeading,
-  formatDurationMinutes,
-  formatTime,
-  formatWeekdayShort,
-  getBlockDurationMinutes,
-  getTodayKey,
-  normalizeScheduleView,
-  parseDayKey,
-  sortScheduledItems,
-  startOfDay,
-  startOfWeek,
-  toTimestamp,
   hydrateSchedulePageData,
+  normalizeScheduleView,
 } from "@/components/schedule/schedule-page-utils";
+import {
+  getQuickCreateDefaults,
+  handleApplyDecompositionFromDialogAction,
+  handleApplySuggestionAction,
+  handleCreateTaskBlockAction,
+  handleQueueQuickCreateAction,
+  handleScheduleDropAction,
+  handleTaskConfigSaveAction,
+  handleQuickCreateAction,
+  refreshScheduleProjection,
+  runSchedulePageAction,
+  buildDraggedItem,
+} from "@/components/schedule/schedule-page-actions";
+import { buildSchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
+import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-panel";
+import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
+import { SchedulePageSidebar } from "@/components/schedule/schedule-page-sidebar";
+import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs";
+import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
+import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
-import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 
@@ -92,52 +71,38 @@ export function SchedulePage({
   );
   const [viewData, setViewData] = useState<SchedulePageData>(data);
   const [draggedTask, setDraggedTask] = useState<{
-    kind: TimelineDragItem["kind"];
+    kind: "queue" | "scheduled";
     taskId: string;
   } | null>(null);
-  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>([]);
-  const [localSelectedTaskId, setLocalSelectedTaskId] = useState<string | undefined>(selectedTaskId);
+  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>(
+    [],
+  );
+  const [localSelectedTaskId, setLocalSelectedTaskId] = useState<
+    string | undefined
+  >(selectedTaskId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [isPending, setIsPending] = useState(false);
-  const [secondaryView, setSecondaryView] = useState<SecondaryPlanningView>("queue");
+  const [secondaryView, setSecondaryView] =
+    useState<SecondaryPlanningView>("queue");
   const [showQuickAddDialog, setShowQuickAddDialog] = useState(false);
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
+  const actionFailedMessage =
+    messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
 
   const refreshProjection = useCallback(async () => {
-    const requestId = ++refreshRequestIdRef.current;
-
-    try {
-      const response = await fetch(`/api/schedule/projection?workspaceId=${workspaceId}`, {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed",
-        );
-      }
-
-      const next = hydrateSchedulePageData((await response.json()) as SchedulePageData);
-
-      if (requestId !== refreshRequestIdRef.current) {
-        return;
-      }
-
-      startTransition(() => setViewData(next));
-    } catch (error) {
-      router.refresh();
-      throw error instanceof Error
-        ? error
-        : new Error(
-            messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed",
-          );
-    }
-  }, [messages.components?.scheduleEditorForm?.actionFailed, router, workspaceId]);
+    await refreshScheduleProjection({
+      workspaceId,
+      setViewData: (next) => startTransition(() => setViewData(next)),
+      routerRefresh: router.refresh,
+      actionFailedMessage,
+      requestIdRef: refreshRequestIdRef,
+    });
+  }, [actionFailedMessage, router, workspaceId]);
 
   useEffect(() => {
-    setViewData(data);
+    setViewData(hydrateSchedulePageData(data));
   }, [data]);
 
   useEffect(() => {
@@ -155,6 +120,9 @@ export function SchedulePage({
       if (current === "proposals" && viewData.proposals.length > 0) {
         return current;
       }
+      if (current === "conflicts" && viewData.conflicts.length > 0) {
+        return current;
+      }
       if (viewData.risks.length > 0) {
         return "risks";
       }
@@ -164,197 +132,62 @@ export function SchedulePage({
       if (viewData.proposals.length > 0) {
         return "proposals";
       }
+      if (viewData.conflicts.length > 0) {
+        return "conflicts";
+      }
       return "queue";
     });
-  }, [viewData.proposals.length, viewData.risks.length, viewData.unscheduled.length]);
+  }, [
+    viewData.conflicts.length,
+    viewData.proposals.length,
+    viewData.risks.length,
+    viewData.unscheduled.length,
+  ]);
 
-  const scheduledGroups = useMemo(
+  const viewModel = useMemo(
     () =>
-      buildWeekGroups(
-        viewData.scheduled,
-        viewData.proposals,
-        viewData.risks,
+      buildSchedulePageViewModel({
+        viewData,
         selectedDay,
+        selectedTaskId,
+        localSelectedTaskId,
+        activeView,
+        secondaryView,
         locale,
         copy,
-      ),
-    [copy, locale, selectedDay, viewData.proposals, viewData.risks, viewData.scheduled],
+      }),
+    [
+      activeView,
+      copy,
+      locale,
+      localSelectedTaskId,
+      secondaryView,
+      selectedDay,
+      selectedTaskId,
+      viewData,
+    ],
   );
-
-  const todayKey = getTodayKey();
-  const tomorrowKey = formatDateKey(
-    addDays(parseDayKey(todayKey) ?? startOfDay(new Date()), 1),
-  );
-  const selectedGroupKey = scheduledGroups.find((group) => group.key === selectedDay)?.key;
-  const todayGroupKey = scheduledGroups.find((group) => group.key === todayKey)?.key;
-  const todayGroup = scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
-  const firstPopulatedGroup =
-    scheduledGroups.find(
-      (group) =>
-        group.items.length > 0 ||
-        group.proposalCount > 0 ||
-        group.riskCount > 0,
-    )?.key ?? null;
-  const activeDay =
-    selectedGroupKey ??
-    (todayGroup &&
-    (todayGroup.items.length > 0 ||
-      todayGroup.proposalCount > 0 ||
-      todayGroup.riskCount > 0)
-      ? todayGroup.key
-      : null) ??
-    firstPopulatedGroup ??
-    scheduledGroups[0]?.key ??
-    todayKey;
-  const activeGroup = scheduledGroups.find((group) => group.key === activeDay) ?? null;
-  const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
-  const selectedItem =
-    activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ?? null;
-  const todayFocusItems = useMemo(
-    () => buildTodayFocusItems(viewData, activeGroup, copy),
-    [activeGroup, copy, viewData],
-  );
-  const activeRailLabel =
-    secondaryView === "risks"
-      ? copy.conflictsTitle
-      : secondaryView === "proposals"
-        ? copy.aiProposalsTitle
-        : copy.unscheduledQueue;
-  const activeDayDate = parseDayKey(activeDay) ?? startOfDay(new Date());
-  const calendarMonthDate = startOfDay(new Date(activeDayDate.getFullYear(), activeDayDate.getMonth(), 1));
-  const calendarGridStart = startOfWeek(calendarMonthDate);
-  const calendarDays = Array.from({ length: 35 }, (_, index) => {
-    const date = addDays(calendarGridStart, index);
-    const dayKey = formatDateKey(date);
-    const dayGroup = scheduledGroups.find((group) => group.key === dayKey);
-
-    return {
-      key: dayKey,
-      label: formatDayHeading(date, locale, copy),
-      shortLabel: formatWeekdayShort(date, locale),
-      dateNumber: String(date.getDate()),
-      href: localizeHref(locale, buildScheduleViewHref(dayKey, activeView, activeSelectedTaskId)),
-      isCurrentMonth: date.getMonth() === activeDayDate.getMonth(),
-      isToday: dayKey === todayKey,
-      isSelected: dayKey === activeDay,
-      scheduledCount: dayGroup?.items.length ?? 0,
-      riskCount: dayGroup?.riskCount ?? 0,
-    };
-  });
-  const calendarMonthLabel = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
-    month: "long",
-    year: "numeric",
-  }).format(activeDayDate);
-  const conflictTaskIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const conflict of viewData.conflicts) {
-      for (const taskId of conflict.taskIds) {
-        ids.add(taskId);
-      }
-    }
-    return ids;
-  }, [viewData.conflicts]);
-
-  const cockpitSummary = copy.cockpitSummaryTemplate
-    .replace("{scheduled}", formatDurationMinutes(viewData.planningSummary.todayLoadMinutes))
-    .replace("{queue}", String(viewData.planningSummary.readyToScheduleCount))
-    .replace("{risks}", String(viewData.planningSummary.riskCount))
-    .replace("{automation}", String(viewData.automationCandidates.length));
-
-  function getQuickCreateDefaults() {
-    const selectedAdapter =
-      data.runtimeAdapters.find((adapter) => adapter.key === data.defaultRuntimeAdapterKey) ??
-      data.runtimeAdapters[0] ??
-      null;
-
-    return {
-      runtimeAdapterKey: selectedAdapter?.key ?? data.defaultRuntimeAdapterKey,
-      runtimeInputVersion:
-        selectedAdapter?.spec.version ?? `${data.defaultRuntimeAdapterKey}-v1`,
-    };
-  }
-
-  function getSuggestedDurationMinutes(
-    value: unknown,
-    fallback = DEFAULT_SCHEDULE_BLOCK_MINUTES,
-  ) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return fallback;
-    }
-
-    return Math.max(15, Math.round(value / 15) * 15);
-  }
-
-  function patchScheduledWindow(taskId: string, startAt: Date, endAt: Date, dueAt?: Date | null) {
-    setViewData((current) => ({
-      ...current,
-      scheduled: sortScheduledItems(
-        current.scheduled.map((item) =>
-          item.taskId === taskId
-            ? {
-                ...item,
-                dueAt: dueAt ?? item.dueAt,
-                scheduledStartAt: startAt,
-                scheduledEndAt: endAt,
-                scheduleStatus: "Scheduled",
-                scheduleSource: "human",
-              }
-            : item,
-        ),
-      ),
-      listItems: current.listItems.map((item) =>
-        item.taskId === taskId ? applyScheduleToListItem(item, startAt, endAt) : item,
-      ),
-    }));
-  }
 
   const draggedQueueItem =
     draggedTask?.kind === "queue"
-      ? (viewData.unscheduled.find((item) => item.taskId === draggedTask.taskId) ?? null)
+      ? (viewData.unscheduled.find(
+          (item) => item.taskId === draggedTask.taskId,
+        ) ?? null)
       : null;
-  const draggedScheduledItem =
-    draggedTask?.kind === "scheduled"
-      ? (activeGroup?.items.find((item) => item.taskId === draggedTask.taskId) ?? null)
-      : null;
-  const draggedItem: TimelineDragItem | null = draggedQueueItem
-    ? {
-        kind: "queue",
-        taskId: draggedQueueItem.taskId,
-        title: draggedQueueItem.title,
-        dueAt: draggedQueueItem.dueAt,
-        durationMinutes: getSuggestedDurationMinutes(
-          (draggedQueueItem.runtimeConfig as { suggestedDurationMinutes?: unknown } | null)
-            ?.suggestedDurationMinutes,
-        ),
-      }
-    : draggedScheduledItem
-      ? {
-          kind: "scheduled",
-          taskId: draggedScheduledItem.taskId,
-          title: draggedScheduledItem.title,
-          dueAt: draggedScheduledItem.dueAt,
-          durationMinutes: getBlockDurationMinutes(draggedScheduledItem),
-        }
-      : null;
+  const draggedItem = useMemo(
+    () =>
+      buildDraggedItem({
+        draggedTask,
+        unscheduled: viewData.unscheduled,
+        activeGroupItems: viewModel.activeGroup?.items ?? [],
+      }),
+    [draggedTask, viewData.unscheduled, viewModel.activeGroup?.items],
+  );
 
-  async function runAction(action: () => Promise<void>) {
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-      await action();
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-    } finally {
-      setIsPending(false);
-    }
-  }
-
-  function handleQueueDragStart(item: UnscheduledItem, event: DragEvent<HTMLElement>) {
+  function handleQueueDragStart(
+    item: UnscheduledItem,
+    event: DragEvent<HTMLElement>,
+  ) {
     if (isPending) {
       event.preventDefault();
       return;
@@ -364,7 +197,9 @@ export function SchedulePage({
     event.dataTransfer.setData("text/plain", item.taskId);
     setDraggedTask({ kind: "queue", taskId: item.taskId });
     setErrorMessage(null);
-    setAnnouncement(`Picked up ${item.title}. Move it to the timeline to create a block.`);
+    setAnnouncement(
+      `Picked up ${item.title}. Move it to the timeline to create a block.`,
+    );
   }
 
   function handleQueueDragEnd() {
@@ -380,244 +215,121 @@ export function SchedulePage({
   }
 
   async function handleScheduleDrop(
-    item: TimelineDragItem,
+    item: NonNullable<typeof draggedItem>,
     startAt: Date,
     endAt: Date,
   ) {
-    setAnnouncement(
-      `Dropped ${item.title} on ${formatDayHeading(startAt, locale, copy)} at ${formatTime(startAt, locale)}.`,
-    );
-
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-
-      if (item.kind === "queue" && draggedQueueItem) {
-        setViewData((current) => ({
-          ...current,
-          summary: {
-            ...current.summary,
-            scheduledCount: current.summary.scheduledCount + 1,
-            unscheduledCount: Math.max(0, current.summary.unscheduledCount - 1),
-          },
-          scheduled: sortScheduledItems([
-            ...current.scheduled,
-            createScheduledItemFromQueueItem(draggedQueueItem, startAt, endAt),
-          ]),
-          unscheduled: current.unscheduled.filter(
-            (queueItem) => queueItem.taskId !== draggedQueueItem.taskId,
-          ),
-          listItems: current.listItems.map((listItem) =>
-            listItem.taskId === draggedQueueItem.taskId
-              ? applyScheduleToListItem(listItem, startAt, endAt)
-              : listItem,
-          ),
-        }));
+    await handleScheduleDropAction({
+      item,
+      startAt,
+      endAt,
+      draggedQueueItem,
+      locale,
+      copy,
+      applyOptimisticViewData: (updater) => setViewData(updater),
+      removeExpandedQueueTask: (taskId) =>
         setExpandedQueueTaskIds((current) =>
-          current.filter((taskId) => taskId !== draggedQueueItem.taskId),
-        );
-      }
-
-      if (item.kind === "scheduled") {
-        patchScheduledWindow(item.taskId, startAt, endAt, item.dueAt);
-        setLocalSelectedTaskId(item.taskId);
-      }
-
-      await applySchedule({
-        taskId: item.taskId,
-        dueAt: item.dueAt ?? null,
-        scheduledStartAt: startAt,
-        scheduledEndAt: endAt,
-        scheduleSource: "human",
-      });
-
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-      setViewData(data);
-    } finally {
-      setIsPending(false);
-      setDraggedTask(null);
-    }
+          current.filter((value) => value !== taskId),
+        ),
+      setLocalSelectedTaskId,
+      setAnnouncement,
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      resetViewData: () => setViewData(data),
+      clearDraggedTask: () => setDraggedTask(null),
+      actionFailedMessage,
+    });
   }
 
   async function handleCreateTaskBlock(input: TimelineCreateInput) {
-    setAnnouncement(
-      `Creating ${input.title} on ${formatDayHeading(input.scheduledStartAt, locale, copy)} at ${formatTime(input.scheduledStartAt, locale)}.`,
-    );
-
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-
-      const created = await createTaskFromSchedule({
-        workspaceId,
-        title: input.title,
-        description: input.description || null,
-        priority: input.priority,
-        dueAt: input.dueAt,
-        runtimeAdapterKey: input.runtimeAdapterKey,
-        runtimeInput: input.runtimeInput,
-        runtimeInputVersion: input.runtimeInputVersion,
-        runtimeModel: input.runtimeModel,
-        prompt: input.prompt,
-        runtimeConfig: input.runtimeConfig ?? null,
-      });
-
-      const createdItem = createScheduledItemFromCreateInput(
-        created.taskId,
-        workspaceId,
-        data.defaultRuntimeAdapterKey,
-        input,
-      );
-
-      await applySchedule({
-        taskId: created.taskId,
-        dueAt: input.dueAt,
-        scheduledStartAt: input.scheduledStartAt,
-        scheduledEndAt: input.scheduledEndAt,
-        scheduleSource: "human",
-      });
-
-      setViewData((current) => ({
-        ...current,
-        summary: {
-          ...current.summary,
-          scheduledCount: current.summary.scheduledCount + 1,
-        },
-        scheduled: sortScheduledItems([...current.scheduled, createdItem]),
-        listItems: [...current.listItems, createListItemFromScheduledItem(createdItem)],
-      }));
-      setLocalSelectedTaskId(created.taskId);
-      router.push(
-        localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)),
-      );
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-      setViewData(data);
-    } finally {
-      setIsPending(false);
-    }
+    await handleCreateTaskBlockAction({
+      input,
+      workspaceId,
+      data,
+      activeDay: viewModel.activeDay,
+      activeView,
+      locale,
+      copy,
+      applyOptimisticViewData: (updater) => setViewData(updater),
+      setLocalSelectedTaskId,
+      pushRoute: router.push,
+      localizeHref,
+      buildScheduleViewHref,
+      setAnnouncement,
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      resetViewData: () => setViewData(data),
+      actionFailedMessage,
+    });
   }
 
   async function handleQuickCreate(draft: QuickCreateDraft) {
-    const defaults = getQuickCreateDefaults();
-
-    const input: TimelineCreateInput = {
-      title: draft.title,
-      description: "",
-      priority: draft.priority,
-      dueAt: draft.dueAt,
-      runtimeAdapterKey: defaults.runtimeAdapterKey,
-      runtimeInput: {},
-      runtimeInputVersion: defaults.runtimeInputVersion,
-      runtimeModel: null,
-      prompt: null,
-      runtimeConfig: null,
-      scheduledStartAt: draft.scheduledStartAt ?? new Date(),
-      scheduledEndAt:
-        draft.scheduledEndAt ??
-        new Date(
-          (toTimestamp(draft.scheduledStartAt) ?? Date.now()) +
-            DEFAULT_SCHEDULE_BLOCK_MINUTES * 60 * 1000,
-        ),
-    };
-
-    await handleCreateTaskBlock(input);
+    await handleQuickCreateAction({
+      draft,
+      data,
+      handleCreateTaskBlock,
+    });
   }
 
   async function handleQueueQuickCreate(
     draft: QuickCreateDraft & { durationMinutes: number },
   ) {
-    const defaults = getQuickCreateDefaults();
-
-    setAnnouncement(`Adding ${draft.title} to the queue.`);
-
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-
-      await createTaskFromSchedule({
-        workspaceId,
-        title: draft.title,
-        description: null,
-        priority: draft.priority,
-        dueAt: draft.dueAt,
-        runtimeAdapterKey: defaults.runtimeAdapterKey,
-        runtimeInput: {},
-        runtimeInputVersion: defaults.runtimeInputVersion,
-        runtimeModel: null,
-        prompt: null,
-        runtimeConfig: {
-          suggestedDurationMinutes: draft.durationMinutes,
-        },
-      });
-
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-      setViewData(data);
-    } finally {
-      setIsPending(false);
-    }
+    await handleQueueQuickCreateAction({
+      draft,
+      workspaceId,
+      data,
+      setAnnouncement,
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      resetViewData: () => setViewData(data),
+      actionFailedMessage,
+    });
   }
 
   async function handleAcceptProposal(proposalId: string) {
-    await runAction(async () => {
-      await acceptScheduleProposal(proposalId, "Accepted on schedule page");
+    await runSchedulePageAction({
+      action: async () => {
+        const { acceptScheduleProposal } = await import(
+          "@/app/actions/task-actions"
+        );
+        await acceptScheduleProposal(proposalId, "Accepted on schedule page");
+      },
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      actionFailedMessage,
     });
   }
 
   async function handleRejectProposal(proposalId: string) {
-    await runAction(async () => {
-      await rejectScheduleProposal(proposalId, "Rejected on schedule page");
+    await runSchedulePageAction({
+      action: async () => {
+        const { rejectScheduleProposal } = await import(
+          "@/app/actions/task-actions"
+        );
+        await rejectScheduleProposal(proposalId, "Rejected on schedule page");
+      },
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      actionFailedMessage,
     });
   }
 
-  async function handleApplySuggestion(suggestion: ScheduleSuggestion) {
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-
-      // 调用 API 应用建议
-      const response = await fetch("/api/ai/apply-suggestion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId,
-          suggestionId: suggestion.id,
-          changes: suggestion.changes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to apply suggestion");
-      }
-
-      // 刷新数据
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-    } finally {
-      setIsPending(false);
-    }
+  async function handleApplySuggestion(
+    suggestion: (typeof viewData.suggestions)[number],
+  ) {
+    await handleApplySuggestionAction({
+      suggestion,
+      workspaceId,
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      actionFailedMessage,
+    });
   }
 
   function toggleQueueCard(taskId: string) {
@@ -628,53 +340,23 @@ export function SchedulePage({
     );
   }
 
-  async function handleTaskConfigSave(taskId: string, input: TaskConfigFormInput) {
-    try {
-      setIsPending(true);
-      setErrorMessage(null);
-
-      setViewData((current) => ({
-        ...current,
-        scheduled: current.scheduled.map((item) =>
-          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
-        ),
-        unscheduled: current.unscheduled.map((item) =>
-          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
-        ),
-        risks: current.risks.map((item) =>
-          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
-        ),
-        listItems: current.listItems.map((item) =>
-          item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
-        ),
-      }));
-
-      await updateTaskConfigFromSchedule({
-        taskId,
-        title: input.title,
-        description: input.description || null,
-        priority: input.priority,
-        dueAt: input.dueAt,
-        runtimeAdapterKey: input.runtimeAdapterKey,
-        runtimeInput: input.runtimeInput,
-        runtimeInputVersion: input.runtimeInputVersion,
-        runtimeModel: input.runtimeModel,
-        prompt: input.prompt,
-        runtimeConfig: input.runtimeConfig ?? null,
-      });
-
-      await refreshProjection();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-      );
-      setViewData(data);
-    } finally {
-      setIsPending(false);
-    }
+  async function handleTaskConfigSave(
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) {
+    await handleTaskConfigSaveAction({
+      taskId,
+      input,
+      applyOptimisticViewData: (updater) => setViewData(updater),
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      resetViewData: () => setViewData(data),
+      actionFailedMessage,
+    });
   }
+
+  const dialogDefaults = getQuickCreateDefaults(data);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -682,260 +364,74 @@ export function SchedulePage({
         {announcement}
       </p>
 
-      <PlanningHeader
-        ariaLabel={copy.pageTitle}
-        title={copy.pageTitle}
-        activeDayLabel={activeGroup?.label ?? activeDay}
-        summary={cockpitSummary}
-        dateSwitcherLabel={copy.dateSwitcher}
-        dayLinks={[
-          {
-            label: copy.today,
-            href: localizeHref(locale, buildScheduleViewHref(todayKey, activeView)),
-            current: activeDay === todayKey,
-          },
-          {
-            label: copy.tomorrow,
-            href: localizeHref(locale, buildScheduleViewHref(tomorrowKey, activeView)),
-            current: activeDay === tomorrowKey,
-          },
-        ]}
+      <SchedulePageHeader
+        copy={copy}
+        locale={locale}
         activeView={activeView}
-        timelineHref={localizeHref(locale, buildScheduleViewHref(activeDay, "timeline", activeSelectedTaskId))}
-        listHref={localizeHref(locale, buildScheduleViewHref(activeDay, "list", activeSelectedTaskId))}
-        timelineLabel={copy.timeline}
-        listLabel={copy.list}
-        metrics={[
-          {
-            label: copy.cockpitTodayLoad,
-            value: formatDurationMinutes(viewData.planningSummary.todayLoadMinutes),
-            hint: copy.cockpitTodayLoadHint,
-          },
-          {
-            label: copy.queueMetric,
-            value: String(viewData.planningSummary.readyToScheduleCount),
-            hint: copy.cockpitQueueHint,
-            tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined,
-          },
-          {
-            label: copy.risksMetric,
-            value: String(viewData.summary.riskCount),
-            hint: copy.cockpitRisksHint,
-            tone: viewData.summary.riskCount > 0 ? "critical" : undefined,
-          },
-          {
-            label: copy.cockpitSuggestions,
-            value: String(viewData.summary.proposalCount + viewData.automationCandidates.length),
-            hint: copy.cockpitSuggestionsHint,
-            tone:
-              viewData.summary.proposalCount > 0 || viewData.automationCandidates.length > 0
-                ? "info"
-                : undefined,
-          },
-        ]}
-        actions={[
-          {
-            label: copy.cockpitQuickAdd,
-            onClick: () => setShowQuickAddDialog(true),
-            description: copy.cockpitQuickAddHint,
-          },
-          {
-            label: copy.cockpitReviewSuggestions,
-            href: "#schedule-cockpit-sidebar",
-            description: copy.cockpitReviewSuggestionsHint,
-          },
-          {
-            label: copy.cockpitAutoArrange,
-            description: copy.cockpitAutoArrangeHint,
-            disabled: true,
-          },
-          {
-            label: copy.cockpitPlanWithAi,
-            description: copy.cockpitPlanWithAiHint,
-            disabled: true,
-          },
-        ]}
+        viewData={viewData}
+        viewModel={viewModel}
+        onOpenQuickAdd={() => setShowQuickAddDialog(true)}
+        localizeHref={localizeHref}
+        buildScheduleViewHref={buildScheduleViewHref}
       />
 
       {errorMessage ? (
         <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {errorMessage}
+          Error: {errorMessage}
         </div>
       ) : null}
 
       <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
-        <div className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto">
-          <ScheduleMiniCalendar monthLabel={calendarMonthLabel} days={calendarDays} />
+        <SchedulePageSidebar
+          copy={copy}
+          locale={locale}
+          activeView={activeView}
+          viewData={viewData}
+          viewModel={viewModel}
+          secondaryView={secondaryView}
+          draggedTask={draggedTask}
+          expandedQueueTaskIds={expandedQueueTaskIds}
+          data={data}
+          isPending={isPending}
+          refreshProjection={refreshProjection}
+          setSecondaryView={setSecondaryView}
+          toggleQueueCard={toggleQueueCard}
+          handleQueueQuickCreate={handleQueueQuickCreate}
+          handleTaskConfigSave={handleTaskConfigSave}
+          handleQueueDragStart={handleQueueDragStart}
+          handleQueueDragEnd={handleQueueDragEnd}
+          handleApplySuggestion={handleApplySuggestion}
+          handleAcceptProposal={handleAcceptProposal}
+          handleRejectProposal={handleRejectProposal}
+          localizeHref={localizeHref}
+          buildScheduleViewHref={buildScheduleViewHref}
+        />
 
-          <CompactTodayFocus
-            title={copy.todayFocus}
-            items={todayFocusItems}
-            emptyMessage={copy.todayFocusEmpty}
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">{copy.scheduledTimeline}</h2>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {draggedItem ? (
-                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                    {copy.dropMode}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
-              {activeView === "timeline" ? (
-                activeGroup ? (
-                  <DayTimeline
-                    items={activeGroup.items}
-                    dayDate={activeGroup.date}
-                    selectedDay={activeGroup.key}
-                    selectedTaskId={activeSelectedTaskId}
-                    conflictTaskIds={conflictTaskIds}
-                    draggedItem={draggedItem}
-                    runtimeAdapters={data.runtimeAdapters}
-                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                    isPending={isPending}
-                    onScheduleDrop={handleScheduleDrop}
-                    onCreateTaskBlock={handleCreateTaskBlock}
-                    onScheduledDragStart={handleScheduledDragStart}
-                    onDragEnd={handleQueueDragEnd}
-                  />
-                ) : (
-                  <EmptyState>{copy.noTimelineDay}</EmptyState>
-                )
-              ) : (
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <ScheduleTaskList
-                    items={viewData.listItems}
-                    runtimeAdapters={data.runtimeAdapters}
-                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                    onSaveTaskConfigAction={handleTaskConfigSave}
-                    isPending={isPending}
-                  />
-                </div>
-              )}
-            </div>
-          </SurfaceCard>
-        </div>
-
-        <div className="w-[340px] shrink-0 overflow-y-auto">
-          <ScheduleActionRail
-            id="schedule-cockpit-sidebar"
-            ariaLabel={activeRailLabel}
-            tablistAriaLabel={activeRailLabel}
-            activeTab={secondaryView}
-            onTabChange={setSecondaryView}
-            sections={[
-              {
-                value: "queue",
-                label: copy.unscheduledQueue,
-                title: copy.unscheduledQueue,
-                description: copy.unscheduledQueueDescription,
-                body: (
-                  <div className="space-y-3">
-                    <ScheduleInlineQuickCreate
-                      mode="queue"
-                      selectedDay={activeDay}
-                      isPending={isPending}
-                      submitLabel={copy.quickCreateQueueSubmit}
-                      hint={copy.quickCreateQueueHint}
-                      compact
-                      onSubmit={handleQueueQuickCreate}
-                    />
-                    {viewData.unscheduled.length === 0 ? (
-                      <EmptyState>{copy.noUnscheduledWork}</EmptyState>
-                    ) : (
-                      viewData.unscheduled.map((item) => (
-                        <QueueCard
-                          key={item.taskId}
-                          item={item}
-                          runtimeAdapters={data.runtimeAdapters}
-                          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                          isPending={isPending}
-                          isDragging={
-                            draggedTask?.kind === "queue" && draggedTask.taskId === item.taskId
-                          }
-                          isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                          onToggle={() => toggleQueueCard(item.taskId)}
-                          onMutatedAction={refreshProjection}
-                          onSaveTaskConfigAction={handleTaskConfigSave}
-                          onDragStart={handleQueueDragStart}
-                          onDragEnd={handleQueueDragEnd}
-                        />
-                      ))
-                    )}
-                  </div>
-                ),
-              },
-              {
-                value: "risks",
-                label: copy.conflictsTitle,
-                title: copy.conflictsTitle,
-                body:
-                  viewData.risks.length === 0 ? (
-                    <EmptyState>{copy.noScheduleRisks}</EmptyState>
-                  ) : (
-                    viewData.risks
-                      .slice(0, 2)
-                      .map((item) => <RiskCard key={item.taskId} item={item} />)
-                  ),
-              },
-              {
-                value: "conflicts",
-                label: "AI 冲突检测",
-                title: "AI 冲突检测",
-                body:
-                  viewData.conflicts.length === 0 ? (
-                    <EmptyState>未检测到冲突</EmptyState>
-                  ) : (
-                    <div className="space-y-3">
-                      {viewData.conflicts.slice(0, 3).map((conflict) => (
-                        <ConflictCard
-                          key={conflict.id}
-                          conflict={conflict}
-                          suggestions={viewData.suggestions}
-                          onApplySuggestion={handleApplySuggestion}
-                          isPending={isPending}
-                        />
-                      ))}
-                    </div>
-                  ),
-              },
-              {
-                value: "proposals",
-                label: copy.aiProposalsTitle,
-                title: copy.aiProposalsTitle,
-                body:
-                  viewData.proposals.length === 0 ? (
-                    <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
-                  ) : (
-                    viewData.proposals.slice(0, 2).map((proposal) => (
-                      <ProposalCard
-                        key={proposal.proposalId}
-                        proposal={proposal}
-                        isPending={isPending}
-                        onAccept={handleAcceptProposal}
-                        onReject={handleRejectProposal}
-                      />
-                    ))
-                  ),
-              },
-            ]}
-          />
-        </div>
+        <SchedulePageMainPanel
+          copy={copy}
+          activeView={activeView}
+          draggedItem={draggedItem}
+          activeGroup={viewModel.activeGroup}
+          activeSelectedTaskId={viewModel.activeSelectedTaskId}
+          conflictTaskIds={viewModel.conflictTaskIds}
+          listItems={viewData.listItems}
+          runtimeAdapters={data.runtimeAdapters}
+          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+          isPending={isPending}
+          onScheduleDrop={handleScheduleDrop}
+          onCreateTaskBlock={handleCreateTaskBlock}
+          onScheduledDragStart={handleScheduledDragStart}
+          onDragEnd={handleQueueDragEnd}
+          onSaveTaskConfigAction={handleTaskConfigSave}
+        />
       </div>
 
-      {activeView === "timeline" && selectedItem && activeDay ? (
+      {activeView === "timeline" &&
+      viewModel.selectedItem &&
+      viewModel.activeDay ? (
         <SelectedBlockSheet
-          item={selectedItem}
-          selectedDay={activeDay}
+          item={viewModel.selectedItem}
+          selectedDay={viewModel.activeDay}
           runtimeAdapters={data.runtimeAdapters}
           defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
           isPending={isPending}
@@ -945,81 +441,51 @@ export function SchedulePage({
         />
       ) : null}
 
-      {showQuickAddDialog ? (
-        <TaskCreateDialog
-          isOpen={showQuickAddDialog}
-          initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
-          initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
-          isPending={isPending}
-          onClose={() => setShowQuickAddDialog(false)}
-          onSubmit={async (input) => {
-            await handleCreateTaskBlock({
-              title: input.title,
-              description: input.description,
-              priority: input.priority,
-              dueAt: input.dueAt,
-              runtimeAdapterKey: data.defaultRuntimeAdapterKey,
-              runtimeInput: {},
-              runtimeInputVersion: `${data.defaultRuntimeAdapterKey}-v1`,
-              runtimeModel: null,
-              prompt: null,
-              runtimeConfig: null,
-              scheduledStartAt: input.scheduledStartAt,
-              scheduledEndAt: input.scheduledEndAt,
-            });
-            setShowQuickAddDialog(false);
-          }}
-          onApplyDecomposition={async (result) => {
-            if (!workspaceId) return;
-            setIsPending(true);
-            setErrorMessage(null);
-            try {
-              const created = await createTaskFromSchedule({
-                workspaceId,
-                title: input.title,
-                description: input.description || null,
-                priority: input.priority,
-                dueAt: input.dueAt,
-                runtimeAdapterKey: data.defaultRuntimeAdapterKey,
-                runtimeInput: {},
-                runtimeInputVersion: `${data.defaultRuntimeAdapterKey}-v1`,
-                runtimeModel: null,
-                prompt: null,
-                runtimeConfig: null,
-              });
-
-              const response = await fetch("/api/ai/batch-decompose", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  taskId: created.taskId,
-                  replaceExisting: true,
-                  subtasks: result.subtasks,
-                }),
-              });
-
-              if (!response.ok) {
-                throw new Error("Failed to apply decomposition");
-              }
-
-              setShowQuickAddDialog(false);
-              setLocalSelectedTaskId(created.taskId);
-              router.push(
-                localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)),
-              );
-              await refreshProjection();
-            } catch (error) {
-              setErrorMessage(
-                error instanceof Error
-                  ? error.message
-                  : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
-              );
-            } finally {
-              setIsPending(false);
-            }
-          }}
-        />
-      ) : null}
+      <SchedulePageDialogs
+        showQuickAddDialog={showQuickAddDialog}
+        isPending={isPending}
+        dialogDefaults={dialogDefaults}
+        data={data}
+        viewModel={viewModel}
+        activeView={activeView}
+        workspaceId={workspaceId}
+        routerPush={router.push}
+        locale={locale}
+        localizeHref={localizeHref}
+        buildScheduleViewHref={buildScheduleViewHref}
+        actionFailedMessage={actionFailedMessage}
+        onCloseQuickAdd={() => setShowQuickAddDialog(false)}
+        handleCreateTaskBlock={handleCreateTaskBlock}
+        handleApplyDecompositionFromDialog={async ({
+          result,
+          title,
+          description,
+          priority,
+          dueAt,
+        }) => {
+          await handleApplyDecompositionFromDialogAction({
+            workspaceId,
+            title,
+            description,
+            priority,
+            dueAt,
+            defaultRuntimeAdapterKey: data.defaultRuntimeAdapterKey,
+            result,
+            activeDay: viewModel.activeDay,
+            activeView,
+            locale,
+            pushRoute: router.push,
+            localizeHref,
+            buildScheduleViewHref,
+            setShowQuickAddDialog,
+            setLocalSelectedTaskId,
+            setIsPending,
+            setErrorMessage,
+            refreshProjection,
+            actionFailedMessage,
+          });
+        }}
+      />
     </div>
   );
 }
