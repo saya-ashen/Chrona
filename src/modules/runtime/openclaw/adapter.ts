@@ -1,4 +1,5 @@
 import { OpenClawGatewayClient, type OpenClawRuntimeClient } from "@/modules/runtime/openclaw/client";
+import { OpenClawBridgeClient } from "@/modules/runtime/openclaw/bridge-client";
 import { loadOpenClawPersistedDeviceIdentity } from "@/modules/runtime/openclaw/device-identity";
 import { createMockOpenClawAdapter } from "@/modules/runtime/openclaw/mock-adapter";
 import {
@@ -92,6 +93,16 @@ export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
     return createMockOpenClawAdapter();
   }
 
+  // Prefer CLI Bridge when configured (simpler, no WebSocket)
+  if (process.env.OPENCLAW_MODE === "bridge" || process.env.OPENCLAW_BRIDGE_URL) {
+    const client = new OpenClawBridgeClient({
+      baseUrl: process.env.OPENCLAW_BRIDGE_URL,
+      timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
+    });
+    return createLiveOpenClawAdapter(client);
+  }
+
+  // Fallback to WebSocket gateway
   const deviceIdentity = await loadOpenClawPersistedDeviceIdentity({
     identityDir: process.env.OPENCLAW_IDENTITY_DIR,
   });
