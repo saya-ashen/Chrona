@@ -29,6 +29,7 @@ import {
   getRunnabilityTone,
   getScheduleTone,
   toTaskConfigInitialValues,
+  toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
 import {
   TaskConfigForm,
@@ -160,11 +161,11 @@ export function DayTimelineSummary({
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const starts = items
-    .map((item) => item.scheduledStartAt?.getTime())
-    .filter((value): value is number => value !== undefined);
+    .map((item) => toTimestamp(item.scheduledStartAt))
+    .filter((value): value is number => value !== null);
   const ends = items
-    .map((item) => item.scheduledEndAt?.getTime())
-    .filter((value): value is number => value !== undefined);
+    .map((item) => toTimestamp(item.scheduledEndAt))
+    .filter((value): value is number => value !== null);
 
   if (starts.length === 0 || ends.length === 0) {
     return (

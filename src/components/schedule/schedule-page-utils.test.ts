@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildCompressedTimeline,
   buildTimelinePlacementPreview,
+  buildWeekGroups,
   clampScheduledEndMinute,
   detectScheduleConflicts,
+  getDayKey,
   moveScheduledItem,
+  sortScheduledItems,
+  toDate,
+  toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
@@ -121,5 +126,102 @@ describe("schedule-page-utils scheduling helpers", () => {
       source: "drag",
     });
     expect(preview.height).toBeGreaterThan(0);
+  });
+});
+
+describe("toTimestamp / toDate / getDayKey – string date handling", () => {
+  it("toTimestamp handles Date objects", () => {
+    const d = new Date(2026, 3, 15, 9, 0);
+    expect(toTimestamp(d)).toBe(d.getTime());
+  });
+
+  it("toTimestamp handles ISO strings", () => {
+    const d = new Date(2026, 3, 15, 9, 0);
+    expect(toTimestamp(d.toISOString())).toBe(d.getTime());
+  });
+
+  it("toTimestamp returns null for null/undefined", () => {
+    expect(toTimestamp(null)).toBeNull();
+    expect(toTimestamp(undefined)).toBeNull();
+  });
+
+  it("toTimestamp returns null for invalid strings", () => {
+    expect(toTimestamp("not-a-date")).toBeNull();
+  });
+
+  it("toDate converts ISO strings to Date objects", () => {
+    const d = new Date(2026, 3, 15, 9, 0);
+    const result = toDate(d.toISOString());
+    expect(result).toBeInstanceOf(Date);
+    expect(result!.getTime()).toBe(d.getTime());
+  });
+
+  it("toDate returns null for invalid input", () => {
+    expect(toDate(null)).toBeNull();
+    expect(toDate("garbage")).toBeNull();
+  });
+
+  it("getDayKey handles ISO strings", () => {
+    const d = new Date(2026, 3, 15);
+    expect(getDayKey(d.toISOString())).toBe(getDayKey(d));
+  });
+});
+
+describe("sortScheduledItems – with string dates", () => {
+  it("sorts items with ISO string dates correctly", () => {
+    const early = createScheduledItem({
+      taskId: "early",
+      scheduledStartAt: "2026-04-15T09:00:00.000Z" as unknown as Date,
+    });
+    const late = createScheduledItem({
+      taskId: "late",
+      scheduledStartAt: "2026-04-15T14:00:00.000Z" as unknown as Date,
+    });
+
+    const sorted = sortScheduledItems([late, early]);
+    expect(sorted[0].taskId).toBe("early");
+    expect(sorted[1].taskId).toBe("late");
+  });
+
+  it("sorts mixed Date and string dates", () => {
+    const dateItem = createScheduledItem({
+      taskId: "date-item",
+      scheduledStartAt: new Date("2026-04-15T14:00:00.000Z"),
+    });
+    const stringItem = createScheduledItem({
+      taskId: "string-item",
+      scheduledStartAt: "2026-04-15T08:00:00.000Z" as unknown as Date,
+    });
+
+    const sorted = sortScheduledItems([dateItem, stringItem]);
+    expect(sorted[0].taskId).toBe("string-item");
+    expect(sorted[1].taskId).toBe("date-item");
+  });
+});
+
+describe("buildWeekGroups – with string dates", () => {
+  it("handles items with ISO string scheduledStartAt", () => {
+    const item = createScheduledItem({
+      taskId: "string-date-task",
+      scheduledStartAt: "2026-04-15T09:00:00.000Z" as unknown as Date,
+      scheduledEndAt: "2026-04-15T10:00:00.000Z" as unknown as Date,
+    });
+
+    const groups = buildWeekGroups(
+      [item],
+      [],
+      [],
+      "2026-04-15",
+      "en",
+      {} as Parameters<typeof buildWeekGroups>[5],
+    );
+
+    // Should produce 7 day groups (one week)
+    expect(groups.length).toBe(7);
+
+    // Find the group containing our item
+    const groupWithItem = groups.find((g) => g.items.length > 0);
+    expect(groupWithItem).toBeTruthy();
+    expect(groupWithItem!.items[0].taskId).toBe("string-date-task");
   });
 });

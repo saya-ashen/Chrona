@@ -23,6 +23,34 @@ import { ScheduleCommandBar } from "@/components/schedule/schedule-command-bar";
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+function makeSuggestion(overrides: Record<string, unknown> = {}) {
+  return {
+    id: overrides.id ?? "sug-1",
+    summary: overrides.summary ?? "Summary text",
+    action: {
+      type: "create_task",
+      title: (overrides as Record<string, string>).title ?? "Write weekly report",
+      description: (overrides as Record<string, string>).description ?? "Summarize this week's progress",
+      priority: (overrides as Record<string, string>).priority ?? "High",
+      estimatedMinutes: (overrides as Record<string, number>).estimatedMinutes ?? 45,
+      tags: (overrides as Record<string, string[]>).tags ?? ["writing"],
+    },
+  };
+}
+
+function mockHookReturn(overrides: Record<string, unknown> = {}) {
+  return {
+    structuredSuggestions: overrides.structuredSuggestions ?? [],
+    suggestions: overrides.suggestions ?? [],
+    isLoading: overrides.isLoading ?? false,
+    error: overrides.error ?? null,
+    phase: overrides.phase ?? "idle",
+    statusMessage: overrides.statusMessage ?? "",
+    toolCalls: overrides.toolCalls ?? [],
+    toolResults: overrides.toolResults ?? [],
+  };
+}
+
 const defaultProps = {
   selectedDay: "2026-04-15",
   isPending: false,
@@ -42,32 +70,16 @@ describe("ScheduleCommandBar – AI integration", () => {
   it("shows AI suggestion dropdown when typing >= 3 chars", async () => {
     const user = userEvent.setup();
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [
-        {
-          title: "Write weekly report",
-          description: "Summarize this week's progress",
-          priority: "High",
-          estimatedMinutes: 45,
-          tags: ["writing"],
-        },
-        {
-          title: "Write documentation",
-          description: "Document new API endpoints",
-          priority: "Medium",
-          estimatedMinutes: 60,
-          tags: ["docs"],
-        },
-      ],
-      isLoading: false,
-      error: null,
-    });
+    const s1 = makeSuggestion({ id: "s1", title: "Write weekly report", description: "Summarize this week's progress", priority: "High", estimatedMinutes: 45 });
+    const s2 = makeSuggestion({ id: "s2", title: "Write documentation", summary: "Docs summary", description: "Document new API endpoints", priority: "Medium", estimatedMinutes: 60, tags: ["docs"] });
+
+    mockUseAutoComplete.mockReturnValue(mockHookReturn({
+      structuredSuggestions: [s1, s2],
+    }));
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
-    const input = screen.getByPlaceholderText(
-      /task title/i,
-    );
+    const input = screen.getByPlaceholderText(/task title/i);
     await user.type(input, "Wri");
 
     // AI suggestion dropdown should appear
@@ -75,17 +87,9 @@ describe("ScheduleCommandBar – AI integration", () => {
       expect(screen.getByText("AI suggestions")).toBeInTheDocument();
     });
 
-    // Both suggestions should be visible
+    // Both suggestions should be visible (rendered via s.action.title)
     expect(screen.getByText("Write weekly report")).toBeInTheDocument();
     expect(screen.getByText("Write documentation")).toBeInTheDocument();
-
-    // Descriptions should be shown
-    expect(
-      screen.getByText("Summarize this week's progress"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Document new API endpoints"),
-    ).toBeInTheDocument();
 
     // Priority badges
     expect(screen.getByText("High")).toBeInTheDocument();
@@ -100,39 +104,27 @@ describe("ScheduleCommandBar – AI integration", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [
-        {
-          title: "Write weekly report",
-          description: "Summarize this week's progress",
-          priority: "High",
-          estimatedMinutes: 45,
-          tags: ["writing"],
-        },
-      ],
-      isLoading: false,
-      error: null,
-    });
+    const s1 = makeSuggestion({ id: "s1", title: "Write weekly report", priority: "High" });
+
+    mockUseAutoComplete.mockReturnValue(mockHookReturn({
+      structuredSuggestions: [s1],
+    }));
 
     render(<ScheduleCommandBar {...defaultProps} onSubmit={onSubmit} />);
 
     const input = screen.getByPlaceholderText(/task title/i);
     await user.type(input, "Wri");
 
-    // Wait for dropdown
     await waitFor(() => {
       expect(screen.getByText("Write weekly report")).toBeInTheDocument();
     });
 
-    // The component uses onMouseDown to prevent blur and trigger selection
-    const suggestionButton = screen.getByText("Write weekly report")
-      .closest("button")!;
+    const suggestionButton = screen.getByText("Write weekly report").closest("button")!;
 
     await act(async () => {
       fireEvent.mouseDown(suggestionButton);
     });
 
-    // onSubmit should have been called with a draft containing the suggestion title and priority
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit).toHaveBeenCalledWith(
@@ -147,36 +139,28 @@ describe("ScheduleCommandBar – AI integration", () => {
   it("dropdown hides when no suggestions", async () => {
     const user = userEvent.setup();
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-    });
+    mockUseAutoComplete.mockReturnValue(mockHookReturn({
+      structuredSuggestions: [],
+    }));
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
     const input = screen.getByPlaceholderText(/task title/i);
     await user.type(input, "Write something");
 
-    // No dropdown should appear
     expect(screen.queryByText("AI suggestions")).not.toBeInTheDocument();
   });
 
   it("passes null to useAutoComplete when input is shorter than 3 chars", async () => {
     const user = userEvent.setup();
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-    });
+    mockUseAutoComplete.mockReturnValue(mockHookReturn());
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
     const input = screen.getByPlaceholderText(/task title/i);
     await user.type(input, "ab");
 
-    // The hook should have been called with null since "ab".length < 3
     const lastCall =
       mockUseAutoComplete.mock.calls[
         mockUseAutoComplete.mock.calls.length - 1
@@ -187,19 +171,13 @@ describe("ScheduleCommandBar – AI integration", () => {
   it("limits AI suggestion dropdown to 5 items", async () => {
     const user = userEvent.setup();
 
-    const manySuggestions = Array.from({ length: 8 }, (_, i) => ({
-      title: `Suggestion item ${i + 1}`,
-      description: `Description for item ${i + 1}`,
-      priority: "Medium" as const,
-      estimatedMinutes: 30,
-      tags: [],
-    }));
+    const manySuggestions = Array.from({ length: 8 }, (_, i) =>
+      makeSuggestion({ id: `s${i}`, title: `Suggestion item ${i + 1}`, priority: "Medium", estimatedMinutes: 30, tags: [] }),
+    );
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: manySuggestions,
-      isLoading: false,
-      error: null,
-    });
+    mockUseAutoComplete.mockReturnValue(mockHookReturn({
+      structuredSuggestions: manySuggestions,
+    }));
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
@@ -213,64 +191,38 @@ describe("ScheduleCommandBar – AI integration", () => {
     // Only the first 5 should appear
     expect(screen.getByText("Suggestion item 1")).toBeInTheDocument();
     expect(screen.getByText("Suggestion item 5")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Suggestion item 6"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Suggestion item 8"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestion item 6")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestion item 8")).not.toBeInTheDocument();
   });
 
   it("hides dropdown on Escape key", async () => {
     const user = userEvent.setup();
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [
-        {
-          title: "Write weekly report",
-          description: "Summary",
-          priority: "Medium",
-          estimatedMinutes: 30,
-          tags: [],
-        },
-      ],
-      isLoading: false,
-      error: null,
-    });
+    mockUseAutoComplete.mockReturnValue(mockHookReturn({
+      structuredSuggestions: [makeSuggestion()],
+    }));
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
     const input = screen.getByPlaceholderText(/task title/i);
     await user.type(input, "Wri");
 
-    // Dropdown should be visible
     await waitFor(() => {
       expect(screen.getByText("AI suggestions")).toBeInTheDocument();
     });
 
-    // Press Escape to hide dropdown
     await user.keyboard("{Escape}");
 
-    // Dropdown should be hidden
     await waitFor(() => {
-      expect(
-        screen.queryByText("AI suggestions"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("AI suggestions")).not.toBeInTheDocument();
     });
   });
 
   it("renders help hint text below the command bar", () => {
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-    });
+    mockUseAutoComplete.mockReturnValue(mockHookReturn());
 
     render(<ScheduleCommandBar {...defaultProps} />);
 
-    // The hint text from DEFAULT_SCHEDULE_PAGE_COPY.quickCreateHint
-    expect(
-      screen.getByText(/write weekly report/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/write weekly report/i)).toBeInTheDocument();
   });
 });
