@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { AutomationSuggestion, TimeslotSuggestionResult } from "@/modules/ai/types";
-import type { TaskDecompositionResult } from "@/modules/ai/task-decomposer";
+import type { AutomationSuggestion, TaskPlanGraphResponse, TimeslotSuggestionResult } from "@/modules/ai/types";
 
 // ---------- Shared helpers ----------
 
@@ -431,10 +430,12 @@ export interface SmartDecompositionTaskInput {
   priority?: string;
   dueAt?: string | Date | null;
   estimatedMinutes?: number;
+  planningPrompt?: string;
+  forceRefresh?: boolean;
 }
 
 export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | null) {
-  const [result, setResult] = useState<TaskDecompositionResult | null>(null);
+  const [result, setResult] = useState<TaskPlanGraphResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -463,7 +464,7 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
     setIsLoading(true);
     setError(null);
 
-    fetchJSON<TaskDecompositionResult>(
+    fetchJSON<TaskPlanGraphResponse>(
       "/api/ai/decompose-task",
       {
         taskId: taskInput.taskId,
@@ -472,6 +473,8 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
         priority: taskInput.priority,
         dueAt: taskInput.dueAt,
         estimatedMinutes: taskInput.estimatedMinutes,
+        planningPrompt: taskInput.planningPrompt,
+        forceRefresh: taskInput.forceRefresh,
       },
       controller.signal,
     )

@@ -14,6 +14,7 @@ import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
   id: string;
   workspaceId: string;
+  parentTaskId: string | null;
   title: string;
   description: string | null;
   workspace: { defaultRuntime: string };
@@ -30,6 +31,7 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
   return {
     taskId: item.taskId,
     workspaceId: item.workspaceId,
+    parentTaskId: item.task.parentTaskId,
     title: item.task.title,
     description: item.task.description,
     priority: item.task.priority,
@@ -265,22 +267,25 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   const listItems = projections.map((item) => mapProjectionItem(item));
+  const topLevelItems = listItems.filter((item) => item.parentTaskId === null);
 
-  const scheduled = listItems
+  const scheduled = topLevelItems
     .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
     .map((item) => item);
 
-  const unscheduled = listItems
+  const unscheduled = topLevelItems
     .filter((item) => item.scheduleStatus === "Unscheduled")
     .map((item) => item);
 
-  const risks = listItems
+  const risks = topLevelItems
     .filter(
       (item) => item.scheduleStatus && ["AtRisk", "Overdue", "Interrupted"].includes(item.scheduleStatus),
     )
     .map((item) => item);
 
-  const mappedProposals = proposals.map((proposal) => ({
+  const topLevelProposals = proposals.filter((proposal) => proposal.task.parentTaskId === null);
+
+  const mappedProposals = topLevelProposals.map((proposal) => ({
     proposalId: proposal.id,
     taskId: proposal.taskId,
     workspaceId: proposal.workspaceId,
@@ -307,7 +312,7 @@ export async function getSchedulePage(workspaceId: string) {
     scheduled,
     unscheduled,
     risks,
-    proposals,
+    proposals: topLevelProposals,
   });
 
   // 分析冲突
@@ -343,7 +348,7 @@ export async function getSchedulePage(workspaceId: string) {
     scheduled,
     unscheduled,
     risks,
-    listItems,
+    listItems: topLevelItems,
     proposals: mappedProposals,
     conflicts: conflictAnalysis.conflicts as unknown as ScheduleConflict[],
     suggestions: conflictAnalysis.suggestions as unknown as ScheduleSuggestion[],

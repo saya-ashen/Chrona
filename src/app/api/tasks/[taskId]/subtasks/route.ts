@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createTask } from "@/modules/commands/create-task";
 
+function mapSubtask(task: Awaited<ReturnType<typeof db.task.findMany>>[number] & { projection: { persistedStatus: string; scheduleStatus: string | null } | null }) {
+  return {
+    id: task.id,
+    parentTaskId: task.parentTaskId,
+    title: task.title,
+    description: task.description,
+    priority: task.priority,
+    status: task.status,
+    persistedStatus: task.projection?.persistedStatus ?? task.status,
+    scheduleStatus: task.projection?.scheduleStatus ?? task.scheduleStatus,
+    dueAt: task.dueAt,
+    scheduledStartAt: task.scheduledStartAt,
+    scheduledEndAt: task.scheduledEndAt,
+    completedAt: task.completedAt,
+    isCompleted: task.status === "Done" || task.status === "Completed",
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+  };
+}
+
 /**
  * GET /api/tasks/[taskId]/subtasks — List subtasks of a parent task.
  */
@@ -28,7 +48,9 @@ export async function GET(
       orderBy: { createdAt: "asc" },
     });
 
-    return NextResponse.json({ subtasks, count: subtasks.length });
+    const normalizedSubtasks = subtasks.map(mapSubtask);
+
+    return NextResponse.json({ subtasks: normalizedSubtasks, count: normalizedSubtasks.length });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to list subtasks";
     console.error("GET /api/tasks/[taskId]/subtasks error:", message);
@@ -74,13 +96,8 @@ export async function POST(
       title,
       description: body.description,
       priority: body.priority,
+      parentTaskId: taskId,
       dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
-    });
-
-    // Set the parentTaskId (createTask doesn't support it directly)
-    await db.task.update({
-      where: { id: result.taskId },
-      data: { parentTaskId: taskId },
     });
 
     // Fetch the full created subtask to return
@@ -89,7 +106,7 @@ export async function POST(
       include: { projection: true },
     });
 
-    return NextResponse.json({ subtask }, { status: 201 });
+    return NextResponse.json({ subtask: subtask ? mapSubtask(subtask) : null }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create subtask";
     console.error("POST /api/tasks/[taskId]/subtasks error:", message);

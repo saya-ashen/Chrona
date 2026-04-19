@@ -80,6 +80,7 @@ vi.mock("@/components/schedule/task-create-dialog", () => ({
 
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import type { SchedulePageData } from "@/components/schedule/schedule-page-types";
+import { hydrateSchedulePageData } from "@/components/schedule/schedule-page-utils";
 
 Object.defineProperty(globalThis, "fetch", {
   configurable: true,
@@ -152,6 +153,7 @@ function createData(): SchedulePageData {
       {
         taskId: "task-1",
         workspaceId: "workspace-1",
+        parentTaskId: null,
         title: "Existing block",
         description: null,
         priority: "Medium",
@@ -188,6 +190,24 @@ function createData(): SchedulePageData {
     suggestions: [],
   };
 }
+
+describe("SchedulePage projection hydration", () => {
+  it("hydrates refreshed projection date strings back into Date objects", () => {
+    const hydrated = hydrateSchedulePageData({
+      ...createData(),
+      scheduled: [
+        {
+          ...createData().scheduled[0],
+          scheduledStartAt: "2026-04-15T09:00:00.000Z" as unknown as Date,
+          scheduledEndAt: "2026-04-15T10:00:00.000Z" as unknown as Date,
+        },
+      ],
+    } as unknown as SchedulePageData);
+
+    expect(hydrated.scheduled[0]?.scheduledStartAt).toBeInstanceOf(Date);
+    expect(hydrated.scheduled[0]?.scheduledEndAt).toBeInstanceOf(Date);
+  });
+});
 
 describe("SchedulePage quick create", () => {
   it("renders the timeline view and shows scheduled blocks", () => {
@@ -309,6 +329,7 @@ describe("SchedulePage data display", () => {
       {
         taskId: "task-risk-1",
         workspaceId: "workspace-1",
+        parentTaskId: null,
         title: "At-risk task",
         description: null,
         priority: "High",
@@ -358,6 +379,7 @@ describe("SchedulePage data display", () => {
       {
         taskId: "task-unsched-1",
         workspaceId: "workspace-1",
+        parentTaskId: null,
         title: "Unscheduled task",
         description: null,
         priority: "Medium",

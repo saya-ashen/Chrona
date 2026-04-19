@@ -182,22 +182,6 @@ export function registerTaskCommands(
       }
     });
 
-  // ── task plan ──────────────────────────────────────────────────────
-  task
-    .command("plan")
-    .description("Generate a plan for a task")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.generatePlan(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
-
   // ── task delete ─────────────────────────────────────────────────────
   task
     .command("delete")

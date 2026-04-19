@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ChevronDown, GripVertical, ListTree } from "lucide-react";
+import { Calendar, ChevronDown, GripVertical, ListTree, Sparkles } from "lucide-react";
 import { type DragEvent, useCallback, useEffect, useState } from "react";
 import { AiInsightsPanel } from "@/components/schedule/ai-insights-panel";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
@@ -44,6 +44,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { markTaskDone, reopenTask } from "@/app/actions/task-actions";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
@@ -217,141 +218,179 @@ export function SelectedBlockSheet({
       <LocalizedLink
         href={buildScheduleHref(selectedDay)}
         aria-label={copy.closeTaskDetails}
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-slate-950/35"
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="schedule-task-sheet-title"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-3xl border border-border/70 bg-background p-5 shadow-2xl md:inset-y-4 md:right-4 md:left-auto md:w-[min(520px,92vw)] md:max-h-none md:rounded-3xl"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:inset-y-4 md:left-1/2 md:w-[min(1180px,calc(100vw-2rem))] md:max-h-none md:-translate-x-1/2 md:rounded-[2rem]"
       >
-        <div className="flex items-start justify-between gap-4 border-b pb-4">
-          <div className="space-y-1">
-            <h2
-              id="schedule-task-sheet-title"
-              className="text-sm font-semibold text-foreground"
+        <div className="flex max-h-[92vh] min-h-0 flex-col md:max-h-[calc(100vh-2rem)]">
+          <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 md:px-6">
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
+                {copy.taskDetailsEyebrow}
+              </p>
+              <div className="space-y-1">
+                <h2
+                  id="schedule-task-sheet-title"
+                  className="text-xl font-semibold tracking-tight text-foreground"
+                >
+                  {item.title}
+                </h2>
+                <p className="max-w-3xl text-sm text-muted-foreground">
+                  {copy.taskDetailsSummary}
+                </p>
+              </div>
+              <ItemMeta item={item} />
+            </div>
+            <LocalizedLink
+              href={buildScheduleHref(selectedDay)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              {copy.taskDetails}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {copy.taskDetailsDescription}
-            </p>
-          </div>
-          <LocalizedLink
-            href={buildScheduleHref(selectedDay)}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {copy.close}
-          </LocalizedLink>
-        </div>
-
-        <div className="mt-4 space-y-4 overflow-y-auto pr-1 text-sm text-muted-foreground md:max-h-[calc(100vh-9rem)]">
-          {/* ── Title + meta ── */}
-          <div className="space-y-2">
-            <p className="text-base font-medium text-foreground">{item.title}</p>
-            <ItemMeta item={item} />
+              {copy.close}
+            </LocalizedLink>
           </div>
 
-          {/* ── 1. Time adjustment (top) ── */}
-          <SurfaceCard
-            as="div"
-            variant="inset"
-            padding="sm"
-            className="rounded-2xl border-dashed"
-          >
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {copy.adjustBlock}
-            </p>
-            <p className="mb-2 text-xs text-muted-foreground">
-              {formatTimeRange(
-                item.scheduledStartAt,
-                item.scheduledEndAt,
-                locale,
-                copy,
-              )}
-            </p>
-            <ScheduleEditorForm
-              taskId={item.taskId}
-              dueAt={item.dueAt}
-              scheduledStartAt={item.scheduledStartAt}
-              scheduledEndAt={item.scheduledEndAt}
-              submitLabel={copy.scheduleTask}
-              onMutatedAction={onMutatedAction}
-            />
-          </SurfaceCard>
+          <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_300px]">
+            <div
+              data-testid="selected-block-main-column"
+              className="min-h-0 overflow-y-auto border-b border-border/60 px-5 py-5 text-sm text-muted-foreground md:border-b-0 md:border-r md:px-6"
+            >
+              <div className="space-y-5 pb-6">
+                <SurfaceCard
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
+                >
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          {copy.adjustBlock}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatTimeRange(
+                            item.scheduledStartAt,
+                            item.scheduledEndAt,
+                            locale,
+                            copy,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="size-3.5 text-muted-foreground" />
+                          {formatDateTime(item.dueAt, locale)}
+                        </div>
+                      </div>
+                    </div>
+                    <ScheduleEditorForm
+                      taskId={item.taskId}
+                      dueAt={item.dueAt}
+                      scheduledStartAt={item.scheduledStartAt}
+                      scheduledEndAt={item.scheduledEndAt}
+                      submitLabel={copy.scheduleTask}
+                      onMutatedAction={onMutatedAction}
+                    />
+                  </div>
+                </SurfaceCard>
 
-          {/* ── 2. Status grid ── */}
-          <DetailGrid
-            items={[
-              { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-              {
-                label: copy.currentPlan,
-                value: item.scheduleStatus ?? copy.scheduledMetric,
-              },
-              {
-                label: copy.latestRun,
-                value: item.latestRunStatus ?? copy.noActiveRun,
-              },
-              {
-                label: copy.nextAction,
-                value: item.actionRequired ?? copy.stayOnPlan,
-              },
-            ]}
-          />
+                <DetailGrid
+                  items={[
+                    { label: copy.due, value: formatDateTime(item.dueAt, locale) },
+                    {
+                      label: copy.currentPlan,
+                      value: item.scheduleStatus ?? copy.scheduledMetric,
+                    },
+                    {
+                      label: copy.latestRun,
+                      value: item.latestRunStatus ?? copy.noActiveRun,
+                    },
+                    {
+                      label: copy.nextAction,
+                      value: item.actionRequired ?? copy.stayOnPlan,
+                    },
+                  ]}
+                />
 
-          {/* ── 3. Task config (description in main, adapter/model/prompt in advanced) ── */}
-          <SurfaceCard
-            as="div"
-            variant="inset"
-            padding="sm"
-            className="rounded-2xl border-dashed"
-          >
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {copy.taskConfig}
-            </p>
-            <TaskConfigForm
-              runtimeAdapters={runtimeAdapters}
-              defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-              isPending={isPending}
-              initialValues={toTaskConfigInitialValues(item)}
-              submitLabel={copy.saveTaskConfig}
-              pendingLabel={copy.saving}
-              onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
-            />
-          </SurfaceCard>
+                <SurfaceCard
+                  as="div"
+                  variant="inset"
+                  padding="sm"
+                  className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
+                >
+                  <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    {copy.taskConfig}
+                  </p>
+                  <TaskConfigForm
+                    runtimeAdapters={runtimeAdapters}
+                    defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                    isPending={isPending}
+                    initialValues={toTaskConfigInitialValues(item)}
+                    submitLabel={copy.saveTaskConfig}
+                    pendingLabel={copy.saving}
+                    onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
+                  />
+                </SurfaceCard>
 
-          {/* ── 4. Subtasks list ── */}
-          <SubtasksList parentTaskId={item.taskId} workspaceId={item.workspaceId} refreshKey={subtasksRefreshKey} />
+                <SubtasksList
+                  parentTaskId={item.taskId}
+                  workspaceId={item.workspaceId}
+                  refreshKey={subtasksRefreshKey}
+                />
+              </div>
+            </div>
 
-          {/* ── 5. AI insights (tabbed: automation + decomposition) ── */}
-          <AiInsightsPanel
-            item={item}
-            onApplyDecomposition={async (result) => {
-              try {
-                const res = await fetch("/api/ai/batch-decompose", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    taskId: item.taskId,
-                    subtasks: result.subtasks,
-                  }),
-                });
-                if (!res.ok) throw new Error("Batch decompose failed");
-                setSubtasksRefreshKey((k) => k + 1);
-                await onMutatedAction();
-              } catch (err) {
-                console.error("[TaskDecomposition] Failed to apply:", err);
-              }
-            }}
-          />
+            <aside
+              data-testid="selected-block-ai-sidebar"
+              className="min-h-0 overflow-y-auto bg-muted/10 px-5 py-5 md:px-5"
+            >
+              <div className="space-y-4 pb-6">
+                <SurfaceCard className="border-border/70 bg-background shadow-sm">
+                  <div className="space-y-3 p-4">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-foreground/80">
+                      <Sparkles className="size-3.5 text-primary" />
+                      {copy.aiSidebarTitle}
+                    </div>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {copy.aiSidebarDescription}
+                    </p>
+                  </div>
+                </SurfaceCard>
 
-          {/* ── 6. Workbench link ── */}
-          <TaskContextLinks
-            workspaceId={item.workspaceId}
-            taskId={item.taskId}
-            latestRunStatus={item.latestRunStatus}
-            workLabel={t("common.openWorkbench")}
-          />
+                <AiInsightsPanel
+                  item={item}
+                  onApplyDecomposition={async (result) => {
+                    try {
+                      const res = await fetch("/api/ai/batch-decompose", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          taskId: item.taskId,
+                          replaceExisting: true,
+                        }),
+                      });
+                      if (!res.ok) throw new Error("Batch decompose failed");
+                      setSubtasksRefreshKey((k) => k + 1);
+                      await onMutatedAction();
+                    } catch (err) {
+                      console.error("[TaskDecomposition] Failed to apply:", err);
+                    }
+                  }}
+                />
+
+                <TaskContextLinks
+                  workspaceId={item.workspaceId}
+                  taskId={item.taskId}
+                  latestRunStatus={item.latestRunStatus}
+                  workLabel={t("common.openWorkbench")}
+                />
+              </div>
+            </aside>
+          </div>
         </div>
       </section>
     </>
@@ -736,10 +775,31 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
 
 type SubtaskData = {
   id: string;
+  parentTaskId: string | null;
   title: string;
+  description: string | null;
   priority: string;
+  status: string;
   persistedStatus: string | null;
+  scheduleStatus: string | null;
+  dueAt: string | Date | null;
+  scheduledStartAt: string | Date | null;
+  scheduledEndAt: string | Date | null;
+  completedAt: string | Date | null;
+  isCompleted: boolean;
 };
+
+function formatSubtaskWindow(locale: string, value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
 
 function SubtasksList({
   parentTaskId,
@@ -752,8 +812,11 @@ function SubtasksList({
 }) {
   const [subtasks, setSubtasks] = useState<SubtaskData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingSubtaskId, setPendingSubtaskId] = useState<string | null>(null);
+  const locale = useLocale();
 
   const fetchSubtasks = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
       if (!res.ok) {
@@ -784,23 +847,57 @@ function SubtasksList({
       </div>
       <div className="space-y-1">
         {subtasks.map((sub) => (
-          <LocalizedLink
+          <div
             key={sub.id}
-            href={`/workspaces/${workspaceId}/work/${sub.id}`}
-            className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/60 px-3 py-2 text-sm transition hover:border-primary/40 hover:bg-primary/5"
+            className="rounded-lg border border-border/40 bg-background/60 px-3 py-2"
           >
-            <span className="truncate font-medium text-foreground">
-              {sub.title}
-            </span>
-            <div className="flex shrink-0 items-center gap-2">
-              <StatusBadge tone={getPriorityTone(sub.priority)}>
-                {sub.priority}
-              </StatusBadge>
-              {sub.persistedStatus ? (
-                <StatusBadge>{sub.persistedStatus}</StatusBadge>
-              ) : null}
+            <div className="flex items-start justify-between gap-3">
+              <LocalizedLink
+                href={`/workspaces/${workspaceId}/work/${sub.id}`}
+                className="min-w-0 flex-1 space-y-1 transition hover:text-primary"
+              >
+                <div className="truncate font-medium text-foreground">{sub.title}</div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <StatusBadge tone={getPriorityTone(sub.priority)}>{sub.priority}</StatusBadge>
+                  {sub.persistedStatus ? <StatusBadge>{sub.persistedStatus}</StatusBadge> : null}
+                  {sub.scheduleStatus ? <StatusBadge>{sub.scheduleStatus}</StatusBadge> : null}
+                  {sub.isCompleted ? <StatusBadge tone="success">Done</StatusBadge> : null}
+                  {sub.scheduledStartAt ? (
+                    <span>
+                      {formatSubtaskWindow(locale, sub.scheduledStartAt)}
+                      {sub.scheduledEndAt
+                        ? ` → ${formatSubtaskWindow(locale, sub.scheduledEndAt)}`
+                        : ""}
+                    </span>
+                  ) : sub.dueAt ? (
+                    <span>Due {formatSubtaskWindow(locale, sub.dueAt)}</span>
+                  ) : null}
+                </div>
+              </LocalizedLink>
+              <button
+                type="button"
+                disabled={pendingSubtaskId === sub.id}
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      setPendingSubtaskId(sub.id);
+                      if (sub.isCompleted) {
+                        await reopenTask({ taskId: sub.id });
+                      } else {
+                        await markTaskDone({ taskId: sub.id });
+                      }
+                      await fetchSubtasks();
+                    } finally {
+                      setPendingSubtaskId(null);
+                    }
+                  })();
+                }}
+                className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-50"
+              >
+                {pendingSubtaskId === sub.id ? "..." : sub.isCompleted ? "Reopen" : "Mark done"}
+              </button>
             </div>
-          </LocalizedLink>
+          </div>
         ))}
       </div>
     </div>

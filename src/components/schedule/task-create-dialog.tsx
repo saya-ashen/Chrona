@@ -2,10 +2,11 @@
 
 import { Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { AutomationSuggestionPanel } from "@/components/schedule/automation-suggestion-panel";
+import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useAutoComplete, useSmartAutomation } from "@/hooks/use-ai";
+import { useAutoComplete } from "@/hooks/use-ai";
+import type { TaskDecompositionResult } from "@/modules/ai/task-decomposer";
 
 /* ------------------------------------------------------------------ */
 /*  Priority badge color map                                          */
@@ -32,6 +33,7 @@ type TaskCreateDialogProps = {
     scheduledStartAt: Date;
     scheduledEndAt: Date;
   }) => Promise<void>;
+  onApplyDecomposition?: (result: TaskDecompositionResult) => Promise<void>;
 };
 
 export function TaskCreateDialog({
@@ -42,6 +44,7 @@ export function TaskCreateDialog({
   isPending,
   onClose,
   onSubmit,
+  onApplyDecomposition,
 }: TaskCreateDialogProps) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState("");
@@ -49,6 +52,7 @@ export function TaskCreateDialog({
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [decompositionSeedTitle, setDecompositionSeedTitle] = useState("");
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
@@ -66,24 +70,6 @@ export function TaskCreateDialog({
   } = useAutoComplete(
     !suppressRef.current && title.trim().length >= 3 ? title.trim() : null,
   );
-
-  const automationInput =
-    !suppressRef.current && title.trim().length >= 3
-      ? {
-          title: title.trim(),
-          description,
-          priority,
-          dueAt: null as Date | null,
-          scheduledStartAt: initialStartAt,
-          scheduledEndAt: initialEndAt,
-          isRunnable: false,
-          runnabilityState: "not_configured" as const,
-          ownerType: "human" as const,
-        }
-      : null;
-
-  const { suggestion: aiSuggestion, isLoading: aiLoading } =
-    useSmartAutomation(automationInput);
 
   /* ---- Derive dropdown visibility ---- */
   const hasAutoCompleteSuggestions =
@@ -120,6 +106,7 @@ export function TaskCreateDialog({
       setDescription("");
       setPriority("Medium");
       setShowAutoComplete(false);
+      setDecompositionSeedTitle(initialTitle);
       suppressRef.current = false;
     }
   }, [isOpen, initialStartAt, initialEndAt, initialTitle]);
@@ -264,6 +251,7 @@ export function TaskCreateDialog({
                       }
                       suppressRef.current = true;
                       setTitle(suggestion.title);
+                      setDecompositionSeedTitle(suggestion.title);
                       if (suggestion.description) {
                         setDescription(suggestion.description);
                       }
@@ -399,11 +387,32 @@ export function TaskCreateDialog({
             </div>
           </div>
 
-          {/* AI Suggestion */}
-          <AutomationSuggestionPanel
-            suggestion={aiSuggestion}
-            isLoading={aiLoading}
-          />
+          {/* AI plan */}
+          {onApplyDecomposition ? (
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Sparkles className="size-4 text-primary" />
+                <span>AI 任务规划</span>
+              </div>
+              <TaskDecompositionPanel
+                title={decompositionSeedTitle || title || initialTitle}
+                description={description}
+                priority={priority}
+                dueAt={null}
+                estimatedMinutes={(() => {
+                  const durationMinutes =
+                    (new Date(`${startDate}T${endTime}`).getTime() -
+                      new Date(`${startDate}T${startTime}`).getTime()) /
+                    60000;
+                  return Number.isFinite(durationMinutes) && durationMinutes > 0
+                    ? Math.max(15, Math.round(durationMinutes))
+                    : 60;
+                })()}
+                autoRequest
+                onApply={onApplyDecomposition}
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* Footer */}

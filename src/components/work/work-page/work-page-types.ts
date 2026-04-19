@@ -119,6 +119,17 @@ export type WorkPageClientProps = {
           | "done"
           | "blocked";
         needsUserInput: boolean;
+        type?: string;
+        linkedTaskId?: string | null;
+        executionMode?: string | null;
+        estimatedMinutes?: number | null;
+        priority?: string | null;
+      }>;
+      edges?: Array<{
+        id: string;
+        fromNodeId: string;
+        toNodeId: string;
+        type: string;
       }>;
     };
     workspaceRail?: {

@@ -14,9 +14,12 @@ vi.mock("@/i18n/client", () => ({
 const mockUseAutoComplete = vi.fn();
 const mockUseSmartAutomation = vi.fn();
 
+const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
+
 vi.mock("@/hooks/use-ai", () => ({
   useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
   useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
+  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
@@ -157,7 +160,7 @@ describe("TaskCreateDialog – AI integration", () => {
     expect(urgentButton.className).toContain("bg-primary");
   });
 
-  it("automation suggestion panel shows when AI returns data", () => {
+  it("merged AI plan panel shows when decomposition handler is provided", () => {
     mockUseAutoComplete.mockReturnValue({
       suggestions: [],
       isLoading: false,
@@ -180,19 +183,17 @@ describe("TaskCreateDialog – AI integration", () => {
     });
 
     render(
-      <TaskCreateDialog {...defaultProps} initialTitle="Write weekly report" />,
+      <TaskCreateDialog
+        {...defaultProps}
+        initialTitle="Write weekly report"
+        onApplyDecomposition={vi.fn().mockResolvedValue(undefined)}
+      />,
     );
 
-    // AutomationSuggestionPanel should render with AI data
-    expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
-    expect(screen.getByText("high confidence")).toBeInTheDocument();
-    expect(screen.getByText("Scheduled")).toBeInTheDocument();
-    expect(screen.getByText(/15min before/)).toBeInTheDocument();
-    expect(screen.getByText("Review last week notes")).toBeInTheDocument();
-    expect(screen.getByText("Gather metrics")).toBeInTheDocument();
+    expect(screen.getByText("AI 任务规划")).toBeInTheDocument();
   });
 
-  it("automation panel shows loading state", () => {
+  it("does not show merged AI plan panel when decomposition handler is absent", () => {
     mockUseAutoComplete.mockReturnValue({
       suggestions: [],
       isLoading: false,
@@ -200,7 +201,7 @@ describe("TaskCreateDialog – AI integration", () => {
     });
     mockUseSmartAutomation.mockReturnValue({
       suggestion: null,
-      isLoading: true,
+      isLoading: false,
       error: null,
     });
 
@@ -211,10 +212,7 @@ describe("TaskCreateDialog – AI integration", () => {
       />,
     );
 
-    // The loading state of AutomationSuggestionPanel shows this text
-    expect(
-      screen.getByText("AI is analyzing your task..."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("AI 任务规划")).not.toBeInTheDocument();
   });
 
   it("handles empty suggestions gracefully", () => {

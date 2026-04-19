@@ -63,6 +63,7 @@ import {
   startOfDay,
   startOfWeek,
   toTimestamp,
+  hydrateSchedulePageData,
 } from "@/components/schedule/schedule-page-utils";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 import { SurfaceCard } from "@/components/ui/surface-card";
@@ -118,7 +119,7 @@ export function SchedulePage({
         );
       }
 
-      const next = (await response.json()) as SchedulePageData;
+      const next = hydrateSchedulePageData((await response.json()) as SchedulePageData);
 
       if (requestId !== refreshRequestIdRef.current) {
         return;
@@ -967,6 +968,55 @@ export function SchedulePage({
               scheduledEndAt: input.scheduledEndAt,
             });
             setShowQuickAddDialog(false);
+          }}
+          onApplyDecomposition={async (result) => {
+            if (!workspaceId) return;
+            setIsPending(true);
+            setErrorMessage(null);
+            try {
+              const created = await createTaskFromSchedule({
+                workspaceId,
+                title: input.title,
+                description: input.description || null,
+                priority: input.priority,
+                dueAt: input.dueAt,
+                runtimeAdapterKey: data.defaultRuntimeAdapterKey,
+                runtimeInput: {},
+                runtimeInputVersion: `${data.defaultRuntimeAdapterKey}-v1`,
+                runtimeModel: null,
+                prompt: null,
+                runtimeConfig: null,
+              });
+
+              const response = await fetch("/api/ai/batch-decompose", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  taskId: created.taskId,
+                  replaceExisting: true,
+                  subtasks: result.subtasks,
+                }),
+              });
+
+              if (!response.ok) {
+                throw new Error("Failed to apply decomposition");
+              }
+
+              setShowQuickAddDialog(false);
+              setLocalSelectedTaskId(created.taskId);
+              router.push(
+                localizeHref(locale, buildScheduleViewHref(activeDay, activeView, created.taskId)),
+              );
+              await refreshProjection();
+            } catch (error) {
+              setErrorMessage(
+                error instanceof Error
+                  ? error.message
+                  : (messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed"),
+              );
+            } finally {
+              setIsPending(false);
+            }
           }}
         />
       ) : null}
