@@ -40,14 +40,17 @@ export function ScheduleCommandBar({
   const [value, setValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Suppress auto-complete after applying a suggestion until next manual input */
+  const suppressRef = useRef(false);
 
   /* ---- AI auto-complete ---- */
   const { suggestions, structuredSuggestions } = useAutoComplete(
-    value.trim().length >= 3 ? value.trim() : null,
+    !suppressRef.current && value.trim().length >= 3 ? value.trim() : null,
   );
 
   function handleSelectSuggestion(structured: StructuredSuggestion) {
     const { action } = structured;
+    suppressRef.current = true;
     setValue(action.title);
     setShowSuggestions(false);
 
@@ -108,6 +111,7 @@ export function ScheduleCommandBar({
             value={value}
             disabled={isPending}
             onChange={(event) => {
+              suppressRef.current = false;
               setValue(event.target.value);
               setShowSuggestions(true);
             }}

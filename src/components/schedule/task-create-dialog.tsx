@@ -53,10 +53,12 @@ export function TaskCreateDialog({
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Suppress auto-complete after applying a suggestion until next manual input */
+  const suppressRef = useRef(false);
 
   /* ---- AI hooks ---- */
   const { suggestions: autoCompleteSuggestions } = useAutoComplete(
-    title.trim().length >= 3 ? title.trim() : null,
+    !suppressRef.current && title.trim().length >= 3 ? title.trim() : null,
   );
 
   const automationInput =
@@ -113,6 +115,7 @@ export function TaskCreateDialog({
       setDescription("");
       setPriority("Medium");
       setShowAutoComplete(false);
+      suppressRef.current = false;
     }
   }, [isOpen, initialStartAt, initialEndAt, initialTitle]);
 
@@ -185,7 +188,10 @@ export function TaskCreateDialog({
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                suppressRef.current = false;
+                setTitle(e.target.value);
+              }}
               onFocus={() => {
                 if (
                   title.trim().length >= 3 &&
@@ -233,6 +239,8 @@ export function TaskCreateDialog({
                           clearTimeout(blurTimeoutRef.current);
                           blurTimeoutRef.current = null;
                         }
+                        // Suppress auto-complete re-trigger
+                        suppressRef.current = true;
                         // Fill in fields from the suggestion
                         setTitle(suggestion.title);
                         if (suggestion.description) {
