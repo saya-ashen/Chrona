@@ -1,7 +1,13 @@
 {
   "name": "agent-dashboard",
   "version": "0.1.0",
-  "private": true,
+  "description": "AI-Native Task Control Plane — Plan, schedule, and observe AI-runtime-powered work",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/AgentDashboard.git"
+  },
+  "keywords": ["ai", "agent", "dashboard", "task-management", "cqrs", "event-sourcing", "nextjs", "openclaw"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
