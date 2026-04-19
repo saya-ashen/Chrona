@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Bot, Sparkles, RotateCcw, Check } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import { buttonVariants } from "@/components/ui/button";
 import {
   SurfaceCard,
@@ -21,7 +22,149 @@ type SavedTaskAiPlanSummary = {
   revision?: number;
   summary?: string | null;
   updatedAt: string;
+  plan?: {
+    id: string;
+    taskId: string;
+    status: "draft" | "accepted" | "superseded" | "archived";
+    revision: number;
+    source: "ai" | "user" | "mixed";
+    generatedBy: string | null;
+    prompt: string | null;
+    summary: string | null;
+    changeSummary: string | null;
+    createdAt: string;
+    updatedAt: string;
+    nodes: Array<{
+      id: string;
+      type: string;
+      title: string;
+      objective: string;
+      description: string | null;
+      status: "pending" | "in_progress" | "waiting_for_user" | "blocked" | "done" | "skipped";
+      phase: string | null;
+      estimatedMinutes: number | null;
+      priority: string | null;
+      executionMode: "none" | "child_task" | "inline_action";
+      linkedTaskId: string | null;
+      needsUserInput: boolean;
+    }>;
+    edges: Array<{
+      id: string;
+      fromNodeId: string;
+      toNodeId: string;
+      type: string;
+    }>;
+  };
 };
+
+function buildCockpitGraph(plan: SavedTaskAiPlanSummary["plan"] | undefined) {
+  if (!plan?.nodes?.length) {
+    return null;
+  }
+
+  return {
+    state: "ready" as const,
+    revision: typeof plan.revision === "number" ? `r${plan.revision}` : null,
+    generatedBy: plan.generatedBy,
+    isMock: false,
+    summary: plan.summary,
+    updatedAt: plan.updatedAt,
+    changeSummary: plan.changeSummary,
+    currentStepId:
+      plan.nodes.find((node) => ["in_progress", "waiting_for_user", "blocked"].includes(node.status))?.id ?? null,
+    steps: plan.nodes.map((node) => ({
+      id: node.id,
+      title: node.title,
+      objective: node.objective,
+      phase: node.phase ?? node.type,
+      status: node.status === "skipped" ? "done" : node.status,
+      needsUserInput: node.needsUserInput || node.status === "waiting_for_user",
+      type: node.type,
+      linkedTaskId: node.linkedTaskId,
+      executionMode: node.executionMode,
+      estimatedMinutes: node.estimatedMinutes,
+      priority: node.priority,
+    })),
+    edges: plan.edges.map((edge) => ({
+      id: edge.id,
+      fromNodeId: edge.fromNodeId,
+      toNodeId: edge.toNodeId,
+      type: edge.type,
+    })),
+  };
+}
+
+function FlowSummary({ plan }: { plan: SavedTaskAiPlanSummary["plan"] | undefined }) {
+  if (!plan?.nodes?.length) {
+    return <p className="text-xs text-muted-foreground">暂无已保存流程</p>;
+  }
+
+  const titles = plan.nodes.map((node) => node.title).filter(Boolean);
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      {titles.map((title, index) => (
+        <div key={`${title}-${index}`} className="flex items-center gap-2">
+          <span className="max-w-[180px] truncate rounded-full border border-border/60 bg-background px-2.5 py-1 text-foreground">
+            {title}
+          </span>
+          {index < titles.length - 1 ? <span className="text-muted-foreground/60">→</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CompactPlanSummary({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
+  return (
+    <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">AI Task Plan</p>
+          <p className="mt-1 text-sm text-foreground">
+            {plan ? "当前保存的完整计划标题与主流程。" : "还没有保存的 AI 计划。"}
+          </p>
+        </div>
+        {plan ? (
+          <span className={cn(
+            "rounded-full px-2 py-1 text-[11px] font-medium",
+            plan.status === "accepted" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
+          )}>
+            {plan.status === "accepted" ? "Accepted" : "Draft"}
+          </span>
+        ) : null}
+      </div>
+      {plan ? (
+        <>
+          <p className="text-sm font-medium text-foreground">{plan.summary ?? "完整任务计划"}</p>
+          <FlowSummary plan={plan.plan} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function TaskCockpitGraphSection({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
+  const graph = buildCockpitGraph(plan?.plan);
+  if (!graph) {
+    return null;
+  }
+
+  return (
+    <SurfaceCard className="space-y-4">
+      <SurfaceCardHeader>
+        <SurfaceCardTitle>Task cockpit</SurfaceCardTitle>
+        <SurfaceCardDescription>
+          用 AI Task Plan 里的 graph 直接替换原来的子任务区域。
+        </SurfaceCardDescription>
+      </SurfaceCardHeader>
+      <div className="px-6 pb-6">
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/70 p-4">
+          <TaskPlanGraph plan={graph} />
+        </div>
+      </div>
+    </SurfaceCard>
+  );
+}
 
 type TaskAiSidebarTask = {
   id: string;
@@ -132,6 +275,8 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
 
   return (
     <div className="space-y-4">
+      <TaskCockpitGraphSection plan={activePlan} />
+
       <SurfaceCard className="overflow-hidden border-primary/15 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.16),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] text-white shadow-[0_24px_80px_-36px_rgba(79,70,229,0.75)]">
         <div className="space-y-5 p-5">
           <div className="flex items-start justify-between gap-4">
@@ -178,36 +323,13 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
         </SurfaceCardHeader>
 
         <div className="space-y-4 px-6 pb-6">
-          <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Planning status</p>
-                <p className="mt-1 text-sm text-foreground">
-                  {activePlan
-                    ? accepted
-                      ? "当前规划已接受，默认展示已采纳版本。"
-                      : "当前规划尚未接受，已自动保存为草稿。"
-                    : "还没有保存的 AI 规划，首次打开会自动生成。"}
-                </p>
-              </div>
-              {activePlan ? (
-                <span className={cn(
-                  "rounded-full px-2 py-1 text-[11px] font-medium",
-                  accepted ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
-                )}>
-                  {accepted ? "Accepted" : "Draft"}
-                </span>
-              ) : null}
-            </div>
-            {activePlan ? (
-              <p className="text-xs text-muted-foreground">
-                最近保存：{formatSavedAt(activePlan.updatedAt)}
-                {typeof activePlan.revision === "number" ? ` · 版本：r${activePlan.revision}` : ""}
-                {activePlan.summary ? ` · ${activePlan.summary}` : ""}
-                {activePlan.prompt ? ` · 提示词：${activePlan.prompt}` : ""}
-              </p>
-            ) : null}
-          </div>
+          {activePlan ? (
+            <p className="text-xs text-muted-foreground">
+              最近保存：{formatSavedAt(activePlan.updatedAt)}
+              {typeof activePlan.revision === "number" ? ` · 版本：r${activePlan.revision}` : ""}
+              {activePlan.prompt ? ` · 提示词：${activePlan.prompt}` : ""}
+            </p>
+          ) : null}
 
           <div className="space-y-2">
             <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -241,19 +363,23 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
             ) : null}
           </div>
 
-          <TaskDecompositionPanel
-            key={`${refreshToken}:${forceRefresh ? "fresh" : activePlan?.id ?? "none"}`}
-            taskId={task.id}
-            title={task.title}
-            description={task.description}
-            priority={task.priority}
-            dueAt={task.dueAt ? new Date(task.dueAt) : null}
-            autoRequest={initialAutoRequest}
-            planningPrompt={planningPrompt}
-            forceRefresh={forceRefresh}
-            onApply={handleApplyDecomposition}
-            onPlanLoaded={handlePlanLoaded}
-          />
+          {activePlan && !forceRefresh ? (
+            <CompactPlanSummary plan={activePlan} />
+          ) : (
+            <TaskDecompositionPanel
+              key={`${refreshToken}:${forceRefresh ? "fresh" : activePlan?.id ?? "none"}`}
+              taskId={task.id}
+              title={task.title}
+              description={task.description}
+              priority={task.priority}
+              dueAt={task.dueAt ? new Date(task.dueAt) : null}
+              autoRequest={initialAutoRequest}
+              planningPrompt={planningPrompt}
+              forceRefresh={forceRefresh}
+              onApply={handleApplyDecomposition}
+              onPlanLoaded={handlePlanLoaded}
+            />
+          )}
 
           {feedback ? (
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

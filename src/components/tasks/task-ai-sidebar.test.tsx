@@ -67,7 +67,7 @@ describe("TaskAiSidebar", () => {
     );
   });
 
-  it("shows saved draft plans without auto-requesting again", () => {
+  it("shows saved draft plans as a compact flow summary instead of the full planning panel", () => {
     render(
       <TaskAiSidebar
         task={{
@@ -79,24 +79,19 @@ describe("TaskAiSidebar", () => {
             revision: 2,
             summary: "2 planned items",
             updatedAt: "2026-04-19T18:00:00.000Z",
+            plan: undefined,
           },
         }}
       />,
     );
 
-    expect(screen.getByText(/当前规划尚未接受/)).toBeInTheDocument();
-    expect(screen.getByText(/版本：r2/)).toBeInTheDocument();
+    expect(screen.getByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
     expect(screen.getByText(/2 planned items/)).toBeInTheDocument();
     expect(screen.getByText(/提示词：prioritize constitutional checks/)).toBeInTheDocument();
-    expect(taskDecompositionPanelProps).toHaveBeenCalledWith(
-      expect.objectContaining({
-        autoRequest: false,
-        forceRefresh: false,
-      }),
-    );
+    expect(taskDecompositionPanelProps).not.toHaveBeenCalled();
   });
 
-  it("renders accepted status copy and replan button for accepted plans", () => {
+  it("renders accepted plans with replan controls", () => {
     render(
       <TaskAiSidebar
         task={{
@@ -108,12 +103,13 @@ describe("TaskAiSidebar", () => {
             revision: 4,
             summary: "Accepted graph plan",
             updatedAt: "2026-04-19T18:00:00.000Z",
+            plan: undefined,
           },
         }}
       />,
     );
 
-    expect(screen.getByText(/当前规划已接受/)).toBeInTheDocument();
+    expect(screen.getByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /重新规划/i })).toBeInTheDocument();
     expect(screen.getByText(/已接受，除非重新规划否则不会自动重跑/)).toBeInTheDocument();
   });
@@ -151,6 +147,7 @@ describe("TaskAiSidebar", () => {
   });
 
   it("accepts the saved plan after applying the graph plan", async () => {
+    const user = userEvent.setup();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
       .mockResolvedValueOnce({
@@ -181,6 +178,8 @@ describe("TaskAiSidebar", () => {
         }}
       />,
     );
+
+    await user.click(screen.getByRole("button", { name: /重新规划/i }));
 
     const lastProps = taskDecompositionPanelProps.mock.calls.at(-1)?.[0];
     await lastProps.onApply({
@@ -243,6 +242,6 @@ describe("TaskAiSidebar", () => {
       updatedAt: "2026-04-19T18:05:00.000Z",
     });
 
-    expect(await screen.findByText(/当前规划尚未接受/)).toBeInTheDocument();
+    expect(await screen.findByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
   });
 });

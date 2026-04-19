@@ -37,6 +37,39 @@ type TaskPageProps = {
         revision?: number;
         summary?: string | null;
         updatedAt: string;
+        plan?: {
+          id: string;
+          taskId: string;
+          status: "draft" | "accepted" | "superseded" | "archived";
+          revision: number;
+          source: "ai" | "user" | "mixed";
+          generatedBy: string | null;
+          prompt: string | null;
+          summary: string | null;
+          changeSummary: string | null;
+          createdAt: string;
+          updatedAt: string;
+          nodes: Array<{
+            id: string;
+            type: string;
+            title: string;
+            objective: string;
+            description: string | null;
+            status: "pending" | "in_progress" | "waiting_for_user" | "blocked" | "done" | "skipped";
+            phase: string | null;
+            estimatedMinutes: number | null;
+            priority: string | null;
+            executionMode: "none" | "child_task" | "inline_action";
+            linkedTaskId: string | null;
+            needsUserInput: boolean;
+          }>;
+          edges: Array<{
+            id: string;
+            fromNodeId: string;
+            toNodeId: string;
+            type: string;
+          }>;
+        };
       } | null;
       blockReason:
         | {
