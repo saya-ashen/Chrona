@@ -209,6 +209,7 @@ export function SelectedBlockSheet({
   const locale = useLocale();
   const { messages, t } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const [subtasksRefreshKey, setSubtasksRefreshKey] = useState(0);
 
   return (
     <>
@@ -319,7 +320,7 @@ export function SelectedBlockSheet({
           </SurfaceCard>
 
           {/* ── 4. Subtasks list ── */}
-          <SubtasksList parentTaskId={item.taskId} workspaceId={item.workspaceId} />
+          <SubtasksList parentTaskId={item.taskId} workspaceId={item.workspaceId} refreshKey={subtasksRefreshKey} />
 
           {/* ── 5. AI insights (tabbed: automation + decomposition) ── */}
           <AiInsightsPanel
@@ -335,6 +336,7 @@ export function SelectedBlockSheet({
                   }),
                 });
                 if (!res.ok) throw new Error("Batch decompose failed");
+                setSubtasksRefreshKey((k) => k + 1);
                 await onMutatedAction();
               } catch (err) {
                 console.error("[TaskDecomposition] Failed to apply:", err);
@@ -741,9 +743,11 @@ type SubtaskData = {
 function SubtasksList({
   parentTaskId,
   workspaceId,
+  refreshKey,
 }: {
   parentTaskId: string;
   workspaceId: string;
+  refreshKey?: number;
 }) {
   const [subtasks, setSubtasks] = useState<SubtaskData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -756,7 +760,7 @@ function SubtasksList({
         return;
       }
       const data = await res.json();
-      setSubtasks(Array.isArray(data) ? data : data.tasks ?? []);
+      setSubtasks(Array.isArray(data) ? data : data.subtasks ?? data.tasks ?? []);
     } catch {
       setSubtasks([]);
     } finally {
@@ -766,7 +770,7 @@ function SubtasksList({
 
   useEffect(() => {
     void fetchSubtasks();
-  }, [fetchSubtasks]);
+  }, [fetchSubtasks, refreshKey]);
 
   if (loading) return null;
   if (subtasks.length === 0) return null;
