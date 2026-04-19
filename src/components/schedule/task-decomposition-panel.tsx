@@ -114,7 +114,16 @@ export function TaskDecompositionPanel({
   const { result, isLoading, error } = useSmartDecomposition(decompositionInput);
   const { suggestion } = useSmartAutomation(automationInput);
 
-  const savedPlanMeta = useMemo(() => result?.savedPlan ?? null, [result]);
+  const savedPlanMeta = useMemo(() => {
+    if (!result?.savedPlan) {
+      return null;
+    }
+
+    return {
+      ...result.savedPlan,
+      plan: result.planGraph,
+    };
+  }, [result]);
 
   const planGraph = useMemo(() => {
     const graph = result?.planGraph;

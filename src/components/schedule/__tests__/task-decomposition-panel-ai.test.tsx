@@ -292,7 +292,10 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
     render(<TaskDecompositionPanel {...defaultProps} autoRequest onPlanLoaded={onPlanLoaded} />);
 
     await waitFor(() => {
-      expect(onPlanLoaded).toHaveBeenCalledWith(samplePlanResponse.savedPlan);
+      expect(onPlanLoaded).toHaveBeenCalledWith({
+        ...samplePlanResponse.savedPlan,
+        plan: samplePlanResponse.planGraph,
+      });
     });
   });
 });
