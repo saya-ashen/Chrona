@@ -14,7 +14,7 @@ import {
   mapApprovalResolution,
   mapHistoryDelta,
   mapRunLifecycleEvent,
-} from "@/modules/openclaw/mapper";
+} from "@/modules/runtime-sync/mapper";
 
 function resolveSessionKey(run: {
   taskSession?: { sessionKey: string } | null;

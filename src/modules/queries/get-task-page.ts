@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { syncTaskRunForRead } from "@/modules/openclaw/freshness";
+import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 

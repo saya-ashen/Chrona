@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createMockOpenClawAdapter } from "@/modules/openclaw/mock-adapter";
-import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
+import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
