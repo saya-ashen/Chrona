@@ -179,7 +179,7 @@ function buildAutomationCandidates(input: {
       continue;
     }
 
-    if (!item.isRunnable && (!item.prompt || item.runnabilityState !== "ready")) {
+    if (!item.isRunnable && (!item.prompt || item.runnabilityState !== "ready_to_run")) {
       candidates.push({
         taskId: item.taskId,
         kind: "decompose",

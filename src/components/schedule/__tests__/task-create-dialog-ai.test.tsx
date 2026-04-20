@@ -17,9 +17,9 @@ const mockUseSmartAutomation = vi.fn();
 const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
 
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
-  useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
-  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
+  useAutoComplete: () => mockUseAutoComplete(),
+  useSmartAutomation: () => mockUseSmartAutomation(),
+  useSmartDecomposition: () => mockUseSmartDecomposition(),
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";

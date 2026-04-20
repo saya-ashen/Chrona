@@ -47,6 +47,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
+    parentTaskId: null,
   };
 }
 

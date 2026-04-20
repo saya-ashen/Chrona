@@ -78,6 +78,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
+    parentTaskId: null,
   };
 }
 
@@ -740,7 +741,7 @@ describe("buildQuickCreateDraft", () => {
     expect(draft.priority).toBe("Medium");
     expect(draft.dueAt).toBeNull();
     // Different day → starts at 9:00
-    expect(draft.scheduledStartAt.getHours()).toBe(9);
+    expect(draft.scheduledStartAt!.getHours()).toBe(9);
   });
 
   it("uses rounded-up current time for same day", () => {
@@ -750,7 +751,7 @@ describe("buildQuickCreateDraft", () => {
       selectedDay: "2026-04-15",
       now,
     });
-    expect(draft.scheduledStartAt.getMinutes()).toBe(15);
+    expect(draft.scheduledStartAt!.getMinutes()).toBe(15);
   });
 
   it("applies custom priority and duration", () => {
@@ -762,7 +763,7 @@ describe("buildQuickCreateDraft", () => {
       durationMinutes: 120,
     });
     expect(draft.priority).toBe("High");
-    const durationMs = draft.scheduledEndAt.getTime() - draft.scheduledStartAt.getTime();
+    const durationMs = draft.scheduledEndAt!.getTime() - draft.scheduledStartAt!.getTime();
     expect(durationMs).toBe(120 * 60000);
   });
 });
@@ -955,6 +956,7 @@ describe("buildTodayFocusItems", () => {
       taskId: overrides.taskId ?? "risk-1",
       workspaceId: "w1",
       title: overrides.title ?? "Risk Task",
+      description: null,
       priority: overrides.priority ?? "High",
       ownerType: "human",
       assigneeAgentId: null,
@@ -977,9 +979,10 @@ describe("buildTodayFocusItems", () => {
       prompt: null,
       runtimeConfig: null,
       isRunnable: true,
-      runnabilityState: "ready",
-      runnabilitySummary: "Ready",
-    };
+      runnabilityState: "ready_to_run",
+    runnabilitySummary: "Ready",
+    parentTaskId: null,
+  };
   }
 
   it("returns empty for no risks and no group", () => {

@@ -37,6 +37,7 @@ type WorkInspectorProps = {
       estimatedMinutes?: number | null;
       priority?: string | null;
     }>;
+    edges?: Array<{ id: string; fromNodeId: string; toNodeId: string; type: string }>;
   };
   currentAction?: { label: string; href: string } | null;
   currentException?: string | null;

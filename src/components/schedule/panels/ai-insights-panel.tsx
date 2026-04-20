@@ -32,7 +32,7 @@ export function AiInsightsPanel({
 }: {
   item: ScheduledItem;
   planResult: TaskPlanGraphResponse | null;
-  onPlanLoaded: (result: TaskPlanGraphResponse | null) => void;
+  onPlanLoaded: (result: any) => void;
   onApplyDecomposition: (result: TaskPlanGraphResponse) => Promise<void>;
 }) {
   const compactNodes = toCompactPlan(planResult);

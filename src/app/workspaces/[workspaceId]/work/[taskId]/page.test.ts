@@ -96,6 +96,9 @@ describe("WorkPage", () => {
         artifacts: [],
         toolCalls: [],
       },
+      taskPlan: { state: "empty" as const, revision: null, generatedBy: null, isMock: false, summary: null, updatedAt: null, changeSummary: null, currentStepId: null, steps: [], edges: [] },
+      workspaceRail: { sections: [] },
+      composerValue: "",
     });
 
     await expect(

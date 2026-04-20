@@ -303,7 +303,6 @@ describe("SchedulePage data display", () => {
         dueAt: null,
         scheduledStartAt: new Date(2026, 3, 15, 14, 0),
         scheduledEndAt: new Date(2026, 3, 15, 15, 0),
-        createdAt: new Date(),
       },
     ];
     data.summary.proposalCount = 1;
@@ -354,7 +353,7 @@ describe("SchedulePage data display", () => {
         prompt: null,
         runtimeConfig: null,
         isRunnable: true,
-        runnabilityState: "ready",
+        runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",
       },
     ];
@@ -404,7 +403,7 @@ describe("SchedulePage data display", () => {
         prompt: null,
         runtimeConfig: null,
         isRunnable: true,
-        runnabilityState: "ready",
+        runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",
       },
     ];

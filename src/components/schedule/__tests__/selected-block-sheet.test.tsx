@@ -85,6 +85,7 @@ const mockItem: ScheduledItem = {
   isRunnable: true,
   runnabilityState: "ready",
   runnabilitySummary: "Ready",
+  parentTaskId: null,
 };
 
 const defaultSheetProps = {

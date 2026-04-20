@@ -174,6 +174,11 @@ describe("WorkPageClient", () => {
       heroErrorMessage: null,
       resultErrorMessage: null,
       composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
         acceptResult: vi.fn(),
@@ -205,6 +210,11 @@ describe("WorkPageClient", () => {
       heroErrorMessage: null,
       resultErrorMessage: null,
       composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
         acceptResult: vi.fn(),
@@ -285,6 +295,11 @@ describe("WorkPageClient", () => {
       heroErrorMessage: null,
       resultErrorMessage: null,
       composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
         acceptResult: vi.fn(),
@@ -320,8 +335,8 @@ describe("WorkPageClient", () => {
     const user = userEvent.setup();
     const originalInnerWidth = window.innerWidth;
     const originalInnerHeight = window.innerHeight;
-    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-      if ((this as HTMLElement).dataset.slot === "workbench-shell") {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.slot === "workbench-shell") {
         return {
           x: 0,
           y: 83,
@@ -456,6 +471,11 @@ describe("WorkPageClient", () => {
       heroErrorMessage: null,
       resultErrorMessage: null,
       composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
         acceptResult: vi.fn(),
@@ -543,6 +563,11 @@ describe("WorkPageClient", () => {
       heroErrorMessage: null,
       resultErrorMessage: null,
       composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
         acceptResult: vi.fn(),

@@ -52,7 +52,7 @@ describe("TaskDetailPage", () => {
         blockReason: null,
         isRunnable: true,
         runnabilitySummary: "Ready to run",
-        runnabilityState: "ready",
+        runnabilityState: "ready_to_run",
         ownerType: "human",
         savedAiPlan: {
           id: "plan_1",
@@ -61,6 +61,7 @@ describe("TaskDetailPage", () => {
           revision: 2,
           summary: "2 planned items",
           updatedAt: "2026-04-19T18:00:00.000Z",
+          plan: { id: "plan_1", taskId: "task_1", status: "draft" as const, revision: 2, source: "ai" as const, generatedBy: null, prompt: null, summary: null, changeSummary: null, createdAt: "2026-04-19T18:00:00.000Z", updatedAt: "2026-04-19T18:00:00.000Z", nodes: [], edges: [] },
         },
         dependencies: [],
       },

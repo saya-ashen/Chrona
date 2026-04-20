@@ -333,12 +333,8 @@ export async function handleCreateTaskBlockAction({
   applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   pushRoute: (href: string) => void;
-  localizeHref: (locale: string, href: string) => string;
-  buildScheduleViewHref: (
-    selectedDay?: string,
-    selectedView?: string,
-    selectedTaskId?: string,
-  ) => string;
+  localizeHref: (locale: any, href: string) => string;
+  buildScheduleViewHref: (...args: any[]) => string;
   setAnnouncement: (value: string) => void;
   setIsPending: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
@@ -679,12 +675,8 @@ export async function handleApplyDecompositionFromDialogAction({
   activeView: ScheduleViewMode;
   locale: string;
   pushRoute: (href: string) => void;
-  localizeHref: (locale: string, href: string) => string;
-  buildScheduleViewHref: (
-    selectedDay?: string,
-    selectedView?: string,
-    selectedTaskId?: string,
-  ) => string;
+  localizeHref: (locale: any, href: string) => string;
+  buildScheduleViewHref: (...args: any[]) => string;
   setShowQuickAddDialog: (value: boolean) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   setIsPending: (value: boolean) => void;
