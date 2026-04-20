@@ -51,7 +51,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
   const currentRun = data.currentRun;
   const taskStatusMeta = getTaskStatusMeta(data, copy);
-  const currentException = getCurrentException(data);
+  const currentException = getCurrentException(data, copy);
   const taskSummary = getTaskSummary(data, copy);
   const workbenchComposer = getWorkbenchComposer(
     currentRun,
@@ -60,12 +60,12 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     data.taskShell,
     copy,
   );
-  const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan);
+  const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan, copy);
   const currentPlanStep = data.taskPlan.steps.find(
     (step) => step.id === data.taskPlan.currentStepId,
   ) ?? null;
   const quickPrompts = workbenchComposer
-    ? getQuickPrompts(workbenchComposer, currentRun, data.currentIntervention)
+    ? getQuickPrompts(workbenchComposer, currentRun, data.currentIntervention, copy)
     : [];
   const collaborationFeed = buildConversationFeed(data, copy);
   const passiveHeroGuidance = getPassiveHeroGuidance(

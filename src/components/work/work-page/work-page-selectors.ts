@@ -35,51 +35,51 @@ export function getTaskStatusMeta(
   copy: WorkbenchCopy,
 ) {
   if (data.closure.isDone) {
-    return { label: "已完成", tone: "success" as const };
+    return { label: copy.statusCompleted, tone: "success" as const };
   }
 
   if (!data.currentRun) {
-    return { label: "待开始", tone: "neutral" as const };
+    return { label: copy.statusNotStarted, tone: "neutral" as const };
   }
 
   if (
     data.currentRun.status === "Failed" ||
     data.currentRun.status === "Cancelled"
   ) {
-    return { label: "已中断", tone: "critical" as const };
+    return { label: copy.statusInterrupted, tone: "critical" as const };
   }
 
   if (data.currentRun.status === "Completed") {
     return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
   }
 
-  return { label: "进行中", tone: "info" as const };
+  return { label: copy.statusInProgress, tone: "info" as const };
 }
 
-export function getCurrentException(data: WorkPageClientProps["initialData"]) {
+export function getCurrentException(data: WorkPageClientProps["initialData"], copy: WorkbenchCopy) {
   if (data.reliability.isStale) {
-    return "同步异常，等待恢复";
+    return copy.syncException;
   }
 
   switch (data.currentRun?.status) {
     case "WaitingForApproval":
-      return data.taskShell.blockReason?.actionRequired ?? "等待审批";
+      return data.taskShell.blockReason?.actionRequired ?? copy.waitingForApproval;
     case "WaitingForInput":
       return (
         data.currentRun.pendingInputPrompt ??
         data.taskShell.blockReason?.actionRequired ??
-        "等待补充说明"
+        copy.waitingForInput
       );
     case "Failed":
     case "Cancelled":
       return (
         data.reliability.stopReason ??
         data.taskShell.blockReason?.actionRequired ??
-        "执行已中断，等待恢复"
+        copy.executionInterrupted
       );
     default:
       return isOverdueScheduleStatus(data.scheduleImpact.status)
-        ? "已超出原计划时间窗"
+        ? copy.overdueSchedule
         : null;
   }
 }
@@ -88,60 +88,62 @@ export function getQuickPrompts(
   workbenchComposer: WorkbenchComposer,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   currentIntervention?: WorkPageClientProps["initialData"]["currentIntervention"] | null,
+  copy?: WorkbenchCopy,
 ) {
   switch (currentIntervention?.kind) {
     case "input":
-      return ["直接回答缺失信息", "先说明不可变约束", "如果有假设请标出来"];
+      return [copy?.quickPromptInputA ?? "Answer the missing information directly", copy?.quickPromptInputB ?? "State immutable constraints first", copy?.quickPromptInputC ?? "Flag any assumptions"];
     case "approval":
-      return ["解释为什么这样做", "给出更安全的替代方案", "总结审批后的下一步"];
+      return [copy?.quickPromptApprovalA ?? "Explain why this approach", copy?.quickPromptApprovalB ?? "Suggest a safer alternative", copy?.quickPromptApprovalC ?? "Summarize next steps after approval"];
     case "retry":
-      return ["先定位失败原因", "给出恢复方案", "缩小这轮变更范围"];
+      return [copy?.quickPromptRetryA ?? "Identify the failure cause first", copy?.quickPromptRetryB ?? "Propose a recovery plan", copy?.quickPromptRetryC ?? "Narrow the scope of this change"];
     case "review":
-      return ["先总结这轮产出", "指出仍未覆盖的风险", "给出建议的下一步"];
+      return [copy?.quickPromptReviewA ?? "Summarize this round's output first", copy?.quickPromptReviewB ?? "Point out uncovered risks", copy?.quickPromptReviewC ?? "Suggest next steps"];
     case "observe":
-      return ["只补充必要背景", "保持输出简洁", "发现风险就重点提示"];
+      return [copy?.quickPromptObserveA ?? "Only add essential context", copy?.quickPromptObserveB ?? "Keep output concise", copy?.quickPromptObserveC ?? "Highlight any risks found"];
     default:
       break;
   }
 
   if (workbenchComposer.mode === "start") {
-    return ["先给出简洁计划", "明确关键假设", "先提出澄清问题"];
+    return [copy?.quickPromptStartA ?? "Give a concise plan first", copy?.quickPromptStartB ?? "State key assumptions", copy?.quickPromptStartC ?? "Ask clarifying questions first"];
   }
   if (currentRun?.status === "Running") {
-    return ["只补充必要背景", "保持输出简洁", "发现风险就重点提示"];
+    return [copy?.quickPromptRunningA ?? "Only add essential context", copy?.quickPromptRunningB ?? "Keep output concise", copy?.quickPromptRunningC ?? "Highlight any risks found"];
   }
   if (currentRun?.status === "WaitingForApproval") {
-    return ["解释当前阻塞", "给出更安全的改法", "总结接下来的步骤"];
+    return [copy?.quickPromptWaitingApprovalA ?? "Explain the current blocker", copy?.quickPromptWaitingApprovalB ?? "Suggest a safer change", copy?.quickPromptWaitingApprovalC ?? "Summarize the next steps"];
   }
-  return ["基于最新结果继续", "收紧下一步动作", "记录这次决策"];
+  return [copy?.quickPromptDefaultA ?? "Continue based on latest results", copy?.quickPromptDefaultB ?? "Tighten the next action", copy?.quickPromptDefaultC ?? "Record this decision"];
 }
 
 export function getCurrentPlanAction(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   taskPlan: WorkPageClientProps["initialData"]["taskPlan"],
+  copy?: WorkbenchCopy,
 ) {
   if (taskPlan.state !== "ready" || !taskPlan.currentStepId) {
     return null;
   }
 
   if (!currentRun) {
-    return { label: "从这一步启动", href: "#next-action-hero" };
+    return { label: copy?.planActionStart ?? "Start from this step", href: "#next-action-hero" };
   }
 
   switch (currentRun.status) {
     case "WaitingForApproval":
-      return { label: "处理当前确认", href: "#next-action-hero" };
+      return { label: copy?.planActionApproval ?? "Handle current approval", href: "#next-action-hero" };
     case "WaitingForInput":
-      return { label: "补充说明后继续", href: "#next-action-hero" };
+      return { label: copy?.planActionInput ?? "Continue after providing input", href: "#next-action-hero" };
     case "Running":
-      return { label: "查看当前进展", href: "#execution-stream" };
+      return { label: copy?.planActionRunning ?? "View current progress", href: "#execution-stream" };
     case "Completed":
-      return { label: "确认结果", href: "#latest-result" };
+      return { label: copy?.planActionCompleted ?? "Confirm result", href: "#latest-result" };
     case "Failed":
     case "Cancelled":
-      return { label: "从这一步恢复", href: "#next-action-hero" };
+      return { label: copy?.planActionRecover ?? "Recover from this step", href: "#next-action-hero" };
     default:
-      return { label: "查看当前动作", href: "#next-action-hero" };
+      return { label: copy?.planActionDefault ?? "View current action", href: "#next-action-hero" };
   }
 }
 export function buildConversationFeed(
@@ -159,7 +161,7 @@ export function buildConversationFeed(
       return {
         id: entry.id,
         kind,
-        eyebrow: isAgent ? copy.agentLabel : "你",
+        eyebrow: isAgent ? copy.agentLabel : copy.userLabel,
         title: "",
         body: entry.content,
         meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
@@ -181,12 +183,15 @@ export function getScheduleSourceSummary(
 export function getComposerDefaultValue(
   taskTitle: string,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
+  copy?: WorkbenchCopy,
 ) {
-  return currentRun?.pendingInputPrompt ?? `继续处理：${taskTitle}`;
+  const prefix = copy?.continueProcessingPrefix ?? "Continue: ";
+  return currentRun?.pendingInputPrompt ?? `${prefix}${taskTitle}`;
 }
 
-export function getStartRunDefaultValue(taskTitle: string) {
-  return `继续处理：${taskTitle}`;
+export function getStartRunDefaultValue(taskTitle: string, copy?: WorkbenchCopy) {
+  const prefix = copy?.continueProcessingPrefix ?? "Continue: ";
+  return `${prefix}${taskTitle}`;
 }
 
 export function getFollowUpDefaultTitle(
@@ -254,7 +259,7 @@ export function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.sendAndContinue,
       defaultValue:
-        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title),
+        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title, copy),
       statusHint: copy.noActiveRunYet,
       submitVariant: "default",
     };
@@ -269,7 +274,7 @@ export function getWorkbenchComposer(
       submitLabel: copy.sendAndContinue,
       defaultValue:
         currentIntervention?.defaultMessage ??
-        getComposerDefaultValue(taskShell.title, currentRun),
+        getComposerDefaultValue(taskShell.title, currentRun, copy),
       statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };
@@ -310,7 +315,7 @@ export function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
       defaultValue:
-        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title),
+        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title, copy),
       statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };
@@ -327,7 +332,7 @@ export function getWorkbenchComposer(
         currentIntervention?.description ?? copy.workbenchDescription,
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
-      defaultValue: taskShell.prompt ?? `恢复任务：${taskShell.title}`,
+      defaultValue: taskShell.prompt ?? `${copy.recoverTaskPrefix}${taskShell.title}`,
       statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };

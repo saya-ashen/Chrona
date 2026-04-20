@@ -13,70 +13,70 @@ export function isOverdueScheduleStatus(status: string | null | undefined) {
 export function getScheduleStatusLabel(status: string | null | undefined) {
   switch (status) {
     case "AtRisk":
-      return "有风险";
+      return "At risk";
     case "Overdue":
-      return "已超时";
+      return "Overdue";
     case "OnTrack":
-      return "按计划进行";
+      return "On track";
     case "Unscheduled":
-      return "未安排";
+      return "Unscheduled";
     case "Completed":
-      return "已完成";
+      return "Completed";
     default:
-      return status || "暂无";
+      return status || "N/A";
   }
 }
 
 export function getRunStatusLabel(status: string | null | undefined) {
   switch (status) {
     case "Running":
-      return "执行中";
+      return "Running";
     case "WaitingForApproval":
-      return "等待审批";
+      return "Waiting for approval";
     case "WaitingForInput":
-      return "等待补充说明";
+      return "Waiting for input";
     case "Completed":
-      return "已完成";
+      return "Completed";
     case "Failed":
-      return "执行中断";
+      return "Failed";
     case "Cancelled":
-      return "已取消";
+      return "Cancelled";
     default:
-      return "暂无运行";
+      return "No run";
   }
 }
 
 export function getApprovalStatusLabel(status: string | null | undefined) {
   switch (status) {
     case "Pending":
-      return "待处理";
+      return "Pending";
     case "Approved":
-      return "已批准";
+      return "Approved";
     case "Rejected":
-      return "已拒绝";
+      return "Rejected";
     case "Cancelled":
-      return "已取消";
+      return "Cancelled";
     default:
-      return status || "暂无";
+      return status || "N/A";
   }
 }
 
 export function getTaskLifecycleLabel(status: string | null | undefined) {
   switch (status) {
     case "Ready":
-      return "待开始";
+      return "Pending";
     case "Running":
     case "InProgress":
-      return "进行中";
+      return "In progress";
     case "Blocked":
-      return "阻塞";
+      return "Blocked";
     case "Done":
     case "Completed":
-      return "已完成";
+      return "Completed";
     case "Cancelled":
-      return "已取消";
+      return "Cancelled";
     default:
-      return status || "暂无";
+      return status || "N/A";
   }
 }
 
@@ -98,15 +98,15 @@ export function getSyncStatusLabel(
 export function getArtifactTypeLabel(type: string | null | undefined) {
   switch (type) {
     case "document":
-      return "文档";
+      return "Document";
     case "file":
-      return "文件";
+      return "File";
     case "link":
-      return "链接";
+      return "Link";
     case "image":
-      return "图片";
+      return "Image";
     default:
-      return type || "暂无";
+      return type || "N/A";
   }
 }
 
@@ -114,17 +114,17 @@ export function getToolCallStatusLabel(status: string | null | undefined) {
   switch (status) {
     case "completed":
     case "success":
-      return "已完成";
+      return "Completed";
     case "running":
     case "pending":
-      return "进行中";
+      return "In progress";
     case "failed":
     case "error":
-      return "失败";
+      return "Failed";
     case "cancelled":
-      return "已取消";
+      return "Cancelled";
     default:
-      return status || "暂无";
+      return status || "N/A";
   }
 }
 export function parseDateInputForSubmission(value: string) {
