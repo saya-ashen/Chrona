@@ -261,13 +261,14 @@ export async function chat(
     return { content: raw, source: client.type };
   }
 
-  // LLM — use full message history
+  // LLM — use full message history with streaming
   const config = client.config as LLMClientConfig;
   const model = config.model ?? "gpt-4o-mini";
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
   const body: Record<string, unknown> = {
     model,
+    stream: true,
     messages: request.messages,
     temperature: request.temperature ?? config.temperature ?? 0.7,
   };
@@ -281,7 +282,7 @@ export async function chat(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(300_000),
   });
 
   if (!res.ok) {
@@ -293,15 +294,40 @@ export async function chat(
     );
   }
 
-  interface LLMChatCompletionResponse {
-    choices: Array<{ message: { content: string } }>;
+  // Parse SSE stream
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new AiClientError("No response body for streaming", "llm", "internal");
   }
 
-  const data = (await res.json()) as LLMChatCompletionResponse;
-  const content = data.choices?.[0]?.message?.content ?? "";
-  console.log(
-    `[LLM Chat] User: ${request.messages.map((m) => `${m.role}: ${m.content}`).join(" | ")} => Assistant: ${content}`,
-  );
+  const decoder = new TextDecoder();
+  const contentChunks: string[] = [];
+  let sseBuffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    sseBuffer += decoder.decode(value, { stream: true });
+    const lines = sseBuffer.split("\n");
+    sseBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") continue;
+      try {
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const c = parsed.choices?.[0]?.delta?.content;
+        if (c) contentChunks.push(c);
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  const content = contentChunks.join("");
 
   if (request.jsonMode) {
     const parsed = extractJSON<unknown>(content, client.type);

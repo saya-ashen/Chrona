@@ -331,6 +331,59 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
   const [rects, setRects] = useState<Map<string, DOMRect>>(new Map());
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
+  const edgesByFrom = useMemo(() => {
+    const map = new Map<string, PlanEdge[]>();
+    for (const edge of plan.edges ?? []) {
+      const list = map.get(edge.fromNodeId) ?? [];
+      list.push(edge);
+      map.set(edge.fromNodeId, list);
+    }
+    return map;
+  }, [plan.edges]);
+
+  // All edges flat
+  const allEdges = useMemo(() => plan.edges ?? [], [plan.edges]);
+
+  // Compute topological layers for DAG layout
+  const layers = useMemo(() => {
+    const steps = plan.steps;
+    const edges = plan.edges ?? [];
+    if (steps.length === 0) return [];
+
+    // Build adjacency: which nodes must come before each node
+    const incomingMap = new Map<string, Set<string>>();
+    for (const s of steps) incomingMap.set(s.id, new Set());
+    for (const e of edges) {
+      incomingMap.get(e.toNodeId)?.add(e.fromNodeId);
+    }
+
+    const assigned = new Set<string>();
+    const result: PlanStep[][] = [];
+
+    // Kahn's-style layering: each layer = nodes whose predecessors are all assigned
+    while (assigned.size < steps.length) {
+      const layer: PlanStep[] = [];
+      for (const s of steps) {
+        if (assigned.has(s.id)) continue;
+        const deps = incomingMap.get(s.id) ?? new Set();
+        const allDepsAssigned = [...deps].every((d) => assigned.has(d));
+        if (allDepsAssigned) layer.push(s);
+      }
+      if (layer.length === 0) {
+        // Cycle or orphan — dump remaining
+        for (const s of steps) {
+          if (!assigned.has(s.id)) layer.push(s);
+        }
+        result.push(layer);
+        break;
+      }
+      for (const s of layer) assigned.add(s.id);
+      result.push(layer);
+    }
+
+    return result;
+  }, [plan.steps, plan.edges]);
+
   // Collect node positions for SVG connectors
   useEffect(() => {
     if (plan.state !== "ready" || !containerRef.current) return;
@@ -357,20 +410,7 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
       clearTimeout(timer);
       observer?.disconnect();
     };
-  }, [plan.state, plan.steps.length, selectedStepId]);
-
-  const edgesByFrom = useMemo(() => {
-    const map = new Map<string, PlanEdge[]>();
-    for (const edge of plan.edges ?? []) {
-      const list = map.get(edge.fromNodeId) ?? [];
-      list.push(edge);
-      map.set(edge.fromNodeId, list);
-    }
-    return map;
-  }, [plan.edges]);
-
-  // All edges flat
-  const allEdges = useMemo(() => plan.edges ?? [], [plan.edges]);
+  }, [plan.state, plan.steps.length, selectedStepId, layers.length]);
 
   useEffect(() => {
     if (plan.state !== "ready" || plan.steps.length === 0) {
@@ -442,32 +482,47 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
         </svg>
       ) : null}
 
-      {/* Nodes */}
-      <div className="relative z-10 space-y-4">
-        {plan.steps.map((step) => {
-          const tone = getNodeTone(step);
-          const isCurrent = step.id === plan.currentStepId;
-          const isSelected = step.id === selectedStepId;
+      {/* Nodes — layered DAG layout */}
+      <div className="relative z-10">
+        {layers.map((layerNodes, layerIdx) => (
+          <div
+            key={layerIdx}
+            className={cn(
+              "flex gap-3",
+              layerIdx > 0 && "mt-4",
+              layerNodes.length === 1 && "justify-center",
+              layerNodes.length > 1 && "justify-center",
+            )}
+          >
+            {layerNodes.map((step) => {
+              const tone = getNodeTone(step);
+              const isCurrent = step.id === plan.currentStepId;
+              const isSelected = step.id === selectedStepId;
 
-          return (
-            <div
-              key={step.id}
-              ref={(el) => {
-                if (el) nodeRefs.current.set(step.id, el);
-                else nodeRefs.current.delete(step.id);
-              }}
-            >
-              <FlowNode
-                step={step}
-                tone={tone}
-                isCurrent={isCurrent}
-                isSelected={isSelected}
-                onClick={() => setSelectedStepId(isSelected ? null : step.id)}
-                graphCopy={graphCopy}
-              />
-            </div>
-          );
-        })}
+              return (
+                <div
+                  key={step.id}
+                  ref={(el) => {
+                    if (el) nodeRefs.current.set(step.id, el);
+                    else nodeRefs.current.delete(step.id);
+                  }}
+                  className={cn(
+                    layerNodes.length === 1 ? "w-full max-w-2xl" : "flex-1 min-w-0 max-w-md",
+                  )}
+                >
+                  <FlowNode
+                    step={step}
+                    tone={tone}
+                    isCurrent={isCurrent}
+                    isSelected={isSelected}
+                    onClick={() => setSelectedStepId(isSelected ? null : step.id)}
+                    graphCopy={graphCopy}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
