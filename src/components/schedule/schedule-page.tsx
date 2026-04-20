@@ -19,6 +19,7 @@ import type {
   TimelineCreateInput,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
+// Note: SecondaryPlanningView still used by view model
 import {
   buildScheduleHref,
   buildScheduleViewHref,
@@ -41,7 +42,7 @@ import {
 import { buildSchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
-import { SchedulePageSidebar } from "@/components/schedule/schedule-page-sidebar";
+import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/schedule-page-sidebar";
 import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs";
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
@@ -381,28 +382,11 @@ export function SchedulePage({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
-        <SchedulePageSidebar
-          copy={copy}
+      <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-4 pb-4 pt-3">
+        <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}
-          viewData={viewData}
           viewModel={viewModel}
-          secondaryView={secondaryView}
-          draggedTask={draggedTask}
-          expandedQueueTaskIds={expandedQueueTaskIds}
-          data={data}
-          isPending={isPending}
-          refreshProjection={refreshProjection}
-          setSecondaryView={setSecondaryView}
-          toggleQueueCard={toggleQueueCard}
-          handleQueueQuickCreate={handleQueueQuickCreate}
-          handleTaskConfigSave={handleTaskConfigSave}
-          handleQueueDragStart={handleQueueDragStart}
-          handleQueueDragEnd={handleQueueDragEnd}
-          handleApplySuggestion={handleApplySuggestion}
-          handleAcceptProposal={handleAcceptProposal}
-          handleRejectProposal={handleRejectProposal}
           localizeHref={localizeHref}
           buildScheduleViewHref={buildScheduleViewHref}
         />
@@ -423,6 +407,20 @@ export function SchedulePage({
           onScheduledDragStart={handleScheduledDragStart}
           onDragEnd={handleQueueDragEnd}
           onSaveTaskConfigAction={handleTaskConfigSave}
+        />
+
+        <ScheduleRightSidebar
+          copy={copy}
+          viewData={viewData}
+          data={data}
+          draggedTask={draggedTask}
+          expandedQueueTaskIds={expandedQueueTaskIds}
+          isPending={isPending}
+          refreshProjection={refreshProjection}
+          toggleQueueCard={toggleQueueCard}
+          handleTaskConfigSave={handleTaskConfigSave}
+          handleQueueDragStart={handleQueueDragStart}
+          handleQueueDragEnd={handleQueueDragEnd}
         />
       </div>
 
