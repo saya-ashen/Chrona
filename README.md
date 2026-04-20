@@ -3,24 +3,29 @@
 Chrona is an AI-native control plane for turning intent into scheduled execution.
 
 It is designed around two product pillars:
-- Schedule creation and arrangement
-- Automatic task completion
+- **Schedule creation and arrangement**
+- **Automatic task completion**
 
-The project currently focuses on making planning and execution feel like one connected system: users create work, shape it into time, and let agents carry tasks forward with continuously updated plans.
+The project focuses on making planning and execution feel like one connected system: users create work, shape it into time, and let agents carry tasks forward with continuously updated plans.
 
-Documentation:
-- English docs index: ./docs/en/README.md
-- 中文文档索引: ./docs/zh/README.md
+## Documentation
 
-Quick start:
-- English: ./docs/en/quick-start.md
-- 中文: ./docs/zh/quick-start.md
+Start here:
+- Docs index (English / 中文): `./docs/README.md`
 
-Roadmap:
-- English: ./docs/en/roadmap.md
-- 中文: ./docs/zh/roadmap.md
+Language entry points:
+- English docs: `./docs/en/README.md`
+- 中文文档：`./docs/zh/README.md`
+
+Key docs:
+- Quick start (EN): `./docs/en/quick-start.md`
+- 快速开始（中文）：`./docs/zh/quick-start.md`
+- Roadmap (EN): `./docs/en/roadmap.md`
+- 路线图（中文）：`./docs/zh/roadmap.md`
 
 ## Quick Start
+
+> For full setup details, environment variables, and runtime options, see `./docs/en/quick-start.md`.
 
 1. Install dependencies
 
@@ -40,7 +45,7 @@ bunx prisma generate
 bun run db:seed
 ```
 
-Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is intentionally not listed as a primary README command until the Prisma workflow is stabilized.
+> Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is intentionally not listed as a primary README command until the Prisma workflow is stabilized.
 
 4. Start the web app
 
@@ -55,8 +60,6 @@ bun run services/openclaw-bridge/server.ts
 ```
 
 Open http://localhost:3000.
-
-For full setup details, environment variables, and runtime options, see ./docs/en/quick-start.md.
 
 ## Product Roadmap
 
