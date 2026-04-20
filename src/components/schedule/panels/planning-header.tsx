@@ -1,3 +1,4 @@
+import { Calendar, Plus, LayoutList, Clock } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -5,14 +6,6 @@ type PlanningDayLink = {
   label: string;
   href: string;
   current?: boolean;
-};
-
-type PlanningAction = {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  description?: string;
-  disabled?: boolean;
 };
 
 export type ScheduleCockpitMetric = {
@@ -27,7 +20,7 @@ export function PlanningHeader({
   title,
   activeDayLabel,
   summary,
-  dateSwitcherLabel,
+  dateSwitcherLabel: _dateSwitcherLabel,
   dayLinks,
   metrics,
   actions,
@@ -44,148 +37,122 @@ export function PlanningHeader({
   dateSwitcherLabel: string;
   dayLinks: PlanningDayLink[];
   metrics: ScheduleCockpitMetric[];
-  actions: PlanningAction[];
+  actions: { label: string; href?: string; onClick?: () => void; description?: string; disabled?: boolean }[];
   activeView: "timeline" | "list";
   timelineHref: string;
   listHref: string;
   timelineLabel: string;
   listLabel: string;
 }) {
+  const quickAddAction = actions.find((a) => a.onClick && !a.disabled);
+
+  // Only show queue + risk metrics (first two)
+  const keyMetrics = metrics.slice(0, 2);
+
   return (
     <header
       aria-label={ariaLabel}
-      className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm"
+      className="flex items-center gap-4 border-b border-border/40 bg-background px-5 py-2.5"
     >
-      <div className="flex items-center gap-2">
-        <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
-        <span className="rounded-full bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
+      {/* Title + Date */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Calendar className="size-4 text-muted-foreground" />
+          <h1 className="text-base font-semibold tracking-tight text-foreground">{title}</h1>
+        </div>
+        <span className="text-sm text-muted-foreground">
           {activeDayLabel}
         </span>
-        {summary && (
-          <span className="text-xs text-muted-foreground">{summary}</span>
-        )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          {dateSwitcherLabel}
-        </span>
-        <div className="flex gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
-          {dayLinks.map((dayLink) => (
-            <a
-              key={dayLink.label}
-              href={dayLink.href}
-              aria-current={dayLink.current ? "date" : undefined}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                dayLink.current
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
-              )}
-            >
-              {dayLink.label}
-            </a>
-          ))}
-        </div>
+      {/* Day switcher */}
+      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
+        {dayLinks.map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            aria-current={link.current ? "date" : undefined}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              link.current
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {link.label}
+          </a>
+        ))}
       </div>
 
-      <div className="flex gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5">
+      {/* View toggle */}
+      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
         <a
           href={timelineHref}
           aria-current={activeView === "timeline" ? "page" : undefined}
           className={cn(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
             activeView === "timeline"
               ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
+          <Clock className="size-3" />
           {timelineLabel}
         </a>
         <a
           href={listHref}
           aria-current={activeView === "list" ? "page" : undefined}
           className={cn(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
             activeView === "list"
               ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
+          <LayoutList className="size-3" />
           {listLabel}
         </a>
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        {metrics.map((metric) => (
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Key metrics — compact pills */}
+      <div className="flex items-center gap-1.5">
+        {keyMetrics.map((m) => (
           <div
-            key={metric.label}
-            title={metric.hint}
-            className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-2.5 py-1"
+            key={m.label}
+            title={m.hint}
+            className="flex items-center gap-1 rounded-full border border-border/40 px-2 py-0.5"
           >
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {metric.label}
-            </span>
+            <span className="text-[10px] text-muted-foreground">{m.label}</span>
             <span
               className={cn(
-                "text-sm font-semibold",
-                metric.tone === "critical"
-                  ? "text-red-600"
-                  : metric.tone === "info"
-                    ? "text-blue-600"
-                    : "text-foreground",
+                "text-xs font-semibold",
+                m.tone === "critical" ? "text-rose-600" : m.tone === "info" ? "text-blue-600" : "text-foreground",
               )}
             >
-              {metric.value}
+              {m.value}
             </span>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-2">
-        {actions.map((action, index) =>
-          action.onClick ? (
-            <button
-              key={action.label}
-              type="button"
-              onClick={action.onClick}
-              disabled={action.disabled}
-              title={action.description}
-              className={cn(
-                buttonVariants({ variant: index === 0 ? "default" : "outline", size: "sm" }),
-                "h-8 rounded-lg text-xs",
-              )}
-            >
-              {action.label}
-            </button>
-          ) : action.href && !action.disabled ? (
-            <a
-              key={action.label}
-              href={action.href}
-              title={action.description}
-              className={cn(
-                buttonVariants({ variant: index === 0 ? "default" : "outline", size: "sm" }),
-                "h-8 rounded-lg text-xs",
-              )}
-            >
-              {action.label}
-            </a>
-          ) : (
-            <button
-              key={action.label}
-              type="button"
-              disabled
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "h-8 rounded-lg text-xs",
-              )}
-              title={action.description}
-            >
-              {action.label}
-            </button>
-          ),
-        )}
-      </div>
+      {/* Quick add */}
+      {quickAddAction ? (
+        <button
+          type="button"
+          onClick={quickAddAction.onClick}
+          title={quickAddAction.description}
+          className={cn(
+            buttonVariants({ variant: "default", size: "sm" }),
+            "h-7 gap-1 rounded-lg px-3 text-xs",
+          )}
+        >
+          <Plus className="size-3.5" />
+          {quickAddAction.label}
+        </button>
+      ) : null}
     </header>
   );
 }

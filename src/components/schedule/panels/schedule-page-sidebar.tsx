@@ -1,219 +1,141 @@
 import {
-  CompactTodayFocus,
   ScheduleMiniCalendar,
 } from "@/components/schedule/schedule-mini-calendar";
 import {
   EmptyState,
-  ProposalCard,
   QueueCard,
-  RiskCard,
 } from "@/components/schedule/schedule-page-panels";
-import { ConflictCard } from "@/components/schedule/conflict-card";
-import { ScheduleActionRail } from "@/components/schedule/schedule-action-rail";
-import { ScheduleInlineQuickCreate } from "@/components/schedule/schedule-inline-quick-create";
 import type {
   QuickCreateDraft,
   SchedulePageData,
-  SecondaryPlanningView,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
+import type { Locale } from "@/i18n/config";
+import type { ScheduleViewMode } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 
-export function SchedulePageSidebar({
-  copy,
+import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+
+/**
+ * Schedule page sidebar — now split into two parts:
+ * - LeftSidebar: compact mini calendar
+ * - RightSidebar: simplified queue list
+ *
+ * The parent SchedulePage composes them on either side of the main timeline.
+ */
+
+export function ScheduleLeftSidebar({
   locale,
   activeView,
-  viewData,
   viewModel,
-  secondaryView,
-  draggedTask,
-  expandedQueueTaskIds,
-  data,
-  isPending,
-  refreshProjection,
-  setSecondaryView,
-  toggleQueueCard,
-  handleQueueQuickCreate,
-  handleTaskConfigSave,
-  handleQueueDragStart,
-  handleQueueDragEnd,
-  handleApplySuggestion,
-  handleAcceptProposal,
-  handleRejectProposal,
   localizeHref,
   buildScheduleViewHref,
 }: {
-  copy: SchedulePageCopy;
-  locale: string;
-  activeView: "timeline" | "list";
-  viewData: SchedulePageData;
+  locale: Locale | undefined;
+  activeView: ScheduleViewMode;
   viewModel: SchedulePageViewModel;
-  secondaryView: SecondaryPlanningView;
+  localizeHref: (locale: Locale | undefined, href: string) => string;
+  buildScheduleViewHref: (
+    day: string,
+    view: ScheduleViewMode,
+    taskId?: string,
+  ) => string;
+}) {
+  return (
+    <div className="flex w-56 shrink-0 flex-col gap-3 overflow-y-auto">
+      <ScheduleMiniCalendar
+        monthLabel={viewModel.calendarMonthLabel}
+        days={viewModel.calendarDays.map((day) => ({
+          ...day,
+          href: localizeHref(
+            locale,
+            buildScheduleViewHref(
+              day.key,
+              activeView,
+              viewModel.activeSelectedTaskId,
+            ),
+          ),
+        }))}
+      />
+    </div>
+  );
+}
+
+export function ScheduleRightSidebar({
+  copy,
+  viewData,
+  data,
+  draggedTask,
+  expandedQueueTaskIds,
+  isPending,
+  refreshProjection,
+  toggleQueueCard,
+  handleTaskConfigSave,
+  handleQueueDragStart,
+  handleQueueDragEnd,
+}: {
+  copy: SchedulePageCopy;
+  viewData: SchedulePageData;
+  data: SchedulePageData;
   draggedTask: { kind: "queue" | "scheduled"; taskId: string } | null;
   expandedQueueTaskIds: string[];
-  data: SchedulePageData;
   isPending: boolean;
   refreshProjection: () => Promise<void>;
-  setSecondaryView: (view: SecondaryPlanningView) => void;
   toggleQueueCard: (taskId: string) => void;
-  handleQueueQuickCreate: (
-    draft: QuickCreateDraft & { durationMinutes: number },
-  ) => Promise<void>;
   handleTaskConfigSave: (
     taskId: string,
-    input: Parameters<SchedulePageSidebarProps["handleTaskConfigSave"]>[1],
+    input: TaskConfigFormInput,
   ) => Promise<void>;
   handleQueueDragStart: (
     item: UnscheduledItem,
     event: React.DragEvent<HTMLElement>,
   ) => void;
   handleQueueDragEnd: () => void;
-  handleApplySuggestion: (
-    suggestion: SchedulePageData["suggestions"][number],
-  ) => Promise<void>;
-  handleAcceptProposal: (proposalId: string) => Promise<void>;
-  handleRejectProposal: (proposalId: string) => Promise<void>;
-  localizeHref: (locale: string, href: string) => string;
-  buildScheduleViewHref: (
-    selectedDay?: string,
-    selectedView?: string,
-    selectedTaskId?: string,
-  ) => string;
 }) {
   return (
-    <>
-      <div className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto">
-        <ScheduleMiniCalendar
-          monthLabel={viewModel.calendarMonthLabel}
-          days={viewModel.calendarDays.map((day) => ({
-            ...day,
-            href: localizeHref(
-              locale,
-              buildScheduleViewHref(
-                day.key,
-                activeView,
-                viewModel.activeSelectedTaskId,
-              ),
-            ),
-          }))}
-        />
-
-        <CompactTodayFocus
-          title={copy.todayFocus}
-          items={viewModel.todayFocusItems}
-          emptyMessage={copy.todayFocusEmpty}
-        />
+    <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border/30 px-3 py-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {copy.unscheduledQueue}
+        </h3>
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {viewData.unscheduled.length}
+        </span>
       </div>
 
-      <div className="w-[340px] shrink-0 overflow-y-auto">
-        <ScheduleActionRail
-          id="schedule-cockpit-sidebar"
-          ariaLabel={viewModel.activeRailLabel}
-          tablistAriaLabel={viewModel.activeRailLabel}
-          activeTab={secondaryView}
-          onTabChange={setSecondaryView}
-          sections={[
-            {
-              value: "queue",
-              label: copy.unscheduledQueue,
-              title: copy.unscheduledQueue,
-              description: copy.unscheduledQueueDescription,
-              body: (
-                <div className="space-y-3">
-                  <ScheduleInlineQuickCreate
-                    mode="queue"
-                    selectedDay={viewModel.activeDay}
-                    isPending={isPending}
-                    submitLabel={copy.quickCreateQueueSubmit}
-                    hint={copy.quickCreateQueueHint}
-                    compact
-                    onSubmit={handleQueueQuickCreate}
-                  />
-                  {viewData.unscheduled.length === 0 ? (
-                    <EmptyState>{copy.noUnscheduledWork}</EmptyState>
-                  ) : (
-                    viewData.unscheduled.map((item) => (
-                      <QueueCard
-                        key={item.taskId}
-                        item={item}
-                        runtimeAdapters={data.runtimeAdapters}
-                        defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                        isPending={isPending}
-                        isDragging={
-                          draggedTask?.kind === "queue" &&
-                          draggedTask.taskId === item.taskId
-                        }
-                        isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                        onToggle={() => toggleQueueCard(item.taskId)}
-                        onMutatedAction={refreshProjection}
-                        onSaveTaskConfigAction={handleTaskConfigSave}
-                        onDragStart={handleQueueDragStart}
-                        onDragEnd={handleQueueDragEnd}
-                      />
-                    ))
-                  )}
-                </div>
-              ),
-            },
-            {
-              value: "risks",
-              label: copy.conflictsTitle,
-              title: copy.conflictsTitle,
-              body:
-                viewData.risks.length === 0 ? (
-                  <EmptyState>{copy.noScheduleRisks}</EmptyState>
-                ) : (
-                  viewData.risks
-                    .slice(0, 2)
-                    .map((item) => <RiskCard key={item.taskId} item={item} />)
-                ),
-            },
-            {
-              value: "conflicts",
-              label: copy.conflictDetectionTitle,
-              title: copy.conflictDetectionTitle,
-              body:
-                viewData.conflicts.length === 0 ? (
-                  <EmptyState>{copy.conflictDetectionEmpty}</EmptyState>
-                ) : (
-                  <div className="space-y-3">
-                    {viewData.conflicts.slice(0, 3).map((conflict) => (
-                      <ConflictCard
-                        key={conflict.id}
-                        conflict={conflict}
-                        suggestions={viewData.suggestions}
-                        onApplySuggestion={handleApplySuggestion}
-                        isPending={isPending}
-                      />
-                    ))}
-                  </div>
-                ),
-            },
-            {
-              value: "proposals",
-              label: copy.aiProposalsTitle,
-              title: copy.aiProposalsTitle,
-              body:
-                viewData.proposals.length === 0 ? (
-                  <EmptyState>{copy.aiProposalsCompactEmpty}</EmptyState>
-                ) : (
-                  viewData.proposals.slice(0, 2).map((proposal) => (
-                    <ProposalCard
-                      key={proposal.proposalId}
-                      proposal={proposal}
-                      isPending={isPending}
-                      onAccept={handleAcceptProposal}
-                      onReject={handleRejectProposal}
-                    />
-                  ))
-                ),
-            },
-          ]}
-        />
+      {/* Queue items */}
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+        {viewData.unscheduled.length === 0 ? (
+          <EmptyState>{copy.noUnscheduledWork}</EmptyState>
+        ) : (
+          viewData.unscheduled.map((item) => (
+            <QueueCard
+              key={item.taskId}
+              item={item}
+              runtimeAdapters={data.runtimeAdapters}
+              defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+              isPending={isPending}
+              isDragging={
+                draggedTask?.kind === "queue" &&
+                draggedTask.taskId === item.taskId
+              }
+              isExpanded={expandedQueueTaskIds.includes(item.taskId)}
+              onToggle={() => toggleQueueCard(item.taskId)}
+              onMutatedAction={refreshProjection}
+              onSaveTaskConfigAction={handleTaskConfigSave}
+              onDragStart={handleQueueDragStart}
+              onDragEnd={handleQueueDragEnd}
+            />
+          ))
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
-type SchedulePageSidebarProps = Parameters<typeof SchedulePageSidebar>[0];
+// Legacy export for backward compatibility
+export function SchedulePageSidebar(_props: Record<string, unknown>) {
+  return null;
+}
