@@ -108,8 +108,13 @@ export async function openclawHealthCheck(
   }
 }
 
-// ── LLM Client ──
+// ── LLM Client (streaming) ──
 
+/**
+ * Call an OpenAI-compatible chat completion endpoint using SSE streaming.
+ * Streaming avoids nginx/proxy gateway timeouts on long-running generations
+ * because the connection stays alive with incremental data chunks.
+ */
 export async function llmCall(
   config: LLMClientConfig,
   systemPrompt: string,
@@ -121,6 +126,7 @@ export async function llmCall(
 
   const body: Record<string, unknown> = {
     model,
+    stream: true,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -138,7 +144,7 @@ export async function llmCall(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(300_000),
   });
 
   if (!res.ok) {
@@ -150,8 +156,43 @@ export async function llmCall(
     );
   }
 
-  const data = (await res.json()) as LLMChatCompletionResponse;
-  return data.choices?.[0]?.message?.content ?? "";
+  // Parse SSE stream and accumulate content
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new AiClientError("No response body for streaming", "llm", "internal");
+  }
+
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) chunks.push(content);
+      } catch {
+        // skip malformed SSE lines
+      }
+    }
+  }
+
+  return chunks.join("");
 }
 
 export function llmHealthCheck(config: LLMClientConfig): boolean {

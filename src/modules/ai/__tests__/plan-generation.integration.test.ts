@@ -161,6 +161,17 @@ Return JSON.`;
       expect(nodeIds.has(e.fromNodeId)).toBe(true);
       expect(nodeIds.has(e.toNodeId)).toBe(true);
     }
+
+    // Graph must NOT be purely linear — should have parallelism
+    const outDeg = new Map<string, number>();
+    const inDeg = new Map<string, number>();
+    for (const e of graph.edges) {
+      outDeg.set(e.fromNodeId, (outDeg.get(e.fromNodeId) ?? 0) + 1);
+      inDeg.set(e.toNodeId, (inDeg.get(e.toNodeId) ?? 0) + 1);
+    }
+    const hasFanOut = [...outDeg.values()].some((d) => d > 1);
+    const hasFanIn = [...inDeg.values()].some((d) => d > 1);
+    expect(hasFanOut || hasFanIn).toBe(true);
   }, 120_000);
 
   it("separates automatic and manual nodes", async () => {
