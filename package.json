@@ -26,6 +26,7 @@
     "test:watch": "vitest",
     "test:openclaw:integration": "OPENCLAW_INTEGRATION_TESTS=1 vitest run src/modules/openclaw/__tests__/client.integration.test.ts",
     "test:e2e": "playwright test",
+    "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
     "chrona": "bun packages/cli/src/index.ts",

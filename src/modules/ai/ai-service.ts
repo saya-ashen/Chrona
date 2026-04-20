@@ -13,8 +13,8 @@ import {
   type AiFeature,
   type SmartSuggestRequest,
   type SmartSuggestResponse,
-  type DecomposeTaskRequest,
-  type DecomposeTaskResponse,
+  type GenerateTaskPlanRequest,
+  type GenerateTaskPlanResponse,
   type AnalyzeConflictsRequest,
   type AnalyzeConflictsResponse,
   type SuggestTimeslotRequest,
@@ -24,13 +24,13 @@ import {
   type StreamEvent,
   AiClientError,
   suggest,
-  decompose,
+  generatePlan,
   analyzeConflicts,
   suggestTimeslots,
   chat,
   checkClientHealth,
   suggestStream,
-} from "./ai-client";
+} from "./client";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution
@@ -88,10 +88,10 @@ export async function aiSuggest(request: SmartSuggestRequest): Promise<SmartSugg
   return suggest(client, request);
 }
 
-export async function aiDecompose(request: DecomposeTaskRequest): Promise<DecomposeTaskResponse | null> {
-  const client = await getClientForFeature("decompose");
+export async function aiGeneratePlan(request: GenerateTaskPlanRequest): Promise<GenerateTaskPlanResponse | null> {
+  const client = await getClientForFeature("generate_plan");
   if (!client) return null;
-  return decompose(client, request);
+  return generatePlan(client, request);
 }
 
 export async function aiAnalyzeConflicts(request: AnalyzeConflictsRequest): Promise<AnalyzeConflictsResponse | null> {
@@ -162,13 +162,13 @@ export async function getAIClientInfo(): Promise<Array<{
 }
 
 // Re-exports
-export { AiClientError } from "./ai-client";
+export { AiClientError } from "./client";
 export type {
   SmartSuggestRequest,
   SmartSuggestResponse,
   SmartSuggestion,
-  DecomposeTaskRequest,
-  DecomposeTaskResponse,
+  GenerateTaskPlanRequest,
+  GenerateTaskPlanResponse,
   AnalyzeConflictsRequest,
   AnalyzeConflictsResponse,
   SuggestTimeslotRequest,
@@ -181,4 +181,4 @@ export type {
   AiClientType,
   AiFeature,
   StreamEvent,
-} from "./ai-client";
+} from "./client";

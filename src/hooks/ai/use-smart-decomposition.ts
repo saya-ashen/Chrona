@@ -52,7 +52,7 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
     setError(null);
 
     fetchJSON<TaskPlanGraphResponse>(
-      "/api/ai/decompose-task",
+      "/api/ai/generate-task-plan",
       {
         taskId: taskInput.taskId,
         title: taskInput.title,
@@ -74,7 +74,7 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : "Failed to decompose task");
+          setError(err instanceof Error ? err.message : "Failed to generate task plan");
           setResult(null);
           setIsLoading(false);
         }
@@ -89,22 +89,18 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
   return { result, isLoading, error };
 }
 
-interface BatchDecomposeResponse {
+interface BatchApplyPlanResponse {
   parentTaskId: string;
-  subtasks: unknown[];
-  decomposition: {
-    totalEstimatedMinutes: number;
-    feasibilityScore: number;
-    warnings: string[];
-  };
+  childTasks: unknown[];
+  planGraph: unknown;
 }
 
-export function useBatchDecompose() {
+export function useBatchApplyPlan() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const decompose = useCallback(async (taskId: string) => {
+  const applyPlan = useCallback(async (taskId: string) => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -113,8 +109,8 @@ export function useBatchDecompose() {
     setError(null);
 
     try {
-      const data = await fetchJSON<BatchDecomposeResponse>(
-        "/api/ai/batch-decompose",
+      const data = await fetchJSON<BatchApplyPlanResponse>(
+        "/api/ai/batch-apply-plan",
         { taskId },
         controller.signal,
       );
@@ -129,7 +125,7 @@ export function useBatchDecompose() {
         return undefined;
       }
       if (!controller.signal.aborted) {
-        const message = err instanceof Error ? err.message : "Failed to batch decompose task";
+        const message = err instanceof Error ? err.message : "Failed to apply task plan";
         setError(message);
         setIsLoading(false);
       }
@@ -137,5 +133,8 @@ export function useBatchDecompose() {
     }
   }, []);
 
-  return { decompose, isLoading, error };
+  return { applyPlan, isLoading, error };
 }
+
+/** @deprecated Use useBatchApplyPlan instead */
+export const useBatchDecompose = useBatchApplyPlan;

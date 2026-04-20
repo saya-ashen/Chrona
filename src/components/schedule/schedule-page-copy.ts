@@ -214,9 +214,9 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   aiProposalsCompactEmpty: "No pending AI proposals.",
   taskPlanLabel: "Task Plan",
   loadingTaskPlan: "Loading task plan…",
-  subtasksLabel: "Subtasks",
-  subtaskReopen: "Reopen",
-  subtaskMarkDone: "Mark done",
+  childTasksLabel: "Child Tasks",
+  childTaskReopen: "Reopen",
+  childTaskMarkDone: "Mark done",
 } as const;
 
 export type SchedulePageCopy = Record<

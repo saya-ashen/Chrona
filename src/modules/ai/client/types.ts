@@ -5,7 +5,7 @@
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
   | "suggest"
-  | "decompose"
+  | "generate_plan"
   | "conflicts"
   | "timeslots"
   | "chat";
@@ -82,18 +82,19 @@ export interface SmartSuggestResponse {
   requestId: string;
 }
 
-export interface DecomposeTaskRequest {
+import type { TaskPlanNode, TaskPlanEdge } from "../types";
+
+export interface GenerateTaskPlanRequest {
   taskId: string;
   title: string;
   description?: string;
   estimatedMinutes?: number;
 }
 
-export type { SubtaskSuggestion } from "../types";
-import type { SubtaskSuggestion } from "../types";
-
-export interface DecomposeTaskResponse {
-  subtasks: SubtaskSuggestion[];
+export interface GenerateTaskPlanResponse {
+  nodes: TaskPlanNode[];
+  edges: TaskPlanEdge[];
+  summary: string;
   reasoning?: string;
   source: string;
 }

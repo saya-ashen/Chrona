@@ -15,6 +15,7 @@
 /.playwright-cli/
 /.playwright-browsers
 /test-results
+/artifacts/demo/playwright
 
 # next.js
 /.next/

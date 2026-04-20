@@ -903,7 +903,7 @@
       "statusUnknown": "未测试",
       "reasonUnknown": "暂无详情",
       "featureSuggest": "智能建议",
-      "featureDecompose": "任务分解",
+      "featureGeneratePlan": "タスクプラン生成",
       "featureConflicts": "冲突分析",
       "featureTimeslots": "时间段推荐",
       "featureChat": "对话 / 计划生成"

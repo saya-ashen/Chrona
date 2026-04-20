@@ -1,5 +1,5 @@
 /**
- * AI Client — Feature implementations (suggest, decompose, conflicts, timeslots, chat).
+ * AI Client — Feature implementations (suggest, generatePlan, conflicts, timeslots, chat).
  */
 
 import { randomUUID } from "node:crypto";
@@ -10,9 +10,8 @@ import type {
   SmartSuggestRequest,
   SmartSuggestResponse,
   SmartSuggestion,
-  DecomposeTaskRequest,
-  DecomposeTaskResponse,
-  SubtaskSuggestion,
+  GenerateTaskPlanRequest,
+  GenerateTaskPlanResponse,
   AnalyzeConflictsRequest,
   AnalyzeConflictsResponse,
   ConflictInfo,
@@ -25,6 +24,49 @@ import type {
 } from "./types";
 import { AiClientError } from "./types";
 import { dispatch, extractJSON } from "./providers";
+import type {
+  TaskPlanNode,
+  TaskPlanEdge,
+  TaskPlanNodeType,
+  TaskPlanEdgeType,
+} from "../types";
+
+// ── Helpers ──
+
+function normalizeNodeType(value: unknown): TaskPlanNodeType {
+  switch (value) {
+    case "checkpoint":
+    case "decision":
+    case "user_input":
+    case "deliverable":
+    case "tool_action":
+      return value;
+    default:
+      return "step";
+  }
+}
+
+function normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "low") return "Low";
+  if (normalized === "medium") return "Medium";
+  if (normalized === "high") return "High";
+  if (normalized === "urgent") return "Urgent";
+  return null;
+}
+
+function normalizeEdgeType(value: unknown): TaskPlanEdgeType {
+  switch (value) {
+    case "depends_on":
+    case "branches_to":
+    case "unblocks":
+    case "feeds_output":
+      return value;
+    default:
+      return "sequential";
+  }
+}
 
 // ── Suggest ──
 
@@ -82,29 +124,63 @@ export async function suggest(
   };
 }
 
-// ── Decompose ──
+// ── Generate Plan ──
 
-export async function decompose(
+export async function generatePlan(
   client: AiClientRecord,
-  request: DecomposeTaskRequest,
-): Promise<DecomposeTaskResponse> {
-  const msg = `Decompose this task:\nTitle: "${request.title}"${
+  request: GenerateTaskPlanRequest,
+): Promise<GenerateTaskPlanResponse> {
+  const msg = `Generate an executable task plan graph for:\nTitle: "${request.title}"${
     request.description ? `\nDescription: ${request.description}` : ""
   }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}\n\nReturn JSON.`;
-  const raw = await dispatch(client, "decompose", msg);
+  const raw = await dispatch(client, "generate_plan", msg);
   const parsed = extractJSON<{
-    subtasks?: Array<Partial<SubtaskSuggestion>>;
+    summary?: string;
     reasoning?: string;
+    nodes?: Array<Partial<TaskPlanNode>>;
+    edges?: Array<Partial<TaskPlanEdge>>;
   }>(raw, client.type);
+  
+  const nodes: TaskPlanNode[] = (parsed.nodes ?? []).map((n, i) => {
+    const execMode = n.executionMode === "manual" || n.executionMode === "hybrid" 
+      ? n.executionMode 
+      : "automatic";
+    const requiresInput = Boolean(n.requiresHumanInput);
+    const requiresApproval = Boolean(n.requiresHumanApproval);
+    const autoRunnable = execMode === "automatic" && !requiresInput && !requiresApproval;
+    
+    return {
+      id: n.id ?? `node-${i + 1}`,
+      type: normalizeNodeType(n.type),
+      title: n.title ?? `Step ${i + 1}`,
+      objective: n.objective ?? n.title ?? `Step ${i + 1}`,
+      description: n.description ?? null,
+      status: "pending" as const,
+      phase: n.phase ?? null,
+      estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : 30,
+      priority: normalizePriority(n.priority),
+      executionMode: execMode,
+      requiresHumanInput: requiresInput,
+      requiresHumanApproval: requiresApproval,
+      autoRunnable,
+      blockingReason: requiresInput ? "needs_user_input" as const : requiresApproval ? "needs_approval" as const : null,
+      linkedTaskId: n.linkedTaskId ?? null,
+      metadata: n.metadata ?? null,
+    };
+  });
+  
+  const edges: TaskPlanEdge[] = (parsed.edges ?? []).map((e, i) => ({
+    id: e.id ?? `edge-${i + 1}`,
+    fromNodeId: e.fromNodeId ?? "",
+    toNodeId: e.toNodeId ?? "",
+    type: normalizeEdgeType(e.type),
+    metadata: e.metadata ?? null,
+  }));
+  
   return {
-    subtasks: (parsed.subtasks ?? []).map((s, i) => ({
-      title: s.title ?? `Subtask ${i + 1}`,
-      description: s.description,
-      estimatedMinutes: s.estimatedMinutes ?? 30,
-      priority: s.priority ?? "Medium",
-      order: s.order ?? i + 1,
-      dependsOnPrevious: i > 0,
-    })),
+    nodes,
+    edges,
+    summary: parsed.summary ?? `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
     reasoning: parsed.reasoning,
     source: client.type,
   };

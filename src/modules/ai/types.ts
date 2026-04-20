@@ -144,12 +144,12 @@ export interface AutomationSuggestion {
   confidence: "low" | "medium" | "high";
 }
 
-// --- Task Decomposition Types ---
+// --- Task Plan Generation Types ---
 
 /**
- * タスク分解の入力情報
+ * タスクプラン生成リクエスト
  */
-export interface TaskDecompositionInput {
+export interface GenerateTaskPlanRequest {
   taskId?: string;
   title: string;
   description?: string;
@@ -157,28 +157,6 @@ export interface TaskDecompositionInput {
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
   planningPrompt?: string;
-}
-
-/**
- * サブタスク提案
- */
-export interface SubtaskSuggestion {
-  title: string;
-  description?: string;
-  estimatedMinutes: number;
-  priority: string;
-  order: number;
-  dependsOnPrevious: boolean;
-}
-
-/**
- * タスク分解の結果
- */
-export interface TaskDecompositionResult {
-  subtasks: SubtaskSuggestion[];
-  totalEstimatedMinutes: number;
-  feasibilityScore: number;
-  warnings: string[];
 }
 
 export type TaskPlanStatus = "draft" | "accepted" | "superseded" | "archived";
@@ -206,7 +184,13 @@ export type TaskPlanEdgeType =
   | "unblocks"
   | "feeds_output";
 
-export type TaskPlanNodeExecutionMode = "none" | "child_task" | "inline_action";
+export type TaskPlanNodeExecutionMode = "automatic" | "manual" | "hybrid";
+
+export type TaskPlanNodeBlockingReason = 
+  | "needs_user_input"
+  | "needs_approval" 
+  | "external_dependency"
+  | null;
 
 export type TaskPlanNode = {
   id: string;
@@ -219,8 +203,11 @@ export type TaskPlanNode = {
   estimatedMinutes: number | null;
   priority: "Low" | "Medium" | "High" | "Urgent" | null;
   executionMode: TaskPlanNodeExecutionMode;
+  requiresHumanInput: boolean;
+  requiresHumanApproval: boolean;
+  autoRunnable: boolean;
+  blockingReason: TaskPlanNodeBlockingReason;
   linkedTaskId: string | null;
-  needsUserInput: boolean;
   metadata: Record<string, unknown> | null;
 };
 

@@ -22,7 +22,7 @@ type TaskPlanSidePanelProps = {
       objective: string;
       phase: string;
       status: "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
-      needsUserInput: boolean;
+      requiresHumanInput: boolean;
       type?: string;
       linkedTaskId?: string | null;
       executionMode?: string | null;

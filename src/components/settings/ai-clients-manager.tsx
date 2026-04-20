@@ -95,7 +95,7 @@ function getStatusClasses(status: TestStatus) {
   }
 }
 
-const ALL_FEATURES = ["suggest", "decompose", "conflicts", "timeslots", "chat"] as const;
+const ALL_FEATURES = ["suggest", "generate_plan", "conflicts", "timeslots", "chat"] as const;
 
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
@@ -122,7 +122,7 @@ const DEFAULTS: Record<string, string> = {
   statusUnknown: "Not tested",
   reasonUnknown: "No details yet",
   featureSuggest: "Smart Suggestions",
-  featureDecompose: "Task Decomposition",
+  featureGeneratePlan: "Task Plan Generation",
   featureConflicts: "Conflict Analysis",
   featureTimeslots: "Timeslot Recommendations",
   featureChat: "Chat / Plan Generation",
@@ -136,7 +136,7 @@ function getCopy(messages: Record<string, unknown>): Record<string, string> {
 function getFeatureLabels(copy: Record<string, string>): Record<string, string> {
   return {
     suggest: copy.featureSuggest,
-    decompose: copy.featureDecompose,
+    generate_plan: copy.featureGeneratePlan,
     conflicts: copy.featureConflicts,
     timeslots: copy.featureTimeslots,
     chat: copy.featureChat,

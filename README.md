@@ -10,8 +10,37 @@ The project focuses on making planning and execution feel like one connected sys
 
 ## Documentation
 
-Start here:
-- [Docs index (English / 中文)](./docs/README.md)
+## Demo
+
+README demo assets are generated automatically from a Playwright-driven interaction script.
+
+Primary command:
+
+```bash
+bun run demo:readme-gif
+```
+
+What it does:
+1. Ensures the Playwright Chromium browser is installed
+2. Seeds the local demo database
+3. Starts the app on `http://127.0.0.1:3100`
+4. Runs `e2e/demo.readme.spec.ts` to open the schedule quick-add dialog, fill the form fields, save the task block, and scroll through the result
+5. Records a Playwright video
+6. Converts that video into a GIF with `ffmpeg`
+7. Writes the final artifact to `./docs/assets/demo/chrona-readme-demo.gif`
+
+Source files for the automated demo pipeline:
+- Playwright demo config: `./playwright.demo.config.ts`
+- Demo interaction script: `./e2e/demo.readme.spec.ts`
+- GIF export script: `./scripts/demo/readme-gif.ts`
+
+README embed:
+
+![Chrona automated README demo](./docs/assets/demo/chrona-readme-demo.gif)
+
+Quick start:
+- English: ./docs/en/quick-start.md
+- 中文: ./docs/zh/quick-start.md
 
 Language entry points:
 - [English docs](./docs/en/README.md)

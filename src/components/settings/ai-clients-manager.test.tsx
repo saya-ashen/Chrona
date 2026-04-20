@@ -23,7 +23,7 @@ const messages = {
       save: "Save",
       cancel: "Cancel",
       featureSuggest: "Smart Suggestions",
-      featureDecompose: "Task Decomposition",
+      featureGeneratePlan: "Task Plan Generation",
       featureConflicts: "Conflict Analysis",
       featureTimeslots: "Timeslot Recommendations",
       featureChat: "Chat / Plan Generation",

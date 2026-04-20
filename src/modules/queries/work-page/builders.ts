@@ -150,7 +150,7 @@ export function buildTaskPlanFromGraph({
     objective: node.objective,
     phase: node.phase ?? node.type,
     status: node.status === "skipped" ? "done" : node.status,
-    needsUserInput: node.needsUserInput || node.status === "waiting_for_user",
+    requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
     type: node.type,
     linkedTaskId: node.linkedTaskId,
     executionMode: node.executionMode,

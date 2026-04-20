@@ -2,7 +2,7 @@
 
 import { Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
@@ -65,7 +65,7 @@ export function TaskCreateDialog({
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [decompositionSeedTitle, setDecompositionSeedTitle] = useState("");
+  const [planSeedTitle, setDecompositionSeedTitle] = useState("");
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
@@ -408,7 +408,7 @@ export function TaskCreateDialog({
                 <span>{dialogCopy.aiTaskPlanning}</span>
               </div>
               <TaskDecompositionPanel
-                title={decompositionSeedTitle || title || initialTitle}
+                title={planSeedTitle || title || initialTitle}
                 description={description}
                 priority={priority}
                 dueAt={null}

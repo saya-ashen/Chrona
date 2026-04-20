@@ -92,7 +92,7 @@ export function TaskDecompositionPanel({
   const { messages } = useI18n();
   const decompCopy = getDecompCopy(messages as Record<string, unknown>);
 
-  const decompositionInput = requested
+  const planInput = requested
     ? {
         taskId,
         title,
@@ -106,7 +106,7 @@ export function TaskDecompositionPanel({
       }
     : null;
 
-  const { result, isLoading, error } = useSmartDecomposition(decompositionInput);
+  const { result, isLoading, error } = useSmartDecomposition(planInput);
 
   const savedPlanMeta = useMemo(() => {
     if (!result?.savedPlan) {
@@ -141,7 +141,7 @@ export function TaskDecompositionPanel({
         objective: node.objective,
         phase: node.phase ?? node.type,
         status: node.status === "skipped" ? "done" : node.status,
-        needsUserInput: node.needsUserInput || node.status === "waiting_for_user",
+        requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
         type: node.type,
         linkedTaskId: node.linkedTaskId,
         executionMode: node.executionMode,

@@ -2,10 +2,10 @@ import { MemoryScope, MemorySourceType, MemoryStatus, type Memory } from "@/gene
 import { db } from "@/lib/db";
 import type {
   SavedTaskPlanGraph,
-  TaskDecompositionResult,
   TaskPlanEdge,
   TaskPlanGraph,
   TaskPlanNode,
+  TaskPlanNodeBlockingReason,
   TaskPlanNodeStatus,
   TaskPlanNodeType,
   TaskPlanStatus,
@@ -73,6 +73,17 @@ function normalizePlanStatus(value: unknown): TaskPlanStatus {
   }
 }
 
+function normalizeBlockingReason(value: unknown): TaskPlanNodeBlockingReason {
+  switch (value) {
+    case "needs_user_input":
+    case "needs_approval":
+    case "external_dependency":
+      return value;
+    default:
+      return null;
+  }
+}
+
 function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGraphPayload): SavedTaskPlanGraph | null {
   if (!memory.taskId) {
     return null;
@@ -113,12 +124,15 @@ function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGrap
               : null,
           priority: normalizePriority(node.priority),
           executionMode:
-            node.executionMode === "child_task" || node.executionMode === "inline_action"
+            node.executionMode === "automatic" || node.executionMode === "manual" || node.executionMode === "hybrid"
               ? node.executionMode
-              : "none",
+              : "automatic",
+          requiresHumanInput: Boolean(node.requiresHumanInput),
+          requiresHumanApproval: Boolean(node.requiresHumanApproval),
+          autoRunnable: Boolean(node.autoRunnable),
+          blockingReason: normalizeBlockingReason(node.blockingReason),
           linkedTaskId:
             typeof node.linkedTaskId === "string" && node.linkedTaskId.trim().length > 0 ? node.linkedTaskId : null,
-          needsUserInput: Boolean(node.needsUserInput),
           metadata: node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
             ? (node.metadata as Record<string, unknown>)
             : null,
@@ -201,135 +215,6 @@ function serializeTaskPlanGraph(input: {
   return JSON.stringify(payload);
 }
 
-function inferGraphSummary(result: TaskDecompositionResult) {
-  return `${result.subtasks.length} planned item${result.subtasks.length === 1 ? "" : "s"}`;
-}
-
-function inferNodeTypeFromSubtask(subtask: TaskDecompositionResult["subtasks"][number]): TaskPlanNodeType {
-  const text = `${subtask.title} ${subtask.description ?? ""}`.toLowerCase();
-  if (/(wait|confirm|approval|user input|ask user|need user|确认|审批|等待|用户)/.test(text)) {
-    return "user_input";
-  }
-  if (/(check|verify|review|validate|确认结果|检查|校验|复核)/.test(text)) {
-    return "checkpoint";
-  }
-  if (/(report|draft|deliver|output|memo|summary|artifact|报告|草稿|输出|摘要)/.test(text)) {
-    return "deliverable";
-  }
-  return "step";
-}
-
-function inferExecutionModeFromSubtask(subtask: TaskDecompositionResult["subtasks"][number]) {
-  const type = inferNodeTypeFromSubtask(subtask);
-  return type === "step" || type === "deliverable" ? "child_task" : "none";
-}
-
-export function decompositionResultToTaskPlanGraph(input: {
-  taskId: string;
-  result: TaskDecompositionResult;
-  status?: TaskPlanStatus;
-  revision?: number;
-  source?: "ai" | "user" | "mixed";
-  generatedBy?: string | null;
-  prompt?: string | null;
-  summary?: string | null;
-  changeSummary?: string | null;
-}): TaskPlanGraph {
-  const orderedSubtasks = [...input.result.subtasks].sort((a, b) => a.order - b.order);
-  const nodes: TaskPlanNode[] = orderedSubtasks.map((subtask, index) => {
-    const inferredType = inferNodeTypeFromSubtask(subtask);
-    return {
-      id: `node-${index + 1}`,
-      type: inferredType,
-      title: subtask.title,
-      objective: subtask.description?.trim() || subtask.title,
-      description: subtask.description ?? null,
-      status: inferredType === "user_input" ? "waiting_for_user" : "pending",
-      phase: inferredType,
-      estimatedMinutes: subtask.estimatedMinutes,
-      priority: normalizePriority(subtask.priority) ?? "Medium",
-      executionMode: inferExecutionModeFromSubtask(subtask),
-      linkedTaskId: null,
-      needsUserInput: inferredType === "user_input",
-      metadata: {
-        order: subtask.order,
-        dependsOnPrevious: subtask.dependsOnPrevious,
-        warnings: input.result.warnings,
-        feasibilityScore: input.result.feasibilityScore,
-        totalEstimatedMinutes: input.result.totalEstimatedMinutes,
-      },
-    };
-  });
-
-  const edges: TaskPlanEdge[] = [];
-  orderedSubtasks.forEach((subtask, index) => {
-    if (index === 0 || !subtask.dependsOnPrevious) return;
-    edges.push({
-      id: `edge-${index}`,
-      fromNodeId: nodes[index - 1]!.id,
-      toNodeId: nodes[index]!.id,
-      type: "sequential",
-      metadata: null,
-    });
-  });
-
-  const now = new Date().toISOString();
-  return {
-    id: `graph-${input.taskId}-${input.revision ?? 1}`,
-    taskId: input.taskId,
-    status: input.status ?? "draft",
-    revision: input.revision ?? 1,
-    source: input.source ?? "ai",
-    generatedBy: input.generatedBy ?? null,
-    prompt: input.prompt?.trim() ? input.prompt.trim() : null,
-    summary: input.summary?.trim() ? input.summary.trim() : inferGraphSummary(input.result),
-    changeSummary: input.changeSummary?.trim() ? input.changeSummary.trim() : null,
-    createdAt: now,
-    updatedAt: now,
-    nodes,
-    edges,
-  };
-}
-
-export function taskPlanGraphToDecompositionResult(plan: TaskPlanGraph): TaskDecompositionResult {
-  const edgesByToNode = new Set(plan.edges.filter((edge) => edge.type === "sequential").map((edge) => edge.toNodeId));
-  const orderedNodes = [...plan.nodes].sort((a, b) => {
-    const orderA = typeof a.metadata?.order === "number" ? a.metadata.order : Number.MAX_SAFE_INTEGER;
-    const orderB = typeof b.metadata?.order === "number" ? b.metadata.order : Number.MAX_SAFE_INTEGER;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.title.localeCompare(b.title);
-  });
-
-  const subtasks = orderedNodes.map((node, index) => ({
-    title: node.title,
-    description: node.description ?? undefined,
-    estimatedMinutes: node.estimatedMinutes ?? 0,
-    priority: node.priority ?? "Medium",
-    order: typeof node.metadata?.order === "number" ? node.metadata.order : index + 1,
-    dependsOnPrevious: edgesByToNode.has(node.id),
-  }));
-
-  const totalEstimatedMinutesFromMetadata = orderedNodes.find(
-    (node) => typeof node.metadata?.totalEstimatedMinutes === "number",
-  )?.metadata?.totalEstimatedMinutes;
-  const feasibilityFromMetadata = orderedNodes.find(
-    (node) => typeof node.metadata?.feasibilityScore === "number",
-  )?.metadata?.feasibilityScore;
-  const warningsFromMetadata = orderedNodes.find((node) => Array.isArray(node.metadata?.warnings))?.metadata?.warnings;
-
-  return {
-    subtasks,
-    totalEstimatedMinutes:
-      typeof totalEstimatedMinutesFromMetadata === "number"
-        ? totalEstimatedMinutesFromMetadata
-        : subtasks.reduce((sum, subtask) => sum + (subtask.estimatedMinutes ?? 0), 0),
-    feasibilityScore: typeof feasibilityFromMetadata === "number" ? feasibilityFromMetadata : 0,
-    warnings: Array.isArray(warningsFromMetadata)
-      ? warningsFromMetadata.filter((warning): warning is string => typeof warning === "string")
-      : [],
-  };
-}
-
 async function findTaskPlanMemories(taskId: string) {
   return db.memory.findMany({
     where: {
@@ -396,8 +281,7 @@ export async function supersedeOlderTaskPlanGraphs(input: { taskId: string; excl
 export async function saveTaskPlanGraph(input: {
   workspaceId: string;
   taskId: string;
-  plan?: TaskPlanGraph;
-  decompositionResult?: TaskDecompositionResult;
+  plan: TaskPlanGraph;
   prompt?: string | null;
   status?: TaskPlanStatus;
   source?: "ai" | "user" | "mixed";
@@ -407,19 +291,7 @@ export async function saveTaskPlanGraph(input: {
 }) {
   const current = await getLatestTaskPlanGraph(input.taskId);
   const nextRevision = (current?.revision ?? 0) + 1;
-  const plan =
-    input.plan ??
-    decompositionResultToTaskPlanGraph({
-      taskId: input.taskId,
-      result: input.decompositionResult!,
-      status: input.status ?? "draft",
-      revision: nextRevision,
-      source: input.source ?? "ai",
-      generatedBy: input.generatedBy ?? null,
-      prompt: input.prompt ?? null,
-      summary: input.summary ?? null,
-      changeSummary: input.changeSummary ?? null,
-    });
+  const plan = input.plan;
 
   const currentMemories = await findTaskPlanMemories(input.taskId);
   const activeGraphMemories = currentMemories
@@ -495,4 +367,26 @@ export async function acceptTaskPlanGraph(input: { planId: string; taskId: strin
   });
 
   return parseTaskPlanMemory(updated)!;
+}
+
+export function getReadyAutoRunnableNodes(graph: TaskPlanGraph): TaskPlanNode[] {
+  const completedNodeIds = new Set(
+    graph.nodes.filter(n => n.status === "done" || n.status === "skipped").map(n => n.id)
+  );
+  
+  const incomingEdges = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    if (!incomingEdges.has(edge.toNodeId)) {
+      incomingEdges.set(edge.toNodeId, []);
+    }
+    incomingEdges.get(edge.toNodeId)!.push(edge.fromNodeId);
+  }
+  
+  return graph.nodes.filter(node => {
+    if (node.status !== "pending") return false;
+    if (!node.autoRunnable) return false;
+    if (node.requiresHumanInput || node.requiresHumanApproval) return false;
+    const deps = incomingEdges.get(node.id) ?? [];
+    return deps.every(depId => completedNodeIds.has(depId));
+  });
 }

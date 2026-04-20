@@ -65,9 +65,12 @@ type TaskPageProps = {
             phase: string | null;
             estimatedMinutes: number | null;
             priority: string | null;
-            executionMode: "none" | "child_task" | "inline_action";
+            executionMode: "automatic" | "manual" | "hybrid";
             linkedTaskId: string | null;
-            needsUserInput: boolean;
+            requiresHumanInput: boolean;
+            requiresHumanApproval: boolean;
+            autoRunnable: boolean;
+            blockingReason: string | null;
           }>;
           edges: Array<{
             id: string;

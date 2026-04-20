@@ -25,7 +25,8 @@ export {
 } from "@/hooks/ai/use-smart-automation";
 export {
   useSmartDecomposition,
-  useBatchDecompose,
+  useBatchApplyPlan,
+  useBatchApplyPlan as useBatchDecompose,
   type SmartDecompositionTaskInput,
 } from "@/hooks/ai/use-smart-decomposition";
 export {

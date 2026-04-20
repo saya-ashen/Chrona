@@ -165,7 +165,7 @@ describe("getSchedulePage runnable state", () => {
     expect(page.automationCandidates).toEqual([
       {
         taskId: draftTask.id,
-        kind: "decompose",
+        kind: "generate_plan",
         reason: "Task needs execution details before it can run.",
         priority: "medium",
       },

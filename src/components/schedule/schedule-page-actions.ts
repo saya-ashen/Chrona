@@ -606,43 +606,6 @@ export async function handleTaskConfigSaveAction({
   }
 }
 
-function planGraphResponseToProvidedSubtasks(result: TaskPlanGraphResponse) {
-  const edgesByToNode = new Set(
-    result.planGraph.edges
-      .filter((edge) => edge.type === "sequential")
-      .map((edge) => edge.toNodeId),
-  );
-
-  return [...result.planGraph.nodes]
-    .sort((left, right) => {
-      const leftOrder =
-        typeof left.metadata?.order === "number"
-          ? left.metadata.order
-          : Number.MAX_SAFE_INTEGER;
-      const rightOrder =
-        typeof right.metadata?.order === "number"
-          ? right.metadata.order
-          : Number.MAX_SAFE_INTEGER;
-
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder;
-      }
-
-      return left.title.localeCompare(right.title);
-    })
-    .map((node, index) => ({
-      title: node.title,
-      description: node.description ?? undefined,
-      priority: node.priority ?? "Medium",
-      estimatedMinutes: node.estimatedMinutes ?? 30,
-      order:
-        typeof node.metadata?.order === "number"
-          ? node.metadata.order
-          : index + 1,
-      dependsOnPrevious: edgesByToNode.has(node.id),
-    }));
-}
-
 export async function handleApplyDecompositionFromDialogAction({
   workspaceId,
   title,
@@ -702,18 +665,18 @@ export async function handleApplyDecompositionFromDialogAction({
       runtimeConfig: null,
     });
 
-    const response = await fetch("/api/ai/batch-decompose", {
+    const response = await fetch("/api/ai/batch-apply-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         taskId: created.taskId,
-        replaceExisting: true,
-        subtasks: planGraphResponseToProvidedSubtasks(result),
+        nodes: result.planGraph.nodes,
+        edges: result.planGraph.edges,
       }),
     });
 
     if (!response.ok) {
-      throw new Error("Failed to apply decomposition");
+      throw new Error("Failed to apply task plan");
     }
 
     setShowQuickAddDialog(false);

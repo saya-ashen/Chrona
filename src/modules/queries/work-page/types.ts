@@ -129,7 +129,7 @@ export type TaskPlanProjectionStep = {
   objective: string;
   phase: string;
   status: TaskPlanStepStatus;
-  needsUserInput: boolean;
+  requiresHumanInput: boolean;
   type?: string;
   linkedTaskId?: string | null;
   executionMode?: string | null;

@@ -27,7 +27,7 @@ function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
       | "waiting_for_user"
       | "done"
       | "blocked",
-    needsUserInput: n.needsUserInput || n.status === "waiting_for_user",
+    requiresHumanInput: n.requiresHumanInput || n.status === "waiting_for_user",
     type: n.type,
     linkedTaskId: n.linkedTaskId,
     executionMode: n.executionMode,
@@ -48,7 +48,7 @@ function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
     })),
   };
 }
-import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
@@ -288,15 +288,16 @@ export function SelectedBlockSheet({
     id: string;
     status: "draft" | "accepted" | "superseded" | "archived";
     prompt: string | null;
-    revision: number | null;
-    summary: string | null;
+    revision?: number;
+    summary?: string | null;
     updatedAt: string;
-    plan: TaskPlanGraphResponse["planGraph"] | null;
+    plan?: TaskPlanGraphResponse["planGraph"];
   } | null) => {
     if (saved?.status !== "accepted" || !saved.plan) {
       return;
     }
 
+    const confirmedPlan = saved.plan;
     setAcceptedPlan((current) => {
       if (
         current?.savedPlan?.id === saved.id
@@ -307,9 +308,10 @@ export function SelectedBlockSheet({
         return current;
       }
 
+
       return {
         source: "saved",
-        planGraph: saved.plan,
+        planGraph: confirmedPlan,
         savedPlan: {
           id: saved.id,
           status: saved.status,
