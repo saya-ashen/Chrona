@@ -1,0 +1,67 @@
+{
+  "snapshot": {
+    "runtimeRunRef": "runtime_waiting_1",
+    "runtimeSessionKey": "agent:main:dashboard:session_waiting_1",
+    "status": "WaitingForApproval",
+    "rawStatus": "waiting_for_approval",
+    "lastMessage": "Approval required before applying the patch."
+  },
+  "history": {
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          { "type": "text", "text": "Read package.json and prepare a patch." }
+        ],
+        "timestamp": 1737264000000,
+        "__openclaw": { "id": "msg_waiting_1", "seq": 1 }
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "toolCall",
+            "id": "tool_read_1",
+            "name": "read",
+            "arguments": { "path": "package.json", "offset": 1, "limit": 20 }
+          }
+        ],
+        "timestamp": 1737264001000,
+        "__openclaw": { "id": "msg_waiting_2", "seq": 2 }
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_read_1",
+        "toolName": "read",
+        "content": [
+          { "type": "text", "text": "{\"name\":\"agent-dashboard\"}" }
+        ],
+        "isError": false,
+        "timestamp": 1737264002000,
+        "__openclaw": { "id": "msg_waiting_3", "seq": 3 }
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I found the package name and I am waiting for approval to continue."
+          }
+        ],
+        "timestamp": 1737264003000,
+        "__openclaw": { "id": "msg_waiting_4", "seq": 4 }
+      }
+    ]
+  },
+  "approvals": [
+    {
+      "approvalId": "approval_waiting_1",
+      "sessionKey": "agent:main:dashboard:session_waiting_1",
+      "host": "gateway",
+      "command": "apply_patch",
+      "ask": "Approve patch",
+      "createdAtMs": 1737264004000,
+      "expiresAtMs": 1737267600000
+    }
+  ]
+}

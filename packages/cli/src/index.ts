@@ -7,7 +7,7 @@
  * structured JSON output by default.
  *
  * Usage:
- *   bun cli/index.ts <group> <command> [options]
+ *   bun packages/cli/src/index.ts <group> <command> [options]
  *
  * Command Groups:
  *   task       Task management (list, get, create, update, done, reopen, plan)

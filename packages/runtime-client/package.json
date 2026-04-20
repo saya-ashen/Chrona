@@ -1,0 +1,11 @@
+{
+  "name": "@agent-dashboard/runtime-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./openclaw": "./src/openclaw/index.ts",
+    "./openclaw/*": "./src/openclaw/*.ts"
+  }
+}

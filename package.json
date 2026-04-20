@@ -1,13 +1,22 @@
 {
   "name": "agent-dashboard",
   "version": "0.1.0",
-  "description": "AI-Native Task Control Plane — Plan, schedule, and observe AI-runtime-powered work",
+  "description": "AI-Native Task Control Plane \u2014 Plan, schedule, and observe AI-runtime-powered work",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/your-org/AgentDashboard.git"
   },
-  "keywords": ["ai", "agent", "dashboard", "task-management", "cqrs", "event-sourcing", "nextjs", "openclaw"],
+  "keywords": [
+    "ai",
+    "agent",
+    "dashboard",
+    "task-management",
+    "cqrs",
+    "event-sourcing",
+    "nextjs",
+    "openclaw"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,7 +28,7 @@
     "test:e2e": "playwright test",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
-    "agentdash": "bun cli/index.ts"
+    "agentdash": "bun packages/cli/src/index.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -77,5 +86,8 @@
     "prisma",
     "sharp",
     "unrs-resolver"
+  ],
+  "workspaces": [
+    "packages/*"
   ]
 }
