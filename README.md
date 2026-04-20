@@ -11,21 +11,21 @@ The project focuses on making planning and execution feel like one connected sys
 ## Documentation
 
 Start here:
-- Docs index (English / 中文): `./docs/README.md`
+- [Docs index (English / 中文)](./docs/README.md)
 
 Language entry points:
-- English docs: `./docs/en/README.md`
-- 中文文档：`./docs/zh/README.md`
+- [English docs](./docs/en/README.md)
+- [中文文档](./docs/zh/README.md)
 
 Key docs:
-- Quick start (EN): `./docs/en/quick-start.md`
-- 快速开始（中文）：`./docs/zh/quick-start.md`
-- Roadmap (EN): `./docs/en/roadmap.md`
-- 路线图（中文）：`./docs/zh/roadmap.md`
+- [Quick start (EN)](./docs/en/quick-start.md)
+- [快速开始（中文）](./docs/zh/quick-start.md)
+- [Roadmap (EN)](./docs/en/roadmap.md)
+- [路线图（中文）](./docs/zh/roadmap.md)
 
 ## Quick Start
 
-> For full setup details, environment variables, and runtime options, see `./docs/en/quick-start.md`.
+> For full setup details, environment variables, and runtime options, see [./docs/en/quick-start.md](./docs/en/quick-start.md).
 
 1. Install dependencies
 
