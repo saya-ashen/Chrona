@@ -13,6 +13,7 @@ export interface SmartDecompositionTaskInput {
   estimatedMinutes?: number;
   planningPrompt?: string;
   forceRefresh?: boolean;
+  requestKey?: number;
 }
 
 export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | null) {
@@ -27,6 +28,11 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
         title: taskInput.title.trim(),
         description: taskInput.description,
         priority: taskInput.priority,
+        dueAt: taskInput.dueAt,
+        estimatedMinutes: taskInput.estimatedMinutes,
+        planningPrompt: taskInput.planningPrompt,
+        forceRefresh: taskInput.forceRefresh,
+        requestKey: taskInput.requestKey ?? 0,
       })
     : null;
 

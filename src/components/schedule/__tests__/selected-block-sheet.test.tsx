@@ -18,11 +18,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-// Mock the AI insights panel
-vi.mock("@/components/schedule/ai-insights-panel", () => ({
-  AiInsightsPanel: () => <div data-testid="ai-insights-panel" />,
-}));
-
 // Mock the schedule editor form
 vi.mock("@/components/schedule/schedule-editor-form", () => ({
   ScheduleEditorForm: () => <div data-testid="schedule-editor-form" />,
@@ -31,6 +26,13 @@ vi.mock("@/components/schedule/schedule-editor-form", () => ({
 // Mock the task config form
 vi.mock("@/components/schedule/task-config-form", () => ({
   TaskConfigForm: () => <div data-testid="task-config-form" />,
+}));
+
+// Mock the task decomposition panel
+vi.mock("@/components/schedule/task-decomposition-panel", () => ({
+  TaskDecompositionPanel: ({ activeAcceptedPlanId }: { activeAcceptedPlanId?: string | null }) => (
+    <div data-testid="task-decomposition-panel" data-active-accepted-plan-id={activeAcceptedPlanId ?? ""} />
+  ),
 }));
 
 // Mock the task context links
@@ -140,10 +142,10 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(screen.getByTestId("task-config-form")).toBeInTheDocument();
   });
 
-  it("renders AI insights panel", () => {
+  it("renders the task decomposition sidebar", () => {
     render(<SelectedBlockSheet {...defaultSheetProps} />);
 
-    expect(screen.getByTestId("ai-insights-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("task-decomposition-panel")).toBeInTheDocument();
   });
 
   it("renders task context links", () => {
@@ -160,11 +162,11 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(mainColumn).toBeTruthy();
     expect(aiSidebar).toBeTruthy();
-    expect(aiSidebar).toContainElement(screen.getByTestId("ai-insights-panel"));
+    expect(aiSidebar).toContainElement(screen.getByTestId("task-decomposition-panel"));
     expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
   });
 
-  it("keeps schedule editing and task config in the main popup column while AI lives in the sidebar", () => {
+  it("keeps schedule editing and task config merged in the main popup column while planning lives in the sidebar", () => {
     const { container } = render(<SelectedBlockSheet {...defaultSheetProps} />);
 
     const mainColumn = container.querySelector("[data-testid='selected-block-main-column']");
@@ -172,14 +174,14 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(mainColumn).toContainElement(screen.getByTestId("schedule-editor-form"));
     expect(mainColumn).toContainElement(screen.getByTestId("task-config-form"));
-    expect(aiSidebar).toContainElement(screen.getByTestId("ai-insights-panel"));
+    expect(aiSidebar).toContainElement(screen.getByTestId("task-decomposition-panel"));
     expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
   });
 
-  it("fetches subtasks for the task", async () => {
+  it("passes no accepted plan id into the sidebar before apply", () => {
     render(<SelectedBlockSheet {...defaultSheetProps} />);
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/subtasks");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-active-accepted-plan-id", "");
   });
 
   it("has a dialog with proper aria attributes", () => {

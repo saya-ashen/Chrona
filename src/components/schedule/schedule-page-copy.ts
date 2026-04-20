@@ -112,10 +112,6 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   taskDetailsDescription:
     "Review the selected block in a floating panel, then return to the timeline.",
   taskDetailsEyebrow: "Task cockpit",
-  taskDetailsSummary: "Adjust the schedule first, then refine runtime setup and AI actions without leaving the timeline.",
-  aiSidebarTitle: "AI workspace",
-  aiSidebarDescription:
-    "Keep AI suggestions and decomposition nearby, but visually quiet until you need them.",
   close: "Close",
   due: "Due",
   currentPlan: "Current plan",
@@ -126,7 +122,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   taskConfig: "Task config",
   saveTaskConfig: "Save task config",
   saving: "Saving…",
-  adjustBlock: "Adjust block",
+  scheduledWindow: "Scheduled window",
   placeOnTimeline: "Place on timeline",
   scheduleTask: "Schedule Task",
   schedulingUpdating: "Scheduling is updating.",

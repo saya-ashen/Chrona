@@ -8,11 +8,9 @@ vi.mock("@/i18n/client", () => ({
 }));
 
 const mockUseSmartDecomposition = vi.fn();
-const mockUseSmartAutomation = vi.fn();
 
 vi.mock("@/hooks/use-ai", () => ({
   useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
-  useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
 }));
 
 import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
@@ -26,6 +24,7 @@ const defaultProps = {
   dueAt: new Date(2026, 3, 20),
   estimatedMinutes: 120,
   onApply: vi.fn(),
+  activeAcceptedPlanId: null,
 };
 
 const samplePlanResponse: TaskPlanGraphResponse = {
@@ -107,24 +106,6 @@ const samplePlanResponse: TaskPlanGraphResponse = {
   },
 };
 
-beforeEach(() => {
-  mockUseSmartAutomation.mockReturnValue({
-    suggestion: {
-      executionMode: "manual",
-      reminderStrategy: {
-        advanceMinutes: 30,
-        frequency: "once",
-        channels: ["push"],
-      },
-      preparationSteps: ["Review task description"],
-      contextSources: [],
-      confidence: "medium",
-    },
-    isLoading: false,
-    error: null,
-  });
-});
-
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -140,7 +121,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} />);
 
-    expect(screen.getByText("AI 任务规划")).toBeInTheDocument();
+    expect(screen.getByText(/AI Task Planning/i)).toBeInTheDocument();
     expect(mockUseSmartDecomposition).toHaveBeenCalledWith(null);
   });
 
@@ -154,16 +135,17 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} />);
 
-    await user.click(screen.getByText("AI 任务规划"));
+    await user.click(screen.getByText(/AI Task Planning/i));
 
-    expect(mockUseSmartDecomposition).toHaveBeenCalledWith({
+    expect(mockUseSmartDecomposition).toHaveBeenCalledWith(expect.objectContaining({
       taskId: "task_1",
       title: "Review and update documentation",
       description: "Go through all docs and update them",
       priority: "High",
       dueAt: new Date(2026, 3, 20),
       estimatedMinutes: 120,
-    });
+      requestKey: 0,
+    }));
   });
 });
 
@@ -177,15 +159,16 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
-    expect(screen.queryByText("AI 任务规划")).not.toBeInTheDocument();
-    expect(mockUseSmartDecomposition).toHaveBeenCalledWith({
+    expect(screen.queryByText(/AI Task Planning/i)).not.toBeInTheDocument();
+    expect(mockUseSmartDecomposition).toHaveBeenCalledWith(expect.objectContaining({
       taskId: "task_1",
       title: "Review and update documentation",
       description: "Go through all docs and update them",
       priority: "High",
       dueAt: new Date(2026, 3, 20),
       estimatedMinutes: 120,
-    });
+      requestKey: 0,
+    }));
   });
 
   it("shows loading skeleton when isLoading is true", () => {
@@ -197,7 +180,7 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
-    expect(screen.getByText("AI 正在规划任务...")).toBeInTheDocument();
+    expect(screen.getByText(/AI is planning task/i)).toBeInTheDocument();
   });
 
   it("shows error state when error is set", () => {
@@ -222,15 +205,12 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
     expect(screen.getByText("AI Task Plan")).toBeInTheDocument();
-    expect(screen.getByText("80% feasible")).toBeInTheDocument();
     expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
     expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Update API reference").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Update deployment guide").length).toBeGreaterThan(0);
     expect(screen.getByText("Total: 120 min")).toBeInTheDocument();
     expect(screen.getByText("3 planned nodes")).toBeInTheDocument();
-    expect(screen.getByText("manual execution")).toBeInTheDocument();
-    expect(screen.queryByText("Review task description")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /apply plan/i })).toBeInTheDocument();
   });
 
@@ -250,6 +230,49 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
 
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith(samplePlanResponse);
+  });
+
+  it("keeps regenerate visible but hides the drafted graph and apply action once that plan is already accepted", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: samplePlanResponse,
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        autoRequest
+        activeAcceptedPlanId={samplePlanResponse.savedPlan?.id ?? null}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /regenerate plan/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /apply plan/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/accepted plan is active in the main panel/i)).toBeInTheDocument();
+  });
+
+  it("regenerates a new plan request when the regenerate button is clicked", async () => {
+    const user = userEvent.setup();
+
+    mockUseSmartDecomposition.mockReturnValue({
+      result: samplePlanResponse,
+      isLoading: false,
+      error: null,
+    });
+
+    render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+
+    const beforeCalls = mockUseSmartDecomposition.mock.calls.length;
+    await user.click(screen.getByRole("button", { name: /regenerate plan/i }));
+
+    expect(mockUseSmartDecomposition.mock.calls.length).toBeGreaterThan(beforeCalls);
+    expect(mockUseSmartDecomposition.mock.calls.at(-1)?.[0]).toMatchObject({
+      taskId: "task_1",
+      title: "Review and update documentation",
+      requestKey: 1,
+    });
   });
 
   it("renders warnings when present", () => {

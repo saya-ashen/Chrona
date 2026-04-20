@@ -43,27 +43,27 @@ type TaskPlanGraphProps = {
 // ────────────────────────────────────────────────────────────
 
 const DEFAULT_GRAPH_COPY = {
-  ariaLabel: "Task plan graph",
-  statusInProgress: "In progress",
-  statusWaitingForUser: "Waiting for user",
-  statusDone: "Done",
-  statusBlocked: "Blocked",
-  statusPending: "Pending",
-  edgeDependsOn: "Depends on",
-  edgeBranchesTo: "Branches to",
-  edgeUnblocks: "Unblocks",
-  edgeFeedsOutput: "Output feeds",
-  edgeSequential: "Sequential",
-  outgoingEdges: "Out {count}",
-  incomingEdges: "In {count}",
-  needsUserInput: "Needs user input",
-  detailStatus: "Status",
-  detailType: "Type",
-  detailExecutionMode: "Execution mode",
-  detailPriority: "Priority",
-  detailEstimatedDuration: "Estimated duration",
-  detailLinkedTask: "Linked task",
-  detailDescription: "Description",
+  ariaLabel: "任务计划图",
+  statusInProgress: "进行中",
+  statusWaitingForUser: "等待你处理",
+  statusDone: "已完成",
+  statusBlocked: "已阻塞",
+  statusPending: "待处理",
+  edgeDependsOn: "依赖于",
+  edgeBranchesTo: "分支到",
+  edgeUnblocks: "解除阻塞",
+  edgeFeedsOutput: "输出流向",
+  edgeSequential: "顺序执行",
+  outgoingEdges: "流出 {count}",
+  incomingEdges: "流入 {count}",
+  needsUserInput: "需要用户输入",
+  detailStatus: "状态",
+  detailType: "类型",
+  detailExecutionMode: "执行模式",
+  detailPriority: "优先级",
+  detailEstimatedDuration: "预计时长",
+  detailLinkedTask: "关联任务",
+  detailDescription: "详细说明",
 } as const;
 
 type GraphCopyType = Record<keyof typeof DEFAULT_GRAPH_COPY, string>;
@@ -97,16 +97,18 @@ type NodeTone =
   | "deliverable" | "tool-action" | "done" | "blocked" | "current" | "default";
 
 function getNodeTone(step: PlanStep): NodeTone {
-  if (step.executionMode === "child_task" || step.linkedTaskId) return "child-task";
+  if (step.status === "blocked") return "blocked";
   if (step.needsUserInput || step.status === "waiting_for_user") return "waiting";
+  if (step.status === "in_progress") return "current";
+  if (step.status === "done") return "done";
+
   if (step.type === "checkpoint") return "checkpoint";
   if (step.type === "decision") return "decision";
   if (step.type === "deliverable") return "deliverable";
   if (step.type === "tool_action") return "tool-action";
-  if (step.status === "done") return "done";
-  if (step.status === "blocked") return "blocked";
-  if (step.status === "in_progress") return "current";
-  return "default";
+  if (step.executionMode === "child_task" || step.linkedTaskId) return "child-task";
+
+  return step.priority === "Urgent" || step.priority === "High" ? "decision" : "default";
 }
 
 const TONE_STYLES: Record<NodeTone, { border: string; bg: string; ring: string; dot: string }> = {
@@ -141,6 +143,11 @@ function edgeColor(type: string) {
 // ────────────────────────────────────────────────────────────
 // DetailItem
 // ────────────────────────────────────────────────────────────
+
+function formatEstimatedDuration(minutes?: number | null) {
+  if (typeof minutes !== "number") return "-";
+  return `${minutes} min`;
+}
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -178,6 +185,7 @@ function FlowNode({
       data-testid={`task-plan-node-${step.id}`}
       data-node-tone={tone}
       data-node-current={isCurrent ? "true" : "false"}
+      data-node-selected={isSelected ? "true" : "false"}
       className={cn(
         "group relative w-full rounded-2xl border px-4 py-3 text-left transition-all duration-200",
         s.border, s.bg,
@@ -234,10 +242,12 @@ function FlowNode({
       {/* Expanded detail panel */}
       {isSelected ? (
         <div className="mt-3 space-y-2 border-t border-border/30 pt-3">
-          <div className="grid gap-1.5 sm:grid-cols-3">
+          <DetailItem label={graphCopy.detailDescription} value={step.objective} />
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label={graphCopy.detailType} value={step.type ?? "step"} />
             <DetailItem label={graphCopy.detailExecutionMode} value={step.executionMode ?? "none"} />
             <DetailItem label={graphCopy.detailPriority} value={step.priority ?? "-"} />
+            <DetailItem label={graphCopy.detailEstimatedDuration} value={formatEstimatedDuration(step.estimatedMinutes)} />
           </div>
           {step.linkedTaskId ? (
             <DetailItem label={graphCopy.detailLinkedTask} value={step.linkedTaskId} />
@@ -339,12 +349,13 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
 
     // Measure after layout settles
     const timer = setTimeout(measure, 50);
-    const observer = new ResizeObserver(measure);
-    if (containerRef.current) observer.observe(containerRef.current);
+    const ResizeObserverCtor = globalThis.ResizeObserver;
+    const observer = ResizeObserverCtor ? new ResizeObserverCtor(measure) : null;
+    if (containerRef.current && observer) observer.observe(containerRef.current);
 
     return () => {
       clearTimeout(timer);
-      observer.disconnect();
+      observer?.disconnect();
     };
   }, [plan.state, plan.steps.length, selectedStepId]);
 
@@ -363,11 +374,19 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
 
   useEffect(() => {
     if (plan.state !== "ready" || plan.steps.length === 0) {
-      setSelectedStepId(null);
+      if (selectedStepId !== null) {
+        setSelectedStepId(null);
+      }
       return;
     }
-    if (selectedStepId && plan.steps.some((s) => s.id === selectedStepId)) return;
-    setSelectedStepId(null);
+
+    if (selectedStepId && plan.steps.some((s) => s.id === selectedStepId)) {
+      return;
+    }
+
+    if (selectedStepId !== null) {
+      setSelectedStepId(null);
+    }
   }, [plan.state, plan.steps, selectedStepId]);
 
   if (plan.state !== "ready" || plan.steps.length === 0) return null;

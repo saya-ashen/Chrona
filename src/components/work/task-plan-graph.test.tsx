@@ -48,7 +48,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(screen.getByLabelText("Task plan graph")).toBeInTheDocument();
 
     const currentNode = screen.getByTestId("task-plan-node-node-current");
     expect(currentNode.getAttribute("data-node-current")).toBe("true");
@@ -110,6 +110,6 @@ describe("TaskPlanGraph", () => {
     expect(deliverableNode).toHaveTextContent("Urgent");
     expect(deliverableNode).toHaveTextContent("60 min");
     expect(deliverableNode).toHaveTextContent("child-9");
-    expect(deliverableNode).toHaveTextContent("详细说明");
+    expect(deliverableNode).toHaveTextContent("Description");
   });
 });

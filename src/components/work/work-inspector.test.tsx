@@ -153,7 +153,7 @@ describe("WorkInspector", () => {
       />,
     );
 
-    expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(screen.getByLabelText("Task plan graph")).toBeInTheDocument();
     expect(screen.getByTestId("task-plan-node-linked-node").getAttribute("data-node-tone")).toBe("child-task");
     expect(screen.queryByText("等待你处理")).not.toBeInTheDocument();
     expect(screen.queryByText("已关联子任务")).not.toBeInTheDocument();
