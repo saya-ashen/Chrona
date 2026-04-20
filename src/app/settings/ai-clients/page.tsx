@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useI18n } from "@/i18n/client";
 
 // ── Types ──
 
@@ -22,13 +23,46 @@ const ALL_FEATURES = [
   "timeslots",
   "chat",
 ] as const;
-const FEATURE_LABELS: Record<string, string> = {
-  suggest: "智能建议",
-  decompose: "任务分解",
-  conflicts: "冲突分析",
-  timeslots: "时间段推荐",
-  chat: "对话 / 计划生成",
+
+const DEFAULTS: Record<string, string> = {
+  title: "AI Clients",
+  subtitle: "Manage AI clients and configure which client each feature uses",
+  addClient: "+ Add Client",
+  emptyState: "No AI Clients configured yet. Click the button above to add one.",
+  loading: "Loading...",
+  defaultBadge: "Default",
+  enabled: "Enabled",
+  edit: "Edit",
+  delete: "Delete",
+  nameLabel: "Name",
+  typeLabel: "Type",
+  llmCompatible: "LLM (OpenAI Compatible)",
+  timeoutSeconds: "Timeout (seconds)",
+  modelLabel: "Model",
+  setAsDefault: "Set as default Client",
+  save: "Save",
+  cancel: "Cancel",
+  featureSuggest: "Smart Suggestions",
+  featureDecompose: "Task Decomposition",
+  featureConflicts: "Conflict Analysis",
+  featureTimeslots: "Timeslot Recommendations",
+  featureChat: "Chat / Plan Generation",
 };
+
+function getCopy(messages: Record<string, unknown>): Record<string, string> {
+  const section = (messages.pages as Record<string, Record<string, string>> | undefined)?.aiClientsPage ?? {};
+  return { ...DEFAULTS, ...section };
+}
+
+function getFeatureLabels(copy: Record<string, string>): Record<string, string> {
+  return {
+    suggest: copy.featureSuggest,
+    decompose: copy.featureDecompose,
+    conflicts: copy.featureConflicts,
+    timeslots: copy.featureTimeslots,
+    chat: copy.featureChat,
+  };
+}
 
 // ── Client Form ──
 
@@ -36,6 +70,7 @@ function ClientForm({
   initial,
   onSave,
   onCancel,
+  copy,
 }: {
   initial?: AiClientInfo;
   onSave: (data: {
@@ -45,6 +80,7 @@ function ClientForm({
     isDefault: boolean;
   }) => void;
   onCancel: () => void;
+  copy: Record<string, string>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<"openclaw" | "llm">(
@@ -78,7 +114,7 @@ function ClientForm({
     <div className="space-y-4 rounded-xl border bg-card p-4">
       <div className="grid grid-cols-2 gap-3">
         <label className="space-y-1">
-          <span className="text-xs text-muted-foreground">名称</span>
+          <span className="text-xs text-muted-foreground">{copy.nameLabel}</span>
           <input
             className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
             value={name}
@@ -87,14 +123,14 @@ function ClientForm({
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-muted-foreground">类型</span>
+          <span className="text-xs text-muted-foreground">{copy.typeLabel}</span>
           <select
             className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
             value={type}
             onChange={(e) => setType(e.target.value as "openclaw" | "llm")}
           >
             <option value="openclaw">OpenClaw (CLI Bridge)</option>
-            <option value="llm">LLM (OpenAI 兼容)</option>
+            <option value="llm">{copy.llmCompatible}</option>
           </select>
         </label>
       </div>
@@ -110,7 +146,7 @@ function ClientForm({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">超时 (秒)</span>
+            <span className="text-xs text-muted-foreground">{copy.timeoutSeconds}</span>
             <input
               className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
               type="number"
@@ -142,7 +178,7 @@ function ClientForm({
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">模型</span>
+              <span className="text-xs text-muted-foreground">{copy.modelLabel}</span>
               <input
                 className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                 value={model}
@@ -159,7 +195,7 @@ function ClientForm({
           checked={isDefault}
           onChange={(e) => setIsDefault(e.target.checked)}
         />
-        设为默认 Client
+        {copy.setAsDefault}
       </label>
 
       <div className="flex gap-2">
@@ -173,13 +209,13 @@ function ClientForm({
             onSave({ name, type, config, isDefault });
           }}
         >
-          保存
+          {copy.save}
         </button>
         <button
           className="rounded-md border px-3 py-1.5 text-sm"
           onClick={onCancel}
         >
-          取消
+          {copy.cancel}
         </button>
       </div>
     </div>
@@ -189,6 +225,9 @@ function ClientForm({
 // ── Main Page ──
 
 export default function AiClientsPage() {
+  const { messages } = useI18n();
+  const copy = getCopy(messages as Record<string, unknown>);
+  const FEATURE_LABELS = getFeatureLabels(copy);
   const [clients, setClients] = useState<AiClientInfo[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -279,7 +318,7 @@ export default function AiClientsPage() {
     return (
       <div className="p-6">
         <div className="animate-pulse text-sm text-muted-foreground">
-          加载中...
+          {copy.loading}
         </div>
       </div>
     );
@@ -291,24 +330,24 @@ export default function AiClientsPage() {
         <div>
           <h1 className="text-2xl font-semibold">AI Clients</h1>
           <p className="text-sm text-muted-foreground">
-            管理 AI 客户端并配置各功能使用的客户端
+            {copy.subtitle}
           </p>
         </div>
         <button
           className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
           onClick={() => setShowForm(true)}
         >
-          + 添加 Client
+          {copy.addClient}
         </button>
       </div>
 
       {showForm && (
-        <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} />
+        <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} />
       )}
 
       {clients.length === 0 && !showForm && (
         <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          还没有配置 AI Client。点击上方按钮添加一个。
+          {copy.emptyState}
         </div>
       )}
 
@@ -322,6 +361,7 @@ export default function AiClientsPage() {
               initial={client}
               onSave={(data) => handleUpdate(client.id, data)}
               onCancel={() => setEditingId(null)}
+              copy={copy}
             />
           ) : (
             <>
@@ -334,7 +374,7 @@ export default function AiClientsPage() {
                     </span>
                     {client.isDefault && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                        默认
+                        {copy.defaultBadge}
                       </span>
                     )}
                   </div>
@@ -348,19 +388,19 @@ export default function AiClientsPage() {
                         handleToggleEnabled(client.id, e.target.checked)
                       }
                     />
-                    启用
+                    {copy.enabled}
                   </label>
                   <button
                     className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                     onClick={() => setEditingId(client.id)}
                   >
-                    编辑
+                    {copy.edit}
                   </button>
                   <button
                     className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                     onClick={() => handleDelete(client.id)}
                   >
-                    删除
+                    {copy.delete}
                   </button>
                 </div>
               </div>

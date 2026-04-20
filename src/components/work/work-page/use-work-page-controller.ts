@@ -259,7 +259,7 @@ export function useWorkPageController(
           prompt:
             prompt?.trim() ||
             data.taskShell.prompt ||
-            `继续处理：${data.taskShell.title}`,
+            `${copy.continueProcessingPrefix}${data.taskShell.title}`,
         });
       }, "result");
     },
