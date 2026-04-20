@@ -5,7 +5,7 @@ import {
   ChevronDown,
   GripVertical,
 } from "lucide-react";
-import { type DragEvent, useState } from "react";
+import { type DragEvent, useCallback, useState } from "react";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
 import type { ScheduleSlot, TaskPlanGraphResponse, TaskPlanNode } from "@/modules/ai/types";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
@@ -187,6 +187,30 @@ export function DetailGrid({
   );
 }
 
+function CompactMetaPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | null | undefined;
+  tone?: "default" | "accent";
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex min-w-[9rem] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-xs",
+        tone === "accent"
+          ? "border-primary/20 bg-primary/[0.08] text-foreground"
+          : "border-border/60 bg-background/80 text-foreground",
+      )}
+    >
+      <span className="uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+      <span className="truncate font-medium">{value ?? "-"}</span>
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
@@ -260,6 +284,44 @@ export function SelectedBlockSheet({
   const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanGraphResponse | null>(null);
   const [isApplying, setIsApplying] = useState(false);
 
+  const handleAcceptedPlanLoaded = useCallback((saved: {
+    id: string;
+    status: "draft" | "accepted" | "superseded" | "archived";
+    prompt: string | null;
+    revision: number | null;
+    summary: string | null;
+    updatedAt: string;
+    plan: TaskPlanGraphResponse["planGraph"] | null;
+  } | null) => {
+    if (saved?.status !== "accepted" || !saved.plan) {
+      return;
+    }
+
+    setAcceptedPlan((current) => {
+      if (
+        current?.savedPlan?.id === saved.id
+        && current.savedPlan?.status === saved.status
+        && current.savedPlan?.revision === (saved.revision ?? 0)
+        && current.savedPlan?.updatedAt === saved.updatedAt
+      ) {
+        return current;
+      }
+
+      return {
+        source: "saved",
+        planGraph: saved.plan,
+        savedPlan: {
+          id: saved.id,
+          status: saved.status,
+          prompt: saved.prompt,
+          revision: saved.revision ?? 0,
+          summary: saved.summary ?? null,
+          updatedAt: saved.updatedAt,
+        },
+      };
+    });
+  }, []);
+
   const handleApplyPlan = async (result: TaskPlanGraphResponse) => {
     if (!result.savedPlan?.id) return;
     setIsApplying(true);
@@ -273,7 +335,22 @@ export function SelectedBlockSheet({
         }),
       });
       if (!res.ok) throw new Error("Failed to accept plan");
-      setAcceptedPlan(result);
+      setAcceptedPlan({
+        ...result,
+        source: "saved",
+        savedPlan: result.savedPlan
+          ? {
+              ...result.savedPlan,
+              status: "accepted",
+            }
+          : result.savedPlan,
+        planGraph: result.planGraph
+          ? {
+              ...result.planGraph,
+              status: "accepted",
+            }
+          : result.planGraph,
+      });
       await onMutatedAction();
     } catch (err) {
       console.error("[TaskPlan] Accept failed:", err);
@@ -296,33 +373,69 @@ export function SelectedBlockSheet({
         className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:inset-y-4 md:left-1/2 md:w-[min(1180px,calc(100vw-2rem))] md:max-h-none md:-translate-x-1/2 md:rounded-[2rem]"
       >
         <div className="flex max-h-[92vh] min-h-0 flex-col md:max-h-[calc(100vh-2rem)]">
-          <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 md:px-6">
-            <div className="space-y-2">
-              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
-                {copy.taskDetailsEyebrow}
-              </p>
-              <div className="space-y-1">
-                <h2
-                  id="schedule-task-sheet-title"
-                  className="text-xl font-semibold tracking-tight text-foreground"
-                >
-                  {item.title}
-                </h2>
-                <p className="max-w-3xl text-sm text-muted-foreground">
-                  {copy.taskDetailsSummary}
-                </p>
+          <div className="border-b border-border/70 bg-muted/[0.12] px-5 py-4 md:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
+                    {copy.taskDetailsEyebrow}
+                  </p>
+                  <h2
+                    id="schedule-task-sheet-title"
+                    className="text-xl font-semibold tracking-tight text-foreground"
+                  >
+                    {item.title}
+                  </h2>
+                </div>
+                <ItemMeta item={item} />
+                <div className="flex flex-wrap gap-2">
+                  <CompactMetaPill
+                    label={copy.scheduledWindow}
+                    value={formatTimeRange(
+                      item.scheduledStartAt,
+                      item.scheduledEndAt,
+                      locale,
+                      copy,
+                    )}
+                    tone="accent"
+                  />
+                  <CompactMetaPill
+                    label={copy.due}
+                    value={formatDateTime(item.dueAt, locale)}
+                  />
+                  <CompactMetaPill
+                    label={copy.currentPlan}
+                    value={item.scheduleStatus ?? copy.scheduledMetric}
+                  />
+                  <CompactMetaPill
+                    label={copy.latestRun}
+                    value={item.latestRunStatus ?? copy.noActiveRun}
+                  />
+                  <CompactMetaPill
+                    label={copy.nextAction}
+                    value={item.actionRequired ?? copy.stayOnPlan}
+                  />
+                  <CompactMetaPill
+                    label={copy.taskPlanLabel}
+                    value={acceptedPlan?.savedPlan?.revision
+                      ? `Accepted · r${acceptedPlan.savedPlan.revision}`
+                      : acceptedPlan?.savedPlan?.status === "accepted"
+                        ? "Accepted"
+                        : "No accepted plan"}
+                    tone={acceptedPlan?.savedPlan?.status === "accepted" ? "accent" : "default"}
+                  />
+                </div>
               </div>
-              <ItemMeta item={item} />
+              <LocalizedLink
+                href={buildScheduleHref(selectedDay)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                {copy.close}
+              </LocalizedLink>
             </div>
-            <LocalizedLink
-              href={buildScheduleHref(selectedDay)}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              {copy.close}
-            </LocalizedLink>
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_320px]">
             <div
               data-testid="selected-block-main-column"
               className="min-h-0 overflow-y-auto border-b border-border/60 px-5 py-5 text-sm text-muted-foreground md:border-b-0 md:border-r md:px-6"
@@ -332,82 +445,33 @@ export function SelectedBlockSheet({
                   as="div"
                   variant="inset"
                   padding="sm"
-                  className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
+                  className="overflow-hidden rounded-[1.6rem] border-border/70 bg-background shadow-sm"
                 >
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                          {copy.adjustBlock}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatTimeRange(
-                            item.scheduledStartAt,
-                            item.scheduledEndAt,
-                            locale,
-                            copy,
-                          )}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-xs text-foreground">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="size-3.5 text-muted-foreground" />
-                          {formatDateTime(item.dueAt, locale)}
-                        </div>
-                      </div>
+                  <div className="space-y-5">
+                    <div className="px-1">
+                      <ScheduleEditorForm
+                        taskId={item.taskId}
+                        dueAt={item.dueAt}
+                        scheduledStartAt={item.scheduledStartAt}
+                        scheduledEndAt={item.scheduledEndAt}
+                        submitLabel={copy.scheduleTask}
+                        onMutatedAction={onMutatedAction}
+                      />
                     </div>
-                    <ScheduleEditorForm
-                      taskId={item.taskId}
-                      dueAt={item.dueAt}
-                      scheduledStartAt={item.scheduledStartAt}
-                      scheduledEndAt={item.scheduledEndAt}
-                      submitLabel={copy.scheduleTask}
-                      onMutatedAction={onMutatedAction}
-                    />
+                    <div className="border-t border-border/60 bg-muted/[0.12] px-1 pt-4">
+                      <TaskConfigForm
+                        runtimeAdapters={runtimeAdapters}
+                        defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                        isPending={isPending}
+                        initialValues={toTaskConfigInitialValues(item)}
+                        submitLabel={copy.saveTaskConfig}
+                        pendingLabel={copy.saving}
+                        onSubmitAction={(input) =>
+                          onSaveTaskConfigAction(item.taskId, input)
+                        }
+                      />
+                    </div>
                   </div>
-                </SurfaceCard>
-
-                <DetailGrid
-                  items={[
-                    {
-                      label: copy.due,
-                      value: formatDateTime(item.dueAt, locale),
-                    },
-                    {
-                      label: copy.currentPlan,
-                      value: item.scheduleStatus ?? copy.scheduledMetric,
-                    },
-                    {
-                      label: copy.latestRun,
-                      value: item.latestRunStatus ?? copy.noActiveRun,
-                    },
-                    {
-                      label: copy.nextAction,
-                      value: item.actionRequired ?? copy.stayOnPlan,
-                    },
-                  ]}
-                />
-
-                <SurfaceCard
-                  as="div"
-                  variant="inset"
-                  padding="sm"
-                  className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
-                >
-                  <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    {copy.taskConfig}
-                  </p>
-                  <TaskConfigForm
-                    runtimeAdapters={runtimeAdapters}
-                    defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-                    isPending={isPending}
-                    initialValues={toTaskConfigInitialValues(item)}
-                    submitLabel={copy.saveTaskConfig}
-                    pendingLabel={copy.saving}
-                    onSubmitAction={(input) =>
-                      onSaveTaskConfigAction(item.taskId, input)
-                    }
-                  />
                 </SurfaceCard>
 
                 {/* Accepted Task Plan Graph — only shown after user confirms */}
@@ -438,7 +502,16 @@ export function SelectedBlockSheet({
               className="min-h-0 overflow-y-auto bg-muted/10 px-5 py-5 md:px-5"
             >
               <div className="space-y-4 pb-6">
-                {/* AI Plan Generation — user reviews and applies */}
+                <div className="rounded-[1rem] border border-border/60 bg-background/80 p-3 shadow-sm">
+                  <TaskContextLinks
+                    workspaceId={item.workspaceId}
+                    taskId={item.taskId}
+                    latestRunStatus={item.latestRunStatus}
+                    workLabel={t("common.openWorkbench")}
+                    className="w-full [&>a]:flex-1"
+                  />
+                </div>
+
                 <TaskDecompositionPanel
                   taskId={item.taskId}
                   title={item.title}
@@ -446,30 +519,9 @@ export function SelectedBlockSheet({
                   priority={item.priority}
                   dueAt={item.dueAt}
                   autoRequest
-                  onPlanLoaded={(saved) => {
-                    if (saved?.status === "accepted" && saved.plan) {
-                      setAcceptedPlan({
-                        source: "saved",
-                        planGraph: saved.plan,
-                        savedPlan: {
-                          id: saved.id,
-                          status: saved.status,
-                          prompt: saved.prompt,
-                          revision: saved.revision ?? 0,
-                          summary: saved.summary ?? null,
-                          updatedAt: saved.updatedAt,
-                        },
-                      });
-                    }
-                  }}
+                  onPlanLoaded={handleAcceptedPlanLoaded}
                   onApply={handleApplyPlan}
-                />
-
-                <TaskContextLinks
-                  workspaceId={item.workspaceId}
-                  taskId={item.taskId}
-                  latestRunStatus={item.latestRunStatus}
-                  workLabel={t("common.openWorkbench")}
+                  activeAcceptedPlanId={acceptedPlan?.savedPlan?.id ?? null}
                 />
               </div>
             </aside>

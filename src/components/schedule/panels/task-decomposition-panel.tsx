@@ -6,15 +6,14 @@ import {
   Clock,
   AlertTriangle,
   Check,
+  CheckCircle2,
   Bot,
   Sparkles,
-  CalendarClock,
-  Bell,
+  RotateCcw,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@/modules/ai/types";
-import { useSmartAutomation, useSmartDecomposition } from "@/hooks/use-ai";
+import { useSmartDecomposition } from "@/hooks/use-ai";
 
 import { useI18n } from "@/i18n/client";
 
@@ -38,20 +37,14 @@ export interface TaskDecompositionPanelProps {
     updatedAt: string;
     plan?: TaskPlanGraphData;
   } | null) => void;
+  activeAcceptedPlanId?: string | null;
 }
-
-const feasibilityColor = (score: number): string => {
-  if (score >= 70) return "text-green-700 bg-green-100";
-  if (score >= 40) return "text-amber-700 bg-amber-100";
-  return "text-muted-foreground bg-muted";
-};
 
 function summarizePlanGraph(graph: TaskPlanGraphData | null) {
   if (!graph) {
     return {
       totalEstimatedMinutes: 0,
       nodeCount: 0,
-      feasibilityScore: 0,
       warnings: [] as string[],
     };
   }
@@ -61,12 +54,10 @@ function summarizePlanGraph(graph: TaskPlanGraphData | null) {
   const warnings = Array.isArray(firstWarnings)
     ? firstWarnings.filter((warning): warning is string => typeof warning === "string")
     : [];
-  const feasibilityScore = graph.nodes.find((node) => typeof node.metadata?.feasibilityScore === "number")?.metadata?.feasibilityScore;
 
   return {
     totalEstimatedMinutes,
     nodeCount: graph.nodes.length,
-    feasibilityScore: typeof feasibilityScore === "number" ? feasibilityScore : 0,
     warnings,
   };
 }
@@ -94,8 +85,10 @@ export function TaskDecompositionPanel({
   forceRefresh,
   onApply,
   onPlanLoaded,
+  activeAcceptedPlanId = null,
 }: TaskDecompositionPanelProps) {
   const [requested, setRequested] = useState(autoRequest);
+  const [requestKey, setRequestKey] = useState(0);
   const { messages } = useI18n();
   const decompCopy = getDecompCopy(messages as Record<string, unknown>);
 
@@ -109,25 +102,11 @@ export function TaskDecompositionPanel({
         estimatedMinutes,
         planningPrompt,
         forceRefresh,
-      }
-    : null;
-
-  const automationInput = requested
-    ? {
-        title,
-        description: description ?? undefined,
-        priority,
-        dueAt,
-        scheduledStartAt: null,
-        scheduledEndAt: null,
-        isRunnable: false,
-        runnabilityState: "not_configured",
-        ownerType: "human",
+        requestKey,
       }
     : null;
 
   const { result, isLoading, error } = useSmartDecomposition(decompositionInput);
-  const { suggestion } = useSmartAutomation(automationInput);
 
   const savedPlanMeta = useMemo(() => {
     if (!result?.savedPlan) {
@@ -179,6 +158,16 @@ export function TaskDecompositionPanel({
   }, [result]);
 
   const graphSummary = useMemo(() => summarizePlanGraph(result?.planGraph ?? null), [result]);
+  const isAppliedPlan = Boolean(
+    activeAcceptedPlanId
+      && savedPlanMeta?.id
+      && savedPlanMeta.id === activeAcceptedPlanId,
+  );
+
+  const handleRegenerate = () => {
+    setRequested(true);
+    setRequestKey((current) => current + 1);
+  };
 
   useEffect(() => {
     onPlanLoaded?.(savedPlanMeta);
@@ -226,22 +215,22 @@ export function TaskDecompositionPanel({
 
   return (
     <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Scissors className="size-4" />
           AI Task Plan
         </div>
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-            feasibilityColor(graphSummary.feasibilityScore),
-          )}
+        <button
+          type="button"
+          onClick={handleRegenerate}
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10"
         >
-          {graphSummary.feasibilityScore}% feasible
-        </span>
+          <RotateCcw className="size-3.5" />
+          Regenerate plan
+        </button>
       </div>
 
-      <div className="grid gap-2 rounded-lg border border-border/50 bg-background/70 p-3 text-xs text-muted-foreground sm:grid-cols-3">
+      <div className="grid gap-2 rounded-lg border border-border/50 bg-background/70 p-3 text-xs text-muted-foreground sm:grid-cols-2">
         <div className="flex items-center gap-1.5">
           <Clock className="size-3.5 text-primary" />
           <span>Total: {graphSummary.totalEstimatedMinutes} min</span>
@@ -250,34 +239,7 @@ export function TaskDecompositionPanel({
           <Scissors className="size-3.5 text-primary" />
           <span>{graphSummary.nodeCount} planned nodes</span>
         </div>
-        {suggestion ? (
-          <div className="flex items-center gap-1.5">
-            <CalendarClock className="size-3.5 text-primary" />
-            <span>{suggestion.executionMode} execution</span>
-          </div>
-        ) : null}
       </div>
-
-      {suggestion ? (
-        <div className="grid gap-2 rounded-lg border border-border/40 bg-background/60 p-3 text-xs text-muted-foreground sm:grid-cols-2">
-          <div className="flex items-start gap-2">
-            <CalendarClock className="mt-0.5 size-3.5 shrink-0 text-primary" />
-            <div>
-              <p className="font-medium text-foreground">Execution mode</p>
-              <p>{suggestion.executionMode}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <Bell className="mt-0.5 size-3.5 shrink-0 text-primary" />
-            <div>
-              <p className="font-medium text-foreground">Reminder</p>
-              <p>
-                {suggestion.reminderStrategy.advanceMinutes}m before · {suggestion.reminderStrategy.frequency}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {graphSummary.warnings.length > 0 ? (
         <div className="space-y-1">
@@ -290,20 +252,31 @@ export function TaskDecompositionPanel({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-border/40 bg-background/60 p-3">
-        <TaskPlanGraph plan={planGraph} />
-      </div>
+      {isAppliedPlan ? (
+        <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/70 px-3 py-2.5 text-xs text-muted-foreground">
+          <CheckCircle2 className="size-4 shrink-0 text-primary" />
+          <span>Accepted plan is active in the main panel.</span>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-lg border border-border/40 bg-background/60 p-3">
+            <TaskPlanGraph plan={planGraph} />
+          </div>
 
-      {onApply ? (
-        <button
-          type="button"
-          onClick={() => onApply(result)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition hover:bg-primary/20"
-        >
-          <Check className="size-4" />
-          Apply Plan
-        </button>
-      ) : null}
+          {onApply ? (
+            <div className="flex justify-end rounded-lg border border-border/40 bg-background/70 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => onApply(result)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/20"
+              >
+                <Check className="size-4" />
+                Apply Plan
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
