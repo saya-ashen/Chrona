@@ -1,7 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/openclaw/adapter";
-import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
+import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 
 export const SYNC_STALE_MS = 5 * 60 * 1000;
 

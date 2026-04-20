@@ -1,4 +1,4 @@
-import { SYNC_STALE_MS } from "@/modules/openclaw/freshness";
+import { SYNC_STALE_MS } from "@/modules/runtime-sync/freshness";
 import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import type { EvidenceItem, TaskPlanProjection, TaskPlanProjectionStep, WorkPageCopy } from "./types";
 import { makeEvidence, toIsoString } from "./helpers";

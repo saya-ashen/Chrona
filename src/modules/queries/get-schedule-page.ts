@@ -5,7 +5,7 @@ import {
   startOfDay,
 } from "@/components/schedule/schedule-page-utils";
 import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task-execution/registry";
-import { syncStaleWorkspaceRunsForRead } from "@/modules/openclaw/freshness";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";

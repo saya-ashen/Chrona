@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { syncStaleWorkspaceRunsForRead } from "@/modules/openclaw/freshness";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 
 export async function getTaskCenter(
   workspaceId: string,

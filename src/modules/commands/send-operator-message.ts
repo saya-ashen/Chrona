@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
-import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
+import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import { resolveTaskSessionKey } from "@/modules/task-execution/task-sessions";
 import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
 

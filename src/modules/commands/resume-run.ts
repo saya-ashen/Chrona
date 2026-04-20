@@ -1,7 +1,7 @@
 import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
+import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import {
   createRuntimeAdapter,
   type OpenClawAdapter,
