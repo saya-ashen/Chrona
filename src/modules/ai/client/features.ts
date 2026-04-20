@@ -169,12 +169,12 @@ export async function generatePlan(
     };
   });
   
-  const edges: TaskPlanEdge[] = (parsed.edges ?? []).map((e, i) => ({
-    id: e.id ?? `edge-${i + 1}`,
-    fromNodeId: e.fromNodeId ?? "",
-    toNodeId: e.toNodeId ?? "",
+  const edges: TaskPlanEdge[] = (parsed.edges ?? []).map((e: Record<string, unknown>, i: number) => ({
+    id: (e.id as string) ?? `edge-${i + 1}`,
+    fromNodeId: (e.fromNodeId ?? e.from ?? "") as string,
+    toNodeId: (e.toNodeId ?? e.to ?? "") as string,
     type: normalizeEdgeType(e.type),
-    metadata: e.metadata ?? null,
+    metadata: (e.metadata as Record<string, unknown>) ?? null,
   }));
   
   return {

@@ -138,7 +138,7 @@ export async function llmCall(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
