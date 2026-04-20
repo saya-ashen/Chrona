@@ -206,4 +206,11 @@ export const DEFAULT_WORK_PAGE_COPY = {
   approvalSummaryFallback: "继续运行前，请先查看这条审批。",
   agentLabel: "智能体",
   followUpDefaultSuffix: "后续任务",
+  actionCurrentAction: "当前动作",
+  actionInputTitle: "这次需要补充",
+  actionApprovalTitle: "审批焦点",
+  actionRetryTitle: "恢复建议",
+  actionReviewTitle: "确认这轮产出",
+  actionObserveTitle: "当前协作方式",
+  actionDefaultTitle: "当前动作说明",
 } as const;

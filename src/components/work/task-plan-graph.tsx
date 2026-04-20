@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 type PlanStep = {
   id: string;
@@ -96,33 +97,59 @@ function getMetaChips(step: PlanStep) {
 }
 
 
-function getStatusLabel(status: PlanStep["status"]) {
+const DEFAULT_GRAPH_COPY = {
+  ariaLabel: "Task plan graph",
+  statusInProgress: "In progress",
+  statusWaitingForUser: "Waiting for user",
+  statusDone: "Done",
+  statusBlocked: "Blocked",
+  statusPending: "Pending",
+  edgeDependsOn: "Depends on",
+  edgeBranchesTo: "Branches to",
+  edgeUnblocks: "Unblocks",
+  edgeFeedsOutput: "Output feeds",
+  edgeSequential: "Sequential",
+  outgoingEdges: "Out {count}",
+  incomingEdges: "In {count}",
+  needsUserInput: "Needs user input",
+  detailStatus: "Status",
+  detailType: "Type",
+  detailExecutionMode: "Execution mode",
+  detailPriority: "Priority",
+  detailEstimatedDuration: "Estimated duration",
+  detailLinkedTask: "Linked task",
+  detailDescription: "Description",
+} as const;
+
+type GraphCopyType = Record<keyof typeof DEFAULT_GRAPH_COPY, string>;
+
+function getStatusLabel(status: PlanStep["status"], graphCopy: GraphCopyType) {
   switch (status) {
     case "in_progress":
-      return "进行中";
+      return graphCopy.statusInProgress;
     case "waiting_for_user":
-      return "等待用户";
+      return graphCopy.statusWaitingForUser;
     case "done":
-      return "已完成";
+      return graphCopy.statusDone;
     case "blocked":
-      return "已阻塞";
+      return graphCopy.statusBlocked;
     default:
-      return "待处理";
+      return graphCopy.statusPending;
   }
 }
 
-function getEdgeLabel(type: string) {
+function getEdgeLabel(type: string, graphCopy: GraphCopyType) {
   switch (type) {
     case "depends_on":
-      return "依赖";
+      return graphCopy.edgeDependsOn;
     case "branches_to":
-      return "分支";
+      return graphCopy.edgeBranchesTo;
     case "unblocks":
-      return "解锁";
+      return graphCopy.edgeUnblocks;
     case "feeds_output":
-      return "产出流向";
+      return graphCopy.edgeFeedsOutput;
     default:
-      return "顺序";
+      return graphCopy.edgeSequential;
   }
 }
 
@@ -137,6 +164,8 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const { messages } = useI18n();
+  const graphCopy = { ...DEFAULT_GRAPH_COPY, ...(messages.components?.taskPlanGraph ?? {}) };
 
   const edgesByFrom = useMemo(() => {
     const map = new Map<string, PlanEdge[]>();
@@ -175,7 +204,7 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
 
   return (
     <div
-      aria-label="任务计划图"
+      aria-label={graphCopy.ariaLabel}
       className="space-y-3"
       data-testid="task-plan-graph"
     >
@@ -218,31 +247,31 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
                     </p>
                   </div>
                   <div className="shrink-0 rounded-full border border-black/5 bg-white/60 px-2 py-1 text-[11px] text-muted-foreground">
-                    {getStatusLabel(step.status)}
+                    {getStatusLabel(step.status, graphCopy)}
                   </div>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                  <span className="rounded-full bg-black/5 px-2 py-1">出边 {outgoing.length}</span>
-                  <span className="rounded-full bg-black/5 px-2 py-1">入边 {dependencyCount}</span>
-                  {step.needsUserInput ? <span className="rounded-full bg-black/5 px-2 py-1">需要用户输入</span> : null}
+                  <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.outgoingEdges.replace("{count}", String(outgoing.length))}</span>
+                  <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.incomingEdges.replace("{count}", String(dependencyCount))}</span>
+                  {step.needsUserInput ? <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.needsUserInput}</span> : null}
                 </div>
 
                 {selected ? (
                   <div className="mt-3 space-y-3 border-t border-black/10 pt-3 text-sm">
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <DetailItem label="状态" value={getStatusLabel(step.status)} />
-                      <DetailItem label="类型" value={step.type ?? "step"} />
-                      <DetailItem label="执行方式" value={step.executionMode ?? "none"} />
-                      <DetailItem label="优先级" value={step.priority ?? "-"} />
+                      <DetailItem label={graphCopy.detailStatus} value={getStatusLabel(step.status, graphCopy)} />
+                      <DetailItem label={graphCopy.detailType} value={step.type ?? "step"} />
+                      <DetailItem label={graphCopy.detailExecutionMode} value={step.executionMode ?? "none"} />
+                      <DetailItem label={graphCopy.detailPriority} value={step.priority ?? "-"} />
                       <DetailItem
-                        label="预计时长"
+                        label={graphCopy.detailEstimatedDuration}
                         value={typeof step.estimatedMinutes === "number" ? `${step.estimatedMinutes} min` : "-"}
                       />
-                      <DetailItem label="关联任务" value={step.linkedTaskId ?? "-"} />
+                      <DetailItem label={graphCopy.detailLinkedTask} value={step.linkedTaskId ?? "-"} />
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">详细说明</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{graphCopy.detailDescription}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{step.objective}</p>
                     </div>
                   </div>
@@ -253,7 +282,7 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
                   {outgoing.map((edge) => (
                     <div key={edge.id} className="flex items-center gap-2">
                       <span className="text-muted-foreground/60">↓</span>
-                      <span>{getEdgeLabel(edge.type)}</span>
+                      <span>{getEdgeLabel(edge.type, graphCopy)}</span>
                     </div>
                   ))}
                 </div>

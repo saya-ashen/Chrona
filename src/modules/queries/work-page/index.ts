@@ -1,7 +1,13 @@
-// Compatibility barrel – re-exports from the split work-page modules.
+export { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
+export type {
+  WorkPageCopy,
+  EvidenceItem,
+  TaskPlanStepStatus,
+  TaskPlanProjectionStep,
+  TaskPlanProjection,
+} from "./types";
+
 export {
-  WorkPageTaskNotFoundError,
-  DEFAULT_COPY,
   isMissingRecordError,
   makeEvidence,
   toIsoString,
@@ -9,6 +15,9 @@ export {
   summarizePayload,
   formatEventTitle,
   classifyWorkstreamItem,
+} from "./helpers";
+
+export {
   buildScheduleImpact,
   readBlockReason,
   deriveTaskPlanStepStatus,
@@ -18,13 +27,6 @@ export {
   buildReliability,
   buildClosureState,
   buildWorkspaceRail,
-  getWorkPage,
-} from "./work-page";
+} from "./builders";
 
-export type {
-  WorkPageCopy,
-  EvidenceItem,
-  TaskPlanStepStatus,
-  TaskPlanProjectionStep,
-  TaskPlanProjection,
-} from "./work-page";
+export { getWorkPage } from "./get-work-page";

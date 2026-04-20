@@ -216,6 +216,11 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   queueReady: "Queue ready",
   needsAttention: "Needs attention",
   aiProposalsCompactEmpty: "No pending AI proposals.",
+  taskPlanLabel: "Task Plan",
+  loadingTaskPlan: "Loading task plan…",
+  subtasksLabel: "Subtasks",
+  subtaskReopen: "Reopen",
+  subtaskMarkDone: "Mark done",
 } as const;
 
 export type SchedulePageCopy = Record<

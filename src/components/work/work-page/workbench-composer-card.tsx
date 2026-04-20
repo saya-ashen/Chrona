@@ -50,6 +50,7 @@ function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
 function renderActionWorkspace(
   currentIntervention: WorkPageData["currentIntervention"],
   currentStepTitle: string | null,
+  copy: WorkbenchCopy,
 ) {
   if (!currentIntervention) {
     return null;
@@ -60,7 +61,7 @@ function renderActionWorkspace(
   const shell = (title: string, body: ReactNode) => (
     <div className="rounded-[18px] border border-border/70 bg-background/75 px-3.5 py-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone="info">当前动作</StatusBadge>
+        <StatusBadge tone="info">{copy.actionCurrentAction}</StatusBadge>
         {currentStepTitle ? <StatusBadge tone="warning">{currentStepTitle}</StatusBadge> : null}
       </div>
       <p className="mt-2 text-sm font-medium text-foreground">{currentIntervention.actionLabel}</p>
@@ -76,7 +77,7 @@ function renderActionWorkspace(
   switch (currentIntervention.kind) {
     case "input":
       return shell(
-        "这次需要补充",
+        copy.actionInputTitle,
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>{currentIntervention.description}</p>
           {evidence.length > 0 ? (
@@ -96,7 +97,7 @@ function renderActionWorkspace(
       );
     case "approval":
       return shell(
-        "审批焦点",
+        copy.actionApprovalTitle,
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>{currentIntervention.description}</p>
           {(currentIntervention.approvals?.length ?? 0) > 0 ? (
@@ -118,7 +119,7 @@ function renderActionWorkspace(
       );
     case "retry":
       return shell(
-        "恢复建议",
+        copy.actionRetryTitle,
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>{currentIntervention.whyNow}</p>
           {evidence.length > 0 ? (
@@ -132,17 +133,17 @@ function renderActionWorkspace(
       );
     case "review":
       return shell(
-        "确认这轮产出",
+        copy.actionReviewTitle,
         <p className="text-sm text-muted-foreground">{currentIntervention.whyNow}</p>,
       );
     case "observe":
       return shell(
-        "当前协作方式",
+        copy.actionObserveTitle,
         <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
       );
     default:
       return shell(
-        "当前动作说明",
+        copy.actionDefaultTitle,
         <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
       );
   }
@@ -193,7 +194,7 @@ export function WorkbenchComposerCard({
         <span>{copy.keyboardHint}</span>
       </div>
 
-      {renderActionWorkspace(currentIntervention, currentStepTitle)}
+      {renderActionWorkspace(currentIntervention, currentStepTitle, copy)}
 
       {errorMessage ? (
         <p

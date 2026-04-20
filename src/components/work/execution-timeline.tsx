@@ -147,10 +147,12 @@ function sortEvents(events: ExecutionEvent[]) {
   });
 }
 
+type CopyType = Record<keyof typeof DEFAULT_COPY, string>;
+
 function groupEventsByRun(
   events: ExecutionEvent[],
   currentRunId: string | null | undefined,
-  copy: typeof DEFAULT_COPY,
+  copy: CopyType,
 ): ExecutionGroup[] {
   if (!events.some((event) => event.runId)) {
     return [{ key: "all-events", label: null, events }];
@@ -193,7 +195,7 @@ function groupEventsByRun(
 
 function renderEventCard(
   event: ExecutionEvent,
-  copy: typeof DEFAULT_COPY,
+  copy: CopyType,
 ) {
   const payloadEntries = Object.entries(event.payload);
 
@@ -239,7 +241,7 @@ function renderEventCard(
 
 function renderEventSections(
   events: ExecutionEvent[],
-  copy: typeof DEFAULT_COPY,
+  copy: CopyType,
   expanded: boolean,
   onToggleExpanded: (expanded: boolean) => void,
 ) {
