@@ -235,7 +235,7 @@ describe("syncRunFromRuntime", () => {
                 role: "toolResult",
                 toolCallId: "tool_call_read_1",
                 toolName: "read",
-                content: [{ type: "text", text: '{"name":"agent-dashboard"}' }],
+                content: [{ type: "text", text: '{"name":"chrona"}' }],
                 isError: false,
                 timestamp: 1737264002000,
                 __openclaw: { id: "msg_tool_3", seq: 3 },

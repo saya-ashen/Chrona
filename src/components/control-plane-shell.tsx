@@ -27,9 +27,12 @@ export function ControlPlaneShell({ children }: ControlPlaneShellProps) {
               aria-label={t("nav.brandTitle")}
               className="group flex min-w-0 items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm transition-colors hover:border-primary/30 hover:bg-background"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 via-blue-500/15 to-violet-500/20 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/15">
-                AD
-              </span>
+              <img
+                src="/chrona_icon_app.svg"
+                alt=""
+                aria-hidden="true"
+                className="h-9 w-9 shrink-0 rounded-xl ring-1 ring-inset ring-primary/15"
+              />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold tracking-tight text-foreground">{t("nav.brandTitle")}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">{t("nav.brandTagline")}</span>

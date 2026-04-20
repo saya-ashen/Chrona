@@ -1,6 +1,6 @@
 {
   "nav": {
-    "brandTitle": "Agent Dashboard",
+    "brandTitle": "Chrona",
     "brandTagline": "Task-centric AI control plane",
     "workspaces": "Workspaces",
     "schedule": "Schedule",
@@ -21,7 +21,7 @@
     "taskPlural": "tasks"
   },
   "metadata": {
-    "title": "Agent Dashboard",
+    "title": "Chrona",
     "description": "Task-centric AI control plane for human and runtime collaboration."
   },
   "components": {

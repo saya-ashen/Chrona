@@ -32,20 +32,20 @@ import { randomUUID } from "node:crypto";
 // Types
 // ────────────────────────────────────────────────────────────────────
 
-// Shared types from @agent-dashboard/runtime-client
+// Shared types from @chrona/runtime-client
 export type {
   BridgeRequest,
   BridgeResponse,
   NDJSONEvent,
   ToolCallInfo,
-} from "@agent-dashboard/runtime-client/openclaw/bridge-types";
+} from "@chrona/runtime-client/openclaw/bridge-types";
 
 import type {
   BridgeRequest,
   BridgeResponse,
   NDJSONEvent,
   ToolCallInfo,
-} from "@agent-dashboard/runtime-client/openclaw/bridge-types";
+} from "@chrona/runtime-client/openclaw/bridge-types";
 
 // ── Legacy single-blob format ──
 interface LegacyBlobPayload {

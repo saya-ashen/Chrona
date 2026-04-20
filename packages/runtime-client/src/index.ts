@@ -1,5 +1,5 @@
 /**
- * @agent-dashboard/runtime-client
+ * @chrona/runtime-client
  *
  * Shared runtime types and utilities for task execution adapters.
  * No database or application-specific dependencies.

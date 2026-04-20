@@ -76,7 +76,7 @@ describe("startRun", () => {
           toolMode: "workspace-write",
         });
         expect(input.runtimeSessionKey).toBe(
-          `agent-dashboard:openclaw:task:${task.id}:default`,
+          `chrona:openclaw:task:${task.id}:default`,
         );
 
         const pendingRun = await db.run.findFirstOrThrow({
@@ -151,7 +151,7 @@ describe("startRun", () => {
     expect(storedTask.runs[0]?.runtimeSessionRef).toBe("agent:main:dashboard:runtime_123");
     expect(storedTask.sessions).toHaveLength(1);
     expect(storedTask.sessions[0]?.sessionKey).toBe(
-      `agent-dashboard:openclaw:task:${task.id}:default`,
+      `chrona:openclaw:task:${task.id}:default`,
     );
     expect(storedTask.sessions[0]?.status).toBe("running");
   });
@@ -191,7 +191,7 @@ describe("startRun", () => {
           toolMode: "workspace-write",
         });
         expect(input.runtimeSessionKey).toBe(
-          `agent-dashboard:openclaw:task:${task.id}:default`,
+          `chrona:openclaw:task:${task.id}:default`,
         );
 
         return {
@@ -266,7 +266,7 @@ describe("startRun", () => {
           webSearch: true,
         });
         expect(input.runtimeSessionKey).toBe(
-          `agent-dashboard:research:task:${task.id}:default`,
+          `chrona:research:task:${task.id}:default`,
         );
 
         return {
@@ -381,8 +381,8 @@ describe("startRun", () => {
 
     expect(sessions).toHaveLength(1);
     expect(seenSessionKeys).toEqual([
-      `agent-dashboard:openclaw:task:${task.id}:default`,
-      `agent-dashboard:openclaw:task:${task.id}:default`,
+      `chrona:openclaw:task:${task.id}:default`,
+      `chrona:openclaw:task:${task.id}:default`,
     ]);
   });
 });
@@ -439,7 +439,7 @@ describe("createTask", () => {
     expect(storedTask.defaultSessionId).toBeTruthy();
     expect(storedTask.sessions).toHaveLength(1);
     expect(storedTask.sessions[0]?.sessionKey).toBe(
-      `agent-dashboard:openclaw:task:${storedTask.id}:default`,
+      `chrona:openclaw:task:${storedTask.id}:default`,
     );
     expect(storedTask.projection).not.toBeNull();
     expect(createdEvent?.payload).toEqual(

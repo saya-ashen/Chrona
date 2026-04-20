@@ -1,6 +1,6 @@
 {
   "nav": {
-    "brandTitle": "Agent Dashboard",
+    "brandTitle": "Chrona",
     "brandTagline": "以任务为中心的 AI 控制台",
     "workspaces": "工作区",
     "schedule": "日程",
@@ -21,7 +21,7 @@
     "taskPlural": "个任务"
   },
   "metadata": {
-    "title": "Agent Dashboard",
+    "title": "Chrona",
     "description": "面向人与运行时协作的任务型 AI 控制台。"
   },
   "components": {

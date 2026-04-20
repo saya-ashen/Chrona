@@ -1,10 +1,10 @@
 {
-  "name": "@agent-dashboard/openclaw-bridge",
+  "name": "@chrona/openclaw-bridge",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@agent-dashboard/runtime-client": "workspace:*"
+    "@chrona/runtime-client": "workspace:*"
   },
   "exports": {
     ".": "./src/server.ts"

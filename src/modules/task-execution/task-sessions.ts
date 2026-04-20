@@ -11,6 +11,10 @@ type EnsureDefaultTaskSessionInput = {
 type TaskSessionStatus = "idle" | "running" | "waiting_for_input" | "waiting_for_approval";
 
 export function buildDefaultTaskSessionKey(input: { taskId: string; runtimeName: string }) {
+  return `chrona:${input.runtimeName}:task:${input.taskId}:default`;
+}
+
+function buildLegacyTaskSessionKey(input: { taskId: string; runtimeName: string }) {
   return `agent-dashboard:${input.runtimeName}:task:${input.taskId}:default`;
 }
 
@@ -37,17 +41,34 @@ export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionIn
     }
   }
 
-  const existingSession = await db.taskSession.findUnique({
-    where: { sessionKey: expectedSessionKey },
+  const existingSession = await db.taskSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      runtimeName: input.runtimeName,
+      OR: [
+        { sessionKey: expectedSessionKey },
+        { sessionKey: buildLegacyTaskSessionKey({ taskId: input.taskId, runtimeName: input.runtimeName }) },
+      ],
+    },
+    orderBy: { createdAt: "asc" },
   });
 
   if (existingSession) {
+    if (existingSession.sessionKey !== expectedSessionKey) {
+      await db.taskSession.update({
+        where: { id: existingSession.id },
+        data: { sessionKey: expectedSessionKey },
+      });
+    }
+
     await db.task.update({
       where: { id: input.taskId },
       data: { defaultSessionId: existingSession.id },
     });
 
-    return existingSession;
+    return existingSession.sessionKey === expectedSessionKey
+      ? existingSession
+      : { ...existingSession, sessionKey: expectedSessionKey };
   }
 
   const createdSession = await db.taskSession.create({

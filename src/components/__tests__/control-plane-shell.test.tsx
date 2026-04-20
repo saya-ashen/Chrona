@@ -10,7 +10,7 @@ describe("ControlPlaneShell", () => {
       </ControlPlaneShell>,
     );
 
-    expect(screen.getByRole("link", { name: "Agent Dashboard" })).toHaveAttribute("href", "/en/schedule");
+    expect(screen.getByRole("link", { name: "Chrona" })).toHaveAttribute("href", "/en/schedule");
     expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/en/schedule");
     expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute("href", "/en/inbox");
     expect(screen.getByRole("link", { name: "Memory" })).toHaveAttribute("href", "/en/memory");

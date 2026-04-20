@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * AgentDashboard CLI — agentdash
+ * Chrona CLI — chrona
  *
  * A comprehensive command-line interface for interacting with the
- * AgentDashboard backend API. Designed to be AI-agent-friendly with
+ * Chrona backend API. Designed to be AI-agent-friendly with
  * structured JSON output by default.
  *
  * Usage:
@@ -32,9 +32,9 @@ import { registerAiCommands } from "./commands/ai.js";
 const program = new Command();
 
 program
-  .name("agentdash")
+  .name("chrona")
   .description(
-    "AgentDashboard CLI — manage tasks, runs, schedules, and AI features.\n" +
+    "Chrona CLI — manage tasks, runs, schedules, and AI features.\n" +
     "Outputs structured JSON by default for AI-agent integration.",
   )
   .version("0.2.0")

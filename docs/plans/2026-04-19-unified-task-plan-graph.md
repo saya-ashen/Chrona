@@ -1,6 +1,6 @@
 # Unified Task Plan Graph Implementation Plan
 
-> For Hermes: use this as the implementation source of truth for migrating AgentDashboard from split placeholder task plans + subtasks toward a unified plan-first architecture.
+> For Hermes: use this as the implementation source of truth for migrating Chrona from split placeholder task plans + subtasks toward a unified plan-first architecture.
 
 Goal
 
