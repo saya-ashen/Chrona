@@ -48,7 +48,7 @@ function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
     })),
   };
 }
-import { useSmartDecomposition } from "@/hooks/use-ai";
+import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
@@ -255,13 +255,32 @@ export function SelectedBlockSheet({
   const locale = useLocale();
   const { messages, t } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
-  const decomposition = useSmartDecomposition({
-    taskId: item.taskId,
-    title: item.title,
-    description: item.description ?? undefined,
-    priority: item.priority,
-    dueAt: item.dueAt,
-  });
+
+  // Accepted plan state — only shown on left after user confirms
+  const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanGraphResponse | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+
+  const handleApplyPlan = async (result: TaskPlanGraphResponse) => {
+    if (!result.savedPlan?.id) return;
+    setIsApplying(true);
+    try {
+      const res = await fetch("/api/ai/task-plan/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: item.taskId,
+          planId: result.savedPlan.id,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to accept plan");
+      setAcceptedPlan(result);
+      await onMutatedAction();
+    } catch (err) {
+      console.error("[TaskPlan] Accept failed:", err);
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   return (
     <>
@@ -391,9 +410,9 @@ export function SelectedBlockSheet({
                   />
                 </SurfaceCard>
 
-                {/* Full interactive Task Plan Graph */}
+                {/* Accepted Task Plan Graph — only shown after user confirms */}
                 {(() => {
-                  const plan = toPlanGraphPlan(decomposition.result);
+                  const plan = toPlanGraphPlan(acceptedPlan);
                   if (plan) {
                     return (
                       <SurfaceCard
@@ -409,13 +428,6 @@ export function SelectedBlockSheet({
                       </SurfaceCard>
                     );
                   }
-                  if (decomposition.isLoading) {
-                    return (
-                      <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
-                        {copy.loadingTaskPlan}
-                      </div>
-                    );
-                  }
                   return null;
                 })()}
               </div>
@@ -426,40 +438,32 @@ export function SelectedBlockSheet({
               className="min-h-0 overflow-y-auto bg-muted/10 px-5 py-5 md:px-5"
             >
               <div className="space-y-4 pb-6">
-                {/* Compact plan overview — title-only node list */}
-                {decomposition.result?.planGraph?.nodes?.length ? (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      {copy.taskPlanLabel}
-                    </p>
-                    <div className="space-y-1">
-                      {decomposition.result.planGraph.nodes.map((node) => (
-                        <div
-                          key={node.id}
-                          className="flex items-center gap-2 px-1 py-1 text-sm"
-                        >
-                          <span
-                            className={cn(
-                              "size-1.5 shrink-0 rounded-full",
-                              node.status === "done"
-                                ? "bg-emerald-500"
-                                : node.status === "in_progress"
-                                  ? "bg-blue-500"
-                                  : node.status === "waiting_for_user"
-                                    ? "bg-amber-500"
-                                    : node.status === "blocked"
-                                      ? "bg-rose-500"
-                                      : "bg-muted-foreground/30",
-                            )}
-                          />
-                          <span className="truncate text-foreground/80">
-                            {node.title}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                {/* AI Plan Generation — user reviews and applies */}
+                <TaskDecompositionPanel
+                  taskId={item.taskId}
+                  title={item.title}
+                  description={item.description}
+                  priority={item.priority}
+                  dueAt={item.dueAt}
+                  autoRequest
+                  onPlanLoaded={(saved) => {
+                    if (saved?.status === "accepted" && saved.plan) {
+                      setAcceptedPlan({
+                        source: "saved",
+                        planGraph: saved.plan,
+                        savedPlan: {
+                          id: saved.id,
+                          status: saved.status,
+                          prompt: saved.prompt,
+                          revision: saved.revision ?? 0,
+                          summary: saved.summary ?? null,
+                          updatedAt: saved.updatedAt,
+                        },
+                      });
+                    }
+                  }}
+                  onApply={handleApplyPlan}
+                />
 
                 <TaskContextLinks
                   workspaceId={item.workspaceId}

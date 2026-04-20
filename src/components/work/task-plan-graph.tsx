@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/client";
+
+// ────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────
 
 type PlanStep = {
   id: string;
@@ -34,68 +38,9 @@ type TaskPlanGraphProps = {
   };
 };
 
-function getNodeTone(step: PlanStep) {
-  if (step.executionMode === "child_task" || step.linkedTaskId) return "child-task";
-  if (step.needsUserInput || step.status === "waiting_for_user") return "waiting";
-  if (step.type === "checkpoint") return "checkpoint";
-  if (step.type === "decision") return "decision";
-  if (step.type === "deliverable") return "deliverable";
-  if (step.type === "tool_action") return "tool-action";
-  if (step.status === "done") return "done";
-  if (step.status === "blocked") return "blocked";
-  if (step.status === "in_progress") return "current";
-  return "default";
-}
-
-function getNodeClasses(tone: string, current: boolean, selected: boolean) {
-  return cn(
-    "w-full rounded-2xl border px-3 py-3 text-left shadow-sm transition-colors",
-    tone === "child-task" && "border-emerald-300 bg-emerald-50/90",
-    tone === "waiting" && "border-amber-300 bg-amber-50/90",
-    tone === "checkpoint" && "border-violet-300 bg-violet-50/90",
-    tone === "decision" && "border-fuchsia-300 bg-fuchsia-50/90",
-    tone === "deliverable" && "border-cyan-300 bg-cyan-50/90",
-    tone === "tool-action" && "border-indigo-300 bg-indigo-50/90",
-    tone === "done" && "border-slate-300 bg-slate-50/90",
-    tone === "blocked" && "border-rose-300 bg-rose-50/90",
-    tone === "current" && "border-sky-400 bg-sky-50/90",
-    tone === "default" && "border-border/70 bg-background/80",
-    current && "ring-2 ring-primary/35",
-    selected && "ring-2 ring-foreground/20",
-  );
-}
-
-function clampClass(lines: 1 | 2) {
-  return lines === 1
-    ? "overflow-hidden text-ellipsis whitespace-nowrap"
-    : "overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]";
-}
-
-function getMetaChips(step: PlanStep) {
-  const chips: string[] = [];
-
-  const normalizedPhase = step.phase?.trim().toLowerCase() ?? "";
-  const normalizedType = step.type?.trim().toLowerCase() ?? "";
-
-  if (step.type && normalizedType !== normalizedPhase) {
-    chips.push(step.type);
-  }
-  if (step.executionMode === "child_task") {
-    chips.push("child task");
-  }
-  if (step.linkedTaskId) {
-    chips.push(step.linkedTaskId);
-  }
-  if (step.priority) {
-    chips.push(step.priority);
-  }
-  if (typeof step.estimatedMinutes === "number") {
-    chips.push(`${step.estimatedMinutes}m`);
-  }
-
-  return chips;
-}
-
+// ────────────────────────────────────────────────────────────
+// i18n copy
+// ────────────────────────────────────────────────────────────
 
 const DEFAULT_GRAPH_COPY = {
   ariaLabel: "Task plan graph",
@@ -123,49 +68,285 @@ const DEFAULT_GRAPH_COPY = {
 
 type GraphCopyType = Record<keyof typeof DEFAULT_GRAPH_COPY, string>;
 
-function getStatusLabel(status: PlanStep["status"], graphCopy: GraphCopyType) {
+function getStatusLabel(status: PlanStep["status"], c: GraphCopyType) {
   switch (status) {
-    case "in_progress":
-      return graphCopy.statusInProgress;
-    case "waiting_for_user":
-      return graphCopy.statusWaitingForUser;
-    case "done":
-      return graphCopy.statusDone;
-    case "blocked":
-      return graphCopy.statusBlocked;
-    default:
-      return graphCopy.statusPending;
+    case "in_progress": return c.statusInProgress;
+    case "waiting_for_user": return c.statusWaitingForUser;
+    case "done": return c.statusDone;
+    case "blocked": return c.statusBlocked;
+    default: return c.statusPending;
   }
 }
 
-function getEdgeLabel(type: string, graphCopy: GraphCopyType) {
+function getEdgeLabel(type: string, c: GraphCopyType) {
   switch (type) {
-    case "depends_on":
-      return graphCopy.edgeDependsOn;
-    case "branches_to":
-      return graphCopy.edgeBranchesTo;
-    case "unblocks":
-      return graphCopy.edgeUnblocks;
-    case "feeds_output":
-      return graphCopy.edgeFeedsOutput;
-    default:
-      return graphCopy.edgeSequential;
+    case "depends_on": return c.edgeDependsOn;
+    case "branches_to": return c.edgeBranchesTo;
+    case "unblocks": return c.edgeUnblocks;
+    case "feeds_output": return c.edgeFeedsOutput;
+    default: return c.edgeSequential;
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// Node visual config
+// ────────────────────────────────────────────────────────────
+
+type NodeTone =
+  | "child-task" | "waiting" | "checkpoint" | "decision"
+  | "deliverable" | "tool-action" | "done" | "blocked" | "current" | "default";
+
+function getNodeTone(step: PlanStep): NodeTone {
+  if (step.executionMode === "child_task" || step.linkedTaskId) return "child-task";
+  if (step.needsUserInput || step.status === "waiting_for_user") return "waiting";
+  if (step.type === "checkpoint") return "checkpoint";
+  if (step.type === "decision") return "decision";
+  if (step.type === "deliverable") return "deliverable";
+  if (step.type === "tool_action") return "tool-action";
+  if (step.status === "done") return "done";
+  if (step.status === "blocked") return "blocked";
+  if (step.status === "in_progress") return "current";
+  return "default";
+}
+
+const TONE_STYLES: Record<NodeTone, { border: string; bg: string; ring: string; dot: string }> = {
+  "child-task":  { border: "border-emerald-400/60", bg: "bg-emerald-50 dark:bg-emerald-950/30", ring: "ring-emerald-400/30", dot: "bg-emerald-500" },
+  waiting:       { border: "border-amber-400/60",   bg: "bg-amber-50 dark:bg-amber-950/30",     ring: "ring-amber-400/30",   dot: "bg-amber-500" },
+  checkpoint:    { border: "border-violet-400/60",   bg: "bg-violet-50 dark:bg-violet-950/30",   ring: "ring-violet-400/30",  dot: "bg-violet-500" },
+  decision:      { border: "border-fuchsia-400/60",  bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30", ring: "ring-fuchsia-400/30", dot: "bg-fuchsia-500" },
+  deliverable:   { border: "border-cyan-400/60",     bg: "bg-cyan-50 dark:bg-cyan-950/30",       ring: "ring-cyan-400/30",    dot: "bg-cyan-500" },
+  "tool-action": { border: "border-indigo-400/60",   bg: "bg-indigo-50 dark:bg-indigo-950/30",   ring: "ring-indigo-400/30",  dot: "bg-indigo-500" },
+  done:          { border: "border-slate-300/60",     bg: "bg-slate-50 dark:bg-slate-900/30",     ring: "ring-slate-300/30",   dot: "bg-slate-400" },
+  blocked:       { border: "border-rose-400/60",      bg: "bg-rose-50 dark:bg-rose-950/30",       ring: "ring-rose-400/30",    dot: "bg-rose-500" },
+  current:       { border: "border-sky-400/60",       bg: "bg-sky-50 dark:bg-sky-950/30",         ring: "ring-sky-400/30",     dot: "bg-sky-500" },
+  default:       { border: "border-border/50",        bg: "bg-background",                        ring: "ring-border/20",      dot: "bg-muted-foreground/40" },
+};
+
+const EDGE_DASH: Record<string, string> = {
+  depends_on: "6,4",
+  branches_to: "3,3",
+  feeds_output: "8,3",
+};
+
+function edgeColor(type: string) {
+  switch (type) {
+    case "depends_on": return "stroke-violet-400/60";
+    case "branches_to": return "stroke-fuchsia-400/60";
+    case "unblocks": return "stroke-emerald-400/60";
+    case "feeds_output": return "stroke-cyan-400/60";
+    default: return "stroke-muted-foreground/25";
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// DetailItem
+// ────────────────────────────────────────────────────────────
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value}</p>
+    <div className="rounded-xl border border-border/40 bg-muted/30 px-3 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-xs text-foreground">{value}</p>
     </div>
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// FlowNode
+// ────────────────────────────────────────────────────────────
+
+function FlowNode({
+  step,
+  tone,
+  isCurrent,
+  isSelected,
+  onClick,
+  graphCopy,
+}: {
+  step: PlanStep;
+  tone: NodeTone;
+  isCurrent: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+  graphCopy: GraphCopyType;
+}) {
+  const s = TONE_STYLES[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`task-plan-node-${step.id}`}
+      data-node-tone={tone}
+      data-node-current={isCurrent ? "true" : "false"}
+      className={cn(
+        "group relative w-full rounded-2xl border px-4 py-3 text-left transition-all duration-200",
+        s.border, s.bg,
+        isCurrent && "ring-2",
+        isCurrent && s.ring,
+        isSelected && !isCurrent && "ring-1 ring-foreground/10",
+        "hover:shadow-md hover:shadow-black/5",
+      )}
+    >
+      {/* Status dot */}
+      <div className="flex items-start gap-3">
+        <div className="mt-1.5 flex flex-col items-center gap-1">
+          <span className={cn("size-2.5 rounded-full shadow-sm", s.dot)} />
+        </div>
+        <div className="min-w-0 flex-1">
+          {/* Phase + chips */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {step.phase}
+            </span>
+            {step.type && step.type !== step.phase?.toLowerCase() ? (
+              <span className="rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {step.type}
+              </span>
+            ) : null}
+            {typeof step.estimatedMinutes === "number" ? (
+              <span className="rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {step.estimatedMinutes}m
+              </span>
+            ) : null}
+          </div>
+          {/* Title */}
+          <p className="mt-1 text-sm font-medium leading-snug text-foreground">
+            {step.title}
+          </p>
+          {/* Objective — collapsed unless selected */}
+          {isSelected ? (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{step.objective}</p>
+          ) : null}
+        </div>
+        {/* Status badge */}
+        <span className={cn(
+          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+          step.status === "done" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+          step.status === "in_progress" && "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+          step.status === "waiting_for_user" && "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+          step.status === "blocked" && "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+          step.status === "pending" && "bg-muted text-muted-foreground",
+        )}>
+          {getStatusLabel(step.status, graphCopy)}
+        </span>
+      </div>
+
+      {/* Expanded detail panel */}
+      {isSelected ? (
+        <div className="mt-3 space-y-2 border-t border-border/30 pt-3">
+          <div className="grid gap-1.5 sm:grid-cols-3">
+            <DetailItem label={graphCopy.detailType} value={step.type ?? "step"} />
+            <DetailItem label={graphCopy.detailExecutionMode} value={step.executionMode ?? "none"} />
+            <DetailItem label={graphCopy.detailPriority} value={step.priority ?? "-"} />
+          </div>
+          {step.linkedTaskId ? (
+            <DetailItem label={graphCopy.detailLinkedTask} value={step.linkedTaskId} />
+          ) : null}
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// SVG Connector
+// ────────────────────────────────────────────────────────────
+
+function FlowConnector({
+  edge,
+  fromRect,
+  toRect,
+  containerRect,
+  graphCopy,
+}: {
+  edge: PlanEdge;
+  fromRect: DOMRect;
+  toRect: DOMRect;
+  containerRect: DOMRect;
+  graphCopy: GraphCopyType;
+}) {
+  // Bottom center of from → Top center of to (relative to container)
+  const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
+  const y1 = fromRect.bottom - containerRect.top;
+  const x2 = toRect.left + toRect.width / 2 - containerRect.left;
+  const y2 = toRect.top - containerRect.top;
+
+  const midY = (y1 + y2) / 2;
+  const dx = Math.abs(x2 - x1);
+
+  // Curved path
+  const path = dx < 4
+    ? `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`
+    : `M ${x1} ${y1} C ${x1} ${y1 + 20}, ${x1} ${midY}, ${(x1 + x2) / 2} ${midY} S ${x2} ${y2 - 20}, ${x2} ${y2}`;
+
+  const dash = EDGE_DASH[edge.type];
+  const label = getEdgeLabel(edge.type, graphCopy);
+
+  return (
+    <g>
+      <path
+        d={path}
+        fill="none"
+        className={cn("transition-colors", edgeColor(edge.type))}
+        strokeWidth={1.5}
+        strokeDasharray={dash}
+        markerEnd="url(#flowArrow)"
+      />
+      {/* Edge label at midpoint */}
+      {edge.type !== "sequential" ? (
+        <text
+          x={(x1 + x2) / 2}
+          y={midY - 4}
+          textAnchor="middle"
+          className="fill-muted-foreground/50 text-[9px]"
+        >
+          {label}
+        </text>
+      ) : null}
+    </g>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Main component
+// ────────────────────────────────────────────────────────────
+
 export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const { messages } = useI18n();
-  const graphCopy = { ...DEFAULT_GRAPH_COPY, ...(messages.components?.taskPlanGraph ?? {}) };
+  const graphCopy = { ...DEFAULT_GRAPH_COPY, ...(messages.components?.taskPlanGraph ?? {}) } as GraphCopyType;
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [rects, setRects] = useState<Map<string, DOMRect>>(new Map());
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+
+  // Collect node positions for SVG connectors
+  useEffect(() => {
+    if (plan.state !== "ready" || !containerRef.current) return;
+
+    const measure = () => {
+      const cr = containerRef.current?.getBoundingClientRect();
+      if (!cr) return;
+      setContainerRect(cr);
+
+      const newRects = new Map<string, DOMRect>();
+      for (const [id, el] of nodeRefs.current.entries()) {
+        newRects.set(id, el.getBoundingClientRect());
+      }
+      setRects(newRects);
+    };
+
+    // Measure after layout settles
+    const timer = setTimeout(measure, 50);
+    const observer = new ResizeObserver(measure);
+    if (containerRef.current) observer.observe(containerRef.current);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [plan.state, plan.steps.length, selectedStepId]);
 
   const edgesByFrom = useMemo(() => {
     const map = new Map<string, PlanEdge[]>();
@@ -177,116 +358,94 @@ export function TaskPlanGraph({ plan }: TaskPlanGraphProps) {
     return map;
   }, [plan.edges]);
 
-  const incomingCountByNodeId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const edge of plan.edges ?? []) {
-      map.set(edge.toNodeId, (map.get(edge.toNodeId) ?? 0) + 1);
-    }
-    return map;
-  }, [plan.edges]);
+  // All edges flat
+  const allEdges = useMemo(() => plan.edges ?? [], [plan.edges]);
 
   useEffect(() => {
     if (plan.state !== "ready" || plan.steps.length === 0) {
       setSelectedStepId(null);
       return;
     }
-
-    if (selectedStepId && plan.steps.some((step) => step.id === selectedStepId)) {
-      return;
-    }
-
+    if (selectedStepId && plan.steps.some((s) => s.id === selectedStepId)) return;
     setSelectedStepId(null);
   }, [plan.state, plan.steps, selectedStepId]);
 
-  if (plan.state !== "ready" || plan.steps.length === 0) {
-    return null;
-  }
+  if (plan.state !== "ready" || plan.steps.length === 0) return null;
+
+  const svgHeight = containerRef.current?.scrollHeight ?? 0;
+  const svgWidth = containerRef.current?.scrollWidth ?? 0;
 
   return (
     <div
+      ref={containerRef}
       aria-label={graphCopy.ariaLabel}
-      className="space-y-3"
+      className="relative"
       data-testid="task-plan-graph"
     >
-      <div className="space-y-3">
+      {/* SVG overlay for connectors */}
+      {containerRect && allEdges.length > 0 ? (
+        <svg
+          className="pointer-events-none absolute inset-0 z-0"
+          width={svgWidth}
+          height={svgHeight}
+          style={{ overflow: "visible" }}
+        >
+          <defs>
+            <marker
+              id="flowArrow"
+              markerWidth="8"
+              markerHeight="6"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <path
+                d="M 0 0 L 8 3 L 0 6 Z"
+                className="fill-muted-foreground/30"
+              />
+            </marker>
+          </defs>
+          {allEdges.map((edge) => {
+            const fromRect = rects.get(edge.fromNodeId);
+            const toRect = rects.get(edge.toNodeId);
+            if (!fromRect || !toRect) return null;
+            return (
+              <FlowConnector
+                key={edge.id}
+                edge={edge}
+                fromRect={fromRect}
+                toRect={toRect}
+                containerRect={containerRect}
+                graphCopy={graphCopy}
+              />
+            );
+          })}
+        </svg>
+      ) : null}
+
+      {/* Nodes */}
+      <div className="relative z-10 space-y-4">
         {plan.steps.map((step) => {
           const tone = getNodeTone(step);
-          const current = step.id === plan.currentStepId;
-          const selected = step.id === selectedStepId;
-          const outgoing = edgesByFrom.get(step.id) ?? [];
-          const dependencyCount = incomingCountByNodeId.get(step.id) ?? 0;
-          const metaChips = getMetaChips(step);
+          const isCurrent = step.id === plan.currentStepId;
+          const isSelected = step.id === selectedStepId;
 
           return (
-            <div key={step.id} className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setSelectedStepId(selected ? null : step.id)}
-                data-testid={`task-plan-node-${step.id}`}
-                data-node-tone={tone}
-                data-node-current={current ? "true" : "false"}
-                data-node-selected={selected ? "true" : "false"}
-                className={getNodeClasses(tone, current, selected)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1 text-left">
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                      <span className={clampClass(1)}>{step.phase}</span>
-                      {metaChips.map((chip) => (
-                        <span
-                          key={`${step.id}-${chip}`}
-                          className="rounded-full bg-black/5 px-2 py-0.5 normal-case tracking-normal"
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                    <p className={cn("mt-2 text-sm font-semibold text-foreground", clampClass(1))}>{step.title}</p>
-                    <p className={cn("mt-1 text-sm text-muted-foreground", selected ? "" : clampClass(2))}>
-                      {step.objective}
-                    </p>
-                  </div>
-                  <div className="shrink-0 rounded-full border border-black/5 bg-white/60 px-2 py-1 text-[11px] text-muted-foreground">
-                    {getStatusLabel(step.status, graphCopy)}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                  <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.outgoingEdges.replace("{count}", String(outgoing.length))}</span>
-                  <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.incomingEdges.replace("{count}", String(dependencyCount))}</span>
-                  {step.needsUserInput ? <span className="rounded-full bg-black/5 px-2 py-1">{graphCopy.needsUserInput}</span> : null}
-                </div>
-
-                {selected ? (
-                  <div className="mt-3 space-y-3 border-t border-black/10 pt-3 text-sm">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <DetailItem label={graphCopy.detailStatus} value={getStatusLabel(step.status, graphCopy)} />
-                      <DetailItem label={graphCopy.detailType} value={step.type ?? "step"} />
-                      <DetailItem label={graphCopy.detailExecutionMode} value={step.executionMode ?? "none"} />
-                      <DetailItem label={graphCopy.detailPriority} value={step.priority ?? "-"} />
-                      <DetailItem
-                        label={graphCopy.detailEstimatedDuration}
-                        value={typeof step.estimatedMinutes === "number" ? `${step.estimatedMinutes} min` : "-"}
-                      />
-                      <DetailItem label={graphCopy.detailLinkedTask} value={step.linkedTaskId ?? "-"} />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{graphCopy.detailDescription}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{step.objective}</p>
-                    </div>
-                  </div>
-                ) : null}
-              </button>
-              {outgoing.length > 0 ? (
-                <div className="space-y-1 pl-4 text-xs text-muted-foreground">
-                  {outgoing.map((edge) => (
-                    <div key={edge.id} className="flex items-center gap-2">
-                      <span className="text-muted-foreground/60">↓</span>
-                      <span>{getEdgeLabel(edge.type, graphCopy)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+            <div
+              key={step.id}
+              ref={(el) => {
+                if (el) nodeRefs.current.set(step.id, el);
+                else nodeRefs.current.delete(step.id);
+              }}
+            >
+              <FlowNode
+                step={step}
+                tone={tone}
+                isCurrent={isCurrent}
+                isSelected={isSelected}
+                onClick={() => setSelectedStepId(isSelected ? null : step.id)}
+                graphCopy={graphCopy}
+              />
             </div>
           );
         })}
