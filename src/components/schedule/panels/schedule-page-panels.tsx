@@ -7,7 +7,47 @@ import {
 } from "lucide-react";
 import { type DragEvent, useState } from "react";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
-import type { ScheduleSlot } from "@/modules/ai/types";
+import type { ScheduleSlot, TaskPlanGraphResponse, TaskPlanNode } from "@/modules/ai/types";
+import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+
+/**
+ * Convert a TaskPlanGraphResponse into the plan shape that TaskPlanGraph component expects.
+ */
+function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
+  if (!res?.planGraph?.nodes?.length) return null;
+  const g = res.planGraph;
+  const steps = g.nodes.map((n: TaskPlanNode) => ({
+    id: n.id,
+    title: n.title,
+    objective: n.objective,
+    phase: n.phase ?? n.type,
+    status: (n.status === "skipped" ? "done" : n.status) as
+      | "pending"
+      | "in_progress"
+      | "waiting_for_user"
+      | "done"
+      | "blocked",
+    needsUserInput: n.needsUserInput || n.status === "waiting_for_user",
+    type: n.type,
+    linkedTaskId: n.linkedTaskId,
+    executionMode: n.executionMode,
+    estimatedMinutes: n.estimatedMinutes,
+    priority: n.priority,
+  }));
+  const currentStepId =
+    steps.find((s) => ["in_progress", "waiting_for_user", "blocked"].includes(s.status))?.id ?? null;
+  return {
+    state: "ready" as const,
+    currentStepId,
+    steps,
+    edges: g.edges.map((e) => ({
+      id: e.id,
+      fromNodeId: e.fromNodeId,
+      toNodeId: e.toNodeId,
+      type: e.type,
+    })),
+  };
+}
 import { useSmartDecomposition } from "@/hooks/use-ai";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
@@ -329,46 +369,6 @@ export function SelectedBlockSheet({
                   ]}
                 />
 
-                {/* Task Plan Graph — compact node list */}
-                {decomposition.result?.planGraph?.nodes?.length ? (
-                  <SurfaceCard
-                    as="div"
-                    variant="inset"
-                    padding="sm"
-                    className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
-                  >
-                    <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      {copy.taskPlanLabel}
-                    </p>
-                    <div className="space-y-1.5">
-                      {decomposition.result.planGraph.nodes.map((node) => (
-                        <div
-                          key={node.id}
-                          className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm"
-                        >
-                          <span
-                            className={cn(
-                              "size-2 shrink-0 rounded-full",
-                              node.status === "done"
-                                ? "bg-green-500"
-                                : node.status === "in_progress"
-                                  ? "bg-blue-500"
-                                  : "bg-muted-foreground/40",
-                            )}
-                          />
-                          <span className="truncate text-foreground">
-                            {node.title}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </SurfaceCard>
-                ) : decomposition.isLoading ? (
-                  <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
-                    {copy.loadingTaskPlan}
-                  </div>
-                ) : null}
-
                 <SurfaceCard
                   as="div"
                   variant="inset"
@@ -390,6 +390,34 @@ export function SelectedBlockSheet({
                     }
                   />
                 </SurfaceCard>
+
+                {/* Full interactive Task Plan Graph */}
+                {(() => {
+                  const plan = toPlanGraphPlan(decomposition.result);
+                  if (plan) {
+                    return (
+                      <SurfaceCard
+                        as="div"
+                        variant="inset"
+                        padding="sm"
+                        className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
+                      >
+                        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          {copy.taskPlanLabel}
+                        </p>
+                        <TaskPlanGraph plan={plan} />
+                      </SurfaceCard>
+                    );
+                  }
+                  if (decomposition.isLoading) {
+                    return (
+                      <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                        {copy.loadingTaskPlan}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
@@ -398,6 +426,41 @@ export function SelectedBlockSheet({
               className="min-h-0 overflow-y-auto bg-muted/10 px-5 py-5 md:px-5"
             >
               <div className="space-y-4 pb-6">
+                {/* Compact plan overview — title-only node list */}
+                {decomposition.result?.planGraph?.nodes?.length ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      {copy.taskPlanLabel}
+                    </p>
+                    <div className="space-y-1">
+                      {decomposition.result.planGraph.nodes.map((node) => (
+                        <div
+                          key={node.id}
+                          className="flex items-center gap-2 px-1 py-1 text-sm"
+                        >
+                          <span
+                            className={cn(
+                              "size-1.5 shrink-0 rounded-full",
+                              node.status === "done"
+                                ? "bg-emerald-500"
+                                : node.status === "in_progress"
+                                  ? "bg-blue-500"
+                                  : node.status === "waiting_for_user"
+                                    ? "bg-amber-500"
+                                    : node.status === "blocked"
+                                      ? "bg-rose-500"
+                                      : "bg-muted-foreground/30",
+                            )}
+                          />
+                          <span className="truncate text-foreground/80">
+                            {node.title}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <TaskContextLinks
                   workspaceId={item.workspaceId}
                   taskId={item.taskId}
