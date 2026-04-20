@@ -13,7 +13,7 @@ vi.mock("@/hooks/use-ai", () => ({
   useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
 }));
 
-import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 
 const defaultProps = {
@@ -35,7 +35,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
     status: "draft",
     revision: 2,
     source: "ai",
-    generatedBy: "decompose-task",
+    generatedBy: "generate-task-plan",
     prompt: null,
     summary: "3 planned nodes",
     changeSummary: null,
@@ -52,13 +52,13 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         phase: "execution",
         estimatedMinutes: 40,
         priority: "High",
-        executionMode: "child_task",
+        executionMode: "automatic",
         linkedTaskId: null,
-        needsUserInput: false,
-        metadata: {
-          feasibilityScore: 80,
-          warnings: [],
-        },
+        requiresHumanInput: false,
+        requiresHumanApproval: false,
+        autoRunnable: true,
+        blockingReason: null,
+        metadata: null,
       },
       {
         id: "node-2",
@@ -70,9 +70,12 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         phase: "delivery",
         estimatedMinutes: 50,
         priority: "High",
-        executionMode: "child_task",
+        executionMode: "automatic",
         linkedTaskId: null,
-        needsUserInput: false,
+        requiresHumanInput: false,
+        requiresHumanApproval: false,
+        autoRunnable: true,
+        blockingReason: null,
         metadata: null,
       },
       {
@@ -85,9 +88,12 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         phase: "review",
         estimatedMinutes: 30,
         priority: "Medium",
-        executionMode: "none",
+        executionMode: "manual",
         linkedTaskId: null,
-        needsUserInput: false,
+        requiresHumanInput: false,
+        requiresHumanApproval: false,
+        autoRunnable: false,
+        blockingReason: null,
         metadata: null,
       },
     ],
@@ -125,7 +131,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
     expect(mockUseSmartDecomposition).toHaveBeenCalledWith(null);
   });
 
-  it("requests decomposition after clicking trigger button", async () => {
+  it("requests plan generation after clicking trigger button", async () => {
     const user = userEvent.setup();
     mockUseSmartDecomposition.mockReturnValue({
       result: null,
@@ -150,7 +156,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
 });
 
 describe("TaskDecompositionPanel – autoRequest mode", () => {
-  it("immediately requests decomposition with autoRequest=true", () => {
+  it("immediately requests plan generation with autoRequest=true", () => {
     mockUseSmartDecomposition.mockReturnValue({
       result: null,
       isLoading: true,
@@ -285,7 +291,7 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
             {
               ...samplePlanResponse.planGraph.nodes[0]!,
               metadata: {
-                feasibilityScore: 80,
+                autoRunnable: true,
                 warnings: ["Due date is soon", "Requires stakeholder review"],
               },
             },

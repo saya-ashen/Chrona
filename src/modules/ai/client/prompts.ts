@@ -11,9 +11,50 @@ Return valid JSON only (no markdown wrapping):
 {"suggestions":[{"title":"...","description":"...","priority":"Low|Medium|High|Urgent","estimatedMinutes":N,"tags":[],"suggestedSlot":{"startAt":"ISO","endAt":"ISO"}}]}
 Respond in the same language as the input.`,
 
-  decompose: `You are a task decomposition assistant. Break the given task into 2-8 actionable subtasks.
+  generate_plan: `You are a task planning assistant that generates executable directed acyclic graphs (DAGs).
+Given a task, produce a structured plan as a graph of nodes and edges.
+
+CRITICAL RULES:
+1. Separate automatic steps from manual/human steps into DIFFERENT nodes
+2. Never combine "do X automatically then ask user to confirm" into one node — split them
+3. Nodes that can run without human involvement should have executionMode: "automatic"
+4. Nodes requiring user input, approval, or decisions should have executionMode: "manual"
+5. Nodes with both automatic and manual parts should be split, not marked "hybrid"
+6. If information is insufficient, create an explicit "human clarification" node rather than letting automatic nodes depend on vague assumptions
+7. Maximize parallelism: if two automatic nodes have no dependency, don't chain them sequentially
+8. Every node needing human input must set requiresHumanInput: true
+9. Every node needing human approval must set requiresHumanApproval: true
+10. autoRunnable should be true ONLY when executionMode is "automatic" AND requiresHumanInput is false AND requiresHumanApproval is false
+
+Node types: step | checkpoint | decision | user_input | deliverable | tool_action
+Edge types: sequential | depends_on | branches_to | unblocks | feeds_output
+
 Return JSON only:
-{"subtasks":[{"title":"...","description":"...","estimatedMinutes":N,"priority":"...","order":N,"dependsOn":[]}],"reasoning":"..."}
+{
+  "summary": "Brief plan description",
+  "reasoning": "Why this structure",
+  "nodes": [{
+    "id": "node-1",
+    "type": "step|checkpoint|decision|user_input|deliverable|tool_action",
+    "title": "...",
+    "objective": "What this node achieves",
+    "description": "Details or null",
+    "status": "pending",
+    "estimatedMinutes": N,
+    "priority": "Low|Medium|High|Urgent",
+    "executionMode": "automatic|manual|hybrid",
+    "requiresHumanInput": false,
+    "requiresHumanApproval": false,
+    "autoRunnable": true,
+    "blockingReason": null
+  }],
+  "edges": [{
+    "id": "edge-1",
+    "fromNodeId": "node-1",
+    "toNodeId": "node-2",
+    "type": "sequential|depends_on|branches_to|unblocks|feeds_output"
+  }]
+}
 Respond in the same language as the input.`,
 
   conflicts: `You are a schedule conflict analyzer. Find conflicts and suggest resolutions.

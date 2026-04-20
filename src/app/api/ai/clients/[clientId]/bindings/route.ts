@@ -1,7 +1,7 @@
 /**
  * PUT /api/ai/clients/[clientId]/bindings — set feature bindings for a client
  *
- * Body: { features: ["suggest", "decompose", ...] }
+ * Body: { features: ["suggest", "generate_plan", ...] }
  *
  * This replaces all existing bindings. Features bound to this client
  * are removed from other clients automatically (unique constraint).
@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 
-const VALID_FEATURES = ["suggest", "decompose", "conflicts", "timeslots", "chat"] as const;
+const VALID_FEATURES = ["suggest", "generate_plan", "conflicts", "timeslots", "chat"] as const;
 
 interface RouteParams {
   params: Promise<{ clientId: string }>;

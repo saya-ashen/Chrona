@@ -37,7 +37,7 @@ export type ScheduleFocusZone = {
 
 export type ScheduleAutomationCandidate = {
   taskId: string;
-  kind: "auto_schedule" | "decompose" | "remind" | "auto_run";
+  kind: "auto_schedule" | "generate_plan" | "remind" | "auto_run";
   reason: string;
   priority: "low" | "medium" | "high";
 };

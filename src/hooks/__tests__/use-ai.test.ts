@@ -4,11 +4,11 @@ import {
   useAutoComplete,
   useSmartAutomation,
   useSmartDecomposition,
-  useBatchDecompose,
+  useBatchApplyPlan,
   useSmartTimeslot,
 } from "../use-ai";
 import type { AutoCompleteSuggestion, SmartAutomationTaskInput, SmartDecompositionTaskInput, SmartTimeslotTaskInput } from "../use-ai";
-import type { AutomationSuggestion, TaskDecompositionResult } from "@/modules/ai/types";
+import type { AutomationSuggestion } from "@/modules/ai/types";
 
 // ---------- Helpers ----------
 
@@ -56,28 +56,26 @@ const sampleAutomationSuggestion: AutomationSuggestion = {
   confidence: "high",
 };
 
-const sampleDecompositionResult: TaskDecompositionResult = {
-  subtasks: [
-    {
-      title: "Research",
-      description: "Research the topic",
-      estimatedMinutes: 30,
-      priority: "High",
-      order: 1,
-      dependsOnPrevious: false,
-    },
-    {
-      title: "Implementation",
-      description: "Implement the solution",
-      estimatedMinutes: 120,
-      priority: "High",
-      order: 2,
-      dependsOnPrevious: true,
-    },
-  ],
-  totalEstimatedMinutes: 150,
-  feasibilityScore: 0.85,
-  warnings: [],
+const samplePlanGraphResponse = {
+  source: "ai",
+  planGraph: {
+    id: "graph-1",
+    taskId: "task-1",
+    status: "draft",
+    revision: 1,
+    source: "ai",
+    generatedBy: "test",
+    prompt: null,
+    summary: "2 steps",
+    changeSummary: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    nodes: [
+      { id: "node-1", type: "step", title: "Research", objective: "Research the topic", executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", estimatedMinutes: 30, priority: "High" },
+      { id: "node-2", type: "step", title: "Implementation", objective: "Implement the solution", executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", estimatedMinutes: 120, priority: "High" },
+    ],
+    edges: [{ id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "sequential" }],
+  },
 };
 
 // NOTE: The hook returns raw JSON from the API (no Date parsing),
@@ -101,17 +99,13 @@ const sampleTimeslotResult = {
   },
 };
 
-const sampleBatchDecomposeResponse = {
+const sampleBatchApplyPlanResponse = {
   parentTaskId: "task-123",
-  subtasks: [
-    { title: "Subtask 1", estimatedMinutes: 30 },
-    { title: "Subtask 2", estimatedMinutes: 45 },
+  childTasks: [
+    { id: "child-1", title: "Step 1" },
+    { id: "child-2", title: "Step 2" },
   ],
-  decomposition: {
-    totalEstimatedMinutes: 75,
-    feasibilityScore: 0.9,
-    warnings: [],
-  },
+  planGraph: { id: "graph-1", nodes: [], edges: [] },
 };
 
 // ---------- useAutoComplete ----------
@@ -582,7 +576,7 @@ describe("useSmartDecomposition", () => {
   });
 
   it("should fetch immediately (no debounce) when input provided", () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleDecompositionResult));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
     renderHook(() => useSmartDecomposition(validInput));
@@ -590,7 +584,7 @@ describe("useSmartDecomposition", () => {
     // No debounce — fetch is called directly in the effect
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/ai/decompose-task",
+      "/api/ai/generate-task-plan",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -605,8 +599,8 @@ describe("useSmartDecomposition", () => {
     );
   });
 
-  it("should return TaskDecompositionResult on success", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleDecompositionResult));
+  it("should return TaskPlanGraphResponse on success", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { result } = renderHook(() => useSmartDecomposition(validInput));
@@ -616,7 +610,7 @@ describe("useSmartDecomposition", () => {
       // flush microtasks
     });
 
-    expect(result.current.result).toEqual(sampleDecompositionResult);
+    expect(result.current.result).toEqual(samplePlanGraphResponse);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
   });
@@ -660,7 +654,7 @@ describe("useSmartDecomposition", () => {
       },
     );
 
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleDecompositionResult));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { rerender } = renderHook(
@@ -678,7 +672,7 @@ describe("useSmartDecomposition", () => {
   });
 
   it("should reset state when input becomes null", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleDecompositionResult));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { result, rerender } = renderHook(
@@ -691,7 +685,7 @@ describe("useSmartDecomposition", () => {
       // flush
     });
 
-    expect(result.current.result).toEqual(sampleDecompositionResult);
+    expect(result.current.result).toEqual(samplePlanGraphResponse);
 
     rerender({ input: null });
 
@@ -716,7 +710,7 @@ describe("useSmartDecomposition", () => {
   });
 
   it("should send all task fields in the request body", () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleDecompositionResult));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
     const input: SmartDecompositionTaskInput = {
@@ -742,26 +736,26 @@ describe("useSmartDecomposition", () => {
   });
 });
 
-// ---------- useBatchDecompose ----------
+// ---------- useBatchApplyPlan ----------
 
-describe("useBatchDecompose", () => {
+describe("useBatchApplyPlan", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("should call API when decompose() is called", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchDecomposeResponse));
+  it("should call API when applyPlan() is called", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     await act(async () => {
-      await result.current.decompose("task-123");
+      await result.current.applyPlan("task-123");
     });
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/ai/batch-decompose",
+      "/api/ai/batch-apply-plan",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ taskId: "task-123" }),
@@ -770,34 +764,34 @@ describe("useBatchDecompose", () => {
   });
 
   it("should return response data on success", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchDecomposeResponse));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     let data: unknown;
     await act(async () => {
-      data = await result.current.decompose("task-123");
+      data = await result.current.applyPlan("task-123");
     });
 
-    expect(data).toEqual(sampleBatchDecomposeResponse);
+    expect(data).toEqual(sampleBatchApplyPlanResponse);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
   });
 
   it("should set error on failure", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ error: "Batch decompose failed" }, 500));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ error: "Failed to apply task plan" }, 500));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     let data: unknown;
     await act(async () => {
-      data = await result.current.decompose("task-123");
+      data = await result.current.applyPlan("task-123");
     });
 
     expect(data).toBeUndefined();
-    expect(result.current.error).toBe("Batch decompose failed");
+    expect(result.current.error).toBe("Failed to apply task plan");
     expect(result.current.isLoading).toBe(false);
   });
 
@@ -810,12 +804,12 @@ describe("useBatchDecompose", () => {
     );
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
-    // Start decompose but don't await yet
-    let decomposePromise: Promise<unknown>;
+    // Start applyPlan but don't await yet
+    let applyPromise: Promise<unknown>;
     act(() => {
-      decomposePromise = result.current.decompose("task-123");
+      applyPromise = result.current.applyPlan("task-123");
     });
 
     // isLoading should be true while request is in-flight
@@ -824,8 +818,8 @@ describe("useBatchDecompose", () => {
 
     // Resolve the fetch
     await act(async () => {
-      resolveFetch(jsonResponse(sampleBatchDecomposeResponse));
-      await decomposePromise!;
+      resolveFetch(jsonResponse(sampleBatchApplyPlanResponse));
+      await applyPromise!;
     });
 
     expect(result.current.isLoading).toBe(false);
@@ -835,11 +829,11 @@ describe("useBatchDecompose", () => {
     const fetchSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     let data: unknown;
     await act(async () => {
-      data = await result.current.decompose("task-123");
+      data = await result.current.applyPlan("task-123");
     });
 
     expect(data).toBeUndefined();
@@ -847,7 +841,7 @@ describe("useBatchDecompose", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("should abort previous request when decompose() called again", async () => {
+  it("should abort previous request when applyPlan() called again", async () => {
     const abortSpy = vi.fn();
     const originalAbortController = globalThis.AbortController;
 
@@ -864,14 +858,14 @@ describe("useBatchDecompose", () => {
       },
     );
 
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchDecomposeResponse));
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     await act(async () => {
-      const p1 = result.current.decompose("task-1");
-      const p2 = result.current.decompose("task-2");
+      const p1 = result.current.applyPlan("task-1");
+      const p2 = result.current.applyPlan("task-2");
       await Promise.all([p1, p2]);
     });
 
@@ -881,14 +875,14 @@ describe("useBatchDecompose", () => {
     vi.stubGlobal("AbortController", originalAbortController);
   });
 
-  it("should maintain stable decompose function reference", () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(sampleBatchDecomposeResponse)));
+  it("should maintain stable applyPlan function reference", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse)));
 
-    const { result, rerender } = renderHook(() => useBatchDecompose());
+    const { result, rerender } = renderHook(() => useBatchApplyPlan());
 
-    const firstDecompose = result.current.decompose;
+    const firstApplyPlan = result.current.applyPlan;
     rerender();
-    expect(result.current.decompose).toBe(firstDecompose);
+    expect(result.current.applyPlan).toBe(firstApplyPlan);
   });
 
   it("should handle HTTP error without error field in body", async () => {
@@ -897,11 +891,11 @@ describe("useBatchDecompose", () => {
     );
     vi.stubGlobal("fetch", fetchSpy);
 
-    const { result } = renderHook(() => useBatchDecompose());
+    const { result } = renderHook(() => useBatchApplyPlan());
 
     let data: unknown;
     await act(async () => {
-      data = await result.current.decompose("task-123");
+      data = await result.current.applyPlan("task-123");
     });
 
     expect(data).toBeUndefined();

@@ -14,7 +14,7 @@ type PlanStep = {
   objective: string;
   phase: string;
   status: "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
-  needsUserInput: boolean;
+  requiresHumanInput: boolean;
   type?: string;
   linkedTaskId?: string | null;
   executionMode?: string | null;
@@ -56,7 +56,7 @@ const DEFAULT_GRAPH_COPY = {
   edgeSequential: "顺序执行",
   outgoingEdges: "流出 {count}",
   incomingEdges: "流入 {count}",
-  needsUserInput: "需要用户输入",
+  requiresHumanInput: "需要用户输入",
   detailStatus: "状态",
   detailType: "类型",
   detailExecutionMode: "执行模式",
@@ -98,7 +98,7 @@ type NodeTone =
 
 function getNodeTone(step: PlanStep): NodeTone {
   if (step.status === "blocked") return "blocked";
-  if (step.needsUserInput || step.status === "waiting_for_user") return "waiting";
+  if (step.requiresHumanInput || step.status === "waiting_for_user") return "waiting";
   if (step.status === "in_progress") return "current";
   if (step.status === "done") return "done";
 
@@ -106,7 +106,7 @@ function getNodeTone(step: PlanStep): NodeTone {
   if (step.type === "decision") return "decision";
   if (step.type === "deliverable") return "deliverable";
   if (step.type === "tool_action") return "tool-action";
-  if (step.executionMode === "child_task" || step.linkedTaskId) return "child-task";
+  if (step.executionMode === "automatic" || step.linkedTaskId) return "child-task";
 
   return step.priority === "Urgent" || step.priority === "High" ? "decision" : "default";
 }

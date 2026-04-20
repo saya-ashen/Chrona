@@ -61,7 +61,7 @@ function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
       objective: node.title,
       phase: "",
       status: node.status === "skipped" ? "done" : node.status,
-      needsUserInput: false,
+      requiresHumanInput: node.requiresHumanInput ?? false,
       type: node.type,
       linkedTaskId: node.linkedTaskId,
       executionMode: node.executionMode,
@@ -138,7 +138,7 @@ export function ScheduleTaskPlanSubtasks({
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             <ListTree className="size-3" />
-            <span>{copy.subtasksLabel} ({subtasks.length})</span>
+            <span>{copy.childTasksLabel} ({subtasks.length})</span>
           </div>
           <div className="space-y-1">
             {subtasks.map((sub) => (
@@ -204,8 +204,8 @@ export function ScheduleTaskPlanSubtasks({
                     {pendingSubtaskId === sub.id
                       ? "..."
                       : sub.isCompleted
-                        ? copy.subtaskReopen
-                        : copy.subtaskMarkDone}
+                        ? copy.childTaskReopen
+                        : copy.childTaskMarkDone}
                   </button>
                 </div>
               </div>

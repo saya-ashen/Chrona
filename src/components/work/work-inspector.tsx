@@ -30,7 +30,7 @@ type WorkInspectorProps = {
       objective: string;
       phase: string;
       status: StepStatus;
-      needsUserInput: boolean;
+      requiresHumanInput: boolean;
       type?: string;
       linkedTaskId?: string | null;
       executionMode?: string | null;

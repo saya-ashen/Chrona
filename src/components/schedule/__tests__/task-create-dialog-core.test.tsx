@@ -22,7 +22,6 @@ vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
-import type { TaskDecompositionResult } from "@/modules/ai/task-decomposer";
 
 const defaultProps = {
   isOpen: true,
@@ -145,7 +144,7 @@ describe("TaskCreateDialog – Core functionality", () => {
   it("exposes merged AI planning UI only when handler is provided and preserves priorities on apply", async () => {
     const user = userEvent.setup();
     const onApplyDecomposition = vi.fn().mockResolvedValue(undefined);
-    const decompositionResult: TaskDecompositionResult = {
+    const decompositionResult = {
       subtasks: [
         {
           title: "Draft legal filing checklist",

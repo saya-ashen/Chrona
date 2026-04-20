@@ -158,7 +158,7 @@ function buildAutomationCandidates(input: {
   const riskTaskIds = new Set(input.risks.map((item) => item.taskId));
   const candidates: Array<{
     taskId: string;
-    kind: "auto_schedule" | "decompose" | "remind" | "auto_run";
+    kind: "auto_schedule" | "generate_plan" | "remind" | "auto_run";
     reason: string;
     priority: "low" | "medium" | "high";
   }> = [];
@@ -182,7 +182,7 @@ function buildAutomationCandidates(input: {
     if (!item.isRunnable && (!item.prompt || item.runnabilityState !== "ready_to_run")) {
       candidates.push({
         taskId: item.taskId,
-        kind: "decompose",
+        kind: "generate_plan",
         reason: "Task needs execution details before it can run.",
         priority: isDueSoon ? "high" : "medium",
       });

@@ -109,7 +109,7 @@ const baseData: WorkPageData = {
         objective: "确认用户想要的 work 页面方向",
         phase: "planning",
         status: "done",
-        needsUserInput: false,
+        requiresHumanInput: false,
       },
       {
         id: "step_2",
@@ -117,7 +117,7 @@ const baseData: WorkPageData = {
         objective: "把页面改造成 task 驱动协作工作台",
         phase: "execution",
         status: "in_progress",
-        needsUserInput: false,
+        requiresHumanInput: false,
       },
       {
         id: "step_3",
@@ -125,7 +125,7 @@ const baseData: WorkPageData = {
         objective: "看首轮结果后决定是否继续细化",
         phase: "review",
         status: "pending",
-        needsUserInput: false,
+        requiresHumanInput: false,
       },
     ],
     edges: [
@@ -269,7 +269,7 @@ describe("WorkPageClient", () => {
         ...baseData.taskPlan,
         steps: baseData.taskPlan.steps.map((step) =>
           step.id === "step_2"
-            ? { ...step, status: "waiting_for_user", needsUserInput: true }
+            ? { ...step, status: "waiting_for_user", requiresHumanInput: true }
             : step,
         ),
       },

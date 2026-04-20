@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Bot, Sparkles, RotateCcw, Check } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition-panel";
+import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ function getAiSidebarCopy(raw: Record<string, string> | undefined) {
     cockpitDescription: s.cockpitDescription ?? "Replace sub-tasks with the AI Task Plan graph directly.",
     planAcceptedAndApplied: s.planAcceptedAndApplied ?? "Task plan accepted and applied; new sub-tasks created.",
     acceptingPlan: s.acceptingPlan ?? "Accepting and applying plan…",
-    decompositionFailed: s.decompositionFailed ?? "Task decomposition failed — please try again later.",
+    planGenerationFailed: s.planGenerationFailed ?? "Task plan generation failed — please try again later.",
     noSavedFlow: s.noSavedFlow ?? "No saved flows yet",
     savedPlanTitle: s.savedPlanTitle ?? "Current saved plan title and main flow.",
     noPlanYet: s.noPlanYet ?? "No saved AI plan yet.",
@@ -71,9 +71,12 @@ type SavedTaskAiPlanSummary = {
       phase: string | null;
       estimatedMinutes: number | null;
       priority: string | null;
-      executionMode: "none" | "child_task" | "inline_action";
+      executionMode: "automatic" | "manual" | "hybrid";
       linkedTaskId: string | null;
-      needsUserInput: boolean;
+      requiresHumanInput: boolean;
+      requiresHumanApproval: boolean;
+      autoRunnable: boolean;
+      blockingReason: string | null;
     }>;
     edges: Array<{
       id: string;
@@ -105,7 +108,9 @@ function buildCockpitGraph(plan: SavedTaskAiPlanSummary["plan"] | undefined) {
       objective: node.objective,
       phase: node.phase ?? node.type,
       status: node.status === "skipped" ? "done" : node.status,
-      needsUserInput: node.needsUserInput || node.status === "waiting_for_user",
+      requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
+      requiresHumanApproval: node.requiresHumanApproval ?? false,
+      autoRunnable: node.autoRunnable ?? false,
       type: node.type,
       linkedTaskId: node.linkedTaskId,
       executionMode: node.executionMode,
@@ -245,7 +250,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
 
   async function handleApplyDecomposition(result: TaskPlanGraphResponse) {
     setFeedback(null);
-    const response = await fetch("/api/ai/batch-decompose", {
+    const response = await fetch("/api/ai/batch-apply-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -255,7 +260,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
     });
 
     if (!response.ok) {
-      let message = copy.decompositionFailed;
+      let message = copy.planGenerationFailed;
       try {
         const data = (await response.json()) as { error?: string };
         if (data.error) {

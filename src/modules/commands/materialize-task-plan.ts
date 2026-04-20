@@ -49,7 +49,7 @@ function createTaskProjectionData(params: {
 }
 
 function isMaterializableNode(node: TaskPlanNode) {
-  return node.executionMode === "child_task";
+  return node.executionMode === "automatic";
 }
 
 function isSequentialMaterializedEdge(edge: TaskPlanEdge, materializedNodeIds: Set<string>) {

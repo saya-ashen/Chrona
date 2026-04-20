@@ -190,7 +190,7 @@ describe("TaskAiSidebar", () => {
         status: "draft",
         revision: 4,
         source: "ai",
-        generatedBy: "decompose-task",
+        generatedBy: "generate-task-plan",
         prompt: "keep it brief",
         summary: "Accepted graph plan",
         changeSummary: null,
@@ -212,7 +212,7 @@ describe("TaskAiSidebar", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
         1,
-        "/api/ai/batch-decompose",
+        "/api/ai/batch-apply-plan",
         expect.objectContaining({ method: "POST" }),
       );
     });

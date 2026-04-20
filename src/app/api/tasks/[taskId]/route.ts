@@ -130,7 +130,7 @@ export async function DELETE(
       // Delete schedule proposals
       await tx.scheduleProposal.deleteMany({ where: { taskId } });
 
-      // Delete child tasks (subtasks) and their related records
+      // Delete child tasks and their related records
       const childTasks = await tx.task.findMany({
         where: { parentTaskId: taskId },
         select: { id: true },
