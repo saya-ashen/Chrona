@@ -1,0 +1,14 @@
+{
+  "name": "@agent-dashboard/cli",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentdash": "./src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5"
+  }
+}

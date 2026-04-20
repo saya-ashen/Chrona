@@ -75,7 +75,7 @@ bun start
 在 Web UI 的任务中心或排期页面创建任务，也可通过 CLI：
 
 ```bash
-bun cli/index.ts task create \
+bun packages/cli/src/index.ts task create \
   -w <workspaceId> \
   --title "分析用户数据" \
   --description "使用 Python 分析最近30天的用户行为数据" \
@@ -97,7 +97,7 @@ bun cli/index.ts task create \
 也可通过 CLI：
 
 ```bash
-bun cli/index.ts schedule apply \
+bun packages/cli/src/index.ts schedule apply \
   -t <taskId> \
   --start "2025-01-15T14:00:00" \
   --end "2025-01-15T15:00:00"
@@ -108,7 +108,7 @@ bun cli/index.ts schedule apply \
 启动 AI 智能体执行任务：
 
 ```bash
-bun cli/index.ts run start -t <taskId>
+bun packages/cli/src/index.ts run start -t <taskId>
 ```
 
 或在 Web UI 的工作台页面点击"运行"按钮。
@@ -122,26 +122,26 @@ bun cli/index.ts run start -t <taskId>
 ### 5. 完成
 
 ```bash
-bun cli/index.ts task done -t <taskId>
+bun packages/cli/src/index.ts task done -t <taskId>
 ```
 
 ## CLI 快速参考
 
 ```bash
 # 查看所有命令
-bun cli/index.ts --help
+bun packages/cli/src/index.ts --help
 
 # 任务管理
-bun cli/index.ts task list -w <workspaceId>
-bun cli/index.ts task get -t <taskId>
+bun packages/cli/src/index.ts task list -w <workspaceId>
+bun packages/cli/src/index.ts task get -t <taskId>
 
 # AI 功能
-bun cli/index.ts ai decompose -t <taskId>      # AI 任务分解
-bun cli/index.ts ai auto-complete --title "分析" # 标题自动补全
+bun packages/cli/src/index.ts ai decompose -t <taskId>      # AI 任务分解
+bun packages/cli/src/index.ts ai auto-complete --title "分析" # 标题自动补全
 
 # 排期
-bun cli/index.ts schedule view -w <workspaceId> # 查看排期
-bun cli/index.ts schedule conflicts -w <wId>    # 冲突分析
+bun packages/cli/src/index.ts schedule view -w <workspaceId> # 查看排期
+bun packages/cli/src/index.ts schedule conflicts -w <wId>    # 冲突分析
 ```
 
 ## 测试
