@@ -55,6 +55,7 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     isRunnable: true,
     runnabilityState: "Ready",
     runnabilitySummary: "Ready",
+    parentTaskId: null,
     ...overrides,
   };
 }

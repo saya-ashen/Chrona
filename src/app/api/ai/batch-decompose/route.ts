@@ -85,6 +85,8 @@ export async function POST(request: Request) {
           ...subtask,
           order: subtask.order ?? index + 1,
           dependsOnPrevious: subtask.dependsOnPrevious ?? index > 0,
+          estimatedMinutes: subtask.estimatedMinutes ?? 30,
+          priority: subtask.priority ?? "Medium",
         })),
       },
       status: "draft",

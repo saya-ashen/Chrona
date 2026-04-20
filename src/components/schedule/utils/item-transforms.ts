@@ -77,6 +77,7 @@ export function createScheduledItemFromQueueItem(
     isRunnable: item.isRunnable,
     runnabilityState: item.runnabilityState,
     runnabilitySummary: item.runnabilitySummary,
+    parentTaskId: item.parentTaskId ?? null,
   };
 }
 
@@ -124,6 +125,7 @@ export function createScheduledItemFromCreateInput(
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
     runnabilitySummary: runnability.summary,
+    parentTaskId: null,
   };
 }
 

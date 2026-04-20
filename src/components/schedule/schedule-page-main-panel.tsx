@@ -6,9 +6,11 @@ import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
 import type {
   SchedulePageData,
   ScheduleViewMode,
+  TimelineDragItem,
 } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 
 export function SchedulePageHeader({
   copy,
@@ -26,12 +28,8 @@ export function SchedulePageHeader({
   viewData: SchedulePageData;
   viewModel: SchedulePageViewModel;
   onOpenQuickAdd: () => void;
-  localizeHref: (locale: string, href: string) => string;
-  buildScheduleViewHref: (
-    selectedDay?: string,
-    selectedView?: string,
-    selectedTaskId?: string,
-  ) => string;
+  localizeHref: (locale: any, href: string) => string;
+  buildScheduleViewHref: (...args: any[]) => string;
 }) {
   return (
     <PlanningHeader
@@ -154,13 +152,7 @@ export function SchedulePageMainPanel({
 }: {
   copy: SchedulePageCopy;
   activeView: ScheduleViewMode;
-  draggedItem: {
-    kind: "queue" | "scheduled";
-    taskId: string;
-    title: string;
-    dueAt: Date | null;
-    durationMinutes: number;
-  } | null;
+  draggedItem: TimelineDragItem | null;
   activeGroup: SchedulePageViewModel["activeGroup"];
   activeSelectedTaskId: string | undefined;
   conflictTaskIds: Set<string>;
@@ -169,14 +161,14 @@ export function SchedulePageMainPanel({
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
   onScheduleDrop: (
-    item: NonNullable<SchedulePageMainPanelProps["draggedItem"]>,
+    item: TimelineDragItem,
     startAt: Date,
     endAt: Date,
   ) => Promise<void>;
-  onCreateTaskBlock: (input: Parameters<SchedulePageMainPanelProps["onCreateTaskBlock"]>[0]) => Promise<void>;
+  onCreateTaskBlock: (input: any) => Promise<void>;
   onScheduledDragStart: (item: SchedulePageData["scheduled"][number]) => void;
   onDragEnd: () => void;
-  onSaveTaskConfigAction: (taskId: string, input: Parameters<SchedulePageMainPanelProps["onSaveTaskConfigAction"]>[1]) => Promise<void>;
+  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -237,4 +229,4 @@ export function SchedulePageMainPanel({
   );
 }
 
-type SchedulePageMainPanelProps = Parameters<typeof SchedulePageMainPanel>[0];
+

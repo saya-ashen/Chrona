@@ -662,6 +662,12 @@ describe("resolveApproval", () => {
         expect(input.inputText).toBe("Use the safer patch");
         return { accepted: true, runtimeRunRef: "runtime_run_1", runtimeSessionKey: "session_1", runStarted: true };
       },
+      async executeTask() {
+        throw new Error("not used");
+      },
+      async getSessionStatus() {
+        throw new Error("not used");
+      },
     };
 
     await resolveApproval({
@@ -744,6 +750,12 @@ describe("resolveApproval", () => {
       async resumeRun(input: { decision?: string }) {
         expect(input.decision).toBe("reject");
         return { accepted: false };
+      },
+      async executeTask() {
+        throw new Error("not used");
+      },
+      async getSessionStatus() {
+        throw new Error("not used");
       },
     };
 

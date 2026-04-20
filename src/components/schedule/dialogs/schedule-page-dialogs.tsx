@@ -36,12 +36,8 @@ export function SchedulePageDialogs({
   workspaceId: string;
   routerPush: (href: string) => void;
   locale: string;
-  localizeHref: (locale: string, href: string) => string;
-  buildScheduleViewHref: (
-    selectedDay?: string,
-    selectedView?: string,
-    selectedTaskId?: string,
-  ) => string;
+  localizeHref: (locale: any, href: string) => string;
+buildScheduleViewHref: (...args: any[]) => string;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
   handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;

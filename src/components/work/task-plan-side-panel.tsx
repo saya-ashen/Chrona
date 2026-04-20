@@ -29,6 +29,12 @@ type TaskPlanSidePanelProps = {
       estimatedMinutes?: number | null;
       priority?: string | null;
     }>;
+    edges?: Array<{
+      id: string;
+      fromNodeId: string;
+      toNodeId: string;
+      type: string;
+    }>;
   };
   isPending?: boolean;
   currentAction?: {

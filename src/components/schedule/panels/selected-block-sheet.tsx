@@ -25,7 +25,7 @@ import { AiInsightsPanel } from "@/components/schedule/ai-insights-panel";
 import { ScheduleTaskPlanSubtasks } from "@/components/schedule/schedule-task-plan-subtasks";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 import { applyTaskPlanGraphResult } from "@/components/schedule/schedule-task-plan-utils";
-import { ItemMeta, DetailGrid } from "@/components/schedule/schedule-page-shared";
+import { ItemMeta, DetailGrid } from "@/components/schedule/panels/schedule-page-panels";
 
 export function SelectedBlockSheet({
   item,

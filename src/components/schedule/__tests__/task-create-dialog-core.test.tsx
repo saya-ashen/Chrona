@@ -12,9 +12,9 @@ const mockUseSmartAutomation = vi.fn(() => ({ suggestion: null, isLoading: false
 const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
 
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
-  useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
-  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
+  useAutoComplete: () => mockUseAutoComplete(),
+  useSmartAutomation: () => mockUseSmartAutomation(),
+  useSmartDecomposition: () => mockUseSmartDecomposition(),
 }));
 
 vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
@@ -169,11 +169,11 @@ describe("TaskCreateDialog – Core functionality", () => {
       warnings: [],
     };
 
-    mockUseSmartDecomposition.mockImplementation((input) => ({
-      result: input ? decompositionResult : null,
+    mockUseSmartDecomposition.mockImplementation((() => ({
+      result: decompositionResult,
       isLoading: false,
       error: null,
-    }));
+    })) as any);
 
     const { rerender } = render(<TaskCreateDialog {...defaultProps} initialTitle="Campaign setup" />);
 

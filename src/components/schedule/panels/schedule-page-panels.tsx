@@ -165,7 +165,7 @@ export function ItemMeta({ item }: { item: ScheduleCardItem }) {
   );
 }
 
-function DetailGrid({
+export function DetailGrid({
   items,
 }: {
   items: Array<{ label: string; value: string | null | undefined }>;

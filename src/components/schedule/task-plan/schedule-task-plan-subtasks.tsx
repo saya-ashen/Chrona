@@ -59,7 +59,7 @@ function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
       id: node.id,
       title: node.title,
       objective: node.title,
-      phase: null,
+      phase: "",
       status: node.status === "skipped" ? "done" : node.status,
       needsUserInput: false,
       type: node.type,

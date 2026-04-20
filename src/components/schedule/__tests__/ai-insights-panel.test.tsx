@@ -57,7 +57,7 @@ afterEach(() => {
 describe("AiInsightsPanel", () => {
   it("renders the merged AI task plan panel directly", () => {
     render(
-      <AiInsightsPanel item={mockItem} onApplyDecomposition={vi.fn()} />,
+      <AiInsightsPanel item={mockItem} planResult={null} onPlanLoaded={vi.fn()} onApplyDecomposition={vi.fn()} />,
     );
 
     expect(screen.getByTestId("task-decomposition-panel")).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe("AiInsightsPanel", () => {
     const onApplyDecomposition = vi.fn();
 
     render(
-      <AiInsightsPanel item={mockItem} onApplyDecomposition={onApplyDecomposition} />,
+      <AiInsightsPanel item={mockItem} planResult={null} onPlanLoaded={vi.fn()} onApplyDecomposition={onApplyDecomposition} />,
     );
 
     expect(taskDecompositionPanelProps).toHaveBeenCalledWith(
