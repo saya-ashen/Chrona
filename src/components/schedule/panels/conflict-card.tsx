@@ -4,6 +4,7 @@ import type {
 } from "@/components/schedule/schedule-page-types";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useI18n } from "@/i18n/client";
 
 type ConflictCardProps = {
   conflict: ScheduleConflict;
@@ -12,20 +13,41 @@ type ConflictCardProps = {
   isPending?: boolean;
 };
 
-const conflictTypeLabels: Record<string, string> = {
-  time_overlap: "时间重叠",
-  overload: "工作量过载",
-  fragmentation: "碎片化",
-  dependency: "依赖冲突",
+const DEFAULT_COPY = {
+  timeRange: "Time range",
+  suggestions: "Suggested solutions",
+  reason: "Reason",
+  applying: "Applying...",
+  applySuggestion: "Apply Suggestion",
+  conflictTypes: {
+    time_overlap: "Time Overlap",
+    overload: "Overload",
+    fragmentation: "Fragmentation",
+    dependency: "Dependency Conflict",
+  } as Record<string, string>,
+  suggestionTypes: {
+    reschedule: "Reschedule",
+    split: "Split Task",
+    merge: "Merge Tasks",
+    defer: "Defer Task",
+    reorder: "Reorder",
+  } as Record<string, string>,
 };
 
-const suggestionTypeLabels: Record<string, string> = {
-  reschedule: "重新安排",
-  split: "拆分任务",
-  merge: "合并任务",
-  defer: "延后任务",
-  reorder: "调整顺序",
-};
+function getCopy(messages: Record<string, unknown>) {
+  const raw = (messages.components as Record<string, Record<string, unknown>> | undefined)?.conflictCard ?? {};
+  return {
+    timeRange: (raw.timeRange as string) ?? DEFAULT_COPY.timeRange,
+    suggestions: (raw.suggestions as string) ?? DEFAULT_COPY.suggestions,
+    reason: (raw.reason as string) ?? DEFAULT_COPY.reason,
+    applying: (raw.applying as string) ?? DEFAULT_COPY.applying,
+    applySuggestion: (raw.applySuggestion as string) ?? DEFAULT_COPY.applySuggestion,
+    conflictTypes: { ...DEFAULT_COPY.conflictTypes, ...(raw.conflictTypes as Record<string, string> | undefined) },
+    suggestionTypes: { ...DEFAULT_COPY.suggestionTypes, ...(raw.suggestionTypes as Record<string, string> | undefined) },
+    resolvedConflicts: (raw.resolvedConflicts as string) ?? "Resolve {count} conflicts",
+    movedTasks: (raw.movedTasks as string) ?? "Move {count} tasks",
+  };
+}
 
 export function ConflictCard({
   conflict,
@@ -33,6 +55,9 @@ export function ConflictCard({
   onApplySuggestion,
   isPending,
 }: ConflictCardProps) {
+  const { messages } = useI18n();
+  const copy = getCopy(messages as Record<string, unknown>);
+
   const severityTone =
     conflict.severity === "high"
       ? "critical"
@@ -53,7 +78,7 @@ export function ConflictCard({
               {conflict.severity.toUpperCase()}
             </StatusBadge>
             <span className="text-sm font-medium text-foreground">
-              {conflictTypeLabels[conflict.type] || conflict.type}
+              {copy.conflictTypes[conflict.type] || conflict.type}
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -64,7 +89,7 @@ export function ConflictCard({
 
       {conflict.timeRange && (
         <div className="text-xs text-muted-foreground">
-          时间范围:{" "}
+          {copy.timeRange}:{" "}
           {conflict.timeRange.start.toLocaleTimeString("zh-CN", {
             hour: "2-digit",
             minute: "2-digit",
@@ -80,7 +105,7 @@ export function ConflictCard({
       {conflictSuggestions.length > 0 && (
         <div className="space-y-2 border-t border-border pt-3">
           <div className="text-xs font-medium text-muted-foreground">
-            建议方案
+            {copy.suggestions}
           </div>
           {conflictSuggestions.map((suggestion) => (
             <div
@@ -90,13 +115,13 @@ export function ConflictCard({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <div className="text-sm font-medium text-foreground">
-                    {suggestionTypeLabels[suggestion.type] || suggestion.type}
+                    {copy.suggestionTypes[suggestion.type] || suggestion.type}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {suggestion.description}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    原因: {suggestion.reason}
+                    {copy.reason}: {suggestion.reason}
                   </p>
                 </div>
               </div>
@@ -104,9 +129,9 @@ export function ConflictCard({
               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <div className="flex gap-3">
                   <span>
-                    解决 {suggestion.estimatedImpact.resolvedConflicts} 个冲突
+                    {copy.resolvedConflicts.replace("{count}", String(suggestion.estimatedImpact.resolvedConflicts))}
                   </span>
-                  <span>移动 {suggestion.estimatedImpact.movedTasks} 个任务</span>
+                  <span>{copy.movedTasks.replace("{count}", String(suggestion.estimatedImpact.movedTasks))}</span>
                 </div>
                 {onApplySuggestion && (
                   <button
@@ -115,7 +140,7 @@ export function ConflictCard({
                     disabled={isPending}
                     className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
-                    {isPending ? "应用中..." : "应用建议"}
+                    {isPending ? copy.applying : copy.applySuggestion}
                   </button>
                 )}
               </div>

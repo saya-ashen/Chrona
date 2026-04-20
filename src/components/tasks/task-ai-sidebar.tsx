@@ -14,6 +14,33 @@ import {
 } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import { useI18n } from "@/i18n/client";
+
+function getAiSidebarCopy(raw: Record<string, string> | undefined) {
+  const s = raw ?? {};
+  return {
+    cockpitDescription: s.cockpitDescription ?? "Replace sub-tasks with the AI Task Plan graph directly.",
+    planAcceptedAndApplied: s.planAcceptedAndApplied ?? "Task plan accepted and applied; new sub-tasks created.",
+    acceptingPlan: s.acceptingPlan ?? "Accepting and applying plan…",
+    decompositionFailed: s.decompositionFailed ?? "Task decomposition failed — please try again later.",
+    noSavedFlow: s.noSavedFlow ?? "No saved flows yet",
+    savedPlanTitle: s.savedPlanTitle ?? "Current saved plan title and main flow.",
+    noPlanYet: s.noPlanYet ?? "No saved AI plan yet.",
+    fullTaskPlan: s.fullTaskPlan ?? "Full task plan",
+    aiCockpitLabel: s.aiCockpitLabel ?? "AI Task Planning Panel",
+    aiCockpitHeading: s.aiCockpitHeading ?? "Let AI produce an actionable task plan",
+    aiCockpitDescription: s.aiCockpitDescription ?? "Auto-generates on first visit; after that shows saved plans and lets you re-plan with a prompt.",
+    aiPlanningPanel: s.aiPlanningPanel ?? "AI Task Planning Panel",
+    aiPlanningDescription: s.aiPlanningDescription ?? "Auto-saves un-accepted plans; after accepting, keeps the current version and re-plans via the button.",
+    lastSaved: s.lastSaved ?? "Last saved: ",
+    version: s.version ?? "Version: ",
+    prompt: s.prompt ?? "Prompt: ",
+    planningPromptLabel: s.planningPromptLabel ?? "Planning prompt",
+    planningPromptPlaceholder: s.planningPromptPlaceholder ?? "E.g.: prioritize regulatory checks first, then schedule the timeline",
+    replan: s.replan ?? "Re-plan",
+    acceptedNoAutoRerun: s.acceptedNoAutoRerun ?? "Accepted — will not auto-rerun unless you re-plan",
+  };
+}
 
 type SavedTaskAiPlanSummary = {
   id: string;
@@ -95,8 +122,10 @@ function buildCockpitGraph(plan: SavedTaskAiPlanSummary["plan"] | undefined) {
 }
 
 function FlowSummary({ plan }: { plan: SavedTaskAiPlanSummary["plan"] | undefined }) {
+  const { messages } = useI18n();
+  const copy = getAiSidebarCopy(messages.components?.taskAiSidebar as Record<string, string> | undefined);
   if (!plan?.nodes?.length) {
-    return <p className="text-xs text-muted-foreground">暂无已保存流程</p>;
+    return <p className="text-xs text-muted-foreground">{copy.noSavedFlow}</p>;
   }
 
   const titles = plan.nodes.map((node) => node.title).filter(Boolean);
@@ -115,13 +144,15 @@ function FlowSummary({ plan }: { plan: SavedTaskAiPlanSummary["plan"] | undefine
 }
 
 function CompactPlanSummary({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
+  const { messages } = useI18n();
+  const copy = getAiSidebarCopy(messages.components?.taskAiSidebar as Record<string, string> | undefined);
   return (
     <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">AI Task Plan</p>
           <p className="mt-1 text-sm text-foreground">
-            {plan ? "当前保存的完整计划标题与主流程。" : "还没有保存的 AI 计划。"}
+            {plan ? copy.savedPlanTitle : copy.noPlanYet}
           </p>
         </div>
         {plan ? (
@@ -135,7 +166,7 @@ function CompactPlanSummary({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
       </div>
       {plan ? (
         <>
-          <p className="text-sm font-medium text-foreground">{plan.summary ?? "完整任务计划"}</p>
+          <p className="text-sm font-medium text-foreground">{plan.summary ?? copy.fullTaskPlan}</p>
           <FlowSummary plan={plan.plan} />
         </>
       ) : null}
@@ -144,6 +175,8 @@ function CompactPlanSummary({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
 }
 
 function TaskCockpitGraphSection({ plan }: { plan: SavedTaskAiPlanSummary | null }) {
+  const { messages } = useI18n();
+  const copy = getAiSidebarCopy(messages.components?.taskAiSidebar as Record<string, string> | undefined);
   const graph = buildCockpitGraph(plan?.plan);
   if (!graph) {
     return null;
@@ -154,7 +187,7 @@ function TaskCockpitGraphSection({ plan }: { plan: SavedTaskAiPlanSummary | null
       <SurfaceCardHeader>
         <SurfaceCardTitle>Task cockpit</SurfaceCardTitle>
         <SurfaceCardDescription>
-          用 AI Task Plan 里的 graph 直接替换原来的子任务区域。
+          {copy.cockpitDescription}
         </SurfaceCardDescription>
       </SurfaceCardHeader>
       <div className="px-6 pb-6">
@@ -195,6 +228,8 @@ function formatSavedAt(value: string | null | undefined) {
 }
 
 export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
+  const { messages } = useI18n();
+  const copy = getAiSidebarCopy(messages.components?.taskAiSidebar as Record<string, string> | undefined);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [activePlan, setActivePlan] = useState<SavedTaskAiPlanSummary | null>(task.savedAiPlan ?? null);
   const [planningPrompt, setPlanningPrompt] = useState(task.savedAiPlan?.prompt ?? "");
@@ -220,7 +255,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
     });
 
     if (!response.ok) {
-      let message = "任务分解应用失败，请稍后重试。";
+      let message = copy.decompositionFailed;
       try {
         const data = (await response.json()) as { error?: string };
         if (data.error) {
@@ -257,7 +292,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
     }
 
     setForceRefresh(false);
-    setFeedback("任务规划已接受并应用，新的子任务已经创建。");
+    setFeedback(copy.planAcceptedAndApplied);
   }
 
   function handlePlanLoaded(meta: SavedTaskAiPlanSummary | null) {
@@ -286,9 +321,9 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
                 AI cockpit
               </div>
               <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight">让 AI 直接产出可应用的任务计划</h2>
+                <h2 className="text-xl font-semibold tracking-tight">{copy.aiCockpitHeading}</h2>
                 <p className="text-sm leading-6 text-white/70">
-                  首次无规划时自动生成；之后优先展示已保存的规划，并允许你带提示词重新规划。
+                  {copy.aiCockpitDescription}
                 </p>
               </div>
             </div>
@@ -316,29 +351,29 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
 
       <SurfaceCard className="sticky top-6 space-y-4">
         <SurfaceCardHeader>
-          <SurfaceCardTitle>AI 任务规划面板</SurfaceCardTitle>
+          <SurfaceCardTitle>{copy.aiPlanningPanel}</SurfaceCardTitle>
           <SurfaceCardDescription>
-            自动保存未接受的规划；接受后保留当前版本，并通过重新规划按钮生成新方案。
+            {copy.aiPlanningDescription}
           </SurfaceCardDescription>
         </SurfaceCardHeader>
 
         <div className="space-y-4 px-6 pb-6">
           {activePlan ? (
             <p className="text-xs text-muted-foreground">
-              最近保存：{formatSavedAt(activePlan.updatedAt)}
-              {typeof activePlan.revision === "number" ? ` · 版本：r${activePlan.revision}` : ""}
-              {activePlan.prompt ? ` · 提示词：${activePlan.prompt}` : ""}
+              {copy.lastSaved}{formatSavedAt(activePlan.updatedAt)}
+              {typeof activePlan.revision === "number" ? ` · ${copy.version}r${activePlan.revision}` : ""}
+              {activePlan.prompt ? ` · ${copy.prompt}${activePlan.prompt}` : ""}
             </p>
           ) : null}
 
           <div className="space-y-2">
             <label className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              规划提示词
+              {copy.planningPromptLabel}
             </label>
             <textarea
               value={planningPrompt}
               onChange={(event) => setPlanningPrompt(event.target.value)}
-              placeholder="例如：优先考虑法规核查，再安排时间线；或请按我能在一天内完成的粒度拆分"
+              placeholder={copy.planningPromptPlaceholder}
               rows={3}
               className="w-full resize-none rounded-xl border border-border/70 bg-background px-3 py-2 text-sm outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
             />
@@ -352,13 +387,13 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
               >
                 <RotateCcw className="mr-1 size-4" />
-                重新规划
+                {copy.replan}
               </button>
             ) : null}
             {accepted ? (
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">
                 <Check className="mr-1 size-3.5" />
-                已接受，除非重新规划否则不会自动重跑
+                {copy.acceptedNoAutoRerun}
               </span>
             ) : null}
           </div>
@@ -383,7 +418,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
 
           {feedback ? (
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {isAccepting ? "正在确认并应用规划..." : feedback}
+              {isAccepting ? copy.acceptingPlan : feedback}
             </p>
           ) : null}
         </div>

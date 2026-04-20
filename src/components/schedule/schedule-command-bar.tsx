@@ -37,6 +37,10 @@ export function ScheduleCommandBar({
     () => getSchedulePageCopy(messages.components?.schedulePage),
     [messages.components?.schedulePage],
   );
+  const cmdBarCopy = {
+    generatingSuggestions: "Generating suggestions...",
+    ...((messages.components as unknown as Record<string, Record<string, string>> | undefined)?.scheduleCommandBar ?? {}),
+  };
   const [value, setValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,7 +208,7 @@ export function ScheduleCommandBar({
               {/* Loading placeholder when no suggestions yet */}
               {(structuredSuggestions?.length ?? 0) === 0 && aiLoading && (
                 <div className="px-3 py-3 text-center text-xs text-muted-foreground">
-                  正在生成建议...
+                  {cmdBarCopy.generatingSuggestions}
                 </div>
               )}
             </div>

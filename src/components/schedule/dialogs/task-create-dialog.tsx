@@ -6,6 +6,7 @@ import { TaskDecompositionPanel } from "@/components/schedule/task-decomposition
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
+import { useI18n } from "@/i18n/client";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 
 /* ------------------------------------------------------------------ */
@@ -53,6 +54,12 @@ export function TaskCreateDialog({
   onApplyDecomposition,
 }: TaskCreateDialogProps) {
   const [title, setTitle] = useState(initialTitle);
+  const { messages } = useI18n();
+  const dialogCopy = {
+    generatingSuggestions: "Generating suggestions...",
+    aiTaskPlanning: "AI Task Planning",
+    ...((messages.components as unknown as Record<string, Record<string, string>> | undefined)?.taskCreateDialog ?? {}),
+  };
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [startDate, setStartDate] = useState("");
@@ -156,7 +163,7 @@ export function TaskCreateDialog({
 
   return (
     <>
-      {/* Backdrop - 不模糊，只是半透明遮罩 */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/10"
         onClick={onClose}
@@ -301,7 +308,7 @@ export function TaskCreateDialog({
                 {/* Loading placeholder */}
                 {autoCompleteSuggestions.length === 0 && acLoading && (
                   <div className="px-3 py-3 text-center text-xs text-muted-foreground">
-                    正在生成建议...
+                    {dialogCopy.generatingSuggestions}
                   </div>
                 )}
               </div>
@@ -398,7 +405,7 @@ export function TaskCreateDialog({
             <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles className="size-4 text-primary" />
-                <span>AI 任务规划</span>
+                <span>{dialogCopy.aiTaskPlanning}</span>
               </div>
               <TaskDecompositionPanel
                 title={decompositionSeedTitle || title || initialTitle}

@@ -2,6 +2,7 @@
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { useI18n } from "@/i18n/client";
 import type { WorkbenchCopy } from "./work-page/work-page-types";
 
 type TaskPlanSidePanelProps = {
@@ -41,21 +42,21 @@ function formatDateTime(value: string | null | undefined, fallback: string) {
   return value ? value.slice(0, 16).replace("T", " ") : fallback;
 }
 
-function getRevisionLabel(revision: string | null) {
+function getRevisionLabel(revision: string | null, panelCopy: { revisionUpdated: string; revisionGenerated: string; revisionPlanPrefix: string }) {
   if (!revision) {
     return null;
   }
 
   if (revision === "updated") {
-    return "最近更新";
+    return panelCopy.revisionUpdated;
   }
 
   if (revision === "generated") {
-    return "初次生成";
+    return panelCopy.revisionGenerated;
   }
 
   if (/^r\d+$/i.test(revision)) {
-    return `图计划 ${revision}`;
+    return `${panelCopy.revisionPlanPrefix} ${revision}`;
   }
 
   return revision;
@@ -68,6 +69,18 @@ export function TaskPlanSidePanel({
   currentAction = null,
   currentException = null,
 }: TaskPlanSidePanelProps) {
+  const { messages } = useI18n();
+  const panelCopy = {
+    revisionUpdated: "Recently updated",
+    revisionGenerated: "Initially generated",
+    revisionPlanPrefix: "Plan",
+    mockPlanBadge: "Placeholder plan",
+    planOverallStatus: "Overall plan status",
+    sourcePrefix: "Source:",
+    currentBlocker: "Current blocker:",
+    lastUpdatedLabel: "Last updated",
+    ...((messages.components as unknown as Record<string, Record<string, string>>)?.taskPlanSidePanel ?? {}),
+  };
   return (
     <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:max-h-[calc(100vh-15rem)]">
       <div className="rounded-[24px] border border-border/80 bg-card p-4 shadow-[0_16px_36px_rgba(15,23,42,0.07)] xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
@@ -80,8 +93,8 @@ export function TaskPlanSidePanel({
           </div>
           {plan.state === "ready" ? (
             <div className="flex flex-wrap gap-2">
-              {plan.revision ? <StatusBadge tone="info">{getRevisionLabel(plan.revision)}</StatusBadge> : null}
-              {plan.isMock ? <StatusBadge tone="warning">占位计划</StatusBadge> : null}
+              {plan.revision ? <StatusBadge tone="info">{getRevisionLabel(plan.revision, panelCopy)}</StatusBadge> : null}
+              {plan.isMock ? <StatusBadge tone="warning">{panelCopy.mockPlanBadge}</StatusBadge> : null}
             </div>
           ) : null}
         </div>
@@ -95,8 +108,8 @@ export function TaskPlanSidePanel({
           <div className="mt-4 space-y-3 text-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
             <div className="rounded-[20px] border border-border/70 bg-muted/[0.24] p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone="info">计划整体状态</StatusBadge>
-                {plan.generatedBy ? <span className="text-xs text-muted-foreground">来源：{plan.generatedBy}</span> : null}
+                <StatusBadge tone="info">{panelCopy.planOverallStatus}</StatusBadge>
+                {plan.generatedBy ? <span className="text-xs text-muted-foreground">{panelCopy.sourcePrefix}{plan.generatedBy}</span> : null}
               </div>
               {plan.summary ? <p className="mt-3 text-muted-foreground">{plan.summary}</p> : null}
               {plan.changeSummary ? <p className="mt-3 text-xs text-muted-foreground">{plan.changeSummary}</p> : null}
@@ -104,7 +117,7 @@ export function TaskPlanSidePanel({
             </div>
 
             {currentException ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">当前阻塞：{currentException}</p>
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{panelCopy.currentBlocker}{currentException}</p>
             ) : null}
             {currentAction ? (
               <div className="flex flex-wrap gap-2">

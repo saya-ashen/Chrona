@@ -338,7 +338,7 @@ export function SelectedBlockSheet({
                     className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
                   >
                     <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                      Task Plan
+                      {copy.taskPlanLabel}
                     </p>
                     <div className="space-y-1.5">
                       {decomposition.result.planGraph.nodes.map((node) => (
@@ -365,7 +365,7 @@ export function SelectedBlockSheet({
                   </SurfaceCard>
                 ) : decomposition.isLoading ? (
                   <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
-                    Loading task plan…
+                    {copy.loadingTaskPlan}
                   </div>
                 ) : null}
 

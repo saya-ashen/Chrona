@@ -16,6 +16,8 @@ import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@/modules/ai/types";
 import { useSmartAutomation, useSmartDecomposition } from "@/hooks/use-ai";
 
+import { useI18n } from "@/i18n/client";
+
 export interface TaskDecompositionPanelProps {
   taskId?: string;
   title: string;
@@ -69,6 +71,17 @@ function summarizePlanGraph(graph: TaskPlanGraphData | null) {
   };
 }
 
+const DEFAULT_DECOMP_COPY = {
+  aiTaskPlanning: "AI Task Planning",
+  aiPlanning: "AI is planning task...",
+  applyPlan: "Apply Plan",
+};
+
+function getDecompCopy(messages: Record<string, unknown>) {
+  const raw = (messages.components as Record<string, Record<string, string>> | undefined)?.taskDecompositionPanel ?? {};
+  return { ...DEFAULT_DECOMP_COPY, ...raw };
+}
+
 export function TaskDecompositionPanel({
   taskId,
   title,
@@ -83,6 +96,8 @@ export function TaskDecompositionPanel({
   onPlanLoaded,
 }: TaskDecompositionPanelProps) {
   const [requested, setRequested] = useState(autoRequest);
+  const { messages } = useI18n();
+  const decompCopy = getDecompCopy(messages as Record<string, unknown>);
 
   const decompositionInput = requested
     ? {
@@ -177,7 +192,7 @@ export function TaskDecompositionPanel({
         className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
       >
         <Scissors className="size-4" />
-        <span>AI 任务规划</span>
+        <span>{decompCopy.aiTaskPlanning}</span>
         <Sparkles className="ml-auto size-3" />
       </button>
     );
@@ -188,7 +203,7 @@ export function TaskDecompositionPanel({
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2 text-sm text-primary">
           <Bot className="size-4 animate-pulse" />
-          <span className="font-medium">AI 正在规划任务...</span>
+          <span className="font-medium">{decompCopy.aiPlanning}</span>
         </div>
         <div className="mt-3 space-y-2">
           <div className="h-3 animate-pulse rounded bg-primary/10" />

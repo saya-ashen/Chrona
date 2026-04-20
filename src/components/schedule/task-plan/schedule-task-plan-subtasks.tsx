@@ -7,6 +7,8 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useLocale } from "@/i18n/client";
+import { useI18n } from "@/i18n/client";
+import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { getPriorityTone } from "@/components/schedule/schedule-page-utils";
 import { cn } from "@/lib/utils";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
@@ -92,6 +94,8 @@ export function ScheduleTaskPlanSubtasks({
   const [loading, setLoading] = useState(true);
   const [pendingSubtaskId, setPendingSubtaskId] = useState<string | null>(null);
   const locale = useLocale();
+  const { messages } = useI18n();
+  const copy = getSchedulePageCopy(messages.components?.schedulePage);
 
   const fetchSubtasks = useCallback(async () => {
     setLoading(true);
@@ -134,7 +138,7 @@ export function ScheduleTaskPlanSubtasks({
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             <ListTree className="size-3" />
-            <span>子任务 ({subtasks.length})</span>
+            <span>{copy.subtasksLabel} ({subtasks.length})</span>
           </div>
           <div className="space-y-1">
             {subtasks.map((sub) => (
@@ -200,8 +204,8 @@ export function ScheduleTaskPlanSubtasks({
                     {pendingSubtaskId === sub.id
                       ? "..."
                       : sub.isCompleted
-                        ? "Reopen"
-                        : "Mark done"}
+                        ? copy.subtaskReopen
+                        : copy.subtaskMarkDone}
                   </button>
                 </div>
               </div>
