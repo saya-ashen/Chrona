@@ -1,7 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { startRun } from "@/modules/commands/start-run";
-import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
+import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
 
 export async function retryRun(input: {
   taskId: string;

@@ -1,11 +1,11 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { createRuntimeExecutionAdapter } from "@/modules/runtime/execution-registry";
-import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
-import { syncRunFromRuntime } from "@/modules/runtime/openclaw/sync-run";
-import { resolveTaskSessionKey } from "@/modules/runtime/task-sessions";
-import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
+import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
+import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
+import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
+import { resolveTaskSessionKey } from "@/modules/task-execution/task-sessions";
+import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
 
 const MESSAGEABLE_RUN_STATUSES: ReadonlySet<RunStatus> = new Set([
   RunStatus.Running,

@@ -1,6 +1,6 @@
-import { readMissingRequiredPaths, readRequiredFieldLabel } from "@/modules/runtime/config-spec";
-import { getRuntimeTaskConfigSpec } from "@/modules/runtime/registry";
-import { resolveTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import { readMissingRequiredPaths, readRequiredFieldLabel } from "@/modules/task-execution/config-spec";
+import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { resolveTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 
 type DeriveTaskRunnabilityInput = {
   runtimeAdapterKey?: string | null;

@@ -2,8 +2,8 @@ import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/runtime/registry";
-import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
+import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
 

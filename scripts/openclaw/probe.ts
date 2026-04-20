@@ -1,47 +1,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { OpenClawGatewayClient } from "../../src/modules/runtime/openclaw/client";
-import { loadOpenClawPersistedDeviceIdentity } from "../../src/modules/runtime/openclaw/device-identity";
-import { evaluateOpenClawGate } from "../../src/modules/runtime/openclaw/evaluate-gate";
+import { OpenClawBridgeClient } from "../../src/modules/openclaw/bridge-client";
+import { evaluateOpenClawGate } from "../../src/modules/openclaw/evaluate-gate";
 import {
   collectOpenClawGateChecks,
   renderOpenClawGateMarkdown,
-} from "../../src/modules/runtime/openclaw/probe";
-
-function readGatewayUrl() {
-  return process.env.OPENCLAW_GATEWAY_URL ?? process.env.OPENCLAW_BASE_URL;
-}
-
-function readAuth(deviceToken?: string) {
-  const token = process.env.OPENCLAW_AUTH_TOKEN ?? process.env.OPENCLAW_API_KEY;
-  const password = process.env.OPENCLAW_AUTH_PASSWORD;
-
-   if (deviceToken) {
-    return { deviceToken };
-  }
-
-  if (!token && !password) {
-    throw new Error(
-      "OPENCLAW_AUTH_TOKEN (or legacy OPENCLAW_API_KEY) / OPENCLAW_AUTH_PASSWORD is required",
-    );
-  }
-
-  return { token, password };
-}
+} from "../../src/modules/openclaw/probe";
 
 async function main() {
-  const gatewayUrl = readGatewayUrl();
-  if (!gatewayUrl) {
-    throw new Error("OPENCLAW_GATEWAY_URL (or legacy OPENCLAW_BASE_URL) is required");
-  }
-
-  const deviceIdentity = await loadOpenClawPersistedDeviceIdentity({
-    identityDir: process.env.OPENCLAW_IDENTITY_DIR,
-  });
-
-  const client = new OpenClawGatewayClient({
-    gatewayUrl,
-    auth: readAuth(deviceIdentity?.deviceToken),
-    deviceIdentity,
+  const client = new OpenClawBridgeClient({
+    baseUrl: process.env.OPENCLAW_BRIDGE_URL,
+    timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
   });
 
   try {
@@ -59,7 +27,7 @@ async function main() {
       process.exit(1);
     }
   } finally {
-    client.close(1000, "probe-complete");
+    client.close();
   }
 }
 

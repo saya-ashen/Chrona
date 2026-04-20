@@ -72,8 +72,8 @@ AgentDashboard uses a CQRS/Event Sourcing architecture:
 
 1. Create adapter directory in `src/modules/runtime/<name>/`
 2. Implement `RuntimeAdapterDefinition` and `RuntimeExecutionAdapter` interfaces
-3. Register in `src/modules/runtime/execution-registry.ts`
-4. Add config spec in `config.ts`
+3. Register in `src/modules/task-execution/execution-registry.ts`
+4. Add config spec in the relevant execution module
 5. Add tests in `__tests__/`
 
 ## Testing

@@ -19,7 +19,7 @@ import { retryRun as retryRunCommand } from "@/modules/commands/retry-run";
 import { sendOperatorMessage as sendOperatorMessageCommand } from "@/modules/commands/send-operator-message";
 import { startRun as startRunCommand } from "@/modules/commands/start-run";
 import { updateTask as updateTaskCommand } from "@/modules/commands/update-task";
-import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeAdapter } from "@/modules/openclaw/adapter";
 
 function revalidateWorkspaceTaskPaths(workspaceId: string, taskId: string) {
   revalidateAppPaths([

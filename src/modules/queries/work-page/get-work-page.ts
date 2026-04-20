@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { syncTaskRunForRead } from "@/modules/runtime/openclaw/freshness";
+import { syncTaskRunForRead } from "@/modules/openclaw/freshness";
 import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";

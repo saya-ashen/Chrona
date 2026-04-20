@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:openclaw:integration": "OPENCLAW_INTEGRATION_TESTS=1 vitest run src/modules/runtime/openclaw/__tests__/client.integration.test.ts",
+    "test:openclaw:integration": "OPENCLAW_INTEGRATION_TESTS=1 vitest run src/modules/openclaw/__tests__/client.integration.test.ts",
     "test:e2e": "playwright test",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",

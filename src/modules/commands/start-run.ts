@@ -2,13 +2,13 @@ import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { createRuntimeExecutionAdapter } from "@/modules/runtime/execution-registry";
-import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
+import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import {
   ensureDefaultTaskSession,
   updateTaskSessionStateFromRun,
-} from "@/modules/runtime/task-sessions";
-import type { RuntimeExecutionAdapter } from "@/modules/runtime/types";
+} from "@/modules/task-execution/task-sessions";
+import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 export async function startRun(input: {

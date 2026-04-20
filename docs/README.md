@@ -29,7 +29,7 @@ AgentDashboard 是一个基于事件溯源（Event Sourcing）和 CQRS 架构的
 | 验证 | Zod 4 |
 | CLI | Commander + chalk |
 | 测试 | Vitest 4 (组件) + Bun Test (查询) + Playwright (E2E) |
-| AI 运行时 | OpenClaw Gateway (WebSocket) |
+| AI 运行时 | OpenClaw CLI Bridge (HTTP) |
 | 国际化 | 自建 i18n (支持中英文) |
 
 ## 核心概念

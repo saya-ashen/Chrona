@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { SYNC_STALE_MS } from "@/modules/runtime/openclaw/freshness";
+import { SYNC_STALE_MS } from "@/modules/openclaw/freshness";
 import { deriveScheduleState } from "@/modules/tasks/derive-schedule-state";
 import { deriveTaskState } from "@/modules/tasks/derive-task-state";
 

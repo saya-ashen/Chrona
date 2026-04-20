@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { startRun } from "@/modules/commands/start-run";
-import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeAdapter } from "@/modules/openclaw/adapter";
 
 /**
  * POST /api/tasks/[taskId]/run — Start a new AI agent run for a task.

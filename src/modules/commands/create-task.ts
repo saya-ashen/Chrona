@@ -2,8 +2,8 @@ import { OwnerType, Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { ensureDefaultTaskSession } from "@/modules/runtime/task-sessions";
-import { validateTaskRuntimeConfig } from "@/modules/runtime/task-config";
+import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
+import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 function normalizeOptionalTextField(value: string | null | undefined, field: string) {

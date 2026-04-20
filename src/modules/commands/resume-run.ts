@@ -1,15 +1,15 @@
 import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { syncRunFromRuntime } from "@/modules/runtime/openclaw/sync-run";
+import { syncRunFromRuntime } from "@/modules/openclaw/sync-run";
 import {
   createRuntimeAdapter,
   type OpenClawAdapter,
-} from "@/modules/runtime/openclaw/adapter";
+} from "@/modules/openclaw/adapter";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
-} from "@/modules/runtime/task-sessions";
+} from "@/modules/task-execution/task-sessions";
 
 export async function resumeRun(input: {
   runId: string;

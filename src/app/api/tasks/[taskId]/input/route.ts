@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { provideInput } from "@/modules/commands/provide-input";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/openclaw/adapter";
 
 /**
  * POST /api/tasks/[taskId]/input — Provide input to a waiting agent.

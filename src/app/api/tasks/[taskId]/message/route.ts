@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendOperatorMessage } from "@/modules/commands/send-operator-message";
-import { createRuntimeAdapter } from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeAdapter } from "@/modules/openclaw/adapter";
 
 /**
  * POST /api/tasks/[taskId]/message — Send an operator message to the running agent.

@@ -1,6 +1,6 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime/openclaw/freshness";
+import { syncStaleWorkspaceRunsForRead } from "@/modules/openclaw/freshness";
 
 export async function getInbox(workspaceId: string) {
   await syncStaleWorkspaceRunsForRead(workspaceId);
