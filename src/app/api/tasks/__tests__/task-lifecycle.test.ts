@@ -19,8 +19,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createStatefulMockAdapter,
   type StatefulMockAdapter,
-} from "@/modules/runtime/openclaw/mock-adapter";
-import type { OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+} from "@/modules/openclaw/mock-adapter";
+import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
 
 // ---------------------------------------------------------------------------
 // Helpers

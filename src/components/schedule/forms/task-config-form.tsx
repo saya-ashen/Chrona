@@ -11,8 +11,8 @@ import {
   getValueAtPath,
   setValueAtPath,
   validateTaskConfigAgainstSpec,
-} from "@/modules/runtime/config-spec";
-import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@/modules/runtime/types";
+} from "@/modules/task-execution/config-spec";
+import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@/modules/task-execution/types";
 
 export type TaskConfigFormInput = {
   title: string;

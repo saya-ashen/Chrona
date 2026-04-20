@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,29 +15,56 @@ type ControlPlaneShellProps = {
 
 export function ControlPlaneShell({ children }: ControlPlaneShellProps) {
   const { t } = useI18n();
+  const pathname = usePathname() ?? "/schedule";
 
   return (
-    <div className="flex h-screen flex-col bg-[linear-gradient(180deg,rgba(15,23,42,0.03),transparent_22%),linear-gradient(135deg,rgba(59,130,246,0.05),transparent_35%),linear-gradient(225deg,rgba(168,85,247,0.04),transparent_30%)] bg-background text-foreground">
-      <header className="border-b border-border/60 bg-background/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-6 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-4">
-            <LocalizedLink href="/schedule" aria-label={t("nav.brandTitle")} className="space-y-0.5">
-              <span className="block text-base font-semibold tracking-tight">{t("nav.brandTitle")}</span>
-              <span className="block text-xs text-muted-foreground">{t("nav.brandTagline")}</span>
+    <div className="flex h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_26%),linear-gradient(180deg,rgba(15,23,42,0.02),transparent_18%)] bg-background text-foreground">
+      <header className="border-b border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/70 supports-[backdrop-filter]:backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <LocalizedLink
+              href="/schedule"
+              aria-label={t("nav.brandTitle")}
+              className="group flex min-w-0 items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm transition-colors hover:border-primary/30 hover:bg-background"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 via-blue-500/15 to-violet-500/20 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/15">
+                AD
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold tracking-tight text-foreground">{t("nav.brandTitle")}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{t("nav.brandTagline")}</span>
+              </span>
             </LocalizedLink>
-            <LocaleSwitcher />
+            <div className="hidden lg:block">
+              <LocaleSwitcher />
+            </div>
           </div>
-          <nav aria-label="Primary" className="flex flex-wrap items-center gap-1.5 text-sm">
-            {NAV_ITEMS.map((item) => (
-              <LocalizedLink
-                key={item.href}
-                href={item.href}
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
-              >
-                {t(item.labelKey)}
-              </LocalizedLink>
-            ))}
-          </nav>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <nav aria-label="Primary" className="flex flex-wrap items-center gap-1 rounded-2xl border border-border/50 bg-background/65 p-1 shadow-sm">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+                return (
+                  <LocalizedLink
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }),
+                      "h-9 rounded-xl px-3 text-sm",
+                      isActive ? "bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t(item.labelKey)}
+                  </LocalizedLink>
+                );
+              })}
+            </nav>
+            <div className="lg:hidden">
+              <LocaleSwitcher />
+            </div>
+          </div>
         </div>
       </header>
       <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col px-4 py-4 sm:px-6 xl:overflow-hidden">

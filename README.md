@@ -76,7 +76,7 @@ AgentDashboard uses **CQRS (Command Query Responsibility Segregation)** and **Ev
 - **Queries** — Pure reads from optimized projections
 - **Projections** — Listen to events, maintain read-optimized models
 - **Events** — Immutable domain events as the single source of truth
-- **Runtime Adapter** — Abstracts AI runtime interaction; supports `bridge` (CLI), `live` (WebSocket gateway), and `mock` modes
+- **Runtime Adapter** — Abstracts AI runtime interaction; supports `bridge` (CLI) and `mock` modes
 
 ---
 
@@ -181,18 +181,15 @@ AgentDashboard/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | SQLite database path | `file:./prisma/dev.db` |
-| `OPENCLAW_MODE` | Runtime mode: `bridge`, `live`, or `mock` | `live` |
-| `OPENCLAW_BRIDGE_URL` | CLI Bridge HTTP URL (when mode=bridge) | `http://localhost:7677` |
-| `OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL (when mode=live) | `ws://localhost:3001/gateway` |
-| `OPENCLAW_AUTH_TOKEN` | Gateway auth token | — |
+| `OPENCLAW_MODE` | Runtime mode: `bridge` or `mock` | `bridge` |
+| `OPENCLAW_BRIDGE_URL` | CLI Bridge HTTP URL | `http://localhost:7677` |
 | `OPENCLAW_TIMEOUT` | CLI execution timeout (seconds) | `300` |
 | `AI_PROVIDER_*` | AI provider config (API keys, model names) | — |
 | `NEXT_PUBLIC_WORK_POLL_INTERVAL_MS` | Work page poll interval (ms) | `10000` |
 
 ### OpenClaw Modes
 
-- **`bridge`** (recommended) — Uses the CLI Bridge HTTP server wrapping `openclaw agent --local --json`. Simpler, no WebSocket required.
-- **`live`** — Connects to an OpenClaw gateway via WebSocket. Full feature support including interactive approvals.
+- **`bridge`** (recommended) — Uses the CLI Bridge HTTP server wrapping `openclaw agent --local --json`.
 - **`mock`** — In-memory mock adapter for development and testing. No external dependencies.
 
 ---
@@ -220,7 +217,7 @@ bun run agentdash task list         # List tasks
 bun run agentdash schedule today    # Today's schedule
 
 # OpenClaw Bridge
-bun run src/services/openclaw-bridge/server.ts  # Start CLI Bridge
+bun run services/openclaw-bridge/server.ts  # Start CLI Bridge
 ```
 
 ---

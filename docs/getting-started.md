@@ -37,9 +37,10 @@ bunx prisma db seed
 # 数据库（默认使用 SQLite）
 DATABASE_URL="file:./dev.db"
 
-# OpenClaw Gateway（AI 智能体运行时）
-OPENCLAW_GATEWAY_URL="ws://localhost:8080"
-OPENCLAW_API_KEY="your-api-key"
+# OpenClaw CLI Bridge（AI 智能体运行时）
+OPENCLAW_MODE="bridge"
+OPENCLAW_BRIDGE_URL="http://localhost:7677"
+OPENCLAW_TIMEOUT="300"
 
 # LLM 服务（可选，用于 AI 增强功能）
 OPENAI_API_KEY="sk-..."

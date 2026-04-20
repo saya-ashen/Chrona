@@ -313,7 +313,7 @@ POST /api/ai/auto-complete
 }
 ```
 
-**优先级链：** OpenClaw Gateway → 直接 LLM → 中文关键词规则引擎
+**优先级链：** OpenClaw CLI Bridge → 直接 LLM → 中文关键词规则引擎
 
 ### 自动化建议
 

@@ -1,19 +1,22 @@
 import { ControlPlaneShell } from "@/components/control-plane-shell";
+import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
+import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { resolveLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/get-dictionary";
+import { getWorkspaces } from "@/modules/queries/get-workspaces";
 
-export default async function SettingsPage(props: { params?: Promise<{ lang?: string }> }) {
+export default async function SettingsPage(props: {
+  params?: Promise<{ lang?: string }>;
+  searchParams?: Promise<{ panel?: string }>;
+}) {
   const locale = resolveLocale((await props.params)?.lang);
-  const t = (await getDictionary(locale)).pages.settings;
-  const settings = {
-    runtimeMode: process.env.OPENCLAW_MODE ?? "live",
-    gatewayUrl:
-      process.env.OPENCLAW_GATEWAY_URL ??
-      process.env.OPENCLAW_BASE_URL ??
-      "ws://localhost:3001/gateway",
-    pollIntervalMs: process.env.NEXT_PUBLIC_WORK_POLL_INTERVAL_MS ?? "10000",
-  };
+  const dictionary = await getDictionary(locale);
+  const t = dictionary.pages.settings;
+  const searchParams = props.searchParams ? await props.searchParams : undefined;
+  const showAiClientsDialog = searchParams?.panel === "ai-clients";
+  const showAdvancedDialog = searchParams?.panel === "advanced";
+  const workspaces = await getWorkspaces();
 
   return (
     <ControlPlaneShell>
@@ -22,20 +25,6 @@ export default async function SettingsPage(props: { params?: Promise<{ lang?: st
           <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
           <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
-        <dl className="space-y-3 text-sm text-muted-foreground">
-          <div className="flex items-center justify-between gap-4">
-            <dt>{t.runtimeMode}</dt>
-            <dd>{settings.runtimeMode}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt>{t.gatewayUrl}</dt>
-            <dd className="max-w-[32rem] break-all text-right">{settings.gatewayUrl}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt>{t.workPollInterval}</dt>
-            <dd>{settings.pollIntervalMs}ms</dd>
-          </div>
-        </dl>
         <div className="rounded-xl border bg-muted/30 p-4">
           <div className="space-y-1">
             <h2 className="text-sm font-medium text-foreground">AI Clients</h2>
@@ -43,7 +32,7 @@ export default async function SettingsPage(props: { params?: Promise<{ lang?: st
           </div>
           <div className="mt-3">
             <LocalizedLink
-              href="/settings/ai-clients"
+              href="/settings?panel=ai-clients"
               className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
             >
               {t.manageAiClients}
@@ -57,7 +46,7 @@ export default async function SettingsPage(props: { params?: Promise<{ lang?: st
           </div>
           <div className="mt-3">
             <LocalizedLink
-              href="/settings/advanced"
+              href="/settings?panel=advanced"
               className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
             >
               {t.openAdvancedSettings}
@@ -65,6 +54,8 @@ export default async function SettingsPage(props: { params?: Promise<{ lang?: st
           </div>
         </div>
       </div>
+      <AiClientsDialog isOpen={showAiClientsDialog} closeHref={`/${locale}/settings`} />
+      <AdvancedSettingsDialog isOpen={showAdvancedDialog} closeHref={`/${locale}/settings`} workspaces={workspaces} />
     </ControlPlaneShell>
   );
 }

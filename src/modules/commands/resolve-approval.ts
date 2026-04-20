@@ -3,11 +3,11 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resumeRun } from "@/modules/commands/resume-run";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/runtime/openclaw/adapter";
+import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/openclaw/adapter";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
-} from "@/modules/runtime/task-sessions";
+} from "@/modules/task-execution/task-sessions";
 
 async function markApprovalResolved(input: {
   approval: {
