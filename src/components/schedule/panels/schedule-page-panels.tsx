@@ -4,12 +4,11 @@ import {
   Calendar,
   ChevronDown,
   GripVertical,
-  Sparkles,
 } from "lucide-react";
 import { type DragEvent, useState } from "react";
-import { AiInsightsPanel } from "@/components/schedule/ai-insights-panel";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
 import type { ScheduleSlot } from "@/modules/ai/types";
+import { useSmartDecomposition } from "@/hooks/use-ai";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
@@ -49,7 +48,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { TaskContextLinks } from "@/components/ui/task-context-links";
-import { markTaskDone, reopenTask } from "@/app/actions/task-actions";
+
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
@@ -216,7 +215,13 @@ export function SelectedBlockSheet({
   const locale = useLocale();
   const { messages, t } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
-  const [subtasksRefreshKey, setSubtasksRefreshKey] = useState(0);
+  const decomposition = useSmartDecomposition({
+    taskId: item.taskId,
+    title: item.title,
+    description: item.description ?? undefined,
+    priority: item.priority,
+    dueAt: item.dueAt,
+  });
 
   return (
     <>
@@ -324,6 +329,46 @@ export function SelectedBlockSheet({
                   ]}
                 />
 
+                {/* Task Plan Graph — compact node list */}
+                {decomposition.result?.planGraph?.nodes?.length ? (
+                  <SurfaceCard
+                    as="div"
+                    variant="inset"
+                    padding="sm"
+                    className="rounded-[1.5rem] border-border/70 bg-background shadow-sm"
+                  >
+                    <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      Task Plan
+                    </p>
+                    <div className="space-y-1.5">
+                      {decomposition.result.planGraph.nodes.map((node) => (
+                        <div
+                          key={node.id}
+                          className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm"
+                        >
+                          <span
+                            className={cn(
+                              "size-2 shrink-0 rounded-full",
+                              node.status === "done"
+                                ? "bg-green-500"
+                                : node.status === "in_progress"
+                                  ? "bg-blue-500"
+                                  : "bg-muted-foreground/40",
+                            )}
+                          />
+                          <span className="truncate text-foreground">
+                            {node.title}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </SurfaceCard>
+                ) : decomposition.isLoading ? (
+                  <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                    Loading task plan…
+                  </div>
+                ) : null}
+
                 <SurfaceCard
                   as="div"
                   variant="inset"
@@ -345,12 +390,6 @@ export function SelectedBlockSheet({
                     }
                   />
                 </SurfaceCard>
-
-                <SubtasksList
-                  parentTaskId={item.taskId}
-                  workspaceId={item.workspaceId}
-                  refreshKey={subtasksRefreshKey}
-                />
               </div>
             </div>
 
@@ -359,42 +398,6 @@ export function SelectedBlockSheet({
               className="min-h-0 overflow-y-auto bg-muted/10 px-5 py-5 md:px-5"
             >
               <div className="space-y-4 pb-6">
-                <SurfaceCard className="border-border/70 bg-background shadow-sm">
-                  <div className="space-y-3 p-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-foreground/80">
-                      <Sparkles className="size-3.5 text-primary" />
-                      {copy.aiSidebarTitle}
-                    </div>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {copy.aiSidebarDescription}
-                    </p>
-                  </div>
-                </SurfaceCard>
-
-                <AiInsightsPanel
-                  item={item}
-                  onApplyDecomposition={async (result) => {
-                    try {
-                      const res = await fetch("/api/ai/batch-decompose", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          taskId: item.taskId,
-                          replaceExisting: true,
-                        }),
-                      });
-                      if (!res.ok) throw new Error("Batch decompose failed");
-                      setSubtasksRefreshKey((k) => k + 1);
-                      await onMutatedAction();
-                    } catch (err) {
-                      console.error(
-                        "[TaskDecomposition] Failed to apply:",
-                        err,
-                      );
-                    }
-                  }}
-                />
-
                 <TaskContextLinks
                   workspaceId={item.workspaceId}
                   taskId={item.taskId}
@@ -788,152 +791,5 @@ export function RiskCard({ item }: { item: ScheduledItem }) {
   );
 }
 
-type SubtaskData = {
-  id: string;
-  parentTaskId: string | null;
-  title: string;
-  description: string | null;
-  priority: string;
-  status: string;
-  persistedStatus: string | null;
-  scheduleStatus: string | null;
-  dueAt: string | Date | null;
-  scheduledStartAt: string | Date | null;
-  scheduledEndAt: string | Date | null;
-  completedAt: string | Date | null;
-  isCompleted: boolean;
-};
 
-function formatSubtaskWindow(
-  locale: string,
-  value: string | Date | null | undefined,
-) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
 
-function SubtasksList({
-  parentTaskId,
-  workspaceId,
-  refreshKey,
-}: {
-  parentTaskId: string;
-  workspaceId: string;
-  refreshKey?: number;
-}) {
-  const [subtasks, setSubtasks] = useState<SubtaskData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pendingSubtaskId, setPendingSubtaskId] = useState<string | null>(null);
-  const locale = useLocale();
-
-  const fetchSubtasks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
-      if (!res.ok) {
-        setSubtasks([]);
-        return;
-      }
-      const data = await res.json();
-      setSubtasks(
-        Array.isArray(data) ? data : (data.subtasks ?? data.tasks ?? []),
-      );
-    } catch {
-      setSubtasks([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [parentTaskId]);
-
-  useEffect(() => {
-    void fetchSubtasks();
-  }, [fetchSubtasks, refreshKey]);
-
-  if (loading) return null;
-  if (subtasks.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        <ListTree className="size-3" />
-        <span>子任务 131231231 ({subtasks.length})</span>
-      </div>
-      <div className="space-y-1">
-        {subtasks.map((sub) => (
-          <div
-            key={sub.id}
-            className="rounded-lg border border-border/40 bg-background/60 px-3 py-2"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <LocalizedLink
-                href={`/workspaces/${workspaceId}/work/${sub.id}`}
-                className="min-w-0 flex-1 space-y-1 transition hover:text-primary"
-              >
-                <div className="truncate font-medium text-foreground">
-                  {sub.title}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <StatusBadge tone={getPriorityTone(sub.priority)}>
-                    {sub.priority}
-                  </StatusBadge>
-                  {sub.persistedStatus ? (
-                    <StatusBadge>{sub.persistedStatus}</StatusBadge>
-                  ) : null}
-                  {sub.scheduleStatus ? (
-                    <StatusBadge>{sub.scheduleStatus}</StatusBadge>
-                  ) : null}
-                  {sub.isCompleted ? (
-                    <StatusBadge tone="success">Done</StatusBadge>
-                  ) : null}
-                  {sub.scheduledStartAt ? (
-                    <span>
-                      {formatSubtaskWindow(locale, sub.scheduledStartAt)}
-                      {sub.scheduledEndAt
-                        ? ` → ${formatSubtaskWindow(locale, sub.scheduledEndAt)}`
-                        : ""}
-                    </span>
-                  ) : sub.dueAt ? (
-                    <span>Due {formatSubtaskWindow(locale, sub.dueAt)}</span>
-                  ) : null}
-                </div>
-              </LocalizedLink>
-              <button
-                type="button"
-                disabled={pendingSubtaskId === sub.id}
-                onClick={() => {
-                  void (async () => {
-                    try {
-                      setPendingSubtaskId(sub.id);
-                      if (sub.isCompleted) {
-                        await reopenTask({ taskId: sub.id });
-                      } else {
-                        await markTaskDone({ taskId: sub.id });
-                      }
-                      await fetchSubtasks();
-                    } finally {
-                      setPendingSubtaskId(null);
-                    }
-                  })();
-                }}
-                className="shrink-0 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-50"
-              >
-                {pendingSubtaskId === sub.id
-                  ? "..."
-                  : sub.isCompleted
-                    ? "Reopen"
-                    : "Mark done"}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
