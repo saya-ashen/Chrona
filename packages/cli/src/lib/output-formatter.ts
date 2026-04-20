@@ -1,5 +1,5 @@
 /**
- * Output formatting utilities for the AgentDashboard CLI.
+ * Output formatting utilities for the Chrona CLI.
  * Supports JSON and table output modes using chalk and cli-table3.
  *
  * Default output is JSON (optimized for AI-agent consumption).

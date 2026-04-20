@@ -1,9 +1,10 @@
 {
-  "name": "@agent-dashboard/cli",
+  "name": "@chrona/cli",
   "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
+    "chrona": "./src/index.ts",
     "agentdash": "./src/index.ts"
   },
   "dependencies": {

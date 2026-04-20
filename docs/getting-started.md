@@ -13,8 +13,8 @@
 
 ```bash
 # 克隆仓库
-git clone <repo-url> AgentDashboard
-cd AgentDashboard
+git clone <repo-url> Chrona
+cd Chrona
 
 # 安装依赖
 bun install
@@ -163,7 +163,7 @@ bunx vitest run src/components/schedule/schedule-command-bar.test.tsx
 ## 项目结构速览
 
 ```
-AgentDashboard/
+Chrona/
 ├── docs/               # 本文档
 ├── prisma/
 │   ├── schema.prisma   # 数据库模型定义

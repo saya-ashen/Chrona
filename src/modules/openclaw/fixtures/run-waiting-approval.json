@@ -34,7 +34,7 @@
         "toolCallId": "tool_read_1",
         "toolName": "read",
         "content": [
-          { "type": "text", "text": "{\"name\":\"agent-dashboard\"}" }
+          { "type": "text", "text": "{\"name\":\"chrona\"}" }
         ],
         "isError": false,
         "timestamp": 1737264002000,

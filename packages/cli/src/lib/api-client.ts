@@ -1,5 +1,5 @@
 /**
- * HTTP API client for AgentDashboard backend.
+ * HTTP API client for Chrona backend.
  * Uses native fetch to communicate with the Next.js API routes.
  * Covers ALL backend endpoints for comprehensive CLI access.
  */

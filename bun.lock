@@ -50,10 +50,10 @@
       },
     },
     "packages/cli": {
-      "name": "@agent-dashboard/cli",
+      "name": "@chrona/cli",
       "version": "0.2.0",
       "bin": {
-        "agentdash": "./src/index.ts",
+        "chrona": "./src/index.ts",
       },
       "dependencies": {
         "chalk": "^5.6.2",
@@ -62,14 +62,14 @@
       },
     },
     "packages/openclaw-bridge": {
-      "name": "@agent-dashboard/openclaw-bridge",
+      "name": "@chrona/openclaw-bridge",
       "version": "0.1.0",
       "dependencies": {
-        "@agent-dashboard/runtime-client": "workspace:*",
+        "@chrona/runtime-client": "workspace:*",
       },
     },
     "packages/runtime-client": {
-      "name": "@agent-dashboard/runtime-client",
+      "name": "@chrona/runtime-client",
       "version": "0.1.0",
     },
   },
@@ -83,12 +83,6 @@
   ],
   "packages": {
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],
-
-    "@agent-dashboard/cli": ["@agent-dashboard/cli@workspace:packages/cli"],
-
-    "@agent-dashboard/openclaw-bridge": ["@agent-dashboard/openclaw-bridge@workspace:packages/openclaw-bridge"],
-
-    "@agent-dashboard/runtime-client": ["@agent-dashboard/runtime-client@workspace:packages/runtime-client"],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
@@ -163,6 +157,12 @@
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
+
+    "@chrona/cli": ["@chrona/cli@workspace:packages/cli"],
+
+    "@chrona/openclaw-bridge": ["@chrona/openclaw-bridge@workspace:packages/openclaw-bridge"],
+
+    "@chrona/runtime-client": ["@chrona/runtime-client@workspace:packages/runtime-client"],
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
 

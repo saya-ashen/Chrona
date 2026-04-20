@@ -9,7 +9,7 @@ import { metadata } from "@/app/layout";
 
 describe("RootLayout metadata", () => {
   it("describes the task-centric control plane product", () => {
-    expect(metadata.title).toBe("Agent Dashboard");
+    expect(metadata.title).toBe("Chrona");
     expect(metadata.description).toBe(
       "Task-centric AI control plane for human and runtime collaboration.",
     );

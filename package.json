@@ -1,11 +1,11 @@
 {
-  "name": "agent-dashboard",
+  "name": "chrona",
   "version": "0.1.0",
-  "description": "AI-Native Task Control Plane \u2014 Plan, schedule, and observe AI-runtime-powered work",
+  "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/AgentDashboard.git"
+    "url": "https://github.com/your-org/Chrona.git"
   },
   "keywords": [
     "ai",
@@ -28,6 +28,7 @@
     "test:e2e": "playwright test",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
+    "chrona": "bun packages/cli/src/index.ts",
     "agentdash": "bun packages/cli/src/index.ts"
   },
   "dependencies": {

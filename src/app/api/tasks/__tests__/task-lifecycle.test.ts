@@ -28,7 +28,7 @@ import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
 
 /** Simulate the session key format used by the real system */
 function taskSessionKey(taskId: string, variant = "default") {
-  return `agent-dashboard:openclaw:task:${taskId}:${variant}`;
+  return `chrona:openclaw:task:${taskId}:${variant}`;
 }
 
 // ---------------------------------------------------------------------------

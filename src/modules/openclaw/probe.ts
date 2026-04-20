@@ -1,5 +1,5 @@
 /**
- * Re-export from @agent-dashboard/runtime-client
+ * Re-export from @chrona/runtime-client
  * Source of truth: packages/runtime-client/src/openclaw/probe.ts
  */
-export * from "@agent-dashboard/runtime-client/openclaw/probe";
+export * from "@chrona/runtime-client/openclaw/probe";

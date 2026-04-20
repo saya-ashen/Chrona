@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agent Dashboard",
+  title: "Chrona",
   description: "Task-centric AI control plane for human and runtime collaboration.",
 };
 

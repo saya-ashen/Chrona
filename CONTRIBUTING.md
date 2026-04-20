@@ -1,4 +1,4 @@
-# Contributing to AgentDashboard
+# Contributing to Chrona
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -6,8 +6,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/AgentDashboard.git
-cd AgentDashboard
+git clone https://github.com/your-org/Chrona.git
+cd Chrona
 bun install
 
 # Set up environment
@@ -21,7 +21,7 @@ bun run dev
 
 ## Project Architecture
 
-AgentDashboard uses a CQRS/Event Sourcing architecture:
+Chrona uses a CQRS/Event Sourcing architecture:
 
 - **`src/modules/commands/`** — Write operations that produce domain events
 - **`src/modules/queries/`** — Read operations from projections

@@ -1,5 +1,5 @@
 /**
- * @agent-dashboard/runtime-client/openclaw
+ * @chrona/runtime-client/openclaw
  *
  * OpenClaw runtime client — pure communication layer.
  * No database, no event system, no projections.
