@@ -25,19 +25,16 @@ import type {
   OpenClawRunSnapshot,
   OpenClawSendInput,
   OpenClawSendInputResult,
+  OpenClawStructuredRunResult,
 } from "./types";
-import type { BridgeResponse, NDJSONEvent } from "./bridge-types";
+import type { BridgeRequest, BridgeResponse, NDJSONEvent } from "./bridge-types";
 
 type BridgeClientOptions = {
-  /** Bridge server base URL. Default: http://localhost:7677 */
   baseUrl?: string;
-  /** Default timeout for CLI execution (seconds). Default: 300 */
   timeoutSeconds?: number;
-  /** Called for each streaming NDJSON event (only used with stream endpoint). */
   onEvent?: (event: NDJSONEvent) => void;
 };
 
-// Per-session conversation history kept in memory (the bridge is stateless per-call)
 type SessionState = {
   sessionId: string;
   messages: Array<Record<string, unknown>>;
@@ -45,6 +42,7 @@ type SessionState = {
   lastRunStatus: OpenClawRunSnapshot["status"];
   lastOutput: string;
   toolCalls: Array<{ tool: string; callId: string; input: Record<string, unknown>; result?: string }>;
+  lastStructured: OpenClawStructuredRunResult | null;
 };
 
 export class OpenClawBridgeClient implements OpenClawRuntimeClient {
@@ -59,10 +57,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     this.onEvent = options.onEvent;
   }
 
-  // -- Connection lifecycle (no-op for HTTP) --
-
   async connect(): Promise<OpenClawHello> {
-    // Verify bridge is healthy
     const res = await fetch(`${this.baseUrl}/v1/health`);
     if (!res.ok) {
       throw new Error(`Bridge health check failed: ${res.status}`);
@@ -71,14 +66,12 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     if (health.status !== "ok") {
       throw new Error("OpenClaw CLI not available on bridge");
     }
-    return { protocol: 1, methods: ["chat", "chat/stream", "health"] };
+    return { protocol: 1, methods: ["chat", "chat/stream", "health", "chat/structured"] };
   }
 
   close(): void {
     // No-op for HTTP client
   }
-
-  // -- Core methods --
 
   async createRun(input: {
     prompt: string;
@@ -91,32 +84,35 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   }> {
     const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
     const response = await this.callBridge(sessionId, input.prompt);
-
-    // Track session state
-    const session = this.getOrCreateSession(sessionId);
-    session.lastRunRef = response.sessionId;
-    session.lastOutput = response.output;
-    session.lastRunStatus = response.error ? "Failed" : "Completed";
-    session.messages.push(
-      { role: "user", content: input.prompt },
-      { role: "assistant", content: response.output },
-    );
-
-    // Track tool calls
-    for (const tc of response.toolCalls) {
-      session.toolCalls.push({
-        tool: tc.tool,
-        callId: tc.callId,
-        input: tc.input,
-        result: tc.result,
-      });
-    }
+    this.recordBridgeResponse(sessionId, input.prompt, response);
 
     return {
-      runtimeRunRef: response.sessionId,
+      runtimeRunRef: response.runId ?? response.sessionId,
       runtimeSessionRef: response.sessionId,
       runtimeSessionKey: sessionId,
       runStarted: true,
+    };
+  }
+
+  async createStructuredRun<T = unknown>(input: {
+    prompt: string;
+    runtimeSessionKey?: string;
+    systemPrompt?: string;
+    timeoutSeconds?: number;
+  }): Promise<OpenClawStructuredRunResult<T>> {
+    const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
+    const response = await this.callBridge(sessionId, input.prompt, {
+      systemPrompt: input.systemPrompt,
+      timeout: input.timeoutSeconds,
+    });
+    this.recordBridgeResponse(sessionId, input.prompt, response);
+
+    return {
+      ...response.structured,
+      parsed: (response.structured?.parsed ?? null) as T | null,
+      rawOutput: response.output,
+      sessionId: response.sessionId,
+      runId: response.runId,
     };
   }
 
@@ -128,7 +124,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
     return {
       runtimeRunRef: session?.lastRunRef ?? key,
-      runtimeSessionRef: session?.lastRunRef ?? undefined,
+      runtimeSessionRef: session?.sessionId ?? undefined,
       runtimeSessionKey: key,
       status: session?.lastRunStatus ?? "Completed",
       lastMessage: session?.lastOutput,
@@ -142,47 +138,44 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     };
   }
 
+  async getStructuredResult<T = unknown>(runtimeSessionKey: string): Promise<OpenClawStructuredRunResult<T> | null> {
+    const session = this.sessions.get(runtimeSessionKey);
+    if (!session?.lastStructured) {
+      return null;
+    }
+    return {
+      ...session.lastStructured,
+      parsed: (session.lastStructured.parsed ?? null) as T | null,
+    };
+  }
+
   async listApprovals(): Promise<OpenClawPendingApproval[]> {
-    // CLI Bridge doesn't support interactive approvals — auto-handled by CLI
     return [];
   }
 
   async sendInput(input: OpenClawSendInput): Promise<OpenClawSendInputResult> {
     const response = await this.callBridge(input.runtimeSessionKey, input.message);
-
-    const session = this.getOrCreateSession(input.runtimeSessionKey);
-    session.lastOutput = response.output;
-    session.lastRunStatus = response.error ? "Failed" : "Completed";
-    session.lastRunRef = response.sessionId;
-    session.messages.push(
-      { role: "user", content: input.message },
-      { role: "assistant", content: response.output },
-    );
+    this.recordBridgeResponse(input.runtimeSessionKey, input.message, response);
 
     return {
       accepted: !response.error,
-      runtimeRunRef: response.sessionId,
+      runtimeRunRef: response.runId ?? response.sessionId,
       runtimeSessionKey: input.runtimeSessionKey,
       runStarted: true,
     };
   }
 
   async waitForApprovalDecision(): Promise<OpenClawApprovalDecision | null> {
-    // Not supported via CLI Bridge
     return null;
   }
 
   async requestApproval(_input: OpenClawApprovalRequest): Promise<OpenClawApprovalRequestResult> {
-    // Not supported via CLI Bridge
     return { approvalId: "noop", status: "auto-approved" };
   }
 
   async resolveApproval(_input: OpenClawApprovalResolution): Promise<{ accepted: boolean }> {
-    // Not supported via CLI Bridge
     return { accepted: true };
   }
-
-  // -- Internals --
 
   private getOrCreateSession(sessionId: string): SessionState {
     let session = this.sessions.get(sessionId);
@@ -194,21 +187,53 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
         lastRunStatus: "Pending",
         lastOutput: "",
         toolCalls: [],
+        lastStructured: null,
       };
       this.sessions.set(sessionId, session);
     }
     return session;
   }
 
-  private async callBridge(sessionId: string, message: string): Promise<BridgeResponse> {
+  private recordBridgeResponse(sessionId: string, userMessage: string, response: BridgeResponse): void {
+    const session = this.getOrCreateSession(sessionId);
+    session.lastRunRef = response.runId ?? response.sessionId;
+    session.lastOutput = response.output;
+    session.lastRunStatus = response.error ? "Failed" : "Completed";
+    session.lastStructured = response.structured;
+    session.messages.push(
+      { role: "user", content: userMessage },
+      { role: "assistant", content: response.output },
+    );
+
+    for (const tc of response.toolCalls) {
+      session.toolCalls.push({
+        tool: tc.tool,
+        callId: tc.callId,
+        input: tc.input,
+        result: tc.result,
+      });
+    }
+  }
+
+  private async callBridge(
+    sessionId: string,
+    message: string,
+    overrides?: { systemPrompt?: string; timeout?: number },
+  ): Promise<BridgeResponse> {
+    const requestBody: BridgeRequest = {
+      sessionId,
+      message,
+      timeout: overrides?.timeout ?? this.timeoutSeconds,
+    };
+
+    if (overrides?.systemPrompt) {
+      requestBody.systemPrompt = overrides.systemPrompt;
+    }
+
     const res = await fetch(`${this.baseUrl}/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId,
-        message,
-        timeout: this.timeoutSeconds,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!res.ok) {
@@ -219,10 +244,6 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     return (await res.json()) as BridgeResponse;
   }
 
-  /**
-   * Call the bridge streaming endpoint. Returns the final BridgeResponse
-   * after processing all SSE events.
-   */
   async callBridgeStreaming(
     sessionId: string,
     message: string,
@@ -286,6 +307,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       throw new Error("Stream ended without a final response");
     }
 
+    this.recordBridgeResponse(sessionId, message, finalResponse);
     return finalResponse;
   }
 }

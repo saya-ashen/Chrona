@@ -3,6 +3,8 @@
  * Extracted so the runtime-client package doesn't depend on the bridge server.
  */
 
+import type { StructuredAgentResult } from "./structured-result";
+
 export interface BridgeRequest {
   sessionId?: string;
   message: string;
@@ -20,6 +22,7 @@ export interface ToolCallInfo {
 
 export interface BridgeResponse {
   sessionId: string;
+  runId?: string;
   output: string;
   toolCalls: ToolCallInfo[];
   usage: {
@@ -28,6 +31,7 @@ export interface BridgeResponse {
   } | null;
   error: string | null;
   durationMs: number;
+  structured: StructuredAgentResult | null;
 }
 
 export interface NDJSONEvent {

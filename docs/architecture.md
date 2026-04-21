@@ -161,13 +161,20 @@ src/
 │   ├── workspaces/         # 工作空间页面
 │   └── [lang]/             # 国际化路由（镜像所有页面）
 │
-├── cli/                    # CLI 工具
-│   ├── index.ts            # 入口 (commander)
-│   ├── commands/           # 子命令
-│   └── lib/                # API 客户端 + 输出格式化
+├── packages/
+│   ├── cli/                # Chrona CLI workspace package
+│   │   ├── src/index.ts    # 入口 (commander)
+│   │   ├── src/commands/   # 子命令
+│   │   └── src/lib/        # API 客户端 + 输出格式化
+│   ├── runtime-client/     # 共享运行时客户端与 OpenClaw 通信层
+│   ├── openclaw-bridge/    # Bridge HTTP 服务封装
+│   └── openclaw-plugin-structured-result/ # submit_structured_result 插件
+│
+├── services/
+│   └── openclaw-bridge/    # Bridge 启动入口（委托到 packages/openclaw-bridge）
 │
 ├── components/             # React 组件
-│   ├── ui/                 # 基础 UI 组件 (shadcn)
+│   ├── ui/                 # 基础 UI 组件
 │   ├── control-plane-shell.tsx  # 应用外壳
 │   ├── schedule/           # 排期 UI 组件集
 │   ├── work/               # 工作台 UI 组件集

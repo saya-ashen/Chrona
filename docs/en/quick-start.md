@@ -41,6 +41,25 @@ bun run dev
 Then open:
 - http://localhost:3000
 
+## Optional: install the Chrona OpenClaw structured-result plugin
+
+If you want structured OpenClaw task results, install the local plugin:
+
+```bash
+bun run openclaw:plugin:install
+```
+
+What it does:
+- builds `packages/openclaw-plugin-structured-result`
+- installs it into local OpenClaw as `chrona-structured-result`
+- enables the plugin
+- attempts a gateway restart
+
+Notes from verification:
+- install and enable completed successfully in this repository
+- gateway restart may still report a local service-management issue, so manually restart your OpenClaw gateway/bridge process if needed
+- OpenClaw may warn that `plugins.allow` is empty; if you want stricter trust configuration, pin allowed plugin ids in your OpenClaw config
+
 ## Optional: start the OpenClaw bridge
 
 If you want to test agent execution through the OpenClaw bridge:
@@ -51,6 +70,10 @@ bun run services/openclaw-bridge/server.ts
 
 Default bridge URL:
 - http://localhost:7677
+
+Bridge notes from verification:
+- this command starts `services/openclaw-bridge/server.ts`, which delegates to `packages/openclaw-bridge/src/server.ts`
+- if port `7677` is already in use, the bridge exits immediately with an address-in-use error
 
 ## Runtime directions
 
@@ -89,7 +112,6 @@ Current direction:
 bun run dev
 bun run test
 bun run chrona --help
-bun run agentdash --help
 ```
 
 ## Next reading

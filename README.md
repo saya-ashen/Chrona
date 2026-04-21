@@ -10,6 +10,17 @@ The project focuses on making planning and execution feel like one connected sys
 
 ## Documentation
 
+Language entry points:
+- [English docs](./docs/en/README.md)
+- [中文文档](./docs/zh/README.md)
+
+Key docs:
+- [Quick start (EN)](./docs/en/quick-start.md)
+- [快速开始（中文）](./docs/zh/quick-start.md)
+- [Architecture](./docs/architecture.md)
+- [API reference](./docs/api-reference.md)
+- [Getting started details](./docs/getting-started.md)
+
 ## Demo
 
 README demo assets are generated automatically from a Playwright-driven interaction script.
@@ -42,13 +53,7 @@ Quick start:
 - English: ./docs/en/quick-start.md
 - 中文: ./docs/zh/quick-start.md
 
-Language entry points:
-- [English docs](./docs/en/README.md)
-- [中文文档](./docs/zh/README.md)
-
-Key docs:
-- [Quick start (EN)](./docs/en/quick-start.md)
-- [快速开始（中文）](./docs/zh/quick-start.md)
+Roadmaps:
 - [Roadmap (EN)](./docs/en/roadmap.md)
 - [路线图（中文）](./docs/zh/roadmap.md)
 
@@ -82,11 +87,30 @@ bun run db:seed
 bun run dev
 ```
 
-5. Optional: start the OpenClaw bridge when testing agent execution
+5. Optional but recommended for structured OpenClaw tasks: install the Chrona OpenClaw plugin
+
+```bash
+bun run openclaw:plugin:install
+```
+
+What this command does:
+- builds `packages/openclaw-plugin-structured-result`
+- installs it into your local OpenClaw as `chrona-structured-result`
+- enables the plugin
+- attempts a gateway restart so the tool becomes available immediately
+
+The plugin provides `submit_structured_result`, which Chrona now uses as the primary machine-readable output path for OpenClaw structured tasks. The bridge/client parses that tool call instead of trusting assistant free text.
+
+6. Optional: start the OpenClaw bridge when testing agent execution
 
 ```bash
 bun run services/openclaw-bridge/server.ts
 ```
+
+Bridge notes:
+- default bridge URL: `http://localhost:7677`
+- if port `7677` is already in use, the bridge will fail to bind until you stop the existing process
+- this entrypoint starts `services/openclaw-bridge/server.ts`, which delegates to `packages/openclaw-bridge/src/server.ts`
 
 Open http://localhost:3000.
 

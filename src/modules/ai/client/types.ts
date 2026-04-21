@@ -2,6 +2,13 @@
  * AI Client — Type definitions.
  */
 
+import type {
+  StructuredAgentResult,
+  StructuredSubmissionEnvelope,
+  StructuredValidationIssue,
+  StructuredResultStatus,
+} from "../../../../packages/runtime-client/src/openclaw/structured-result";
+
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
   | "suggest"
@@ -29,6 +36,22 @@ export interface LLMClientConfig {
   apiKey: string;
   model?: string;
   temperature?: number;
+}
+
+export interface StructuredDebugInfo {
+  rawToolCall?: unknown;
+  rawOutput?: string | null;
+  error?: string | null;
+  status?: StructuredResultStatus | null;
+  sessionId?: string;
+  runId?: string;
+  reliability?: "tool_call" | "fallback_text";
+  validationIssues?: StructuredValidationIssue[];
+  structuredEnvelope?: StructuredSubmissionEnvelope | null;
+}
+
+export interface StructuredResponseMeta {
+  structured?: StructuredDebugInfo;
 }
 
 // ── Request / Response ──
@@ -76,7 +99,7 @@ export interface SmartSuggestion {
   suggestedSlot?: { startAt: string; endAt: string };
 }
 
-export interface SmartSuggestResponse {
+export interface SmartSuggestResponse extends StructuredResponseMeta {
   suggestions: SmartSuggestion[];
   source: string;
   requestId: string;
@@ -91,7 +114,7 @@ export interface GenerateTaskPlanRequest {
   estimatedMinutes?: number;
 }
 
-export interface GenerateTaskPlanResponse {
+export interface GenerateTaskPlanResponse extends StructuredResponseMeta {
   nodes: TaskPlanNode[];
   edges: TaskPlanEdge[];
   summary: string;
@@ -125,7 +148,7 @@ export interface ResolutionSuggestion {
   }>;
 }
 
-export interface AnalyzeConflictsResponse {
+export interface AnalyzeConflictsResponse extends StructuredResponseMeta {
   conflicts: ConflictInfo[];
   resolutions: ResolutionSuggestion[];
   summary: string;
@@ -153,7 +176,7 @@ export interface TimeslotOption {
   reason: string;
 }
 
-export interface SuggestTimeslotResponse {
+export interface SuggestTimeslotResponse extends StructuredResponseMeta {
   slots: TimeslotOption[];
   reasoning?: string;
   source: string;
@@ -171,7 +194,7 @@ export interface ChatRequest {
   maxTokens?: number;
 }
 
-export interface ChatResponse {
+export interface ChatResponse extends StructuredResponseMeta {
   content: string;
   parsed?: unknown;
   source: string;
@@ -198,5 +221,5 @@ export type StreamEvent =
   | { type: "tool_call"; tool: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool: string; result: string }
   | { type: "partial"; text: string }
-  | { type: "done"; text: string }
+  | { type: "done"; text: string; structured?: StructuredAgentResult | null }
   | { type: "error"; message: string };
