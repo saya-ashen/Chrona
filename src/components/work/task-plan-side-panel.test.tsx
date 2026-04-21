@@ -1,5 +1,27 @@
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+
+beforeAll(() => {
+  class ResizeObserverMock {
+    observe(target?: Element) {
+      if (target) {
+        const width = Number.parseInt((target as HTMLElement).style.width || "0", 10);
+        Object.defineProperty(target, "clientWidth", {
+          configurable: true,
+          value: width || 320,
+        });
+      }
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+
+  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+});
+
+vi.mock("@/i18n/client", () => ({
+  useI18n: () => ({ messages: {} }),
+}));
 
 vi.mock("@/components/ui/button", () => ({
   buttonVariants: () => "btn",
@@ -87,10 +109,13 @@ describe("TaskPlanSidePanel", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Task plan graph")).toBeInTheDocument();
+    const graph = screen.getByLabelText("任务计划图");
+    expect(graph).toBeInTheDocument();
+    expect(graph).toHaveAttribute("data-graph-mode", "compact");
     expect(screen.getByText("物化可执行子任务")).toBeInTheDocument();
-    expect(screen.getByTestId("task-plan-node-step-linked").getAttribute("data-node-tone")).toBe("child-task");
-    expect(screen.queryByText("等待你处理")).not.toBeInTheDocument();
+    expect(screen.getByTestId("task-plan-outline-node-step-linked").getAttribute("data-node-tone")).toBe("child-task");
+    expect(screen.getByText("需处理")).toBeInTheDocument();
+    expect(screen.getByText("当前推进")).toBeInTheDocument();
     expect(screen.queryByText("已关联子任务")).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,16 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+beforeAll(() => {
+  class ResizeObserverMock {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+});
 
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),
@@ -194,8 +204,8 @@ describe("WorkPageClient", () => {
 
     render(<WorkPageClient initialData={baseData} />);
 
-    expect(screen.getByRole("tab", { name: "协作推进" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "执行记录" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: DEFAULT_WORK_PAGE_COPY.conversationTab })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: DEFAULT_WORK_PAGE_COPY.fullFlowTab })).toBeInTheDocument();
     expect(screen.getByText("起草任务驱动 Agent 面板")).toBeInTheDocument();
     expect(screen.getByText("补充执行要求")).toBeInTheDocument();
     expect(
@@ -234,9 +244,9 @@ describe("WorkPageClient", () => {
       name: DEFAULT_WORK_PAGE_COPY.planRailAria,
     });
 
-    expect(within(planRail).getByText("任务路径")).toBeInTheDocument();
+    expect(within(planRail).getByText(DEFAULT_WORK_PAGE_COPY.taskPath)).toBeInTheDocument();
     expect(within(planRail).getByLabelText("任务计划图")).toBeInTheDocument();
-    expect(within(planRail).getAllByText("sequential").length).toBeGreaterThan(0);
+    expect(within(planRail).getByTestId("task-plan-graph")).toHaveAttribute("data-graph-mode", "compact");
     expect(planRail.className).toContain("self-start");
     expect(planRail.className).toContain("pb-3");
     expect(planRail.parentElement?.className).not.toContain("items-start");
@@ -326,9 +336,9 @@ describe("WorkPageClient", () => {
     expect(within(workbench).getAllByText("我会先整理工作页的任务推进结构。").length).toBeGreaterThan(0);
     expect(screen.queryByText("Task Plan Updated")).not.toBeInTheDocument();
     expect(screen.queryByText("首轮任务理解")).not.toBeInTheDocument();
-    expect(within(workbench).getAllByText("智能体").length).toBe(1);
-    expect(screen.getByText("直接回答缺失信息")).toBeInTheDocument();
-    expect(screen.getByText("先说明不可变约束")).toBeInTheDocument();
+    expect(within(workbench).getAllByText(DEFAULT_WORK_PAGE_COPY.agentLabel).length).toBe(1);
+    expect(screen.getByText(DEFAULT_WORK_PAGE_COPY.quickPromptInputA)).toBeInTheDocument();
+    expect(screen.getByText(DEFAULT_WORK_PAGE_COPY.quickPromptInputB)).toBeInTheDocument();
   });
 
   it("keeps the execution record view scrollable inside the workbench", async () => {
@@ -491,29 +501,29 @@ describe("WorkPageClient", () => {
 
     render(<WorkPageClient initialData={groupedExecutionData} />);
 
-    await user.click(screen.getAllByRole("tab", { name: "执行记录" })[0]!);
+    await user.click(screen.getAllByRole("tab", { name: DEFAULT_WORK_PAGE_COPY.fullFlowTab })[0]!);
 
     const [workbench] = screen.getAllByLabelText(DEFAULT_WORK_PAGE_COPY.conversationWorkbenchAria);
     const shell = workbench.closest('[data-slot="workbench-shell"]') as HTMLElement | null;
     const thread = workbench.querySelector('[data-slot="workbench-thread"]');
-    const mainRegion = screen.getByRole("region", { name: "执行记录主区域" });
-    const sidebar = screen.getByRole("complementary", { name: "执行记录侧栏" });
+    const mainRegion = screen.getByRole("region", { name: DEFAULT_WORK_PAGE_COPY.executionRecordMain });
+    const sidebar = screen.getByRole("complementary", { name: DEFAULT_WORK_PAGE_COPY.executionRecordSidebar });
 
     expect(shell).not.toBeNull();
     expect(workbench.className).toContain("xl:h-full");
     expect(thread?.className).toContain("overflow-y-auto");
-    expect(screen.getByRole("tabpanel", { name: "执行记录" })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: DEFAULT_WORK_PAGE_COPY.fullFlowTab })).toBeInTheDocument();
     expect(mainRegion).toBeInTheDocument();
     expect(sidebar).toBeInTheDocument();
-    expect(within(sidebar).getByText("任务驾驶舱")).toBeInTheDocument();
-    expect(within(sidebar).getByText("当前阻塞")).toBeInTheDocument();
-    expect(within(sidebar).getByText("当前没有记录阻塞动作。")).toBeInTheDocument();
-    expect(within(sidebar).getByText("建议动作")).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.taskCockpit)).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.currentBlocker)).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.noBlockingAction)).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.nextAction)).toBeInTheDocument();
     expect(within(sidebar).getByText("补充执行要求")).toBeInTheDocument();
-    expect(within(sidebar).getByText("最近产出")).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.recentOutput)).toBeInTheDocument();
     expect(within(sidebar).getAllByText("首轮任务理解").length).toBeGreaterThan(0);
-    expect(within(sidebar).getByText("风险与同步")).toBeInTheDocument();
-    expect(within(sidebar).getByText(/同步正常/)).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEFAULT_WORK_PAGE_COPY.riskAndSync)).toBeInTheDocument();
+    expect(within(sidebar).getByText(new RegExp(DEFAULT_WORK_PAGE_COPY.healthySync))).toBeInTheDocument();
 
     rectSpy.mockRestore();
     Object.defineProperty(window, "innerWidth", {
@@ -583,7 +593,7 @@ describe("WorkPageClient", () => {
 
     render(<WorkPageClient initialData={approvalData} />);
 
-    expect(screen.getByText("审批焦点")).toBeInTheDocument();
+    expect(screen.getByText(DEFAULT_WORK_PAGE_COPY.actionApprovalTitle)).toBeInTheDocument();
     expect(screen.getAllByText("允许替换当前协作主区结构").length).toBeGreaterThan(0);
     expect(screen.getAllByText("只改 work 页，不扩散到 schedule。").length).toBeGreaterThan(0);
   });
