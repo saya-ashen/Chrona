@@ -134,7 +134,7 @@ export function TaskPlanSidePanel({
             ) : null}
 
             <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
-              <TaskPlanGraph plan={plan} />
+              <TaskPlanGraph mode="auto" plan={plan} />
             </div>
           </div>
         )}
