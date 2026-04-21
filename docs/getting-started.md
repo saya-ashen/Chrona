@@ -1,78 +1,109 @@
-# 快速开始
+# 快速开始（详细版）
+
+本页补充主 README 与 `docs/zh/quick-start.md` 的细节，重点覆盖当前仓库里已经验证过的命令、CLI 用法，以及 OpenClaw 结构化结果链路。
 
 ## 环境要求
 
 | 依赖 | 最低版本 | 说明 |
 |------|---------|------|
-| Bun | 1.0+ | JavaScript 运行时（替代 Node.js） |
-| Git | 2.0+ | 版本控制 |
+| Bun | 1.x | 包管理器 + 运行时 |
+| Git | 2.x | 版本控制 |
+| OpenClaw（可选） | 本地可执行命令 | 仅在测试 bridge / 插件时需要 |
 
-> **注意**：本项目使用 Bun 作为包管理器和运行时，不使用 npm/yarn。
+> 注意：本仓库默认使用 Bun，不使用 npm / yarn。
 
-## 安装
+## 安装与初始化
 
 ```bash
-# 克隆仓库
 git clone <repo-url> Chrona
 cd Chrona
-
-# 安装依赖
 bun install
-
-# 生成 Prisma 客户端
 bunx prisma generate
-
-# 初始化数据库（创建 SQLite 文件 + 运行迁移）
-bunx prisma db push
-
-# （可选）填充种子数据
-bunx prisma db seed
+bun run db:seed
 ```
 
-## 环境变量
+说明：
+- `bunx prisma generate` 已验证可用。
+- `bun run db:seed` 是当前仓库主推荐初始化命令。
+- `bunx prisma db push` 在当前仓库/环境下并不稳定，因此不再作为主流程文档命令。
 
-创建 `.env` 文件：
+## 启动应用
 
-```env
-# 数据库（默认使用 SQLite）
-DATABASE_URL="file:./dev.db"
-
-# OpenClaw CLI Bridge（AI 智能体运行时）
-OPENCLAW_MODE="bridge"
-OPENCLAW_BRIDGE_URL="http://localhost:7677"
-OPENCLAW_TIMEOUT="300"
-
-# LLM 服务（可选，用于 AI 增强功能）
-OPENAI_API_KEY="sk-..."
-OPENAI_BASE_URL="https://api.openai.com/v1"  # 或其他 OpenAI 兼容 API
-OPENAI_MODEL="gpt-4o"
-
-# 应用配置
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-## 启动
-
-### 开发模式
+开发模式：
 
 ```bash
-bun dev
+bun run dev
 ```
 
-访问 http://localhost:3000
+默认访问地址：
+- http://localhost:3000
 
-### 生产构建
+生产构建命令保留如下，但本次文档更新未专门跑完整构建验证：
 
 ```bash
 bun run build
-bun start
+bun run start
 ```
 
-## 基本使用流程
+## OpenClaw：结构化结果插件与 Bridge
 
-### 1. 创建任务
+### 1. 安装结构化结果插件
 
-在 Web UI 的任务中心或排期页面创建任务，也可通过 CLI：
+```bash
+bun run openclaw:plugin:install
+```
+
+这个命令已经实际验证过，会执行以下动作：
+- 构建 `packages/openclaw-plugin-structured-result`
+- 安装到本地 OpenClaw，插件 id 为 `chrona-structured-result`
+- 启用插件
+- 尝试重启 OpenClaw gateway
+
+验证结论：
+- 插件安装与启用成功
+- gateway 重启步骤可能因为本地 systemctl / service 管理方式不同而失败，此时需要你手动重启 OpenClaw gateway 或 bridge 进程
+- OpenClaw 可能提示 `plugins.allow` 为空；如果你要更严格的信任策略，请在 OpenClaw 配置中显式固定允许的插件 id
+
+### 2. 启动 OpenClaw Bridge
+
+```bash
+bun run services/openclaw-bridge/server.ts
+```
+
+说明：
+- 这个入口实际启动 `services/openclaw-bridge/server.ts`，再委托到 `packages/openclaw-bridge/src/server.ts`
+- 默认监听 `http://localhost:7677`
+- 如果端口 `7677` 已被占用，bridge 会立刻退出并报 address-in-use 错误
+
+## CLI 使用
+
+当前 CLI 入口统一为：
+
+```bash
+bun run chrona --help
+```
+
+兼容别名 `agentdash` 仍然可用，但只是同一个入口的历史别名，不再推荐在文档中继续强调。
+
+### 已验证的命令组
+
+```bash
+bun run chrona --help
+bun packages/cli/src/index.ts task --help
+bun packages/cli/src/index.ts run --help
+bun packages/cli/src/index.ts schedule --help
+bun packages/cli/src/index.ts ai --help
+```
+
+当前命令组包括：
+- `task`: list / get / create / update / done / reopen / delete / subtasks / add-subtask
+- `run`: start / message / input
+- `schedule`: apply / clear / view / conflicts / suggest-time
+- `ai`: decompose / suggest-automation / apply-suggestion / batch-decompose / auto-complete
+
+### 示例
+
+创建任务：
 
 ```bash
 bun packages/cli/src/index.ts task create \
@@ -84,17 +115,7 @@ bun packages/cli/src/index.ts task create \
   --model gpt-4o
 ```
 
-### 2. 排期
-
-在排期页面的时间线上点击空白区域创建排期，或通过命令栏快速创建：
-
-```
-# 命令栏支持自然语言
-"下午2点到3点 分析用户数据"
-"明天上午 代码审查 @High"
-```
-
-也可通过 CLI：
+应用排期：
 
 ```bash
 bun packages/cli/src/index.ts schedule apply \
@@ -103,79 +124,74 @@ bun packages/cli/src/index.ts schedule apply \
   --end "2025-01-15T15:00:00"
 ```
 
-### 3. 执行
-
-启动 AI 智能体执行任务：
+启动运行：
 
 ```bash
 bun packages/cli/src/index.ts run start -t <taskId>
 ```
 
-或在 Web UI 的工作台页面点击"运行"按钮。
-
-### 4. 审批
-
-当智能体遇到需要人工审批的操作时：
-- 收件箱会出现审批请求
-- 在工作台页面可以审批/拒绝/编辑后审批
-
-### 5. 完成
+标记完成：
 
 ```bash
 bun packages/cli/src/index.ts task done -t <taskId>
 ```
 
-## CLI 快速参考
+## OpenClaw 结构化结果链路
+
+当前仓库已经把 OpenClaw 结构化结果能力整理为更清晰的链路：
+- 插件：`packages/openclaw-plugin-structured-result`
+- Bridge：`packages/openclaw-bridge`
+- 兼容入口：`services/openclaw-bridge/server.ts`
+- Runtime client：`packages/runtime-client`
+- AI 客户端消费层：`src/modules/ai/client/*`
+
+关键规则：
+- 结构化任务必须通过 `submit_structured_result` 工具提交机器可读结果
+- bridge/client 解析工具调用参数，而不是把 assistant 自由文本当成最终机器结果
+- README / quick-start 现在都以这个插件安装命令作为正式启用方式
+
+## 测试与验证命令
 
 ```bash
-# 查看所有命令
-bun packages/cli/src/index.ts --help
-
-# 任务管理
-bun packages/cli/src/index.ts task list -w <workspaceId>
-bun packages/cli/src/index.ts task get -t <taskId>
-
-# AI 功能
-bun packages/cli/src/index.ts ai decompose -t <taskId>      # AI 任务分解
-bun packages/cli/src/index.ts ai auto-complete --title "分析" # 标题自动补全
-
-# 排期
-bun packages/cli/src/index.ts schedule view -w <workspaceId> # 查看排期
-bun packages/cli/src/index.ts schedule conflicts -w <wId>    # 冲突分析
+bun run test
+bun run chrona --help
+bun packages/cli/src/index.ts task --help
+bun packages/cli/src/index.ts run --help
+bun packages/cli/src/index.ts schedule --help
+bun packages/cli/src/index.ts ai --help
 ```
 
-## 测试
+补充说明：
+- `bun run test` 是当前主测试入口
+- 本次文档更新没有把不稳定或未验证的命令继续保留在主流程里
 
-```bash
-# 组件/UI 测试（Vitest）
-bunx vitest run
+## 当前目录结构（已按现状更新）
 
-# 查询/数据库测试（Bun Test）
-bun test src/modules/queries/__tests__/
-
-# E2E 测试（Playwright）
-bunx playwright test
-
-# 单文件测试
-bunx vitest run src/components/schedule/schedule-command-bar.test.tsx
-```
-
-## 项目结构速览
-
-```
+```text
 Chrona/
-├── docs/               # 本文档
+├── docs/
+├── packages/
+│   ├── cli/
+│   ├── openclaw-bridge/
+│   ├── openclaw-plugin-structured-result/
+│   └── runtime-client/
 ├── prisma/
-│   ├── schema.prisma   # 数据库模型定义
-│   └── seed.ts         # 种子数据
+├── services/
+│   └── openclaw-bridge/
 ├── src/
-│   ├── app/            # Next.js 页面 + API 路由
-│   ├── cli/            # 命令行工具
-│   ├── components/     # React UI 组件
-│   ├── hooks/          # React Hooks
-│   ├── i18n/           # 国际化
-│   ├── lib/            # 共享工具
-│   └── modules/        # 核心业务逻辑
+│   ├── app/
+│   ├── components/
+│   ├── hooks/
+│   ├── i18n/
+│   ├── lib/
+│   └── modules/
+├── scripts/
 ├── package.json
 └── tsconfig.json
 ```
+
+如果你只想快速开始，优先阅读：
+- `README.md`
+- `docs/zh/quick-start.md`
+- `docs/architecture.md`
+- `docs/api-reference.md`

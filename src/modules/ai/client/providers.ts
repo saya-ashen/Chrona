@@ -2,31 +2,21 @@
  * AI Client — Provider implementations (OpenClaw + LLM).
  */
 
-import {
-  type AiClientRecord,
-  type AiFeature,
-  type OpenClawClientConfig,
-  type LLMClientConfig,
-  AiClientError,
+import type {
+  AiClientRecord,
+  AiFeature,
+  OpenClawClientConfig,
+  LLMClientConfig,
 } from "./types";
+import { AiClientError } from "./types";
 import { SYSTEM_PROMPTS } from "./prompts";
-
-// ── Internal types ──
-
-interface BridgeChatResponse {
-  sessionId: string;
-  output: string;
-  toolCalls: Array<{
-    tool: string;
-    callId: string;
-    input: Record<string, unknown>;
-    result?: string;
-    status: string;
-  }>;
-  usage: { inputTokens: number; outputTokens: number } | null;
-  error: string | null;
-  durationMs: number;
-}
+import {
+  coerceStructuredResult,
+  parseTextJsonWithFallback,
+  type OpenClawCallResult,
+  type OpenClawStructuredMode,
+} from "./structured";
+import type { BridgeResponse } from "../../../../packages/runtime-client/src/openclaw/bridge-types";
 
 interface LLMChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
@@ -37,33 +27,31 @@ interface LLMChatCompletionResponse {
   };
 }
 
-// ── JSON Parsing Utility ──
+function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
+  const sanitize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) || "default";
 
-export function extractJSON<T>(raw: string, clientType: string): T {
-  const jsonMatch =
-    raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? raw.match(/(\{[\s\S]*\})/);
-  const jsonStr = jsonMatch?.[1] ?? raw;
-  try {
-    return JSON.parse(jsonStr.trim()) as T;
-  } catch {
-    throw new AiClientError(
-      `Failed to parse JSON: ${raw.slice(0, 200)}`,
-      clientType,
-      "invalid_response",
-    );
-  }
+  return `ai-${sanitize(feature)}-${sanitize(scope)}`;
 }
 
-// ── OpenClaw Client ──
+export function extractJSON<T>(raw: string, clientType: string): T {
+  return parseTextJsonWithFallback<T>(raw, clientType);
+}
 
-export async function openclawCall(
+async function fetchOpenClawBridge(
   config: OpenClawClientConfig,
   feature: AiFeature,
   scope: string,
   userMessage: string,
-): Promise<string> {
+  mode: OpenClawStructuredMode,
+): Promise<OpenClawCallResult> {
   const timeout = config.timeoutSeconds ?? 120;
-  const sessionId = `ai::${feature}::${scope}`;
+  const sessionId = buildOpenClawSessionId(feature, scope);
 
   const res = await fetch(`${config.bridgeUrl}/v1/chat`, {
     method: "POST",
@@ -86,11 +74,37 @@ export async function openclawCall(
     );
   }
 
-  const result = (await res.json()) as BridgeChatResponse;
-  if (result.error) {
-    throw new AiClientError(result.error, "openclaw", "internal");
+  const bridge = (await res.json()) as BridgeResponse;
+  if (bridge.error) {
+    throw new AiClientError(bridge.error, "openclaw", "internal");
   }
-  return result.output;
+
+  return coerceStructuredResult(bridge, mode);
+}
+
+export async function openclawCall(
+  config: OpenClawClientConfig,
+  feature: AiFeature,
+  scope: string,
+  userMessage: string,
+): Promise<string> {
+  const result = await fetchOpenClawBridge(config, feature, scope, userMessage, "text");
+  return result.text;
+}
+
+export async function openclawStructuredCall<T = unknown>(
+  config: OpenClawClientConfig,
+  feature: AiFeature,
+  scope: string,
+  userMessage: string,
+): Promise<OpenClawCallResult<T>> {
+  const result = await fetchOpenClawBridge(config, feature, scope, userMessage, "structured");
+  return {
+    ...result,
+    structured: result.structured
+      ? { ...result.structured, parsed: (result.structured.parsed ?? null) as T | null }
+      : null,
+  };
 }
 
 export async function openclawHealthCheck(
@@ -108,13 +122,6 @@ export async function openclawHealthCheck(
   }
 }
 
-// ── LLM Client (streaming) ──
-
-/**
- * Call an OpenAI-compatible chat completion endpoint using SSE streaming.
- * Streaming avoids nginx/proxy gateway timeouts on long-running generations
- * because the connection stays alive with incremental data chunks.
- */
 export async function llmCall(
   config: LLMClientConfig,
   systemPrompt: string,
@@ -156,7 +163,6 @@ export async function llmCall(
     );
   }
 
-  // Parse SSE stream and accumulate content
   const reader = res.body?.getReader();
   if (!reader) {
     throw new AiClientError("No response body for streaming", "llm", "internal");
@@ -199,8 +205,6 @@ export function llmHealthCheck(config: LLMClientConfig): boolean {
   return Boolean(config.baseUrl && config.apiKey);
 }
 
-// ── Unified Dispatch ──
-
 export async function dispatch(
   client: AiClientRecord,
   feature: AiFeature,
@@ -223,7 +227,44 @@ export async function dispatch(
   );
 }
 
-// ── Health Check ──
+export async function dispatchStructured<T = unknown>(
+  client: AiClientRecord,
+  feature: AiFeature,
+  userMessage: string,
+  scope = "default",
+): Promise<OpenClawCallResult<T>> {
+  if (client.type === "openclaw") {
+    return openclawStructuredCall<T>(
+      client.config as OpenClawClientConfig,
+      feature,
+      scope,
+      userMessage,
+    );
+  }
+
+  const text = await llmCall(
+    client.config as LLMClientConfig,
+    SYSTEM_PROMPTS[feature],
+    userMessage,
+    { jsonMode: feature !== "chat" },
+  );
+
+  return {
+    mode: "structured",
+    text,
+    structured: null,
+    bridge: {
+      sessionId: buildOpenClawSessionId(feature, scope),
+      runId: undefined,
+      output: text,
+      toolCalls: [],
+      usage: null,
+      error: null,
+      durationMs: 0,
+      structured: null,
+    },
+  };
+}
 
 export async function checkClientHealth(
   client: AiClientRecord,

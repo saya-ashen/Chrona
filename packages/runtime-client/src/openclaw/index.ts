@@ -40,6 +40,22 @@ export type {
   ToolCallInfo,
 } from "./bridge-types";
 
+// Structured result types
+export {
+  SUBMIT_STRUCTURED_RESULT_TOOL_NAME,
+  STRUCTURED_RESULT_STATUSES,
+  extractStructuredResultFromToolCalls,
+  parseMaybeJson,
+  validateStructuredSubmission,
+} from "./structured-result";
+export type {
+  StructuredAgentResult,
+  StructuredResultReliability,
+  StructuredResultStatus,
+  StructuredSubmissionEnvelope,
+  StructuredValidationIssue,
+} from "./structured-result";
+
 // Client interface
 export type {
   OpenClawRuntimeClient,

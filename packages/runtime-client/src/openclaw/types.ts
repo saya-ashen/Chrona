@@ -97,6 +97,10 @@ export type OpenClawSendInputResult = {
   runStarted: boolean;
 };
 
+import type { StructuredAgentResult } from "./structured-result";
+
+export type OpenClawStructuredRunResult<T = unknown> = StructuredAgentResult<T>;
+
 // ---------------------------------------------------------------------------
 // Orchestration types
 // ---------------------------------------------------------------------------

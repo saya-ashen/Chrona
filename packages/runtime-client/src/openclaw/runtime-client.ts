@@ -9,6 +9,7 @@ import type {
   OpenClawRunSnapshot,
   OpenClawSendInput,
   OpenClawSendInputResult,
+  OpenClawStructuredRunResult,
 } from "./types";
 
 export type OpenClawWaitForRunInput = {

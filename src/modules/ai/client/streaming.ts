@@ -10,9 +10,22 @@ import type {
   SmartSuggestRequest,
   StreamEvent,
 } from "./types";
+import type { StructuredAgentResult } from "../../../../packages/runtime-client/src/openclaw/structured-result";
 import { SYSTEM_PROMPTS } from "./prompts";
-import { openclawCall } from "./providers";
 import { buildSuggestMessage } from "./features";
+import { openclawCall } from "./providers";
+
+function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
+  const sanitize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) || "default";
+
+  return `ai-${sanitize(feature)}-${sanitize(scope)}`;
+}
 
 /**
  * Stream from OpenClaw CLI Bridge.
@@ -26,11 +39,10 @@ export async function* openclawStream(
   userMessage: string,
 ): AsyncGenerator<StreamEvent> {
   const timeout = config.timeoutSeconds ?? 120;
-  const sessionId = `ai::${feature}::${scope}`;
+  const sessionId = buildOpenClawSessionId(feature, scope);
 
   yield { type: "status", message: "正在连接 AI 服务..." };
 
-  // Try streaming endpoint first
   try {
     const res = await fetch(`${config.bridgeUrl}/v1/chat/stream`, {
       method: "POST",
@@ -50,6 +62,7 @@ export async function* openclawStream(
       const decoder = new TextDecoder();
       let buffer = "";
       let fullText = "";
+      let finalStructured: StreamEvent extends { type: "done"; structured?: infer S } ? S : never;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -59,51 +72,63 @@ export async function* openclawStream(
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
+        let eventType = "";
         for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+            continue;
+          }
+
           if (!line.startsWith("data: ")) continue;
           const raw = line.slice(6).trim();
-          if (raw === "[DONE]") {
-            yield { type: "done", text: fullText };
-            return;
-          }
           try {
             const evt = JSON.parse(raw) as {
               type?: string;
-              content?: string;
+              text?: string;
               tool?: string;
               input?: Record<string, unknown>;
               result?: string;
               error?: string;
+              output?: string;
+              structured?: StreamEvent extends { type: "done"; structured?: infer S } ? S : never;
             };
-            if (evt.type === "tool_call" && evt.tool) {
+
+            if (eventType === "done") {
+              fullText = typeof evt.output === "string" ? evt.output : fullText;
+              finalStructured = evt.structured;
+              yield { type: "done", text: fullText, structured: finalStructured ?? null };
+              return;
+            }
+
+            if (evt.type === "tool_use" && evt.tool) {
               yield { type: "tool_call", tool: evt.tool, input: evt.input ?? {} };
             } else if (evt.type === "tool_result" && evt.tool) {
-              yield { type: "tool_result", tool: evt.tool, result: evt.result ?? "" };
+              yield { type: "tool_result", tool: evt.tool, result: evt.text ?? evt.result ?? "" };
             } else if (evt.type === "error") {
-              yield { type: "error", message: evt.error ?? "Unknown error" };
+              yield { type: "error", message: evt.error ?? evt.text ?? "Unknown error" };
               return;
-            } else if (evt.content) {
-              fullText += evt.content;
-              yield { type: "partial", text: evt.content };
+            } else if (evt.type === "text" && evt.text) {
+              fullText += evt.text;
+              yield { type: "partial", text: evt.text };
             }
           } catch {
             // skip unparseable lines
           }
+          eventType = "";
         }
       }
-      yield { type: "done", text: fullText };
+      yield { type: "done", text: fullText, structured: finalStructured ?? null };
       return;
     }
   } catch {
     // Stream endpoint not available, fall back to blocking
   }
 
-  // Fallback: blocking call
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
     const text = await openclawCall(config, feature, scope, userMessage);
     yield { type: "partial", text };
-    yield { type: "done", text };
+    yield { type: "done", text, structured: null };
   } catch (e) {
     yield { type: "error", message: e instanceof Error ? e.message : "Unknown error" };
   }
@@ -178,7 +203,7 @@ export async function* llmStream(
       if (!line.startsWith("data: ")) continue;
       const raw = line.slice(6).trim();
       if (raw === "[DONE]") {
-        yield { type: "done", text: fullText };
+        yield { type: "done", text: fullText, structured: null };
         return;
       }
       try {
@@ -195,7 +220,7 @@ export async function* llmStream(
       }
     }
   }
-  yield { type: "done", text: fullText };
+  yield { type: "done", text: fullText, structured: null };
 }
 
 /**

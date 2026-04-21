@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import "@xyflow/react/dist/style.css";
 import "./globals.css";
 import { I18nProvider } from "@/i18n/client";
 import { defaultLocale } from "@/i18n/config";

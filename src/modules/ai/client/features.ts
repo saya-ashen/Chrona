@@ -21,9 +21,11 @@ import type {
   TimeslotOption,
   ChatRequest,
   ChatResponse,
+  StructuredDebugInfo,
 } from "./types";
 import { AiClientError } from "./types";
-import { dispatch, extractJSON } from "./providers";
+import { dispatch, dispatchStructured, extractJSON } from "./providers";
+import { parseDirectStructuredEnvelope, requireStructuredResult } from "./structured";
 import type {
   TaskPlanNode,
   TaskPlanEdge,
@@ -31,7 +33,19 @@ import type {
   TaskPlanEdgeType,
 } from "../types";
 
-// ── Helpers ──
+function toStructuredDebugInfo(result: ReturnType<typeof requireStructuredResult>): StructuredDebugInfo {
+  return {
+    rawToolCall: result.rawToolCall,
+    rawOutput: result.rawOutput,
+    error: result.error,
+    status: result.status,
+    sessionId: result.sessionId,
+    runId: result.runId,
+    reliability: result.reliability,
+    validationIssues: result.validationIssues,
+    structuredEnvelope: result.structured,
+  };
+}
 
 function normalizeNodeType(value: unknown): TaskPlanNodeType {
   switch (value) {
@@ -68,6 +82,38 @@ function normalizeEdgeType(value: unknown): TaskPlanEdgeType {
   }
 }
 
+function ensureObject(value: unknown, context: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new AiClientError(`${context} must be an object`, "openclaw", "invalid_response");
+  }
+  return value as Record<string, unknown>;
+}
+
+function parseStructuredFeatureResult<T>(
+  client: AiClientRecord,
+  feature: Parameters<typeof dispatchStructured>[1],
+  message: string,
+  scope = "default",
+): Promise<{ parsed: T; debug?: StructuredDebugInfo; rawText?: string }> {
+  return (async () => {
+    if (client.type === "openclaw") {
+      const structuredCall = await dispatchStructured<T>(client, feature, message, scope);
+      const structured = requireStructuredResult<T>(structuredCall, client.type);
+      return {
+        parsed: structured.parsed as T,
+        debug: toStructuredDebugInfo(structured),
+        rawText: structured.rawOutput ?? structuredCall.text,
+      };
+    }
+
+    const raw = await dispatch(client, feature, message, scope);
+    return {
+      parsed: extractJSON<T>(raw, client.type),
+      rawText: raw,
+    };
+  })();
+}
+
 // ── Suggest ──
 
 export function buildSuggestMessage(request: SmartSuggestRequest): string {
@@ -90,7 +136,7 @@ export function buildSuggestMessage(request: SmartSuggestRequest): string {
   }
   return `Suggest task completions for: "${request.input}"${
     contextParts.length ? `\n\nContext:\n${contextParts.join("\n")}` : ""
-  }\n\nReturn JSON: { "suggestions": [...] }`;
+  }`;
 }
 
 export async function suggest(
@@ -98,18 +144,15 @@ export async function suggest(
   request: SmartSuggestRequest,
 ): Promise<SmartSuggestResponse> {
   const requestId = randomUUID();
-  const raw = await dispatch(
+  const result = await parseStructuredFeatureResult<{ suggestions?: Array<Partial<SmartSuggestion>> }>(
     client,
     "suggest",
     buildSuggestMessage(request),
     request.workspaceId ?? "default",
   );
-  const parsed = extractJSON<{ suggestions?: Array<Partial<SmartSuggestion>> }>(
-    raw,
-    client.type,
-  );
+
   return {
-    suggestions: (parsed.suggestions ?? [])
+    suggestions: (result.parsed.suggestions ?? [])
       .filter((s) => s.title)
       .map((s) => ({
         title: s.title!,
@@ -121,6 +164,7 @@ export async function suggest(
       })),
     source: client.type,
     requestId,
+    structured: result.debug,
   };
 }
 
@@ -132,23 +176,25 @@ export async function generatePlan(
 ): Promise<GenerateTaskPlanResponse> {
   const msg = `Generate an executable task plan graph for:\nTitle: "${request.title}"${
     request.description ? `\nDescription: ${request.description}` : ""
-  }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}\n\nReturn JSON.`;
-  const raw = await dispatch(client, "generate_plan", msg);
-  const parsed = extractJSON<{
+  }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}`;
+
+  const result = await parseStructuredFeatureResult<{
     summary?: string;
     reasoning?: string;
     nodes?: Array<Partial<TaskPlanNode>>;
     edges?: Array<Partial<TaskPlanEdge>>;
-  }>(raw, client.type);
-  
-  const nodes: TaskPlanNode[] = (parsed.nodes ?? []).map((n, i) => {
-    const execMode = n.executionMode === "manual" || n.executionMode === "hybrid" 
-      ? n.executionMode 
+  }>(client, "generate_plan", msg, request.taskId);
+
+  const parsed = ensureObject(result.parsed, "task plan result");
+
+  const nodes: TaskPlanNode[] = ((parsed.nodes as Array<Partial<TaskPlanNode>> | undefined) ?? []).map((n, i) => {
+    const execMode = n.executionMode === "manual" || n.executionMode === "hybrid"
+      ? n.executionMode
       : "automatic";
     const requiresInput = Boolean(n.requiresHumanInput);
     const requiresApproval = Boolean(n.requiresHumanApproval);
     const autoRunnable = execMode === "automatic" && !requiresInput && !requiresApproval;
-    
+
     return {
       id: n.id ?? `node-${i + 1}`,
       type: normalizeNodeType(n.type),
@@ -168,21 +214,22 @@ export async function generatePlan(
       metadata: n.metadata ?? null,
     };
   });
-  
-  const edges: TaskPlanEdge[] = (parsed.edges ?? []).map((e: Record<string, unknown>, i: number) => ({
+
+  const edges: TaskPlanEdge[] = ((parsed.edges as Array<Record<string, unknown>> | undefined) ?? []).map((e, i) => ({
     id: (e.id as string) ?? `edge-${i + 1}`,
     fromNodeId: (e.fromNodeId ?? e.from ?? "") as string,
     toNodeId: (e.toNodeId ?? e.to ?? "") as string,
     type: normalizeEdgeType(e.type),
     metadata: (e.metadata as Record<string, unknown>) ?? null,
   }));
-  
+
   return {
     nodes,
     edges,
-    summary: parsed.summary ?? `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
-    reasoning: parsed.reasoning,
+    summary: typeof parsed.summary === "string" ? parsed.summary : `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
+    reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
     source: client.type,
+    structured: result.debug,
   };
 }
 
@@ -198,23 +245,20 @@ export async function analyzeConflicts(
         `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`,
     )
     .join("\n");
-  const msg = `Analyze conflicts:\n${taskList}${request.focusDate ? `\nFocus date: ${request.focusDate}` : ""}\n\nReturn JSON.`;
-  const raw = await dispatch(
-    client,
-    "conflicts",
-    msg,
-    request.workspaceId ?? "default",
-  );
-  const parsed = extractJSON<{
+  const msg = `Analyze conflicts:\n${taskList}${request.focusDate ? `\nFocus date: ${request.focusDate}` : ""}`;
+
+  const result = await parseStructuredFeatureResult<{
     conflicts?: ConflictInfo[];
     resolutions?: ResolutionSuggestion[];
     summary?: string;
-  }>(raw, client.type);
+  }>(client, "conflicts", msg, request.workspaceId ?? "default");
+
   return {
-    conflicts: parsed.conflicts ?? [],
-    resolutions: parsed.resolutions ?? [],
-    summary: parsed.summary ?? "",
+    conflicts: result.parsed.conflicts ?? [],
+    resolutions: result.parsed.resolutions ?? [],
+    summary: result.parsed.summary ?? "",
     source: client.type,
+    structured: result.debug,
   };
 }
 
@@ -230,16 +274,20 @@ export async function suggestTimeslots(
     .join("\n");
   const msg = `Find time slots for:\nTask: "${request.taskTitle}" (${request.estimatedMinutes} min, ${request.priority ?? "Medium"})${
     request.deadline ? `\nDeadline: ${request.deadline}` : ""
-  }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\n\nCurrent schedule:\n${scheduleList || "(empty)"}\n\nReturn JSON.`;
-  const raw = await dispatch(client, "timeslots", msg);
-  const parsed = extractJSON<{ slots?: TimeslotOption[]; reasoning?: string }>(
-    raw,
-    client.type,
+  }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\n\nCurrent schedule:\n${scheduleList || "(empty)"}`;
+
+  const result = await parseStructuredFeatureResult<{ slots?: TimeslotOption[]; reasoning?: string }>(
+    client,
+    "timeslots",
+    msg,
+    request.taskTitle,
   );
+
   return {
-    slots: parsed.slots ?? [],
-    reasoning: parsed.reasoning,
+    slots: result.parsed.slots ?? [],
+    reasoning: result.parsed.reasoning,
     source: client.type,
+    structured: result.debug,
   };
 }
 
@@ -253,15 +301,31 @@ export async function chat(
     const lastUserMsg =
       [...request.messages].reverse().find((m) => m.role === "user")?.content ??
       "";
-    const raw = await dispatch(client, "chat", lastUserMsg);
+
     if (request.jsonMode) {
-      const parsed = extractJSON<unknown>(raw, client.type);
-      return { content: raw, parsed, source: client.type };
+      const structuredCall = await dispatchStructured<unknown>(client, "chat", lastUserMsg);
+      if (structuredCall.structured?.structured) {
+        return {
+          content: structuredCall.text,
+          parsed: structuredCall.structured.parsed,
+          source: client.type,
+          structured: toStructuredDebugInfo(structuredCall.structured),
+        };
+      }
+
+      const fallback = parseDirectStructuredEnvelope<unknown>(extractJSON<unknown>(structuredCall.text, client.type), client.type);
+      return {
+        content: structuredCall.text,
+        parsed: fallback.parsed,
+        source: client.type,
+        structured: toStructuredDebugInfo(fallback),
+      };
     }
+
+    const raw = await dispatch(client, "chat", lastUserMsg);
     return { content: raw, source: client.type };
   }
 
-  // LLM — use full message history with streaming
   const config = client.config as LLMClientConfig;
   const model = config.model ?? "gpt-4o-mini";
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -294,7 +358,6 @@ export async function chat(
     );
   }
 
-  // Parse SSE stream
   const reader = res.body?.getReader();
   if (!reader) {
     throw new AiClientError("No response body for streaming", "llm", "internal");
