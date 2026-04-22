@@ -9,10 +9,17 @@ import type {
   LLMClientConfig,
   SmartSuggestRequest,
   StreamEvent,
+  GenerateTaskPlanRequest,
+  GenerateTaskPlanResponse,
 } from "./types";
 import type { StructuredAgentResult } from "../../../../packages/runtime-client/src/openclaw/structured-result";
 import { SYSTEM_PROMPTS } from "./prompts";
-import { buildSuggestMessage } from "./features";
+import {
+  buildSuggestMessage,
+  buildGeneratePlanMessage,
+  normalizeGeneratePlanResponse,
+  normalizeSuggestResponse,
+} from "./features";
 import { openclawCall } from "./providers";
 
 function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
@@ -90,6 +97,8 @@ export async function* openclawStream(
               result?: string;
               error?: string;
               output?: string;
+              message?: string;
+              phase?: string;
               structured?: StreamEvent extends { type: "done"; structured?: infer S } ? S : never;
             };
 
@@ -104,8 +113,10 @@ export async function* openclawStream(
               yield { type: "tool_call", tool: evt.tool, input: evt.input ?? {} };
             } else if (evt.type === "tool_result" && evt.tool) {
               yield { type: "tool_result", tool: evt.tool, result: evt.text ?? evt.result ?? "" };
+            } else if (evt.type === "lifecycle") {
+              yield { type: "status", message: evt.message ?? evt.phase ?? "Processing" };
             } else if (evt.type === "error") {
-              yield { type: "error", message: evt.error ?? evt.text ?? "Unknown error" };
+              yield { type: "error", message: evt.error ?? evt.text ?? evt.message ?? "Unknown error" };
               return;
             } else if (evt.type === "text" && evt.text) {
               fullText += evt.text;
@@ -262,7 +273,78 @@ export async function* suggestStream(
     request.workspaceId ?? "default",
   );
 
+  let finalText = "";
   for await (const event of gen) {
+    if (event.type === "partial") {
+      finalText += event.text;
+      yield event;
+      continue;
+    }
+
+    if (event.type === "done") {
+      const text = event.text ?? finalText;
+      const structuredParsed = event.structured?.parsed;
+      const parsed =
+        structuredParsed && typeof structuredParsed === "object"
+          ? structuredParsed
+          : (() => {
+              try {
+                return text ? JSON.parse(text) : { suggestions: [] };
+              } catch {
+                return { suggestions: [] };
+              }
+            })();
+
+      const suggestions = normalizeSuggestResponse({
+        parsed,
+        source: client.type,
+        structured: event.structured ?? undefined,
+      });
+      yield { type: "result", suggestions };
+      yield { type: "done", text, structured: event.structured ?? null };
+      return;
+    }
+
+    yield event;
+  }
+}
+
+export async function* generatePlanStream(
+  client: AiClientRecord,
+  request: GenerateTaskPlanRequest,
+): AsyncGenerator<StreamEvent> {
+  const gen = dispatchStream(
+    client,
+    "generate_plan",
+    buildGeneratePlanMessage(request),
+    request.taskId || "default",
+  );
+
+  let finalText = "";
+  for await (const event of gen) {
+    if (event.type === "partial") {
+      finalText += event.text;
+      yield event;
+      continue;
+    }
+
+    if (event.type === "done") {
+      const text = event.text ?? finalText;
+      let parsed: unknown = { summary: "", nodes: [], edges: [] };
+      try {
+        parsed = text ? JSON.parse(text) : parsed;
+      } catch {
+        parsed = { summary: text || "", nodes: [], edges: [] };
+      }
+      const plan = normalizeGeneratePlanResponse({
+        parsed,
+        source: client.type,
+      });
+      yield { type: "result", plan };
+      yield { type: "done", text, structured: event.structured ?? null };
+      return;
+    }
+
     yield event;
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useAutoComplete,
   useSmartAutomation,
@@ -359,6 +359,111 @@ describe("useAutoComplete", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("should replace provisional rule suggestions with final streamed AI suggestions", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  'event: suggestions\ndata: {"suggestions":[{"id":"rule-1","summary":"rule summary","action":{"type":"create_task","title":"Rule suggestion","description":"rule","priority":"Medium","estimatedMinutes":30,"tags":[]}}],"source":"rules","requestId":"req-1","isFinal":false}\n\n' +
+                    'event: suggestions\ndata: {"suggestions":[{"id":"ai-1","summary":"AI summary","action":{"type":"create_task","title":"AI suggestion","description":"streamed structured result","priority":"High","estimatedMinutes":45,"tags":["testing"]}}],"source":"ai","requestId":"req-1","isFinal":true}\n\n' +
+                    'event: done\ndata: {"requestId":"req-1"}\n\n',
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      ),
+    );
+
+    const { result } = renderHook(() => useAutoComplete("Write tests", 100));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.suggestions).toEqual([
+      {
+        title: "AI suggestion",
+        description: "streamed structured result",
+        priority: "High",
+        estimatedMinutes: 45,
+        tags: ["testing"],
+      },
+    ]);
+    expect(result.current.phase).toBe("done");
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it("should not get stuck in connecting when a newer request replaces an older one", async () => {
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>(() => {
+            // keep first request pending forever to simulate a stale in-flight request
+          }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              const encoder = new TextEncoder();
+              controller.enqueue(
+                encoder.encode(
+                  'event: suggestions\ndata: {"suggestions":[{"id":"final-1","summary":"AI summary","action":{"type":"create_task","title":"参加美国总统竞选","description":"final","priority":"High","estimatedMinutes":60,"tags":[]}}],"source":"ai","requestId":"req-2","isFinal":true}\n\n' +
+                    'event: done\ndata: {"requestId":"req-2"}\n\n',
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { result, rerender } = renderHook(
+      ({ title }: { title: string | null }) => useAutoComplete(title, 100),
+      { initialProps: { title: "参加美国" } },
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(result.current.phase).toBe("connecting");
+    expect(result.current.isLoading).toBe(true);
+
+    rerender({ title: "参加美国总统竞选" });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.current.phase).toBe("done");
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.suggestions).toEqual([
+      {
+        title: "参加美国总统竞选",
+        description: "final",
+        priority: "High",
+        estimatedMinutes: 60,
+        tags: [],
+      },
+    ]);
+  });
+
   it("should use default 500ms debounce when not specified", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: [] }));
     vi.stubGlobal("fetch", fetchSpy);
@@ -605,7 +710,6 @@ describe("useSmartDecomposition", () => {
 
     const { result } = renderHook(() => useSmartDecomposition(validInput));
 
-    // Wait for the async fetch to settle
     await act(async () => {
       // flush microtasks
     });
@@ -613,6 +717,48 @@ describe("useSmartDecomposition", () => {
     expect(result.current.result).toEqual(samplePlanGraphResponse);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
+  });
+
+  it("should consume SSE plan-generation progress including tool calls before final result", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  'event: status\ndata: {"message":"Planning graph"}\n\n' +
+                    'event: tool_call\ndata: {"tool":"submit_structured_result","input":{"schemaName":"task_plan_graph"}}\n\n' +
+                    'event: result\ndata: ' +
+                    JSON.stringify(samplePlanGraphResponse) +
+                    '\n\n' +
+                    'event: done\ndata: {}\n\n',
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      ),
+    );
+
+    const { result } = renderHook(() => useSmartDecomposition(validInput));
+
+    await waitFor(() => {
+      expect(result.current.result).toEqual(samplePlanGraphResponse);
+    });
+
+    expect(result.current.statusMessage).toBe("Planning graph");
+    expect(result.current.toolCalls).toEqual([
+      {
+        tool: "submit_structured_result",
+        input: { schemaName: "task_plan_graph" },
+      },
+    ]);
+    expect(result.current.isLoading).toBe(false);
   });
 
   it("should handle error state", async () => {

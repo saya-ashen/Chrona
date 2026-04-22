@@ -221,5 +221,6 @@ export type StreamEvent =
   | { type: "tool_call"; tool: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool: string; result: string }
   | { type: "partial"; text: string }
-  | { type: "done"; text: string; structured?: StructuredAgentResult | null }
+  | { type: "result"; plan?: GenerateTaskPlanResponse; suggestions?: SmartSuggestResponse }
+  | { type: "done"; text?: string; structured?: StructuredAgentResult<Record<string, unknown>> | null }
   | { type: "error"; message: string };

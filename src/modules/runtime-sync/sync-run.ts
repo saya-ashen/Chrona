@@ -7,7 +7,10 @@ import {
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
-import { progressAcceptedTaskPlan } from "@/modules/commands/progress-accepted-task-plan";
+import {
+  progressAcceptedTaskPlan,
+  syncParentTaskStateFromAcceptedPlan,
+} from "@/modules/commands/progress-accepted-task-plan";
 import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import { syncAcceptedTaskPlanForTask } from "@/modules/tasks/sync-task-plan-graph";
 import {
@@ -293,6 +296,14 @@ export async function syncRunFromRuntime(input: {
       });
       if (snapshot.status === "Completed") {
         await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });
+      } else if (snapshot.status === "WaitingForApproval") {
+        await db.task.update({
+          where: { id: run.task.parentTaskId },
+          data: { status: "WaitingForApproval", completedAt: null },
+        });
+        await rebuildTaskProjection(run.task.parentTaskId);
+      } else {
+        await syncParentTaskStateFromAcceptedPlan(run.task.parentTaskId);
       }
     }
   }

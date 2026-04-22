@@ -139,6 +139,37 @@ export function buildSuggestMessage(request: SmartSuggestRequest): string {
   }`;
 }
 
+function normalizeSuggestion(input: Partial<SmartSuggestion>): SmartSuggestion | null {
+  if (!input.title) return null;
+  return {
+    title: input.title,
+    description: input.description ?? "",
+    priority: input.priority ?? "Medium",
+    estimatedMinutes: input.estimatedMinutes ?? 30,
+    tags: input.tags ?? [],
+    suggestedSlot: input.suggestedSlot,
+  };
+}
+
+export function normalizeSuggestResponse(input: {
+  parsed: unknown;
+  source: string;
+  requestId?: string;
+  structured?: StructuredDebugInfo;
+}): SmartSuggestResponse {
+  const parsed = ensureObject(input.parsed, "smart suggestions result");
+  const suggestions = ((parsed.suggestions as Array<Partial<SmartSuggestion>> | undefined) ?? [])
+    .map((suggestion) => normalizeSuggestion(suggestion))
+    .filter((suggestion): suggestion is SmartSuggestion => suggestion !== null);
+
+  return {
+    suggestions,
+    source: input.source,
+    requestId: input.requestId ?? randomUUID(),
+    structured: input.structured,
+  };
+}
+
 export async function suggest(
   client: AiClientRecord,
   request: SmartSuggestRequest,
@@ -151,41 +182,28 @@ export async function suggest(
     request.workspaceId ?? "default",
   );
 
-  return {
-    suggestions: (result.parsed.suggestions ?? [])
-      .filter((s) => s.title)
-      .map((s) => ({
-        title: s.title!,
-        description: s.description ?? "",
-        priority: s.priority ?? "Medium",
-        estimatedMinutes: s.estimatedMinutes ?? 30,
-        tags: s.tags ?? [],
-        suggestedSlot: s.suggestedSlot,
-      })),
+  return normalizeSuggestResponse({
+    parsed: result.parsed,
     source: client.type,
     requestId,
     structured: result.debug,
-  };
+  });
 }
 
 // ── Generate Plan ──
 
-export async function generatePlan(
-  client: AiClientRecord,
-  request: GenerateTaskPlanRequest,
-): Promise<GenerateTaskPlanResponse> {
-  const msg = `Generate an executable task plan graph for:\nTitle: "${request.title}"${
+export function buildGeneratePlanMessage(request: GenerateTaskPlanRequest) {
+  return `Generate an executable task plan graph for:\nTitle: "${request.title}"${
     request.description ? `\nDescription: ${request.description}` : ""
   }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}`;
+}
 
-  const result = await parseStructuredFeatureResult<{
-    summary?: string;
-    reasoning?: string;
-    nodes?: Array<Partial<TaskPlanNode>>;
-    edges?: Array<Partial<TaskPlanEdge>>;
-  }>(client, "generate_plan", msg, request.taskId);
-
-  const parsed = ensureObject(result.parsed, "task plan result");
+export function normalizeGeneratePlanResponse(input: {
+  parsed: unknown;
+  source: string;
+  structured?: StructuredDebugInfo;
+}): GenerateTaskPlanResponse {
+  const parsed = ensureObject(input.parsed, "task plan result");
 
   const nodes: TaskPlanNode[] = ((parsed.nodes as Array<Partial<TaskPlanNode>> | undefined) ?? []).map((n, i) => {
     const execMode = n.executionMode === "manual" || n.executionMode === "hybrid"
@@ -211,6 +229,7 @@ export async function generatePlan(
       autoRunnable,
       blockingReason: requiresInput ? "needs_user_input" as const : requiresApproval ? "needs_approval" as const : null,
       linkedTaskId: n.linkedTaskId ?? null,
+      completionSummary: n.completionSummary ?? null,
       metadata: n.metadata ?? null,
     };
   });
@@ -228,9 +247,27 @@ export async function generatePlan(
     edges,
     summary: typeof parsed.summary === "string" ? parsed.summary : `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
     reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
+    source: input.source,
+    structured: input.structured,
+  };
+}
+
+export async function generatePlan(
+  client: AiClientRecord,
+  request: GenerateTaskPlanRequest,
+): Promise<GenerateTaskPlanResponse> {
+  const result = await parseStructuredFeatureResult<{
+    summary?: string;
+    reasoning?: string;
+    nodes?: Array<Partial<TaskPlanNode>>;
+    edges?: Array<Partial<TaskPlanEdge>>;
+  }>(client, "generate_plan", buildGeneratePlanMessage(request), request.taskId);
+
+  return normalizeGeneratePlanResponse({
+    parsed: result.parsed,
     source: client.type,
     structured: result.debug,
-  };
+  });
 }
 
 // ── Analyze Conflicts ──

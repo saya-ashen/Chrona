@@ -69,6 +69,7 @@ export function TaskCreateDialog({
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Suppress auto-complete after applying a suggestion until next manual input */
   const suppressRef = useRef(false);
@@ -81,12 +82,13 @@ export function TaskCreateDialog({
     statusMessage,
     toolCalls,
   } = useAutoComplete(
-    !suppressRef.current && title.trim().length >= 3 ? title.trim() : null,
+    !suppressRef.current && !isComposing && title.trim().length >= 3 ? title.trim() : null,
   );
 
   /* ---- Derive dropdown visibility ---- */
   const hasAutoCompleteSuggestions =
     !suppressRef.current &&
+    !isComposing &&
     title.trim().length >= 3 &&
     autoCompleteSuggestions != null &&
     autoCompleteSuggestions.length > 0;
@@ -196,10 +198,24 @@ export function TaskCreateDialog({
               onChange={(e) => {
                 suppressRef.current = false;
                 setTitle(e.target.value);
-                setShowAutoComplete(true);
+                if (!isComposing) {
+                  setShowAutoComplete(true);
+                }
+              }}
+              onCompositionStart={() => {
+                setIsComposing(true);
+                setShowAutoComplete(false);
+              }}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                suppressRef.current = false;
+                setTitle(e.currentTarget.value);
+                if (e.currentTarget.value.trim().length >= 3) {
+                  setShowAutoComplete(true);
+                }
               }}
               onFocus={() => {
-                if (hasAutoCompleteSuggestions || (acLoading && phase !== "idle")) {
+                if (!isComposing && (hasAutoCompleteSuggestions || (acLoading && phase !== "idle"))) {
                   setShowAutoComplete(true);
                 }
               }}
