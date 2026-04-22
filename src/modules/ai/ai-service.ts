@@ -30,6 +30,7 @@ import {
   chat,
   checkClientHealth,
   suggestStream,
+  generatePlanStream,
 } from "./client";
 
 // ────────────────────────────────────────────────────────────────────
@@ -119,6 +120,15 @@ export async function* aiSuggestStream(request: SmartSuggestRequest): AsyncGener
     return;
   }
   yield* suggestStream(client, request);
+}
+
+export async function* aiGeneratePlanStream(request: GenerateTaskPlanRequest): AsyncGenerator<StreamEvent> {
+  const client = await getClientForFeature("generate_plan");
+  if (!client) {
+    yield { type: "error", message: "No AI client configured for task planning" };
+    return;
+  }
+  yield* generatePlanStream(client, request);
 }
 
 export async function isAIAvailable(): Promise<boolean> {

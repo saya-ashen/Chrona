@@ -2,6 +2,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {}, t: (k: string) => k }),
   useLocale: () => "en",
@@ -123,6 +131,11 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
       result: null,
       isLoading: false,
       error: null,
+      phase: "idle",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
     });
 
     render(<TaskDecompositionPanel {...defaultProps} />);
@@ -137,6 +150,11 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
       result: null,
       isLoading: false,
       error: null,
+      phase: "idle",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
     });
 
     render(<TaskDecompositionPanel {...defaultProps} />);
@@ -161,6 +179,11 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
       result: null,
       isLoading: true,
       error: null,
+      phase: "thinking",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
     });
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
@@ -182,11 +205,36 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
       result: null,
       isLoading: true,
       error: null,
+      phase: "thinking",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
     });
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
     expect(screen.getByText(/AI is planning task/i)).toBeInTheDocument();
+  });
+
+  it("shows streaming process details instead of only a blank waiting skeleton", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: true,
+      error: null,
+      phase: "streaming",
+      statusMessage: "Planning graph",
+      partialText: "Thinking through task decomposition...",
+      toolCalls: [{ tool: "submit_structured_result", input: { schemaName: "task_plan_graph" } }],
+      toolResults: [{ tool: "submit_structured_result", result: "validated" }],
+    });
+
+    render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+
+    expect(screen.getAllByText("Planning graph").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Thinking through task decomposition/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/submit_structured_result/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/validated/i)).toBeInTheDocument();
   });
 
   it("shows error state when error is set", () => {

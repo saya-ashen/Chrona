@@ -106,7 +106,16 @@ export function TaskDecompositionPanel({
       }
     : null;
 
-  const { result, isLoading, error } = useSmartDecomposition(planInput);
+  const {
+    result,
+    isLoading,
+    error,
+    phase,
+    statusMessage,
+    partialText,
+    toolCalls,
+    toolResults,
+  } = useSmartDecomposition(planInput);
 
   const savedPlanMeta = useMemo(() => {
     if (!result?.savedPlan) {
@@ -192,13 +201,48 @@ export function TaskDecompositionPanel({
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2 text-sm text-primary">
           <Bot className="size-4 animate-pulse" />
-          <span className="font-medium">{decompCopy.aiPlanning}</span>
+          <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
         </div>
-        <div className="mt-3 space-y-2">
-          <div className="h-3 animate-pulse rounded bg-primary/10" />
-          <div className="h-3 w-3/4 animate-pulse rounded bg-primary/10" />
-          <div className="h-3 w-1/2 animate-pulse rounded bg-primary/10" />
-        </div>
+        {phase !== "thinking" || statusMessage || partialText || toolCalls.length || toolResults.length ? (
+          <div className="mt-3 space-y-3 text-xs text-primary/90">
+            {statusMessage ? (
+              <div className="rounded-lg border border-primary/20 bg-background/70 px-3 py-2">
+                {statusMessage}
+              </div>
+            ) : null}
+            {partialText ? (
+              <div className="rounded-lg border border-border/40 bg-background/70 px-3 py-2 text-muted-foreground">
+                {partialText}
+              </div>
+            ) : null}
+            {toolCalls.length > 0 ? (
+              <div className="space-y-1 rounded-lg border border-border/40 bg-background/70 px-3 py-2">
+                <p className="font-medium text-foreground">Tools in progress</p>
+                {toolCalls.map((call, index) => (
+                  <div key={`${call.tool}-${index}`} className="text-muted-foreground">
+                    {call.tool}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {toolResults.length > 0 ? (
+              <div className="space-y-1 rounded-lg border border-border/40 bg-background/70 px-3 py-2">
+                <p className="font-medium text-foreground">Tool results</p>
+                {toolResults.map((toolResult, index) => (
+                  <div key={`${toolResult.tool}-${index}`} className="text-muted-foreground">
+                    {toolResult.tool}: {toolResult.result}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <div className="h-3 animate-pulse rounded bg-primary/10" />
+            <div className="h-3 w-3/4 animate-pulse rounded bg-primary/10" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-primary/10" />
+          </div>
+        )}
       </div>
     );
   }

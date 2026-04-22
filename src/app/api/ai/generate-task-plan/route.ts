@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { aiGeneratePlan } from "@/modules/ai/ai-service";
+import { aiGeneratePlan, aiGeneratePlanStream } from "@/modules/ai/ai-service";
 import {
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
 } from "@/modules/tasks/task-plan-graph-store";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph, TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { GenerateTaskPlanResponse } from "@/modules/ai/client/types";
 
 function buildSavedPlanSummary(savedPlan: {
   id: string;
@@ -23,6 +24,55 @@ function buildSavedPlanSummary(savedPlan: {
     summary: savedPlan.summary,
     updatedAt: savedPlan.updatedAt,
   };
+}
+
+function buildDraftPlanGraph(input: {
+  taskId: string;
+  prompt: string | null;
+  generatedBy: string;
+  planResult: GenerateTaskPlanResponse;
+}) {
+  const now = new Date().toISOString();
+  return {
+    id: `graph-${input.taskId || "adhoc"}-${Date.now()}`,
+    taskId: input.taskId,
+    status: "draft",
+    revision: 1,
+    source: "ai",
+    generatedBy: input.generatedBy,
+    prompt: input.prompt,
+    summary: input.planResult.summary,
+    changeSummary: null,
+    createdAt: now,
+    updatedAt: now,
+    nodes: input.planResult.nodes,
+    edges: input.planResult.edges,
+  } satisfies TaskPlanGraph;
+}
+
+function buildPlanResponse(input: {
+  source: string;
+  planGraph: TaskPlanGraph;
+  savedPlan?: {
+    id: string;
+    status: string;
+    prompt: string | null;
+    revision: number;
+    summary: string | null;
+    updatedAt: string;
+  };
+  reasoning?: string;
+}): TaskPlanGraphResponse & { reasoning?: string } {
+  return {
+    source: input.source,
+    planGraph: input.planGraph,
+    savedPlan: input.savedPlan,
+    reasoning: input.reasoning,
+  };
+}
+
+function sseEncode(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export async function POST(request: Request) {
@@ -46,14 +96,37 @@ export async function POST(request: Request) {
       );
     }
 
+    const wantsStream = (request.headers.get("accept") ?? "").includes("text/event-stream");
+
     if (taskId && !forceRefresh) {
       const savedPlan = await getLatestTaskPlanGraph(taskId);
       if (savedPlan) {
-        return NextResponse.json({
+        if (wantsStream) {
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(sseEncode("result", buildPlanResponse({
+                source: "saved",
+                planGraph: savedPlan.plan,
+                savedPlan: buildSavedPlanSummary(savedPlan),
+              }))));
+              controller.enqueue(encoder.encode(sseEncode("done", {})));
+              controller.close();
+            },
+          });
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+        return NextResponse.json(buildPlanResponse({
           source: "saved",
           planGraph: savedPlan.plan,
           savedPlan: buildSavedPlanSummary(savedPlan),
-        });
+        }));
       }
     }
 
@@ -77,6 +150,91 @@ export async function POST(request: Request) {
       }
     }
 
+    if (wantsStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          let finalResponse: (TaskPlanGraphResponse & { reasoning?: string }) | null = null;
+          try {
+            for await (const event of aiGeneratePlanStream({
+              taskId: taskId ?? "",
+              title: resolvedTitle,
+              description: resolvedDescription,
+              estimatedMinutes: resolvedEstimatedMinutes,
+            })) {
+              if (event.type === "status") {
+                controller.enqueue(encoder.encode(sseEncode("status", { message: event.message })));
+              } else if (event.type === "tool_call") {
+                controller.enqueue(
+                  encoder.encode(sseEncode("tool_call", { tool: event.tool, input: event.input })),
+                );
+              } else if (event.type === "tool_result") {
+                controller.enqueue(
+                  encoder.encode(sseEncode("tool_result", { tool: event.tool, result: event.result })),
+                );
+              } else if (event.type === "partial") {
+                controller.enqueue(encoder.encode(sseEncode("partial", { text: event.text })));
+              } else if (event.type === "result" && event.plan) {
+                const draftPlan = buildDraftPlanGraph({
+                  taskId: taskId ?? "",
+                  prompt: planningPrompt ?? null,
+                  generatedBy: event.plan.source ?? "ai",
+                  planResult: event.plan,
+                });
+
+                if (taskId && resolvedWorkspaceId) {
+                  const savedPlan = await saveTaskPlanGraph({
+                    workspaceId: resolvedWorkspaceId,
+                    taskId,
+                    plan: draftPlan,
+                    prompt: planningPrompt ?? null,
+                    status: "draft",
+                    source: "ai",
+                    generatedBy: event.plan.source ?? "ai",
+                    summary: event.plan.summary,
+                  });
+                  finalResponse = buildPlanResponse({
+                    source: event.plan.source,
+                    planGraph: savedPlan.plan,
+                    savedPlan: buildSavedPlanSummary(savedPlan),
+                    reasoning: event.plan.reasoning,
+                  });
+                } else {
+                  finalResponse = buildPlanResponse({
+                    source: event.plan.source,
+                    planGraph: draftPlan,
+                    reasoning: event.plan.reasoning,
+                  });
+                }
+                controller.enqueue(encoder.encode(sseEncode("result", finalResponse)));
+              } else if (event.type === "error") {
+                controller.enqueue(encoder.encode(sseEncode("error", { message: event.message })));
+              } else if (event.type === "done") {
+                controller.enqueue(encoder.encode(sseEncode("done", { response: finalResponse })));
+              }
+            }
+            controller.close();
+          } catch (error) {
+            controller.enqueue(
+              encoder.encode(
+                sseEncode("error", {
+                  message: error instanceof Error ? error.message : "Failed to generate task plan",
+                }),
+              ),
+            );
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
     const planResult = await aiGeneratePlan({
       taskId: taskId ?? "",
       title: resolvedTitle,
@@ -91,22 +249,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const now = new Date().toISOString();
-    const plan: TaskPlanGraph = {
-      id: `graph-${taskId ?? "adhoc"}-${Date.now()}`,
+    const plan = buildDraftPlanGraph({
       taskId: taskId ?? "",
-      status: "draft",
-      revision: 1,
-      source: "ai",
-      generatedBy: planResult.source ?? "ai",
       prompt: planningPrompt ?? null,
-      summary: planResult.summary,
-      changeSummary: null,
-      createdAt: now,
-      updatedAt: now,
-      nodes: planResult.nodes,
-      edges: planResult.edges,
-    };
+      generatedBy: planResult.source ?? "ai",
+      planResult,
+    });
 
     if (taskId && resolvedWorkspaceId) {
       const savedPlan = await saveTaskPlanGraph({
@@ -120,19 +268,19 @@ export async function POST(request: Request) {
         summary: planResult.summary,
       });
 
-      return NextResponse.json({
+      return NextResponse.json(buildPlanResponse({
         source: planResult.source,
         planGraph: savedPlan.plan,
         savedPlan: buildSavedPlanSummary(savedPlan),
         reasoning: planResult.reasoning,
-      });
+      }));
     }
 
-    return NextResponse.json({
+    return NextResponse.json(buildPlanResponse({
       source: planResult.source,
       planGraph: plan,
       reasoning: planResult.reasoning,
-    });
+    }));
   } catch (error) {
     console.error("Error generating task plan:", error);
     return NextResponse.json(

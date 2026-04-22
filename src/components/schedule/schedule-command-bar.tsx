@@ -43,6 +43,7 @@ export function ScheduleCommandBar({
   };
   const [value, setValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Suppress auto-complete after applying a suggestion until next manual input */
   const suppressRef = useRef(false);
@@ -55,7 +56,7 @@ export function ScheduleCommandBar({
     statusMessage,
     toolCalls,
   } = useAutoComplete(
-    !suppressRef.current && value.trim().length >= 3 ? value.trim() : null,
+    !suppressRef.current && !isComposing && value.trim().length >= 3 ? value.trim() : null,
   );
 
   const showPanel = showSuggestions && (
@@ -128,13 +129,38 @@ export function ScheduleCommandBar({
             onChange={(event) => {
               suppressRef.current = false;
               setValue(event.target.value);
-              setShowSuggestions(true);
+              if (!isComposing) {
+                setShowSuggestions(true);
+              }
             }}
-            onFocus={() => setShowSuggestions(true)}
+            onCompositionStart={() => {
+              setIsComposing(true);
+              setShowSuggestions(false);
+            }}
+            onCompositionEnd={(event) => {
+              setIsComposing(false);
+              suppressRef.current = false;
+              setValue(event.currentTarget.value);
+              if (event.currentTarget.value.trim().length >= 3) {
+                setShowSuggestions(true);
+              }
+            }}
+            onFocus={() => {
+              if (!isComposing) {
+                setShowSuggestions(true);
+              }
+            }}
             onBlur={() => {
               blurTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
             onKeyDown={(event) => {
+              const nativeEvent = event.nativeEvent as KeyboardEvent["nativeEvent"] & {
+                isComposing?: boolean;
+                keyCode?: number;
+              };
+              if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+                return;
+              }
               if (event.key === "Enter") {
                 event.preventDefault();
                 void handleSubmit();

@@ -22,6 +22,7 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const lastFetchedRef = useRef<string | null>(null);
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -29,6 +30,10 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
     const trimmed = title?.trim() ?? "";
 
     if (!title || trimmed.length < 3) {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
       setStructuredSuggestions([]);
       setIsLoading(false);
       setError(null);
@@ -45,17 +50,24 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
       return;
     }
 
+    const requestId = ++requestSeqRef.current;
     setIsLoading(true);
     setError(null);
-    setPhase("connecting");
+    setPhase("idle");
+    setStatusMessage(null);
     setToolCalls([]);
     setToolResults([]);
     setPartialText("");
 
     timerRef.current = setTimeout(async () => {
+      if (requestId !== requestSeqRef.current) return;
+
       if (abortRef.current) abortRef.current.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      setPhase("connecting");
+
+      const isActiveRequest = () => requestId === requestSeqRef.current && !controller.signal.aborted;
 
       try {
         const res = await fetch("/api/ai/auto-complete", {
@@ -65,7 +77,7 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
           signal: controller.signal,
         });
 
-        if (controller.signal.aborted) return;
+        if (!isActiveRequest()) return;
 
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
@@ -79,10 +91,11 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
+          let sawTerminalError = false;
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done || controller.signal.aborted) break;
+            if (done || !isActiveRequest()) break;
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
@@ -96,6 +109,7 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
                 const raw = line.slice(6).trim();
                 try {
                   const data = JSON.parse(raw) as Record<string, unknown>;
+                  if (!isActiveRequest()) return;
                   switch (eventType) {
                     case "status":
                       setPhase("thinking");
@@ -121,16 +135,16 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
                     case "suggestions": {
                       const suggestions = data.suggestions as StructuredSuggestion[];
                       const isFinal = data.isFinal as boolean;
-                      if (suggestions?.length) {
-                        setStructuredSuggestions(suggestions);
-                      }
+                      setStructuredSuggestions(suggestions ?? []);
                       if (isFinal) {
                         lastFetchedRef.current = trimmed;
                       }
                       break;
                     }
                     case "error":
+                      sawTerminalError = true;
                       setError(data.message as string);
+                      setIsLoading(false);
                       setPhase("error");
                       break;
                     case "done":
@@ -145,13 +159,15 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
               }
             }
           }
-          if (!controller.signal.aborted) {
+          if (isActiveRequest()) {
             setIsLoading(false);
-            if (phase !== "error") setPhase("done");
+            if (!sawTerminalError) {
+              setPhase("done");
+            }
           }
         } else {
           const data = (await res.json()) as { suggestions?: StructuredSuggestion[] };
-          if (!controller.signal.aborted) {
+          if (isActiveRequest()) {
             setStructuredSuggestions(data.suggestions ?? []);
             setIsLoading(false);
             setPhase("done");
@@ -160,30 +176,54 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        if (!controller.signal.aborted) {
+        if (isActiveRequest()) {
           setError(err instanceof Error ? err.message : "Failed to fetch suggestions");
           setStructuredSuggestions([]);
           setIsLoading(false);
           setPhase("error");
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
         }
       }
     }, debounceMs);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      if (abortRef.current) abortRef.current.abort();
     };
   }, [title, debounceMs]);
 
+  useEffect(() => () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, []);
+
   const suggestions: AutoCompleteSuggestion[] = useMemo(
     () =>
-      structuredSuggestions.map((s) => ({
-        title: s.action.title,
-        description: s.action.description,
-        priority: s.action.priority,
-        estimatedMinutes: s.action.estimatedMinutes,
-        tags: s.action.tags,
-      })),
+      structuredSuggestions.map((s) => {
+        const action = (s as StructuredSuggestion & { action?: StructuredSuggestion["action"] }).action;
+        if (action) {
+          return {
+            title: action.title,
+            description: action.description,
+            priority: action.priority,
+            estimatedMinutes: action.estimatedMinutes,
+            tags: action.tags,
+          };
+        }
+
+        const legacy = s as unknown as AutoCompleteSuggestion;
+        return {
+          title: legacy.title,
+          description: legacy.description,
+          priority: legacy.priority,
+          estimatedMinutes: legacy.estimatedMinutes,
+          tags: legacy.tags,
+        };
+      }),
     [structuredSuggestions],
   );
 

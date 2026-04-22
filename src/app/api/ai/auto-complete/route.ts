@@ -110,12 +110,19 @@ function ruleBasedSuggest(title: string): StructuredSuggestion[] {
 // JSON extraction from LLM output
 // ────────────────────────────────────────────────────────────────────
 
-function tryExtractSuggestions(text: string): StructuredSuggestion[] | null {
-  const jsonMatch =
-    text.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-  const jsonStr = jsonMatch?.[1] ?? text;
-  try {
-    const parsed = JSON.parse(jsonStr.trim()) as {
+function normalizeSuggestionShape(parsed: unknown): StructuredSuggestion[] | null {
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const envelope = parsed as {
+    suggestions?: Array<{
+      title?: string;
+      description?: string;
+      priority?: string;
+      estimatedMinutes?: number;
+      tags?: string[];
+      suggestedSlot?: { startAt: string; endAt: string };
+    }>;
+    result?: {
       suggestions?: Array<{
         title?: string;
         description?: string;
@@ -125,27 +132,40 @@ function tryExtractSuggestions(text: string): StructuredSuggestion[] | null {
         suggestedSlot?: { startAt: string; endAt: string };
       }>;
     };
-    if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) return null;
-    return parsed.suggestions
-      .filter((s) => s.title)
-      .map((s) => ({
-        id: randomUUID(),
-        summary: generateSummary({
-          title: s.title!,
-          priority: s.priority ?? "Medium",
-          estimatedMinutes: s.estimatedMinutes ?? 30,
-        }),
-        action: {
-          type: "create_task" as const,
-          title: s.title!,
-          description: s.description ?? "",
-          priority: (s.priority ?? "Medium") as "Low" | "Medium" | "High" | "Urgent",
-          estimatedMinutes: s.estimatedMinutes ?? 30,
-          tags: s.tags ?? [],
-          scheduledStartAt: s.suggestedSlot?.startAt,
-          scheduledEndAt: s.suggestedSlot?.endAt,
-        },
-      }));
+  };
+
+  const suggestions = envelope.suggestions ?? envelope.result?.suggestions;
+  if (!suggestions || !Array.isArray(suggestions)) return null;
+
+  return suggestions
+    .filter((s) => s.title)
+    .map((s) => ({
+      id: randomUUID(),
+      summary: generateSummary({
+        title: s.title!,
+        priority: s.priority ?? "Medium",
+        estimatedMinutes: s.estimatedMinutes ?? 30,
+      }),
+      action: {
+        type: "create_task" as const,
+        title: s.title!,
+        description: s.description ?? "",
+        priority: (s.priority ?? "Medium") as "Low" | "Medium" | "High" | "Urgent",
+        estimatedMinutes: s.estimatedMinutes ?? 30,
+        tags: s.tags ?? [],
+        scheduledStartAt: s.suggestedSlot?.startAt,
+        scheduledEndAt: s.suggestedSlot?.endAt,
+      },
+    }));
+}
+
+function tryExtractSuggestions(text: string): StructuredSuggestion[] | null {
+  const jsonMatch =
+    text.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  const jsonStr = jsonMatch?.[1] ?? text;
+  try {
+    const parsed = JSON.parse(jsonStr.trim()) as unknown;
+    return normalizeSuggestionShape(parsed);
   } catch {
     return null;
   }
@@ -253,6 +273,38 @@ export async function POST(request: Request) {
                   encoder.encode(sseEncode("partial", { text: event.text })),
                 );
                 break;
+              case "result": {
+                const aiSuggestions = event.suggestions?.suggestions?.map((suggestion) => ({
+                  id: randomUUID(),
+                  summary: generateSummary({
+                    title: suggestion.title,
+                    priority: suggestion.priority,
+                    estimatedMinutes: suggestion.estimatedMinutes,
+                  }),
+                  action: {
+                    type: "create_task" as const,
+                    title: suggestion.title,
+                    description: suggestion.description,
+                    priority: suggestion.priority,
+                    estimatedMinutes: suggestion.estimatedMinutes,
+                    tags: suggestion.tags,
+                    scheduledStartAt: suggestion.suggestedSlot?.startAt,
+                    scheduledEndAt: suggestion.suggestedSlot?.endAt,
+                  },
+                })) ?? [];
+
+                if (aiSuggestions.length > 0) {
+                  controller.enqueue(
+                    encoder.encode(sseEncode("suggestions", {
+                      suggestions: aiSuggestions,
+                      source: event.suggestions?.source ?? "ai",
+                      requestId,
+                      isFinal: true,
+                    })),
+                  );
+                }
+                break;
+              }
               case "done":
                 fullText = event.text;
                 // Try to parse final suggestions
