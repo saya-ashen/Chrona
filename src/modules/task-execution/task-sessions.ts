@@ -6,12 +6,19 @@ type EnsureDefaultTaskSessionInput = {
   taskTitle: string;
   runtimeName: string;
   defaultSessionId?: string | null;
+  suffix?: string | null;
+  label?: string | null;
 };
 
 type TaskSessionStatus = "idle" | "running" | "waiting_for_input" | "waiting_for_approval";
 
-export function buildDefaultTaskSessionKey(input: { taskId: string; runtimeName: string }) {
-  return `chrona:${input.runtimeName}:task:${input.taskId}:default`;
+export function buildDefaultTaskSessionKey(input: {
+  taskId: string;
+  runtimeName: string;
+  suffix?: string | null;
+}) {
+  const suffix = input.suffix?.trim() || "default";
+  return `chrona:${input.runtimeName}:task:${input.taskId}:${suffix}`;
 }
 
 function buildLegacyTaskSessionKey(input: { taskId: string; runtimeName: string }) {
@@ -29,6 +36,7 @@ export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionIn
   const expectedSessionKey = buildDefaultTaskSessionKey({
     taskId: input.taskId,
     runtimeName: input.runtimeName,
+    suffix: input.suffix,
   });
 
   if (input.defaultSessionId) {
@@ -76,7 +84,7 @@ export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionIn
       taskId: input.taskId,
       runtimeName: input.runtimeName,
       sessionKey: expectedSessionKey,
-      label: `${input.taskTitle.trim() || "Task"} · Default session`,
+      label: input.label?.trim() || `${input.taskTitle.trim() || "Task"} · ${input.suffix?.trim() || "Default session"}`,
       createdByFramework: true,
     },
   });

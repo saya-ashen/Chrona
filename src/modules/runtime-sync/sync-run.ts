@@ -7,6 +7,9 @@ import {
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
+import { progressAcceptedTaskPlan } from "@/modules/commands/progress-accepted-task-plan";
+import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { syncAcceptedTaskPlanForTask } from "@/modules/tasks/sync-task-plan-graph";
 import {
   decodeSyncCursor,
   encodeSyncCursor,
@@ -271,12 +274,28 @@ export async function syncRunFromRuntime(input: {
     },
   });
 
+  const nextRunStatus = toRunStatus(snapshot.status);
+
   await updateTaskSessionStateFromRun({
     taskSessionId: run.taskSessionId,
     runId: run.id,
-    runStatus: toRunStatus(snapshot.status),
+    runStatus: nextRunStatus,
     runtimeRunRef: snapshot.runtimeRunRef ?? run.runtimeRunRef,
   });
+
+  if (run.task.parentTaskId) {
+    const acceptedPlan = await getAcceptedTaskPlanGraph(run.task.parentTaskId);
+    if (acceptedPlan) {
+      await syncAcceptedTaskPlanForTask({
+        savedPlan: acceptedPlan,
+        linkedTaskId: run.taskId,
+        taskStatus: snapshot.status,
+      });
+      if (snapshot.status === "Completed") {
+        await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });
+      }
+    }
+  }
 
   const nextCursor = encodeSyncCursor({
     sessionKey: runtimeSessionKey,

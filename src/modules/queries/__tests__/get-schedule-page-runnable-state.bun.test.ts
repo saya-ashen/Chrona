@@ -49,7 +49,7 @@ describe("getSchedulePage runnable state", () => {
         runtimeInputVersion: "1",
         runtimeModel: "gpt-5.4",
         prompt: "Execute the configured task",
-        runtimeConfig: { temperature: 0.2 },
+        runtimeConfig: { temperature: 0.2, sessionStrategy: "per_subtask" },
         scheduleStatus: "Scheduled",
         scheduleSource: "human",
         scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
@@ -174,6 +174,10 @@ describe("getSchedulePage runnable state", () => {
         kind: "auto_run",
         reason: "Scheduled task is ready to run automatically.",
         priority: "high",
+        scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
+        executionMode: "none",
+        sessionStrategy: "per_subtask",
+        readyNodeIds: [],
       },
     ]);
   });

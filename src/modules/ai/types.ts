@@ -208,6 +208,7 @@ export type TaskPlanNode = {
   autoRunnable: boolean;
   blockingReason: TaskPlanNodeBlockingReason;
   linkedTaskId: string | null;
+  completionSummary: string | null;
   metadata: Record<string, unknown> | null;
 };
 

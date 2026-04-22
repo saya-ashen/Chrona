@@ -11,6 +11,7 @@ import type {
   OpenClawSendInputResult,
   OpenClawStructuredRunResult,
 } from "./types";
+import type { RuntimeInput } from "../types";
 
 export type OpenClawWaitForRunInput = {
   runtimeRunRef: string;
@@ -21,7 +22,11 @@ export type OpenClawWaitForRunInput = {
 export interface OpenClawRuntimeClient {
   connect(): Promise<OpenClawHello>;
   close(code?: number, reason?: string): void;
-  createRun(input: { prompt: string; runtimeSessionKey?: string }): Promise<{
+  createRun(input: {
+    prompt: string;
+    runtimeInput: RuntimeInput;
+    runtimeSessionKey?: string;
+  }): Promise<{
     runtimeRunRef?: string;
     runtimeSessionRef?: string;
     runtimeSessionKey?: string;

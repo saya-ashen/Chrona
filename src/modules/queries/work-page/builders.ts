@@ -156,6 +156,7 @@ export function buildTaskPlanFromGraph({
     executionMode: node.executionMode,
     estimatedMinutes: node.estimatedMinutes,
     priority: node.priority,
+    completionSummary: node.completionSummary,
   }));
 
   const currentStepId =

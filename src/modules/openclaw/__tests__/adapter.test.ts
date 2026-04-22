@@ -29,12 +29,37 @@ describe("createRuntimeAdapter", () => {
     });
 
     const adapter = await createRuntimeAdapter();
-    const result = await adapter.createRun({ prompt: "hello", runtimeInput: {} });
+    const result = await adapter.createRun({
+      prompt: "hello",
+      runtimeInput: {
+        model: "gpt-5.4",
+        approvalPolicy: "never",
+        toolMode: "workspace-write",
+        temperature: 0.2,
+      },
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://bridge.example:7677/v1/chat",
       expect.objectContaining({ method: "POST" }),
     );
+    const [, requestInit] = fetchMock.mock.calls[0];
+    const requestBody = JSON.parse(String(requestInit?.body));
+    expect(requestBody).toMatchObject({
+      message: "hello",
+      timeout: 42,
+      execution: {
+        mode: "task",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          model: "gpt-5.4",
+          approvalPolicy: "never",
+          toolMode: "workspace-write",
+          temperature: 0.2,
+        },
+      },
+    });
+    expect(typeof requestBody.sessionId).toBe("string");
     expect(result).toEqual({
       runStarted: true,
       runtimeRunRef: "bridge-session-1",

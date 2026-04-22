@@ -74,6 +74,19 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
         { value: "full-access", label: "Full access" },
       ],
     },
+    {
+      key: "sessionStrategy",
+      path: "sessionStrategy",
+      kind: "select",
+      label: "Subtask session strategy",
+      description: "Decide whether child tasks reuse the parent session or get one session per subtask",
+      advanced: true,
+      defaultValue: "per_subtask",
+      options: [
+        { value: "per_subtask", label: "Per subtask" },
+        { value: "shared", label: "Shared with parent" },
+      ],
+    },
   ],
   runnability: {
     requiredPaths: ["model", "prompt"],

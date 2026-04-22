@@ -105,6 +105,7 @@ describe("POST /api/ai/generate-task-plan", () => {
           autoRunnable: true,
           blockingReason: null,
           linkedTaskId: null,
+          completionSummary: null,
           metadata: null,
         },
         {
@@ -123,6 +124,7 @@ describe("POST /api/ai/generate-task-plan", () => {
           autoRunnable: false,
           blockingReason: "needs_user_input",
           linkedTaskId: null,
+          completionSummary: null,
           metadata: null,
         },
       ],

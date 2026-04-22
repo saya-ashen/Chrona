@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  buildAgentMessage,
   buildStructuredResult,
   createBridgeLogger,
   parseNDJSONEvents,
@@ -24,7 +25,53 @@ describe("openclaw bridge logging helpers", () => {
       messageChars: 11,
       hasSystemPrompt: true,
       systemPromptChars: 18,
+      hasExecution: false,
+      executionMode: null,
+      runtimeAdapterKey: null,
+      taskId: null,
+      runtimeInputKeys: [],
     });
+  });
+
+  it("builds a task-execution prompt envelope from bridge metadata", () => {
+    expect(
+      buildAgentMessage({
+        sessionId: "sess-task",
+        message: "Implement the schedule automation flow.",
+        execution: {
+          mode: "task",
+          runtimeAdapterKey: "openclaw",
+          taskId: "task-123",
+          workspaceId: "ws-1",
+          taskTitle: "Schedule automation",
+          runtimeInput: {
+            model: "gpt-5.4",
+            approvalPolicy: "never",
+            toolMode: "workspace-write",
+            temperature: 0.2,
+          },
+        },
+      }),
+    ).toContain("[Chrona Task Execution Request]");
+    expect(
+      buildAgentMessage({
+        sessionId: "sess-task",
+        message: "Implement the schedule automation flow.",
+        execution: {
+          mode: "task",
+          runtimeAdapterKey: "openclaw",
+          taskId: "task-123",
+          workspaceId: "ws-1",
+          taskTitle: "Schedule automation",
+          runtimeInput: {
+            model: "gpt-5.4",
+            approvalPolicy: "never",
+            toolMode: "workspace-write",
+            temperature: 0.2,
+          },
+        },
+      }),
+    ).toContain("Task ID: task-123");
   });
 
   it("emits structured log entries through an injectable sink", () => {

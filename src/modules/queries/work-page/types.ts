@@ -135,6 +135,7 @@ export type TaskPlanProjectionStep = {
   executionMode?: string | null;
   estimatedMinutes?: number | null;
   priority?: string | null;
+  completionSummary?: string | null;
 };
 
 export type TaskPlanProjection = {

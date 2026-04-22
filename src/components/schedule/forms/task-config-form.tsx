@@ -25,6 +25,7 @@ export type TaskConfigFormInput = {
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
+  sessionStrategy?: "shared" | "per_subtask";
 };
 
 export type TaskConfigRuntimeAdapter = {
@@ -321,6 +322,11 @@ function buildTaskConfigFormInput(
   });
   const legacyRuntimeFields = extractLegacyRuntimeFields(runtimeInputWithoutDefaults);
 
+  const sessionStrategy =
+    runtimeInput.sessionStrategy === "shared" || runtimeInput.sessionStrategy === "per_subtask"
+      ? (runtimeInput.sessionStrategy as "shared" | "per_subtask")
+      : undefined;
+
   return {
     title: formState.title,
     description: formState.description,
@@ -332,6 +338,7 @@ function buildTaskConfigFormInput(
     runtimeModel: legacyRuntimeFields.runtimeModel,
     prompt: legacyRuntimeFields.prompt,
     runtimeConfig: legacyRuntimeFields.runtimeConfig,
+    sessionStrategy,
   };
 }
 

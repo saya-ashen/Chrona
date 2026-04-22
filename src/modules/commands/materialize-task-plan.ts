@@ -49,7 +49,7 @@ function createTaskProjectionData(params: {
 }
 
 function isMaterializableNode(node: TaskPlanNode) {
-  return node.executionMode === "automatic";
+  return node.executionMode === "automatic" || node.executionMode === "child_task";
 }
 
 function isSequentialMaterializedEdge(edge: TaskPlanEdge, materializedNodeIds: Set<string>) {
@@ -104,6 +104,20 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           dueAt: parentTask.dueAt,
           scheduledStartAt: parentTask.scheduledStartAt,
           scheduledEndAt: parentTask.scheduledEndAt,
+          runtimeAdapterKey: "openclaw",
+          runtimeInput: {
+            model: "gpt-5.4",
+            prompt: node.objective,
+          },
+          runtimeInputVersion: "openclaw-legacy-v1",
+          runtimeModel: "gpt-5.4",
+          prompt: node.objective,
+          runtimeConfig: {
+            sessionStrategy:
+              node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
+                ? (node.metadata as Record<string, unknown>).sessionStrategy ?? "per_subtask"
+                : "per_subtask",
+          },
         },
       });
 

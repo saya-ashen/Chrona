@@ -47,6 +47,7 @@ import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 
@@ -89,6 +90,27 @@ export function SchedulePage({
   const [showQuickAddDialog, setShowQuickAddDialog] = useState(false);
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
+
+  const canBackendAutoRun = useCallback((taskId: string) => {
+    const item = viewData.listItems.find((entry) => entry.taskId === taskId)
+      ?? viewData.scheduled.find((entry) => entry.taskId === taskId)
+      ?? viewData.unscheduled.find((entry) => entry.taskId === taskId)
+      ?? null;
+    const runtimeKey =
+      item?.runtimeAdapterKey
+      ?? (typeof (item?.runtimeInput as { adapterKey?: unknown } | undefined)?.adapterKey === "string"
+        ? String((item?.runtimeInput as { adapterKey?: unknown }).adapterKey)
+        : null);
+    if (!runtimeKey) {
+      return false;
+    }
+
+    try {
+      return getRuntimeAdapterDefinition(runtimeKey).key === "openclaw";
+    } catch {
+      return false;
+    }
+  }, [viewData.listItems, viewData.scheduled, viewData.unscheduled]);
   const actionFailedMessage =
     messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
 
@@ -357,6 +379,22 @@ export function SchedulePage({
     });
   }
 
+  async function handleRunAutomationCandidate(taskId: string) {
+    await runSchedulePageAction({
+      action: async () => {
+        if (!canBackendAutoRun(taskId)) {
+          throw new Error(copy.automationUnsupportedRuntime);
+        }
+        const { startRun } = await import("@/app/actions/task-actions");
+        await startRun({ taskId });
+      },
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      actionFailedMessage,
+    });
+  }
+
   const dialogDefaults = getQuickCreateDefaults(data);
 
   return (
@@ -421,6 +459,9 @@ export function SchedulePage({
           handleTaskConfigSave={handleTaskConfigSave}
           handleQueueDragStart={handleQueueDragStart}
           handleQueueDragEnd={handleQueueDragEnd}
+          secondaryView={secondaryView}
+          setSecondaryView={setSecondaryView}
+          onRunAutomationCandidate={handleRunAutomationCandidate}
         />
       </div>
 

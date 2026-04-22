@@ -19,6 +19,7 @@ describe("openclaw task config", () => {
       "temperature",
       "approvalPolicy",
       "toolMode",
+      "sessionStrategy",
     ]);
   });
 
@@ -34,6 +35,19 @@ describe("openclaw task config", () => {
       temperature: 0.2,
       approvalPolicy: "never",
       toolMode: "workspace-write",
+      sessionStrategy: "per_subtask",
+    });
+  });
+
+  it("accepts shared-session execution strategy", () => {
+    expect(
+      validateOpenClawTaskConfig({
+        model: "gpt-5.4",
+        prompt: "Investigate the failing run",
+        sessionStrategy: "shared",
+      }),
+    ).toMatchObject({
+      sessionStrategy: "shared",
     });
   });
 

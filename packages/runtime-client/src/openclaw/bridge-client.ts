@@ -28,6 +28,7 @@ import type {
   OpenClawStructuredRunResult,
 } from "./types";
 import type { BridgeRequest, BridgeResponse, NDJSONEvent } from "./bridge-types";
+import type { RuntimeInput } from "../types";
 
 type BridgeClientOptions = {
   baseUrl?: string;
@@ -75,6 +76,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
   async createRun(input: {
     prompt: string;
+    runtimeInput: RuntimeInput;
     runtimeSessionKey?: string;
   }): Promise<{
     runtimeRunRef?: string;
@@ -83,7 +85,13 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     runStarted: boolean;
   }> {
     const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
-    const response = await this.callBridge(sessionId, input.prompt);
+    const response = await this.callBridge(sessionId, input.prompt, {
+      execution: {
+        mode: "task",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: input.runtimeInput,
+      },
+    });
     this.recordBridgeResponse(sessionId, input.prompt, response);
 
     return {
@@ -218,7 +226,11 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   private async callBridge(
     sessionId: string,
     message: string,
-    overrides?: { systemPrompt?: string; timeout?: number },
+    overrides?: {
+      systemPrompt?: string;
+      timeout?: number;
+      execution?: BridgeRequest["execution"];
+    },
   ): Promise<BridgeResponse> {
     const requestBody: BridgeRequest = {
       sessionId,
@@ -228,6 +240,10 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
     if (overrides?.systemPrompt) {
       requestBody.systemPrompt = overrides.systemPrompt;
+    }
+
+    if (overrides?.execution) {
+      requestBody.execution = overrides.execution;
     }
 
     const res = await fetch(`${this.baseUrl}/v1/chat`, {
