@@ -2,22 +2,13 @@
  * OpenClaw CLI Bridge Client
  *
  * Implements the OpenClawRuntimeClient interface by communicating with the
- * CLI Bridge HTTP server (services/openclaw-bridge/server.ts).
- *
- * The bridge wraps `openclaw agent --local --json` CLI invocations behind
- * a simple REST API on localhost:7677.
- *
- * This client uses a simpler HTTP flow because:
- * - Each request is a blocking HTTP call (no persistent connection)
- * - Session management is handled by the CLI via --session-id
- * - Approvals are auto-resolved (the CLI bridge doesn't expose interactive approvals)
- *
- * Note: this adapter also keeps a small in-memory compatibility cache so blocking
- * bridge responses can still satisfy runtime-style status/history reads. That cache
- * belongs to the OpenClaw integration layer, not the backend-agnostic runtime core.
+ * CLI Bridge HTTP server (`packages/openclaw-bridge/src/server.ts`).
  */
 
-import type { OpenClawRuntimeClient, OpenClawWaitForRunInput } from "../runtime/runtime-client";
+import type {
+  OpenClawRuntimeClient,
+  OpenClawWaitForRunInput,
+} from "../runtime/runtime-client";
 import type {
   OpenClawApprovalDecision,
   OpenClawApprovalRequest,
@@ -31,7 +22,13 @@ import type {
   OpenClawSendInputResult,
   OpenClawStructuredRunResult,
 } from "../protocol/types";
-import type { BridgeRequest, BridgeResponse, NDJSONEvent } from "./bridge-types";
+import type {
+  BridgeExecutionTaskRequest,
+  BridgeFeatureRequest,
+  BridgeResponse,
+  NDJSONEvent,
+  BridgeFeature,
+} from "./bridge-types";
 import type { RuntimeInput } from "../../../../packages/runtime-core/src/index";
 
 type BridgeClientOptions = {
@@ -46,7 +43,12 @@ type SessionState = {
   lastRunRef: string | null;
   lastRunStatus: OpenClawRunSnapshot["status"];
   lastOutput: string;
-  toolCalls: Array<{ tool: string; callId: string; input: Record<string, unknown>; result?: string }>;
+  toolCalls: Array<{
+    tool: string;
+    callId: string;
+    input: Record<string, unknown>;
+    result?: string;
+  }>;
   lastStructured: OpenClawStructuredRunResult | null;
 };
 
@@ -57,7 +59,11 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   private sessions = new Map<string, SessionState>();
 
   constructor(options: BridgeClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? process.env.OPENCLAW_BRIDGE_URL ?? "http://localhost:7677").replace(/\/$/, "");
+    this.baseUrl = (
+      options.baseUrl ??
+      process.env.OPENCLAW_BRIDGE_URL ??
+      "http://localhost:7677"
+    ).replace(/\/$/, "");
     this.timeoutSeconds = options.timeoutSeconds ?? 300;
     this.onEvent = options.onEvent;
   }
@@ -71,11 +77,24 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     if (health.status !== "ok") {
       throw new Error("OpenClaw CLI not available on bridge");
     }
-    return { protocol: 1, methods: ["chat", "chat/stream", "health", "chat/structured"] };
+    return {
+      protocol: 1,
+      methods: [
+        "health",
+        "features/suggest",
+        "features/suggest/stream",
+        "features/generate-plan",
+        "features/generate-plan/stream",
+        "features/analyze-conflicts",
+        "features/suggest-timeslot",
+        "features/chat",
+        "execution/task",
+      ],
+    };
   }
 
   close(): void {
-    // No-op for HTTP client
+    // no-op for HTTP client
   }
 
   async createRun(input: {
@@ -89,13 +108,17 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     runStarted: boolean;
   }> {
     const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
-    const response = await this.callBridge(sessionId, input.prompt, {
-      execution: {
-        mode: "task",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: input.runtimeInput,
-      },
-    });
+    const requestBody: BridgeExecutionTaskRequest = {
+      sessionId,
+      instructions: input.prompt,
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: input.runtimeInput,
+      timeout: this.timeoutSeconds,
+    };
+    const response = await this.postJson<BridgeResponse>(
+      "/v1/execution/task",
+      requestBody,
+    );
     this.recordBridgeResponse(sessionId, input.prompt, response);
 
     return {
@@ -111,27 +134,48 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     runtimeSessionKey?: string;
     systemPrompt?: string;
     timeoutSeconds?: number;
+    feature?: BridgeFeature;
   }): Promise<OpenClawStructuredRunResult<T>> {
     const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
-    const response = await this.callBridge(sessionId, input.prompt, {
-      systemPrompt: input.systemPrompt,
-      timeout: input.timeoutSeconds,
-    });
+    const feature = input.feature ?? "chat";
+    const path = this.getFeaturePath(feature, false);
+    const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
+      sessionId,
+      input: {
+        message: input.prompt,
+        systemPrompt: input.systemPrompt,
+      },
+      timeout: input.timeoutSeconds ?? this.timeoutSeconds,
+    };
+    const response = await this.postJson<BridgeResponse>(
+      path,
+      requestBody,
+    );
     this.recordBridgeResponse(sessionId, input.prompt, response);
 
     return {
-      ...response.structured,
+      ok: response.structured?.ok ?? false,
       parsed: (response.structured?.parsed ?? null) as T | null,
+      structured: response.structured?.structured ?? null,
+      rawToolCall: response.structured?.rawToolCall,
       rawOutput: response.output,
+      status: response.structured?.status ?? null,
+      error: response.structured?.error ?? response.error,
+      validationIssues: response.structured?.validationIssues,
+      reliability: response.structured?.reliability,
       sessionId: response.sessionId,
       runId: response.runId,
+      bridgeToolCalls: response.structured?.bridgeToolCalls,
     };
   }
 
   async waitForRun(
     input: OpenClawWaitForRunInput | string,
   ): Promise<OpenClawRunSnapshot> {
-    const key = typeof input === "string" ? input : (input.runtimeSessionKey ?? input.runtimeRunRef);
+    const key =
+      typeof input === "string"
+        ? input
+        : (input.runtimeSessionKey ?? input.runtimeRunRef);
     const session = this.sessions.get(key);
 
     return {
@@ -145,16 +189,14 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
   async readOutputs(runtimeSessionKey: string): Promise<OpenClawChatHistory> {
     const session = this.sessions.get(runtimeSessionKey);
-    return {
-      messages: session?.messages ?? [],
-    };
+    return { messages: session?.messages ?? [] };
   }
 
-  async getStructuredResult<T = unknown>(runtimeSessionKey: string): Promise<OpenClawStructuredRunResult<T> | null> {
+  async getStructuredResult<T = unknown>(
+    runtimeSessionKey: string,
+  ): Promise<OpenClawStructuredRunResult<T> | null> {
     const session = this.sessions.get(runtimeSessionKey);
-    if (!session?.lastStructured) {
-      return null;
-    }
+    if (!session?.lastStructured) return null;
     return {
       ...session.lastStructured,
       parsed: (session.lastStructured.parsed ?? null) as T | null,
@@ -166,7 +208,15 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   }
 
   async sendInput(input: OpenClawSendInput): Promise<OpenClawSendInputResult> {
-    const response = await this.callBridge(input.runtimeSessionKey, input.message);
+    const requestBody: BridgeExecutionTaskRequest = {
+      sessionId: input.runtimeSessionKey,
+      instructions: input.message,
+      timeout: this.timeoutSeconds,
+    };
+    const response = await this.postJson<BridgeResponse>(
+      "/v1/execution/task",
+      requestBody,
+    );
     this.recordBridgeResponse(input.runtimeSessionKey, input.message, response);
 
     return {
@@ -181,11 +231,15 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     return null;
   }
 
-  async requestApproval(_input: OpenClawApprovalRequest): Promise<OpenClawApprovalRequestResult> {
+  async requestApproval(
+    _input: OpenClawApprovalRequest,
+  ): Promise<OpenClawApprovalRequestResult> {
     return { approvalId: "noop", status: "auto-approved" };
   }
 
-  async resolveApproval(_input: OpenClawApprovalResolution): Promise<{ accepted: boolean }> {
+  async resolveApproval(
+    _input: OpenClawApprovalResolution,
+  ): Promise<{ accepted: boolean }> {
     return { accepted: true };
   }
 
@@ -206,7 +260,11 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     return session;
   }
 
-  private recordBridgeResponse(sessionId: string, userMessage: string, response: BridgeResponse): void {
+  private recordBridgeResponse(
+    sessionId: string,
+    userMessage: string,
+    response: BridgeResponse,
+  ): void {
     const session = this.getOrCreateSession(sessionId);
     session.lastRunRef = response.runId ?? response.sessionId;
     session.lastOutput = response.output;
@@ -217,66 +275,73 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       { role: "assistant", content: response.output },
     );
 
-    for (const tc of response.toolCalls) {
+    for (const toolCall of response.toolCalls) {
       session.toolCalls.push({
-        tool: tc.tool,
-        callId: tc.callId,
-        input: tc.input,
-        result: tc.result,
+        tool: toolCall.tool,
+        callId: toolCall.callId,
+        input: toolCall.input,
+        result: toolCall.result,
       });
     }
   }
 
-  private async callBridge(
-    sessionId: string,
-    message: string,
-    overrides?: {
-      systemPrompt?: string;
-      timeout?: number;
-      execution?: BridgeRequest["execution"];
-    },
-  ): Promise<BridgeResponse> {
-    const requestBody: BridgeRequest = {
-      sessionId,
-      message,
-      timeout: overrides?.timeout ?? this.timeoutSeconds,
-    };
-
-    if (overrides?.systemPrompt) {
-      requestBody.systemPrompt = overrides.systemPrompt;
+  private getFeaturePath(feature: BridgeFeature, stream: boolean): string {
+    switch (feature) {
+      case "suggest":
+        return stream ? "/v1/features/suggest/stream" : "/v1/features/suggest";
+      case "generate_plan":
+        return stream
+          ? "/v1/features/generate-plan/stream"
+          : "/v1/features/generate-plan";
+      case "conflicts":
+        return "/v1/features/analyze-conflicts";
+      case "timeslots":
+        return "/v1/features/suggest-timeslot";
+      case "chat":
+        return "/v1/features/chat";
     }
+  }
 
-    if (overrides?.execution) {
-      requestBody.execution = overrides.execution;
-    }
-
-    const res = await fetch(`${this.baseUrl}/v1/chat`, {
+  private async postJson<TResponse>(
+    path: string,
+    body: unknown,
+  ): Promise<TResponse> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      throw new Error(`Bridge call failed (${res.status}): ${errBody}`);
+    const text = await res.text().catch(() => "");
+    let parsed: unknown;
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(
+        `Bridge call failed (${res.status}): ${text.slice(0, 200)}`,
+      );
     }
 
-    return (await res.json()) as BridgeResponse;
+    if (!res.ok) {
+      const message =
+        parsed && typeof parsed === "object" && "error" in parsed
+          ? String((parsed as { error?: unknown }).error ?? text)
+          : text;
+      throw new Error(`Bridge call failed (${res.status}): ${message}`);
+    }
+
+    return parsed as TResponse;
   }
 
   async callBridgeStreaming(
-    sessionId: string,
-    message: string,
+    path: string,
+    body: unknown,
     onEvent?: (event: NDJSONEvent) => void,
   ): Promise<BridgeResponse> {
-    const res = await fetch(`${this.baseUrl}/v1/chat/stream`, {
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId,
-        message,
-        timeout: this.timeoutSeconds,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -306,20 +371,21 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       for (const line of lines) {
         if (line.startsWith("event: ")) {
           eventType = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          const raw = line.slice(6).trim();
-          try {
-            const data = JSON.parse(raw) as NDJSONEvent | BridgeResponse;
-            if (eventType === "done") {
-              finalResponse = data as BridgeResponse;
-            } else if (eventType === "event" && handler) {
-              handler(data as NDJSONEvent);
-            }
-          } catch {
-            // skip
-          }
-          eventType = "";
+          continue;
         }
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        try {
+          const data = JSON.parse(raw) as NDJSONEvent | BridgeResponse;
+          if (eventType === "done") {
+            finalResponse = data as BridgeResponse;
+          } else if (eventType === "event" && handler) {
+            handler(data as NDJSONEvent);
+          }
+        } catch {
+          // ignore malformed SSE lines
+        }
+        eventType = "";
       }
     }
 
@@ -327,10 +393,6 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       throw new Error("Stream ended without a final response");
     }
 
-    this.recordBridgeResponse(sessionId, message, finalResponse);
     return finalResponse;
   }
 }
-
-
-
