@@ -9,6 +9,7 @@ import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness"
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";
+import { getAcceptedTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
 
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
@@ -146,7 +147,7 @@ function buildFocusZones(items: Array<ReturnType<typeof mapProjectionItem>>) {
     });
 }
 
-function buildAutomationCandidates(input: {
+async function buildAutomationCandidates(input: {
   scheduled: Array<ReturnType<typeof mapProjectionItem>>;
   unscheduled: Array<ReturnType<typeof mapProjectionItem>>;
   risks: Array<ReturnType<typeof mapProjectionItem>>;
@@ -161,6 +162,10 @@ function buildAutomationCandidates(input: {
     kind: "auto_schedule" | "generate_plan" | "remind" | "auto_run";
     reason: string;
     priority: "low" | "medium" | "high";
+    scheduledStartAt?: Date | null;
+    executionMode?: "automatic" | "manual" | "hybrid" | "child_task" | "none";
+    sessionStrategy?: "shared" | "per_subtask";
+    readyNodeIds?: string[];
   }> = [];
 
   for (const item of input.unscheduled) {
@@ -220,11 +225,25 @@ function buildAutomationCandidates(input: {
       item.actionRequired === "Reschedule task";
 
     if (item.isRunnable && !blockedByApproval && !blockedByUser && !riskTaskIds.has(item.taskId)) {
+      const acceptedPlan = await getAcceptedTaskPlanGraph(item.taskId);
+      const readyNodes = acceptedPlan ? getReadyAutoRunnableNodes(acceptedPlan.plan) : [];
+      const sessionStrategy =
+        item.runtimeConfig &&
+        typeof item.runtimeConfig === "object" &&
+        !Array.isArray(item.runtimeConfig) &&
+        (item.runtimeConfig as Record<string, unknown>).sessionStrategy === "shared"
+          ? "shared"
+          : "per_subtask";
+
       candidates.push({
         taskId: item.taskId,
         kind: "auto_run",
         reason: "Scheduled task is ready to run automatically.",
         priority: item.priority === "Urgent" || item.priority === "High" ? "high" : "medium",
+        scheduledStartAt: item.scheduledStartAt,
+        executionMode: readyNodes.length > 0 ? "automatic" : "none",
+        sessionStrategy,
+        readyNodeIds: readyNodes.map((node) => node.id),
       });
     }
   }
@@ -308,7 +327,7 @@ export async function getSchedulePage(workspaceId: string) {
     proposals: mappedProposals,
   });
   const focusZones = buildFocusZones(scheduled);
-  const automationCandidates = buildAutomationCandidates({
+  const automationCandidates = await buildAutomationCandidates({
     scheduled,
     unscheduled,
     risks,

@@ -10,6 +10,14 @@ export interface BridgeRequest {
   message: string;
   systemPrompt?: string;
   timeout?: number;
+  execution?: {
+    mode: "task";
+    runtimeAdapterKey?: string;
+    taskId?: string;
+    workspaceId?: string;
+    taskTitle?: string;
+    runtimeInput?: Record<string, unknown>;
+  };
 }
 
 export interface ToolCallInfo {

@@ -85,6 +85,7 @@ describe("task-plan-graph-store", () => {
               autoRunnable: true,
               blockingReason: null,
               linkedTaskId: null,
+              completionSummary: null,
               metadata: null,
             },
             {
@@ -173,6 +174,7 @@ describe("task-plan-graph-store", () => {
               autoRunnable: true,
               blockingReason: null,
               linkedTaskId: null,
+              completionSummary: null,
               metadata: null,
             },
           ],

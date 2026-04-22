@@ -133,6 +133,10 @@ function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGrap
           blockingReason: normalizeBlockingReason(node.blockingReason),
           linkedTaskId:
             typeof node.linkedTaskId === "string" && node.linkedTaskId.trim().length > 0 ? node.linkedTaskId : null,
+          completionSummary:
+            typeof node.completionSummary === "string" && node.completionSummary.trim().length > 0
+              ? node.completionSummary.trim()
+              : null,
           metadata: node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
             ? (node.metadata as Record<string, unknown>)
             : null,

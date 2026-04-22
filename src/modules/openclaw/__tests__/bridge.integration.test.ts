@@ -149,6 +149,7 @@ describe("OpenClaw BridgeClient (real)", () => {
 
     const result = await client.createRun({
       prompt: "What is 3+3? Reply with just the number.",
+      runtimeInput: { model: "gpt-5.4", prompt: "What is 3+3? Reply with just the number." },
       runtimeSessionKey: `test-createRun-${Date.now()}`,
     });
 
@@ -169,6 +170,7 @@ describe("OpenClaw BridgeClient (real)", () => {
     const sessionKey = `test-history-${Date.now()}`;
     await client.createRun({
       prompt: "Say OK.",
+      runtimeInput: { model: "gpt-5.4", prompt: "Say OK." },
       runtimeSessionKey: sessionKey,
     });
 

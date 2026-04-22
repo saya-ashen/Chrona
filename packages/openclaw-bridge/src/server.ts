@@ -65,7 +65,54 @@ export function summarizeBridgeRequest(request: BridgeRequest): Record<string, u
     messageChars: request.message.length,
     hasSystemPrompt: Boolean(request.systemPrompt),
     systemPromptChars: request.systemPrompt?.length ?? 0,
+    hasExecution: Boolean(request.execution),
+    executionMode: request.execution?.mode ?? null,
+    runtimeAdapterKey: request.execution?.runtimeAdapterKey ?? null,
+    taskId: request.execution?.taskId ?? null,
+    runtimeInputKeys: request.execution?.runtimeInput
+      ? Object.keys(request.execution.runtimeInput).sort()
+      : [],
   };
+}
+
+export function buildAgentMessage(request: BridgeRequest): string {
+  let message = request.message;
+
+  if (request.execution?.mode === "task") {
+    const runtimeInput = request.execution.runtimeInput ?? {};
+    const lines = [
+      "[Chrona Task Execution Request]",
+      request.execution.taskTitle ? `Task: ${request.execution.taskTitle}` : null,
+      request.execution.taskId ? `Task ID: ${request.execution.taskId}` : null,
+      request.execution.workspaceId ? `Workspace ID: ${request.execution.workspaceId}` : null,
+      request.execution.runtimeAdapterKey
+        ? `Runtime adapter: ${request.execution.runtimeAdapterKey}`
+        : null,
+      typeof runtimeInput.model === "string" && runtimeInput.model.trim()
+        ? `Model: ${runtimeInput.model.trim()}`
+        : null,
+      typeof runtimeInput.approvalPolicy === "string" && runtimeInput.approvalPolicy.trim()
+        ? `Approval policy: ${runtimeInput.approvalPolicy.trim()}`
+        : null,
+      typeof runtimeInput.toolMode === "string" && runtimeInput.toolMode.trim()
+        ? `Tool mode: ${runtimeInput.toolMode.trim()}`
+        : null,
+      typeof runtimeInput.temperature === "number"
+        ? `Temperature: ${runtimeInput.temperature}`
+        : null,
+      "",
+      "[Task Instructions]",
+      message,
+    ].filter((line): line is string => line !== null);
+
+    message = lines.join("\n");
+  }
+
+  if (request.systemPrompt) {
+    message = `[System Prompt]\n${request.systemPrompt}\n\n[User Message]\n${message}`;
+  }
+
+  return message;
 }
 
 export function createBridgeLogger(options?: {
@@ -563,10 +610,7 @@ export function executeAgent(
   const args = ["agent", "--local", "--json"];
   args.push("--session-id", sessionId);
 
-  let message = request.message;
-  if (request.systemPrompt) {
-    message = `[System Prompt]\n${request.systemPrompt}\n\n[User Message]\n${message}`;
-  }
+  const message = buildAgentMessage(request);
   args.push("--message", message);
 
   if (request.timeout) {

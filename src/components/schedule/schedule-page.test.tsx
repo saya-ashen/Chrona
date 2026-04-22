@@ -10,6 +10,7 @@ const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", worksp
 const acceptScheduleProposal = vi.fn();
 const rejectScheduleProposal = vi.fn();
 const updateTaskConfigFromSchedule = vi.fn();
+const startRun = vi.fn().mockResolvedValue({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1", runtimeRunRef: "runtime-1" });
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
@@ -30,10 +31,19 @@ vi.mock("@/app/actions/task-actions", () => ({
   acceptScheduleProposal: (...args: unknown[]) => acceptScheduleProposal(...args),
   rejectScheduleProposal: (...args: unknown[]) => rejectScheduleProposal(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
+  startRun: (...args: unknown[]) => startRun(...args),
 }));
 
 vi.mock("@/components/schedule/planning-header", () => ({
-  PlanningHeader: () => <div data-testid="planning-header" />,
+  PlanningHeader: ({ actions }: { actions?: Array<{ label: string; onClick?: () => void }> }) => (
+    <div data-testid="planning-header">
+      {actions?.map((action) => (
+        <button key={action.label} type="button" onClick={action.onClick}>
+          {action.label}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/schedule/schedule-page-panels", () => ({
@@ -43,6 +53,30 @@ vi.mock("@/components/schedule/schedule-page-panels", () => ({
   RiskCard: () => <div data-testid="risk-card" />,
   SelectedBlockSheet: () => <div data-testid="selected-block-sheet" />,
   TodayFocusCard: () => <div data-testid="today-focus-card" />,
+  AutomationCandidateCard: ({
+    candidate,
+    onRun,
+  }: {
+    candidate: {
+      taskId: string;
+      reason: string;
+      kind: string;
+      sessionStrategy?: string;
+      readyNodeIds?: string[];
+    };
+    onRun?: (taskId: string) => void;
+  }) => (
+    <div data-testid="automation-card">
+      <span>{candidate.reason}</span>
+      {candidate.sessionStrategy ? <span>{candidate.sessionStrategy}</span> : null}
+      {candidate.readyNodeIds ? <span>{candidate.readyNodeIds.join(",")}</span> : null}
+      {candidate.kind === "auto_run" ? (
+        <button type="button" onClick={() => onRun?.(candidate.taskId)}>
+          Run now
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/schedule/schedule-action-rail", () => ({
@@ -74,7 +108,48 @@ vi.mock("@/components/schedule/conflict-card", () => ({
 }));
 
 vi.mock("@/components/schedule/task-create-dialog", () => ({
-  TaskCreateDialog: () => null,
+  TaskCreateDialog: ({
+    isOpen,
+    onClose,
+    onSubmit,
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (draft: {
+      title: string;
+      startAt: Date;
+      endAt: Date;
+      priority: string;
+      dueAt: Date | null;
+      runtimeAdapterKey: string;
+      runtimeInputVersion: string;
+      runtimeInput: Record<string, unknown>;
+    }) => void;
+  }) =>
+    isOpen ? (
+      <div data-testid="task-create-dialog">
+        <button
+          type="button"
+          onClick={() =>
+            onSubmit({
+              title: "Inbox triage",
+              startAt: new Date(2026, 3, 15, 9, 0, 0, 0),
+              endAt: new Date(2026, 3, 15, 10, 30, 0, 0),
+              priority: "High",
+              dueAt: null,
+              runtimeAdapterKey: "openclaw",
+              runtimeInputVersion: "openclaw-legacy-v1",
+              runtimeInput: {},
+            })
+          }
+        >
+          Add to queue
+        </button>
+        <button type="button" onClick={onClose}>
+          Close dialog
+        </button>
+      </div>
+    ) : null,
 }));
 
 
@@ -148,7 +223,14 @@ function createData(): SchedulePageData {
         riskLevel: "low",
       },
     ],
-    automationCandidates: [],
+    automationCandidates: [
+      {
+        taskId: "task-1",
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: "high",
+      },
+    ],
     scheduled: [
       {
         taskId: "task-1",
@@ -171,15 +253,22 @@ function createData(): SchedulePageData {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        runtimeAdapterKey: "mock",
-        runtimeInput: {},
-        runtimeInputVersion: "mock-v1",
-        runtimeModel: null,
-        prompt: null,
-        runtimeConfig: null,
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          adapterKey: "openclaw",
+          model: "gpt-5.4",
+          approvalPolicy: "never",
+          toolMode: "workspace-write",
+          temperature: 0.2,
+          prompt: "Implement the automation flow",
+        },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Implement the automation flow",
+        runtimeConfig: { approvalPolicy: "never", toolMode: "workspace-write", temperature: 0.2 },
         isRunnable: true,
-        runnabilityState: "ready",
-        runnabilitySummary: "Ready",
+        runnabilityState: "ready_to_run",
+        runnabilitySummary: "Ready to run",
       },
     ],
     unscheduled: [],
@@ -236,10 +325,7 @@ describe("SchedulePage quick create", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /quick create/i }));
-    await user.type(screen.getByPlaceholderText(/add a task to the queue/i), "Inbox triage");
-    fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: "90" } });
-    await user.click(screen.getByRole("button", { name: /^high$/i }));
+    await user.click(screen.getByRole("button", { name: /quick add/i }));
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
@@ -248,12 +334,11 @@ describe("SchedulePage quick create", () => {
           workspaceId: "workspace-1",
           title: "Inbox triage",
           priority: "High",
-          runtimeConfig: { suggestedDurationMinutes: 90 },
         }),
       );
     });
 
-    expect(applySchedule).not.toHaveBeenCalled();
+    expect(applySchedule).toHaveBeenCalled();
   });
 });
 
@@ -286,6 +371,42 @@ describe("SchedulePage view modes", () => {
 });
 
 describe("SchedulePage data display", () => {
+  it("runs an auto-run automation candidate through backend startRun", async () => {
+    const user = userEvent.setup();
+    const data = createData();
+    data.automationCandidates = [
+      {
+        taskId: "task-1",
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: "high",
+        sessionStrategy: "per_subtask",
+        readyNodeIds: ["node-1"],
+      },
+    ];
+
+    render(
+      <SchedulePage
+        workspaceId="workspace-1"
+        data={data}
+        selectedDay="2026-04-15"
+        selectedView="timeline"
+      />,
+    );
+
+    expect(screen.getByText(/per_subtask/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 ready nodes/i)).toBeInTheDocument();
+
+    const runButton = screen.getByRole("button", { name: /run now/i });
+    expect(runButton).toBeEnabled();
+
+    await user.click(runButton);
+
+    await waitFor(() => {
+      expect(startRun).toHaveBeenCalledWith({ taskId: "task-1" });
+    });
+  });
+
   it("renders proposal cards in action rail when proposals exist", () => {
     const data = createData();
     data.proposals = [
@@ -437,8 +558,7 @@ describe("SchedulePage error handling", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /quick create/i }));
-    await user.type(screen.getByPlaceholderText(/add a task to the queue/i), "Failing task");
+    await user.click(screen.getByRole("button", { name: /quick add/i }));
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {

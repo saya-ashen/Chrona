@@ -92,6 +92,7 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
     }) {
       return client.createRun({
         prompt: input.prompt,
+        runtimeInput: input.runtimeInput,
         runtimeSessionKey: input.runtimeSessionKey,
       });
     },

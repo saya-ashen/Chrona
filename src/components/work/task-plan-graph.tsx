@@ -31,6 +31,7 @@ type PlanStep = {
   executionMode?: string | null;
   estimatedMinutes?: number | null;
   priority?: string | null;
+  completionSummary?: string | null;
 };
 
 type PlanEdge = {
@@ -72,6 +73,7 @@ const DEFAULT_GRAPH_COPY = {
   detailEstimatedDuration: "预计时长",
   detailLinkedTask: "关联任务",
   detailDescription: "详细说明",
+  detailCompletionSummary: "完成情况说明",
 } as const;
 
 type GraphCopyType = Record<keyof typeof DEFAULT_GRAPH_COPY, string>;
@@ -502,6 +504,12 @@ function PlanNodeCard({ data }: NodeProps<FlowNodeData>) {
               <DetailItem
                 label={graphCopy.detailLinkedTask}
                 value={step.linkedTaskId}
+              />
+            ) : null}
+            {step.completionSummary ? (
+              <DetailItem
+                label={graphCopy.detailCompletionSummary}
+                value={step.completionSummary}
               />
             ) : null}
           </div>

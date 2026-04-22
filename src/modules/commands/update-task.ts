@@ -79,6 +79,24 @@ function adapterSpecHasFieldPath(adapterKey: string, path: string) {
   return getRuntimeTaskConfigSpec(adapterKey).fields.some((field) => field.path === path);
 }
 
+function mergeSessionStrategyIntoRuntimeConfig(
+  runtimeConfig: Prisma.InputJsonObject | null | undefined,
+  sessionStrategy: "shared" | "per_subtask" | null | undefined,
+) {
+  if (sessionStrategy === undefined) {
+    return runtimeConfig;
+  }
+
+  const nextConfig = runtimeConfig ? { ...runtimeConfig } : {};
+  if (sessionStrategy === null) {
+    delete nextConfig.sessionStrategy;
+  } else {
+    nextConfig.sessionStrategy = sessionStrategy;
+  }
+
+  return Object.keys(nextConfig).length > 0 ? nextConfig : null;
+}
+
 export async function updateTask(input: {
   taskId: string;
   title?: string;
@@ -93,6 +111,7 @@ export async function updateTask(input: {
   runtimeModel?: string | null;
   prompt?: string | null;
   runtimeConfig?: Prisma.InputJsonObject | null;
+  sessionStrategy?: "shared" | "per_subtask" | null;
 }) {
   const title = normalizeRequiredUpdateTextField(input.title, "title");
   const description =
@@ -116,8 +135,12 @@ export async function updateTask(input: {
   });
   const nextRuntimeModel = runtimeModel === undefined ? currentTask.runtimeModel : runtimeModel;
   const nextPrompt = prompt === undefined ? currentTask.prompt : prompt;
-  const nextRuntimeConfig =
+  const baseRuntimeConfig =
     input.runtimeConfig === undefined ? currentTask.runtimeConfig : input.runtimeConfig;
+  const nextRuntimeConfig = mergeSessionStrategyIntoRuntimeConfig(
+    baseRuntimeConfig as Prisma.InputJsonObject | null | undefined,
+    input.sessionStrategy,
+  );
   const nextRuntimeAdapterKeyInput =
     input.runtimeAdapterKey === undefined ? currentTask.runtimeAdapterKey : input.runtimeAdapterKey;
   const currentResolvedRuntimeAdapterKey = resolveRuntimeAdapterKey({

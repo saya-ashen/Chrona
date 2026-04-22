@@ -40,6 +40,10 @@ export type ScheduleAutomationCandidate = {
   kind: "auto_schedule" | "generate_plan" | "remind" | "auto_run";
   reason: string;
   priority: "low" | "medium" | "high";
+  scheduledStartAt?: Date | null;
+  executionMode?: "automatic" | "manual" | "hybrid" | "child_task" | "none";
+  sessionStrategy?: "shared" | "per_subtask";
+  readyNodeIds?: string[];
 };
 
 export type ScheduleSubtask = {
