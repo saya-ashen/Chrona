@@ -1,11 +1,11 @@
-import { validateTaskConfigAgainstSpec } from "@/modules/task-execution/config-spec";
+import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
 import {
   getRuntimeAdapterDefinition,
   getRuntimeTaskConfigSpec,
   resolveRuntimeAdapterKey,
   validateRuntimeTaskConfig,
 } from "@/modules/task-execution/registry";
-import type { RuntimeInput } from "@/modules/task-execution/types";
+import type { RuntimeInput } from "@chrona/runtime-core";
 
 export function isRuntimeInput(value: unknown): value is RuntimeInput {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -145,3 +145,4 @@ export function validateTaskRuntimeConfig(input: {
     runtimeConfig: legacyFields.runtimeConfig,
   };
 }
+

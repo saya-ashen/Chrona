@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import { createMockOpenClawAdapter } from "@/modules/openclaw/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 
 async function resetDb() {
@@ -127,3 +127,5 @@ describe("plan node sync on run completion", () => {
     });
   });
 });
+
+

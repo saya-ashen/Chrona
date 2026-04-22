@@ -1,0 +1,18 @@
+{
+  "name": "@chrona/openclaw-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/runtime-core": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./openclaw": "./src/openclaw/index.ts",
+    "./openclaw/*": "./src/openclaw/*.ts",
+    "./transport/*": "./src/transport/*.ts",
+    "./runtime/*": "./src/runtime/*.ts",
+    "./protocol/*": "./src/protocol/*.ts",
+    "./config/*": "./src/config/*.ts"
+  }
+}

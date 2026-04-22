@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendOperatorMessage } from "@/modules/commands/send-operator-message";
-import { createRuntimeAdapter } from "@/modules/openclaw/adapter";
+import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 
 /**
  * POST /api/tasks/[taskId]/message — Send an operator message to the running agent.
@@ -67,3 +67,5 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

@@ -3,7 +3,7 @@ import {
   OPENCLAW_RUNTIME_INPUT_VERSION,
   OPENCLAW_RUNTIME_ADAPTER_KEY,
   validateOpenClawTaskConfig,
-} from "@/modules/openclaw/config";
+} from "@chrona/openclaw-integration/config/config";
 import {
   getResearchTaskConfigSpec,
   RESEARCH_RUNTIME_ADAPTER_KEY,
@@ -14,7 +14,7 @@ import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
   RuntimeTaskConfigSpec,
-} from "@/modules/task-execution/types";
+} from "@chrona/runtime-core";
 
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
   [
@@ -81,3 +81,5 @@ export function validateRuntimeTaskConfig(key: string, input: unknown): RuntimeI
 export function listRuntimeAdapterKeys() {
   return [...runtimeRegistry.keys()];
 }
+
+

@@ -1,0 +1,11 @@
+{
+  "name": "@chrona/runtime-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./config-spec": "./src/config-spec.ts"
+  }
+}

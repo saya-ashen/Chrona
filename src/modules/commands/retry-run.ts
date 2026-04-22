@@ -1,7 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { startRun } from "@/modules/commands/start-run";
-import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 
 export async function retryRun(input: {
   taskId: string;
@@ -25,3 +25,4 @@ export async function retryRun(input: {
 
   return startRun(input);
 }
+

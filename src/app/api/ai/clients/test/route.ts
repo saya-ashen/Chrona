@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { AiClientType, LLMClientConfig, OpenClawClientConfig } from "@/modules/ai/client";
+import type { AiClientType, LLMClientConfig, OpenClawClientConfig } from "@chrona/ai-features";
 
 async function testOpenClaw(config: OpenClawClientConfig) {
   if (!config.bridgeUrl) {
@@ -61,3 +61,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, available: false, reason: message, error: message }, { status: 500 });
   }
 }
+

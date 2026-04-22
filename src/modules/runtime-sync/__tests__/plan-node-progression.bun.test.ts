@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import { createMockOpenClawAdapter } from "@/modules/openclaw/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
 
 const progressAcceptedTaskPlanMock = mock(async () => ({
   parentTaskId: "parent",
@@ -141,3 +141,5 @@ describe("runtime sync triggers plan progression", () => {
     });
   });
 });
+
+

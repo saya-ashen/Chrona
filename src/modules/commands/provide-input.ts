@@ -1,7 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { resumeRun } from "@/modules/commands/resume-run";
-import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
+import type { OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 
 export async function provideInput(input: {
   runId: string;
@@ -24,3 +24,5 @@ export async function provideInput(input: {
     adapter: input.adapter,
   });
 }
+
+

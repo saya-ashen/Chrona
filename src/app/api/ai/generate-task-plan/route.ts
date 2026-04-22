@@ -7,7 +7,7 @@ import {
   saveTaskPlanGraph,
 } from "@/modules/tasks/task-plan-graph-store";
 import type { TaskPlanGraph, TaskPlanGraphResponse } from "@/modules/ai/types";
-import type { GenerateTaskPlanResponse } from "@/modules/ai/client/types";
+import type { GenerateTaskPlanResponse } from "@chrona/ai-features/core/types";
 
 const logger = createLogger("api.ai.generate-task-plan");
 
@@ -333,3 +333,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

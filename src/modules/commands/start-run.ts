@@ -8,7 +8,7 @@ import {
   ensureDefaultTaskSession,
   updateTaskSessionStateFromRun,
 } from "@/modules/task-execution/task-sessions";
-import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 export async function startRun(input: {
@@ -204,3 +204,4 @@ export async function startRun(input: {
     throw error;
   }
 }
+

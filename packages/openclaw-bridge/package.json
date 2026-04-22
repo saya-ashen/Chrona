@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chrona/runtime-client": "workspace:*"
+    "@chrona/openclaw-integration": "workspace:*"
   },
   "exports": {
     ".": "./src/server.ts"
   }
 }
+

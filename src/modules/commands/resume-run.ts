@@ -5,7 +5,7 @@ import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import {
   createRuntimeAdapter,
   type OpenClawAdapter,
-} from "@/modules/openclaw/adapter";
+} from "@chrona/openclaw-integration/runtime/adapter";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
@@ -106,3 +106,5 @@ export async function resumeRun(input: {
     runId: run.id,
   };
 }
+
+

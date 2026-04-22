@@ -20,7 +20,14 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@chrona/runtime-core": ["./packages/runtime-core/src/index.ts"],
+      "@chrona/runtime-core/*": ["./packages/runtime-core/src/*"],
+      "@chrona/openclaw-integration": ["./packages/openclaw-integration/src/index.ts"],
+      "@chrona/openclaw-integration/*": ["./packages/openclaw-integration/src/*"],
+      "@chrona/ai-features": ["./packages/ai-features/src/index.ts"],
+      "@chrona/ai-features/*": ["./packages/ai-features/src/*"],
+      "@chrona/openclaw-bridge": ["./packages/openclaw-bridge/src/server.ts"]
     }
   },
   "include": [
