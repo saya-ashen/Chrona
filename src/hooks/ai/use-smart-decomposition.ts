@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchJSON } from "@/hooks/ai/types";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 import type { StreamToolCall, StreamToolResult, StreamPhase } from "@/hooks/ai/types";
+import { createLogger, summarizeText } from "@/lib/logger";
+
+const logger = createLogger("hook.use-smart-decomposition");
 
 export interface SmartDecompositionTaskInput {
   taskId?: string;
@@ -59,6 +62,11 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
     const controller = new AbortController();
     abortRef.current = controller;
 
+    logger.info("request.start", {
+      taskId: taskInput.taskId ?? null,
+      title: summarizeText(taskInput.title),
+      requestKey: taskInput.requestKey ?? 0,
+    });
     setIsLoading(true);
     setError(null);
     setPhase("connecting");
@@ -115,6 +123,10 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
                 const raw = line.slice(6).trim();
                 try {
                   const data = JSON.parse(raw) as Record<string, unknown>;
+                  logger.info("stream.event", {
+                    taskId: taskInput.taskId ?? null,
+                    eventType,
+                  });
                   switch (eventType) {
                     case "status":
                       setPhase("thinking");

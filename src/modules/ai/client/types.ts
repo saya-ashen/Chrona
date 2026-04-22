@@ -38,6 +38,13 @@ export interface LLMClientConfig {
   temperature?: number;
 }
 
+export interface StructuredBusinessToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  status?: "pending" | "completed" | "error";
+  result?: string;
+}
+
 export interface StructuredDebugInfo {
   rawToolCall?: unknown;
   rawOutput?: string | null;
@@ -48,6 +55,7 @@ export interface StructuredDebugInfo {
   reliability?: "tool_call" | "fallback_text";
   validationIssues?: StructuredValidationIssue[];
   structuredEnvelope?: StructuredSubmissionEnvelope | null;
+  toolCalls?: StructuredBusinessToolCall[];
 }
 
 export interface StructuredResponseMeta {

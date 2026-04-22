@@ -26,6 +26,8 @@ describe("POST /api/ai/auto-complete (stream)", () => {
   it("forwards streamed structured suggestions as SSE suggestions event", async () => {
     aiSuggestStream.mockImplementation(async function* () {
       yield { type: "status", message: "Generating suggestions" };
+      yield { type: "tool_call", tool: "suggest_task_completions", input: { input: "write tests" } };
+      yield { type: "tool_result", tool: "suggest_task_completions", result: "generated 1 suggestion" };
       yield { type: "tool_call", tool: "submit_structured_result", input: { schemaName: "smart_suggestions" } };
       yield {
         type: "result",
@@ -63,9 +65,34 @@ describe("POST /api/ai/auto-complete (stream)", () => {
     expect(text).toContain("event: status");
     expect(text).toContain("Generating suggestions");
     expect(text).toContain("event: tool_call");
+    expect(text).toContain("suggest_task_completions");
+    expect(text).toContain("event: tool_result");
+    expect(text).toContain("generated 1 suggestion");
     expect(text).toContain("submit_structured_result");
     expect(text).toContain("event: suggestions");
     expect(text).toContain("Write unit tests");
     expect(text).toContain('"isFinal":true');
+    expect(text).not.toContain('"source":"rules"');
+  });
+
+  it("does not emit rule-based fallback suggestions when AI returns nothing", async () => {
+    aiSuggestStream.mockImplementation(async function* () {
+      yield { type: "status", message: "Generating suggestions" };
+      yield { type: "done", text: "done", structured: null };
+    });
+
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      new Request("http://localhost/api/ai/auto-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "meeting", workspaceId: "ws-1" }),
+      }),
+    );
+
+    const text = await response.text();
+    expect(text).not.toContain('"source":"rules"');
+    expect(text).not.toContain("Team sync meeting");
   });
 });

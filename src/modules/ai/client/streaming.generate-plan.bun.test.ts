@@ -27,16 +27,21 @@ function sseResponse(chunks: string[]) {
 }
 
 describe("generatePlanStream", () => {
-  it("maps OpenClaw SSE events including lifecycle/tool-call output into stream events", async () => {
+  it("maps OpenClaw SSE events and derives final plan from generate_task_plan_graph tool input", async () => {
     fetchMock.mockReset();
-    fetchMock.mockResolvedValue(
-      sseResponse([
-        'event: event\ndata: {"type":"lifecycle","phase":"planning","message":"Planning graph"}\n\n',
-        'event: event\ndata: {"type":"tool_use","tool":"submit_structured_result","callId":"call-1","input":{"schemaName":"task_plan_graph"}}\n\n',
-        'event: event\ndata: {"type":"tool_result","tool":"submit_structured_result","callId":"call-1","text":"ok"}\n\n',
-        'event: done\ndata: {"output":"{\"summary\":\"Plan ready\",\"nodes\":[],\"edges\":[]}","structured":null}\n\n',
-      ]),
-    );
+    const sessionIds: string[] = [];
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { sessionId?: string };
+      sessionIds.push(String(body.sessionId ?? ""));
+      return Promise.resolve(
+        sseResponse([
+          'event: event\ndata: {"type":"lifecycle","phase":"planning","message":"Planning graph"}\n\n',
+          'event: event\ndata: {"type":"tool_use","tool":"generate_task_plan_graph","callId":"call-1","input":{"taskId":"task-1","title":"Plan task","summary":"Plan ready","reasoning":"because","nodes":[{"id":"node-1","type":"step","title":"Draft plan","objective":"Draft plan","estimatedMinutes":30,"priority":"High","executionMode":"automatic","requiresHumanInput":false,"requiresHumanApproval":false,"autoRunnable":true}],"edges":[]}}\n\n',
+          'event: event\ndata: {"type":"tool_result","tool":"generate_task_plan_graph","callId":"call-1","text":"ok"}\n\n',
+          'event: done\ndata: {"output":"done","structured":null}\n\n',
+        ]),
+      );
+    });
 
     const client: AiClientRecord = {
       id: "c1",
@@ -65,9 +70,48 @@ describe("generatePlanStream", () => {
     expect(events[0]?.message).toBe("正在连接 AI 服务...");
     expect(events[1]?.message).toBe("AI 正在思考...");
     expect(events[2]?.message).toBe("Planning graph");
-    expect(events[3]).toMatchObject({ type: "tool_call", tool: "submit_structured_result" });
-    expect(events[4]).toMatchObject({ type: "tool_result", tool: "submit_structured_result" });
-    expect(events[5]).toMatchObject({ type: "result" });
+    expect(events[3]).toMatchObject({ type: "tool_call", tool: "generate_task_plan_graph" });
+    expect(events[4]).toMatchObject({ type: "tool_result", tool: "generate_task_plan_graph" });
+    expect(events[5]).toMatchObject({
+      type: "result",
+      plan: {
+        summary: "Plan ready",
+        nodes: [expect.objectContaining({ title: "Draft plan" })],
+      },
+    });
     expect(events[6]).toMatchObject({ type: "done" });
+    expect(sessionIds[0]).toContain("task-1-plan-task");
+  });
+
+  it("uses different generate_plan sessions for repeated requests on the same task", async () => {
+    fetchMock.mockReset();
+    const sessionIds: string[] = [];
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { sessionId?: string };
+      sessionIds.push(String(body.sessionId ?? ""));
+      return Promise.resolve(
+        sseResponse([
+          'event: done\ndata: {"output":"{\"summary\":\"Plan ready\",\"nodes\":[],\"edges\":[]}","structured":null}\n\n',
+        ]),
+      );
+    });
+
+    const client: AiClientRecord = {
+      id: "c1",
+      name: "openclaw",
+      type: "openclaw",
+      config: { bridgeUrl: "http://bridge.test", timeoutSeconds: 30 },
+      isDefault: true,
+      enabled: true,
+    };
+    const request: GenerateTaskPlanRequest = { taskId: "task-1", title: "Plan task" };
+
+    for await (const _event of generatePlanStream(client, request)) {}
+    for await (const _event of generatePlanStream(client, request)) {}
+
+    expect(sessionIds).toHaveLength(2);
+    expect(sessionIds[0]).not.toBe(sessionIds[1]);
+    expect(sessionIds[0]).toContain("task-1-plan-task");
+    expect(sessionIds[1]).toContain("task-1-plan-task");
   });
 });

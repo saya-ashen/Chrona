@@ -1,77 +1,106 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),
   useLocale: () => "en",
 }));
 
+const mockUseAutoComplete = vi.fn();
+vi.mock("@/hooks/use-ai", () => ({
+  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
+}));
+
 import { ScheduleCommandBar } from "@/components/schedule/schedule-command-bar";
-import {
-  buildQuickCreateDraft,
-  parseQuickCreateCommand,
-} from "@/components/schedule/schedule-page-utils";
 
-afterEach(() => {
-  cleanup();
-});
+function hookValue(overrides: Record<string, unknown> = {}) {
+  return {
+    structuredSuggestions: overrides.structuredSuggestions ?? [],
+    suggestions: overrides.suggestions ?? [],
+    isLoading: overrides.isLoading ?? false,
+    error: overrides.error ?? null,
+    phase: overrides.phase ?? "idle",
+    statusMessage: overrides.statusMessage ?? null,
+    toolCalls: overrides.toolCalls ?? [],
+    toolResults: overrides.toolResults ?? [],
+    partialText: overrides.partialText ?? "",
+  };
+}
 
-describe("schedule quick create", () => {
-  it("parses a quick-create command into a normalized draft", () => {
-    const draft = parseQuickCreateCommand(
-      "Write weekly report @ 14:30 for 90m !high",
-      new Date(2026, 3, 15, 8, 0, 0, 0),
-    );
+describe("schedule quick create AI-only path", () => {
+  const cryptoMock = { randomUUID: vi.fn(() => "trace-1") };
 
-    expect(draft).toMatchObject({
-      title: "Write weekly report",
-      priority: "High",
-      scheduledStartAt: new Date(2026, 3, 15, 14, 30, 0, 0),
-      scheduledEndAt: new Date(2026, 3, 15, 16, 0, 0, 0),
-    });
+  beforeEach(() => {
+    vi.stubGlobal("crypto", cryptoMock as unknown as Crypto);
+    mockUseAutoComplete.mockReturnValue(hookValue());
   });
 
-  it("builds a fallback quick-create draft when the command omits scheduling details", () => {
-    const draft = buildQuickCreateDraft({
-      title: "Inbox triage",
-      selectedDay: "2026-04-15",
-      now: new Date(2026, 3, 15, 8, 10, 0, 0),
-    });
-
-    expect(draft).toMatchObject({
-      title: "Inbox triage",
-      priority: "Medium",
-      scheduledStartAt: new Date(2026, 3, 15, 8, 15, 0, 0),
-      scheduledEndAt: new Date(2026, 3, 15, 9, 15, 0, 0),
-    });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
-  it("submits a parsed quick-create draft to the page orchestration", async () => {
+  it("submits direct Chinese title using the current AI suggestion without truncation", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <ScheduleCommandBar
-        selectedDay="2026-04-15"
-        isPending={false}
-        onSubmit={onSubmit}
-      />,
-    );
-
-    await user.type(
-      screen.getByPlaceholderText(/task title/i),
-      "Write weekly report @ 14:30 for 90m !high",
-    );
-    await user.click(screen.getByRole("button", { name: /add block/i }));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Write weekly report",
-        priority: "High",
-        scheduledStartAt: new Date(2026, 3, 15, 14, 30, 0, 0),
-        scheduledEndAt: new Date(2026, 3, 15, 16, 0, 0, 0),
+    mockUseAutoComplete.mockReturnValue(
+      hookValue({
+        structuredSuggestions: [
+          {
+            id: "s1",
+            summary: "创建任务",
+            action: {
+              type: "create_task",
+              title: "参加美国总统竞选",
+              description: "",
+              priority: "High",
+              estimatedMinutes: 90,
+              tags: [],
+            },
+          },
+        ],
+        phase: "done",
+        statusMessage: "Done",
+        toolCalls: [{ tool: "suggest_task_completions", input: { input: "参加美国总统竞选" } }],
+        toolResults: [{ tool: "suggest_task_completions", result: "Generated 1 suggestion" }],
+        partialText: "drafting...",
       }),
     );
+
+    render(
+      <ScheduleCommandBar selectedDay="2026-04-15" isPending={false} onSubmit={onSubmit} />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/task title/i), "参加美国总统竞选");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "参加美国总统竞选", priority: "High" }));
+  });
+
+  it("returns explainable error when no AI suggestion is available instead of silently creating", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    mockUseAutoComplete.mockReturnValue(
+      hookValue({ structuredSuggestions: [], phase: "done", error: null }),
+    );
+
+    render(
+      <ScheduleCommandBar selectedDay="2026-04-15" isPending={false} onSubmit={onSubmit} />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/task title/i), "参加美国总统竞选");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/AI 无法可靠理解该输入/i).length).toBeGreaterThan(0);
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
