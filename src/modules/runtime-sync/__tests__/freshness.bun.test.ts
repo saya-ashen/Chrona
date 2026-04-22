@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus, WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createMockOpenClawAdapter } from "@/modules/openclaw/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 
 async function resetDb() {
@@ -79,3 +79,5 @@ describe("syncTaskRunForRead", () => {
     expect(projection.persistedStatus).toBe("Completed");
   });
 });
+
+

@@ -1,10 +1,10 @@
-import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 
 const runtimeExecutionFactories = new Map<string, () => Promise<RuntimeExecutionAdapter>>([
   [
     "openclaw",
-    async () => (await import("@/modules/openclaw/adapter")).createRuntimeAdapter(),
+    async () => (await import("@chrona/openclaw-integration/runtime/adapter")).createRuntimeAdapter(),
   ],
   [
     "research",
@@ -22,3 +22,5 @@ export async function createRuntimeExecutionAdapter(key: string): Promise<Runtim
 
   return factory();
 }
+
+

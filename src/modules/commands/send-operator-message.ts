@@ -2,10 +2,10 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
-import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
+import type { OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import { resolveTaskSessionKey } from "@/modules/task-execution/task-sessions";
-import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 
 const MESSAGEABLE_RUN_STATUSES: ReadonlySet<RunStatus> = new Set([
   RunStatus.Running,
@@ -76,3 +76,5 @@ export async function sendOperatorMessage(input: {
     runId: run.id,
   };
 }
+
+

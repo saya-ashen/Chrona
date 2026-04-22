@@ -5,7 +5,7 @@ import {
   getResearchTaskConfigSpec,
   validateResearchTaskConfig,
 } from "@/modules/research-execution/adapter";
-import type { RuntimeExecutionAdapter } from "@/modules/task-execution/types";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 
 describe("research task config", () => {
   it("returns a spec with a different field set and required rule", () => {

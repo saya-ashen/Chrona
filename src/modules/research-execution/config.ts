@@ -1,5 +1,5 @@
-import { validateTaskConfigAgainstSpec } from "@/modules/task-execution/config-spec";
-import type { RuntimeInput, RuntimeTaskConfigSpec } from "@/modules/task-execution/types";
+import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
+import type { RuntimeInput, RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 
 export const RESEARCH_RUNTIME_ADAPTER_KEY = "research";
 export const RESEARCH_RUNTIME_INPUT_VERSION = "research-v1";
@@ -91,3 +91,4 @@ export function buildResearchRunPrompt(runtimeInput: RuntimeInput) {
     .filter((line) => line.length > 0)
     .join("\n");
 }
+

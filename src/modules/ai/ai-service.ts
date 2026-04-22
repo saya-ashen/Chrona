@@ -31,7 +31,7 @@ import {
   checkClientHealth,
   suggestStream,
   generatePlanStream,
-} from "./client";
+} from "@chrona/ai-features";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution
@@ -172,7 +172,7 @@ export async function getAIClientInfo(): Promise<Array<{
 }
 
 // Re-exports
-export { AiClientError } from "./client";
+export { AiClientError } from "@chrona/ai-features";
 export type {
   SmartSuggestRequest,
   SmartSuggestResponse,
@@ -191,4 +191,7 @@ export type {
   AiClientType,
   AiFeature,
   StreamEvent,
-} from "./client";
+} from "@chrona/ai-features";
+
+
+

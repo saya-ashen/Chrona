@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resumeRun } from "@/modules/commands/resume-run";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/openclaw/adapter";
+import { createRuntimeAdapter, type OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
@@ -148,3 +148,5 @@ export async function resolveApproval(input: {
 
   return result;
 }
+
+

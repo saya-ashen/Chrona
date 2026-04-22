@@ -19,8 +19,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createStatefulMockAdapter,
   type StatefulMockAdapter,
-} from "@/modules/openclaw/mock-adapter";
-import type { OpenClawAdapter } from "@/modules/openclaw/adapter";
+} from "@chrona/openclaw-integration/runtime/mock-adapter";
+import type { OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -421,3 +421,5 @@ describe("Task Lifecycle Integration", () => {
     });
   });
 });
+
+

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import { createMockOpenClawAdapter } from "@/modules/openclaw/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
 
 const progressAcceptedTaskPlanMock = mock(async () => ({
   parentTaskId: "parent",
@@ -167,3 +167,5 @@ describe("parent task accepted-plan derived states", () => {
     expect(updatedParent.status).toBe(TaskStatus.WaitingForInput);
   });
 });
+
+

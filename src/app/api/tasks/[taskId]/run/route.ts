@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { startRun } from "@/modules/commands/start-run";
-import { createRuntimeAdapter } from "@/modules/openclaw/adapter";
+import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 
 /**
  * POST /api/tasks/[taskId]/run — Start a new AI agent run for a task.
@@ -34,3 +34,5 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

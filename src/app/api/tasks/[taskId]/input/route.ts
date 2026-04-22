@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { provideInput } from "@/modules/commands/provide-input";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@/modules/openclaw/adapter";
+import { createRuntimeAdapter, type OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 
 /**
  * POST /api/tasks/[taskId]/input — Provide input to a waiting agent.
@@ -67,3 +67,5 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

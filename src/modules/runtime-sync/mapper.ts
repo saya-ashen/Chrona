@@ -3,7 +3,7 @@ import type {
   OpenClawChatHistory,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
-} from "@/modules/openclaw/types";
+} from "@chrona/openclaw-integration/protocol/types";
 
 export type OpenClawSyncCursor = {
   sessionKey?: string;
@@ -391,3 +391,5 @@ export function mapApprovalResolution(input: {
     } satisfies OpenClawTimelineEvent,
   };
 }
+
+
