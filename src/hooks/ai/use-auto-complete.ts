@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createLogger, summarizeText } from "@/lib/logger";
+
+const logger = createLogger("hook.use-auto-complete");
 import type {
   StructuredSuggestion,
   AutoCompleteSuggestion,
@@ -51,6 +54,10 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
     }
 
     const requestId = ++requestSeqRef.current;
+    logger.info("request.start", {
+      requestId,
+      title: summarizeText(trimmed),
+    });
     setIsLoading(true);
     setError(null);
     setPhase("idle");
@@ -110,6 +117,7 @@ export function useAutoComplete(title: string | null, debounceMs = 800) {
                 try {
                   const data = JSON.parse(raw) as Record<string, unknown>;
                   if (!isActiveRequest()) return;
+                  logger.info("stream.event", { requestId, eventType });
                   switch (eventType) {
                     case "status":
                       setPhase("thinking");

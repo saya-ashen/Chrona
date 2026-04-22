@@ -113,13 +113,22 @@ describe("openclaw bridge structured parsing", () => {
     expect(events[1]).toMatchObject({ type: "tool_use", tool: "submit_structured_result" });
   });
 
-  it("extracts structured result from tool call args", () => {
+  it("extracts structured result from tool call args and preserves business tool calls", () => {
     const response = buildStructuredResult({
       sessionId: "sess-test",
       runId: "run-1",
       output: "human summary",
       error: null,
       toolCalls: [
+        {
+          tool: "suggest_task_completions",
+          callId: "call-biz-1",
+          status: "completed",
+          input: {
+            input: "参加美国总统竞选",
+          },
+          result: "generated 1 suggestion",
+        },
         {
           tool: "submit_structured_result",
           callId: "call-1",
@@ -143,6 +152,12 @@ describe("openclaw bridge structured parsing", () => {
     expect(response.parsed).toEqual({ answer: 42 });
     expect(response.status).toBe("success");
     expect(response.reliability).toBe("tool_call");
+    expect(response.bridgeToolCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tool: "suggest_task_completions" }),
+        expect.objectContaining({ tool: "submit_structured_result" }),
+      ]),
+    );
   });
 
   it("marks missing tool call as unreliable fallback", () => {

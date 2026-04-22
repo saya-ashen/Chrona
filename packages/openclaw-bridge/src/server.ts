@@ -361,6 +361,13 @@ export function buildStructuredResult(
       reliability: "tool_call",
       sessionId: params.sessionId,
       runId: params.runId,
+      bridgeToolCalls: effectiveToolCalls.map((toolCall) => ({
+        tool: toolCall.tool,
+        callId: toolCall.callId,
+        input: toolCall.input,
+        result: toolCall.result,
+        status: toolCall.status,
+      })),
     };
   }
 

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiGeneratePlan, aiGeneratePlanStream } from "@/modules/ai/ai-service";
+import { createLogger, summarizeText } from "@/lib/logger";
 import {
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
 } from "@/modules/tasks/task-plan-graph-store";
 import type { TaskPlanGraph, TaskPlanGraphResponse } from "@/modules/ai/types";
 import type { GenerateTaskPlanResponse } from "@/modules/ai/client/types";
+
+const logger = createLogger("api.ai.generate-task-plan");
 
 function buildSavedPlanSummary(savedPlan: {
   id: string;
@@ -97,6 +100,15 @@ export async function POST(request: Request) {
     }
 
     const wantsStream = (request.headers.get("accept") ?? "").includes("text/event-stream");
+    const requestId = crypto.randomUUID();
+    logger.info("request.start", {
+      requestId,
+      feature: "generate_plan",
+      taskId: taskId ?? null,
+      title: summarizeText(title ?? null),
+      streaming: wantsStream,
+      forceRefresh,
+    });
 
     if (taskId && !forceRefresh) {
       const savedPlan = await getLatestTaskPlanGraph(taskId);
@@ -156,12 +168,20 @@ export async function POST(request: Request) {
         async start(controller) {
           let finalResponse: (TaskPlanGraphResponse & { reasoning?: string }) | null = null;
           try {
+            const eventCounts: Record<string, number> = {};
             for await (const event of aiGeneratePlanStream({
               taskId: taskId ?? "",
               title: resolvedTitle,
               description: resolvedDescription,
               estimatedMinutes: resolvedEstimatedMinutes,
             })) {
+              eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
+              logger.info("stream.event", {
+                requestId,
+                feature: "generate_plan",
+                taskId: taskId ?? null,
+                eventType: event.type,
+              });
               if (event.type === "status") {
                 controller.enqueue(encoder.encode(sseEncode("status", { message: event.message })));
               } else if (event.type === "tool_call") {
@@ -210,11 +230,24 @@ export async function POST(request: Request) {
               } else if (event.type === "error") {
                 controller.enqueue(encoder.encode(sseEncode("error", { message: event.message })));
               } else if (event.type === "done") {
+                logger.info("request.done", {
+                  requestId,
+                  feature: "generate_plan",
+                  taskId: taskId ?? null,
+                  eventCounts,
+                  savedPlanId: finalResponse?.savedPlan?.id ?? null,
+                });
                 controller.enqueue(encoder.encode(sseEncode("done", { response: finalResponse })));
               }
             }
             controller.close();
           } catch (error) {
+            logger.error("request.stream_error", {
+              requestId,
+              feature: "generate_plan",
+              taskId: taskId ?? null,
+              error: error instanceof Error ? error.message : String(error),
+            });
             controller.enqueue(
               encoder.encode(
                 sseEncode("error", {
@@ -240,6 +273,14 @@ export async function POST(request: Request) {
       title: resolvedTitle,
       description: resolvedDescription,
       estimatedMinutes: resolvedEstimatedMinutes,
+    });
+
+    logger.info("request.blocking_result", {
+      requestId,
+      feature: "generate_plan",
+      taskId: taskId ?? null,
+      title: summarizeText(resolvedTitle),
+      hasPlan: Boolean(planResult),
     });
 
     if (!planResult) {
@@ -282,7 +323,10 @@ export async function POST(request: Request) {
       reasoning: planResult.reasoning,
     }));
   } catch (error) {
-    console.error("Error generating task plan:", error);
+    logger.error("request.error", {
+      feature: "generate_plan",
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: "Failed to generate task plan" },
       { status: 500 },

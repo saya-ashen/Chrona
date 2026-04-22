@@ -21,6 +21,7 @@ import type {
   TimeslotOption,
   ChatRequest,
   ChatResponse,
+  StructuredBusinessToolCall,
   StructuredDebugInfo,
 } from "./types";
 import { AiClientError } from "./types";
@@ -33,7 +34,49 @@ import type {
   TaskPlanEdgeType,
 } from "../types";
 
+function summarizeToolResult(toolCall: StructuredBusinessToolCall): string {
+  if (typeof toolCall.result === "string" && toolCall.result.trim()) {
+    return toolCall.result.trim().slice(0, 200);
+  }
+
+  const result = (toolCall.input as { result?: unknown } | null)?.result;
+  if (typeof result === "string") {
+    return result.slice(0, 200);
+  }
+  if (result && typeof result === "object") {
+    const summary = (result as { summary?: unknown; reasoning?: unknown }).summary;
+    if (typeof summary === "string") {
+      return summary.slice(0, 200);
+    }
+    return JSON.stringify(result).slice(0, 200);
+  }
+
+  return "";
+}
+
+function extractBusinessToolCalls(result: ReturnType<typeof requireStructuredResult>): StructuredBusinessToolCall[] {
+  const bridgeToolCalls = Array.isArray((result as { bridgeToolCalls?: unknown }).bridgeToolCalls)
+    ? ((result as { bridgeToolCalls?: Array<{ tool?: unknown; input?: unknown; status?: unknown; result?: unknown }> }).bridgeToolCalls ?? [])
+    : [];
+
+  return bridgeToolCalls
+    .filter((toolCall) => toolCall && typeof toolCall.tool === "string" && toolCall.tool !== "submit_structured_result")
+    .map((toolCall) => ({
+      tool: String(toolCall.tool),
+      input: (toolCall.input && typeof toolCall.input === "object" ? toolCall.input : {}) as Record<string, unknown>,
+      status: toolCall.status === "pending" || toolCall.status === "completed" || toolCall.status === "error"
+        ? toolCall.status
+        : undefined,
+      result: typeof toolCall.result === "string" ? toolCall.result : undefined,
+    }));
+}
+
 function toStructuredDebugInfo(result: ReturnType<typeof requireStructuredResult>): StructuredDebugInfo {
+  const toolCalls = extractBusinessToolCalls(result).map((toolCall) => ({
+    ...toolCall,
+    result: summarizeToolResult(toolCall),
+  }));
+
   return {
     rawToolCall: result.rawToolCall,
     rawOutput: result.rawOutput,
@@ -44,6 +87,7 @@ function toStructuredDebugInfo(result: ReturnType<typeof requireStructuredResult
     reliability: result.reliability,
     validationIssues: result.validationIssues,
     structuredEnvelope: result.structured,
+    toolCalls,
   };
 }
 
@@ -94,10 +138,40 @@ function parseStructuredFeatureResult<T>(
   feature: Parameters<typeof dispatchStructured>[1],
   message: string,
   scope = "default",
+  options?: { preferBusinessTool?: string },
 ): Promise<{ parsed: T; debug?: StructuredDebugInfo; rawText?: string }> {
   return (async () => {
     if (client.type === "openclaw") {
       const structuredCall = await dispatchStructured<T>(client, feature, message, scope);
+      const preferredTool = options?.preferBusinessTool
+        ? structuredCall.bridge.toolCalls.find((toolCall) => toolCall.tool === options.preferBusinessTool)
+        : null;
+      const preferredParsed = preferredTool?.input && typeof preferredTool.input === "object"
+        ? (preferredTool.input as T)
+        : null;
+
+      if (preferredParsed) {
+        return {
+          parsed: preferredParsed,
+          debug: structuredCall.structured
+            ? toStructuredDebugInfo(structuredCall.structured)
+            : {
+                rawOutput: structuredCall.text,
+                error: structuredCall.bridge.error,
+                sessionId: structuredCall.bridge.sessionId,
+                runId: structuredCall.bridge.runId,
+                reliability: "fallback_text",
+                toolCalls: structuredCall.bridge.toolCalls.map((toolCall) => ({
+                  tool: toolCall.tool,
+                  input: toolCall.input,
+                  status: toolCall.status,
+                  result: toolCall.result,
+                })),
+              },
+          rawText: structuredCall.text,
+        };
+      }
+
       const structured = requireStructuredResult<T>(structuredCall, client.type);
       return {
         parsed: structured.parsed as T,
@@ -134,9 +208,15 @@ export function buildSuggestMessage(request: SmartSuggestRequest): string {
       `Schedule: ${h.loadPercent}% load, ${h.conflictCount} conflicts, ${h.freeMinutesToday}min free`,
     );
   }
-  return `Suggest task completions for: "${request.input}"${
-    contextParts.length ? `\n\nContext:\n${contextParts.join("\n")}` : ""
-  }`;
+  return [
+    "Tool contract:",
+    "1. Call suggest_task_completions with the user input and any useful context.",
+    "2. Put the real suggestions directly into that business tool input/result flow.",
+    "3. Chrona treats suggest_task_completions as the source of truth; submit_structured_result is not required.",
+    "",
+    `User input: \"${request.input}\"`,
+    contextParts.length ? `Context:\n${contextParts.join("\n")}` : null,
+  ].filter(Boolean).join("\n");
 }
 
 function normalizeSuggestion(input: Partial<SmartSuggestion>): SmartSuggestion | null {
@@ -193,9 +273,16 @@ export async function suggest(
 // ── Generate Plan ──
 
 export function buildGeneratePlanMessage(request: GenerateTaskPlanRequest) {
-  return `Generate an executable task plan graph for:\nTitle: "${request.title}"${
-    request.description ? `\nDescription: ${request.description}` : ""
-  }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}`;
+  return [
+    "Tool contract:",
+    "1. Call generate_task_plan_graph with the full graph payload in tool input.",
+    "2. Chrona treats generate_task_plan_graph as the business source of truth for generate_plan.",
+    "3. submit_structured_result is not required for this feature.",
+    "",
+    `Title: \"${request.title}\"`,
+    request.description ? `Description: ${request.description}` : null,
+    request.estimatedMinutes ? `Estimated: ${request.estimatedMinutes} min` : null,
+  ].filter(Boolean).join("\n");
 }
 
 export function normalizeGeneratePlanResponse(input: {
@@ -261,7 +348,9 @@ export async function generatePlan(
     reasoning?: string;
     nodes?: Array<Partial<TaskPlanNode>>;
     edges?: Array<Partial<TaskPlanEdge>>;
-  }>(client, "generate_plan", buildGeneratePlanMessage(request), request.taskId);
+  }>(client, "generate_plan", buildGeneratePlanMessage(request), request.taskId, {
+    preferBusinessTool: "generate_task_plan_graph",
+  });
 
   return normalizeGeneratePlanResponse({
     parsed: result.parsed,

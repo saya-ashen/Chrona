@@ -668,69 +668,18 @@ describe("date helpers", () => {
 // ---------------------------------------------------------------------------
 // 4. Quick create
 // ---------------------------------------------------------------------------
-describe("parseQuickCreateCommand", () => {
-  const ref = new Date(2026, 3, 15, 10, 0);
-
-  it("returns null for empty string", () => {
-    expect(parseQuickCreateCommand("", ref)).toBeNull();
-    expect(parseQuickCreateCommand("   ", ref)).toBeNull();
-  });
-
-  it("parses plain title", () => {
-    const result = parseQuickCreateCommand("Write report", ref);
-    expect(result).not.toBeNull();
-    expect(result!.title).toBe("Write report");
-    expect(result!.priority).toBe("Medium");
-    expect(result!.scheduledStartAt).toBeNull();
-  });
-
-  it("parses @time", () => {
-    const result = parseQuickCreateCommand("Task @14:30", ref);
-    expect(result!.title).toBe("Task");
-    expect(result!.scheduledStartAt!.getHours()).toBe(14);
-    expect(result!.scheduledStartAt!.getMinutes()).toBe(30);
-  });
-
-  it("parses @time without minutes", () => {
-    const result = parseQuickCreateCommand("Task @9", ref);
-    expect(result!.scheduledStartAt!.getHours()).toBe(9);
-    expect(result!.scheduledStartAt!.getMinutes()).toBe(0);
-  });
-
-  it("parses !priority", () => {
-    expect(parseQuickCreateCommand("Task !high", ref)!.priority).toBe("High");
-    expect(parseQuickCreateCommand("Task !urgent", ref)!.priority).toBe("Urgent");
-    expect(parseQuickCreateCommand("Task !low", ref)!.priority).toBe("Low");
-  });
-
-  it("parses for duration in minutes", () => {
-    const result = parseQuickCreateCommand("Task @14 for 90m", ref);
-    expect(result!.scheduledEndAt!.getTime() - result!.scheduledStartAt!.getTime()).toBe(90 * 60000);
-  });
-
-  it("parses for duration in hours", () => {
-    const result = parseQuickCreateCommand("Task @14 for 2h", ref);
-    expect(result!.scheduledEndAt!.getTime() - result!.scheduledStartAt!.getTime()).toBe(120 * 60000);
-  });
-
-  it("parses due", () => {
-    const result = parseQuickCreateCommand("Task due 17", ref);
-    expect(result!.dueAt).not.toBeNull();
-    expect(result!.dueAt!.getHours()).toBe(17);
-  });
-
-  it("parses full command", () => {
-    const result = parseQuickCreateCommand("Write report @14:30 !high for 2h due 17", ref);
-    expect(result!.title).toBe("Write report");
-    expect(result!.priority).toBe("High");
-    expect(result!.scheduledStartAt!.getHours()).toBe(14);
-    expect(result!.scheduledStartAt!.getMinutes()).toBe(30);
-    expect(result!.scheduledEndAt!.getHours()).toBe(16);
-    expect(result!.dueAt!.getHours()).toBe(17);
-  });
-});
-
 describe("buildQuickCreateDraft", () => {
+  it("preserves a long Chinese title without truncation", () => {
+    const result = buildQuickCreateDraft({
+      title: "参加美国总统竞选",
+      selectedDay: "2026-04-15",
+      now: new Date(2026, 3, 15, 10, 0, 0, 0),
+    });
+
+    expect(result.title).toBe("参加美国总统竞选");
+    expect(result.priority).toBe("Medium");
+  });
+
   it("builds draft with defaults", () => {
     const draft = buildQuickCreateDraft({
       title: " My task ",

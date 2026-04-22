@@ -37,6 +37,13 @@ export interface StructuredAgentResult<T = unknown> {
   reliability?: StructuredResultReliability;
   sessionId?: string;
   runId?: string;
+  bridgeToolCalls?: Array<{
+    tool: string;
+    callId?: string;
+    input: Record<string, unknown>;
+    result?: string;
+    status?: "pending" | "completed" | "error";
+  }>;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

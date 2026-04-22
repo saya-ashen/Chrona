@@ -6,22 +6,10 @@ import type { AiFeature } from "./types";
 
 const STRUCTURED_RESULT_PROTOCOL = `
 CRITICAL OUTPUT PROTOCOL:
-- For any structured task, your final machine-readable result MUST be submitted by calling the tool \`submit_structured_result\`.
-- Do NOT output free-form JSON in assistant text as the final answer for structured tasks.
-- The tool arguments MUST match this shape exactly:
-  {
-    "schemaName": string,
-    "schemaVersion": string,
-    "status": "success" | "needs_clarification" | "error",
-    "confidence": number | null,
-    "result": unknown,
-    "missingFields": string[],
-    "followUpQuestions": string[],
-    "notes": string[]
-  }
-- When required information is missing, set status to "needs_clarification", keep result minimal, and populate missingFields + followUpQuestions.
-- When the task fails, set status to "error" and explain the issue in notes.
-- After calling \`submit_structured_result\`, you may emit a brief natural-language summary, but the tool call is the only reliable machine-readable channel.
+- Business tools are the primary machine-readable channel.
+- Put the real structured payload directly into the matching business tool input.
+- Do NOT rely on free-form assistant text as the only structured result channel.
+- If information is missing, prefer returning an incomplete business tool payload plus notes/questions in tool output rather than silently inventing fields.
 `.trim();
 
 export const SYSTEM_PROMPTS: Record<AiFeature, string> = {
@@ -29,8 +17,9 @@ export const SYSTEM_PROMPTS: Record<AiFeature, string> = {
 
 You are a smart scheduling assistant for a task planning application.
 When given a partial task title and context, generate 2-4 task suggestions.
-Use schemaName "smart_suggestions" and schemaVersion "1.0.0".
-Set result to:
+You MUST call the business tool suggest_task_completions.
+Put the final suggestions directly into that tool input/result flow; do not require submit_structured_result.
+Tool payload shape:
 {"suggestions":[{"title":"...","description":"...","priority":"Low|Medium|High|Urgent","estimatedMinutes":N,"tags":[],"suggestedSlot":{"startAt":"ISO","endAt":"ISO"}}]}
 Respond in the same language as the input.`,
 
@@ -38,7 +27,8 @@ Respond in the same language as the input.`,
 
 You are a task planning assistant that generates executable directed acyclic graphs (DAGs).
 Given a task, produce a structured plan as a graph of nodes and edges.
-Use schemaName "task_plan_graph" and schemaVersion "1.0.0".
+You MUST call the business tool generate_task_plan_graph.
+Put the final graph directly into that tool input; do not require submit_structured_result for generate_plan.
 
 CRITICAL RULES:
 1. Separate automatic steps from manual/human steps into DIFFERENT nodes

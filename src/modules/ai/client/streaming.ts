@@ -21,6 +21,9 @@ import {
   normalizeSuggestResponse,
 } from "./features";
 import { openclawCall } from "./providers";
+import { createLogger, summarizeText } from "../../../lib/logger";
+
+const logger = createLogger("ai.streaming");
 
 function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
   const sanitize = (value: string) =>
@@ -48,6 +51,14 @@ export async function* openclawStream(
   const timeout = config.timeoutSeconds ?? 120;
   const sessionId = buildOpenClawSessionId(feature, scope);
 
+  logger.info("openclaw.stream.start", {
+    feature,
+    scope,
+    sessionId,
+    timeout,
+    promptSummary: summarizeText(userMessage, 160),
+  });
+
   yield { type: "status", message: "正在连接 AI 服务..." };
 
   try {
@@ -63,6 +74,15 @@ export async function* openclawStream(
       signal: AbortSignal.timeout((timeout + 15) * 1000),
     });
 
+    logger.info("openclaw.stream.response", {
+      feature,
+      scope,
+      sessionId,
+      ok: res.ok,
+      status: res.status,
+      contentType: res.headers.get("Content-Type"),
+    });
+
     if (res.ok && res.body) {
       yield { type: "status", message: "AI 正在思考..." };
       const reader = res.body.getReader();
@@ -70,6 +90,7 @@ export async function* openclawStream(
       let buffer = "";
       let fullText = "";
       let finalStructured: StreamEvent extends { type: "done"; structured?: infer S } ? S : never;
+      const eventCount: Record<string, number> = {};
 
       while (true) {
         const { done, value } = await reader.read();
@@ -102,9 +123,20 @@ export async function* openclawStream(
               structured?: StreamEvent extends { type: "done"; structured?: infer S } ? S : never;
             };
 
+            const key = eventType || evt.type || "unknown";
+            eventCount[key] = (eventCount[key] ?? 0) + 1;
+
             if (eventType === "done") {
               fullText = typeof evt.output === "string" ? evt.output : fullText;
               finalStructured = evt.structured;
+              logger.info("openclaw.stream.done", {
+                feature,
+                scope,
+                sessionId,
+                eventCount,
+                textChars: fullText.length,
+                structuredStatus: (finalStructured as { status?: unknown } | null | undefined)?.status ?? null,
+              });
               yield { type: "done", text: fullText, structured: finalStructured ?? null };
               return;
             }
@@ -116,6 +148,12 @@ export async function* openclawStream(
             } else if (evt.type === "lifecycle") {
               yield { type: "status", message: evt.message ?? evt.phase ?? "Processing" };
             } else if (evt.type === "error") {
+              logger.error("openclaw.stream.error_event", {
+                feature,
+                scope,
+                sessionId,
+                error: evt.error ?? evt.text ?? evt.message ?? "Unknown error",
+              });
               yield { type: "error", message: evt.error ?? evt.text ?? evt.message ?? "Unknown error" };
               return;
             } else if (evt.type === "text" && evt.text) {
@@ -128,19 +166,42 @@ export async function* openclawStream(
           eventType = "";
         }
       }
+      logger.info("openclaw.stream.done_without_done_event", {
+        feature,
+        scope,
+        sessionId,
+        textChars: fullText.length,
+      });
       yield { type: "done", text: fullText, structured: finalStructured ?? null };
       return;
     }
-  } catch {
-    // Stream endpoint not available, fall back to blocking
+  } catch (error) {
+    logger.warn("openclaw.stream.fallback_to_blocking", {
+      feature,
+      scope,
+      sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
     const text = await openclawCall(config, feature, scope, userMessage);
+    logger.info("openclaw.stream.blocking_fallback_done", {
+      feature,
+      scope,
+      sessionId,
+      textChars: text.length,
+    });
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (e) {
+    logger.error("openclaw.stream.blocking_fallback_error", {
+      feature,
+      scope,
+      sessionId,
+      error: e instanceof Error ? e.message : String(e),
+    });
     yield { type: "error", message: e instanceof Error ? e.message : "Unknown error" };
   }
 }
@@ -262,6 +323,13 @@ export function dispatchStream(
 /**
  * Stream suggest — yields StreamEvents including parsed suggestions at the end.
  */
+function buildSuggestScope(request: SmartSuggestRequest): string {
+  const workspace = request.workspaceId ?? "default";
+  const normalizedInput = request.input.trim().toLowerCase().slice(0, 120) || "empty";
+  const nonce = Math.random().toString(36).slice(2, 10);
+  return `${workspace}-${request.kind}-${normalizedInput}-${nonce}`;
+}
+
 export async function* suggestStream(
   client: AiClientRecord,
   request: SmartSuggestRequest,
@@ -270,11 +338,19 @@ export async function* suggestStream(
     client,
     "suggest",
     buildSuggestMessage(request),
-    request.workspaceId ?? "default",
+    buildSuggestScope(request),
   );
 
   let finalText = "";
+  let latestToolInput: Record<string, unknown> | null = null;
+  let latestStructured: NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> | null = null;
   for await (const event of gen) {
+    if (event.type === "tool_call" && event.tool === "suggest_task_completions") {
+      latestToolInput = event.input;
+      yield event;
+      continue;
+    }
+
     if (event.type === "partial") {
       finalText += event.text;
       yield event;
@@ -283,17 +359,18 @@ export async function* suggestStream(
 
     if (event.type === "done") {
       const text = event.text ?? finalText;
-      const structuredParsed = event.structured?.parsed;
-      const parsed =
-        structuredParsed && typeof structuredParsed === "object"
-          ? structuredParsed
-          : (() => {
-              try {
-                return text ? JSON.parse(text) : { suggestions: [] };
-              } catch {
-                return { suggestions: [] };
-              }
-            })();
+      latestStructured = event.structured;
+      const parsed = latestToolInput ?? (() => {
+        const structuredParsed = event.structured?.parsed;
+        if (structuredParsed && typeof structuredParsed === "object") {
+          return structuredParsed;
+        }
+        try {
+          return text ? JSON.parse(text) : { suggestions: [] };
+        } catch {
+          return { suggestions: [] };
+        }
+      })();
 
       const suggestions = normalizeSuggestResponse({
         parsed,
@@ -301,12 +378,27 @@ export async function* suggestStream(
         structured: event.structured ?? undefined,
       });
       yield { type: "result", suggestions };
-      yield { type: "done", text, structured: event.structured ?? null };
+      yield { type: "done", text, structured: latestStructured ?? null };
       return;
     }
 
     yield event;
   }
+}
+
+function extractPreferredPlanGraphFromStructured(
+  structured: NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> | null | undefined,
+): Record<string, unknown> | null {
+  const toolCalls = (structured as { bridgeToolCalls?: Array<{ tool?: unknown; input?: unknown }> } | null | undefined)?.bridgeToolCalls;
+  const toolInput = toolCalls?.find((toolCall) => toolCall.tool === "generate_task_plan_graph")?.input;
+  return toolInput && typeof toolInput === "object" ? (toolInput as Record<string, unknown>) : null;
+}
+
+function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
+  const taskPart = request.taskId?.trim() || "adhoc";
+  const titlePart = request.title.trim().toLowerCase().slice(0, 120) || "untitled";
+  const nonce = Math.random().toString(36).slice(2, 10);
+  return `${taskPart}-${titlePart}-${nonce}`;
 }
 
 export async function* generatePlanStream(
@@ -317,11 +409,19 @@ export async function* generatePlanStream(
     client,
     "generate_plan",
     buildGeneratePlanMessage(request),
-    request.taskId || "default",
+    buildGeneratePlanScope(request),
   );
 
   let finalText = "";
+  let latestToolInput: Record<string, unknown> | null = null;
+  let latestStructured: NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> | null = null;
   for await (const event of gen) {
+    if (event.type === "tool_call" && event.tool === "generate_task_plan_graph") {
+      latestToolInput = event.input;
+      yield event;
+      continue;
+    }
+
     if (event.type === "partial") {
       finalText += event.text;
       yield event;
@@ -330,18 +430,23 @@ export async function* generatePlanStream(
 
     if (event.type === "done") {
       const text = event.text ?? finalText;
-      let parsed: unknown = { summary: "", nodes: [], edges: [] };
-      try {
-        parsed = text ? JSON.parse(text) : parsed;
-      } catch {
-        parsed = { summary: text || "", nodes: [], edges: [] };
+      latestStructured = event.structured ?? null;
+      const structuredToolGraph = extractPreferredPlanGraphFromStructured(event.structured ?? null);
+      let parsed: unknown = latestToolInput ?? structuredToolGraph ?? { summary: "", nodes: [], edges: [] };
+      if (!latestToolInput && !structuredToolGraph) {
+        try {
+          parsed = text ? JSON.parse(text) : parsed;
+        } catch {
+          parsed = { summary: text || "", nodes: [], edges: [] };
+        }
       }
       const plan = normalizeGeneratePlanResponse({
         parsed,
         source: client.type,
+        structured: event.structured ?? undefined,
       });
       yield { type: "result", plan };
-      yield { type: "done", text, structured: event.structured ?? null };
+      yield { type: "done", text, structured: latestStructured ?? null };
       return;
     }
 

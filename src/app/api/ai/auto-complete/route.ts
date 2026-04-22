@@ -3,82 +3,18 @@ import { aiSuggestStream } from "@/modules/ai/ai-service";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/ai-service";
 import { db } from "@/lib/db";
 import type { StructuredSuggestion } from "@/hooks/use-ai";
+import { createLogger, summarizeText } from "@/lib/logger";
 
 // Re-export for consumers of this route
 export type { StructuredSuggestion };
+
+const logger = createLogger("api.ai.auto-complete");
 
 export interface AutoCompleteAPIResponse {
   suggestions: StructuredSuggestion[];
   source: string;
   requestId: string;
 }
-
-// ────────────────────────────────────────────────────────────────────
-// Keyword-based fallback (no AI needed)
-// ────────────────────────────────────────────────────────────────────
-
-interface KeywordRule {
-  keywords: string[];
-  suggestions: Array<{
-    title: string;
-    description: string;
-    priority: "Low" | "Medium" | "High" | "Urgent";
-    estimatedMinutes: number;
-    tags: string[];
-  }>;
-}
-
-const keywordRules: KeywordRule[] = [
-  {
-    keywords: ["meeting", "meet", "call", "sync", "会议", "开会", "同步"],
-    suggestions: [
-      { title: "Team sync meeting", description: "Regular team sync to discuss progress and blockers.", priority: "Medium", estimatedMinutes: 30, tags: ["meeting"] },
-      { title: "1:1 meeting", description: "One-on-one check-in.", priority: "Medium", estimatedMinutes: 30, tags: ["meeting", "1:1"] },
-    ],
-  },
-  {
-    keywords: ["review", "pr", "code review", "审查", "评审"],
-    suggestions: [
-      { title: "Code review", description: "Review pull request changes and provide feedback.", priority: "High", estimatedMinutes: 45, tags: ["review", "code"] },
-    ],
-  },
-  {
-    keywords: ["write", "draft", "document", "doc", "写", "文档"],
-    suggestions: [
-      { title: "Write documentation", description: "Draft clear documentation.", priority: "Medium", estimatedMinutes: 60, tags: ["writing"] },
-    ],
-  },
-  {
-    keywords: ["fix", "bug", "debug", "修复", "调试"],
-    suggestions: [
-      { title: "Fix bug", description: "Investigate and fix the issue.", priority: "High", estimatedMinutes: 60, tags: ["bug", "fix"] },
-    ],
-  },
-  {
-    keywords: ["deploy", "release", "部署", "发布"],
-    suggestions: [
-      { title: "Deploy to production", description: "Prepare and execute deployment.", priority: "Urgent", estimatedMinutes: 30, tags: ["deployment"] },
-    ],
-  },
-  {
-    keywords: ["test", "testing", "测试"],
-    suggestions: [
-      { title: "Write tests", description: "Write unit and integration tests.", priority: "Medium", estimatedMinutes: 60, tags: ["testing"] },
-    ],
-  },
-  {
-    keywords: ["plan", "planning", "计划", "规划"],
-    suggestions: [
-      { title: "Sprint planning", description: "Plan tasks for the upcoming sprint.", priority: "Medium", estimatedMinutes: 60, tags: ["planning"] },
-    ],
-  },
-  {
-    keywords: ["learn", "study", "research", "学习", "研究"],
-    suggestions: [
-      { title: "Research topic", description: "Deep dive into the topic and take notes.", priority: "Low", estimatedMinutes: 90, tags: ["research"] },
-    ],
-  },
-];
 
 function generateSummary(s: { title: string; priority: string; estimatedMinutes: number }): string {
   const priorityMap: Record<string, string> = {
@@ -88,22 +24,6 @@ function generateSummary(s: { title: string; priority: string; estimatedMinutes:
     Urgent: "紧急",
   };
   return `创建${s.estimatedMinutes}分钟的「${s.title}」任务，${priorityMap[s.priority] ?? s.priority}`;
-}
-
-function ruleBasedSuggest(title: string): StructuredSuggestion[] {
-  const lower = title.toLowerCase();
-  const matched = keywordRules.filter((rule) =>
-    rule.keywords.some((kw) => lower.includes(kw)),
-  );
-
-  const suggestions = matched.flatMap((rule) => rule.suggestions);
-  if (suggestions.length === 0) return [];
-
-  return suggestions.slice(0, 4).map((s) => ({
-    id: randomUUID(),
-    summary: generateSummary(s),
-    action: { type: "create_task" as const, ...s },
-  }));
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -197,6 +117,15 @@ export async function POST(request: Request) {
 
     const trimmedTitle = title.trim();
     const requestId = randomUUID();
+    logger.info("request.start", {
+      requestId,
+      workspaceId: workspaceId ?? null,
+      feature: "suggest",
+      rawInput: summarizeText(title),
+      normalizedInput: summarizeText(trimmedTitle),
+      source: "schedule_quick_create",
+      streaming: true,
+    });
 
     // Build context
     let context: { existingTasks?: TaskSnapshot[]; scheduleHealth?: ScheduleHealthSnapshot } | undefined;
@@ -228,21 +157,9 @@ export async function POST(request: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send rule-based suggestions immediately as a fast first response
-          const ruleSuggestions = ruleBasedSuggest(trimmedTitle);
-          if (ruleSuggestions.length > 0) {
-            controller.enqueue(
-              encoder.encode(sseEncode("suggestions", {
-                suggestions: ruleSuggestions,
-                source: "rules",
-                requestId,
-                isFinal: false,
-              })),
-            );
-          }
-
           // Stream AI suggestions
           let fullText = "";
+          const eventCounts: Record<string, number> = {};
           const gen = aiSuggestStream({
             input: trimmedTitle,
             kind: "auto-complete",
@@ -251,6 +168,13 @@ export async function POST(request: Request) {
           });
 
           for await (const event of gen) {
+            eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
+            logger.info("stream.event", {
+              requestId,
+              workspaceId: workspaceId ?? null,
+              feature: "suggest",
+              eventType: event.type,
+            });
             switch (event.type) {
               case "status":
                 controller.enqueue(
@@ -302,6 +226,11 @@ export async function POST(request: Request) {
                       isFinal: true,
                     })),
                   );
+                  logger.info("suggestions.final", {
+                    requestId,
+                    workspaceId: workspaceId ?? null,
+                    count: aiSuggestions.length,
+                  });
                 }
                 break;
               }
@@ -328,22 +257,21 @@ export async function POST(request: Request) {
             }
           }
 
-          // If no AI suggestions were generated, ensure we mark as final
-          if (!fullText) {
-            controller.enqueue(
-              encoder.encode(sseEncode("suggestions", {
-                suggestions: ruleSuggestions,
-                source: "rules",
-                requestId,
-                isFinal: true,
-              })),
-            );
-          }
-
+          logger.info("request.done", {
+            requestId,
+            workspaceId: workspaceId ?? null,
+            feature: "suggest",
+            eventCounts,
+          });
           controller.enqueue(encoder.encode(sseEncode("done", { requestId })));
           controller.close();
         } catch (error) {
-          console.error("Stream error:", error);
+          logger.error("request.stream_error", {
+            requestId,
+            workspaceId: workspaceId ?? null,
+            feature: "suggest",
+            error: error instanceof Error ? error.message : String(error),
+          });
           controller.enqueue(
             encoder.encode(sseEncode("error", {
               message: error instanceof Error ? error.message : "Unknown error",
@@ -362,7 +290,10 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Error in auto-complete:", error);
+    logger.error("request.error", {
+      feature: "suggest",
+      error: error instanceof Error ? error.message : String(error),
+    });
     return new Response(JSON.stringify({ error: "Failed to generate suggestions" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
