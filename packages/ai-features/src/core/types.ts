@@ -48,6 +48,13 @@ export interface StructuredDebugInfo {
   reliability?: "tool_call" | "fallback_text";
   validationIssues?: StructuredValidationIssue[];
   structuredEnvelope?: StructuredSubmissionEnvelope | null;
+  bridgeToolCalls?: Array<{
+    tool: string;
+    callId?: string;
+    input: Record<string, unknown>;
+    result?: string;
+    status?: "pending" | "completed" | "error";
+  }>;
 }
 
 export interface StructuredResponseMeta {
@@ -221,6 +228,8 @@ export type StreamEvent =
   | { type: "tool_call"; tool: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool: string; result: string }
   | { type: "partial"; text: string }
+  | { type: "result"; suggestions: SmartSuggestResponse }
+  | { type: "result"; plan: GenerateTaskPlanResponse }
   | { type: "done"; text: string; structured?: StructuredAgentResult | null }
   | { type: "error"; message: string };
 

@@ -1,5 +1,5 @@
 /**
- * AI Features — Canonical feature implementations (suggest, generatePlan, conflicts, timeslots, chat).
+ * AI Features — Canonical feature implementations.
  */
 
 import { randomUUID } from "node:crypto";
@@ -23,9 +23,13 @@ import type {
   ChatResponse,
   StructuredDebugInfo,
 } from "../core/types";
+import type { StructuredAgentResult } from "../core/structured";
 import { AiClientError } from "../core/types";
 import { dispatch, dispatchStructured, extractJSON } from "../core/providers";
-import { parseDirectStructuredEnvelope, requireStructuredResult } from "../core/structured";
+import {
+  parseDirectStructuredEnvelope,
+  requireStructuredResult,
+} from "../core/structured";
 import type {
   TaskPlanNode,
   TaskPlanEdge,
@@ -33,7 +37,9 @@ import type {
   TaskPlanEdgeType,
 } from "@/modules/ai/types";
 
-function toStructuredDebugInfo(result: ReturnType<typeof requireStructuredResult>): StructuredDebugInfo {
+function toStructuredDebugInfo(
+  result: ReturnType<typeof requireStructuredResult>,
+): StructuredDebugInfo {
   return {
     rawToolCall: result.rawToolCall,
     rawOutput: result.rawOutput,
@@ -44,6 +50,7 @@ function toStructuredDebugInfo(result: ReturnType<typeof requireStructuredResult
     reliability: result.reliability,
     validationIssues: result.validationIssues,
     structuredEnvelope: result.structured,
+    bridgeToolCalls: result.bridgeToolCalls,
   };
 }
 
@@ -60,7 +67,9 @@ function normalizeNodeType(value: unknown): TaskPlanNodeType {
   }
 }
 
-function normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent" | null {
+function normalizePriority(
+  value: unknown,
+): "Low" | "Medium" | "High" | "Urgent" | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === "low") return "Low";
@@ -84,149 +93,161 @@ function normalizeEdgeType(value: unknown): TaskPlanEdgeType {
 
 function ensureObject(value: unknown, context: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new AiClientError(`${context} must be an object`, "openclaw", "invalid_response");
+    throw new AiClientError(
+      `${context} must be an object`,
+      "openclaw",
+      "invalid_response",
+    );
   }
   return value as Record<string, unknown>;
 }
 
-function parseStructuredFeatureResult<T>(
+async function parseStructuredFeatureResult<T>(
   client: AiClientRecord,
   feature: Parameters<typeof dispatchStructured>[1],
-  message: string,
+  input: Parameters<typeof dispatchStructured>[2],
   scope = "default",
 ): Promise<{ parsed: T; debug?: StructuredDebugInfo; rawText?: string }> {
-  return (async () => {
-    if (client.type === "openclaw") {
-      const structuredCall = await dispatchStructured<T>(client, feature, message, scope);
-      const structured = requireStructuredResult<T>(structuredCall, client.type);
-      return {
-        parsed: structured.parsed as T,
-        debug: toStructuredDebugInfo(structured),
-        rawText: structured.rawOutput ?? structuredCall.text,
-      };
-    }
-
-    const raw = await dispatch(client, feature, message, scope);
+  if (client.type === "openclaw") {
+    const structuredCall = await dispatchStructured<T>(
+      client,
+      feature,
+      input,
+      scope,
+    );
+    const structured = requireStructuredResult<T>(structuredCall, client.type);
     return {
-      parsed: extractJSON<T>(raw, client.type),
-      rawText: raw,
+      parsed: structured.parsed as T,
+      debug: toStructuredDebugInfo(structured),
+      rawText: structured.rawOutput ?? structuredCall.text,
     };
-  })();
+  }
+
+  const raw = await dispatch(client, feature, input, scope);
+  return {
+    parsed: extractJSON<T>(raw, client.type),
+    rawText: raw,
+  };
 }
 
-// ── Suggest ──
-
-export function buildSuggestMessage(request: SmartSuggestRequest): string {
-  const contextParts: string[] = [];
-  if (request.context?.selectedDay)
-    contextParts.push(`Selected day: ${request.context.selectedDay}`);
-  if (request.context?.existingTasks?.length) {
-    contextParts.push(
-      `Existing tasks (${request.context.existingTasks.length}):\n${request.context.existingTasks
-        .slice(0, 10)
-        .map((t) => `- ${t.title} (${t.status})`)
-        .join("\n")}`,
-    );
-  }
-  if (request.context?.scheduleHealth) {
-    const h = request.context.scheduleHealth;
-    contextParts.push(
-      `Schedule: ${h.loadPercent}% load, ${h.conflictCount} conflicts, ${h.freeMinutesToday}min free`,
-    );
-  }
-  return `Suggest task completions for: "${request.input}"${
-    contextParts.length ? `\n\nContext:\n${contextParts.join("\n")}` : ""
-  }`;
+export function normalizeSuggestResponse(input: {
+  parsed: unknown;
+  source: string;
+  structured?: StructuredDebugInfo | StructuredAgentResult | null;
+}): SmartSuggestResponse {
+  const parsed = ensureObject(input.parsed, "suggest result");
+  return {
+    suggestions: ((parsed.suggestions as Array<Partial<SmartSuggestion>> | undefined) ?? [])
+      .filter((suggestion) => suggestion.title)
+      .map((suggestion) => ({
+        title: suggestion.title!,
+        description: suggestion.description ?? "",
+        priority: suggestion.priority ?? "Medium",
+        estimatedMinutes: suggestion.estimatedMinutes ?? 30,
+        tags: suggestion.tags ?? [],
+        suggestedSlot: suggestion.suggestedSlot,
+      })),
+    source: input.source,
+    requestId: randomUUID(),
+    structured: input.structured ?? undefined,
+  };
 }
 
 export async function suggest(
   client: AiClientRecord,
   request: SmartSuggestRequest,
 ): Promise<SmartSuggestResponse> {
-  const requestId = randomUUID();
-  const result = await parseStructuredFeatureResult<{ suggestions?: Array<Partial<SmartSuggestion>> }>(
-    client,
-    "suggest",
-    buildSuggestMessage(request),
-    request.workspaceId ?? "default",
-  );
+  const result = await parseStructuredFeatureResult<{
+    suggestions?: Array<Partial<SmartSuggestion>>;
+  }>(client, "suggest", request, request.workspaceId ?? "default");
 
   return {
     suggestions: (result.parsed.suggestions ?? [])
-      .filter((s) => s.title)
-      .map((s) => ({
-        title: s.title!,
-        description: s.description ?? "",
-        priority: s.priority ?? "Medium",
-        estimatedMinutes: s.estimatedMinutes ?? 30,
-        tags: s.tags ?? [],
-        suggestedSlot: s.suggestedSlot,
+      .filter((suggestion) => suggestion.title)
+      .map((suggestion) => ({
+        title: suggestion.title!,
+        description: suggestion.description ?? "",
+        priority: suggestion.priority ?? "Medium",
+        estimatedMinutes: suggestion.estimatedMinutes ?? 30,
+        tags: suggestion.tags ?? [],
+        suggestedSlot: suggestion.suggestedSlot,
       })),
     source: client.type,
-    requestId,
+    requestId: randomUUID(),
     structured: result.debug,
   };
-}
-
-// ── Generate Plan ──
-
-export function buildGeneratePlanMessage(request: GenerateTaskPlanRequest) {
-  return `Generate an executable task plan graph for:\nTitle: "${request.title}"${
-    request.description ? `\nDescription: ${request.description}` : ""
-  }${request.estimatedMinutes ? `\nEstimated: ${request.estimatedMinutes} min` : ""}`;
 }
 
 export function normalizeGeneratePlanResponse(input: {
   parsed: unknown;
   source: string;
-  structured?: StructuredDebugInfo;
+  structured?: StructuredDebugInfo | StructuredAgentResult | null;
 }): GenerateTaskPlanResponse {
   const parsed = ensureObject(input.parsed, "task plan result");
 
-  const nodes: TaskPlanNode[] = ((parsed.nodes as Array<Partial<TaskPlanNode>> | undefined) ?? []).map((n, i) => {
-    const execMode = n.executionMode === "manual" || n.executionMode === "hybrid"
-      ? n.executionMode
-      : "automatic";
-    const requiresInput = Boolean(n.requiresHumanInput);
-    const requiresApproval = Boolean(n.requiresHumanApproval);
-    const autoRunnable = execMode === "automatic" && !requiresInput && !requiresApproval;
+  const nodes: TaskPlanNode[] =
+    ((parsed.nodes as Array<Partial<TaskPlanNode>> | undefined) ?? []).map(
+      (node, index) => {
+        const execMode =
+          node.executionMode === "manual" || node.executionMode === "hybrid"
+            ? node.executionMode
+            : "automatic";
+        const requiresInput = Boolean(node.requiresHumanInput);
+        const requiresApproval = Boolean(node.requiresHumanApproval);
+        const autoRunnable =
+          execMode === "automatic" && !requiresInput && !requiresApproval;
 
-    return {
-      id: n.id ?? `node-${i + 1}`,
-      type: normalizeNodeType(n.type),
-      title: n.title ?? `Step ${i + 1}`,
-      objective: n.objective ?? n.title ?? `Step ${i + 1}`,
-      description: n.description ?? null,
-      status: "pending" as const,
-      phase: n.phase ?? null,
-      estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : 30,
-      priority: normalizePriority(n.priority),
-      executionMode: execMode,
-      requiresHumanInput: requiresInput,
-      requiresHumanApproval: requiresApproval,
-      autoRunnable,
-      blockingReason: requiresInput ? "needs_user_input" as const : requiresApproval ? "needs_approval" as const : null,
-      linkedTaskId: n.linkedTaskId ?? null,
-      completionSummary: n.completionSummary ?? null,
-      metadata: n.metadata ?? null,
-    };
-  });
+        return {
+          id: node.id ?? `node-${index + 1}`,
+          type: normalizeNodeType(node.type),
+          title: node.title ?? `Step ${index + 1}`,
+          objective: node.objective ?? node.title ?? `Step ${index + 1}`,
+          description: node.description ?? null,
+          status: "pending" as const,
+          phase: node.phase ?? null,
+          estimatedMinutes:
+            typeof node.estimatedMinutes === "number"
+              ? node.estimatedMinutes
+              : 30,
+          priority: normalizePriority(node.priority),
+          executionMode: execMode,
+          requiresHumanInput: requiresInput,
+          requiresHumanApproval: requiresApproval,
+          autoRunnable,
+          blockingReason: requiresInput
+            ? ("needs_user_input" as const)
+            : requiresApproval
+              ? ("needs_approval" as const)
+              : null,
+          linkedTaskId: node.linkedTaskId ?? null,
+          completionSummary: node.completionSummary ?? null,
+          metadata: node.metadata ?? null,
+        };
+      },
+    );
 
-  const edges: TaskPlanEdge[] = ((parsed.edges as Array<Record<string, unknown>> | undefined) ?? []).map((e, i) => ({
-    id: (e.id as string) ?? `edge-${i + 1}`,
-    fromNodeId: (e.fromNodeId ?? e.from ?? "") as string,
-    toNodeId: (e.toNodeId ?? e.to ?? "") as string,
-    type: normalizeEdgeType(e.type),
-    metadata: (e.metadata as Record<string, unknown>) ?? null,
-  }));
+  const edges: TaskPlanEdge[] =
+    ((parsed.edges as Array<Record<string, unknown>> | undefined) ?? []).map(
+      (edge, index) => ({
+        id: (edge.id as string) ?? `edge-${index + 1}`,
+        fromNodeId: (edge.fromNodeId ?? edge.from ?? "") as string,
+        toNodeId: (edge.toNodeId ?? edge.to ?? "") as string,
+        type: normalizeEdgeType(edge.type),
+        metadata: (edge.metadata as Record<string, unknown>) ?? null,
+      }),
+    );
 
   return {
     nodes,
     edges,
-    summary: typeof parsed.summary === "string" ? parsed.summary : `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
-    reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
+    summary:
+      typeof parsed.summary === "string"
+        ? parsed.summary
+        : `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
+    reasoning:
+      typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
     source: input.source,
-    structured: input.structured,
+    structured: input.structured ?? undefined,
   };
 }
 
@@ -239,7 +260,7 @@ export async function generatePlan(
     reasoning?: string;
     nodes?: Array<Partial<TaskPlanNode>>;
     edges?: Array<Partial<TaskPlanEdge>>;
-  }>(client, "generate_plan", buildGeneratePlanMessage(request), request.taskId);
+  }>(client, "generate_plan", request, request.taskId);
 
   return normalizeGeneratePlanResponse({
     parsed: result.parsed,
@@ -248,25 +269,15 @@ export async function generatePlan(
   });
 }
 
-// ── Analyze Conflicts ──
-
 export async function analyzeConflicts(
   client: AiClientRecord,
   request: AnalyzeConflictsRequest,
 ): Promise<AnalyzeConflictsResponse> {
-  const taskList = request.tasks
-    .map(
-      (t) =>
-        `- ${t.id}: "${t.title}" ${t.scheduledStartAt ?? "?"}~${t.scheduledEndAt ?? "?"} ${t.priority ?? "Medium"}`,
-    )
-    .join("\n");
-  const msg = `Analyze conflicts:\n${taskList}${request.focusDate ? `\nFocus date: ${request.focusDate}` : ""}`;
-
   const result = await parseStructuredFeatureResult<{
     conflicts?: ConflictInfo[];
     resolutions?: ResolutionSuggestion[];
     summary?: string;
-  }>(client, "conflicts", msg, request.workspaceId ?? "default");
+  }>(client, "conflicts", request, request.workspaceId ?? "default");
 
   return {
     conflicts: result.parsed.conflicts ?? [],
@@ -277,26 +288,14 @@ export async function analyzeConflicts(
   };
 }
 
-// ── Suggest Timeslots ──
-
 export async function suggestTimeslots(
   client: AiClientRecord,
   request: SuggestTimeslotRequest,
 ): Promise<SuggestTimeslotResponse> {
-  const scheduleList = request.currentSchedule
-    .filter((t) => t.scheduledStartAt)
-    .map((t) => `- "${t.title}" ${t.scheduledStartAt}~${t.scheduledEndAt}`)
-    .join("\n");
-  const msg = `Find time slots for:\nTask: "${request.taskTitle}" (${request.estimatedMinutes} min, ${request.priority ?? "Medium"})${
-    request.deadline ? `\nDeadline: ${request.deadline}` : ""
-  }\nWork hours: ${request.preferences?.workdayStartHour ?? 9}:00-${request.preferences?.workdayEndHour ?? 18}:00\n\nCurrent schedule:\n${scheduleList || "(empty)"}`;
-
-  const result = await parseStructuredFeatureResult<{ slots?: TimeslotOption[]; reasoning?: string }>(
-    client,
-    "timeslots",
-    msg,
-    request.taskTitle,
-  );
+  const result = await parseStructuredFeatureResult<{
+    slots?: TimeslotOption[];
+    reasoning?: string;
+  }>(client, "timeslots", request, request.taskTitle);
 
   return {
     slots: result.parsed.slots ?? [],
@@ -306,19 +305,18 @@ export async function suggestTimeslots(
   };
 }
 
-// ── Chat ──
-
 export async function chat(
   client: AiClientRecord,
   request: ChatRequest,
 ): Promise<ChatResponse> {
   if (client.type === "openclaw") {
-    const lastUserMsg =
-      [...request.messages].reverse().find((m) => m.role === "user")?.content ??
-      "";
-
     if (request.jsonMode) {
-      const structuredCall = await dispatchStructured<unknown>(client, "chat", lastUserMsg);
+      const structuredCall = await dispatchStructured<unknown>(
+        client,
+        "chat",
+        request,
+        "chat",
+      );
       if (structuredCall.structured?.structured) {
         return {
           content: structuredCall.text,
@@ -328,7 +326,10 @@ export async function chat(
         };
       }
 
-      const fallback = parseDirectStructuredEnvelope<unknown>(extractJSON<unknown>(structuredCall.text, client.type), client.type);
+      const fallback = parseDirectStructuredEnvelope<unknown>(
+        extractJSON<unknown>(structuredCall.text, client.type),
+        client.type,
+      );
       return {
         content: structuredCall.text,
         parsed: fallback.parsed,
@@ -337,7 +338,7 @@ export async function chat(
       };
     }
 
-    const raw = await dispatch(client, "chat", lastUserMsg);
+    const raw = await dispatch(client, "chat", request, "chat");
     return { content: raw, source: client.type };
   }
 
@@ -375,7 +376,11 @@ export async function chat(
 
   const reader = res.body?.getReader();
   if (!reader) {
-    throw new AiClientError("No response body for streaming", "llm", "internal");
+    throw new AiClientError(
+      "No response body for streaming",
+      "llm",
+      "internal",
+    );
   }
 
   const decoder = new TextDecoder();
@@ -397,20 +402,18 @@ export async function chat(
         const parsed = JSON.parse(data) as {
           choices?: Array<{ delta?: { content?: string } }>;
         };
-        const c = parsed.choices?.[0]?.delta?.content;
-        if (c) contentChunks.push(c);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) contentChunks.push(content);
       } catch {
-        // skip
+        // ignore malformed SSE lines
       }
     }
   }
 
   const content = contentChunks.join("");
-
   if (request.jsonMode) {
     const parsed = extractJSON<unknown>(content, client.type);
     return { content, parsed, source: client.type };
   }
   return { content, source: client.type };
 }
-
