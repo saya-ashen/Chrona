@@ -4,6 +4,7 @@ const aiGeneratePlanStream = mock();
 const getLatestTaskPlanGraph = mock();
 const saveTaskPlanGraph = mock();
 const findUnique = mock();
+const ensureDefaultTaskSession = mock();
 
 mock.module("@/modules/ai/ai-service", () => ({
   aiGeneratePlan: mock(async () => null),
@@ -12,6 +13,9 @@ mock.module("@/modules/ai/ai-service", () => ({
 mock.module("@/modules/tasks/task-plan-graph-store", () => ({
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
+}));
+mock.module("@/modules/task-execution/task-sessions", () => ({
+  ensureDefaultTaskSession,
 }));
 
 mock.module("@/lib/db", () => ({
@@ -30,6 +34,8 @@ describe("POST /api/ai/generate-task-plan stream", () => {
     getLatestTaskPlanGraph.mockReset();
     saveTaskPlanGraph.mockReset();
     findUnique.mockReset();
+    ensureDefaultTaskSession.mockReset();
+    ensureDefaultTaskSession.mockResolvedValue({ id: "sess-1", sessionKey: "chrona:openclaw:task:task-1:default" });
   });
 
   it("returns SSE and includes process/tool events before final result", async () => {
@@ -101,5 +107,42 @@ describe("POST /api/ai/generate-task-plan stream", () => {
     expect(text).toContain("graph with 0 nodes");
     expect(text).toContain("event: result");
     expect(text).toContain("Plan ready");
+    expect(text).toContain('"taskSessionKey":"chrona:openclaw:task:task-1:default"');
+    expect(ensureDefaultTaskSession).toHaveBeenCalledWith({
+      taskId: "task-1",
+      taskTitle: "Plan task",
+      runtimeName: "openclaw",
+      defaultSessionId: undefined,
+    });
+  });
+
+  it("does not crash when stream closes before late events complete", async () => {
+    getLatestTaskPlanGraph.mockResolvedValue(null);
+    findUnique.mockResolvedValue({
+      id: "task-1",
+      workspaceId: "ws-1",
+      title: "Plan task",
+      description: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+    });
+    aiGeneratePlanStream.mockImplementation(async function* () {
+      yield { type: "status", message: "Planning graph" };
+      yield { type: "done" };
+      yield { type: "error", message: "late error after done" };
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify({ taskId: "task-1" }),
+      }),
+    );
+
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    const text = await response.text();
+    expect(text).toContain("event: done");
+    expect(text).not.toContain("late error after done");
   });
 });

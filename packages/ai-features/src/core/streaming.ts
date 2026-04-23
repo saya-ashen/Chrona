@@ -356,6 +356,12 @@ export function dispatchStream(
 }
 
 function buildSuggestScope(request: SmartSuggestRequest): string {
+  if (request.sessionKey?.trim()) {
+    return request.sessionKey.trim();
+  }
+  if (request.taskId?.trim()) {
+    return `chrona:openclaw:task:${request.taskId.trim()}:default`;
+  }
   const workspace = request.workspaceId ?? "default";
   const normalizedInput =
     request.input.trim().toLowerCase().slice(0, 120) || "empty";
@@ -443,11 +449,14 @@ function extractPreferredPlanGraphFromStructured(
 }
 
 function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
-  const taskPart = request.taskId?.trim() || "adhoc";
+  const taskPart = request.taskId?.trim();
+  if (taskPart) {
+    return `chrona:openclaw:task:${taskPart}:default`;
+  }
   const titlePart =
     request.title.trim().toLowerCase().slice(0, 120) || "untitled";
   const nonce = Math.random().toString(36).slice(2, 10);
-  return `${taskPart}-${titlePart}-${nonce}`;
+  return `adhoc-${titlePart}-${nonce}`;
 }
 
 export async function* generatePlanStream(

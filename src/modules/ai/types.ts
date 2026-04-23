@@ -255,6 +255,7 @@ export interface SavedTaskPlanGraph {
 export interface TaskPlanGraphResponse {
   source: "saved" | string;
   planGraph: TaskPlanGraph;
+  taskSessionKey?: string | null;
   savedPlan?: {
     id: string;
     status: TaskPlanStatus;

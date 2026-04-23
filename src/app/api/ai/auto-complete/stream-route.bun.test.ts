@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 const aiSuggestStream = mock();
 const aiGeneratePlanStream = mock(async function* () {});
 const aiGeneratePlan = mock(async () => null);
+const ensureDefaultTaskSession = mock();
+const findMany = mock(async () => []);
 
 mock.module("@/modules/ai/ai-service", () => ({
   aiSuggestStream,
@@ -10,10 +12,14 @@ mock.module("@/modules/ai/ai-service", () => ({
   aiGeneratePlan,
 }));
 
+mock.module("@/modules/task-execution/task-sessions", () => ({
+  ensureDefaultTaskSession,
+}));
+
 mock.module("@/lib/db", () => ({
   db: {
     taskProjection: {
-      findMany: mock(async () => []),
+      findMany,
     },
   },
 }));
@@ -21,6 +27,10 @@ mock.module("@/lib/db", () => ({
 describe("POST /api/ai/auto-complete (stream)", () => {
   beforeEach(() => {
     aiSuggestStream.mockReset();
+    ensureDefaultTaskSession.mockReset();
+    findMany.mockReset();
+    ensureDefaultTaskSession.mockResolvedValue({ id: "sess-1", sessionKey: "chrona:openclaw:task:task-1:default" });
+    findMany.mockResolvedValue([]);
   });
 
   it("forwards streamed structured suggestions as SSE suggestions event", async () => {
@@ -72,6 +82,48 @@ describe("POST /api/ai/auto-complete (stream)", () => {
     expect(text).toContain("Write unit tests");
     expect(text).toContain('"isFinal":true');
     expect(text).not.toContain('"source":"rules"');
+  });
+
+  it("reuses task session when input matches an existing task title", async () => {
+    findMany.mockResolvedValue([
+      {
+        taskId: "task-1",
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        task: {
+          title: "write tests",
+          status: "open",
+          priority: "High",
+          defaultSessionId: "sess-1",
+          runtimeAdapterKey: "openclaw",
+        },
+      },
+    ]);
+    aiSuggestStream.mockImplementation(async function* () {
+      yield { type: "done", text: "done", structured: null };
+    });
+
+    const { POST } = await import("./route");
+    await POST(
+      new Request("http://localhost/api/ai/auto-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "write tests", workspaceId: "ws-1" }),
+      }),
+    );
+
+    expect(ensureDefaultTaskSession).toHaveBeenCalledWith({
+      taskId: "task-1",
+      taskTitle: "write tests",
+      runtimeName: "openclaw",
+      defaultSessionId: "sess-1",
+    });
+    expect(aiSuggestStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task-1",
+        sessionKey: "chrona:openclaw:task:task-1:default",
+      }),
+    );
   });
 
   it("does not emit rule-based fallback suggestions when AI returns nothing", async () => {

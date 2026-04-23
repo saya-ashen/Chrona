@@ -84,6 +84,8 @@ export interface SmartSuggestRequest {
   input: string;
   kind: "auto-complete" | "schedule" | "general";
   workspaceId?: string;
+  taskId?: string;
+  sessionKey?: string;
   context?: {
     existingTasks?: TaskSnapshot[];
     selectedDay?: string;
