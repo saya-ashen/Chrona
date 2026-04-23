@@ -41,15 +41,14 @@ function toStructuredDebugInfo(
   result: ReturnType<typeof requireStructuredResult>,
 ): StructuredDebugInfo {
   return {
-    rawToolCall: result.rawToolCall,
     rawOutput: result.rawOutput,
     error: result.error,
-    status: result.status,
+    source: result.source,
+    feature: result.feature,
+    toolName: result.toolName,
     sessionId: result.sessionId,
     runId: result.runId,
-    reliability: result.reliability,
     validationIssues: result.validationIssues,
-    structuredEnvelope: result.structured,
     bridgeToolCalls: result.bridgeToolCalls,
   };
 }
@@ -317,7 +316,7 @@ export async function chat(
         request,
         "chat",
       );
-      if (structuredCall.structured?.structured) {
+      if (structuredCall.structured?.ok) {
         return {
           content: structuredCall.text,
           parsed: structuredCall.structured.parsed,

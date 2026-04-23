@@ -1,16 +1,9 @@
-import {
-  SUBMIT_STRUCTURED_RESULT_TOOL_NAME,
-  validateStructuredSubmission,
-  type StructuredAgentResult,
-  type StructuredResultStatus,
-  type StructuredSubmissionEnvelope,
-  type BridgeResponse,
-} from "@chrona/openclaw-integration/openclaw";
+import type { StructuredAgentResult, StructuredResultReliability } from "@chrona/openclaw-integration/protocol/structured-result";
+import type { BridgeResponse } from "@chrona/openclaw-integration/transport/bridge-types";
 
 import { AiClientError } from "./types";
 
-export { SUBMIT_STRUCTURED_RESULT_TOOL_NAME };
-export type { StructuredAgentResult, StructuredResultStatus, StructuredSubmissionEnvelope };
+export type { StructuredAgentResult, StructuredResultReliability };
 
 export type OpenClawStructuredMode = "text" | "structured";
 
@@ -28,7 +21,9 @@ export function coerceStructuredResult<T = unknown>(
   return {
     mode,
     text: bridge.output,
-    structured: bridge.structured ? { ...bridge.structured, parsed: (bridge.structured.parsed ?? null) as T | null } : null,
+    structured: bridge.structured
+      ? { ...bridge.structured, parsed: (bridge.structured.parsed ?? null) as T | null }
+      : null,
     bridge,
   };
 }
@@ -38,7 +33,8 @@ export function parseTextJsonWithFallback<T>(
   clientType: string,
 ): T {
   const jsonMatch =
-    raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ?? raw.match(/(\{[\s\S]*\})/);
+    raw.match(/```(?:json|tool)?\s*\n?([\s\S]*?)```/) ??
+    raw.match(/(\{[\s\S]*\})/);
   const jsonStr = jsonMatch?.[1] ?? raw;
   try {
     return JSON.parse(jsonStr.trim()) as T;
@@ -56,12 +52,16 @@ export function requireStructuredResult<T>(
   clientType = "openclaw",
 ): StructuredAgentResult<T> {
   if (!result.structured) {
-    throw new AiClientError("Structured mode result missing bridge structured payload", clientType, "invalid_response");
+    throw new AiClientError(
+      "Structured mode result missing parsed feature payload",
+      clientType,
+      "invalid_response",
+    );
   }
 
-  if (!result.structured.ok || !result.structured.structured) {
+  if (!result.structured.ok) {
     throw new AiClientError(
-      result.structured.error ?? `Structured result tool '${SUBMIT_STRUCTURED_RESULT_TOOL_NAME}' missing or invalid`,
+      result.structured.error ?? "Structured feature payload missing or invalid",
       clientType,
       "invalid_response",
     );
@@ -70,24 +70,23 @@ export function requireStructuredResult<T>(
   return result.structured;
 }
 
-export function parseDirectStructuredEnvelope<T>(value: unknown, clientType: string): StructuredAgentResult<T> {
-  const validation = validateStructuredSubmission(value);
-  if (!validation.parsed) {
-    throw new AiClientError("Structured result payload is not a valid object", clientType, "invalid_response");
+export function parseDirectStructuredEnvelope<T>(
+  value: unknown,
+  clientType: string,
+): StructuredAgentResult<T> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new AiClientError(
+      "Structured result payload is not a valid object",
+      clientType,
+      "invalid_response",
+    );
   }
 
   return {
-    ok: validation.ok,
-    parsed: validation.ok ? (validation.parsed.result as T) : null,
-    structured: validation.parsed,
-    status: validation.parsed.status,
-    error: validation.ok ? null : validation.issues.map((issue) => `${issue.path} ${issue.message}`).join("; "),
-    validationIssues: validation.issues,
-    reliability: "tool_call",
+    ok: true,
+    parsed: value as T,
+    source: "output_json",
+    error: null,
+    validationIssues: [],
   };
 }
-
-
-
-
-

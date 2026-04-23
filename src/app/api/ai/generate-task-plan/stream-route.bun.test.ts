@@ -46,8 +46,6 @@ describe("POST /api/ai/generate-task-plan stream", () => {
       yield { type: "status", message: "Planning graph" };
       yield { type: "tool_call", tool: "generate_task_plan_graph", input: { title: "Plan task" } };
       yield { type: "tool_result", tool: "generate_task_plan_graph", result: "graph with 0 nodes" };
-      yield { type: "tool_call", tool: "submit_structured_result", input: { schemaName: "task_plan_graph" } };
-      yield { type: "tool_result", tool: "submit_structured_result", result: "ok" };
       yield {
         type: "result",
         plan: {
@@ -98,7 +96,7 @@ describe("POST /api/ai/generate-task-plan stream", () => {
     expect(text).toContain("Planning graph");
     expect(text).toContain("event: tool_call");
     expect(text).toContain("generate_task_plan_graph");
-    expect(text).toContain("submit_structured_result");
+    expect(text).not.toContain('"tool":"unexpected_legacy_tool"');
     expect(text).toContain("event: tool_result");
     expect(text).toContain("graph with 0 nodes");
     expect(text).toContain("event: result");

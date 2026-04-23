@@ -83,8 +83,17 @@ describe("progress-accepted-task-plan", () => {
       generatedBy: "planner",
       prompt: "plan",
       plan: {
-        version: "task-plan-graph@1",
+        id: "plan-sequential",
+        taskId: parentTask.id,
+        status: "accepted",
+        revision: 1,
+        source: "ai",
+        generatedBy: "planner",
+        prompt: "plan",
         summary: "Sequential plan",
+        changeSummary: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         nodes: [
           {
             id: "a",
@@ -145,8 +154,8 @@ describe("progress-accepted-task-plan", () => {
           },
         ],
         edges: [
-          { id: "e1", fromNodeId: "a", toNodeId: "b", type: "depends_on" },
-          { id: "e2", fromNodeId: "b", toNodeId: "c", type: "depends_on" },
+          { id: "e1", fromNodeId: "a", toNodeId: "b", type: "depends_on", metadata: null },
+          { id: "e2", fromNodeId: "b", toNodeId: "c", type: "depends_on", metadata: null },
         ],
       },
     });
@@ -198,8 +207,17 @@ describe("progress-accepted-task-plan", () => {
       generatedBy: "planner",
       prompt: "plan",
       plan: {
-        version: "task-plan-graph@1",
+        id: "plan-finished",
+        taskId: parentTask.id,
+        status: "accepted",
+        revision: 1,
+        source: "ai",
+        generatedBy: "planner",
+        prompt: "plan",
         summary: "Finished plan",
+        changeSummary: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         nodes: [
           {
             id: "a",

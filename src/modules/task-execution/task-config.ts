@@ -18,7 +18,9 @@ function normalizeText(value: string | null | undefined) {
 
 function readRuntimeText(input: RuntimeInput, key: string) {
   const value = input[key];
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 export function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
@@ -103,9 +105,12 @@ export function resolveTaskRuntimeConfig(input: {
   return {
     runtimeAdapterKey,
     runtimeInput,
-    runtimeInputVersion: input.runtimeInputVersion?.trim() || definition.inputVersion,
-    effectiveRuntimeModel: readRuntimeText(runtimeInput, "model") ?? legacyRuntimeModel,
-    effectivePrompt: readRuntimeText(runtimeInput, "prompt") ?? legacyPrompt ?? promptOverride,
+    runtimeInputVersion:
+      input.runtimeInputVersion?.trim() || definition.inputVersion,
+    effectiveRuntimeModel:
+      readRuntimeText(runtimeInput, "model") ?? legacyRuntimeModel,
+    effectivePrompt:
+      readRuntimeText(runtimeInput, "prompt") ?? legacyPrompt ?? promptOverride,
   };
 }
 
@@ -132,12 +137,15 @@ export function validateTaskRuntimeConfig(input: {
     { applyDefaults: false },
   );
   const legacyFields = extractLegacyRuntimeFields(legacyNormalizedRuntimeInput);
-  const normalizedLegacyFields = extractLegacyRuntimeFields(validatedRuntimeInput);
+  const normalizedLegacyFields = extractLegacyRuntimeFields(
+    validatedRuntimeInput,
+  );
 
   return {
     runtimeAdapterKey: resolved.runtimeAdapterKey,
     runtimeInput: validatedRuntimeInput,
-    runtimeInputVersion: input.runtimeInputVersion?.trim() || definition.inputVersion,
+    runtimeInputVersion:
+      input.runtimeInputVersion?.trim() || definition.inputVersion,
     effectiveRuntimeModel: normalizedLegacyFields.runtimeModel,
     effectivePrompt: normalizedLegacyFields.prompt,
     runtimeModel: normalizedLegacyFields.runtimeModel,
@@ -145,4 +153,3 @@ export function validateTaskRuntimeConfig(input: {
     runtimeConfig: legacyFields.runtimeConfig,
   };
 }
-

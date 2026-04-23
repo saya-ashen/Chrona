@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { llmCall, extractJSON } from "../client/providers";
-import { SYSTEM_PROMPTS } from "../client/prompts";
+import { extractJSON, SYSTEM_PROMPTS } from "@chrona/ai-features";
+import { llmCall } from "@chrona/ai-features/core/providers";
 import type { TaskPlanNode, TaskPlanEdge } from "../types";
 import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 
@@ -65,12 +65,16 @@ function normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent"
 }
 
 function parseGraphResponse(raw: string) {
+  const toolJsonMatch = raw.match(
+    /```(?:json|tool)?\s*\n?(?:generate_task_plan_graph\s*\n)?([\s\S]*?)```/,
+  );
+  const candidate = toolJsonMatch?.[1]?.trim() || raw;
   const parsed = extractJSON<{
     summary?: string;
     reasoning?: string;
     nodes?: Array<Record<string, unknown>>;
     edges?: Array<Record<string, unknown>>;
-  }>(raw, "llm");
+  }>(candidate, "llm");
 
   const nodes: TaskPlanNode[] = (parsed.nodes ?? []).map((n, i) => {
     const execMode =

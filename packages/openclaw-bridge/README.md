@@ -42,7 +42,7 @@ Endpoints:
 - feature endpoint 缺少 `input` 返回 `400`
 - execution endpoint 缺少 `instructions` 返回 `400`
 - feature endpoint 的成功/失败按 endpoint 语义判定，不再共用 generic chat contract
-- execution endpoint 不再要求 `submit_structured_result`
+- execution endpoint 不再要求任何 legacy structured submission tool
 
 ## 1) GET /v1/health
 
@@ -138,7 +138,7 @@ Endpoints:
 成功语义：
 - 只要 OpenClaw 执行成功，就返回真实 execution 结果
 - 不要求 feature business tool
-- 不要求 `submit_structured_result`
+- 不要求任何 legacy structured submission tool
 
 响应中仍然会包含：
 - `output`

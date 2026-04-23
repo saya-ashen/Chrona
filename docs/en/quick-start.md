@@ -65,15 +65,17 @@ Notes from verification:
 If you want to test agent execution through the OpenClaw bridge:
 
 ```bash
-bun run services/openclaw-bridge/server.ts
+bun run openclaw:bridge
 ```
 
 Default bridge URL:
 - http://localhost:7677
 
 Bridge notes from verification:
-- this command starts `services/openclaw-bridge/server.ts`, which delegates to `packages/openclaw-bridge/src/server.ts`
+- the actual entrypoint is `packages/openclaw-bridge/src/server.ts`
+- you can also run `bun packages/openclaw-bridge/src/server.ts` directly
 - if port `7677` is already in use, the bridge exits immediately with an address-in-use error
+- successful startup prints a `bridge.started` log line
 
 ## Runtime directions
 

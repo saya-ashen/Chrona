@@ -29,6 +29,8 @@
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
+    "openclaw:bridge": "bun packages/openclaw-bridge/src/server.ts",
+    "bridge:openclaw": "bun packages/openclaw-bridge/src/server.ts",
     "openclaw:plugin:build": "bun run --cwd packages/openclaw-plugin-structured-result build",
     "openclaw:plugin:install": "bun scripts/openclaw/install-structured-plugin.ts",
     "chrona": "bun packages/cli/src/index.ts",

@@ -730,7 +730,7 @@ describe("useSmartDecomposition", () => {
               controller.enqueue(
                 encoder.encode(
                   'event: status\ndata: {"message":"Planning graph"}\n\n' +
-                    'event: tool_call\ndata: {"tool":"submit_structured_result","input":{"schemaName":"task_plan_graph"}}\n\n' +
+                    'event: tool_call\ndata: {"tool":"generate_task_plan_graph","input":{"title":"Plan task"}}\n\n' +
                     'event: result\ndata: ' +
                     JSON.stringify(samplePlanGraphResponse) +
                     '\n\n' +
@@ -754,8 +754,8 @@ describe("useSmartDecomposition", () => {
     expect(result.current.statusMessage).toBe("Planning graph");
     expect(result.current.toolCalls).toEqual([
       {
-        tool: "submit_structured_result",
-        input: { schemaName: "task_plan_graph" },
+        tool: "generate_task_plan_graph",
+        input: { title: "Plan task" },
       },
     ]);
     expect(result.current.isLoading).toBe(false);

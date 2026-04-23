@@ -53,8 +53,17 @@ describe("update-task-plan-node-summary", () => {
       generatedBy: "planner",
       prompt: "plan",
       plan: {
-        version: "task-plan-graph@1",
+        id: "plan-summary",
+        taskId: task.id,
+        status: "accepted",
+        revision: 1,
+        source: "ai",
+        generatedBy: "planner",
+        prompt: "plan",
         summary: "Summary plan",
+        changeSummary: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         nodes: [
           {
             id: "node-1",

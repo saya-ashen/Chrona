@@ -168,7 +168,7 @@ src/
 │   │   └── src/lib/        # API 客户端 + 输出格式化
 │   ├── runtime-client/     # 共享运行时客户端与 OpenClaw 通信层
 │   ├── openclaw-bridge/    # Bridge HTTP 服务封装
-│   └── openclaw-plugin-structured-result/ # submit_structured_result 插件
+│   └── openclaw-plugin-structured-result/ # OpenClaw business tools 插件
 │
 ├── services/
 │   └── openclaw-bridge/    # Bridge 启动入口（委托到 packages/openclaw-bridge）

@@ -104,6 +104,7 @@ describe("task-plan-graph-store", () => {
               autoRunnable: false,
               blockingReason: "needs_approval",
               linkedTaskId: null,
+              completionSummary: null,
               metadata: null,
             },
           ],
@@ -226,6 +227,7 @@ describe("getReadyAutoRunnableNodes", () => {
     autoRunnable: true,
     blockingReason: null,
     linkedTaskId: null,
+    completionSummary: null,
     metadata: null,
   });
 
@@ -245,6 +247,7 @@ describe("getReadyAutoRunnableNodes", () => {
     autoRunnable: false,
     blockingReason: "needs_user_input" as const,
     linkedTaskId: null,
+    completionSummary: null,
     metadata: null,
   });
 

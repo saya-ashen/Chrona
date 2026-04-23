@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { OpenClawBridgeClient } from "../../src/modules/openclaw/bridge-client";
-import { evaluateOpenClawGate } from "../../src/modules/openclaw/evaluate-gate";
+import { OpenClawBridgeClient } from "@chrona/openclaw-integration";
+import { evaluateOpenClawGate } from "@chrona/openclaw-integration";
 import {
   collectOpenClawGateChecks,
   renderOpenClawGateMarkdown,
-} from "../../src/modules/openclaw/probe";
+} from "@chrona/openclaw-integration";
 
 async function main() {
   const client = new OpenClawBridgeClient({

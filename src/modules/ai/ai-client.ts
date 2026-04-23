@@ -5,4 +5,4 @@
  * from the split submodules under ./client/.
  */
 
-export * from "./client";
+export * from "@chrona/ai-features";

@@ -53,7 +53,7 @@ export async function collectOpenClawGateChecks(
   client: OpenClawRuntimeClient,
   options: OpenClawProbeOptions = {},
 ): Promise<GateCheckResult[]> {
-  const created = await client.createRun({ prompt: OPENCLAW_PROBE_PROMPT });
+  const created = await client.createRun({ prompt: OPENCLAW_PROBE_PROMPT, runtimeInput: {} });
 
   const snapshot = created.runtimeRunRef
     ? await client.waitForRun({
@@ -72,7 +72,7 @@ export async function collectOpenClawGateChecks(
     const approval = await client.requestApproval({
       command: "printf openclaw-feasibility",
       cwd: ".",
-      host: "bridge",
+      host: "gateway",
       sessionKey: created.runtimeSessionKey,
     });
 

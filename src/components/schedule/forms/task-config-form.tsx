@@ -11,8 +11,8 @@ import {
   getValueAtPath,
   setValueAtPath,
   validateTaskConfigAgainstSpec,
-} from "@/modules/task-execution/config-spec";
-import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@/modules/task-execution/types";
+} from "@chrona/runtime-core";
+import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 
 export type TaskConfigFormInput = {
   title: string;

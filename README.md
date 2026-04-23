@@ -99,18 +99,20 @@ What this command does:
 - enables the plugin
 - attempts a gateway restart so the tool becomes available immediately
 
-The plugin provides `submit_structured_result`, which Chrona now uses as the primary machine-readable output path for OpenClaw structured tasks. The bridge/client parses that tool call instead of trusting assistant free text.
+The plugin provides explicit business tools such as `suggest_task_completions` and `generate_task_plan_graph`. Chrona treats those tool inputs as the primary machine-readable source of truth instead of relying on assistant free text.
 
 6. Optional: start the OpenClaw bridge when testing agent execution
 
 ```bash
-bun run services/openclaw-bridge/server.ts
+bun run openclaw:bridge
 ```
 
 Bridge notes:
 - default bridge URL: `http://localhost:7677`
+- actual entrypoint: `packages/openclaw-bridge/src/server.ts`
+- you can also run it directly with `bun packages/openclaw-bridge/src/server.ts`
 - if port `7677` is already in use, the bridge will fail to bind until you stop the existing process
-- this entrypoint starts `services/openclaw-bridge/server.ts`, which delegates to `packages/openclaw-bridge/src/server.ts`
+- successful startup now prints a `bridge.started` log line
 
 Open http://localhost:3000.
 

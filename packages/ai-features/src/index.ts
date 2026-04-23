@@ -7,6 +7,6 @@
 
 export * from "./core/types";
 export * from "./core/prompts";
-export { extractJSON, checkClientHealth } from "./core/providers";
+export { extractJSON, checkClientHealth, llmCall } from "./core/providers";
 export * from "./features";
 export * from "./core/streaming";

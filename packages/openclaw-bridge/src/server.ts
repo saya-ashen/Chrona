@@ -18,11 +18,7 @@ import {
   type NDJSONEvent,
   type ToolCallInfo,
 } from "../../openclaw-integration/src/transport/bridge-types";
-import {
-  extractStructuredResultFromToolCalls,
-  type StructuredAgentResult,
-  SUBMIT_STRUCTURED_RESULT_TOOL_NAME,
-} from "../../openclaw-integration/src/protocol/structured-result";
+import { type StructuredAgentResult } from "../../openclaw-integration/src/protocol/structured-result";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type BridgeLogger = ReturnType<typeof createBridgeLogger>;
@@ -676,30 +672,26 @@ export function buildStructuredResult(params: {
   error: string | null;
   legacyToolCalls?: ToolCallInfo[];
   legacyExtractionError?: string | null;
+  feature?: BridgeFeature | null;
+  featurePayload?: unknown;
+  featureToolName?: string | null;
+  featureSource?: StructuredAgentResult["source"];
 }): StructuredAgentResult {
   const effectiveToolCalls = dedupeToolCalls([
     ...params.toolCalls,
     ...(params.legacyToolCalls ?? []),
   ]);
-  const extracted = extractStructuredResultFromToolCalls(effectiveToolCalls);
 
-  if (extracted.toolCall && extracted.validation) {
+  if (params.featurePayload !== undefined) {
     return {
-      ok: extracted.validation.ok,
-      parsed: extracted.validation.ok
-        ? ((extracted.validation.parsed?.result ?? null) as unknown)
-        : null,
-      structured: extracted.validation.parsed,
-      rawToolCall: extracted.toolCall,
+      ok: true,
+      parsed: params.featurePayload,
+      source: params.featureSource ?? "business_tool",
+      feature: params.feature ?? null,
+      toolName: params.featureToolName ?? null,
       rawOutput: params.output,
-      status: extracted.validation.parsed?.status ?? null,
-      error: extracted.validation.ok
-        ? params.error
-        : extracted.validation.issues
-            .map((issue) => `${issue.path} ${issue.message}`)
-            .join("; "),
-      validationIssues: extracted.validation.issues,
-      reliability: "tool_call",
+      error: params.error,
+      validationIssues: [],
       sessionId: params.sessionId,
       runId: params.runId,
       bridgeToolCalls: effectiveToolCalls.map((toolCall) => ({
@@ -715,14 +707,15 @@ export function buildStructuredResult(params: {
   return {
     ok: false,
     parsed: null,
-    structured: null,
+    source: "fallback_text",
+    feature: params.feature ?? null,
+    toolName: params.featureToolName ?? null,
     rawOutput: params.output,
-    status: null,
     error:
       params.legacyExtractionError ??
       params.error ??
-      `Structured result tool '${SUBMIT_STRUCTURED_RESULT_TOOL_NAME}' was not called; raw assistant text fallback is unreliable.`,
-    reliability: "fallback_text",
+      "No feature-specific payload was extracted; raw assistant text fallback is unreliable.",
+    validationIssues: [],
     sessionId: params.sessionId,
     runId: params.runId,
     bridgeToolCalls: effectiveToolCalls.map((toolCall) => ({
@@ -963,16 +956,6 @@ async function executeRouteRequest(
       ? null
       : `openclaw exited with code ${closeResult.code ?? "null"}${closeResult.signal ? ` signal ${closeResult.signal}` : ""}`;
 
-  const structured = buildStructuredResult({
-    sessionId,
-    toolCalls,
-    legacyToolCalls: legacyTools.toolCalls,
-    legacyExtractionError:
-      transcriptError ?? legacyTools.extractionError ?? null,
-    output,
-    error: cliError,
-  });
-
   let feature: BridgeFeatureResult | null = null;
   let semanticError: string | null = null;
 
@@ -981,6 +964,20 @@ async function executeRouteRequest(
     feature = validated.featureResult;
     semanticError = validated.error;
   }
+
+  const structured = buildStructuredResult({
+    sessionId,
+    toolCalls,
+    legacyToolCalls: legacyTools.toolCalls,
+    legacyExtractionError:
+      transcriptError ?? legacyTools.extractionError ?? null,
+    output,
+    error: cliError ?? semanticError,
+    feature: route.kind === "feature" ? route.feature : null,
+    featurePayload: feature?.payload,
+    featureToolName: feature?.toolName ?? null,
+    featureSource: feature?.source ?? undefined,
+  });
 
   const response: BridgeResponse = {
     sessionId,

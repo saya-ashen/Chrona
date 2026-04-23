@@ -28,7 +28,6 @@ describe("POST /api/ai/auto-complete (stream)", () => {
       yield { type: "status", message: "Generating suggestions" };
       yield { type: "tool_call", tool: "suggest_task_completions", input: { input: "write tests" } };
       yield { type: "tool_result", tool: "suggest_task_completions", result: "generated 1 suggestion" };
-      yield { type: "tool_call", tool: "submit_structured_result", input: { schemaName: "smart_suggestions" } };
       yield {
         type: "result",
         suggestions: {
@@ -68,7 +67,7 @@ describe("POST /api/ai/auto-complete (stream)", () => {
     expect(text).toContain("suggest_task_completions");
     expect(text).toContain("event: tool_result");
     expect(text).toContain("generated 1 suggestion");
-    expect(text).toContain("submit_structured_result");
+    expect(text).not.toContain('"tool":"unexpected_legacy_tool"');
     expect(text).toContain("event: suggestions");
     expect(text).toContain("Write unit tests");
     expect(text).toContain('"isFinal":true');

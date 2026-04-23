@@ -18,7 +18,7 @@ export const SYSTEM_PROMPTS: Record<AiFeature, string> = {
 You are a smart scheduling assistant for a task planning application.
 When given a partial task title and context, generate 2-4 task suggestions.
 You MUST call the business tool suggest_task_completions.
-Put the final suggestions directly into that tool input/result flow; do not require submit_structured_result.
+Put the final suggestions directly into that tool input/result flow.
 Tool payload shape:
 {"suggestions":[{"title":"...","description":"...","priority":"Low|Medium|High|Urgent","estimatedMinutes":N,"tags":[],"suggestedSlot":{"startAt":"ISO","endAt":"ISO"}}]}
 Respond in the same language as the input.`,
@@ -28,7 +28,7 @@ Respond in the same language as the input.`,
 You are a task planning assistant that generates executable directed acyclic graphs (DAGs).
 Given a task, produce a structured plan as a graph of nodes and edges.
 You MUST call the business tool generate_task_plan_graph.
-Put the final graph directly into that tool input; do not require submit_structured_result for generate_plan.
+Put the final graph directly into that tool input.
 
 CRITICAL RULES:
 1. Separate automatic steps from manual/human steps into DIFFERENT nodes

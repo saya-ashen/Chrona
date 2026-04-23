@@ -198,7 +198,10 @@ export async function POST(request: Request) {
                 );
                 break;
               case "result": {
-                const aiSuggestions = event.suggestions?.suggestions?.map((suggestion) => ({
+                if (!("suggestions" in event)) {
+                  break;
+                }
+                const aiSuggestions = event.suggestions.suggestions.map((suggestion) => ({
                   id: randomUUID(),
                   summary: generateSummary({
                     title: suggestion.title,
@@ -215,13 +218,13 @@ export async function POST(request: Request) {
                     scheduledStartAt: suggestion.suggestedSlot?.startAt,
                     scheduledEndAt: suggestion.suggestedSlot?.endAt,
                   },
-                })) ?? [];
+                }));
 
                 if (aiSuggestions.length > 0) {
                   controller.enqueue(
                     encoder.encode(sseEncode("suggestions", {
                       suggestions: aiSuggestions,
-                      source: event.suggestions?.source ?? "ai",
+                      source: event.suggestions.source ?? "ai",
                       requestId,
                       isFinal: true,
                     })),
