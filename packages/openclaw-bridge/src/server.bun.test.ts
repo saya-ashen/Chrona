@@ -188,6 +188,25 @@ describe("openclaw bridge runtime entrypoint", () => {
     }
   });
 
+  it("reports bridge online but cli unavailable via health endpoint", async () => {
+    const server = startBridgeServer({
+      port: 17682,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => false,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17682/v1/health");
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        status: "unavailable",
+        bin: "openclaw",
+      });
+    } finally {
+      server.stop(true);
+    }
+  });
+
   it("serves explicit feature endpoints and extracts generate-plan business tool results", async () => {
     const server = startBridgeServer({
       port: 17678,
@@ -326,6 +345,248 @@ describe("openclaw bridge runtime entrypoint", () => {
     }
   });
 
+  it("serves suggest stream endpoint with SSE event and done payloads", async () => {
+    const server = startBridgeServer({
+      port: 17683,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => ({
+        response: {
+          sessionId: "sess-suggest-stream",
+          output: "",
+          toolCalls: [
+            {
+              tool: "suggest_task_completions",
+              callId: "call-1",
+              input: { suggestions: [{ title: "Write tests" }] },
+              status: "completed",
+            },
+          ],
+          usage: null,
+          error: null,
+          durationMs: 6,
+          structured: {
+            ok: true,
+            parsed: { suggestions: [{ title: "Write tests" }] },
+            source: "business_tool",
+            feature: "suggest",
+            toolName: "suggest_task_completions",
+            rawOutput: "",
+            error: null,
+            validationIssues: [],
+            sessionId: "sess-suggest-stream",
+            runId: "run-suggest-stream",
+            bridgeToolCalls: [
+              {
+                tool: "suggest_task_completions",
+                callId: "call-1",
+                input: { suggestions: [{ title: "Write tests" }] },
+                status: "completed",
+              },
+            ],
+          },
+          feature: {
+            feature: "suggest",
+            source: "business_tool",
+            toolName: "suggest_task_completions",
+            payload: { suggestions: [{ title: "Write tests" }] },
+          },
+        },
+        events: [
+          {
+            type: "tool_use",
+            tool: "suggest_task_completions",
+            callId: "call-1",
+            input: { input: "write tests", kind: "general" },
+          },
+        ],
+      }),
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17683/v1/features/suggest/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { input: "write tests", kind: "general" } }),
+      });
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      expect(text).toContain("event: event");
+      expect(text).toContain("suggest_task_completions");
+      expect(text).toContain("event: done");
+      expect(text).toContain('"feature":{"feature":"suggest"');
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("serves analyze-conflicts endpoint with explicit feature payloads", async () => {
+    const server = startBridgeServer({
+      port: 17684,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async (route, request) => {
+        expect(route).toEqual({ kind: "feature", feature: "conflicts", stream: false });
+        expect(request).toEqual({
+          input: { tasks: [{ id: "t1", title: "Task", status: "open" }] },
+        });
+        return {
+          response: {
+            sessionId: "sess-conflicts",
+            output: "{}",
+            toolCalls: [],
+            usage: null,
+            error: null,
+            durationMs: 11,
+            structured: {
+              ok: true,
+              parsed: {
+                conflicts: [{ id: "c1", type: "time_overlap", severity: "high", taskIds: ["t1"], description: "Overlap" }],
+                resolutions: [],
+                summary: "1 conflict",
+              },
+              source: "output_json",
+              feature: "conflicts",
+              toolName: null,
+              rawOutput: "{}",
+              error: null,
+              validationIssues: [],
+              sessionId: "sess-conflicts",
+              runId: "run-conflicts",
+              bridgeToolCalls: [],
+            },
+            feature: {
+              feature: "conflicts",
+              source: "output_json",
+              payload: {
+                conflicts: [{ id: "c1", type: "time_overlap", severity: "high", taskIds: ["t1"], description: "Overlap" }],
+                resolutions: [],
+                summary: "1 conflict",
+              },
+            },
+          },
+          events: [],
+        };
+      },
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17684/v1/features/analyze-conflicts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { tasks: [{ id: "t1", title: "Task", status: "open" }] } }),
+      });
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        feature: { feature: "conflicts", source: "output_json" },
+      });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("serves suggest-timeslot endpoint with explicit feature payloads", async () => {
+    const server = startBridgeServer({
+      port: 17685,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => ({
+        response: {
+          sessionId: "sess-timeslots",
+          output: "{}",
+          toolCalls: [],
+          usage: null,
+          error: null,
+          durationMs: 12,
+          structured: {
+            ok: true,
+            parsed: { slots: [{ startAt: "2026-04-24T09:00:00Z", endAt: "2026-04-24T10:00:00Z", score: 0.9, reason: "Free slot" }], reasoning: "Best morning slot" },
+            source: "output_json",
+            feature: "timeslots",
+            toolName: null,
+            rawOutput: "{}",
+            error: null,
+            validationIssues: [],
+            sessionId: "sess-timeslots",
+            runId: "run-timeslots",
+            bridgeToolCalls: [],
+          },
+          feature: {
+            feature: "timeslots",
+            source: "output_json",
+            payload: { slots: [{ startAt: "2026-04-24T09:00:00Z", endAt: "2026-04-24T10:00:00Z", score: 0.9, reason: "Free slot" }], reasoning: "Best morning slot" },
+          },
+        },
+        events: [],
+      }),
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17685/v1/features/suggest-timeslot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { taskTitle: "Write tests", estimatedMinutes: 60, currentSchedule: [] } }),
+      });
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        feature: { feature: "timeslots", source: "output_json" },
+      });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("serves chat endpoint with explicit feature payloads", async () => {
+    const server = startBridgeServer({
+      port: 17686,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => ({
+        response: {
+          sessionId: "sess-chat",
+          output: "Hello from chat",
+          toolCalls: [],
+          usage: null,
+          error: null,
+          durationMs: 7,
+          structured: {
+            ok: true,
+            parsed: { content: "Hello from chat" },
+            source: "assistant_text",
+            feature: "chat",
+            toolName: null,
+            rawOutput: "Hello from chat",
+            error: null,
+            validationIssues: [],
+            sessionId: "sess-chat",
+            runId: "run-chat",
+            bridgeToolCalls: [],
+          },
+          feature: {
+            feature: "chat",
+            source: "assistant_text",
+            payload: { content: "Hello from chat" },
+          },
+        },
+        events: [],
+      }),
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17686/v1/features/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { messages: [{ role: "user", content: "Hello?" }] } }),
+      });
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        feature: { feature: "chat", source: "assistant_text" },
+      });
+    } finally {
+      server.stop(true);
+    }
+  });
+
   it("execution endpoint succeeds without structured result payloads", async () => {
     const server = startBridgeServer({
       port: 17680,
@@ -435,6 +696,247 @@ describe("openclaw bridge runtime entrypoint", () => {
       expect(text).toContain("generate_task_plan_graph");
       expect(text).toContain("event: done");
       expect(text).toContain('"feature":{"feature":"generate_plan"');
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("serves execution stream endpoint with SSE done payloads", async () => {
+    const server = startBridgeServer({
+      port: 17687,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => ({
+        response: {
+          sessionId: "sess-exec-stream",
+          output: "done execution",
+          toolCalls: [],
+          usage: null,
+          error: null,
+          durationMs: 3,
+          structured: {
+            ok: false,
+            parsed: null,
+            source: "fallback_text",
+            rawOutput: "done execution",
+            error: "No feature-specific payload was extracted; raw assistant text fallback is unreliable.",
+            validationIssues: [],
+            sessionId: "sess-exec-stream",
+            runId: "run-exec-stream",
+            bridgeToolCalls: [],
+          },
+          feature: null,
+        },
+        events: [{ type: "text", text: "running" }],
+      }),
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17687/v1/execution/task/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instructions: "Do the work" }),
+      });
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      expect(text).toContain("event: event");
+      expect(text).toContain("running");
+      expect(text).toContain("event: done");
+      expect(text).toContain("done execution");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 204 for OPTIONS with CORS headers", async () => {
+    const server = startBridgeServer({
+      port: 17688,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17688/v1/features/suggest", {
+        method: "OPTIONS",
+      });
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 404 for unknown routes", async () => {
+    const server = startBridgeServer({
+      port: 17689,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17689/v1/unknown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toEqual({ error: "Not found" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 400 for invalid JSON request bodies", async () => {
+    const server = startBridgeServer({
+      port: 17690,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17690/v1/features/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{bad-json",
+      });
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "Invalid JSON body" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 400 when feature input is missing", async () => {
+    const server = startBridgeServer({
+      port: 17691,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17691/v1/features/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "sess-1" }),
+      });
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "Missing required field: input" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 400 when execution instructions are missing", async () => {
+    const server = startBridgeServer({
+      port: 17692,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17692/v1/execution/task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "sess-1" }),
+      });
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "Missing required field: instructions" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 500 SSE error events when a streaming route execution throws", async () => {
+    const server = startBridgeServer({
+      port: 17693,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => {
+        throw new Error("stream boom");
+      },
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17693/v1/features/suggest/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { input: "write tests", kind: "general" } }),
+      });
+      expect(res.status).toBe(500);
+      const text = await res.text();
+      expect(text).toContain("event: error");
+      expect(text).toContain("stream boom");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 500 JSON errors when a blocking route execution throws", async () => {
+    const server = startBridgeServer({
+      port: 17694,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => {
+        throw new Error("blocking boom");
+      },
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17694/v1/features/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { messages: [{ role: "user", content: "hello" }] } }),
+      });
+      expect(res.status).toBe(500);
+      await expect(res.json()).resolves.toEqual({ error: "blocking boom" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("returns 422 when a feature endpoint has no valid feature payload", async () => {
+    const server = startBridgeServer({
+      port: 17695,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkCLIAvailable: async () => true,
+      executeRequest: async () => ({
+        response: {
+          sessionId: "sess-invalid-feature",
+          output: "plain text only",
+          toolCalls: [],
+          usage: null,
+          error: "Feature 'suggest' requires business tool 'suggest_task_completions' but no matching payload was extracted",
+          durationMs: 4,
+          structured: {
+            ok: false,
+            parsed: null,
+            source: "fallback_text",
+            feature: "suggest",
+            toolName: null,
+            rawOutput: "plain text only",
+            error: "Feature 'suggest' requires business tool 'suggest_task_completions' but no matching payload was extracted",
+            validationIssues: [],
+            sessionId: "sess-invalid-feature",
+            runId: "run-invalid-feature",
+            bridgeToolCalls: [],
+          },
+          feature: null,
+        },
+        events: [],
+      }),
+    });
+
+    try {
+      const res = await fetch("http://127.0.0.1:17695/v1/features/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { input: "write tests", kind: "general" } }),
+      });
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toMatchObject({
+        error: expect.stringContaining("suggest_task_completions"),
+      });
     } finally {
       server.stop(true);
     }
