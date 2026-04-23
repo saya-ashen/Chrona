@@ -83,7 +83,7 @@ export function buildFeatureInput(
   if (typeof input === "string") {
     return { message: input };
   }
-  return input as Record<string, unknown>;
+  return input as unknown as Record<string, unknown>;
 }
 
 async function fetchOpenClawBridge(

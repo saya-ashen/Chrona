@@ -8,7 +8,7 @@ import {
   useSmartTimeslot,
 } from "../use-ai";
 import type { AutoCompleteSuggestion, SmartAutomationTaskInput, SmartDecompositionTaskInput, SmartTimeslotTaskInput } from "../use-ai";
-import type { AutomationSuggestion } from "@/modules/ai/types";
+import type { AutomationSuggestion, TaskPlanGraphResponse } from "@/modules/ai/types";
 
 // ---------- Helpers ----------
 
@@ -56,10 +56,11 @@ const sampleAutomationSuggestion: AutomationSuggestion = {
   confidence: "high",
 };
 
-const samplePlanGraphResponse = {
+const samplePlanGraphResponse: TaskPlanGraphResponse = {
   source: "ai",
+  taskSessionKey: "chrona:openclaw:task:task-abc:default",
   planGraph: {
-    id: "graph-1",
+
     taskId: "task-1",
     status: "draft",
     revision: 1,
@@ -759,6 +760,43 @@ describe("useSmartDecomposition", () => {
       },
     ]);
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.result?.taskSessionKey).toBe("chrona:openclaw:task:task-abc:default");
+  });
+
+  it("should preserve task session key from streamed plan responses", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  'event: result\ndata: ' +
+                    JSON.stringify({
+                      ...samplePlanGraphResponse,
+                      taskSessionKey: "chrona:openclaw:task:task-abc:default",
+                    }) +
+                    '\n\n' +
+                    'event: done\ndata: {}\n\n',
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      ),
+    );
+
+    const { result } = renderHook(() => useSmartDecomposition(validInput));
+
+    await waitFor(() => {
+      expect(result.current.result?.taskSessionKey).toBe(
+        "chrona:openclaw:task:task-abc:default",
+      );
+    });
   });
 
   it("should handle error state", async () => {

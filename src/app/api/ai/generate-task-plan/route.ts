@@ -6,6 +6,7 @@ import {
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
 } from "@/modules/tasks/task-plan-graph-store";
+import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@/modules/ai/types";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features/core/types";
 
@@ -56,6 +57,7 @@ function buildDraftPlanGraph(input: {
 function buildPlanResponse(input: {
   source: string;
   planGraph: TaskPlanGraph;
+  taskSessionKey?: string | null;
   savedPlan?: {
     id: string;
     status: TaskPlanStatus;
@@ -69,6 +71,7 @@ function buildPlanResponse(input: {
   return {
     source: input.source,
     planGraph: input.planGraph,
+    taskSessionKey: input.taskSessionKey ?? null,
     savedPlan: input.savedPlan,
     reasoning: input.reasoning,
   };
@@ -120,6 +123,7 @@ export async function POST(request: Request) {
               controller.enqueue(encoder.encode(sseEncode("result", buildPlanResponse({
                 source: "saved",
                 planGraph: savedPlan.plan,
+                taskSessionKey: sharedTaskSessionKey,
                 savedPlan: buildSavedPlanSummary(savedPlan),
               }))));
               controller.enqueue(encoder.encode(sseEncode("done", {})));
@@ -147,6 +151,8 @@ export async function POST(request: Request) {
     let resolvedDescription = description;
     let resolvedEstimatedMinutes = estimatedMinutes;
 
+    let sharedTaskSessionKey: string | null = null;
+
     if (taskId) {
       const task = await db.task.findUnique({ where: { id: taskId } });
       if (!task) {
@@ -160,6 +166,14 @@ export async function POST(request: Request) {
           (task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000,
         );
       }
+      sharedTaskSessionKey = (
+        await ensureDefaultTaskSession({
+          taskId: task.id,
+          taskTitle: task.title,
+          runtimeName: "openclaw",
+          defaultSessionId: task.defaultSessionId,
+        })
+      ).sessionKey;
     }
 
     if (wantsStream) {
@@ -169,12 +183,42 @@ export async function POST(request: Request) {
           let finalResponse: (TaskPlanGraphResponse & { reasoning?: string }) | null = null;
           try {
             const eventCounts: Record<string, number> = {};
+            let streamClosed = false;
+            let requestFinished = false;
+
+            const safeEnqueue = (event: string, data: unknown) => {
+              if (streamClosed || requestFinished) {
+                return false;
+              }
+              try {
+                controller.enqueue(encoder.encode(sseEncode(event, data)));
+                return true;
+              } catch {
+                streamClosed = true;
+                return false;
+              }
+            };
+
+            const safeClose = () => {
+              if (streamClosed) return;
+              try {
+                controller.close();
+              } catch {
+                // ignore double-close / cancelled stream
+              } finally {
+                streamClosed = true;
+              }
+            };
+
             for await (const event of aiGeneratePlanStream({
               taskId: taskId ?? "",
               title: resolvedTitle,
               description: resolvedDescription,
               estimatedMinutes: resolvedEstimatedMinutes,
             })) {
+              if (streamClosed || requestFinished) {
+                break;
+              }
               eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
               logger.info("stream.event", {
                 requestId,
@@ -183,17 +227,13 @@ export async function POST(request: Request) {
                 eventType: event.type,
               });
               if (event.type === "status") {
-                controller.enqueue(encoder.encode(sseEncode("status", { message: event.message })));
+                if (!safeEnqueue("status", { message: event.message })) break;
               } else if (event.type === "tool_call") {
-                controller.enqueue(
-                  encoder.encode(sseEncode("tool_call", { tool: event.tool, input: event.input })),
-                );
+                if (!safeEnqueue("tool_call", { tool: event.tool, input: event.input })) break;
               } else if (event.type === "tool_result") {
-                controller.enqueue(
-                  encoder.encode(sseEncode("tool_result", { tool: event.tool, result: event.result })),
-                );
+                if (!safeEnqueue("tool_result", { tool: event.tool, result: event.result })) break;
               } else if (event.type === "partial") {
-                controller.enqueue(encoder.encode(sseEncode("partial", { text: event.text })));
+                if (!safeEnqueue("partial", { text: event.text })) break;
               } else if (event.type === "result") {
                 if (!("plan" in event)) {
                   continue;
@@ -219,6 +259,7 @@ export async function POST(request: Request) {
                   finalResponse = buildPlanResponse({
                     source: event.plan.source,
                     planGraph: savedPlan.plan,
+                    taskSessionKey: sharedTaskSessionKey,
                     savedPlan: buildSavedPlanSummary(savedPlan),
                     reasoning: event.plan.reasoning,
                   });
@@ -226,12 +267,15 @@ export async function POST(request: Request) {
                   finalResponse = buildPlanResponse({
                     source: event.plan.source,
                     planGraph: draftPlan,
+                    taskSessionKey: sharedTaskSessionKey,
                     reasoning: event.plan.reasoning,
                   });
                 }
-                controller.enqueue(encoder.encode(sseEncode("result", finalResponse)));
+                if (!safeEnqueue("result", finalResponse)) break;
               } else if (event.type === "error") {
-                controller.enqueue(encoder.encode(sseEncode("error", { message: event.message })));
+                if (!safeEnqueue("error", { message: event.message })) break;
+                requestFinished = true;
+                break;
               } else if (event.type === "done") {
                 logger.info("request.done", {
                   requestId,
@@ -240,10 +284,12 @@ export async function POST(request: Request) {
                   eventCounts,
                   savedPlanId: finalResponse?.savedPlan?.id ?? null,
                 });
-                controller.enqueue(encoder.encode(sseEncode("done", { response: finalResponse })));
+                if (!safeEnqueue("done", { response: finalResponse })) break;
+                requestFinished = true;
+                break;
               }
             }
-            controller.close();
+            safeClose();
           } catch (error) {
             logger.error("request.stream_error", {
               requestId,
@@ -251,14 +297,22 @@ export async function POST(request: Request) {
               taskId: taskId ?? null,
               error: error instanceof Error ? error.message : String(error),
             });
-            controller.enqueue(
-              encoder.encode(
-                sseEncode("error", {
-                  message: error instanceof Error ? error.message : "Failed to generate task plan",
-                }),
-              ),
-            );
-            controller.close();
+            try {
+              controller.enqueue(
+                encoder.encode(
+                  sseEncode("error", {
+                    message: error instanceof Error ? error.message : "Failed to generate task plan",
+                  }),
+                ),
+              );
+            } catch {
+              // stream already closed/cancelled
+            }
+            try {
+              controller.close();
+            } catch {
+              // ignore double-close / cancelled stream
+            }
           }
         },
       });
@@ -315,6 +369,7 @@ export async function POST(request: Request) {
       return NextResponse.json(buildPlanResponse({
         source: planResult.source,
         planGraph: savedPlan.plan,
+        taskSessionKey: sharedTaskSessionKey,
         savedPlan: buildSavedPlanSummary(savedPlan),
         reasoning: planResult.reasoning,
       }));
@@ -323,6 +378,7 @@ export async function POST(request: Request) {
     return NextResponse.json(buildPlanResponse({
       source: planResult.source,
       planGraph: plan,
+      taskSessionKey: sharedTaskSessionKey,
       reasoning: planResult.reasoning,
     }));
   } catch (error) {

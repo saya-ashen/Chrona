@@ -4,6 +4,7 @@ import type { TaskSnapshot, ScheduleHealthSnapshot } from "@/modules/ai/ai-servi
 import { db } from "@/lib/db";
 import type { StructuredSuggestion } from "@/hooks/use-ai";
 import { createLogger, summarizeText } from "@/lib/logger";
+import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 
 // Re-export for consumers of this route
 export type { StructuredSuggestion };
@@ -129,13 +130,14 @@ export async function POST(request: Request) {
 
     // Build context
     let context: { existingTasks?: TaskSnapshot[]; scheduleHealth?: ScheduleHealthSnapshot } | undefined;
+    let sharedTaskSessionKey: string | null = null;
     if (workspaceId) {
       try {
         const recentTasks = await db.taskProjection.findMany({
           where: { workspaceId },
           take: 10,
           orderBy: { updatedAt: "desc" },
-          include: { task: { select: { title: true, status: true, priority: true } } },
+          include: { task: { select: { title: true, status: true, priority: true, defaultSessionId: true, runtimeAdapterKey: true } } },
         });
         context = {
           existingTasks: recentTasks.map((p) => ({
@@ -147,6 +149,18 @@ export async function POST(request: Request) {
             scheduledEndAt: p.scheduledEndAt?.toISOString(),
           })),
         };
+
+        const exactTask = recentTasks.find((p) => p.task?.title?.trim() === trimmedTitle);
+        if (exactTask?.task) {
+          sharedTaskSessionKey = (
+            await ensureDefaultTaskSession({
+              taskId: exactTask.taskId,
+              taskTitle: exactTask.task.title ?? trimmedTitle,
+              runtimeName: exactTask.task.runtimeAdapterKey ?? "openclaw",
+              defaultSessionId: exactTask.task.defaultSessionId,
+            })
+          ).sessionKey;
+        }
       } catch {
         // Non-critical
       }
@@ -164,6 +178,8 @@ export async function POST(request: Request) {
             input: trimmedTitle,
             kind: "auto-complete",
             workspaceId,
+            taskId: context?.existingTasks?.find((task) => task.title?.trim() === trimmedTitle)?.id,
+            sessionKey: sharedTaskSessionKey ?? undefined,
             context,
           });
 
