@@ -11,6 +11,7 @@ import type {
   OpenClawSendInputResult,
   OpenClawStructuredRunResult,
 } from "../protocol/types";
+import type { BridgeFeature } from "../transport/bridge-types";
 import type { RuntimeInput } from "../../../../packages/runtime-core/src/index";
 
 export type OpenClawWaitForRunInput = {
@@ -32,6 +33,16 @@ export interface OpenClawRuntimeClient {
     runtimeSessionKey?: string;
     runStarted: boolean;
   }>;
+  createStructuredRun<T = unknown>(input: {
+    feature: BridgeFeature;
+    prompt: string;
+    runtimeSessionKey?: string;
+    systemPrompt?: string;
+    timeoutSeconds?: number;
+  }): Promise<OpenClawStructuredRunResult<T>>;
+  getStructuredResult<T = unknown>(
+    runtimeSessionKey: string,
+  ): Promise<OpenClawStructuredRunResult<T> | null>;
   waitForRun(
     input: OpenClawWaitForRunInput | string,
     timeoutMs?: number,

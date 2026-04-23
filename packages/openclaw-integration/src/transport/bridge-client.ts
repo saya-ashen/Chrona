@@ -130,14 +130,14 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   }
 
   async createStructuredRun<T = unknown>(input: {
+    feature: BridgeFeature;
     prompt: string;
     runtimeSessionKey?: string;
     systemPrompt?: string;
     timeoutSeconds?: number;
-    feature?: BridgeFeature;
   }): Promise<OpenClawStructuredRunResult<T>> {
     const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
-    const feature = input.feature ?? "chat";
+    const feature = input.feature;
     const path = this.getFeaturePath(feature, false);
     const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
       sessionId,
