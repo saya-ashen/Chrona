@@ -350,11 +350,11 @@ describe("openclaw bridge runtime entrypoint", () => {
           structured: {
             ok: false,
             parsed: null,
-            structured: null,
+            source: "fallback_text",
             rawOutput: "completed task execution output",
             error:
-              "Structured result tool 'submit_structured_result' was not called; raw assistant text fallback is unreliable.",
-            reliability: "fallback_text",
+              "No feature-specific payload was extracted; raw assistant text fallback is unreliable.",
+            validationIssues: [],
             sessionId: "sess-exec",
             runId: "run-exec",
           },
@@ -374,7 +374,7 @@ describe("openclaw bridge runtime entrypoint", () => {
       await expect(res.json()).resolves.toMatchObject({
         output: "completed task execution output",
         error: null,
-        structured: { ok: false, reliability: "fallback_text" },
+        structured: { ok: false, source: "fallback_text" },
       });
     } finally {
       server.stop(true);
@@ -446,14 +446,14 @@ describe("openclaw bridge parsing", () => {
     const events = parseNDJSONEvents([
       '{"type":"text","text":"hello"}',
       "not-json",
-      '{"type":"tool_use","tool":"submit_structured_result","callId":"call-1","input":{"schemaName":"demo","schemaVersion":"1.0.0","status":"success","confidence":1,"result":{"value":1},"missingFields":[],"followUpQuestions":[],"notes":[]}}',
+      '{"type":"tool_use","tool":"generate_task_plan_graph","callId":"call-1","input":{"summary":"demo","nodes":[],"edges":[]}}',
     ]);
 
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ type: "text", text: "hello" });
     expect(events[1]).toMatchObject({
       type: "tool_use",
-      tool: "submit_structured_result",
+      tool: "generate_task_plan_graph",
     });
   });
 
@@ -473,33 +473,20 @@ describe("openclaw bridge parsing", () => {
           },
           result: "generated 1 suggestion",
         },
-        {
-          tool: "submit_structured_result",
-          callId: "call-1",
-          status: "completed",
-          input: {
-            schemaName: "demo",
-            schemaVersion: "1.0.0",
-            status: "success",
-            confidence: 0.95,
-            result: { answer: 42 },
-            missingFields: [],
-            followUpQuestions: [],
-            notes: ["done"],
-          },
-          result: "accepted",
-        },
       ],
+      feature: "suggest",
+      featurePayload: { input: "参加美国总统竞选" },
+      featureToolName: "suggest_task_completions",
+      featureSource: "business_tool",
     });
 
     expect(response.ok).toBe(true);
-    expect(response.parsed).toEqual({ answer: 42 });
-    expect(response.status).toBe("success");
-    expect(response.reliability).toBe("tool_call");
+    expect(response.parsed).toEqual({ input: "参加美国总统竞选" });
+    expect(response.source).toBe("business_tool");
+    expect(response.toolName).toBe("suggest_task_completions");
     expect(response.bridgeToolCalls).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ tool: "suggest_task_completions" }),
-        expect.objectContaining({ tool: "submit_structured_result" }),
       ]),
     );
   });
@@ -514,24 +501,15 @@ describe("openclaw bridge parsing", () => {
     });
 
     expect(response.ok).toBe(false);
-    expect(response.reliability).toBe("fallback_text");
-    expect(response.error).toContain("submit_structured_result");
+    expect(response.source).toBe("fallback_text");
+    expect(response.error).toContain("No feature-specific payload");
   });
 
-  it("extracts submit_structured_result from legacy single-blob output metadata", () => {
+  it("accepts legacy business-tool extraction as a valid feature payload", () => {
     const legacyToolCall = {
-      tool: "submit_structured_result",
+      tool: "generate_task_plan_graph",
       callId: "legacy-call-1",
-      input: {
-        schemaName: "task_plan_graph",
-        schemaVersion: "1.0.0",
-        status: "needs_clarification",
-        confidence: 0.62,
-        result: { summary: "need more info" },
-        missingFields: ["jurisdiction"],
-        followUpQuestions: ["竞选哪个国家或地区的总统？"],
-        notes: ["legacy blob"],
-      },
+      input: { summary: "need more info", nodes: [], edges: [] },
       status: "completed" as const,
     };
 
@@ -542,16 +520,16 @@ describe("openclaw bridge parsing", () => {
       error: null,
       toolCalls: [],
       legacyToolCalls: [legacyToolCall],
+      feature: "generate_plan",
+      featurePayload: legacyToolCall.input,
+      featureToolName: "generate_task_plan_graph",
+      featureSource: "business_tool",
     });
 
     expect(response.ok).toBe(true);
-    expect(response.status).toBe("needs_clarification");
-    expect(response.structured?.missingFields).toEqual(["jurisdiction"]);
-    expect(response.parsed).toEqual({ summary: "need more info" });
-    expect(response.rawToolCall).toMatchObject({
-      tool: "submit_structured_result",
-      callId: "legacy-call-1",
-    });
+    expect(response.source).toBe("business_tool");
+    expect(response.toolName).toBe("generate_task_plan_graph");
+    expect(response.parsed).toEqual({ summary: "need more info", nodes: [], edges: [] });
   });
 
   it("prefers explicit legacy extraction errors over generic fallback messaging", () => {
@@ -567,25 +545,23 @@ describe("openclaw bridge parsing", () => {
 
     expect(response.ok).toBe(false);
     expect(response.error).toContain("Legacy blob detected");
-    expect(response.error).not.toContain("was not called");
+    expect(response.error).not.toContain("No feature-specific payload");
   });
 
   it("parses tool calls from session transcript jsonl content", () => {
     const transcript = [
-      '{"type":"message","message":{"role":"assistant","content":[{"type":"toolCall","id":"call-1","name":"submit_structured_result","arguments":{"schemaName":"task_plan_graph","schemaVersion":"1.0.0","status":"success","confidence":0.9,"result":{"summary":"ok"},"missingFields":[],"followUpQuestions":[],"notes":[]}}]}}',
-      '{"type":"message","message":{"role":"toolResult","toolCallId":"call-1","toolName":"submit_structured_result","details":{"schemaName":"task_plan_graph","schemaVersion":"1.0.0","status":"success","confidence":0.9,"result":{"summary":"ok"},"missingFields":[],"followUpQuestions":[],"notes":[]},"isError":false}}',
+      '{"type":"message","message":{"role":"assistant","content":[{"type":"toolCall","id":"call-1","name":"generate_task_plan_graph","arguments":{"summary":"ok","nodes":[],"edges":[]}}]}}',
+      '{"type":"message","message":{"role":"toolResult","toolCallId":"call-1","toolName":"generate_task_plan_graph","details":{"summary":"ok","nodes":[],"edges":[]},"isError":false}}',
     ].join("\n");
 
     const toolCalls = parseToolCallsFromSessionTranscript(transcript);
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]).toMatchObject({
-      tool: "submit_structured_result",
+      tool: "generate_task_plan_graph",
       callId: "call-1",
       status: "completed",
       input: {
-        schemaName: "task_plan_graph",
-        schemaVersion: "1.0.0",
-        status: "success",
+        summary: "ok",
       },
     });
   });

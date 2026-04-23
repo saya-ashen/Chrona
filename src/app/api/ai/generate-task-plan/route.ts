@@ -6,14 +6,14 @@ import {
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
 } from "@/modules/tasks/task-plan-graph-store";
-import type { TaskPlanGraph, TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@/modules/ai/types";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features/core/types";
 
 const logger = createLogger("api.ai.generate-task-plan");
 
 function buildSavedPlanSummary(savedPlan: {
   id: string;
-  status: string;
+  status: TaskPlanStatus;
   prompt: string | null;
   revision: number;
   summary: string | null;
@@ -58,7 +58,7 @@ function buildPlanResponse(input: {
   planGraph: TaskPlanGraph;
   savedPlan?: {
     id: string;
-    status: string;
+    status: TaskPlanStatus;
     prompt: string | null;
     revision: number;
     summary: string | null;
@@ -194,7 +194,10 @@ export async function POST(request: Request) {
                 );
               } else if (event.type === "partial") {
                 controller.enqueue(encoder.encode(sseEncode("partial", { text: event.text })));
-              } else if (event.type === "result" && event.plan) {
+              } else if (event.type === "result") {
+                if (!("plan" in event)) {
+                  continue;
+                }
                 const draftPlan = buildDraftPlanGraph({
                   taskId: taskId ?? "",
                   prompt: planningPrompt ?? null,

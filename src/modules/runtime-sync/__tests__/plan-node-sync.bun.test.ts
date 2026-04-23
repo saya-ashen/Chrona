@@ -86,8 +86,17 @@ describe("plan node sync on run completion", () => {
       generatedBy: "test",
       prompt: "Generate executable graph",
       plan: {
-        version: "task-plan-graph@1",
+        id: "plan-node-sync",
+        taskId: parentTask.id,
+        status: "accepted",
+        revision: 1,
+        source: "ai",
+        generatedBy: "test",
+        prompt: "Generate executable graph",
         summary: "Test graph",
+        changeSummary: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         nodes: [
           {
             id: "node-child",

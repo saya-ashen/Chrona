@@ -66,6 +66,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         requiresHumanApproval: false,
         autoRunnable: true,
         blockingReason: null,
+        completionSummary: null,
         metadata: null,
       },
       {
@@ -84,6 +85,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         requiresHumanApproval: false,
         autoRunnable: true,
         blockingReason: null,
+        completionSummary: null,
         metadata: null,
       },
       {
@@ -102,6 +104,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
         requiresHumanApproval: false,
         autoRunnable: false,
         blockingReason: null,
+        completionSummary: null,
         metadata: null,
       },
     ],
@@ -225,15 +228,15 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
       phase: "streaming",
       statusMessage: "Planning graph",
       partialText: "Thinking through task decomposition...",
-      toolCalls: [{ tool: "submit_structured_result", input: { schemaName: "task_plan_graph" } }],
-      toolResults: [{ tool: "submit_structured_result", result: "validated" }],
+      toolCalls: [{ tool: "generate_task_plan_graph", input: { title: "Plan task" } }],
+      toolResults: [{ tool: "generate_task_plan_graph", result: "validated" }],
     });
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
     expect(screen.getAllByText("Planning graph").length).toBeGreaterThan(0);
     expect(screen.getByText(/Thinking through task decomposition/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/submit_structured_result/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/generate_task_plan_graph/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/validated/i)).toBeInTheDocument();
   });
 

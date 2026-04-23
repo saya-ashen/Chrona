@@ -1,6 +1,111 @@
 // @ts-ignore - resolved by OpenClaw runtime
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
+type PluginToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  details: Record<string, unknown>;
+};
+
+function buildMinimalPlanGraph(input: {
+  title: string;
+  description?: string | null;
+  estimatedMinutes?: number | null;
+}) {
+  const title = input.title.trim() || "Untitled task";
+  const estimated =
+    typeof input.estimatedMinutes === "number" && Number.isFinite(input.estimatedMinutes)
+      ? Math.max(15, Math.round(input.estimatedMinutes))
+      : 120;
+  const kickoff = Math.max(10, Math.round(estimated * 0.15));
+  const execution = Math.max(20, Math.round(estimated * 0.6));
+  const review = Math.max(10, estimated - kickoff - execution);
+
+  return {
+    summary: `Plan for ${title}`,
+    reasoning:
+      input.description && input.description.trim().length > 0
+        ? input.description.trim()
+        : "Fallback graph generated from task metadata because the model did not provide a complete DAG.",
+    nodes: [
+      {
+        id: "node-1",
+        type: "step",
+        title: `Clarify scope for ${title}`,
+        objective: "Establish the target and success criteria",
+        description: null,
+        status: "pending",
+        estimatedMinutes: kickoff,
+        priority: "Medium",
+        executionMode: "manual",
+        requiresHumanInput: true,
+        requiresHumanApproval: false,
+        autoRunnable: false,
+        blockingReason: "needs_user_input",
+      },
+      {
+        id: "node-2",
+        type: "tool_action",
+        title: `Produce main deliverable for ${title}`,
+        objective: "Create the concrete output required by the task",
+        description: null,
+        status: "pending",
+        estimatedMinutes: execution,
+        priority: "High",
+        executionMode: "automatic",
+        requiresHumanInput: false,
+        requiresHumanApproval: false,
+        autoRunnable: true,
+        blockingReason: null,
+      },
+      {
+        id: "node-3",
+        type: "checkpoint",
+        title: `Review and finalize ${title}`,
+        objective: "Verify the output and decide whether it is ready",
+        description: null,
+        status: "pending",
+        estimatedMinutes: review,
+        priority: "Medium",
+        executionMode: "manual",
+        requiresHumanInput: false,
+        requiresHumanApproval: true,
+        autoRunnable: false,
+        blockingReason: "needs_approval",
+      },
+    ],
+    edges: [
+      {
+        id: "edge-1",
+        fromNodeId: "node-1",
+        toNodeId: "node-2",
+        type: "depends_on",
+      },
+      {
+        id: "edge-2",
+        fromNodeId: "node-2",
+        toNodeId: "node-3",
+        type: "feeds_output",
+      },
+    ],
+  };
+}
+
+type PluginApi = {
+  registerTool(
+    tool: {
+      name: string;
+      label: string;
+      description: string;
+      parameters: unknown;
+      execute: (toolCallId: string, params: Record<string, unknown>) => Promise<PluginToolResult>;
+    },
+    options: { name: string },
+  ): void;
+  logger: {
+    info(message: string): void;
+  };
+};
+
 const PriorityEnum = ["Low", "Medium", "High", "Urgent"] as const;
 
 function normalizeStringArray(value: unknown): string[] {
@@ -167,7 +272,7 @@ export default definePluginEntry({
   description:
     "Provides readable Chrona business tools for suggestions and task-plan graphs.",
   reload: { restartPrefixes: ["gateway", "plugins"] },
-  register(api) {
+  register(api: PluginApi) {
     api.registerTool(
       {
         name: "suggest_task_completions",
@@ -175,7 +280,7 @@ export default definePluginEntry({
         description:
           "Business tool for schedule quick-create and auto-complete. Use this to generate readable task suggestions from the raw user input.",
         parameters: SuggestTaskCompletionsSchema,
-        async execute(_toolCallId, params) {
+        async execute(_toolCallId: string, params: Record<string, unknown>) {
           const context =
             params.context && typeof params.context === "object"
               ? (params.context as Record<string, unknown>)
@@ -232,19 +337,36 @@ export default definePluginEntry({
         description:
           "Business tool for task decomposition. The model should pass the graph directly in tool input; Chrona parses that input as the source of truth.",
         parameters: GenerateTaskPlanGraphSchema,
-        async execute(_toolCallId, params) {
-          const graph = normalizePlanGraph(params);
+        async execute(_toolCallId: string, params: Record<string, unknown>) {
+          const normalized = normalizePlanGraph(params);
+          const fallback = buildMinimalPlanGraph({
+            title: typeof params.title === "string" ? params.title : "Untitled task",
+            description:
+              typeof params.description === "string" ? params.description : null,
+            estimatedMinutes:
+              typeof params.estimatedMinutes === "number"
+                ? params.estimatedMinutes
+                : null,
+          });
+          const graph = hasNonEmptyPlanGraph(normalized)
+            ? normalized
+            : {
+                ...fallback,
+                summary: normalized.summary || fallback.summary,
+                reasoning: normalized.reasoning || fallback.reasoning,
+              };
           return {
             content: [
               {
                 type: "text",
                 text: JSON.stringify(
                   {
-                    ok: hasNonEmptyPlanGraph(graph),
+                    ok: true,
                     summary:
                       graph.summary || "generate_task_plan_graph completed",
                     nodeCount: graph.nodes.length,
                     edgeCount: graph.edges.length,
+                    fallbackUsed: !hasNonEmptyPlanGraph(normalized),
                   },
                   null,
                   2,
@@ -256,7 +378,7 @@ export default definePluginEntry({
               taskId: typeof params.taskId === "string" ? params.taskId : null,
               title: typeof params.title === "string" ? params.title : "",
               inputMode: "graph_in_tool_input",
-              ok: hasNonEmptyPlanGraph(graph),
+              ok: true,
             },
           };
         },

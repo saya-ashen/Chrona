@@ -64,15 +64,17 @@ bun run openclaw:plugin:install
 如果你要测试通过 OpenClaw 进行的智能体执行：
 
 ```bash
-bun run services/openclaw-bridge/server.ts
+bun run openclaw:bridge
 ```
 
 默认地址：
 - http://localhost:7677
 
 基于实际验证的说明：
-- 这个入口实际启动的是 `services/openclaw-bridge/server.ts`，内部再委托给 `packages/openclaw-bridge/src/server.ts`
+- 实际入口是 `packages/openclaw-bridge/src/server.ts`
+- 也可以直接运行 `bun packages/openclaw-bridge/src/server.ts`
 - 如果 `7677` 端口已被占用，bridge 会立刻因为地址占用而退出
+- 成功启动后会打印 `bridge.started` 日志
 
 ## 后端运行时方向
 

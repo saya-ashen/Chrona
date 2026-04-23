@@ -1,4 +1,4 @@
-import type { GateCheckResult, GateReport } from "./types";
+import type { GateCheckResult, GateReport } from "../protocol/types";
 
 const REQUIRED_CHECKS = [
   "create_run",

@@ -89,8 +89,17 @@ async function seedLinkedChildRun() {
     generatedBy: "test",
     prompt: "plan",
     plan: {
-      version: "task-plan-graph@1",
+      id: "plan-parent-state",
+      taskId: parentTask.id,
+      status: "accepted",
+      revision: 1,
+      source: "ai",
+      generatedBy: "test",
+      prompt: "plan",
       summary: "Parent state graph",
+      changeSummary: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       nodes: [
         {
           id: "node-child",

@@ -4,9 +4,8 @@
 
 import type {
   StructuredAgentResult,
-  StructuredSubmissionEnvelope,
   StructuredValidationIssue,
-  StructuredResultStatus,
+  StructuredResultReliability,
 } from "@chrona/openclaw-integration/protocol/structured-result";
 
 export type AiClientType = "openclaw" | "llm";
@@ -39,15 +38,14 @@ export interface LLMClientConfig {
 }
 
 export interface StructuredDebugInfo {
-  rawToolCall?: unknown;
   rawOutput?: string | null;
   error?: string | null;
-  status?: StructuredResultStatus | null;
+  source?: StructuredResultReliability;
+  feature?: string | null;
+  toolName?: string | null;
   sessionId?: string;
   runId?: string;
-  reliability?: "tool_call" | "fallback_text";
   validationIssues?: StructuredValidationIssue[];
-  structuredEnvelope?: StructuredSubmissionEnvelope | null;
   bridgeToolCalls?: Array<{
     tool: string;
     callId?: string;
@@ -60,8 +58,6 @@ export interface StructuredDebugInfo {
 export interface StructuredResponseMeta {
   structured?: StructuredDebugInfo;
 }
-
-// ── Request / Response ──
 
 export interface TaskSnapshot {
   id: string;
@@ -232,8 +228,3 @@ export type StreamEvent =
   | { type: "result"; plan: GenerateTaskPlanResponse }
   | { type: "done"; text: string; structured?: StructuredAgentResult | null }
   | { type: "error"; message: string };
-
-
-
-
-

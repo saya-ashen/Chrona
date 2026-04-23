@@ -67,13 +67,15 @@ bun run openclaw:plugin:install
 ### 2. 启动 OpenClaw Bridge
 
 ```bash
-bun run services/openclaw-bridge/server.ts
+bun run openclaw:bridge
 ```
 
 说明：
-- 这个入口实际启动 `services/openclaw-bridge/server.ts`，再委托到 `packages/openclaw-bridge/src/server.ts`
+- 实际入口是 `packages/openclaw-bridge/src/server.ts`
+- 也可以直接运行 `bun packages/openclaw-bridge/src/server.ts`
 - 默认监听 `http://localhost:7677`
 - 如果端口 `7677` 已被占用，bridge 会立刻退出并报 address-in-use 错误
+- 成功启动后会打印 `bridge.started` 日志
 
 ## CLI 使用
 
@@ -141,12 +143,12 @@ bun packages/cli/src/index.ts task done -t <taskId>
 当前仓库已经把 OpenClaw 结构化结果能力整理为更清晰的链路：
 - 插件：`packages/openclaw-plugin-structured-result`
 - Bridge：`packages/openclaw-bridge`
-- 兼容入口：`services/openclaw-bridge/server.ts`
+- 运行入口：`packages/openclaw-bridge/src/server.ts`
 - Runtime client：`packages/runtime-client`
 - AI 客户端消费层：`src/modules/ai/client/*`
 
 关键规则：
-- 结构化任务必须通过 `submit_structured_result` 工具提交机器可读结果
+- 结构化 feature 结果优先通过 business tool（如 `suggest_task_completions`、`generate_task_plan_graph`）直接提交机器可读 payload
 - bridge/client 解析工具调用参数，而不是把 assistant 自由文本当成最终机器结果
 - README / quick-start 现在都以这个插件安装命令作为正式启用方式
 

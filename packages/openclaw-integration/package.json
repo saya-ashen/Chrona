@@ -8,8 +8,6 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./openclaw": "./src/openclaw/index.ts",
-    "./openclaw/*": "./src/openclaw/*.ts",
     "./transport/*": "./src/transport/*.ts",
     "./runtime/*": "./src/runtime/*.ts",
     "./protocol/*": "./src/protocol/*.ts",
