@@ -7,20 +7,35 @@ export const LOG_LEVEL_ORDER = {
   error: 40,
 } as const;
 
-function normalizeGatewayUrl(url: string): string {
-  if (url.startsWith("wss://")) {
-    return `https://${url.slice("wss://".length)}`.replace(/\/+$/, "");
+function normalizeGatewayHttpUrl(url: string, sourceEnvName: string): string {
+  const trimmed = url.trim();
+  if (trimmed.startsWith("ws://")) {
+    if (sourceEnvName === "OPENCLAW_GATEWAY_URL") {
+      return `http://${trimmed.slice("ws://".length)}`.replace(/\/+$/, "");
+    }
+    throw new Error(
+      `${sourceEnvName} must be an http(s) URL for the Gateway OpenResponses compatibility endpoint, not a ws(s) URL`,
+    );
   }
-  if (url.startsWith("ws://")) {
-    return `http://${url.slice("ws://".length)}`.replace(/\/+$/, "");
+  if (trimmed.startsWith("wss://")) {
+    if (sourceEnvName === "OPENCLAW_GATEWAY_URL") {
+      return `https://${trimmed.slice("wss://".length)}`.replace(/\/+$/, "");
+    }
+    throw new Error(
+      `${sourceEnvName} must be an http(s) URL for the Gateway OpenResponses compatibility endpoint, not a ws(s) URL`,
+    );
   }
-  return url.replace(/\/+$/, "");
+  return trimmed.replace(/\/+$/, "");
 }
+
+const openResponsesUrl = process.env.OPENCLAW_OPENRESPONSES_URL;
+const legacyGatewayUrl = process.env.OPENCLAW_GATEWAY_URL;
 
 export const DEFAULT_BRIDGE_ENVIRONMENT: BridgeEnvironment = {
   defaultPort: Number(process.env.OPENCLAW_BRIDGE_PORT ?? "7677"),
-  gatewayUrl: normalizeGatewayUrl(
-    process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789",
+  gatewayHttpUrl: normalizeGatewayHttpUrl(
+    openResponsesUrl ?? legacyGatewayUrl ?? "http://127.0.0.1:18789",
+    openResponsesUrl ? "OPENCLAW_OPENRESPONSES_URL" : legacyGatewayUrl ? "OPENCLAW_GATEWAY_URL" : "default",
   ),
   gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN ?? "",
   agentId: process.env.OPENCLAW_AGENT_ID ?? "main",
@@ -28,7 +43,7 @@ export const DEFAULT_BRIDGE_ENVIRONMENT: BridgeEnvironment = {
   messageChannel: process.env.OPENCLAW_MESSAGE_CHANNEL?.trim() || undefined,
 };
 
-export { normalizeGatewayUrl };
+export { normalizeGatewayHttpUrl };
 
 export const FEATURE_ENDPOINTS: Array<{
   pathname: string;

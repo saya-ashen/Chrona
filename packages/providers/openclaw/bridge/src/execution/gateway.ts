@@ -202,7 +202,7 @@ export async function checkGatewayAvailable(
   environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${environment.gatewayUrl}/v1/health`, {
+    const res = await fetch(`${environment.gatewayHttpUrl}/v1/health`, {
       headers: gatewayHeaders(environment),
       signal: AbortSignal.timeout(3000),
     });
@@ -235,12 +235,12 @@ export async function executeGatewayRequest(
 
   logger.info("bridge.request.start", {
     sessionId,
-    gateway: environment.gatewayUrl,
+    gateway: environment.gatewayHttpUrl,
     request: summarizeBridgeRequest(route, request),
   });
 
   const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
-  const response = await fetch(`${environment.gatewayUrl}/v1/responses`, {
+  const response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
     method: "POST",
     headers: gatewayHeaders(environment, request),
     body: JSON.stringify(body),
