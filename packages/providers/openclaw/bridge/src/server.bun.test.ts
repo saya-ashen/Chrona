@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import {
   buildGatewayBody,
   createBridgeApp,
   createBridgeLogger,
+  gatewayHeaders,
   resetBridgeSessions,
   startBridgeServer,
   summarizeBridgeRequest,
@@ -16,10 +17,31 @@ import {
 } from "./server";
 
 const realFetch = globalThis.fetch;
+const originalEnv = {
+  OPENCLAW_MODEL: process.env.OPENCLAW_MODEL,
+  OPENCLAW_MESSAGE_CHANNEL: process.env.OPENCLAW_MESSAGE_CHANNEL,
+};
+
+beforeEach(() => {
+  delete process.env.OPENCLAW_MODEL;
+  delete process.env.OPENCLAW_MESSAGE_CHANNEL;
+});
 
 afterEach(() => {
   globalThis.fetch = realFetch;
   resetBridgeSessions();
+
+  if (originalEnv.OPENCLAW_MODEL === undefined) {
+    delete process.env.OPENCLAW_MODEL;
+  } else {
+    process.env.OPENCLAW_MODEL = originalEnv.OPENCLAW_MODEL;
+  }
+
+  if (originalEnv.OPENCLAW_MESSAGE_CHANNEL === undefined) {
+    delete process.env.OPENCLAW_MESSAGE_CHANNEL;
+  } else {
+    process.env.OPENCLAW_MESSAGE_CHANNEL = originalEnv.OPENCLAW_MESSAGE_CHANNEL;
+  }
 });
 
 function makeSSEResponse(events: Array<{ event: string; data: Record<string, unknown> }>) {
@@ -77,6 +99,7 @@ describe("openclaw bridge gateway helpers", () => {
   it("builds gateway body with tools + forced tool_choice for generate_plan", () => {
     const request: BridgeFeatureRequest<Record<string, unknown>> = {
       sessionId: "sess-plan",
+      sessionKey: "tenant-a:plan-1",
       input: { taskId: "task-1", title: "Plan" },
       timeout: 30,
     };
@@ -87,6 +110,8 @@ describe("openclaw bridge gateway helpers", () => {
       "sess-plan",
     );
 
+    expect(body.model).toBe("openclaw");
+    expect(body.user).toBe("tenant-a:plan-1");
     expect(body.instructions).toBeString();
     expect(body.input).toBe(JSON.stringify({ taskId: "task-1", title: "Plan" }));
     expect(body.tools).toBeArray();
@@ -96,24 +121,119 @@ describe("openclaw bridge gateway helpers", () => {
     });
   });
 
-  it("builds execution body without forced business tools", () => {
+  it("builds execution body using openresponses session/model semantics", () => {
     const request: BridgeExecutionTaskRequest = {
       sessionId: "sess-exec",
+      sessionKey: "tenant-a:workflow-7788",
       instructions: "Do work",
       taskId: "task-1",
       workspaceId: "ws-1",
-      runtimeInput: { model: "gpt-5" },
+      taskTitle: "Run task",
+      runtimeInput: { model: "gpt-5", maxTokens: 777 },
     };
 
     const body = buildGatewayBody(
       { kind: "execution", stream: false },
       request,
       "sess-exec",
+      { defaultPort: 7677, gatewayUrl: "http://gateway", gatewayToken: "", agentId: "main", model: "gpt-5.4" },
     );
 
     expect(body.tool_choice).toBeUndefined();
     expect(body.tools).toBeUndefined();
+    expect(body.model).toBe("gpt-5.4");
+    expect(body.user).toBe("tenant-a:workflow-7788");
     expect(body.instructions).toBe("Do work");
+    expect(body.max_output_tokens).toBe(777);
+    expect(String(body.input)).toContain("Task title: Run task");
+    expect(String(body.input)).toContain('"model": "gpt-5"');
+  });
+
+  it("adds openclaw headers for model, message channel, and explicit session key", () => {
+    const headers = gatewayHeaders(
+      {
+        defaultPort: 7677,
+        gatewayUrl: "http://gateway",
+        gatewayToken: "secret",
+        agentId: "task-agent",
+        model: "gpt-5.4",
+        messageChannel: "internal_task_dispatcher",
+      },
+      {
+        sessionId: "sess-1",
+        sessionKey: "tenant-a:workflow-7788",
+        instructions: "Run task",
+      },
+    );
+
+    expect(headers).toEqual({
+      "Content-Type": "application/json",
+      Authorization: "Bearer secret",
+      "x-openclaw-agent-id": "task-agent",
+      "x-openclaw-message-channel": "internal_task_dispatcher",
+      "x-openclaw-model": "gpt-5.4",
+      "x-openclaw-session-key": "tenant-a:workflow-7788",
+    });
+  });
+
+  it("persists previous_response_id across gateway executions for a shared session key", async () => {
+    const port = 18669;
+    const requestBodies: Array<Record<string, unknown>> = [];
+
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/health")) {
+        return Response.json({ status: "ok" });
+      }
+      if (url.includes("/v1/responses")) {
+        requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+        return Response.json({
+          id: `resp-${requestBodies.length}`,
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              content: [{ type: "output_text", text: `done ${requestBodies.length}` }],
+            },
+          ],
+        });
+      }
+      return realFetch(input, init);
+    }) as typeof fetch;
+
+    const server = startBridgeServer({
+      port,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+    });
+
+    try {
+      const payload = {
+        sessionKey: "tenant-a:workflow-7788",
+        instructions: "Run task",
+      };
+
+      const first = await fetch(`http://127.0.0.1:${port}/v1/execution/task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      expect(first.status).toBe(200);
+
+      const second = await fetch(`http://127.0.0.1:${port}/v1/execution/task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      expect(second.status).toBe(200);
+
+      expect(requestBodies).toHaveLength(2);
+      expect(requestBodies[0]?.user).toBe("tenant-a:workflow-7788");
+      expect(requestBodies[0]?.previous_response_id).toBeUndefined();
+      expect(requestBodies[1]?.user).toBe("tenant-a:workflow-7788");
+      expect(requestBodies[1]?.previous_response_id).toBe("resp-1");
+    } finally {
+      server.stop(true);
+    }
   });
 
   it("emits structured log entries through sink", () => {

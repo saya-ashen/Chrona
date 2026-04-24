@@ -24,6 +24,8 @@ export const DEFAULT_BRIDGE_ENVIRONMENT: BridgeEnvironment = {
   ),
   gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN ?? "",
   agentId: process.env.OPENCLAW_AGENT_ID ?? "main",
+  model: process.env.OPENCLAW_MODEL?.trim() || undefined,
+  messageChannel: process.env.OPENCLAW_MESSAGE_CHANNEL?.trim() || undefined,
 };
 
 export { normalizeGatewayUrl };

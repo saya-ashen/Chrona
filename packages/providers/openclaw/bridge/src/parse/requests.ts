@@ -64,6 +64,10 @@ export function normalizeFeatureRequest(
       typeof request.sessionId === "string" && request.sessionId.trim()
         ? request.sessionId
         : undefined,
+    sessionKey:
+      typeof request.sessionKey === "string" && request.sessionKey.trim()
+        ? request.sessionKey
+        : undefined,
     input: input as Record<string, unknown>,
     timeout: typeof request.timeout === "number" ? request.timeout : undefined,
   };
@@ -87,6 +91,10 @@ export function normalizeExecutionRequest(
     sessionId:
       typeof request.sessionId === "string" && request.sessionId.trim()
         ? request.sessionId
+        : undefined,
+    sessionKey:
+      typeof request.sessionKey === "string" && request.sessionKey.trim()
+        ? request.sessionKey
         : undefined,
     instructions: request.instructions,
     taskId: typeof request.taskId === "string" ? request.taskId : undefined,

@@ -39,8 +39,10 @@ export type OpenClawBridgeClientOptions = {
 
 export type SessionState = {
   sessionId: string;
+  sessionKey: string;
   messages: Array<Record<string, unknown>>;
   lastRunRef: string | null;
+  lastResponseId: string | null;
   lastRunStatus: OpenClawRunSnapshot["status"];
   lastOutput: string;
   toolCalls: Array<{
@@ -107,10 +109,15 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     runtimeSessionKey?: string;
     runStarted: boolean;
   }> {
-    const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
+    const sessionKey = input.runtimeSessionKey ?? crypto.randomUUID();
     const requestBody: BridgeExecutionTaskRequest = {
-      sessionId,
+      sessionId: sessionKey,
+      sessionKey,
       instructions: input.prompt,
+      taskTitle:
+        typeof input.runtimeInput.prompt === "string" && input.runtimeInput.prompt.trim()
+          ? input.runtimeInput.prompt
+          : undefined,
       runtimeAdapterKey: "openclaw",
       runtimeInput: input.runtimeInput,
       timeout: this.timeoutSeconds,
@@ -119,12 +126,12 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       "/v1/execution/task",
       requestBody,
     );
-    this.recordBridgeResponse(sessionId, input.prompt, response);
+    this.recordBridgeResponse(sessionKey, input.prompt, response);
 
     return {
-      runtimeRunRef: response.runId ?? response.sessionId,
+      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
       runtimeSessionRef: response.sessionId,
-      runtimeSessionKey: sessionId,
+      runtimeSessionKey: sessionKey,
       runStarted: true,
     };
   }
@@ -136,14 +143,15 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     systemPrompt?: string;
     timeoutSeconds?: number;
   }): Promise<OpenClawStructuredRunResult<T>> {
-    const sessionId = input.runtimeSessionKey ?? crypto.randomUUID();
+    const sessionKey = input.runtimeSessionKey ?? crypto.randomUUID();
     const feature = input.feature;
     const path = this.getFeaturePath(feature, false);
     const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
-      sessionId,
+      sessionId: sessionKey,
+      sessionKey,
       input: {
-        message: input.prompt,
-        systemPrompt: input.systemPrompt,
+        prompt: input.prompt,
+        ...(input.systemPrompt ? { systemPrompt: input.systemPrompt } : {}),
       },
       timeout: input.timeoutSeconds ?? this.timeoutSeconds,
     };
@@ -151,7 +159,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       path,
       requestBody,
     );
-    this.recordBridgeResponse(sessionId, input.prompt, response);
+    this.recordBridgeResponse(sessionKey, input.prompt, response);
 
     return {
       ok: response.structured?.ok ?? false,
@@ -163,7 +171,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       error: response.structured?.error ?? response.error,
       validationIssues: response.structured?.validationIssues,
       sessionId: response.sessionId,
-      runId: response.runId,
+      runId: response.responseId ?? response.runId,
       bridgeToolCalls: response.structured?.bridgeToolCalls,
     };
   }
@@ -175,12 +183,17 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       typeof input === "string"
         ? input
         : (input.runtimeSessionKey ?? input.runtimeRunRef);
-    const session = this.sessions.get(key);
+    const session =
+      this.sessions.get(key) ??
+      Array.from(this.sessions.values()).find(
+        (candidate) =>
+          candidate.lastRunRef === key || candidate.lastResponseId === key,
+      );
 
     return {
       runtimeRunRef: session?.lastRunRef ?? key,
       runtimeSessionRef: session?.sessionId ?? undefined,
-      runtimeSessionKey: key,
+      runtimeSessionKey: session?.sessionKey ?? key,
       status: session?.lastRunStatus ?? "Completed",
       lastMessage: session?.lastOutput,
     };
@@ -209,6 +222,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   async sendInput(input: OpenClawSendInput): Promise<OpenClawSendInputResult> {
     const requestBody: BridgeExecutionTaskRequest = {
       sessionId: input.runtimeSessionKey,
+      sessionKey: input.runtimeSessionKey,
       instructions: input.message,
       timeout: this.timeoutSeconds,
     };
@@ -220,7 +234,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
     return {
       accepted: !response.error,
-      runtimeRunRef: response.runId ?? response.sessionId,
+      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
       runtimeSessionKey: input.runtimeSessionKey,
       runStarted: true,
     };
@@ -242,30 +256,34 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     return { accepted: true };
   }
 
-  private getOrCreateSession(sessionId: string): SessionState {
-    let session = this.sessions.get(sessionId);
+  private getOrCreateSession(sessionKey: string): SessionState {
+    let session = this.sessions.get(sessionKey);
     if (!session) {
       session = {
-        sessionId,
+        sessionId: sessionKey,
+        sessionKey,
         messages: [],
         lastRunRef: null,
+        lastResponseId: null,
         lastRunStatus: "Pending",
         lastOutput: "",
         toolCalls: [],
         lastStructured: null,
       };
-      this.sessions.set(sessionId, session);
+      this.sessions.set(sessionKey, session);
     }
     return session;
   }
 
   private recordBridgeResponse(
-    sessionId: string,
+    sessionKey: string,
     userMessage: string,
     response: BridgeResponse,
   ): void {
-    const session = this.getOrCreateSession(sessionId);
-    session.lastRunRef = response.runId ?? response.sessionId;
+    const session = this.getOrCreateSession(sessionKey);
+    session.sessionId = response.sessionId;
+    session.lastRunRef = response.responseId ?? response.runId ?? response.sessionId;
+    session.lastResponseId = response.responseId ?? null;
     session.lastOutput = response.output;
     session.lastRunStatus = response.error ? "Failed" : "Completed";
     session.lastStructured = response.structured;

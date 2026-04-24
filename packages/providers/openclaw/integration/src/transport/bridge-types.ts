@@ -14,12 +14,14 @@ export type BridgeFeature =
 
 export interface BridgeFeatureRequest<TInput = Record<string, unknown>> {
   sessionId?: string;
+  sessionKey?: string;
   input: TInput;
   timeout?: number;
 }
 
 export interface BridgeExecutionTaskRequest {
   sessionId?: string;
+  sessionKey?: string;
   instructions: string;
   taskId?: string;
   workspaceId?: string;

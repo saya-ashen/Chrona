@@ -40,6 +40,8 @@ export interface BridgeEnvironment {
   gatewayUrl: string;
   gatewayToken: string;
   agentId: string;
+  model?: string;
+  messageChannel?: string;
 }
 
 export interface StartBridgeServerOptions {

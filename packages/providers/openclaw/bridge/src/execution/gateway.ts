@@ -23,6 +23,11 @@ import { toErrorMessage } from "../shared/json";
 
 const sessionPreviousResponseMap = new Map<string, string>();
 
+type OpenResponsesTurnState = {
+  sessionKey: string;
+  previousResponseId?: string;
+};
+
 function featureInstructions(feature: BridgeFeature): string {
   switch (feature) {
     case "suggest":
@@ -40,18 +45,71 @@ function featureInstructions(feature: BridgeFeature): string {
   }
 }
 
+function normalizeOpenResponsesSessionKey(value: string | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : crypto.randomUUID();
+}
+
+function resolveOpenResponsesTurnState(
+  request: BridgeRequest,
+  fallbackSessionId: string,
+): OpenResponsesTurnState {
+  const requestRecord = request as Record<string, unknown>;
+  const requestedSessionKey =
+    typeof requestRecord.sessionKey === "string" ? requestRecord.sessionKey : undefined;
+  const sessionKey = normalizeOpenResponsesSessionKey(
+    requestedSessionKey ?? request.sessionId ?? fallbackSessionId,
+  );
+  return {
+    sessionKey,
+    previousResponseId: sessionPreviousResponseMap.get(sessionKey),
+  };
+}
+
+function stringifyExecutionInput(
+  execution: BridgeExecutionTaskRequest,
+): string {
+  const parts: string[] = [];
+
+  if (execution.taskTitle?.trim()) {
+    parts.push(`Task title: ${execution.taskTitle.trim()}`);
+  }
+  if (execution.taskId?.trim()) {
+    parts.push(`Task id: ${execution.taskId.trim()}`);
+  }
+  if (execution.workspaceId?.trim()) {
+    parts.push(`Workspace id: ${execution.workspaceId.trim()}`);
+  }
+  if (execution.runtimeAdapterKey?.trim()) {
+    parts.push(`Runtime adapter: ${execution.runtimeAdapterKey.trim()}`);
+  }
+
+  const runtimeInput = execution.runtimeInput ?? {};
+  if (Object.keys(runtimeInput).length > 0) {
+    parts.push(`Runtime input JSON:\n${JSON.stringify(runtimeInput, null, 2)}`);
+  }
+
+  parts.push(execution.instructions);
+  return parts.join("\n\n");
+}
+
 export function buildGatewayBody(
   route: RouteKind,
   request: BridgeRequest,
   sessionId: string,
+  environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
 ): Record<string, unknown> {
-  const previousResponseId = sessionPreviousResponseMap.get(sessionId);
+  const { sessionKey, previousResponseId } = resolveOpenResponsesTurnState(
+    request,
+    sessionId,
+  );
 
   if (route.kind === "feature") {
     const featureRequest = request as BridgeFeatureRequest<Record<string, unknown>>;
     const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
     const body: Record<string, unknown> = {
-      user: sessionId,
+      model: "openclaw",
+      user: sessionKey,
       instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions(route.feature)}`,
       input: JSON.stringify(featureRequest.input),
       stream: route.stream,
@@ -83,20 +141,28 @@ export function buildGatewayBody(
 
   const execution = request as BridgeExecutionTaskRequest;
   const body: Record<string, unknown> = {
-    user: sessionId,
-    instructions: execution.instructions,
-    input: JSON.stringify({
-      taskId: execution.taskId,
-      workspaceId: execution.workspaceId,
-      taskTitle: execution.taskTitle,
-      runtimeAdapterKey: execution.runtimeAdapterKey,
-      runtimeInput: execution.runtimeInput ?? {},
-    }),
+    model: "openclaw",
+    input: stringifyExecutionInput(execution),
     stream: route.stream,
+    max_output_tokens:
+      typeof execution.runtimeInput?.maxTokens === "number"
+        ? execution.runtimeInput.maxTokens
+        : typeof execution.runtimeInput?.maxOutputTokens === "number"
+          ? execution.runtimeInput.maxOutputTokens
+          : undefined,
   };
 
+  if (execution.instructions.trim()) {
+    body.instructions = execution.instructions;
+  }
+  if (sessionKey) {
+    body.user = sessionKey;
+  }
   if (previousResponseId) {
     body.previous_response_id = previousResponseId;
+  }
+  if (environment.model) {
+    body.model = environment.model;
   }
 
   return body;
@@ -104,6 +170,7 @@ export function buildGatewayBody(
 
 export function gatewayHeaders(
   environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
+  request?: BridgeRequest,
 ): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -112,6 +179,22 @@ export function gatewayHeaders(
   if (environment.gatewayToken) {
     headers.Authorization = `Bearer ${environment.gatewayToken}`;
   }
+  if (environment.model) {
+    headers["x-openclaw-model"] = environment.model;
+  }
+  if (environment.messageChannel) {
+    headers["x-openclaw-message-channel"] = environment.messageChannel;
+  }
+
+  const requestRecord = request as (Record<string, unknown> | undefined);
+  const sessionKey =
+    requestRecord && typeof requestRecord.sessionKey === "string"
+      ? requestRecord.sessionKey.trim()
+      : "";
+  if (sessionKey) {
+    headers["x-openclaw-session-key"] = sessionKey;
+  }
+
   return headers;
 }
 
@@ -146,8 +229,9 @@ export async function executeGatewayRequest(
   environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
 ): Promise<ExecutionResult> {
   const sessionId = request.sessionId ?? crypto.randomUUID();
+  const { sessionKey } = resolveOpenResponsesTurnState(request, sessionId);
   const startedAt = Date.now();
-  const body = buildGatewayBody(route, request, sessionId);
+  const body = buildGatewayBody(route, request, sessionId, environment);
 
   logger.info("bridge.request.start", {
     sessionId,
@@ -158,7 +242,7 @@ export async function executeGatewayRequest(
   const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
   const response = await fetch(`${environment.gatewayUrl}/v1/responses`, {
     method: "POST",
-    headers: gatewayHeaders(environment),
+    headers: gatewayHeaders(environment, request),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -188,7 +272,7 @@ export async function executeGatewayRequest(
   if (!route.stream) {
     const gateway = (await response.json()) as Record<string, unknown>;
     const responseId = typeof gateway.id === "string" ? gateway.id : undefined;
-    if (responseId) sessionPreviousResponseMap.set(sessionId, responseId);
+    if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
     const { toolCalls, toolCallOutputs } = parseFunctionItems(gateway);
     const outputText = extractOutputText(gateway);
@@ -296,7 +380,7 @@ export async function executeGatewayRequest(
 
   const responseId =
     typeof finalGatewayResponse.id === "string" ? finalGatewayResponse.id : undefined;
-  if (responseId) sessionPreviousResponseMap.set(sessionId, responseId);
+  if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
   const { toolCalls, toolCallOutputs } = parseFunctionItems(finalGatewayResponse);
   const outputText = extractOutputText(finalGatewayResponse);
