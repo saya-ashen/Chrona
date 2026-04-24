@@ -62,7 +62,7 @@ export function startBridgeServer(options: StartBridgeServerOptions = {}) {
     port,
     hostname,
     pid: process.pid,
-    gateway: environment.gatewayUrl,
+    gateway: environment.gatewayHttpUrl,
     agentId: environment.agentId,
   });
 

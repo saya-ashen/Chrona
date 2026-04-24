@@ -123,14 +123,16 @@ export function buildGatewayBody(
       body.tools = [
         {
           type: "function",
-          name: requiredTool,
-          description: `Chrona structured feature tool: ${requiredTool}`,
-          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          function: {
+            name: requiredTool,
+            description: `Chrona structured feature tool: ${requiredTool}`,
+            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          },
         },
       ];
       body.tool_choice = {
         type: "function",
-        name: requiredTool,
+        function: { name: requiredTool },
       };
     }
 
