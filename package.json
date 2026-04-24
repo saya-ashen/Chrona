@@ -29,12 +29,12 @@
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
     "db:seed": "bun prisma/seed.ts",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
-    "openclaw:bridge": "bun packages/openclaw-bridge/src/server.ts",
-    "bridge:openclaw": "bun packages/openclaw-bridge/src/server.ts",
-    "openclaw:plugin:build": "bun run --cwd packages/openclaw-plugin-structured-result build",
+    "openclaw:bridge": "bun packages/providers/openclaw/bridge/src/server.ts",
+    "bridge:openclaw": "bun packages/providers/openclaw/bridge/src/server.ts",
+    "openclaw:plugin:build": "bun run --cwd packages/providers/openclaw/plugin-structured-result build",
     "openclaw:plugin:install": "bun scripts/openclaw/install-structured-plugin.ts",
-    "chrona": "bun packages/cli/src/index.ts",
-    "agentdash": "bun packages/cli/src/index.ts"
+    "chrona": "bun packages/common/cli/src/index.ts",
+    "agentdash": "bun packages/common/cli/src/index.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -92,6 +92,8 @@
     "unrs-resolver"
   ],
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/*/*",
+    "packages/*/*/*"
   ]
 }

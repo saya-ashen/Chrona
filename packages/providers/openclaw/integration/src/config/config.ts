@@ -1,5 +1,5 @@
-import { validateTaskConfigAgainstSpec } from "../../../../packages/runtime-core/src/index";
-import type { RuntimeTaskConfigSpec } from "../../../../packages/runtime-core/src/index";
+import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
+import type { RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 
 export const OPENCLAW_RUNTIME_ADAPTER_KEY = "openclaw";
 export const OPENCLAW_RUNTIME_INPUT_VERSION = "openclaw-legacy-v1";

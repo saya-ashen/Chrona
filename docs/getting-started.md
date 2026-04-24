@@ -54,7 +54,7 @@ bun run openclaw:plugin:install
 ```
 
 这个命令已经实际验证过，会执行以下动作：
-- 构建 `packages/openclaw-plugin-structured-result`
+- 构建 `packages/providers/openclaw/plugin-structured-result`
 - 安装到本地 OpenClaw，插件 id 为 `chrona-structured-result`
 - 启用插件
 - 尝试重启 OpenClaw gateway
@@ -71,8 +71,8 @@ bun run openclaw:bridge
 ```
 
 说明：
-- 实际入口是 `packages/openclaw-bridge/src/server.ts`
-- 也可以直接运行 `bun packages/openclaw-bridge/src/server.ts`
+- 实际入口是 `packages/providers/openclaw/bridge/src/server.ts`
+- 也可以直接运行 `bun packages/providers/openclaw/bridge/src/server.ts`
 - 默认监听 `http://localhost:7677`
 - 如果端口 `7677` 已被占用，bridge 会立刻退出并报 address-in-use 错误
 - 成功启动后会打印 `bridge.started` 日志
@@ -91,10 +91,10 @@ bun run chrona --help
 
 ```bash
 bun run chrona --help
-bun packages/cli/src/index.ts task --help
-bun packages/cli/src/index.ts run --help
-bun packages/cli/src/index.ts schedule --help
-bun packages/cli/src/index.ts ai --help
+bun packages/common/cli/src/index.ts task --help
+bun packages/common/cli/src/index.ts run --help
+bun packages/common/cli/src/index.ts schedule --help
+bun packages/common/cli/src/index.ts ai --help
 ```
 
 当前命令组包括：
@@ -108,7 +108,7 @@ bun packages/cli/src/index.ts ai --help
 创建任务：
 
 ```bash
-bun packages/cli/src/index.ts task create \
+bun packages/common/cli/src/index.ts task create \
   -w <workspaceId> \
   --title "分析用户数据" \
   --description "使用 Python 分析最近30天的用户行为数据" \
@@ -120,7 +120,7 @@ bun packages/cli/src/index.ts task create \
 应用排期：
 
 ```bash
-bun packages/cli/src/index.ts schedule apply \
+bun packages/common/cli/src/index.ts schedule apply \
   -t <taskId> \
   --start "2025-01-15T14:00:00" \
   --end "2025-01-15T15:00:00"
@@ -129,21 +129,21 @@ bun packages/cli/src/index.ts schedule apply \
 启动运行：
 
 ```bash
-bun packages/cli/src/index.ts run start -t <taskId>
+bun packages/common/cli/src/index.ts run start -t <taskId>
 ```
 
 标记完成：
 
 ```bash
-bun packages/cli/src/index.ts task done -t <taskId>
+bun packages/common/cli/src/index.ts task done -t <taskId>
 ```
 
 ## OpenClaw 结构化结果链路
 
 当前仓库已经把 OpenClaw 结构化结果能力整理为更清晰的链路：
-- 插件：`packages/openclaw-plugin-structured-result`
-- Bridge：`packages/openclaw-bridge`
-- 运行入口：`packages/openclaw-bridge/src/server.ts`
+- 插件：`packages/providers/openclaw/plugin-structured-result`
+- Bridge：`packages/providers/openclaw/bridge`
+- 运行入口：`packages/providers/openclaw/bridge/src/server.ts`
 - Runtime client：`packages/runtime-client`
 - AI 客户端消费层：`src/modules/ai/client/*`
 
@@ -157,10 +157,10 @@ bun packages/cli/src/index.ts task done -t <taskId>
 ```bash
 bun run test
 bun run chrona --help
-bun packages/cli/src/index.ts task --help
-bun packages/cli/src/index.ts run --help
-bun packages/cli/src/index.ts schedule --help
-bun packages/cli/src/index.ts ai --help
+bun packages/common/cli/src/index.ts task --help
+bun packages/common/cli/src/index.ts run --help
+bun packages/common/cli/src/index.ts schedule --help
+bun packages/common/cli/src/index.ts ai --help
 ```
 
 补充说明：

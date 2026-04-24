@@ -50,7 +50,7 @@ bun run openclaw:plugin:install
 ```
 
 What it does:
-- builds `packages/openclaw-plugin-structured-result`
+- builds `packages/providers/openclaw/plugin-structured-result`
 - installs it into local OpenClaw as `chrona-structured-result`
 - enables the plugin
 - attempts a gateway restart
@@ -72,8 +72,8 @@ Default bridge URL:
 - http://localhost:7677
 
 Bridge notes from verification:
-- the actual entrypoint is `packages/openclaw-bridge/src/server.ts`
-- you can also run `bun packages/openclaw-bridge/src/server.ts` directly
+- the actual entrypoint is `packages/providers/openclaw/bridge/src/server.ts`
+- you can also run `bun packages/providers/openclaw/bridge/src/server.ts` directly
 - if port `7677` is already in use, the bridge exits immediately with an address-in-use error
 - successful startup prints a `bridge.started` log line
 

@@ -83,11 +83,11 @@ B. execution endpoints
 
 你现在处理的是 Chrona 仓库，关键层次如下：
 
-- `packages/openclaw-bridge`
+- `packages/providers/openclaw/bridge`
   - Bun HTTP server，包装 `openclaw agent --local --json`
-- `packages/openclaw-integration`
+- `packages/providers/openclaw/integration`
   - OpenClaw bridge client / runtime adapter / execution transport
-- `packages/ai-features`
+- `packages/common/ai-features`
   - AI feature layer：suggest / generate_plan / conflicts / timeslots / chat
 - `src/app/api/ai/*`
   - app 层 feature API，已经大部分是 feature-specific
@@ -99,20 +99,20 @@ B. execution endpoints
 你必须先阅读这些关键文件
 
 bridge:
-- `packages/openclaw-bridge/src/server.ts`
-- `packages/openclaw-bridge/src/server.bun.test.ts`
-- `packages/openclaw-bridge/README.md`
+- `packages/providers/openclaw/bridge/src/server.ts`
+- `packages/providers/openclaw/bridge/src/server.bun.test.ts`
+- `packages/providers/openclaw/bridge/README.md`
 
 integration:
-- `packages/openclaw-integration/src/transport/bridge-types.ts`
-- `packages/openclaw-integration/src/transport/bridge-client.ts`
+- `packages/providers/openclaw/integration/src/transport/bridge-types.ts`
+- `packages/providers/openclaw/integration/src/transport/bridge-client.ts`
 
 feature layer:
-- `packages/ai-features/src/core/types.ts`
-- `packages/ai-features/src/core/providers.ts`
-- `packages/ai-features/src/core/streaming.ts`
-- `packages/ai-features/src/core/prompts.ts`
-- `packages/ai-features/src/features/index.ts`
+- `packages/common/ai-features/src/core/types.ts`
+- `packages/common/ai-features/src/core/providers.ts`
+- `packages/common/ai-features/src/core/streaming.ts`
+- `packages/common/ai-features/src/core/prompts.ts`
+- `packages/common/ai-features/src/features/index.ts`
 
 backend API:
 - `src/modules/ai/ai-service.ts`
@@ -133,7 +133,7 @@ frontend callers:
 
 第一部分：bridge server 路由重构
 
-在 `packages/openclaw-bridge/src/server.ts` 中：
+在 `packages/providers/openclaw/bridge/src/server.ts` 中：
 
 1. 删除或废弃以下路由：
 - `POST /v1/chat`
@@ -223,7 +223,7 @@ B. execution request
 
 第三部分：ai-features 调用方式重构
 
-在 `packages/ai-features/src/core/providers.ts` 和 `packages/ai-features/src/core/streaming.ts` 中：
+在 `packages/common/ai-features/src/core/providers.ts` 和 `packages/common/ai-features/src/core/streaming.ts` 中：
 
 1. 不要再调用：
 - `/v1/chat`
@@ -250,7 +250,7 @@ B. execution request
 
 第四部分：openclaw integration 调用方式重构
 
-在 `packages/openclaw-integration/src/transport/bridge-client.ts` 中：
+在 `packages/providers/openclaw/integration/src/transport/bridge-client.ts` 中：
 
 1. task execution 相关调用不要再打 `/v1/chat`
 2. 改成打：
@@ -274,7 +274,7 @@ B. execution request
 
 2. README 更新
 重写：
-- `packages/openclaw-bridge/README.md`
+- `packages/providers/openclaw/bridge/README.md`
 
 把旧的：
 - `/v1/chat`
