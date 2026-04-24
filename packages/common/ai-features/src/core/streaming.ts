@@ -25,6 +25,7 @@ import {
   normalizeSuggestResponse,
 } from "../features";
 import { buildFeatureInput, openclawCall } from "./providers";
+import { buildOpenClawSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
@@ -36,18 +37,6 @@ const logger = {
   warn: (_message: string, _payload?: Record<string, unknown>) => {},
   error: (_message: string, _payload?: Record<string, unknown>) => {},
 };
-
-function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
-  const sanitize = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 48) || "default";
-
-  return `ai-${sanitize(feature)}-${sanitize(scope)}`;
-}
 
 function getStreamPath(feature: AiFeature): string | null {
   switch (feature) {
@@ -120,7 +109,7 @@ export async function* openclawStream(
     | ChatRequest,
 ): AsyncGenerator<StreamEvent> {
   const timeout = config.timeoutSeconds ?? 120;
-  const sessionId = buildOpenClawSessionId(feature, scope);
+  const { sessionId, sessionKey } = buildOpenClawSessionIdentity(feature, scope);
   const streamPath = getStreamPath(feature);
 
   logger.info("openclaw.stream.start", {
@@ -137,6 +126,7 @@ export async function* openclawStream(
     try {
       const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
         sessionId,
+        sessionKey,
         input: buildStreamingInput(feature, input),
         timeout,
       };
