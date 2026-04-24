@@ -130,10 +130,17 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.user).toBe("tenant-a:plan-1");
     expect(body.instructions).toBeString();
     expect(body.input).toBe(JSON.stringify({ taskId: "task-1", title: "Plan" }));
-    expect(body.tools).toBeArray();
+    expect(body.tools).toEqual([
+      {
+        type: "function",
+        name: "generate_task_plan_graph",
+        description: "Chrona structured feature tool: generate_task_plan_graph",
+        parameters: expect.any(Object),
+      },
+    ]);
     expect(body.tool_choice).toEqual({
       type: "function",
-      function: { name: "generate_task_plan_graph" },
+      name: "generate_task_plan_graph",
     });
   });
 
@@ -462,8 +469,9 @@ describe("openclaw bridge gateway endpoints", () => {
     globalThis.fetch = (async (input, init) => {
       const url = getRequestUrl(input);
       if (url.includes("/v1/responses")) {
-        const req = JSON.parse(String(init?.body ?? "{}")) as { tool_choice?: { function?: { name?: string } } };
-        const toolName = req.tool_choice?.function?.name;
+        const req = JSON.parse(String(init?.body ?? "{}")) as { tool_choice?: { name?: string; function?: { name?: string } } };
+        const toolChoice = req.tool_choice;
+        const toolName = toolChoice?.name ?? toolChoice?.function?.name;
         if (toolName === "suggest_task_completions") {
           return Response.json({
             id: "resp-suggest",
