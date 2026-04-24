@@ -8,6 +8,7 @@ import type {
   AnalyzeConflictsRequest,
   SuggestTimeslotRequest,
   ChatRequest,
+  DispatchTaskInput,
 } from "./types";
 import { AiClientError } from "./types";
 import {
@@ -46,6 +47,8 @@ function toBridgeFeature(feature: AiFeature): BridgeFeature {
       return "timeslots";
     case "chat":
       return "chat";
+    case "dispatch_task":
+      return "chat";
   }
 }
 
@@ -63,6 +66,8 @@ function getBridgePath(feature: AiFeature, stream = false): string {
       return "/v1/features/suggest-timeslot";
     case "chat":
       return "/v1/features/chat";
+    case "dispatch_task":
+      return "/v1/features/dispatch-task";
   }
 }
 
@@ -78,7 +83,8 @@ export function buildFeatureInput(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
 ): Record<string, unknown> {
   if (typeof input === "string") {
     return { message: input };
@@ -96,7 +102,8 @@ async function fetchOpenClawBridge(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
   mode: OpenClawStructuredMode,
 ): Promise<OpenClawCallResult> {
   const timeout = config.timeoutSeconds ?? 120;
@@ -151,7 +158,8 @@ export async function openclawCall(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
 ): Promise<string> {
   const result = await fetchOpenClawBridge(config, feature, scope, input, "text");
   return result.text;
@@ -167,7 +175,8 @@ export async function openclawStructuredCall<T = unknown>(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
 ): Promise<OpenClawCallResult<T>> {
   const result = await fetchOpenClawBridge(
     config,
@@ -298,7 +307,8 @@ export async function dispatch(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
   scope = "default",
 ): Promise<string> {
   if (client.type === "openclaw") {
@@ -327,7 +337,8 @@ export async function dispatchStructured<T = unknown>(
     | GenerateTaskPlanRequest
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
-    | ChatRequest,
+    | ChatRequest
+    | DispatchTaskInput,
   scope = "default",
 ): Promise<OpenClawCallResult<T>> {
   if (client.type === "openclaw") {

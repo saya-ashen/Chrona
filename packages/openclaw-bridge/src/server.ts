@@ -99,6 +99,7 @@ const FEATURE_TOOL_PREFERENCE: Record<BridgeFeature, string | null> = {
   conflicts: null,
   timeslots: null,
   chat: null,
+  dispatch_task: "dispatch_next_task_action",
 };
 
 const FEATURE_ENDPOINTS: Array<{
@@ -129,6 +130,11 @@ const FEATURE_ENDPOINTS: Array<{
     stream: false,
   },
   { pathname: "/v1/features/chat", feature: "chat", stream: false },
+  {
+    pathname: "/v1/features/dispatch-task",
+    feature: "dispatch_task",
+    stream: false,
+  },
 ];
 
 function parseLogLevel(value: string | undefined): LogLevel {

@@ -21,6 +21,8 @@ import {
   type SuggestTimeslotResponse,
   type ChatRequest,
   type ChatResponse,
+  type DispatchTaskInput,
+  type DispatchTaskOutput,
   type StreamEvent,
   AiClientError,
   suggest,
@@ -28,6 +30,7 @@ import {
   analyzeConflicts,
   suggestTimeslots,
   chat,
+  dispatchTask,
   checkClientHealth,
   suggestStream,
   generatePlanStream,
@@ -113,6 +116,12 @@ export async function aiChat(request: ChatRequest): Promise<ChatResponse | null>
   return chat(client, request);
 }
 
+export async function aiDispatchTask(request: DispatchTaskInput): Promise<DispatchTaskOutput | null> {
+  const client = await getClientForFeature("dispatch_task");
+  if (!client) return null;
+  return dispatchTask(client, request);
+}
+
 export async function* aiSuggestStream(request: SmartSuggestRequest): AsyncGenerator<StreamEvent> {
   const client = await getClientForFeature("suggest");
   if (!client) {
@@ -185,6 +194,8 @@ export type {
   SuggestTimeslotResponse,
   ChatRequest,
   ChatResponse,
+  DispatchTaskInput,
+  DispatchTaskOutput,
   TaskSnapshot,
   ScheduleHealthSnapshot,
   AiClientRecord,
@@ -192,6 +203,5 @@ export type {
   AiFeature,
   StreamEvent,
 } from "@chrona/ai-features";
-
 
 
