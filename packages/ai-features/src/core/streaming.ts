@@ -74,34 +74,34 @@ function buildStreamingInput(
 }
 
 function parseBridgeEvent(evt: NDJSONEvent): StreamEvent | null {
-  if (evt.type === "tool_use" && evt.tool) {
+  if (evt.type === "tool_call" && evt.tool) {
     return {
       type: "tool_call",
       tool: evt.tool,
       input: evt.input ?? {},
     };
   }
-  if (evt.type === "tool_result" && evt.tool) {
+  if (evt.type === "tool_result") {
     return {
       type: "tool_result",
-      tool: evt.tool,
-      result: evt.result ?? evt.text ?? "",
+      tool: evt.tool ?? "function_call_output",
+      result:
+        typeof evt.output === "string"
+          ? evt.output
+          : evt.text ?? JSON.stringify(evt.output ?? {}),
     };
   }
-  if (evt.type === "lifecycle") {
+  if (evt.type === "status") {
     return {
       type: "status",
-      message: evt.message ?? evt.phase ?? "Processing",
+      message: evt.message ?? evt.status ?? "Processing",
     };
   }
-  if (evt.type === "error") {
-    const message =
-      typeof evt.error === "string"
-        ? evt.error
-        : evt.error?.data?.message ?? evt.text ?? evt.message ?? "Unknown error";
+  if (evt.type === "failed") {
+    const message = evt.error ?? evt.message ?? "Unknown error";
     return { type: "error", message };
   }
-  if (evt.type === "text" && evt.text) {
+  if (evt.type === "text_delta" && evt.text) {
     return { type: "partial", text: evt.text };
   }
   return null;

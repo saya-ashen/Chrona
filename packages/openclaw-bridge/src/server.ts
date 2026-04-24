@@ -1,13 +1,3 @@
-/**
- * OpenClaw CLI Bridge — explicit feature/execution REST API over `openclaw agent`.
- *
- * Output format handling:
- * - stderr NDJSON event stream
- * - transcript JSONL fallback
- * - legacy single-blob JSON fallback embedded in stderr
- */
-
-import { spawn } from "node:child_process";
 import {
   type BridgeExecutionTaskRequest,
   type BridgeFeature,
@@ -17,6 +7,7 @@ import {
   type BridgeResponse,
   type NDJSONEvent,
   type ToolCallInfo,
+  type ToolCallOutputInfo,
 } from "../../openclaw-integration/src/transport/bridge-types";
 import { type StructuredAgentResult } from "../../openclaw-integration/src/protocol/structured-result";
 
@@ -43,44 +34,11 @@ export interface StartBridgeServerOptions {
   port?: number;
   hostname?: string;
   logger?: BridgeLogger;
-  checkCLIAvailable?: () => Promise<boolean>;
+  checkGatewayAvailable?: () => Promise<boolean>;
   executeRequest?: (
     route: RouteKind,
     request: BridgeRequest,
   ) => Promise<ExecutionResult>;
-}
-
-interface LegacyBlobPayload {
-  text: string | null;
-  mediaUrl?: string | null;
-}
-
-interface LegacyBlobMeta {
-  durationMs?: number;
-  agentMeta?: {
-    usage?: {
-      inputTokens?: number;
-      outputTokens?: number;
-      input_tokens?: number;
-      output_tokens?: number;
-    };
-    toolCalls?: unknown;
-    tool_calls?: unknown;
-    calls?: unknown;
-    events?: unknown;
-    trace?: unknown;
-  };
-  toolCalls?: unknown;
-  tool_calls?: unknown;
-  calls?: unknown;
-  events?: unknown;
-  trace?: unknown;
-  stopReason?: string;
-}
-
-interface LegacyBlob {
-  payloads?: LegacyBlobPayload[];
-  meta?: LegacyBlobMeta;
 }
 
 const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
@@ -90,17 +48,12 @@ const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
   error: 40,
 };
 
-const OPENCLAW_BIN = process.env.OPENCLAW_BIN ?? "openclaw";
 const DEFAULT_BRIDGE_PORT = Number(process.env.OPENCLAW_BRIDGE_PORT ?? "7677");
-
-const FEATURE_TOOL_PREFERENCE: Record<BridgeFeature, string | null> = {
-  suggest: "suggest_task_completions",
-  generate_plan: "generate_task_plan_graph",
-  conflicts: null,
-  timeslots: null,
-  chat: null,
-  dispatch_task: "dispatch_next_task_action",
-};
+const OPENCLAW_GATEWAY_URL = (
+  process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789"
+).replace(/\/+$/, "");
+const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "";
+const OPENCLAW_AGENT_ID = process.env.OPENCLAW_AGENT_ID ?? "main";
 
 const FEATURE_ENDPOINTS: Array<{
   pathname: string;
@@ -137,6 +90,70 @@ const FEATURE_ENDPOINTS: Array<{
   },
 ];
 
+const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
+  suggest_task_completions: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      suggestions: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            priority: { type: "string" },
+            estimatedMinutes: { type: "number" },
+            tags: { type: "array", items: { type: "string" } },
+          },
+          required: ["title"],
+        },
+      },
+    },
+    required: ["suggestions"],
+  },
+  generate_task_plan_graph: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      summary: { type: "string" },
+      reasoning: { type: "string" },
+      nodes: { type: "array", items: { type: "object" } },
+      edges: { type: "array", items: { type: "object" } },
+    },
+    required: ["summary", "nodes", "edges"],
+  },
+  dispatch_next_task_action: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      schemaName: { const: "task_dispatch_decision" },
+      schemaVersion: { const: "1.0.0" },
+      action: { type: "string" },
+      safety: { type: "object" },
+      confidence: { type: "number" },
+      reason: { type: "string" },
+    },
+    required: [
+      "schemaName",
+      "schemaVersion",
+      "action",
+      "safety",
+      "confidence",
+      "reason",
+    ],
+  },
+};
+
+const FEATURE_FUNCTION_TOOL: Partial<Record<BridgeFeature, string>> = {
+  suggest: "suggest_task_completions",
+  generate_plan: "generate_task_plan_graph",
+  dispatch_task: "dispatch_next_task_action",
+};
+
+const sessionPreviousResponseMap = new Map<string, string>();
+
 function parseLogLevel(value: string | undefined): LogLevel {
   if (
     value === "debug" ||
@@ -159,20 +176,10 @@ function routeLabel(route: RouteKind): string {
       : "execution.task";
 }
 
-function getSessionTranscriptPath(sessionId: string): string {
-  return `${process.env.HOME ?? ""}/.openclaw/agents/main/sessions/${sessionId}.jsonl`;
-}
-
 function isFeatureRequest(
   request: BridgeRequest,
 ): request is BridgeFeatureRequest<Record<string, unknown>> {
   return "input" in request;
-}
-
-function isExecutionRequest(
-  request: BridgeRequest,
-): request is BridgeExecutionTaskRequest {
-  return "instructions" in request;
 }
 
 function encodeSSE(event: string, data: unknown): Uint8Array {
@@ -197,18 +204,249 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function parseUsageFromLegacyBlob(blob: LegacyBlob | null): BridgeResponse["usage"] {
-  const usage = blob?.meta?.agentMeta?.usage;
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function safeParseJsonArguments(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "string") {
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  }
+  return parseJsonObject(value);
+}
+
+function extractOutputText(response: Record<string, unknown>): string {
+  const output = Array.isArray(response.output) ? response.output : [];
+  const chunks: string[] = [];
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+
+    if (record.type === "message") {
+      const content = Array.isArray(record.content) ? record.content : [];
+      for (const block of content) {
+        if (!block || typeof block !== "object") continue;
+        const part = block as Record<string, unknown>;
+        if (part.type === "output_text") {
+          if (typeof part.text === "string") chunks.push(part.text);
+          continue;
+        }
+        if (part.type === "text" && typeof part.text === "string") {
+          chunks.push(part.text);
+        }
+      }
+      continue;
+    }
+
+    if (record.type === "output_text" && typeof record.text === "string") {
+      chunks.push(record.text);
+    }
+  }
+
+  if (chunks.length > 0) return chunks.join("").trim();
+  if (typeof response.output_text === "string") return response.output_text.trim();
+  return "";
+}
+
+function parseFunctionItems(response: Record<string, unknown>): {
+  toolCalls: ToolCallInfo[];
+  toolCallOutputs: ToolCallOutputInfo[];
+} {
+  const output = Array.isArray(response.output) ? response.output : [];
+  const toolCalls: ToolCallInfo[] = [];
+  const toolCallOutputs: ToolCallOutputInfo[] = [];
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+
+    if (record.type === "function_call" && typeof record.name === "string") {
+      const callId =
+        typeof record.call_id === "string"
+          ? record.call_id
+          : typeof record.id === "string"
+            ? record.id
+            : `${record.name}-${toolCalls.length + 1}`;
+      const parsedArgs = safeParseJsonArguments(record.arguments) ?? {};
+      toolCalls.push({
+        tool: record.name,
+        callId,
+        input: parsedArgs,
+        status: "completed",
+      });
+      continue;
+    }
+
+    if (record.type === "function_call_output") {
+      const callId =
+        typeof record.call_id === "string"
+          ? record.call_id
+          : typeof record.id === "string"
+            ? record.id
+            : `tool-output-${toolCallOutputs.length + 1}`;
+      toolCallOutputs.push({ callId, output: record.output ?? null });
+    }
+  }
+
+  return { toolCalls, toolCallOutputs };
+}
+
+function mapUsage(response: Record<string, unknown>): BridgeResponse["usage"] {
+  const usage =
+    response.usage && typeof response.usage === "object" && !Array.isArray(response.usage)
+      ? (response.usage as Record<string, unknown>)
+      : null;
   if (!usage) return null;
-  const inputTokens = usage.inputTokens ?? usage.input_tokens;
-  const outputTokens = usage.outputTokens ?? usage.output_tokens;
-  if (typeof inputTokens === "number" || typeof outputTokens === "number") {
+
+  const inputTokens =
+    typeof usage.input_tokens === "number"
+      ? usage.input_tokens
+      : typeof usage.prompt_tokens === "number"
+        ? usage.prompt_tokens
+        : undefined;
+  const outputTokens =
+    typeof usage.output_tokens === "number"
+      ? usage.output_tokens
+      : typeof usage.completion_tokens === "number"
+        ? usage.completion_tokens
+        : undefined;
+  const totalTokens =
+    typeof usage.total_tokens === "number" ? usage.total_tokens : undefined;
+
+  if (
+    typeof inputTokens !== "number" &&
+    typeof outputTokens !== "number" &&
+    typeof totalTokens !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    inputTokens: typeof inputTokens === "number" ? inputTokens : 0,
+    outputTokens: typeof outputTokens === "number" ? outputTokens : 0,
+    totalTokens,
+  };
+}
+
+function buildStructuredResult(params: {
+  sessionId: string;
+  runId?: string;
+  toolCalls: ToolCallInfo[];
+  output: string;
+  error: string | null;
+  feature?: BridgeFeature | null;
+  featurePayload?: unknown;
+  featureToolName?: string | null;
+  featureSource?: StructuredAgentResult["source"];
+}): StructuredAgentResult {
+  if (params.featurePayload !== undefined) {
     return {
-      inputTokens: typeof inputTokens === "number" ? inputTokens : 0,
-      outputTokens: typeof outputTokens === "number" ? outputTokens : 0,
+      ok: true,
+      parsed: params.featurePayload,
+      source: params.featureSource ?? "business_tool",
+      feature: params.feature ?? null,
+      toolName: params.featureToolName ?? null,
+      rawOutput: params.output,
+      error: params.error,
+      validationIssues: [],
+      sessionId: params.sessionId,
+      runId: params.runId,
+      bridgeToolCalls: params.toolCalls.map((toolCall) => ({
+        tool: toolCall.tool,
+        callId: toolCall.callId,
+        input: toolCall.input,
+        result: toolCall.result,
+        status: toolCall.status,
+      })),
     };
   }
-  return null;
+
+  return {
+    ok: false,
+    parsed: null,
+    source: "fallback_text",
+    feature: params.feature ?? null,
+    toolName: params.featureToolName ?? null,
+    rawOutput: params.output,
+    error:
+      params.error ??
+      "No structured payload was extracted from OpenResponses function_call.arguments",
+    validationIssues: [],
+    sessionId: params.sessionId,
+    runId: params.runId,
+    bridgeToolCalls: params.toolCalls.map((toolCall) => ({
+      tool: toolCall.tool,
+      callId: toolCall.callId,
+      input: toolCall.input,
+      result: toolCall.result,
+      status: toolCall.status,
+    })),
+  };
+}
+
+function buildFeatureResultFromResponse(
+  feature: BridgeFeature,
+  outputText: string,
+  toolCalls: ToolCallInfo[],
+): { featureResult: BridgeFeatureResult | null; error: string | null } {
+  const requiredTool = FEATURE_FUNCTION_TOOL[feature];
+  if (requiredTool) {
+    const matching = [...toolCalls].reverse().find((call) => call.tool === requiredTool);
+    if (!matching) {
+      return {
+        featureResult: null,
+        error: `Feature '${feature}' requires function_call '${requiredTool}' in response.output`,
+      };
+    }
+    return {
+      featureResult: {
+        feature,
+        source: "business_tool",
+        toolName: requiredTool,
+        payload: matching.input,
+      },
+      error: null,
+    };
+  }
+
+  if (feature === "chat") {
+    return {
+      featureResult: {
+        feature,
+        source: "assistant_text",
+        payload: { content: outputText },
+      },
+      error: null,
+    };
+  }
+
+  const parsedJson = parseJsonObject(outputText);
+  if (!parsedJson) {
+    return {
+      featureResult: null,
+      error: `Feature '${feature}' did not yield structured output`,
+    };
+  }
+
+  return {
+    featureResult: {
+      feature,
+      source: "output_json",
+      payload: parsedJson,
+    },
+    error: null,
+  };
 }
 
 function summarizeInput(value: unknown): Record<string, unknown> {
@@ -246,572 +484,424 @@ export function summarizeBridgeRequest(
   };
 }
 
-export function buildAgentMessage(
-  route: RouteKind,
-  request: BridgeRequest,
-): string {
-  if (route.kind === "execution") {
-    const execution = request as BridgeExecutionTaskRequest;
-    const runtimeInput = execution.runtimeInput ?? {};
-    return [
-      "[Chrona Task Execution Request]",
-      execution.taskTitle ? `Task: ${execution.taskTitle}` : null,
-      execution.taskId ? `Task ID: ${execution.taskId}` : null,
-      execution.workspaceId ? `Workspace ID: ${execution.workspaceId}` : null,
-      execution.runtimeAdapterKey
-        ? `Runtime adapter: ${execution.runtimeAdapterKey}`
-        : null,
-      typeof runtimeInput.model === "string" && runtimeInput.model.trim()
-        ? `Model: ${runtimeInput.model.trim()}`
-        : null,
-      typeof runtimeInput.approvalPolicy === "string" &&
-      runtimeInput.approvalPolicy.trim()
-        ? `Approval policy: ${runtimeInput.approvalPolicy.trim()}`
-        : null,
-      typeof runtimeInput.toolMode === "string" && runtimeInput.toolMode.trim()
-        ? `Tool mode: ${runtimeInput.toolMode.trim()}`
-        : null,
-      typeof runtimeInput.temperature === "number"
-        ? `Temperature: ${runtimeInput.temperature}`
-        : null,
-      "",
-      "[Task Instructions]",
-      execution.instructions,
-    ]
-      .filter((line): line is string => line !== null)
-      .join("\n");
+function featureInstructions(feature: BridgeFeature): string {
+  switch (feature) {
+    case "suggest":
+      return "Return suggestions only via function call suggest_task_completions.";
+    case "generate_plan":
+      return "Return plan graph only via function call generate_task_plan_graph.";
+    case "dispatch_task":
+      return "Return dispatch decision only via function call dispatch_next_task_action.";
+    case "conflicts":
+      return "Analyze conflicts and return structured JSON.";
+    case "timeslots":
+      return "Suggest timeslots and return structured JSON.";
+    case "chat":
+      return "Answer user request normally.";
   }
-
-  const feature = route.feature;
-  const input = (request as BridgeFeatureRequest<Record<string, unknown>>).input;
-  return [
-    `[Chrona Feature Request]`,
-    `Feature: ${feature}`,
-    `Protocol: Respond using the '${FEATURE_TOOL_PREFERENCE[feature] ?? "feature-specific structured payload"}' semantic contract for this endpoint.`,
-    "",
-    "[Structured Input JSON]",
-    JSON.stringify(input, null, 2),
-  ].join("\n");
 }
 
-export function buildAgentCLIArgs(
+export function buildGatewayBody(
   route: RouteKind,
   request: BridgeRequest,
   sessionId: string,
-) {
-  const agentMessage = buildAgentMessage(route, request);
-  return [
-    "agent",
-    "--local",
-    "--json",
-    "--session-id",
-    sessionId,
-    "--message",
-    agentMessage,
-    "--timeout",
-    String(request.timeout ?? 300),
-  ];
-}
+): Record<string, unknown> {
+  const previousResponseId = sessionPreviousResponseMap.get(sessionId);
 
-export function createBridgeLogger(options?: {
-  minLevel?: LogLevel;
-  sink?: (entry: BridgeLogEntry) => void;
-}) {
-  const minLevel =
-    options?.minLevel ?? parseLogLevel(process.env.OPENCLAW_BRIDGE_LOG_LEVEL);
-  const sink =
-    options?.sink ??
-    ((entry: BridgeLogEntry) => console.log(JSON.stringify(entry)));
+  if (route.kind === "feature") {
+    const featureRequest = request as BridgeFeatureRequest<Record<string, unknown>>;
+    const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
 
-  const shouldLog = (level: LogLevel) =>
-    LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER[minLevel];
+    const body: Record<string, unknown> = {
+      user: sessionId,
+      instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions(route.feature)}`,
+      input: JSON.stringify(featureRequest.input),
+      stream: route.stream,
+    };
 
-  const emit = (
-    level: LogLevel,
-    event: string,
-    data?: Record<string, unknown>,
-  ) => {
-    if (!shouldLog(level)) return;
-    sink({
-      ts: new Date().toISOString(),
-      level,
-      event,
-      data,
-    });
-  };
-
-  return {
-    debug: (event: string, data?: Record<string, unknown>) =>
-      emit("debug", event, data),
-    info: (event: string, data?: Record<string, unknown>) =>
-      emit("info", event, data),
-    warn: (event: string, data?: Record<string, unknown>) =>
-      emit("warn", event, data),
-    error: (event: string, data?: Record<string, unknown>) =>
-      emit("error", event, data),
-  };
-}
-
-export type {
-  BridgeExecutionTaskRequest,
-  BridgeFeature,
-  BridgeFeatureRequest,
-  BridgeFeatureResult,
-  BridgeRequest,
-  BridgeResponse,
-  NDJSONEvent,
-  ToolCallInfo,
-} from "../../openclaw-integration/src/transport/bridge-types";
-
-export function parseToolCallsFromSessionTranscript(
-  transcriptText: string,
-): ToolCallInfo[] {
-  const toolCalls = new Map<string, ToolCallInfo>();
-  const lines = transcriptText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (const line of lines) {
-    if (!line.startsWith("{")) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      continue;
+    if (previousResponseId) {
+      body.previous_response_id = previousResponseId;
     }
 
-    if (!parsed || typeof parsed !== "object") continue;
-    const record = parsed as Record<string, unknown>;
-    if (record.type !== "message") continue;
-    const message = record.message as Record<string, unknown> | undefined;
-    if (!message) continue;
-
-    const role = message.role;
-    if (role === "assistant") {
-      const content = Array.isArray(message.content) ? message.content : [];
-      for (const item of content) {
-        if (!item || typeof item !== "object") continue;
-        const part = item as Record<string, unknown>;
-        if (part.type !== "toolCall") continue;
-        const name = part.name;
-        if (typeof name !== "string") continue;
-        const callId =
-          typeof part.id === "string"
-            ? part.id
-            : `session-${toolCalls.size + 1}`;
-        const argumentsValue = part.arguments;
-        if (!argumentsValue || typeof argumentsValue !== "object") continue;
-        toolCalls.set(callId, {
-          tool: name,
-          callId,
-          input: argumentsValue as Record<string, unknown>,
-          status: "pending",
-        });
-      }
-      continue;
+    if (requiredTool) {
+      body.tools = [
+        {
+          type: "function",
+          function: {
+            name: requiredTool,
+            description: `Chrona structured feature tool: ${requiredTool}`,
+            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          },
+        },
+      ];
+      body.tool_choice = {
+        type: "function",
+        function: { name: requiredTool },
+      };
     }
 
-    if (role === "toolResult") {
-      const toolName = message.toolName;
-      const toolCallId = message.toolCallId;
-      if (typeof toolName !== "string" || typeof toolCallId !== "string") {
-        continue;
-      }
-      const details = message.details;
-      const existing = toolCalls.get(toolCallId);
-      if (existing) {
-        existing.status = "completed";
-        if (details && typeof details === "object") {
-          existing.input = details as Record<string, unknown>;
-        }
-        continue;
-      }
+    return body;
+  }
 
-      if (details && typeof details === "object") {
-        toolCalls.set(toolCallId, {
-          tool: toolName,
-          callId: toolCallId,
-          input: details as Record<string, unknown>,
-          status: "completed",
-        });
-      }
+  const execution = request as BridgeExecutionTaskRequest;
+  const body: Record<string, unknown> = {
+    user: sessionId,
+    instructions: execution.instructions,
+    input: JSON.stringify({
+      taskId: execution.taskId,
+      workspaceId: execution.workspaceId,
+      taskTitle: execution.taskTitle,
+      runtimeAdapterKey: execution.runtimeAdapterKey,
+      runtimeInput: execution.runtimeInput ?? {},
+    }),
+    stream: route.stream,
+  };
+
+  if (previousResponseId) {
+    body.previous_response_id = previousResponseId;
+  }
+
+  return body;
+}
+
+function gatewayHeaders() {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-openclaw-agent-id": OPENCLAW_AGENT_ID,
+  };
+  if (OPENCLAW_GATEWAY_TOKEN) {
+    headers.Authorization = `Bearer ${OPENCLAW_GATEWAY_TOKEN}`;
+  }
+  return headers;
+}
+
+function mapGatewaySseEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  sessionId: string,
+): NDJSONEvent | null {
+  const responseRecord =
+    data.response && typeof data.response === "object" && !Array.isArray(data.response)
+      ? (data.response as Record<string, unknown>)
+      : null;
+
+  if (eventType === "response.created" || eventType === "response.in_progress") {
+    return {
+      type: "status",
+      sessionId,
+      responseId:
+        responseRecord && typeof responseRecord.id === "string"
+          ? responseRecord.id
+          : undefined,
+      status:
+        responseRecord && typeof responseRecord.status === "string"
+          ? responseRecord.status
+          : eventType,
+      message: eventType,
+    };
+  }
+
+  if (eventType === "response.output_text.delta") {
+    return {
+      type: "text_delta",
+      sessionId,
+      text:
+        typeof data.delta === "string"
+          ? data.delta
+          : typeof data.text === "string"
+            ? data.text
+            : "",
+    };
+  }
+
+  if (eventType === "response.output_item.added" || eventType === "response.output_item.done") {
+    const item =
+      data.item && typeof data.item === "object" && !Array.isArray(data.item)
+        ? (data.item as Record<string, unknown>)
+        : null;
+    if (!item) return null;
+
+    if (item.type === "function_call" && typeof item.name === "string") {
+      return {
+        type: "tool_call",
+        sessionId,
+        tool: item.name,
+        callId:
+          typeof item.call_id === "string"
+            ? item.call_id
+            : typeof item.id === "string"
+              ? item.id
+              : undefined,
+        input: safeParseJsonArguments(item.arguments) ?? {},
+      };
+    }
+
+    if (item.type === "function_call_output") {
+      return {
+        type: "tool_result",
+        sessionId,
+        callId:
+          typeof item.call_id === "string"
+            ? item.call_id
+            : typeof item.id === "string"
+              ? item.id
+              : undefined,
+        output: item.output ?? null,
+      };
     }
   }
 
-  return Array.from(toolCalls.values());
-}
+  if (eventType === "response.completed") {
+    return {
+      type: "completed",
+      sessionId,
+      responseId:
+        responseRecord && typeof responseRecord.id === "string"
+          ? responseRecord.id
+          : undefined,
+      status:
+        responseRecord && typeof responseRecord.status === "string"
+          ? responseRecord.status
+          : "completed",
+      usage: mapUsage(responseRecord ?? {}) ?? undefined,
+    };
+  }
 
-function extractFinalBlob(text: string): LegacyBlob | null {
-  let braceCount = 0;
-  let end = -1;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = text.length - 1; i >= 0; i--) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === "\\") {
-        escaped = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = true;
-      escaped = false;
-      continue;
-    }
-
-    if (ch === "}") {
-      if (braceCount === 0) end = i + 1;
-      braceCount += 1;
-      continue;
-    }
-
-    if (ch === "{") {
-      braceCount -= 1;
-      if (braceCount === 0 && end > i) {
-        try {
-          return JSON.parse(text.slice(i, end)) as LegacyBlob;
-        } catch {
-          return null;
-        }
-      }
-    }
+  if (eventType === "response.failed") {
+    const error =
+      typeof data.error === "string"
+        ? data.error
+        : data.error && typeof data.error === "object"
+          ? JSON.stringify(data.error)
+          : "response.failed";
+    return {
+      type: "failed",
+      sessionId,
+      error,
+      message: error,
+    };
   }
 
   return null;
 }
 
-function extractLegacyToolCallsFromBlob(blob: LegacyBlob | null): {
-  toolCalls: ToolCallInfo[];
-  extractionError: string | null;
-} {
-  if (!blob) {
-    return { toolCalls: [], extractionError: null };
+async function executeGatewayRequest(
+  route: RouteKind,
+  request: BridgeRequest,
+  logger: BridgeLogger,
+): Promise<ExecutionResult> {
+  const sessionId = request.sessionId ?? crypto.randomUUID();
+  const startedAt = Date.now();
+  const body = buildGatewayBody(route, request, sessionId);
+
+  logger.info("bridge.request.start", {
+    sessionId,
+    gateway: OPENCLAW_GATEWAY_URL,
+    request: summarizeBridgeRequest(route, request),
+  });
+
+  const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
+  const response = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/responses`, {
+    method: "POST",
+    headers: gatewayHeaders(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
+    const bridgeResponse: BridgeResponse = {
+      sessionId,
+      output: "",
+      toolCalls: [],
+      toolCallOutputs: [],
+      usage: null,
+      error: `Gateway /v1/responses failed (${response.status}): ${errBody.slice(0, 300)}`,
+      durationMs: Date.now() - startedAt,
+      structured: buildStructuredResult({
+        sessionId,
+        output: "",
+        toolCalls: [],
+        error: `Gateway /v1/responses failed (${response.status})`,
+        feature: route.kind === "feature" ? route.feature : null,
+      }),
+      feature: null,
+    };
+    return { response: bridgeResponse, events: [] };
   }
 
-  const candidates: unknown[] = [];
-  const pushIfPresent = (value: unknown) => {
-    if (value != null) candidates.push(value);
-  };
+  if (!route.stream) {
+    const gateway = (await response.json()) as Record<string, unknown>;
+    const responseId = typeof gateway.id === "string" ? gateway.id : undefined;
+    if (responseId) sessionPreviousResponseMap.set(sessionId, responseId);
 
-  pushIfPresent(blob.meta?.toolCalls);
-  pushIfPresent(blob.meta?.tool_calls);
-  pushIfPresent(blob.meta?.calls);
-  pushIfPresent(blob.meta?.events);
-  pushIfPresent(blob.meta?.trace);
-  pushIfPresent(blob.meta?.agentMeta?.toolCalls);
-  pushIfPresent(blob.meta?.agentMeta?.tool_calls);
-  pushIfPresent(blob.meta?.agentMeta?.calls);
-  pushIfPresent(blob.meta?.agentMeta?.events);
-  pushIfPresent(blob.meta?.agentMeta?.trace);
+    const { toolCalls, toolCallOutputs } = parseFunctionItems(gateway);
+    const outputText = extractOutputText(gateway);
 
-  const toolCalls: ToolCallInfo[] = [];
+    let feature: BridgeFeatureResult | null = null;
+    let semanticError: string | null = null;
 
-  const visit = (value: unknown) => {
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    if (!value || typeof value !== "object") return;
-
-    const record = value as Record<string, unknown>;
-    const tool =
-      typeof record.tool === "string"
-        ? record.tool
-        : typeof record.name === "string"
-          ? record.name
-          : typeof record.toolName === "string"
-            ? record.toolName
-            : null;
-    const input = record.input ?? record.args ?? record.arguments ?? record.details;
-    if (tool && input && typeof input === "object") {
-      toolCalls.push({
-        tool,
-        callId:
-          typeof record.callId === "string"
-            ? record.callId
-            : typeof record.id === "string"
-              ? record.id
-              : `legacy-${toolCalls.length + 1}`,
-        input: input as Record<string, unknown>,
-        result: typeof record.result === "string" ? record.result : undefined,
-        status: "completed",
-      });
+    if (route.kind === "feature") {
+      const built = buildFeatureResultFromResponse(route.feature, outputText, toolCalls);
+      feature = built.featureResult;
+      semanticError = built.error;
     }
 
-    for (const nested of Object.values(record)) {
-      visit(nested);
-    }
-  };
+    const bridgeResponse: BridgeResponse = {
+      sessionId,
+      responseId,
+      responseStatus: typeof gateway.status === "string" ? gateway.status : undefined,
+      runId: responseId,
+      output: outputText,
+      toolCalls,
+      toolCallOutputs,
+      usage: mapUsage(gateway),
+      error:
+        semanticError ??
+        (gateway.error ? JSON.stringify(gateway.error) : null),
+      durationMs: Date.now() - startedAt,
+      structured: buildStructuredResult({
+        sessionId,
+        runId: responseId,
+        output: outputText,
+        toolCalls,
+        error:
+          semanticError ??
+          (gateway.error ? JSON.stringify(gateway.error) : null),
+        feature: route.kind === "feature" ? route.feature : null,
+        featurePayload: feature?.payload,
+        featureToolName: feature?.toolName ?? null,
+        featureSource: feature?.source,
+      }),
+      feature,
+    };
 
-  for (const candidate of candidates) {
-    visit(candidate);
+    return { response: bridgeResponse, events: [] };
   }
 
-  if (toolCalls.length > 0) {
-    return { toolCalls, extractionError: null };
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Gateway stream response missing body");
   }
 
-  return {
-    toolCalls: [],
-    extractionError: "Legacy blob detected but did not contain tool metadata",
-  };
-}
-
-function extractOutputFromLegacyBlob(blob: LegacyBlob | null): string {
-  if (!blob?.payloads?.length) return "";
-  return blob.payloads
-    .map((payload) => (typeof payload?.text === "string" ? payload.text : ""))
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-}
-
-function parseAssistantText(events: NDJSONEvent[]): string {
-  return events
-    .filter((event) => event.type === "text" && typeof event.text === "string")
-    .map((event) => event.text as string)
-    .join("")
-    .trim();
-}
-
-export function parseNDJSONEvents(lines: string[]): NDJSONEvent[] {
+  const decoder = new TextDecoder();
   const events: NDJSONEvent[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) continue;
-    try {
-      const obj = JSON.parse(trimmed) as NDJSONEvent;
-      if (obj.type) events.push(obj);
-    } catch {
-      // ignore malformed stderr lines
-    }
-  }
-  return events;
-}
+  let buffer = "";
+  let currentEventType = "";
+  let finalGatewayResponse: Record<string, unknown> | null = null;
 
-function dedupeToolCalls(toolCalls: ToolCallInfo[]): ToolCallInfo[] {
-  const byId = new Map<string, ToolCallInfo>();
-  for (const toolCall of toolCalls) {
-    const existing = byId.get(toolCall.callId);
-    if (!existing) {
-      byId.set(toolCall.callId, toolCall);
-      continue;
-    }
-    byId.set(toolCall.callId, {
-      ...existing,
-      ...toolCall,
-      input:
-        Object.keys(toolCall.input ?? {}).length > 0
-          ? toolCall.input
-          : existing.input,
-      result: toolCall.result ?? existing.result,
-      status:
-        toolCall.status === "completed" || existing.status !== "completed"
-          ? toolCall.status
-          : existing.status,
-    });
-  }
-  return Array.from(byId.values());
-}
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-function toolCallsFromEvents(events: NDJSONEvent[]): ToolCallInfo[] {
-  const pending = new Map<string, ToolCallInfo>();
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
 
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
-    if (event.type === "tool_use" && typeof event.tool === "string") {
-      const callId = event.callId ?? `event-${index + 1}`;
-      pending.set(callId, {
-        tool: event.tool,
-        callId,
-        input: event.input ?? {},
-        status: "pending",
-      });
-      continue;
-    }
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith("event:")) {
+        currentEventType = trimmed.slice(6).trim();
+        continue;
+      }
+      if (!trimmed.startsWith("data:")) continue;
 
-    if (event.type === "tool_result" && typeof event.tool === "string") {
-      const callId = event.callId ?? `event-${index + 1}`;
-      const existing = pending.get(callId);
-      pending.set(callId, {
-        tool: existing?.tool ?? event.tool,
-        callId,
-        input: existing?.input ?? {},
-        result:
-          typeof event.result === "string"
-            ? event.result
-            : typeof event.text === "string"
-              ? event.text
-              : undefined,
-        status: "completed",
-      });
+      const dataRaw = trimmed.slice(5).trim();
+      if (dataRaw === "[DONE]") continue;
+
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(dataRaw) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
+      if (currentEventType === "response.completed") {
+        const responseObj =
+          data.response && typeof data.response === "object" && !Array.isArray(data.response)
+            ? (data.response as Record<string, unknown>)
+            : null;
+        if (responseObj) {
+          finalGatewayResponse = responseObj;
+        }
+      }
+
+      if (currentEventType === "response.failed") {
+        const responseObj =
+          data.response && typeof data.response === "object" && !Array.isArray(data.response)
+            ? (data.response as Record<string, unknown>)
+            : null;
+        if (responseObj) {
+          finalGatewayResponse = responseObj;
+        }
+      }
+
+      const mapped = mapGatewaySseEvent(currentEventType, data, sessionId);
+      if (mapped) {
+        events.push(mapped);
+      }
+      currentEventType = "";
     }
   }
 
-  return Array.from(pending.values());
-}
-
-function parseJsonObject(text: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-export function buildStructuredResult(params: {
-  sessionId: string;
-  runId?: string;
-  toolCalls: ToolCallInfo[];
-  output: string;
-  error: string | null;
-  legacyToolCalls?: ToolCallInfo[];
-  legacyExtractionError?: string | null;
-  feature?: BridgeFeature | null;
-  featurePayload?: unknown;
-  featureToolName?: string | null;
-  featureSource?: StructuredAgentResult["source"];
-}): StructuredAgentResult {
-  const effectiveToolCalls = dedupeToolCalls([
-    ...params.toolCalls,
-    ...(params.legacyToolCalls ?? []),
-  ]);
-
-  if (params.featurePayload !== undefined) {
-    return {
-      ok: true,
-      parsed: params.featurePayload,
-      source: params.featureSource ?? "business_tool",
-      feature: params.feature ?? null,
-      toolName: params.featureToolName ?? null,
-      rawOutput: params.output,
-      error: params.error,
-      validationIssues: [],
-      sessionId: params.sessionId,
-      runId: params.runId,
-      bridgeToolCalls: effectiveToolCalls.map((toolCall) => ({
-        tool: toolCall.tool,
-        callId: toolCall.callId,
-        input: toolCall.input,
-        result: toolCall.result,
-        status: toolCall.status,
-      })),
-    };
+  if (!finalGatewayResponse) {
+    finalGatewayResponse = {};
   }
 
-  return {
-    ok: false,
-    parsed: null,
-    source: "fallback_text",
-    feature: params.feature ?? null,
-    toolName: params.featureToolName ?? null,
-    rawOutput: params.output,
+  const responseId =
+    typeof finalGatewayResponse.id === "string" ? finalGatewayResponse.id : undefined;
+  if (responseId) sessionPreviousResponseMap.set(sessionId, responseId);
+
+  const { toolCalls, toolCallOutputs } = parseFunctionItems(finalGatewayResponse);
+  const outputText = extractOutputText(finalGatewayResponse);
+
+  let feature: BridgeFeatureResult | null = null;
+  let semanticError: string | null = null;
+
+  if (route.kind === "feature") {
+    const built = buildFeatureResultFromResponse(route.feature, outputText, toolCalls);
+    feature = built.featureResult;
+    semanticError = built.error;
+  }
+
+  const bridgeResponse: BridgeResponse = {
+    sessionId,
+    responseId,
+    responseStatus:
+      typeof finalGatewayResponse.status === "string"
+        ? finalGatewayResponse.status
+        : undefined,
+    runId: responseId,
+    output: outputText,
+    toolCalls,
+    toolCallOutputs,
+    usage: mapUsage(finalGatewayResponse),
     error:
-      params.legacyExtractionError ??
-      params.error ??
-      "No feature-specific payload was extracted; raw assistant text fallback is unreliable.",
-    validationIssues: [],
-    sessionId: params.sessionId,
-    runId: params.runId,
-    bridgeToolCalls: effectiveToolCalls.map((toolCall) => ({
-      tool: toolCall.tool,
-      callId: toolCall.callId,
-      input: toolCall.input,
-      result: toolCall.result,
-      status: toolCall.status,
-    })),
-  };
-}
-
-function findFeaturePayloadFromToolCalls(
-  feature: BridgeFeature,
-  toolCalls: ToolCallInfo[],
-): BridgeFeatureResult | null {
-  const preferredTool = FEATURE_TOOL_PREFERENCE[feature];
-  if (!preferredTool) return null;
-  const matched = [...toolCalls]
-    .reverse()
-    .find((toolCall) => toolCall.tool === preferredTool && toolCall.input);
-  if (!matched) return null;
-  return {
+      semanticError ??
+      (finalGatewayResponse.error
+        ? JSON.stringify(finalGatewayResponse.error)
+        : events.some((event) => event.type === "failed")
+          ? "response.failed"
+          : null),
+    durationMs: Date.now() - startedAt,
+    structured: buildStructuredResult({
+      sessionId,
+      runId: responseId,
+      output: outputText,
+      toolCalls,
+      error:
+        semanticError ??
+        (finalGatewayResponse.error ? JSON.stringify(finalGatewayResponse.error) : null),
+      feature: route.kind === "feature" ? route.feature : null,
+      featurePayload: feature?.payload,
+      featureToolName: feature?.toolName ?? null,
+      featureSource: feature?.source,
+    }),
     feature,
-    source: "business_tool",
-    toolName: preferredTool,
-    payload: matched.input,
   };
-}
 
-function findFeaturePayloadFromOutput(
-  feature: BridgeFeature,
-  output: string,
-): BridgeFeatureResult | null {
-  const parsed = parseJsonObject(output);
-  if (!parsed) {
-    if (feature === "chat" && output.trim()) {
-      return {
-        feature,
-        source: "assistant_text",
-        payload: { content: output.trim() },
-      };
-    }
-    return null;
-  }
-
-  return {
-    feature,
-    source: "output_json",
-    payload: parsed,
-  };
-}
-
-function buildFeatureResult(
-  feature: BridgeFeature,
-  toolCalls: ToolCallInfo[],
-  output: string,
-): BridgeFeatureResult | null {
-  return (
-    findFeaturePayloadFromToolCalls(feature, toolCalls) ??
-    findFeaturePayloadFromOutput(feature, output)
-  );
-}
-
-function validateFeatureSuccess(
-  feature: BridgeFeature,
-  toolCalls: ToolCallInfo[],
-  output: string,
-): { featureResult: BridgeFeatureResult | null; error: string | null } {
-  const featureResult = buildFeatureResult(feature, toolCalls, output);
-  const preferredTool = FEATURE_TOOL_PREFERENCE[feature];
-
-  if (preferredTool) {
-    if (!featureResult || featureResult.source !== "business_tool") {
-      return {
-        featureResult,
-        error: `Feature '${feature}' requires business tool '${preferredTool}' but no matching payload was extracted`,
-      };
-    }
-    return { featureResult, error: null };
-  }
-
-  if (!featureResult) {
-    return {
-      featureResult: null,
-      error: `Feature '${feature}' did not yield any structured payload or assistant output`,
-    };
-  }
-
-  return { featureResult, error: null };
+  return { response: bridgeResponse, events };
 }
 
 function normalizeFeatureRequest(
@@ -875,141 +965,16 @@ function normalizeExecutionRequest(
   };
 }
 
-export async function checkCLIAvailable(): Promise<boolean> {
+export async function checkGatewayAvailable(): Promise<boolean> {
   try {
-    const proc = spawn(OPENCLAW_BIN, ["--version"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 5000,
+    const res = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/health`, {
+      headers: gatewayHeaders(),
+      signal: AbortSignal.timeout(3000),
     });
-    return new Promise((resolve) => {
-      proc.on("close", (code) => resolve(code === 0));
-      proc.on("error", () => resolve(false));
-    });
+    return res.ok;
   } catch {
     return false;
   }
-}
-
-async function executeRouteRequest(
-  route: RouteKind,
-  request: BridgeRequest,
-  logger: BridgeLogger,
-): Promise<ExecutionResult> {
-  const sessionId = request.sessionId ?? crypto.randomUUID();
-  const startedAt = Date.now();
-  const args = buildAgentCLIArgs(route, request, sessionId);
-
-  logger.info("bridge.request.start", {
-    sessionId,
-    request: summarizeBridgeRequest(route, request),
-  });
-
-  const proc = spawn(OPENCLAW_BIN, args, {
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: (request.timeout ?? 300) * 1000,
-  });
-
-  let stdout = "";
-  let stderr = "";
-
-  proc.stdout.on("data", (chunk) => {
-    stdout += chunk.toString();
-  });
-  proc.stderr.on("data", (chunk) => {
-    stderr += chunk.toString();
-  });
-
-  const closeResult = await new Promise<{
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  }>((resolve, reject) => {
-    proc.on("error", reject);
-    proc.on("close", (code, signal) => resolve({ code, signal }));
-  });
-
-  const stderrLines = stderr.split(/\r?\n/).filter(Boolean);
-  const events = parseNDJSONEvents(stderrLines);
-  const transcriptPath = getSessionTranscriptPath(sessionId);
-
-  let transcriptToolCalls: ToolCallInfo[] = [];
-  let transcriptError: string | null = null;
-  try {
-    const transcriptFile = Bun.file(transcriptPath);
-    if (await transcriptFile.exists()) {
-      transcriptToolCalls = parseToolCallsFromSessionTranscript(
-        await transcriptFile.text(),
-      );
-    }
-  } catch (error) {
-    transcriptError = toErrorMessage(error);
-  }
-
-  const legacyBlob = extractFinalBlob(stderr);
-  const legacyOutput = extractOutputFromLegacyBlob(legacyBlob);
-  const legacyTools = extractLegacyToolCallsFromBlob(legacyBlob);
-  const eventTools = toolCallsFromEvents(events);
-  const toolCalls = dedupeToolCalls([
-    ...eventTools,
-    ...transcriptToolCalls,
-    ...legacyTools.toolCalls,
-  ]);
-
-  const output =
-    stdout.trim() || legacyOutput || parseAssistantText(events) || "";
-
-  const cliError =
-    closeResult.code === 0 && !closeResult.signal
-      ? null
-      : `openclaw exited with code ${closeResult.code ?? "null"}${closeResult.signal ? ` signal ${closeResult.signal}` : ""}`;
-
-  let feature: BridgeFeatureResult | null = null;
-  let semanticError: string | null = null;
-
-  if (route.kind === "feature") {
-    const validated = validateFeatureSuccess(route.feature, toolCalls, output);
-    feature = validated.featureResult;
-    semanticError = validated.error;
-  }
-
-  const structured = buildStructuredResult({
-    sessionId,
-    toolCalls,
-    legacyToolCalls: legacyTools.toolCalls,
-    legacyExtractionError:
-      transcriptError ?? legacyTools.extractionError ?? null,
-    output,
-    error: cliError ?? semanticError,
-    feature: route.kind === "feature" ? route.feature : null,
-    featurePayload: feature?.payload,
-    featureToolName: feature?.toolName ?? null,
-    featureSource: feature?.source ?? undefined,
-  });
-
-  const response: BridgeResponse = {
-    sessionId,
-    output,
-    toolCalls,
-    usage: parseUsageFromLegacyBlob(legacyBlob),
-    error: cliError ?? semanticError,
-    durationMs:
-      typeof legacyBlob?.meta?.durationMs === "number"
-        ? legacyBlob.meta.durationMs
-        : Date.now() - startedAt,
-    structured,
-    feature,
-  };
-
-  logger.info("bridge.request.finish", {
-    sessionId,
-    route: routeLabel(route),
-    durationMs: response.durationMs,
-    eventCount: events.length,
-    toolCallCount: toolCalls.length,
-    outputChars: response.output.length,
-    error: response.error,
-  });
-
-  return { response, events };
 }
 
 function statusForResponse(route: RouteKind, response: BridgeResponse): number {
@@ -1023,7 +988,9 @@ function statusForResponse(route: RouteKind, response: BridgeResponse): number {
 }
 
 function matchRoute(pathname: string): RouteKind | null {
-  const featureRoute = FEATURE_ENDPOINTS.find((endpoint) => endpoint.pathname === pathname);
+  const featureRoute = FEATURE_ENDPOINTS.find(
+    (endpoint) => endpoint.pathname === pathname,
+  );
   if (featureRoute) {
     return {
       kind: "feature",
@@ -1040,15 +1007,67 @@ function matchRoute(pathname: string): RouteKind | null {
   return null;
 }
 
+export function createBridgeLogger(options?: {
+  minLevel?: LogLevel;
+  sink?: (entry: BridgeLogEntry) => void;
+}) {
+  const minLevel =
+    options?.minLevel ?? parseLogLevel(process.env.OPENCLAW_BRIDGE_LOG_LEVEL);
+  const sink =
+    options?.sink ??
+    ((entry: BridgeLogEntry) => console.log(JSON.stringify(entry)));
+
+  const shouldLog = (level: LogLevel) =>
+    LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER[minLevel];
+
+  const emit = (
+    level: LogLevel,
+    event: string,
+    data?: Record<string, unknown>,
+  ) => {
+    if (!shouldLog(level)) return;
+    sink({
+      ts: new Date().toISOString(),
+      level,
+      event,
+      data,
+    });
+  };
+
+  return {
+    debug: (event: string, data?: Record<string, unknown>) =>
+      emit("debug", event, data),
+    info: (event: string, data?: Record<string, unknown>) =>
+      emit("info", event, data),
+    warn: (event: string, data?: Record<string, unknown>) =>
+      emit("warn", event, data),
+    error: (event: string, data?: Record<string, unknown>) =>
+      emit("error", event, data),
+  };
+}
+
+export type {
+  BridgeExecutionTaskRequest,
+  BridgeFeature,
+  BridgeFeatureRequest,
+  BridgeFeatureResult,
+  BridgeRequest,
+  BridgeResponse,
+  NDJSONEvent,
+  ToolCallInfo,
+  ToolCallOutputInfo,
+} from "../../openclaw-integration/src/transport/bridge-types";
+
 export function startBridgeServer(options: StartBridgeServerOptions = {}) {
   const port = options.port ?? DEFAULT_BRIDGE_PORT;
   const hostname = options.hostname ?? "0.0.0.0";
   const logger = options.logger ?? createBridgeLogger();
-  const cliAvailability = options.checkCLIAvailable ?? checkCLIAvailable;
+  const gatewayAvailability =
+    options.checkGatewayAvailable ?? checkGatewayAvailable;
   const executeRequest =
     options.executeRequest ??
     ((route: RouteKind, request: BridgeRequest) =>
-      executeRouteRequest(route, request, logger));
+      executeGatewayRequest(route, request, logger));
 
   const server = Bun.serve({
     port,
@@ -1068,8 +1087,11 @@ export function startBridgeServer(options: StartBridgeServerOptions = {}) {
       }
 
       if (req.method === "GET" && url.pathname === "/v1/health") {
-        const available = await cliAvailability();
-        return json({ status: available ? "ok" : "unavailable", bin: OPENCLAW_BIN });
+        const available = await gatewayAvailability();
+        return json({
+          status: available ? "ok" : "unavailable",
+          gateway: OPENCLAW_GATEWAY_URL,
+        });
       }
 
       const route = matchRoute(url.pathname);
@@ -1167,7 +1189,8 @@ export function startBridgeServer(options: StartBridgeServerOptions = {}) {
     port,
     hostname,
     pid: process.pid,
-    bin: OPENCLAW_BIN,
+    gateway: OPENCLAW_GATEWAY_URL,
+    agentId: OPENCLAW_AGENT_ID,
   });
 
   return server;

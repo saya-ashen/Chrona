@@ -48,7 +48,7 @@ function toBridgeFeature(feature: AiFeature): BridgeFeature {
     case "chat":
       return "chat";
     case "dispatch_task":
-      return "chat";
+      return "dispatch_task";
   }
 }
 

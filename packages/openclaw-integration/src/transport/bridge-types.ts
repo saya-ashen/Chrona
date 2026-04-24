@@ -39,6 +39,11 @@ export interface ToolCallInfo {
   status: "pending" | "completed" | "error";
 }
 
+export interface ToolCallOutputInfo {
+  callId: string;
+  output: unknown;
+}
+
 export interface BridgeFeatureResult {
   feature: BridgeFeature;
   source: "business_tool" | "output_json" | "assistant_text";
@@ -48,12 +53,16 @@ export interface BridgeFeatureResult {
 
 export interface BridgeResponse {
   sessionId: string;
+  responseId?: string;
+  responseStatus?: string;
   runId?: string;
   output: string;
   toolCalls: ToolCallInfo[];
+  toolCallOutputs?: ToolCallOutputInfo[];
   usage: {
     inputTokens: number;
     outputTokens: number;
+    totalTokens?: number;
   } | null;
   error: string | null;
   durationMs: number;
@@ -62,15 +71,26 @@ export interface BridgeResponse {
 }
 
 export interface NDJSONEvent {
-  type: string;
+  type:
+    | "status"
+    | "text_delta"
+    | "tool_call"
+    | "tool_result"
+    | "completed"
+    | "failed";
   sessionId?: string;
   text?: string;
   tool?: string;
   callId?: string;
   input?: Record<string, unknown>;
-  error?: { name?: string; data?: { message?: string } } | string;
-  phase?: string;
+  output?: unknown;
   message?: string;
-  result?: string;
-  usage?: Record<string, number>;
+  error?: string;
+  responseId?: string;
+  status?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
 }
