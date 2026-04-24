@@ -62,8 +62,21 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
     try {
       payload = await c.req.json();
     } catch {
+      logger.warn("bridge.http.invalid_json", {
+        method: c.req.method,
+        path: new URL(c.req.url).pathname,
+      });
       return c.json({ error: "Invalid JSON body" }, 400);
     }
+
+    logger.info("bridge.http.request.received", {
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      route: route.kind === "feature" ? `${route.kind}:${route.feature}:${route.stream ? "stream" : "once"}` : `${route.kind}:${route.stream ? "stream" : "once"}`,
+      payload: payload && typeof payload === "object" && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : { kind: typeof payload },
+    });
 
     const normalized =
       route.kind === "feature"
