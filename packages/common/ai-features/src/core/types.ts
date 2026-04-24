@@ -118,6 +118,7 @@ export interface GenerateTaskPlanRequest {
   title: string;
   description?: string;
   estimatedMinutes?: number;
+  sessionKey?: string;
 }
 
 export interface GenerateTaskPlanResponse extends StructuredResponseMeta {

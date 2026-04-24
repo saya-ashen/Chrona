@@ -33,6 +33,7 @@ import {
   parseDirectStructuredEnvelope,
   requireStructuredResult,
 } from "../core/structured";
+import { buildGeneratePlanScope } from "../core/streaming";
 import type {
   TaskPlanNode,
   TaskPlanEdge,
@@ -262,7 +263,7 @@ export async function generatePlan(
     reasoning?: string;
     nodes?: Array<Partial<TaskPlanNode>>;
     edges?: Array<Partial<TaskPlanEdge>>;
-  }>(client, "generate_plan", request, request.taskId);
+  }>(client, "generate_plan", request, buildGeneratePlanScope(request));
 
   return normalizeGeneratePlanResponse({
     parsed: result.parsed,
