@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 const getLatestTaskPlanGraph = mock();
 const saveTaskPlanGraph = mock();
 const aiGeneratePlan = mock();
+const aiGeneratePlanStream = mock();
 const findUnique = mock();
+const ensureDefaultTaskSession = mock();
 
 mock.module("@/modules/tasks/task-plan-graph-store", () => ({
   getLatestTaskPlanGraph,
@@ -12,6 +14,11 @@ mock.module("@/modules/tasks/task-plan-graph-store", () => ({
 
 mock.module("@/modules/ai/ai-service", () => ({
   aiGeneratePlan,
+  aiGeneratePlanStream,
+}));
+
+mock.module("@/modules/task-execution/task-sessions", () => ({
+  ensureDefaultTaskSession,
 }));
 
 mock.module("@/lib/db", () => ({
@@ -29,7 +36,10 @@ describe("POST /api/ai/generate-task-plan", () => {
     getLatestTaskPlanGraph.mockReset();
     saveTaskPlanGraph.mockReset();
     aiGeneratePlan.mockReset();
+    aiGeneratePlanStream.mockReset();
     findUnique.mockReset();
+    ensureDefaultTaskSession.mockReset();
+    ensureDefaultTaskSession.mockResolvedValue({ id: "sess-1", sessionKey: "chrona:openclaw:task:task-2:default" });
   });
 
   it("returns saved graph when available and not force-refreshing", async () => {
@@ -75,6 +85,50 @@ describe("POST /api/ai/generate-task-plan", () => {
     // No subtasks field
     expect(data.subtasks).toBeUndefined();
     expect(aiGeneratePlan).not.toHaveBeenCalled();
+  });
+
+  it("passes resolved task session key into blocking AI generate-plan calls", async () => {
+    getLatestTaskPlanGraph.mockResolvedValue(null);
+    findUnique.mockResolvedValue({
+      id: "task-2",
+      workspaceId: "ws-1",
+      title: "Prepare report",
+      description: "Summarize findings",
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      defaultSessionId: undefined,
+    });
+    aiGeneratePlan.mockResolvedValue({
+      nodes: [],
+      edges: [],
+      summary: "ok",
+      source: "openclaw",
+    });
+    saveTaskPlanGraph.mockResolvedValue({
+      id: "plan-2",
+      status: "draft",
+      prompt: null,
+      revision: 1,
+      summary: "ok",
+      updatedAt: "2026-04-20T10:00:00.000Z",
+      plan: { id: "graph-2", nodes: [], edges: [] },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-2" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(aiGeneratePlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task-2",
+        sessionKey: "chrona:openclaw:task:task-2:default",
+      }),
+    );
   });
 
   it("generates graph-native plan via AI when no saved plan exists", async () => {

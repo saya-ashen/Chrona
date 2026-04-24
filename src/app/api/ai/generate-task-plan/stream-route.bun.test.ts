@@ -114,6 +114,12 @@ describe("POST /api/ai/generate-task-plan stream", () => {
       runtimeName: "openclaw",
       defaultSessionId: undefined,
     });
+    expect(aiGeneratePlanStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task-1",
+        sessionKey: "chrona:openclaw:task:task-1:default",
+      }),
+    );
   });
 
   it("does not crash when stream closes before late events complete", async () => {

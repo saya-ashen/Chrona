@@ -215,6 +215,7 @@ export async function POST(request: Request) {
               title: resolvedTitle,
               description: resolvedDescription,
               estimatedMinutes: resolvedEstimatedMinutes,
+              sessionKey: sharedTaskSessionKey ?? undefined,
             })) {
               if (streamClosed || requestFinished) {
                 break;
@@ -330,6 +331,7 @@ export async function POST(request: Request) {
       title: resolvedTitle,
       description: resolvedDescription,
       estimatedMinutes: resolvedEstimatedMinutes,
+      sessionKey: sharedTaskSessionKey ?? undefined,
     });
 
     logger.info("request.blocking_result", {

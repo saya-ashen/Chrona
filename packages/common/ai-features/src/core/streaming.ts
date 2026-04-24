@@ -438,7 +438,10 @@ function extractPreferredPlanGraphFromStructured(
     : null;
 }
 
-function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
+export function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
+  if (request.sessionKey?.trim()) {
+    return request.sessionKey.trim();
+  }
   const taskPart = request.taskId?.trim();
   if (taskPart) {
     return `chrona:openclaw:task:${taskPart}:default`;
