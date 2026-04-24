@@ -22,8 +22,11 @@ import type {
   ChatRequest,
   ChatResponse,
   StructuredDebugInfo,
+  DispatchTaskInput,
+  DispatchTaskOutput,
 } from "../core/types";
 import type { StructuredAgentResult } from "../core/structured";
+import { parseTaskDispatchDecision } from "../core/dispatch-types";
 import { AiClientError } from "../core/types";
 import { dispatch, dispatchStructured, extractJSON } from "../core/providers";
 import {
@@ -415,4 +418,32 @@ export async function chat(
     return { content, parsed, source: client.type };
   }
   return { content, source: client.type };
+}
+
+export async function dispatchTask(
+  client: AiClientRecord,
+  request: DispatchTaskInput,
+): Promise<DispatchTaskOutput> {
+  const result = await parseStructuredFeatureResult<unknown>(
+    client,
+    "dispatch_task",
+    request,
+    request.workspaceId,
+  );
+
+  const parsed = parseTaskDispatchDecision(result.parsed);
+  if (!parsed.ok) {
+    throw new AiClientError(
+      `Invalid dispatch decision: ${parsed.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`,
+      client.type,
+      "invalid_response",
+    );
+  }
+
+  return {
+    decision: parsed.value,
+    reliability: result.debug?.source === "assistant_text" ? "fallback_text" : "structured_tool_call",
+    rawProviderResult: result.rawText,
+    structured: result.debug,
+  };
 }

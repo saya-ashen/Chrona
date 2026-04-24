@@ -9,7 +9,8 @@ export type BridgeFeature =
   | "generate_plan"
   | "conflicts"
   | "timeslots"
-  | "chat";
+  | "chat"
+  | "dispatch_task";
 
 export interface BridgeFeatureRequest<TInput = Record<string, unknown>> {
   sessionId?: string;

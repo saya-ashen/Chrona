@@ -266,6 +266,54 @@ const GenerateTaskPlanGraphSchema = {
   },
 } as const;
 
+const DispatchTaskDecisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "LLM must put the next Chrona task-dispatch decision directly into this tool input.",
+  required: [
+    "schemaName",
+    "schemaVersion",
+    "action",
+    "safety",
+    "confidence",
+    "reason",
+  ],
+  properties: {
+    schemaName: { const: "task_dispatch_decision" },
+    schemaVersion: { const: "1.0.0" },
+    action: {
+      type: "string",
+      enum: [
+        "run_node",
+        "materialize_node",
+        "ask_user",
+        "revise_plan",
+        "summarize_context",
+        "mark_task_done",
+        "stop",
+      ],
+    },
+    targetNodeId: { anyOf: [{ type: "string" }, { type: "null" }] },
+    createNewContext: { anyOf: [{ type: "boolean" }, { type: "null" }] },
+    runtimePrompt: { anyOf: [{ type: "string" }, { type: "null" }] },
+    planPatch: { anyOf: [{ type: "object" }, { type: "null" }] },
+    contextInstruction: { anyOf: [{ type: "object" }, { type: "null" }] },
+    safety: {
+      type: "object",
+      additionalProperties: false,
+      required: ["requiresHumanApproval", "riskLevel"],
+      properties: {
+        requiresHumanApproval: { type: "boolean" },
+        riskLevel: { type: "string", enum: ["low", "medium", "high"] },
+      },
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    reason: { type: "string", minLength: 1 },
+    rationale: { anyOf: [{ type: "string" }, { type: "null" }] },
+  },
+} as const;
+
 export default definePluginEntry({
   id: "chrona-structured-result",
   name: "Chrona Structured Result",
@@ -384,6 +432,43 @@ export default definePluginEntry({
         },
       },
       { name: "generate_task_plan_graph" },
+    );
+
+    api.registerTool(
+      {
+        name: "dispatch_next_task_action",
+        label: "Dispatch Next Task Action",
+        description:
+          "Business tool for task dispatching. The model should pass TaskDispatchDecision JSON directly via tool input.",
+        parameters: DispatchTaskDecisionSchema,
+        async execute(_toolCallId: string, params: Record<string, unknown>) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    ok: true,
+                    action: params.action ?? null,
+                    confidence:
+                      typeof params.confidence === "number"
+                        ? params.confidence
+                        : null,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            details: {
+              ...params,
+              ok: true,
+              inputMode: "dispatch_in_tool_input",
+            },
+          };
+        },
+      },
+      { name: "dispatch_next_task_action" },
     );
 
     api.logger.info("Chrona structured-result plugin loaded");

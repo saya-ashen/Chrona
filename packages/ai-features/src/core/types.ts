@@ -14,7 +14,8 @@ export type AiFeature =
   | "generate_plan"
   | "conflicts"
   | "timeslots"
-  | "chat";
+  | "chat"
+  | "dispatch_task";
 
 export interface AiClientRecord {
   id: string;
@@ -203,6 +204,77 @@ export interface ChatResponse extends StructuredResponseMeta {
   content: string;
   parsed?: unknown;
   source: string;
+}
+
+export interface LinkedPlanTaskSummary {
+  taskId: string;
+  nodeId: string;
+  status: string;
+  title: string;
+}
+
+export interface RuntimeRunSummary {
+  runId: string;
+  taskId: string;
+  status: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  errorSummary?: string | null;
+}
+
+export interface TaskEventSummary {
+  eventType: string;
+  createdAt: string;
+  runId?: string | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface ApprovalSummary {
+  id: string;
+  status: string;
+  riskLevel: string;
+  runId: string;
+  title: string;
+}
+
+export interface BlockerSummary {
+  id: string;
+  type: string;
+  reason: string;
+}
+
+export interface ExecutionContextStats {
+  messageCount: number;
+  transcriptChars: number;
+  estimatedTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  modelContextLimit?: number;
+  compacted: boolean;
+  summaryMemoryId?: string;
+}
+
+import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskDispatchDecision, TaskDispatchPolicy } from "./dispatch-types";
+
+export interface DispatchTaskInput {
+  taskId: string;
+  workspaceId: string;
+  acceptedPlan: TaskPlanGraph;
+  linkedTasks: LinkedPlanTaskSummary[];
+  latestRuns: RuntimeRunSummary[];
+  recentEvents: TaskEventSummary[];
+  approvals: ApprovalSummary[];
+  blockers: BlockerSummary[];
+  contextStats?: ExecutionContextStats[];
+  policy: TaskDispatchPolicy;
+}
+
+export interface DispatchTaskOutput extends StructuredResponseMeta {
+  decision: TaskDispatchDecision;
+  reliability: "structured_tool_call" | "fallback_text" | "mock";
+  rawProviderResult?: unknown;
 }
 
 export class AiClientError extends Error {

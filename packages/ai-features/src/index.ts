@@ -6,6 +6,7 @@
  */
 
 export * from "./core/types";
+export * from "./core/dispatch-types";
 export * from "./core/prompts";
 export { extractJSON, checkClientHealth, llmCall } from "./core/providers";
 export * from "./features";
