@@ -113,39 +113,6 @@ export async function POST(request: Request) {
       forceRefresh,
     });
 
-    if (taskId && !forceRefresh) {
-      const savedPlan = await getLatestTaskPlanGraph(taskId);
-      if (savedPlan) {
-        if (wantsStream) {
-          const encoder = new TextEncoder();
-          const stream = new ReadableStream({
-            start(controller) {
-              controller.enqueue(encoder.encode(sseEncode("result", buildPlanResponse({
-                source: "saved",
-                planGraph: savedPlan.plan,
-                taskSessionKey: sharedTaskSessionKey,
-                savedPlan: buildSavedPlanSummary(savedPlan),
-              }))));
-              controller.enqueue(encoder.encode(sseEncode("done", {})));
-              controller.close();
-            },
-          });
-          return new Response(stream, {
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-              Connection: "keep-alive",
-            },
-          });
-        }
-        return NextResponse.json(buildPlanResponse({
-          source: "saved",
-          planGraph: savedPlan.plan,
-          savedPlan: buildSavedPlanSummary(savedPlan),
-        }));
-      }
-    }
-
     let resolvedWorkspaceId: string | null = null;
     let resolvedTitle = title;
     let resolvedDescription = description;
@@ -174,6 +141,40 @@ export async function POST(request: Request) {
           defaultSessionId: task.defaultSessionId,
         })
       ).sessionKey;
+    }
+
+    if (taskId && !forceRefresh) {
+      const savedPlan = await getLatestTaskPlanGraph(taskId);
+      if (savedPlan) {
+        if (wantsStream) {
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(sseEncode("result", buildPlanResponse({
+                source: "saved",
+                planGraph: savedPlan.plan,
+                taskSessionKey: sharedTaskSessionKey,
+                savedPlan: buildSavedPlanSummary(savedPlan),
+              }))));
+              controller.enqueue(encoder.encode(sseEncode("done", {})));
+              controller.close();
+            },
+          });
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+        return NextResponse.json(buildPlanResponse({
+          source: "saved",
+          planGraph: savedPlan.plan,
+          taskSessionKey: sharedTaskSessionKey,
+          savedPlan: buildSavedPlanSummary(savedPlan),
+        }));
+      }
     }
 
     if (wantsStream) {
