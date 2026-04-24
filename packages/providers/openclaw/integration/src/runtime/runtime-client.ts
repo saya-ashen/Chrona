@@ -12,7 +12,7 @@ import type {
   OpenClawStructuredRunResult,
 } from "../protocol/types";
 import type { BridgeFeature } from "../transport/bridge-types";
-import type { RuntimeInput } from "../../../../packages/runtime-core/src/index";
+import type { RuntimeInput } from "@chrona/runtime-core";
 
 export type OpenClawWaitForRunInput = {
   runtimeRunRef: string;

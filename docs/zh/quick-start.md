@@ -49,7 +49,7 @@ bun run openclaw:plugin:install
 ```
 
 这个命令会：
-- 构建 `packages/openclaw-plugin-structured-result`
+- 构建 `packages/providers/openclaw/plugin-structured-result`
 - 以 `chrona-structured-result` 名称安装到本地 OpenClaw
 - 启用该插件
 - 尝试重启 gateway
@@ -71,8 +71,8 @@ bun run openclaw:bridge
 - http://localhost:7677
 
 基于实际验证的说明：
-- 实际入口是 `packages/openclaw-bridge/src/server.ts`
-- 也可以直接运行 `bun packages/openclaw-bridge/src/server.ts`
+- 实际入口是 `packages/providers/openclaw/bridge/src/server.ts`
+- 也可以直接运行 `bun packages/providers/openclaw/bridge/src/server.ts`
 - 如果 `7677` 端口已被占用，bridge 会立刻因为地址占用而退出
 - 成功启动后会打印 `bridge.started` 日志
 

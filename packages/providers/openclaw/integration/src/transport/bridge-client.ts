@@ -2,7 +2,7 @@
  * OpenClaw CLI Bridge Client
  *
  * Implements the OpenClawRuntimeClient interface by communicating with the
- * CLI Bridge HTTP server (`packages/openclaw-bridge/src/server.ts`).
+ * CLI Bridge HTTP server (`packages/providers/openclaw/bridge/src/server.ts`).
  */
 
 import type {
@@ -29,7 +29,7 @@ import type {
   NDJSONEvent,
   BridgeFeature,
 } from "./bridge-types";
-import type { RuntimeInput } from "../../../../packages/runtime-core/src/index";
+import type { RuntimeInput } from "@chrona/runtime-core";
 
 type BridgeClientOptions = {
   baseUrl?: string;

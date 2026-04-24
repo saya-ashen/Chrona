@@ -1,15 +1,15 @@
-import {
-  type BridgeExecutionTaskRequest,
-  type BridgeFeature,
-  type BridgeFeatureRequest,
-  type BridgeFeatureResult,
-  type BridgeRequest,
-  type BridgeResponse,
-  type NDJSONEvent,
-  type ToolCallInfo,
-  type ToolCallOutputInfo,
-} from "../../openclaw-integration/src/transport/bridge-types";
-import { type StructuredAgentResult } from "../../openclaw-integration/src/protocol/structured-result";
+import { type StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
+import type {
+  BridgeExecutionTaskRequest,
+  BridgeFeature,
+  BridgeFeatureRequest,
+  BridgeFeatureResult,
+  BridgeRequest,
+  BridgeResponse,
+  NDJSONEvent,
+  ToolCallInfo,
+  ToolCallOutputInfo,
+} from "@chrona/openclaw-integration/transport/bridge-types";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type BridgeLogger = ReturnType<typeof createBridgeLogger>;
@@ -1056,7 +1056,7 @@ export type {
   NDJSONEvent,
   ToolCallInfo,
   ToolCallOutputInfo,
-} from "../../openclaw-integration/src/transport/bridge-types";
+} from "@chrona/openclaw-integration/transport/bridge-types";
 
 export function startBridgeServer(options: StartBridgeServerOptions = {}) {
   const port = options.port ?? DEFAULT_BRIDGE_PORT;

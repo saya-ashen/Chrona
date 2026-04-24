@@ -94,7 +94,7 @@ bun run openclaw:plugin:install
 ```
 
 What this command does:
-- builds `packages/openclaw-plugin-structured-result`
+- builds `packages/providers/openclaw/plugin-structured-result`
 - installs it into your local OpenClaw as `chrona-structured-result`
 - enables the plugin
 - attempts a gateway restart so the tool becomes available immediately
@@ -109,8 +109,8 @@ bun run openclaw:bridge
 
 Bridge notes:
 - default bridge URL: `http://localhost:7677`
-- actual entrypoint: `packages/openclaw-bridge/src/server.ts`
-- you can also run it directly with `bun packages/openclaw-bridge/src/server.ts`
+- actual entrypoint: `packages/providers/openclaw/bridge/src/server.ts`
+- you can also run it directly with `bun packages/providers/openclaw/bridge/src/server.ts`
 - if port `7677` is already in use, the bridge will fail to bind until you stop the existing process
 - successful startup now prints a `bridge.started` log line
 

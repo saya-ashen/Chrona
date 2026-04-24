@@ -171,7 +171,7 @@ src/
 │   └── openclaw-plugin-structured-result/ # OpenClaw business tools 插件
 │
 ├── services/
-│   └── openclaw-bridge/    # Bridge 启动入口（委托到 packages/openclaw-bridge）
+│   └── openclaw-bridge/    # Bridge 启动入口（委托到 packages/providers/openclaw/bridge）
 │
 ├── components/             # React 组件
 │   ├── ui/                 # 基础 UI 组件

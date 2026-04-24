@@ -7,7 +7,7 @@ import {
   OPENCLAW_RUNTIME_INPUT_VERSION,
   validateOpenClawTaskConfig,
 } from "../config/config";
-import type { RuntimeInput } from "../../../../packages/runtime-core/src/index";
+import type { RuntimeInput } from "@chrona/runtime-core";
 import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
