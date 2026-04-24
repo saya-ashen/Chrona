@@ -15,11 +15,33 @@ import type {
   NDJSONEvent,
   RouteKind,
 } from "../shared/types";
-import { buildFeatureResultFromResponse, buildStructuredResult, extractOutputText } from "../features/feature-contracts";
-import { parseFunctionItems, mapGatewaySseEvent, mapUsage } from "../parse/gateway-response";
+import {
+  buildFeatureResultFromResponse,
+  buildStructuredResult,
+  extractOutputText,
+} from "../features/feature-contracts";
+import {
+  parseFunctionItems,
+  mapGatewaySseEvent,
+  mapUsage,
+} from "../parse/gateway-response";
 import { summarizeBridgeRequest } from "../parse/requests";
 import { routeLabel } from "../parse/routes";
 import { toErrorMessage } from "../shared/json";
+
+function previewText(value: string, maxLength = 1200): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function summarizeHeaders(headers: Record<string, string>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [
+      key,
+      /authorization/i.test(key) ? "[REDACTED]" : value,
+    ]),
+  );
+}
 
 const sessionPreviousResponseMap = new Map<string, string>();
 
@@ -56,7 +78,9 @@ function resolveOpenResponsesTurnState(
 ): OpenResponsesTurnState {
   const requestRecord = request as Record<string, unknown>;
   const requestedSessionKey =
-    typeof requestRecord.sessionKey === "string" ? requestRecord.sessionKey : undefined;
+    typeof requestRecord.sessionKey === "string"
+      ? requestRecord.sessionKey
+      : undefined;
   const sessionKey = normalizeOpenResponsesSessionKey(
     requestedSessionKey ?? request.sessionId ?? fallbackSessionId,
   );
@@ -105,7 +129,9 @@ export function buildGatewayBody(
   );
 
   if (route.kind === "feature") {
-    const featureRequest = request as BridgeFeatureRequest<Record<string, unknown>>;
+    const featureRequest = request as BridgeFeatureRequest<
+      Record<string, unknown>
+    >;
     const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
     const body: Record<string, unknown> = {
       model: "openclaw",
@@ -123,13 +149,12 @@ export function buildGatewayBody(
       body.tools = [
         {
           type: "function",
-          function: {
-            name: requiredTool,
-            description: `Chrona structured feature tool: ${requiredTool}`,
-            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
-          },
+          name: requiredTool,
+          description: `Chrona structured feature tool: ${requiredTool}`,
+          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
         },
       ];
+
       body.tool_choice = {
         type: "function",
         function: { name: requiredTool },
@@ -186,7 +211,7 @@ export function gatewayHeaders(
     headers["x-openclaw-message-channel"] = environment.messageChannel;
   }
 
-  const requestRecord = request as (Record<string, unknown> | undefined);
+  const requestRecord = request as Record<string, unknown> | undefined;
   const sessionKey =
     requestRecord && typeof requestRecord.sessionKey === "string"
       ? requestRecord.sessionKey.trim()
@@ -212,7 +237,10 @@ export async function checkGatewayAvailable(
   }
 }
 
-export function statusForResponse(route: RouteKind, response: BridgeResponse): number {
+export function statusForResponse(
+  route: RouteKind,
+  response: BridgeResponse,
+): number {
   if (!response.error) {
     return 200;
   }
@@ -233,22 +261,62 @@ export async function executeGatewayRequest(
   const startedAt = Date.now();
   const body = buildGatewayBody(route, request, sessionId, environment);
 
+  const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
+  const headers = gatewayHeaders(environment, request);
+
   logger.info("bridge.request.start", {
     sessionId,
+    sessionKey,
     gateway: environment.gatewayHttpUrl,
+    route: routeLabel(route),
+    timeoutMs,
     request: summarizeBridgeRequest(route, request),
   });
+  logger.debug("bridge.gateway.request", {
+    sessionId,
+    sessionKey,
+    route: routeLabel(route),
+    url: `${environment.gatewayHttpUrl}/v1/responses`,
+    headers: summarizeHeaders(headers),
+    body,
+  });
 
-  const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
   const response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
     method: "POST",
-    headers: gatewayHeaders(environment, request),
+    headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
+  const responseClone = response.clone();
+  const responseText = await responseClone.text().catch(() => "");
+  let responseJsonPreview: unknown = null;
+  try {
+    responseJsonPreview = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    responseJsonPreview = null;
+  }
+
+  logger.info("bridge.gateway.response", {
+    sessionId,
+    sessionKey,
+    route: routeLabel(route),
+    status: response.status,
+    ok: response.ok,
+    contentType: response.headers.get("content-type") ?? null,
+    bodyPreview: responseJsonPreview ?? previewText(responseText),
+  });
+
   if (!response.ok) {
-    const errBody = await response.text().catch(() => "");
+    const errBody = responseText;
+    logger.warn("bridge.gateway.response_error", {
+      sessionId,
+      sessionKey,
+      route: routeLabel(route),
+      status: response.status,
+      contentType: response.headers.get("content-type") ?? null,
+      bodyPreview: previewText(errBody),
+    });
     const bridgeResponse: BridgeResponse = {
       sessionId,
       output: "",
@@ -270,7 +338,7 @@ export async function executeGatewayRequest(
   }
 
   if (!route.stream) {
-    const gateway = (await response.json()) as Record<string, unknown>;
+    const gateway = (responseJsonPreview ?? {}) as Record<string, unknown>;
     const responseId = typeof gateway.id === "string" ? gateway.id : undefined;
     if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
@@ -281,7 +349,11 @@ export async function executeGatewayRequest(
     let semanticError: string | null = null;
 
     if (route.kind === "feature") {
-      const built = buildFeatureResultFromResponse(route.feature, outputText, toolCalls);
+      const built = buildFeatureResultFromResponse(
+        route.feature,
+        outputText,
+        toolCalls,
+      );
       feature = built.featureResult;
       semanticError = built.error;
     }
@@ -289,15 +361,15 @@ export async function executeGatewayRequest(
     const bridgeResponse: BridgeResponse = {
       sessionId,
       responseId,
-      responseStatus: typeof gateway.status === "string" ? gateway.status : undefined,
+      responseStatus:
+        typeof gateway.status === "string" ? gateway.status : undefined,
       runId: responseId,
       output: outputText,
       toolCalls,
       toolCallOutputs,
       usage: mapUsage(gateway),
       error:
-        semanticError ??
-        (gateway.error ? JSON.stringify(gateway.error) : null),
+        semanticError ?? (gateway.error ? JSON.stringify(gateway.error) : null),
       durationMs: Date.now() - startedAt,
       structured: buildStructuredResult({
         sessionId,
@@ -356,9 +428,14 @@ export async function executeGatewayRequest(
         continue;
       }
 
-      if (currentEventType === "response.completed" || currentEventType === "response.failed") {
+      if (
+        currentEventType === "response.completed" ||
+        currentEventType === "response.failed"
+      ) {
         const responseObj =
-          data.response && typeof data.response === "object" && !Array.isArray(data.response)
+          data.response &&
+          typeof data.response === "object" &&
+          !Array.isArray(data.response)
             ? (data.response as Record<string, unknown>)
             : null;
         if (responseObj) {
@@ -379,17 +456,24 @@ export async function executeGatewayRequest(
   }
 
   const responseId =
-    typeof finalGatewayResponse.id === "string" ? finalGatewayResponse.id : undefined;
+    typeof finalGatewayResponse.id === "string"
+      ? finalGatewayResponse.id
+      : undefined;
   if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
-  const { toolCalls, toolCallOutputs } = parseFunctionItems(finalGatewayResponse);
+  const { toolCalls, toolCallOutputs } =
+    parseFunctionItems(finalGatewayResponse);
   const outputText = extractOutputText(finalGatewayResponse);
 
   let feature = null;
   let semanticError: string | null = null;
 
   if (route.kind === "feature") {
-    const built = buildFeatureResultFromResponse(route.feature, outputText, toolCalls);
+    const built = buildFeatureResultFromResponse(
+      route.feature,
+      outputText,
+      toolCalls,
+    );
     feature = built.featureResult;
     semanticError = built.error;
   }
@@ -421,7 +505,9 @@ export async function executeGatewayRequest(
       toolCalls,
       error:
         semanticError ??
-        (finalGatewayResponse.error ? JSON.stringify(finalGatewayResponse.error) : null),
+        (finalGatewayResponse.error
+          ? JSON.stringify(finalGatewayResponse.error)
+          : null),
       feature: route.kind === "feature" ? route.feature : null,
       featurePayload: feature?.payload,
       featureToolName: feature?.toolName ?? null,

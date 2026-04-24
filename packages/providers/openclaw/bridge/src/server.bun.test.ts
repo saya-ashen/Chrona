@@ -133,11 +133,9 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.tools).toEqual([
       {
         type: "function",
-        function: {
-          name: "generate_task_plan_graph",
-          description: "Chrona structured feature tool: generate_task_plan_graph",
-          parameters: expect.any(Object),
-        },
+        name: "generate_task_plan_graph",
+        description: "Chrona structured feature tool: generate_task_plan_graph",
+        parameters: expect.any(Object),
       },
     ]);
     expect(body.tool_choice).toEqual({
@@ -275,6 +273,25 @@ describe("openclaw bridge gateway helpers", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]?.event).toBe("bridge.started");
     expect(entries[1]?.event).toBe("bridge.failed");
+  });
+
+  it("redacts sensitive values and truncates long payloads in logs", () => {
+    const entries: BridgeLogEntry[] = [];
+    const logger = createBridgeLogger({
+      minLevel: "debug",
+      sink: (entry) => entries.push(entry),
+    });
+
+    logger.info("bridge.request", {
+      authorization: "Bearer secret-token",
+      nested: { apiKey: "abc123", text: "x".repeat(1200) },
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.data?.authorization).toBe("[REDACTED]");
+    expect((entries[0]?.data?.nested as Record<string, unknown>)?.apiKey).toBe("[REDACTED]");
+    expect(typeof (entries[0]?.data?.nested as Record<string, unknown>)?.text).toBe("string");
+    expect(String((entries[0]?.data?.nested as Record<string, unknown>)?.text).length).not.toBe("1200");
   });
 });
 
@@ -535,6 +552,53 @@ describe("openclaw bridge gateway endpoints", () => {
         feature: "dispatch_task",
         toolName: "dispatch_next_task_action",
       });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("logs inbound request payloads and outbound gateway traffic", async () => {
+    const port = 18672;
+    const entries: BridgeLogEntry[] = [];
+
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
+        return Response.json({
+          id: "resp-log-1",
+          status: "completed",
+          output: [
+            {
+              type: "function_call",
+              call_id: "call-log-1",
+              name: "generate_task_plan_graph",
+              arguments: JSON.stringify({ summary: "ok", nodes: [], edges: [] }),
+            },
+          ],
+        });
+      }
+      return realFetch(input, init);
+    }) as typeof fetch;
+
+    const server = startBridgeServer({
+      port,
+      logger: createBridgeLogger({ minLevel: "debug", sink: (entry) => entries.push(entry) }),
+    });
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/features/generate-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "sess-log",
+          sessionKey: "tenant-a:task-1",
+          input: { taskId: "task-1", title: "Plan" },
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(entries.some((entry) => entry.event === "bridge.http.request.received")).toBeTrue();
+      expect(entries.some((entry) => entry.event === "bridge.gateway.request")).toBeTrue();
+      expect(entries.some((entry) => entry.event === "bridge.gateway.response")).toBeTrue();
     } finally {
       server.stop(true);
     }
