@@ -22,18 +22,7 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
 } from "@chrona/openclaw-integration/bridge/contracts";
-
-function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
-  const sanitize = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 48) || "default";
-
-  return `ai-${sanitize(feature)}-${sanitize(scope)}`;
-}
+import { buildOpenClawSessionIdentity } from "./session";
 
 function toBridgeFeature(feature: AiFeature): BridgeFeature {
   switch (feature) {
@@ -107,9 +96,10 @@ async function fetchOpenClawBridge(
   mode: OpenClawStructuredMode,
 ): Promise<OpenClawCallResult> {
   const timeout = config.timeoutSeconds ?? 120;
-  const sessionId = buildOpenClawSessionId(feature, scope);
+  const { sessionId, sessionKey } = buildOpenClawSessionIdentity(feature, scope);
   const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
     sessionId,
+    sessionKey,
     input: buildFeatureInput(feature, input),
     timeout,
   };
@@ -363,7 +353,7 @@ export async function dispatchStructured<T = unknown>(
     text,
     structured: null,
     bridge: {
-      sessionId: buildOpenClawSessionId(feature, scope),
+      sessionId: buildOpenClawSessionIdentity(feature, scope).sessionId,
       runId: undefined,
       output: text,
       toolCalls: [],
