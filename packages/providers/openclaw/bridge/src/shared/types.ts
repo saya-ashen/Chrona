@@ -37,7 +37,7 @@ export interface BridgeLogEntry {
 
 export interface BridgeEnvironment {
   defaultPort: number;
-  gatewayUrl: string;
+  gatewayHttpUrl: string;
   gatewayToken: string;
   agentId: string;
   model?: string;

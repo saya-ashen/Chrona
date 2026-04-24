@@ -48,7 +48,7 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
     const available = await gatewayAvailability();
     return c.json({
       status: available ? "ok" : "unavailable",
-      gateway: environment.gatewayUrl,
+      gateway: environment.gatewayHttpUrl,
     });
   });
 

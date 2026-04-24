@@ -20,11 +20,15 @@ const realFetch = globalThis.fetch;
 const originalEnv = {
   OPENCLAW_MODEL: process.env.OPENCLAW_MODEL,
   OPENCLAW_MESSAGE_CHANNEL: process.env.OPENCLAW_MESSAGE_CHANNEL,
+  OPENCLAW_OPENRESPONSES_URL: process.env.OPENCLAW_OPENRESPONSES_URL,
+  OPENCLAW_GATEWAY_URL: process.env.OPENCLAW_GATEWAY_URL,
 };
 
 beforeEach(() => {
   delete process.env.OPENCLAW_MODEL;
   delete process.env.OPENCLAW_MESSAGE_CHANNEL;
+  process.env.OPENCLAW_OPENRESPONSES_URL = "http://127.0.0.1:18789";
+  delete process.env.OPENCLAW_GATEWAY_URL;
 });
 
 afterEach(() => {
@@ -41,6 +45,18 @@ afterEach(() => {
     delete process.env.OPENCLAW_MESSAGE_CHANNEL;
   } else {
     process.env.OPENCLAW_MESSAGE_CHANNEL = originalEnv.OPENCLAW_MESSAGE_CHANNEL;
+  }
+
+  if (originalEnv.OPENCLAW_OPENRESPONSES_URL === undefined) {
+    delete process.env.OPENCLAW_OPENRESPONSES_URL;
+  } else {
+    process.env.OPENCLAW_OPENRESPONSES_URL = originalEnv.OPENCLAW_OPENRESPONSES_URL;
+  }
+
+  if (originalEnv.OPENCLAW_GATEWAY_URL === undefined) {
+    delete process.env.OPENCLAW_GATEWAY_URL;
+  } else {
+    process.env.OPENCLAW_GATEWAY_URL = originalEnv.OPENCLAW_GATEWAY_URL;
   }
 });
 
@@ -136,7 +152,7 @@ describe("openclaw bridge gateway helpers", () => {
       { kind: "execution", stream: false },
       request,
       "sess-exec",
-      { defaultPort: 7677, gatewayUrl: "http://gateway", gatewayToken: "", agentId: "main", model: "gpt-5.4" },
+      { defaultPort: 7677, gatewayHttpUrl: "http://gateway", gatewayToken: "", agentId: "main", model: "gpt-5.4" },
     );
 
     expect(body.tool_choice).toBeUndefined();
@@ -153,7 +169,7 @@ describe("openclaw bridge gateway helpers", () => {
     const headers = gatewayHeaders(
       {
         defaultPort: 7677,
-        gatewayUrl: "http://gateway",
+        gatewayHttpUrl: "http://gateway",
         gatewayToken: "secret",
         agentId: "task-agent",
         model: "gpt-5.4",
@@ -267,9 +283,7 @@ describe("openclaw bridge hono app", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       status: "ok",
-      gateway: (process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789")
-        .replace(/^wss:\/\//, "https://")
-        .replace(/^ws:\/\//, "http://"),
+      gateway: process.env.OPENCLAW_OPENRESPONSES_URL ?? process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789",
     });
   });
 
