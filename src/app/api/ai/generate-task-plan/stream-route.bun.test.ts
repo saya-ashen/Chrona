@@ -38,6 +38,57 @@ describe("POST /api/ai/generate-task-plan stream", () => {
     ensureDefaultTaskSession.mockResolvedValue({ id: "sess-1", sessionKey: "chrona:openclaw:task:task-1:default" });
   });
 
+  it("streams saved plans without crashing when a saved graph already exists", async () => {
+    findUnique.mockResolvedValue({
+      id: "task-1",
+      workspaceId: "ws-1",
+      title: "Plan task",
+      description: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      defaultSessionId: undefined,
+    });
+    getLatestTaskPlanGraph.mockResolvedValue({
+      id: "plan-saved-1",
+      status: "accepted",
+      prompt: "existing guidance",
+      revision: 2,
+      summary: "Saved graph",
+      updatedAt: "2026-04-20T10:00:00.000Z",
+      plan: {
+        id: "graph-saved-1",
+        taskId: "task-1",
+        status: "accepted",
+        revision: 2,
+        source: "ai",
+        generatedBy: "openclaw",
+        prompt: null,
+        summary: "Saved graph",
+        changeSummary: null,
+        createdAt: "2026-04-20T10:00:00.000Z",
+        updatedAt: "2026-04-20T10:00:00.000Z",
+        nodes: [],
+        edges: [],
+      },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify({ taskId: "task-1" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    const text = await response.text();
+    expect(text).toContain("event: result");
+    expect(text).toContain("Saved graph");
+    expect(text).toContain("event: done");
+    expect(aiGeneratePlanStream).not.toHaveBeenCalled();
+  });
+
   it("returns SSE and includes process/tool events before final result", async () => {
     getLatestTaskPlanGraph.mockResolvedValue(null);
     findUnique.mockResolvedValue({

@@ -43,6 +43,15 @@ describe("POST /api/ai/generate-task-plan", () => {
   });
 
   it("returns saved graph when available and not force-refreshing", async () => {
+    findUnique.mockResolvedValue({
+      id: "task-1",
+      workspaceId: "ws-1",
+      title: "Saved task",
+      description: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      defaultSessionId: undefined,
+    });
     getLatestTaskPlanGraph.mockResolvedValue({
       id: "plan-1",
       status: "accepted",
@@ -82,6 +91,7 @@ describe("POST /api/ai/generate-task-plan", () => {
     expect(data.planGraph.id).toBe("graph-1");
     expect(data.planGraph.nodes[0].autoRunnable).toBe(true);
     expect(data.savedPlan.id).toBe("plan-1");
+    expect(data.taskSessionKey).toBe("chrona:openclaw:task:task-2:default");
     // No subtasks field
     expect(data.subtasks).toBeUndefined();
     expect(aiGeneratePlan).not.toHaveBeenCalled();
