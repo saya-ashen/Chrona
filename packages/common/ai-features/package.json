@@ -7,8 +7,6 @@
     "@chrona/openclaw-integration": "workspace:*"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./core/*": "./src/core/*.ts",
-    "./features": "./src/features/index.ts"
+    ".": "./src/index.ts"
   }
 }

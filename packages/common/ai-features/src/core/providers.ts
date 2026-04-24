@@ -21,7 +21,7 @@ import type {
   BridgeFeature,
   BridgeFeatureRequest,
   BridgeResponse,
-} from "@chrona/openclaw-integration/transport/bridge-types";
+} from "@chrona/openclaw-integration/bridge/contracts";
 
 function buildOpenClawSessionId(feature: AiFeature, scope: string): string {
   const sanitize = (value: string) =>

@@ -9,6 +9,7 @@
     ]
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --target=node --format=esm --external openclaw/plugin-sdk/plugin-entry --outfile ./dist/index.js && cp ./openclaw.plugin.json ./dist/openclaw.plugin.json"
+    "build": "bun build ./src/index.ts --target=node --format=esm --external openclaw/plugin-sdk/plugin-entry --outfile ./dist/index.js && cp ./openclaw.plugin.json ./dist/openclaw.plugin.json",
+    "test": "vitest run ./src/index.test.ts"
   }
 }

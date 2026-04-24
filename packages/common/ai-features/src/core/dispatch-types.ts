@@ -171,7 +171,7 @@ export function parseTaskDispatchDecision(raw: unknown): ParseResult<TaskDispatc
     return { ok: false, issues };
   }
 
-  return { ok: true, value: obj as TaskDispatchDecision, issues: [] };
+  return { ok: true, value: obj as unknown as TaskDispatchDecision, issues: [] };
 }
 
 export interface TaskDispatchPolicy {

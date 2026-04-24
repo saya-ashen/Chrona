@@ -1,60 +1,34 @@
 #!/usr/bin/env bun
-/**
- * Chrona CLI — chrona
- *
- * A comprehensive command-line interface for interacting with the
- * Chrona backend API. Designed to be AI-agent-friendly with
- * structured JSON output by default.
- *
- * Usage:
- *   bun packages/common/cli/src/index.ts <group> <command> [options]
- *
- * Command Groups:
- *   task       Task management (list, get, create, update, done, reopen, plan)
- *   run        Run management (start, message, input)
- *   schedule   Schedule management (apply, clear, view, conflicts, suggest-time)
- *   ai         AI-powered features (decompose, suggest-automation, apply-suggestion)
- *
- * Global options:
- *   --base-url <url>     Override the API base URL (default: http://localhost:3000)
- *
- * All commands support:
- *   -o, --output <format>   Output format: json (default) or table
- */
 
 import { Command } from "commander";
-import { ApiClient } from "./lib/api-client.js";
 import { registerTaskCommands } from "./commands/task.js";
 import { registerRunCommands } from "./commands/run.js";
 import { registerScheduleCommands } from "./commands/schedule.js";
 import { registerAiCommands } from "./commands/ai.js";
+import { createClientOptions, createClientResolver } from "./commands/shared.js";
 
-const program = new Command();
+export function createProgram(): Command {
+  const program = new Command();
 
-program
-  .name("chrona")
-  .description(
-    "Chrona CLI — manage tasks, runs, schedules, and AI features.\n" +
-    "Outputs structured JSON by default for AI-agent integration.",
-  )
-  .version("0.2.0")
-  .option("--base-url <url>", "API base URL", "http://localhost:3000");
+  program
+    .name("chrona")
+    .description("Chrona CLI: thin command-line client for the Chrona app API.")
+    .version("0.2.0");
 
-/**
- * Lazily create an ApiClient using the resolved --base-url option.
- * This factory is passed to each subcommand so the client picks up
- * the global option even when it appears before the subcommand name.
- */
-function getClient(): ApiClient {
-  const opts = program.opts<{ baseUrl: string }>();
-  return new ApiClient(opts.baseUrl);
+  createClientOptions(program);
+
+  const resolveClient = createClientResolver(program);
+
+  registerTaskCommands(program, resolveClient);
+  registerRunCommands(program, resolveClient);
+  registerScheduleCommands(program, resolveClient);
+  registerAiCommands(program, resolveClient);
+
+  return program;
 }
 
-// Register command groups
-registerTaskCommands(program, getClient);
-registerRunCommands(program, getClient);
-registerScheduleCommands(program, getClient);
-registerAiCommands(program, getClient);
+async function main(argv: string[]): Promise<void> {
+  await createProgram().parseAsync(argv);
+}
 
-// Parse argv and run
-program.parseAsync(process.argv);
+await main(process.argv);

@@ -2,7 +2,7 @@
  * OpenClaw CLI Bridge Client
  *
  * Implements the OpenClawRuntimeClient interface by communicating with the
- * CLI Bridge HTTP server (`packages/providers/openclaw/bridge/src/server.ts`).
+ * CLI Bridge HTTP server (`packages/providers/openclaw/bridge/src/index.ts`).
  */
 
 import type {
@@ -31,13 +31,13 @@ import type {
 } from "./bridge-types";
 import type { RuntimeInput } from "@chrona/runtime-core";
 
-type BridgeClientOptions = {
+export type OpenClawBridgeClientOptions = {
   baseUrl?: string;
   timeoutSeconds?: number;
   onEvent?: (event: NDJSONEvent) => void;
 };
 
-type SessionState = {
+export type SessionState = {
   sessionId: string;
   messages: Array<Record<string, unknown>>;
   lastRunRef: string | null;
@@ -58,7 +58,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   private onEvent?: (event: NDJSONEvent) => void;
   private sessions = new Map<string, SessionState>();
 
-  constructor(options: BridgeClientOptions = {}) {
+  constructor(options: OpenClawBridgeClientOptions = {}) {
     this.baseUrl = (
       options.baseUrl ??
       process.env.OPENCLAW_BRIDGE_URL ??

@@ -10,8 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { extractJSON, SYSTEM_PROMPTS } from "@chrona/ai-features";
-import { llmCall } from "@chrona/ai-features/core/providers";
+import { extractJSON, llmCall, SYSTEM_PROMPTS } from "@chrona/ai-features";
 import type { TaskPlanNode, TaskPlanEdge } from "../types";
 import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 
@@ -105,6 +104,7 @@ function parseGraphResponse(raw: string) {
           ? ("needs_approval" as const)
           : null,
       linkedTaskId: null,
+      completionSummary: null,
       metadata: null,
     };
   });
@@ -401,6 +401,7 @@ function makeNode(
     autoRunnable: true,
     blockingReason: null,
     linkedTaskId: null,
+    completionSummary: null,
     metadata: null,
     ...overrides,
   };

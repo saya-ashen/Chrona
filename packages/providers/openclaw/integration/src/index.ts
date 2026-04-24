@@ -10,8 +10,12 @@ export type {
   RuntimeExecutionAdapter,
   RuntimeAdapterDefinition,
   RuntimeTaskConfigSpec,
-} from "../../runtime-core/src/index";
+} from "@chrona/runtime-core";
 
+export * from "./bridge/client";
+export * from "./bridge/contracts";
+export * from "./runtime/client";
+export * from "./protocol/openclaw";
 export * from "./transport/bridge-client";
 export * from "./transport/bridge-types";
 export * from "./runtime/runtime-client";

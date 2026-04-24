@@ -1,122 +1,160 @@
-/**
- * CLI command group: ai
- *
- * Subcommands:
- *   ai decompose            - Decompose a task into subtasks
- *   ai suggest-automation   - Get automation suggestions for a task
- *   ai apply-suggestion     - Apply a scheduling suggestion
- *   ai batch-decompose      - Decompose and create subtasks in one step
- *   ai auto-complete        - Get title auto-complete suggestions
- */
-
 import { Command } from "commander";
-import { ApiClient } from "../lib/api-client.js";
+import type { TaskChange } from "../client.js";
+import type { ClientResolver } from "./shared.js";
 import {
-  output,
+  createOutputOption,
+  parseJsonOption,
+  runCommand,
+  type CommonCommandOptions,
+} from "./shared.js";
+import {
+  formatAiStatus,
+  formatAutoComplete,
   formatAutomation,
-  formatSuggestions,
-  formatRunResult,
-  printError,
-  type OutputFormat,
-} from "../lib/output-formatter.js";
+  formatPlanResult,
+  formatSuggestionApplyResult,
+} from "../output/ai.js";
 
-export function registerAiCommands(
-  program: Command,
-  getClient: () => ApiClient,
-): void {
-  const ai = program
-    .command("ai")
-    .description("AI-powered analysis and automation commands");
+export function registerAiCommands(program: Command, getClient: ClientResolver): void {
+  const ai = program.command("ai").description("AI-related app API commands");
 
-  // ── ai decompose ───────────────────────────────────────────────────
-  ai
-    .command("decompose")
-    .description("Decompose a task into subtasks using AI")
-    .requiredOption("-t, --task-id <id>", "Task ID to decompose")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.decomposeTask(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
-
-  // ── ai suggest-automation ──────────────────────────────────────────
-  ai
-    .command("suggest-automation")
-    .description("Get automation suggestions for a task")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.suggestAutomation(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatAutomation));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
-
-  // ── ai apply-suggestion ────────────────────────────────────────────
-  ai
-    .command("apply-suggestion")
-    .description("Apply a scheduling suggestion")
-    .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-    .requiredOption("-s, --suggestion-id <id>", "Suggestion ID to apply")
-    .requiredOption("-c, --changes <json>", "Changes as JSON array (e.g. '[{\"taskId\":\"x\",\"scheduledStartAt\":\"...\"}]')")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { workspaceId: string; suggestionId: string; changes: string; output: string }) => {
-      try {
-        let parsedChanges;
-        try {
-          parsedChanges = JSON.parse(opts.changes);
-        } catch {
-          printError("Invalid JSON for --changes. Expected a JSON array of TaskChange objects.");
-        }
-        const client = getClient();
-        const data = await client.applySuggestion(
-          opts.workspaceId,
-          opts.suggestionId,
-          parsedChanges,
+  createOutputOption(
+    ai
+      .command("generate-plan")
+      .description("Generate a task plan graph")
+      .option("-t, --task-id <id>", "Task ID")
+      .option("--title <title>", "Ad-hoc task title")
+      .option("--description <text>", "Ad-hoc task description")
+      .option("--estimated-minutes <number>", "Estimated minutes")
+      .option("--planning-prompt <text>", "Planning prompt override")
+      .option("--force-refresh", "Ignore cached plan", false)
+      .action(async (options: CommonCommandOptions & {
+        taskId?: string;
+        title?: string;
+        description?: string;
+        estimatedMinutes?: string;
+        planningPrompt?: string;
+        forceRefresh: boolean;
+      }) => {
+        await runCommand(
+          () =>
+            getClient().generateTaskPlan({
+              taskId: options.taskId,
+              title: options.title,
+              description: options.description,
+              estimatedMinutes: options.estimatedMinutes
+                ? Number.parseInt(options.estimatedMinutes, 10)
+                : undefined,
+              planningPrompt: options.planningPrompt,
+              forceRefresh: options.forceRefresh,
+            }),
+          options,
+          formatPlanResult,
         );
-        console.log(output(data, opts.output as OutputFormat, formatSuggestions));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+      }),
+  );
 
-  // ── ai batch-decompose ──────────────────────────────────────────────
-  ai
-    .command("batch-decompose")
-    .description("Decompose a task and create subtasks in one step")
-    .requiredOption("-t, --task-id <id>", "Task ID to decompose")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.batchDecompose(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    ai
+      .command("apply-plan")
+      .description("Materialize a generated task plan")
+      .requiredOption("-t, --task-id <id>", "Parent task ID")
+      .option("--nodes <json>", "Optional JSON array of plan nodes")
+      .option("--edges <json>", "Optional JSON array of plan edges")
+      .action(async (options: CommonCommandOptions & { taskId: string; nodes?: string; edges?: string }) => {
+        await runCommand(
+          () =>
+            getClient().batchApplyPlan({
+              taskId: options.taskId,
+              nodes: options.nodes ? parseJsonOption<unknown[]>(options.nodes, "--nodes") : undefined,
+              edges: options.edges ? parseJsonOption<unknown[]>(options.edges, "--edges") : undefined,
+            }),
+          options,
+          formatPlanResult,
+        );
+      }),
+  );
 
-  // ── ai auto-complete ────────────────────────────────────────────────
-  ai
-    .command("auto-complete")
-    .description("Get title auto-complete suggestions")
-    .requiredOption("--title <partial-title>", "Partial title to auto-complete")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { title: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.autoComplete(opts.title);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    ai
+      .command("suggest-automation")
+      .description("Get automation suggestions for a task")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().suggestAutomation(options.taskId), options, formatAutomation);
+      }),
+  );
+
+  createOutputOption(
+    ai
+      .command("apply-suggestion")
+      .description("Apply a legacy scheduling suggestion change-set")
+      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
+      .requiredOption("-s, --suggestion-id <id>", "Suggestion ID")
+      .requiredOption("-c, --changes <json>", "TaskChange JSON array")
+      .action(async (options: CommonCommandOptions & { workspaceId: string; suggestionId: string; changes: string }) => {
+        await runCommand(
+          () =>
+            getClient().applySuggestion(
+              options.workspaceId,
+              options.suggestionId,
+              parseJsonOption<TaskChange[]>(options.changes, "--changes"),
+            ),
+          options,
+          formatSuggestionApplyResult,
+        );
+      }),
+  );
+
+  createOutputOption(
+    ai
+      .command("auto-complete")
+      .description("Request task creation auto-complete suggestions")
+      .requiredOption("--title <title>", "Partial title")
+      .option("-w, --workspace-id <id>", "Workspace ID for richer context")
+      .action(async (options: CommonCommandOptions & { title: string; workspaceId?: string }) => {
+        await runCommand(
+          () => getClient().autoComplete({ title: options.title, workspaceId: options.workspaceId }),
+          options,
+          formatAutoComplete,
+        );
+      }),
+  );
+
+  createOutputOption(
+    ai
+      .command("status")
+      .description("Get current AI client availability")
+      .action(async (options: CommonCommandOptions) => {
+        await runCommand(() => getClient().getAiStatus(), options, formatAiStatus);
+      }),
+  );
+
+  createOutputOption(
+    ai
+      .command("decompose")
+      .description("Compatibility alias for generate-plan --task-id")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(
+          () => getClient().generateTaskPlan({ taskId: options.taskId }),
+          options,
+          formatPlanResult,
+        );
+      }),
+  );
+
+  createOutputOption(
+    ai
+      .command("batch-decompose")
+      .description("Compatibility alias for apply-plan using latest saved plan")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(
+          () => getClient().batchApplyPlan({ taskId: options.taskId }),
+          options,
+          formatPlanResult,
+        );
+      }),
+  );
 }
