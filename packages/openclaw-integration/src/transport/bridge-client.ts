@@ -298,6 +298,8 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
         return "/v1/features/suggest-timeslot";
       case "chat":
         return "/v1/features/chat";
+      case "dispatch_task":
+        return "/v1/features/dispatch-task";
     }
   }
 
