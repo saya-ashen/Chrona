@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 describe("chrona structured result plugin tools", () => {
   const source = fs.readFileSync(path.resolve(__dirname, "index.ts"), "utf8");
 
-  it("registers readable business tools only", () => {
+  it("registers the bridge business tools only", () => {
     expect(source).toContain('name: "suggest_task_completions"');
     expect(source).toContain('name: "generate_task_plan_graph"');
+    expect(source).toContain('name: "dispatch_next_task_action"');
     expect(source).not.toContain('name: "submit_structured_result"');
   });
 

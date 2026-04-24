@@ -19,7 +19,7 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
   NDJSONEvent,
-} from "@chrona/openclaw-integration/transport/bridge-types";
+} from "@chrona/openclaw-integration/bridge/contracts";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,

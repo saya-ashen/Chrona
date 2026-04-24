@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chrona/openclaw-integration": "workspace:*"
+    "@chrona/openclaw-integration": "workspace:*",
+    "hono": "^4.9.6"
   },
   "exports": {
-    ".": "./src/server.ts"
+    ".": "./src/index.ts",
+    "./app": "./src/app.ts",
+    "./server": "./src/server.ts",
+    "./*": "./src/*"
   }
 }
 

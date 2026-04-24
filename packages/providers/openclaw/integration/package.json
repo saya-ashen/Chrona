@@ -8,8 +8,11 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./bridge/*": "./src/bridge/*.ts",
     "./transport/*": "./src/transport/*.ts",
+    "./runtime/client": "./src/runtime/client.ts",
     "./runtime/*": "./src/runtime/*.ts",
+    "./protocol/openclaw": "./src/protocol/openclaw.ts",
     "./protocol/*": "./src/protocol/*.ts",
     "./config/*": "./src/config/*.ts"
   }

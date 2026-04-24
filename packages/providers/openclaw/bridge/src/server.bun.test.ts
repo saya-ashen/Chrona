@@ -2,18 +2,24 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import {
   buildGatewayBody,
+  createBridgeApp,
   createBridgeLogger,
+  resetBridgeSessions,
   startBridgeServer,
   summarizeBridgeRequest,
   type BridgeExecutionTaskRequest,
   type BridgeFeatureRequest,
   type BridgeLogEntry,
+  type BridgeResponse,
+  type ExecutionResult,
+  type RouteKind,
 } from "./server";
 
 const realFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  resetBridgeSessions();
 });
 
 function makeSSEResponse(events: Array<{ event: string; data: Record<string, unknown> }>) {
@@ -24,6 +30,27 @@ function makeSSEResponse(events: Array<{ event: string; data: Record<string, unk
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
+}
+
+function getRequestUrl(input: Request | URL | string): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function makeResponse(overrides: Partial<BridgeResponse> = {}): BridgeResponse {
+  return {
+    sessionId: "sess-1",
+    output: "ok",
+    toolCalls: [],
+    toolCallOutputs: [],
+    usage: null,
+    error: null,
+    durationMs: 1,
+    structured: null,
+    feature: null,
+    ...overrides,
+  };
 }
 
 describe("openclaw bridge gateway helpers", () => {
@@ -106,16 +133,114 @@ describe("openclaw bridge gateway helpers", () => {
   });
 });
 
+describe("openclaw bridge hono app", () => {
+  it("health route responds through hono app", async () => {
+    const app = createBridgeApp({
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkGatewayAvailable: async () => true,
+      executeRequest: async () => {
+        throw new Error("should not be called");
+      },
+    });
+
+    const res = await app.request("http://bridge.local/v1/health");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      status: "ok",
+      gateway: (process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789")
+        .replace(/^wss:\/\//, "https://")
+        .replace(/^ws:\/\//, "http://"),
+    });
+  });
+
+  it("explicit feature and execution routes exist through hono app", async () => {
+    const calls: Array<{ route: RouteKind; body: BridgeFeatureRequest | BridgeExecutionTaskRequest }> = [];
+    const executeRequest = async (
+      route: RouteKind,
+      body: BridgeFeatureRequest | BridgeExecutionTaskRequest,
+    ): Promise<ExecutionResult> => {
+      calls.push({ route, body });
+      return { response: makeResponse(), events: [] };
+    };
+    const app = createBridgeApp({
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkGatewayAvailable: async () => true,
+      executeRequest,
+    });
+
+    const featureRes = await app.request("http://bridge.local/v1/features/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { title: "test" } }),
+    });
+    const executionRes = await app.request("http://bridge.local/v1/execution/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: "run" }),
+    });
+
+    expect(featureRes.status).toBe(200);
+    expect(executionRes.status).toBe(200);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.route).toEqual({ kind: "feature", feature: "suggest", stream: false });
+    expect(calls[1]?.route).toEqual({ kind: "execution", stream: false });
+  });
+
+  it("streaming endpoint emits done event semantics", async () => {
+    const app = createBridgeApp({
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkGatewayAvailable: async () => true,
+      executeRequest: async () => ({
+        response: makeResponse({ sessionId: "stream-session" }),
+        events: [{ type: "status", sessionId: "stream-session", status: "in_progress" }],
+      }),
+    });
+
+    const res = await app.request("http://bridge.local/v1/execution/task/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: "run" }),
+    });
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("event: event");
+    expect(text).toContain('"type":"status"');
+    expect(text).toContain("event: done");
+  });
+
+  it("streaming endpoint emits error event semantics", async () => {
+    const app = createBridgeApp({
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+      checkGatewayAvailable: async () => true,
+      executeRequest: async () => {
+        throw new Error("kaboom");
+      },
+    });
+
+    const res = await app.request("http://bridge.local/v1/execution/task/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: "run" }),
+    });
+
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).toContain("event: error");
+    expect(text).toContain("kaboom");
+  });
+});
+
 describe("openclaw bridge gateway endpoints", () => {
   it("extracts generate_plan payload from function_call.arguments", async () => {
     const port = 18670;
 
-    globalThis.fetch = async (input, _init) => {
-      const url = String(input);
-      if (url.includes(":18789/v1/health")) {
+    globalThis.fetch = (async (input, _init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/health")) {
         return Response.json({ status: "ok" });
       }
-      if (url.includes(":18789/v1/responses")) {
+      if (url.includes("/v1/responses")) {
         return Response.json({
           id: "resp-plan-1",
           status: "completed",
@@ -136,7 +261,7 @@ describe("openclaw bridge gateway endpoints", () => {
         });
       }
       return realFetch(input, _init);
-    };
+    }) as typeof fetch;
 
     const server = startBridgeServer({
       port,
@@ -166,9 +291,9 @@ describe("openclaw bridge gateway endpoints", () => {
   it("returns 422 when required function_call is missing", async () => {
     const port = 18671;
 
-    globalThis.fetch = async (input, _init) => {
-      const url = String(input);
-      if (url.includes(":18789/v1/responses")) {
+    globalThis.fetch = (async (input, _init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
         return Response.json({
           id: "resp-plan-2",
           status: "completed",
@@ -176,7 +301,7 @@ describe("openclaw bridge gateway endpoints", () => {
         });
       }
       return realFetch(input, _init);
-    };
+    }) as typeof fetch;
 
     const server = startBridgeServer({
       port,
@@ -200,9 +325,9 @@ describe("openclaw bridge gateway endpoints", () => {
   it("extracts suggest and dispatch payloads from function_call.arguments", async () => {
     const port = 18672;
 
-    globalThis.fetch = async (input, init) => {
-      const url = String(input);
-      if (url.includes(":18789/v1/responses")) {
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
         const req = JSON.parse(String(init?.body ?? "{}")) as { tool_choice?: { function?: { name?: string } } };
         const toolName = req.tool_choice?.function?.name;
         if (toolName === "suggest_task_completions") {
@@ -241,7 +366,7 @@ describe("openclaw bridge gateway endpoints", () => {
         });
       }
       return realFetch(input, init);
-    };
+    }) as typeof fetch;
 
     const server = startBridgeServer({
       port,
@@ -275,9 +400,9 @@ describe("openclaw bridge gateway endpoints", () => {
   it("execution/task returns output + function_call + function_call_output + usage", async () => {
     const port = 18673;
 
-    globalThis.fetch = async (input, init) => {
-      const url = String(input);
-      if (url.includes(":18789/v1/responses")) {
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
         const req = JSON.parse(String(init?.body ?? "{}")) as { tools?: unknown[] };
         expect(req.tools).toBeUndefined();
 
@@ -305,7 +430,7 @@ describe("openclaw bridge gateway endpoints", () => {
         });
       }
       return realFetch(input, init);
-    };
+    }) as typeof fetch;
 
     const server = startBridgeServer({
       port,
@@ -332,9 +457,9 @@ describe("openclaw bridge gateway endpoints", () => {
   it("streaming endpoint maps gateway SSE to bridge events", async () => {
     const port = 18674;
 
-    globalThis.fetch = async (input, _init) => {
-      const url = String(input);
-      if (url.includes(":18789/v1/responses")) {
+    globalThis.fetch = (async (input, _init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
         return makeSSEResponse([
           {
             event: "response.created",
@@ -380,7 +505,7 @@ describe("openclaw bridge gateway endpoints", () => {
         ]);
       }
       return realFetch(input, _init);
-    };
+    }) as typeof fetch;
 
     const server = startBridgeServer({
       port,

@@ -1,246 +1,192 @@
-/**
- * CLI command group: task
- *
- * Subcommands:
- *   task list      - List tasks in a workspace
- *   task get       - Get task details
- *   task create    - Create a new task
- *   task update    - Update an existing task
- *   task done      - Mark a task as done
- *   task reopen    - Reopen a completed task
- *   task plan      - Generate a plan for a task
- *   task delete    - Delete a task
- *   task subtasks  - List subtasks of a task
- *   task add-subtask - Create a subtask under a task
- */
-
 import { Command } from "commander";
-import { ApiClient } from "../lib/api-client.js";
+import type { ClientResolver } from "./shared.js";
 import {
-  output,
-  formatTaskList,
-  formatTaskDetail,
-  formatRunResult,
-  printError,
-  type OutputFormat,
-} from "../lib/output-formatter.js";
+  createOutputOption,
+  parseIntegerOption,
+  runCommand,
+  type CommonCommandOptions,
+} from "./shared.js";
+import { formatRunResult } from "../output/run.js";
+import { formatTaskDetail, formatTaskList } from "../output/task.js";
 
-export function registerTaskCommands(
-  program: Command,
-  getClient: () => ApiClient,
-): void {
-  const task = program
-    .command("task")
-    .description("Task management commands");
+export function registerTaskCommands(program: Command, getClient: ClientResolver): void {
+  const task = program.command("task").description("Task management");
 
-  // ── task list ──────────────────────────────────────────────────────
-  task
-    .command("list")
-    .description("List tasks for a workspace")
-    .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-    .option("-s, --status <status>", "Filter by status")
-    .option("-l, --limit <n>", "Maximum number of tasks to return", "50")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { workspaceId: string; status?: string; limit: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.listTasks(opts.workspaceId, {
-          status: opts.status,
-          limit: parseInt(opts.limit, 10),
-        });
-        console.log(output(data, opts.output as OutputFormat, formatTaskList));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("list")
+      .description("List tasks in a workspace")
+      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
+      .option("-s, --status <status>", "Filter by task status")
+      .option("-l, --limit <number>", "Maximum tasks to return", "50")
+      .action(async (options: CommonCommandOptions & { workspaceId: string; status?: string; limit: string }) => {
+        await runCommand(
+          () => getClient().listTasks(options.workspaceId, {
+            status: options.status,
+            limit: parseIntegerOption(options.limit, "--limit"),
+          }),
+          options,
+          formatTaskList,
+        );
+      }),
+  );
 
-  // ── task get ───────────────────────────────────────────────────────
-  task
-    .command("get")
-    .description("Get task details by ID")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.getTask(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatTaskDetail));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("get")
+      .description("Get task details")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().getTask(options.taskId), options, formatTaskDetail);
+      }),
+  );
 
-  // ── task create ────────────────────────────────────────────────────
-  task
-    .command("create")
-    .description("Create a new task")
-    .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-    .requiredOption("--title <title>", "Task title")
-    .option("--description <desc>", "Task description")
-    .option("--priority <priority>", "Priority: Low, Medium, High, or Urgent")
-    .option("--due <date>", "Due date (ISO 8601)")
-    .option("--adapter <key>", "Runtime adapter key")
-    .option("--model <model>", "Runtime model identifier")
-    .option("--prompt <prompt>", "Task prompt")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: {
-      workspaceId: string;
-      title: string;
-      description?: string;
-      priority?: string;
-      due?: string;
-      adapter?: string;
-      model?: string;
-      prompt?: string;
-      output: string;
-    }) => {
-      try {
-        const client = getClient();
-        const data = await client.createTask({
-          workspaceId: opts.workspaceId,
-          title: opts.title,
-          description: opts.description,
-          priority: opts.priority,
-          dueAt: opts.due,
-          runtimeAdapterKey: opts.adapter,
-          runtimeModel: opts.model,
-          prompt: opts.prompt,
-        });
-        console.log(output(data, opts.output as OutputFormat, formatTaskDetail));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("create")
+      .description("Create a task")
+      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
+      .requiredOption("--title <title>", "Task title")
+      .option("--description <text>", "Task description")
+      .option("--priority <priority>", "Task priority")
+      .option("--due <datetime>", "Due date as ISO-8601")
+      .option("--adapter <key>", "Runtime adapter key")
+      .option("--model <model>", "Runtime model")
+      .option("--prompt <text>", "Task prompt")
+      .action(async (options: CommonCommandOptions & {
+        workspaceId: string;
+        title: string;
+        description?: string;
+        priority?: string;
+        due?: string;
+        adapter?: string;
+        model?: string;
+        prompt?: string;
+      }) => {
+        await runCommand(
+          () =>
+            getClient().createTask({
+              workspaceId: options.workspaceId,
+              title: options.title,
+              description: options.description,
+              priority: options.priority,
+              dueAt: options.due,
+              runtimeAdapterKey: options.adapter,
+              runtimeModel: options.model,
+              prompt: options.prompt,
+            }),
+          options,
+          formatTaskDetail,
+        );
+      }),
+  );
 
-  // ── task update ────────────────────────────────────────────────────
-  task
-    .command("update")
-    .description("Update an existing task")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("--title <title>", "New title")
-    .option("--description <desc>", "New description")
-    .option("--priority <priority>", "New priority: Low, Medium, High, or Urgent")
-    .option("--due <date>", "New due date (ISO 8601)")
-    .option("--model <model>", "New runtime model")
-    .option("--prompt <prompt>", "New prompt")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: {
-      taskId: string;
-      title?: string;
-      description?: string;
-      priority?: string;
-      due?: string;
-      model?: string;
-      prompt?: string;
-      output: string;
-    }) => {
-      try {
-        const client = getClient();
-        const body: Record<string, string> = {};
-        if (opts.title) body.title = opts.title;
-        if (opts.description) body.description = opts.description;
-        if (opts.priority) body.priority = opts.priority;
-        if (opts.due) body.dueAt = opts.due;
-        if (opts.model) body.runtimeModel = opts.model;
-        if (opts.prompt) body.prompt = opts.prompt;
-        const data = await client.updateTask(opts.taskId, body);
-        console.log(output(data, opts.output as OutputFormat, formatTaskDetail));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("update")
+      .description("Update a task")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .option("--title <title>", "Task title")
+      .option("--description <text>", "Task description")
+      .option("--priority <priority>", "Task priority")
+      .option("--due <datetime>", "Due date as ISO-8601")
+      .option("--model <model>", "Runtime model")
+      .option("--adapter <key>", "Runtime adapter key")
+      .option("--prompt <text>", "Task prompt")
+      .action(async (options: CommonCommandOptions & {
+        taskId: string;
+        title?: string;
+        description?: string;
+        priority?: string;
+        due?: string;
+        model?: string;
+        adapter?: string;
+        prompt?: string;
+      }) => {
+        await runCommand(
+          () =>
+            getClient().updateTask(options.taskId, {
+              title: options.title,
+              description: options.description,
+              priority: options.priority,
+              dueAt: options.due,
+              runtimeModel: options.model,
+              runtimeAdapterKey: options.adapter,
+              prompt: options.prompt,
+            }),
+          options,
+          formatTaskDetail,
+        );
+      }),
+  );
 
-  // ── task done ──────────────────────────────────────────────────────
-  task
-    .command("done")
-    .description("Mark a task as done")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.markDone(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("done")
+      .description("Mark a task done")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().markDone(options.taskId), options, formatRunResult);
+      }),
+  );
 
-  // ── task reopen ────────────────────────────────────────────────────
-  task
-    .command("reopen")
-    .description("Reopen a completed task")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.reopenTask(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("reopen")
+      .description("Reopen a task")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().reopenTask(options.taskId), options, formatRunResult);
+      }),
+  );
 
-  // ── task delete ─────────────────────────────────────────────────────
-  task
-    .command("delete")
-    .description("Delete a task")
-    .requiredOption("-t, --task-id <id>", "Task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.deleteTask(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatRunResult));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("delete")
+      .description("Delete a task")
+      .requiredOption("-t, --task-id <id>", "Task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().deleteTask(options.taskId), options, formatRunResult);
+      }),
+  );
 
-  // ── task subtasks ───────────────────────────────────────────────────
-  task
-    .command("subtasks")
-    .description("List subtasks of a task")
-    .requiredOption("-t, --task-id <id>", "Parent task ID")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: { taskId: string; output: string }) => {
-      try {
-        const client = getClient();
-        const data = await client.listSubtasks(opts.taskId);
-        console.log(output(data, opts.output as OutputFormat, formatTaskList));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("subtasks")
+      .description("List task subtasks")
+      .requiredOption("-t, --task-id <id>", "Parent task ID")
+      .action(async (options: CommonCommandOptions & { taskId: string }) => {
+        await runCommand(() => getClient().listSubtasks(options.taskId), options, formatTaskList);
+      }),
+  );
 
-  // ── task add-subtask ────────────────────────────────────────────────
-  task
-    .command("add-subtask")
-    .description("Create a subtask under a parent task")
-    .requiredOption("-t, --task-id <id>", "Parent task ID")
-    .requiredOption("--title <title>", "Subtask title")
-    .option("--description <desc>", "Subtask description")
-    .option("--priority <priority>", "Priority: Low, Medium, High, or Urgent")
-    .option("-o, --output <format>", "Output format: json or table", "json")
-    .action(async (opts: {
-      taskId: string;
-      title: string;
-      description?: string;
-      priority?: string;
-      output: string;
-    }) => {
-      try {
-        const client = getClient();
-        const body: { title: string; description?: string; priority?: string } = {
-          title: opts.title,
-        };
-        if (opts.description) body.description = opts.description;
-        if (opts.priority) body.priority = opts.priority;
-        const data = await client.createSubtask(opts.taskId, body);
-        console.log(output(data, opts.output as OutputFormat, formatTaskDetail));
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-      }
-    });
+  createOutputOption(
+    task
+      .command("add-subtask")
+      .description("Create a subtask")
+      .requiredOption("-t, --task-id <id>", "Parent task ID")
+      .requiredOption("--title <title>", "Subtask title")
+      .option("--description <text>", "Subtask description")
+      .option("--priority <priority>", "Subtask priority")
+      .option("--due <datetime>", "Due date as ISO-8601")
+      .action(async (options: CommonCommandOptions & {
+        taskId: string;
+        title: string;
+        description?: string;
+        priority?: string;
+        due?: string;
+      }) => {
+        await runCommand(
+          () =>
+            getClient().createSubtask(options.taskId, {
+              title: options.title,
+              description: options.description,
+              priority: options.priority,
+              dueAt: options.due,
+            }),
+          options,
+          formatTaskDetail,
+        );
+      }),
+  );
 }

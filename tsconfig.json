@@ -26,7 +26,6 @@
       "@chrona/openclaw-integration": ["./packages/providers/openclaw/integration/src/index.ts"],
       "@chrona/openclaw-integration/*": ["./packages/providers/openclaw/integration/src/*"],
       "@chrona/ai-features": ["./packages/common/ai-features/src/index.ts"],
-      "@chrona/ai-features/*": ["./packages/common/ai-features/src/*"],
       "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"]
     }
   },

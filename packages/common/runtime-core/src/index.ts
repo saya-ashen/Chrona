@@ -15,7 +15,7 @@ export type {
   RuntimeTaskConfigSpec,
   RuntimeExecutionAdapter,
   RuntimeAdapterDefinition,
-} from "./types";
+} from "./contracts";
 
 export {
   getValueAtPath,

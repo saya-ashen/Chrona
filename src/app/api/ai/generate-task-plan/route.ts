@@ -8,7 +8,7 @@ import {
 } from "@/modules/tasks/task-plan-graph-store";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@/modules/ai/types";
-import type { GenerateTaskPlanResponse } from "@chrona/ai-features/core/types";
+import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
 
 const logger = createLogger("api.ai.generate-task-plan");
 

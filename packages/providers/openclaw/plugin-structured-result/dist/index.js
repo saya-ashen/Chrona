@@ -1,5 +1,77 @@
 // src/index.ts
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+function buildMinimalPlanGraph(input) {
+  const title = input.title.trim() || "Untitled task";
+  const estimated = typeof input.estimatedMinutes === "number" && Number.isFinite(input.estimatedMinutes) ? Math.max(15, Math.round(input.estimatedMinutes)) : 120;
+  const kickoff = Math.max(10, Math.round(estimated * 0.15));
+  const execution = Math.max(20, Math.round(estimated * 0.6));
+  const review = Math.max(10, estimated - kickoff - execution);
+  return {
+    summary: `Plan for ${title}`,
+    reasoning: input.description && input.description.trim().length > 0 ? input.description.trim() : "Fallback graph generated from task metadata because the model did not provide a complete DAG.",
+    nodes: [
+      {
+        id: "node-1",
+        type: "step",
+        title: `Clarify scope for ${title}`,
+        objective: "Establish the target and success criteria",
+        description: null,
+        status: "pending",
+        estimatedMinutes: kickoff,
+        priority: "Medium",
+        executionMode: "manual",
+        requiresHumanInput: true,
+        requiresHumanApproval: false,
+        autoRunnable: false,
+        blockingReason: "needs_user_input"
+      },
+      {
+        id: "node-2",
+        type: "tool_action",
+        title: `Produce main deliverable for ${title}`,
+        objective: "Create the concrete output required by the task",
+        description: null,
+        status: "pending",
+        estimatedMinutes: execution,
+        priority: "High",
+        executionMode: "automatic",
+        requiresHumanInput: false,
+        requiresHumanApproval: false,
+        autoRunnable: true,
+        blockingReason: null
+      },
+      {
+        id: "node-3",
+        type: "checkpoint",
+        title: `Review and finalize ${title}`,
+        objective: "Verify the output and decide whether it is ready",
+        description: null,
+        status: "pending",
+        estimatedMinutes: review,
+        priority: "Medium",
+        executionMode: "manual",
+        requiresHumanInput: false,
+        requiresHumanApproval: true,
+        autoRunnable: false,
+        blockingReason: "needs_approval"
+      }
+    ],
+    edges: [
+      {
+        id: "edge-1",
+        fromNodeId: "node-1",
+        toNodeId: "node-2",
+        type: "depends_on"
+      },
+      {
+        id: "edge-2",
+        fromNodeId: "node-2",
+        toNodeId: "node-3",
+        type: "feeds_output"
+      }
+    ]
+  };
+}
 var PriorityEnum = ["Low", "Medium", "High", "Urgent"];
 function normalizeStringArray(value) {
   if (!Array.isArray(value))
@@ -116,6 +188,52 @@ var GenerateTaskPlanGraphSchema = {
     edges: { type: "array", items: TaskPlanEdgeSchema }
   }
 };
+var DispatchTaskDecisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "LLM must put the next Chrona task-dispatch decision directly into this tool input.",
+  required: [
+    "schemaName",
+    "schemaVersion",
+    "action",
+    "safety",
+    "confidence",
+    "reason"
+  ],
+  properties: {
+    schemaName: { const: "task_dispatch_decision" },
+    schemaVersion: { const: "1.0.0" },
+    action: {
+      type: "string",
+      enum: [
+        "run_node",
+        "materialize_node",
+        "ask_user",
+        "revise_plan",
+        "summarize_context",
+        "mark_task_done",
+        "stop"
+      ]
+    },
+    targetNodeId: { anyOf: [{ type: "string" }, { type: "null" }] },
+    createNewContext: { anyOf: [{ type: "boolean" }, { type: "null" }] },
+    runtimePrompt: { anyOf: [{ type: "string" }, { type: "null" }] },
+    planPatch: { anyOf: [{ type: "object" }, { type: "null" }] },
+    contextInstruction: { anyOf: [{ type: "object" }, { type: "null" }] },
+    safety: {
+      type: "object",
+      additionalProperties: false,
+      required: ["requiresHumanApproval", "riskLevel"],
+      properties: {
+        requiresHumanApproval: { type: "boolean" },
+        riskLevel: { type: "string", enum: ["low", "medium", "high"] }
+      }
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    reason: { type: "string", minLength: 1 },
+    rationale: { anyOf: [{ type: "string" }, { type: "null" }] }
+  }
+};
 var src_default = definePluginEntry({
   id: "chrona-structured-result",
   name: "Chrona Structured Result",
@@ -163,16 +281,27 @@ var src_default = definePluginEntry({
       description: "Business tool for task decomposition. The model should pass the graph directly in tool input; Chrona parses that input as the source of truth.",
       parameters: GenerateTaskPlanGraphSchema,
       async execute(_toolCallId, params) {
-        const graph = normalizePlanGraph(params);
+        const normalized = normalizePlanGraph(params);
+        const fallback = buildMinimalPlanGraph({
+          title: typeof params.title === "string" ? params.title : "Untitled task",
+          description: typeof params.description === "string" ? params.description : null,
+          estimatedMinutes: typeof params.estimatedMinutes === "number" ? params.estimatedMinutes : null
+        });
+        const graph = hasNonEmptyPlanGraph(normalized) ? normalized : {
+          ...fallback,
+          summary: normalized.summary || fallback.summary,
+          reasoning: normalized.reasoning || fallback.reasoning
+        };
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify({
-                ok: hasNonEmptyPlanGraph(graph),
+                ok: true,
                 summary: graph.summary || "generate_task_plan_graph completed",
                 nodeCount: graph.nodes.length,
-                edgeCount: graph.edges.length
+                edgeCount: graph.edges.length,
+                fallbackUsed: !hasNonEmptyPlanGraph(normalized)
               }, null, 2)
             }
           ],
@@ -181,11 +310,36 @@ var src_default = definePluginEntry({
             taskId: typeof params.taskId === "string" ? params.taskId : null,
             title: typeof params.title === "string" ? params.title : "",
             inputMode: "graph_in_tool_input",
-            ok: hasNonEmptyPlanGraph(graph)
+            ok: true
           }
         };
       }
     }, { name: "generate_task_plan_graph" });
+    api.registerTool({
+      name: "dispatch_next_task_action",
+      label: "Dispatch Next Task Action",
+      description: "Business tool for task dispatching. The model should pass TaskDispatchDecision JSON directly via tool input.",
+      parameters: DispatchTaskDecisionSchema,
+      async execute(_toolCallId, params) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                ok: true,
+                action: params.action ?? null,
+                confidence: typeof params.confidence === "number" ? params.confidence : null
+              }, null, 2)
+            }
+          ],
+          details: {
+            ...params,
+            ok: true,
+            inputMode: "dispatch_in_tool_input"
+          }
+        };
+      }
+    }, { name: "dispatch_next_task_action" });
     api.logger.info("Chrona structured-result plugin loaded");
   }
 });

@@ -3,7 +3,7 @@ import type {
   OpenClawChatHistory,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
-} from "@chrona/openclaw-integration/protocol/types";
+} from "@chrona/openclaw-integration/protocol/openclaw";
 
 export type OpenClawSyncCursor = {
   sessionKey?: string;

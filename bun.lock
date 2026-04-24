@@ -13,6 +13,7 @@
         "clsx": "^2.1.1",
         "dagre": "^0.8.5",
         "date-fns": "^4.1.0",
+        "hono": "^4.9.6",
         "lucide-react": "^1.7.0",
         "next": "^16.2.4",
         "prisma-adapter-bun-sqlite": "^0.7.1",
@@ -67,11 +68,16 @@
         "commander": "^14.0.3",
       },
     },
+    "packages/common/runtime-core": {
+      "name": "@chrona/runtime-core",
+      "version": "0.1.0",
+    },
     "packages/providers/openclaw/bridge": {
       "name": "@chrona/openclaw-bridge",
       "version": "0.1.0",
       "dependencies": {
         "@chrona/openclaw-integration": "workspace:*",
+        "hono": "^4.9.6",
       },
     },
     "packages/providers/openclaw/integration": {
@@ -83,10 +89,6 @@
     },
     "packages/providers/openclaw/plugin-structured-result": {
       "name": "@chrona/openclaw-plugin-structured-result",
-      "version": "0.1.0",
-    },
-    "packages/common/runtime-core": {
-      "name": "@chrona/runtime-core",
       "version": "0.1.0",
     },
   },
