@@ -2,6 +2,8 @@
  * AI Features — Streaming support (OpenClaw SSE + LLM SSE).
  */
 
+import { createHash } from "node:crypto";
+
 import type {
   AiClientRecord,
   AiFeature,
@@ -345,18 +347,32 @@ export function dispatchStream(
   );
 }
 
-function buildSuggestScope(request: SmartSuggestRequest): string {
+function asciiSlug(value: string, maxLength: number): string {
+  const normalized = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, maxLength)
+    .replace(/^-|-$/g, "");
+  return normalized || "input";
+}
+
+export function buildSuggestScope(request: SmartSuggestRequest): string {
   if (request.sessionKey?.trim()) {
     return request.sessionKey.trim();
   }
   if (request.taskId?.trim()) {
     return `chrona:openclaw:task:${request.taskId.trim()}:default`;
   }
-  const workspace = request.workspaceId ?? "default";
-  const normalizedInput =
-    request.input.trim().toLowerCase().slice(0, 120) || "empty";
+  const workspace = asciiSlug(request.workspaceId ?? "default", 24);
+  const normalizedInput = request.input.trim();
+  const inputSlug = asciiSlug(normalizedInput, 24);
+  const inputHash = createHash("sha1").update(normalizedInput).digest("hex").slice(0, 8);
   const nonce = Math.random().toString(36).slice(2, 10);
-  return `${workspace}-${request.kind}-${normalizedInput}-${nonce}`;
+  return `${workspace}-${request.kind}-${inputSlug}-${inputHash}-${nonce}`;
 }
 
 export async function* suggestStream(
