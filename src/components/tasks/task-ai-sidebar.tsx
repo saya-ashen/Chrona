@@ -239,7 +239,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
   const [activePlan, setActivePlan] = useState<SavedTaskAiPlanSummary | null>(task.savedAiPlan ?? null);
   const [planningPrompt, setPlanningPrompt] = useState(task.savedAiPlan?.prompt ?? "");
   const [refreshToken, setRefreshToken] = useState(0);
-  const [forceRefresh, setForceRefresh] = useState(task.savedAiPlan === null);
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
 
   const accepted = activePlan?.status === "accepted";

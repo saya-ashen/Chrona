@@ -22,7 +22,7 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 const taskDecompositionPanelProps = vi.fn();
-vi.mock("@/components/schedule/task-decomposition-panel", () => ({
+vi.mock("@/components/schedule/task-planning-panel", () => ({
   TaskDecompositionPanel: (props: any) => {
     taskDecompositionPanelProps(props);
     return <div data-testid="task-decomposition-panel">task plan graph</div>;
@@ -56,13 +56,13 @@ const task = {
 } as const;
 
 describe("TaskAiSidebar", () => {
-  it("auto-requests a plan only when no saved AI plan exists", () => {
+  it("asks the backend for the current plan when no saved AI plan exists", () => {
     render(<TaskAiSidebar task={{ ...task, savedAiPlan: null }} />);
 
     expect(taskDecompositionPanelProps).toHaveBeenCalledWith(
       expect.objectContaining({
         autoRequest: true,
-        forceRefresh: true,
+        forceRefresh: false,
       }),
     );
   });
@@ -85,9 +85,9 @@ describe("TaskAiSidebar", () => {
       />,
     );
 
-    expect(screen.getByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
+    expect(screen.getByText(/Current saved plan title and main flow/)).toBeInTheDocument();
     expect(screen.getByText(/2 planned items/)).toBeInTheDocument();
-    expect(screen.getByText(/提示词：prioritize constitutional checks/)).toBeInTheDocument();
+    expect(screen.getByText(/promptprioritize constitutional checks/)).toBeInTheDocument();
     expect(taskDecompositionPanelProps).not.toHaveBeenCalled();
   });
 
@@ -109,9 +109,9 @@ describe("TaskAiSidebar", () => {
       />,
     );
 
-    expect(screen.getByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /重新规划/i })).toBeInTheDocument();
-    expect(screen.getByText(/已接受，除非重新规划否则不会自动重跑/)).toBeInTheDocument();
+    expect(screen.getByText(/Current saved plan title and main flow/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Re-plan/i })).toBeInTheDocument();
+    expect(screen.getByText(/Accepted — will not auto-rerun unless you re-plan/)).toBeInTheDocument();
   });
 
   it("passes edited planning prompt into the planning panel and refreshes on replan", async () => {
@@ -130,10 +130,10 @@ describe("TaskAiSidebar", () => {
       />,
     );
 
-    const textarea = screen.getByPlaceholderText(/例如：优先考虑法规核查/);
+    const textarea = screen.getByPlaceholderText(/e.g.: Prioritize regulatory checks/);
     await user.clear(textarea);
     await user.type(textarea, "new planning guidance");
-    await user.click(screen.getByRole("button", { name: /重新规划/i }));
+    await user.click(screen.getByRole("button", { name: /Re-plan/i }));
 
     await waitFor(() => {
       expect(taskDecompositionPanelProps).toHaveBeenLastCalledWith(
@@ -179,7 +179,7 @@ describe("TaskAiSidebar", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /重新规划/i }));
+    await user.click(screen.getByRole("button", { name: /Re-plan/i }));
 
     const lastProps = taskDecompositionPanelProps.mock.calls.at(-1)?.[0];
     await lastProps.onApply({
@@ -225,7 +225,7 @@ describe("TaskAiSidebar", () => {
       );
     });
 
-    expect(await screen.findByText(/任务规划已接受并应用/)).toBeInTheDocument();
+    expect(await screen.findByText(/Task plan accepted and applied/)).toBeInTheDocument();
   });
 
   it("updates saved plan status when planning panel reports a loaded saved plan", async () => {
@@ -242,6 +242,6 @@ describe("TaskAiSidebar", () => {
       updatedAt: "2026-04-19T18:05:00.000Z",
     });
 
-    expect(await screen.findByText(/当前保存的完整计划标题与主流程/)).toBeInTheDocument();
+    expect(await screen.findByText(/Current saved plan title and main flow/)).toBeInTheDocument();
   });
 });

@@ -14,11 +14,14 @@ import {
 } from "@chrona/runtime-core";
 import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 
-export type TaskConfigFormInput = {
+export type TaskConfigFormDraft = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
   dueAt: Date | null;
+};
+
+export type TaskConfigFormInput = TaskConfigFormDraft & {
   runtimeAdapterKey: string;
   runtimeInput: Prisma.InputJsonObject;
   runtimeInputVersion: string;
@@ -52,6 +55,11 @@ type TaskConfigFormState = {
   extraRuntimeConfig: string;
 };
 
+export type TaskConfigDraftState = {
+  isDirty: boolean;
+  values: TaskConfigFormInput;
+};
+
 type TaskConfigFormProps = {
   runtimeAdapters: TaskConfigRuntimeAdapter[];
   defaultRuntimeAdapterKey: string;
@@ -72,6 +80,7 @@ type TaskConfigFormProps = {
   pendingLabel: string;
   isPending?: boolean;
   presets?: TaskConfigPreset[];
+  onDraftStateChange?: (state: TaskConfigDraftState) => void;
   onSubmitAction: (input: TaskConfigFormInput) => Promise<void> | void;
 };
 
@@ -309,9 +318,18 @@ function buildTaskConfigFormInput(
   formState: TaskConfigFormState,
   runtimeAdapters: TaskConfigRuntimeAdapter[],
   copy: { errorInvalidJson: string; errorJsonObject: string },
-): TaskConfigFormInput {
+  options?: { throwOnInvalidJson?: boolean },
+): TaskConfigFormInput | null {
   const runtimeAdapter = resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, formState.runtimeAdapterKey);
-  const extraRuntimeInput = parseRuntimeConfig(formState.extraRuntimeConfig, copy);
+  let extraRuntimeInput: Prisma.InputJsonObject | null;
+  try {
+    extraRuntimeInput = parseRuntimeConfig(formState.extraRuntimeConfig, copy);
+  } catch (error) {
+    if (options?.throwOnInvalidJson) {
+      throw error;
+    }
+    return null;
+  }
   const mergedRuntimeInput = {
     ...cloneRuntimeInput(formState.fieldRuntimeInput),
     ...(extraRuntimeInput ?? {}),
@@ -475,17 +493,19 @@ export function TaskConfigForm({
   pendingLabel,
   isPending = false,
   presets,
+  onDraftStateChange,
   onSubmitAction,
 }: TaskConfigFormProps) {
   const { messages } = useI18n();
-  const copy = {
+  const taskConfigFormMessages = messages.components?.taskConfigForm;
+  const copy = useMemo(() => ({
     ...DEFAULT_COPY,
-    ...(messages.components?.taskConfigForm ?? {}),
+    ...(taskConfigFormMessages ?? {}),
     priorities: {
       ...DEFAULT_COPY.priorities,
-      ...(messages.components?.taskConfigForm?.priorities ?? {}),
+      ...(taskConfigFormMessages?.priorities ?? {}),
     },
-  };
+  }), [taskConfigFormMessages]);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
   const initialTitle = initialValues?.title;
   const initialDescription = initialValues?.description;
@@ -535,6 +555,22 @@ export function TaskConfigForm({
   useEffect(() => {
     setFormState(initialState);
   }, [initialState]);
+
+  useEffect(() => {
+    if (!onDraftStateChange) {
+      return;
+    }
+
+    const values = buildTaskConfigFormInput(formState, runtimeAdapters, copy);
+    if (!values) {
+      return;
+    }
+
+    onDraftStateChange({
+      isDirty: JSON.stringify(formState) !== JSON.stringify(initialState),
+      values,
+    });
+  }, [copy, formState, initialState, onDraftStateChange, runtimeAdapters]);
 
   const selectedRuntimeAdapter = useMemo(
     () => resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, defaultRuntimeAdapterKey),
@@ -588,7 +624,10 @@ export function TaskConfigForm({
     setLocalErrorMessage(null);
 
     try {
-      await onSubmitAction(buildTaskConfigFormInput(formState, runtimeAdapters, copy));
+      const input = buildTaskConfigFormInput(formState, runtimeAdapters, copy, { throwOnInvalidJson: true });
+      if (input) {
+        await onSubmitAction(input);
+      }
     } catch (error) {
       setLocalErrorMessage(error instanceof Error ? error.message : copy.actionFailed);
     }

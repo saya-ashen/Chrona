@@ -116,7 +116,13 @@ describe("openclaw bridge gateway helpers", () => {
     const request: BridgeFeatureRequest<Record<string, unknown>> = {
       sessionId: "sess-plan",
       sessionKey: "tenant-a:plan-1",
-      input: { taskId: "task-1", title: "Plan" },
+      input: {
+        task: {
+          title: "Plan thesis defense slides",
+          description: "Prepare a concise deck for the final defense",
+          estimatedDurationMinutes: 180,
+        },
+      },
       timeout: 30,
     };
 
@@ -128,8 +134,14 @@ describe("openclaw bridge gateway helpers", () => {
 
     expect(body.model).toBe("openclaw");
     expect(body.user).toBe("tenant-a:plan-1");
-    expect(body.instructions).toBeString();
-    expect(body.input).toBe(JSON.stringify({ taskId: "task-1", title: "Plan" }));
+    expect(String(body.instructions)).toContain("You are Chrona's task planning assistant");
+    expect(String(body.instructions)).toContain("generate_task_plan_graph");
+    expect(String(body.input)).toContain("Task to plan");
+    expect(String(body.input)).toContain("Title: Plan thesis defense slides");
+    expect(String(body.input)).toContain("Description: Prepare a concise deck for the final defense");
+    expect(String(body.input)).toContain("Estimated duration: 180 minutes");
+    expect(String(body.input)).not.toContain("taskId");
+    expect(String(body.input)).not.toContain("sessionKey");
     expect(body.tools).toEqual([
       {
         type: "function",

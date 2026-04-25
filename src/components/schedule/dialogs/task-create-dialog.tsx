@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n } from "@/i18n/client";
+import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +42,8 @@ type TaskCreateDialogProps = {
     priority: "Low" | "Medium" | "High" | "Urgent";
     dueAt: Date | null;
   }) => Promise<void>;
+  autoSuggestionsEnabled?: boolean;
+  autoPlanGenerationEnabled?: boolean;
 };
 
 export function TaskCreateDialog({
@@ -52,7 +55,12 @@ export function TaskCreateDialog({
   onClose,
   onSubmit,
   onApplyDecomposition,
+  autoSuggestionsEnabled,
+  autoPlanGenerationEnabled,
 }: TaskCreateDialogProps) {
+  const aiPreferences = useScheduleAiPreferences();
+  const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
+  const resolvedAutoPlanGenerationEnabled = autoPlanGenerationEnabled ?? aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const { messages } = useI18n();
   const dialogCopy = {
@@ -82,18 +90,19 @@ export function TaskCreateDialog({
     statusMessage,
     toolCalls,
   } = useAutoComplete(
-    !suppressRef.current && !isComposing && title.trim().length >= 3 ? title.trim() : null,
+    resolvedAutoSuggestionsEnabled && !suppressRef.current && !isComposing && title.trim().length >= 3 ? title.trim() : null,
   );
 
   /* ---- Derive dropdown visibility ---- */
   const hasAutoCompleteSuggestions =
+    resolvedAutoSuggestionsEnabled &&
     !suppressRef.current &&
     !isComposing &&
     title.trim().length >= 3 &&
     autoCompleteSuggestions != null &&
     autoCompleteSuggestions.length > 0;
 
-  const showPanel = showAutoComplete && (
+  const showPanel = resolvedAutoSuggestionsEnabled && showAutoComplete && (
     hasAutoCompleteSuggestions ||
     (acLoading && phase !== "idle")
   );
@@ -198,7 +207,7 @@ export function TaskCreateDialog({
               onChange={(e) => {
                 suppressRef.current = false;
                 setTitle(e.target.value);
-                if (!isComposing) {
+                if (resolvedAutoSuggestionsEnabled && !isComposing) {
                   setShowAutoComplete(true);
                 }
               }}
@@ -210,12 +219,12 @@ export function TaskCreateDialog({
                 setIsComposing(false);
                 suppressRef.current = false;
                 setTitle(e.currentTarget.value);
-                if (e.currentTarget.value.trim().length >= 3) {
+                if (resolvedAutoSuggestionsEnabled && e.currentTarget.value.trim().length >= 3) {
                   setShowAutoComplete(true);
                 }
               }}
               onFocus={() => {
-                if (!isComposing && (hasAutoCompleteSuggestions || (acLoading && phase !== "idle"))) {
+                if (resolvedAutoSuggestionsEnabled && !isComposing && (hasAutoCompleteSuggestions || (acLoading && phase !== "idle"))) {
                   setShowAutoComplete(true);
                 }
               }}
@@ -437,7 +446,7 @@ export function TaskCreateDialog({
                     ? Math.max(15, Math.round(durationMinutes))
                     : 60;
                 })()}
-                autoRequest
+                autoRequest={resolvedAutoPlanGenerationEnabled && Boolean(planSeedTitle || title || initialTitle)}
                 onApply={async (result) => {
                   await onApplyDecomposition?.({
                     result,

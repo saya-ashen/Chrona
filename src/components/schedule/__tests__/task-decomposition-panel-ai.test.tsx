@@ -126,10 +126,11 @@ const samplePlanResponse: TaskPlanGraphResponse = {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
 describe("TaskDecompositionPanel – opt-in behavior", () => {
-  it("shows trigger button when not requested (default)", () => {
+  it("shows trigger button and does not request a plan when autoRequest is disabled", () => {
     mockUseSmartDecomposition.mockReturnValue({
       result: null,
       isLoading: false,
@@ -218,6 +219,54 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
     expect(screen.getByText(/AI is planning task/i)).toBeInTheDocument();
+  });
+
+  it("shows a stop action while plan generation is running", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: true,
+      error: null,
+      phase: "thinking",
+      statusMessage: "Generating with current task context",
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
+
+  it("calls the stop endpoint from the running generation state", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ taskId: "task_1", stopped: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchSpy);
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: true,
+      error: null,
+      phase: "thinking",
+      statusMessage: "Generating with current task context",
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+
+    await user.click(screen.getByRole("button", { name: /stop/i }));
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/ai/generate-task-plan/stop",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ taskId: "task_1" }),
+      }),
+    );
   });
 
   it("shows streaming process details instead of only a blank waiting skeleton", () => {
@@ -310,7 +359,31 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
     expect(screen.getByText(/accepted plan is active in the main panel/i)).toBeInTheDocument();
   });
 
-  it("regenerates a new plan request when the regenerate button is clicked", async () => {
+  it("does not automatically re-request just because the parent props change after a save", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: samplePlanResponse,
+      isLoading: false,
+      error: null,
+    });
+
+    const { rerender } = render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+    rerender(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        title="Updated saved task title"
+        description="Updated saved task description"
+        autoRequest
+      />,
+    );
+
+    expect(mockUseSmartDecomposition.mock.calls.at(-1)?.[0]).toMatchObject({
+      title: "Review and update documentation",
+      description: "Go through all docs and update them",
+      requestKey: 0,
+    });
+  });
+
+  it("opens a save confirmation instead of regenerating immediately when unsaved config exists", async () => {
     const user = userEvent.setup();
 
     mockUseSmartDecomposition.mockReturnValue({
@@ -319,16 +392,68 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
       error: null,
     });
 
-    render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
+    render(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        autoRequest
+        hasUnsavedConfigChanges
+        unsavedConfigDraft={{
+          title: "Updated draft task title",
+          description: "Updated draft task description",
+          priority: "Urgent",
+          dueAt: new Date(2026, 3, 21, 13, 0),
+        }}
+      />,
+    );
 
     const beforeCalls = mockUseSmartDecomposition.mock.calls.length;
     await user.click(screen.getByRole("button", { name: /regenerate plan/i }));
 
-    expect(mockUseSmartDecomposition.mock.calls.length).toBeGreaterThan(beforeCalls);
+    const callsAfterClick = mockUseSmartDecomposition.mock.calls.slice(beforeCalls);
+    expect(callsAfterClick.map((call) => call[0])).not.toContainEqual(expect.objectContaining({
+      requestKey: 1,
+      forceRefresh: true,
+    }));
+    expect(screen.getByRole("dialog", { name: /save changes before regenerating/i })).toBeInTheDocument();
+    expect(screen.getByText(/you have unsaved task configuration changes/i)).toBeInTheDocument();
+  });
+
+  it("saves unsaved config and regenerates from the saved draft when the confirmation is accepted", async () => {
+    const user = userEvent.setup();
+    const onSaveConfigBeforeRegenerate = vi.fn().mockResolvedValue(undefined);
+
+    mockUseSmartDecomposition.mockReturnValue({
+      result: samplePlanResponse,
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        autoRequest
+        hasUnsavedConfigChanges
+        unsavedConfigDraft={{
+          title: "Updated draft task title",
+          description: "Updated draft task description",
+          priority: "Urgent",
+          dueAt: new Date(2026, 3, 21, 13, 0),
+        }}
+        onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /regenerate plan/i }));
+    await user.click(screen.getByRole("button", { name: /save and regenerate/i }));
+
+    expect(onSaveConfigBeforeRegenerate).toHaveBeenCalledOnce();
     expect(mockUseSmartDecomposition.mock.calls.at(-1)?.[0]).toMatchObject({
       taskId: "task_1",
-      title: "Review and update documentation",
+      title: "Updated draft task title",
+      description: "Updated draft task description",
+      priority: "Urgent",
       requestKey: 1,
+      forceRefresh: true,
     });
   });
 

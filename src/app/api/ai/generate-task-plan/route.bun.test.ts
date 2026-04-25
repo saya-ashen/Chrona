@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { resetTaskPlanGenerationRegistryForTests } from "@/modules/commands/task-plan-generation-registry";
 
 const getLatestTaskPlanGraph = mock();
 const saveTaskPlanGraph = mock();
@@ -30,9 +31,11 @@ mock.module("@/lib/db", () => ({
 }));
 
 const { POST } = await import("@/app/api/ai/generate-task-plan/route");
+const { POST: STOP_POST } = await import("@/app/api/ai/generate-task-plan/stop/route");
 
 describe("POST /api/ai/generate-task-plan", () => {
   beforeEach(() => {
+    resetTaskPlanGenerationRegistryForTests();
     getLatestTaskPlanGraph.mockReset();
     saveTaskPlanGraph.mockReset();
     aiGeneratePlan.mockReset();
@@ -234,6 +237,132 @@ describe("POST /api/ai/generate-task-plan", () => {
     expect(data.subtasks).toBeUndefined();
     expect(data.feasibilityScore).toBeUndefined();
     expect(data.totalEstimatedMinutes).toBeUndefined();
+  });
+
+  it("returns 409 for a new request while the same task already has an active generation", async () => {
+    getLatestTaskPlanGraph.mockResolvedValue(null);
+    findUnique.mockResolvedValue({
+      id: "task-lock",
+      workspaceId: "ws-1",
+      title: "Locked task",
+      description: "Keep one plan job per task",
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      defaultSessionId: undefined,
+    });
+    let releaseFirstPlan!: (value: { nodes: unknown[]; edges: unknown[]; summary: string; source: string }) => void;
+    aiGeneratePlan.mockImplementation(
+      () => new Promise((resolve) => {
+        releaseFirstPlan = resolve;
+      }),
+    );
+
+    const firstRequest = POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-lock", forceRefresh: true }),
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const secondResponse = await POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-lock", forceRefresh: true }),
+      }),
+    );
+
+    expect(secondResponse.status).toBe(409);
+    const data = await secondResponse.json();
+    expect(data).toMatchObject({
+      code: "TASK_PLAN_GENERATION_IN_FLIGHT",
+      taskId: "task-lock",
+      stopEndpoint: "/api/ai/generate-task-plan/stop",
+    });
+    expect(data.error).toContain("Stop");
+    expect(aiGeneratePlan).toHaveBeenCalledTimes(1);
+
+    releaseFirstPlan({ nodes: [], edges: [], summary: "released", source: "openclaw" });
+    saveTaskPlanGraph.mockResolvedValue({
+      id: "plan-lock",
+      status: "draft",
+      prompt: null,
+      revision: 1,
+      summary: "released",
+      updatedAt: "2026-04-20T10:00:00.000Z",
+      plan: { id: "graph-lock", nodes: [], edges: [] },
+    });
+    const firstResponse = await firstRequest;
+    expect(firstResponse.status).toBe(200);
+  });
+
+  it("stops an active task plan generation so a later request can start", async () => {
+    getLatestTaskPlanGraph.mockResolvedValue(null);
+    findUnique.mockResolvedValue({
+      id: "task-stop",
+      workspaceId: "ws-1",
+      title: "Stoppable task",
+      description: "Cancel current run",
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      defaultSessionId: undefined,
+    });
+    let releaseFirstPlan!: (value: { nodes: unknown[]; edges: unknown[]; summary: string; source: string }) => void;
+    aiGeneratePlan.mockImplementation(() =>
+      new Promise((resolve) => {
+        releaseFirstPlan = resolve;
+      }),
+    );
+
+    const firstRequest = POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-stop", forceRefresh: true }),
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const stopResponse = await STOP_POST(
+      new Request("http://localhost/api/ai/generate-task-plan/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-stop" }),
+      }),
+    );
+
+    expect(stopResponse.status).toBe(200);
+    expect(await stopResponse.json()).toMatchObject({ taskId: "task-stop", stopped: true });
+
+    aiGeneratePlan.mockResolvedValueOnce({ nodes: [], edges: [], summary: "second", source: "openclaw" });
+    saveTaskPlanGraph.mockResolvedValue({
+      id: "plan-stop",
+      status: "draft",
+      prompt: null,
+      revision: 1,
+      summary: "second",
+      updatedAt: "2026-04-20T10:00:00.000Z",
+      plan: { id: "graph-stop", nodes: [], edges: [] },
+    });
+
+    const secondResponse = await POST(
+      new Request("http://localhost/api/ai/generate-task-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-stop", forceRefresh: true }),
+      }),
+    );
+
+    expect(secondResponse.status).toBe(200);
+    expect(aiGeneratePlan).toHaveBeenCalledTimes(2);
+
+    releaseFirstPlan({ nodes: [], edges: [], summary: "stopped", source: "openclaw" });
+    const firstResponse = await firstRequest;
+    expect(firstResponse.status).toBe(499);
   });
 
   it("returns 503 when AI is unavailable", async () => {

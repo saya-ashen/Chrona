@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import {
   Scissors,
   Clock,
@@ -10,6 +11,7 @@ import {
   Bot,
   Sparkles,
   RotateCcw,
+  Square,
 } from "lucide-react";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@/modules/ai/types";
@@ -38,6 +40,9 @@ export interface TaskDecompositionPanelProps {
     plan?: TaskPlanGraphData;
   } | null) => void;
   activeAcceptedPlanId?: string | null;
+  hasUnsavedConfigChanges?: boolean;
+  unsavedConfigDraft?: TaskConfigFormDraft | null;
+  onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
 }
 
 function summarizePlanGraph(graph: TaskPlanGraphData | null) {
@@ -86,22 +91,44 @@ export function TaskDecompositionPanel({
   onApply,
   onPlanLoaded,
   activeAcceptedPlanId = null,
+  hasUnsavedConfigChanges = false,
+  unsavedConfigDraft = null,
+  onSaveConfigBeforeRegenerate,
 }: TaskDecompositionPanelProps) {
   const [requested, setRequested] = useState(autoRequest);
   const [requestKey, setRequestKey] = useState(0);
+  const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] = useState(false);
+  const [isSavingBeforeRegenerate, setIsSavingBeforeRegenerate] = useState(false);
+  const [isStoppingGeneration, setIsStoppingGeneration] = useState(false);
+  const [stopGenerationError, setStopGenerationError] = useState<string | null>(null);
+  const [localForceRefresh, setLocalForceRefresh] = useState(Boolean(forceRefresh));
+  const [requestSnapshot, setRequestSnapshot] = useState(() => ({
+    taskId,
+    title,
+    description: description ?? undefined,
+    priority,
+    dueAt,
+    estimatedMinutes,
+    planningPrompt,
+  }));
+  const hasInitializedAutoRequestRef = useRef(autoRequest);
   const { messages } = useI18n();
   const decompCopy = getDecompCopy(messages as Record<string, unknown>);
 
+  const latestRequestSnapshot = (draft?: TaskConfigFormDraft | null) => ({
+    taskId,
+    title: draft?.title ?? title,
+    description: draft ? draft.description : description ?? undefined,
+    priority: draft?.priority ?? priority,
+    dueAt: draft ? draft.dueAt : dueAt,
+    estimatedMinutes,
+    planningPrompt,
+  });
+
   const planInput = requested
     ? {
-        taskId,
-        title,
-        description: description ?? undefined,
-        priority,
-        dueAt,
-        estimatedMinutes,
-        planningPrompt,
-        forceRefresh,
+        ...requestSnapshot,
+        forceRefresh: localForceRefresh,
         requestKey,
       }
     : null;
@@ -173,10 +200,73 @@ export function TaskDecompositionPanel({
       && savedPlanMeta.id === activeAcceptedPlanId,
   );
 
-  const handleRegenerate = () => {
+  const requestFreshPlan = (draft?: TaskConfigFormDraft | null) => {
+    setRequestSnapshot(latestRequestSnapshot(draft));
     setRequested(true);
+    setLocalForceRefresh(true);
     setRequestKey((current) => current + 1);
   };
+
+  const handleRegenerate = () => {
+    if (hasUnsavedConfigChanges) {
+      setShowSaveBeforeRegenerate(true);
+      return;
+    }
+
+    requestFreshPlan();
+  };
+
+  const handleSaveAndRegenerate = async () => {
+    setIsSavingBeforeRegenerate(true);
+    try {
+      await onSaveConfigBeforeRegenerate?.();
+      setShowSaveBeforeRegenerate(false);
+      requestFreshPlan(unsavedConfigDraft);
+    } finally {
+      setIsSavingBeforeRegenerate(false);
+    }
+  };
+
+  const handleStopGeneration = async () => {
+    if (!taskId || isStoppingGeneration) {
+      return;
+    }
+
+    setIsStoppingGeneration(true);
+    setStopGenerationError(null);
+    try {
+      const response = await fetch("/api/ai/generate-task-plan/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId }),
+      });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(
+          (errorBody as { error?: string }).error ?? `Failed to stop generation (${response.status})`,
+        );
+      }
+    } catch (stopError) {
+      setStopGenerationError(stopError instanceof Error ? stopError.message : "Failed to stop generation");
+    } finally {
+      setIsStoppingGeneration(false);
+    }
+  };
+
+  useEffect(() => {
+    setLocalForceRefresh(Boolean(forceRefresh));
+  }, [forceRefresh]);
+
+  useEffect(() => {
+    if (!autoRequest || hasInitializedAutoRequestRef.current) {
+      return;
+    }
+
+    hasInitializedAutoRequestRef.current = true;
+    setRequested(true);
+    setRequestSnapshot(latestRequestSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRequest]);
 
   useEffect(() => {
     onPlanLoaded?.(savedPlanMeta);
@@ -186,7 +276,10 @@ export function TaskDecompositionPanel({
     return (
       <button
         type="button"
-        onClick={() => setRequested(true)}
+        onClick={() => {
+          setRequestSnapshot(latestRequestSnapshot());
+          setRequested(true);
+        }}
         className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
       >
         <Scissors className="size-4" />
@@ -199,10 +292,28 @@ export function TaskDecompositionPanel({
   if (isLoading) {
     return (
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-        <div className="flex items-center gap-2 text-sm text-primary">
-          <Bot className="size-4 animate-pulse" />
-          <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
+        <div className="flex items-center justify-between gap-3 text-sm text-primary">
+          <div className="flex items-center gap-2">
+            <Bot className="size-4 animate-pulse" />
+            <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
+          </div>
+          {taskId ? (
+            <button
+              type="button"
+              onClick={() => void handleStopGeneration()}
+              disabled={isStoppingGeneration}
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-2.5 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-60"
+            >
+              <Square className="size-3" />
+              {isStoppingGeneration ? "Stopping..." : "Stop"}
+            </button>
+          ) : null}
         </div>
+        {stopGenerationError ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {stopGenerationError}
+          </div>
+        ) : null}
         {phase !== "thinking" || statusMessage || partialText || toolCalls.length || toolResults.length ? (
           <div className="mt-3 space-y-3 text-xs text-primary/90">
             {statusMessage ? (
@@ -255,7 +366,39 @@ export function TaskDecompositionPanel({
     );
   }
 
-  if (!result || !planGraph) return null;
+  const saveBeforeRegenerateDialog = showSaveBeforeRegenerate ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Save changes before regenerating"
+      className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+    >
+      <p className="font-medium">Save changes before regenerating?</p>
+      <p className="mt-1 text-xs text-amber-800">
+        You have unsaved task configuration changes. Save them and use the new configuration to regenerate the plan.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setShowSaveBeforeRegenerate(false)}
+          disabled={isSavingBeforeRegenerate}
+          className="rounded-lg border border-amber-300 bg-background px-3 py-1.5 text-xs font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleSaveAndRegenerate()}
+          disabled={isSavingBeforeRegenerate}
+          className="rounded-lg border border-amber-500 bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600 disabled:opacity-60"
+        >
+          {isSavingBeforeRegenerate ? "Saving..." : "Save and regenerate"}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  if (!result || !planGraph) return saveBeforeRegenerateDialog;
 
   return (
     <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -273,6 +416,8 @@ export function TaskDecompositionPanel({
           Regenerate plan
         </button>
       </div>
+
+      {saveBeforeRegenerateDialog}
 
       <div className="grid gap-2 rounded-lg border border-border/50 bg-background/70 p-3 text-xs text-muted-foreground sm:grid-cols-2">
         <div className="flex items-center gap-1.5">

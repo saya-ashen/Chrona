@@ -64,6 +64,21 @@ export function extractJSON<T>(raw: string, clientType: string): T {
   return parseTextJsonWithFallback<T>(raw, clientType);
 }
 
+function buildGeneratePlanInput(input: GenerateTaskPlanRequest): Record<string, unknown> {
+  const task: Record<string, unknown> = {
+    title: input.title,
+  };
+
+  if (input.description?.trim()) {
+    task.description = input.description;
+  }
+  if (typeof input.estimatedMinutes === "number") {
+    task.estimatedDurationMinutes = input.estimatedMinutes;
+  }
+
+  return { task };
+}
+
 export function buildFeatureInput(
   feature: AiFeature,
   input:
@@ -77,6 +92,9 @@ export function buildFeatureInput(
 ): Record<string, unknown> {
   if (typeof input === "string") {
     return { message: input };
+  }
+  if (feature === "generate_plan") {
+    return buildGeneratePlanInput(input as GenerateTaskPlanRequest);
   }
   return input as unknown as Record<string, unknown>;
 }

@@ -55,7 +55,12 @@ function featureInstructions(feature: BridgeFeature): string {
     case "suggest":
       return "Return suggestions only via function call suggest_task_completions.";
     case "generate_plan":
-      return "Return plan graph only via function call generate_task_plan_graph.";
+      return [
+        "You are Chrona's task planning assistant.",
+        "Create a practical task execution plan graph from the current task snapshot only.",
+        "Return the plan graph only via function call generate_task_plan_graph.",
+        "Do not rely on previous task title/description context when a new task snapshot is provided.",
+      ].join("\n");
     case "dispatch_task":
       return "Return dispatch decision only via function call dispatch_next_task_action.";
     case "conflicts":
@@ -65,6 +70,36 @@ function featureInstructions(feature: BridgeFeature): string {
     case "chat":
       return "Answer user request normally.";
   }
+}
+
+function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unknown>): string {
+  if (feature !== "generate_plan") {
+    return JSON.stringify(input);
+  }
+
+  const task =
+    input.task && typeof input.task === "object" && !Array.isArray(input.task)
+      ? (input.task as Record<string, unknown>)
+      : input;
+  const parts: string[] = ["Task to plan"];
+
+  if (typeof task.title === "string" && task.title.trim()) {
+    parts.push(`Title: ${task.title.trim()}`);
+  }
+  if (typeof task.description === "string" && task.description.trim()) {
+    parts.push(`Description: ${task.description.trim()}`);
+  }
+  const estimatedDuration =
+    typeof task.estimatedDurationMinutes === "number"
+      ? task.estimatedDurationMinutes
+      : typeof task.estimatedMinutes === "number"
+        ? task.estimatedMinutes
+        : null;
+  if (estimatedDuration !== null) {
+    parts.push(`Estimated duration: ${estimatedDuration} minutes`);
+  }
+
+  return parts.join("\n");
 }
 
 function normalizeOpenResponsesSessionKey(value: string | undefined): string {
@@ -137,7 +172,7 @@ export function buildGatewayBody(
       model: "openclaw",
       user: sessionKey,
       instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions(route.feature)}`,
-      input: JSON.stringify(featureRequest.input),
+      input: stringifyFeatureInput(route.feature, featureRequest.input),
       stream: route.stream,
     };
 

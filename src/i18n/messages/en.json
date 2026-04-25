@@ -876,7 +876,9 @@
       "advancedDescription": "Workspace management and deeper operational controls live outside the daily task flow.",
       "openAdvancedSettings": "Open Advanced Settings",
       "aiClientsDescription": "Manage AI clients and configure which client each feature uses",
-      "manageAiClients": "Manage AI Clients"
+      "manageAiClients": "Manage AI Clients",
+      "scheduleAiTitle": "Schedule AI automation",
+      "scheduleAiDescription": "Control which AI actions may run automatically in the schedule workflow."
     },
     "aiClientsPage": {
       "title": "AI Clients",

@@ -61,7 +61,17 @@ describe("ScheduleCommandBar – AI integration", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows AI suggestion dropdown when typing >= 3 chars", async () => {
+  it("does not auto-request suggestions by default while the user types", async () => {
+    const user = userEvent.setup();
+
+    render(<ScheduleCommandBar {...defaultProps} />);
+    await user.type(screen.getByPlaceholderText(/task title/i), "Wri");
+
+    expect(mockUseAutoComplete).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText("AI suggestions")).not.toBeInTheDocument();
+  });
+
+  it("shows AI suggestion dropdown when typing >= 3 chars and auto suggestions are enabled", async () => {
     const user = userEvent.setup();
 
     mockUseAutoComplete.mockReturnValue(
@@ -73,7 +83,7 @@ describe("ScheduleCommandBar – AI integration", () => {
       }),
     );
 
-    render(<ScheduleCommandBar {...defaultProps} />);
+    render(<ScheduleCommandBar {...defaultProps} autoSuggestionsEnabled />);
     await user.type(screen.getByPlaceholderText(/task title/i), "Wri");
 
     await waitFor(() => expect(screen.getByText("AI suggestions")).toBeInTheDocument());
@@ -96,7 +106,7 @@ describe("ScheduleCommandBar – AI integration", () => {
       }),
     );
 
-    render(<ScheduleCommandBar {...defaultProps} onSubmit={onSubmit} />);
+    render(<ScheduleCommandBar {...defaultProps} onSubmit={onSubmit} autoSuggestionsEnabled />);
     await user.type(screen.getByPlaceholderText(/task title/i), "Wri");
     await waitFor(() => expect(screen.getByText("Write weekly report")).toBeInTheDocument());
     await user.click(screen.getByText("Write weekly report").closest("button")!);
@@ -122,7 +132,7 @@ describe("ScheduleCommandBar – AI integration", () => {
       }),
     );
 
-    render(<ScheduleCommandBar {...defaultProps} />);
+    render(<ScheduleCommandBar {...defaultProps} autoSuggestionsEnabled />);
     await user.type(screen.getByPlaceholderText(/task title/i), "Write");
 
     expect(screen.getByText(/AI process panel/i)).toBeInTheDocument();

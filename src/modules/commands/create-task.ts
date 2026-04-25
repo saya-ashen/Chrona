@@ -2,6 +2,7 @@ import { OwnerType, Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
@@ -166,6 +167,8 @@ export async function createTask(input: {
   });
 
   await rebuildTaskProjection(task.id);
+
+  enqueueTaskPlanGeneration({ taskId: task.id, reason: "task_created" });
 
   return {
     taskId: task.id,

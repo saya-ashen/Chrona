@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { aiGeneratePlan, aiGeneratePlanStream } from "@/modules/ai/ai-service";
+import { generateTaskPlanForTask } from "@/modules/commands/generate-task-plan-for-task";
+import {
+  startTaskPlanGeneration,
+  TaskPlanGenerationInFlightError,
+  TASK_PLAN_GENERATION_IN_FLIGHT_CODE,
+} from "@/modules/commands/task-plan-generation-registry";
 import { createLogger, summarizeText } from "@/lib/logger";
 import {
   getLatestTaskPlanGraph,
@@ -77,11 +83,24 @@ function buildPlanResponse(input: {
   };
 }
 
+function planGenerationConflictResponse(taskId: string) {
+  return NextResponse.json(
+    {
+      error: "A task plan generation job is already running. Stop the current generation before starting a new one.",
+      code: TASK_PLAN_GENERATION_IN_FLIGHT_CODE,
+      taskId,
+      stopEndpoint: "/api/ai/generate-task-plan/stop",
+    },
+    { status: 409 },
+  );
+}
+
 function sseEncode(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export async function POST(request: Request) {
+  let parsedTaskIdForConflict: string | null = null;
   try {
     const body = await request.json();
     const {
@@ -94,6 +113,7 @@ export async function POST(request: Request) {
       planningPrompt,
       forceRefresh = false,
     } = body;
+    parsedTaskIdForConflict = typeof taskId === "string" ? taskId : null;
 
     if (!taskId && !title) {
       return NextResponse.json(
@@ -103,6 +123,26 @@ export async function POST(request: Request) {
     }
 
     const wantsStream = (request.headers.get("accept") ?? "").includes("text/event-stream");
+    if (taskId && !wantsStream) {
+      const lock = startTaskPlanGeneration(taskId);
+      try {
+        const result = await generateTaskPlanForTask({
+          taskId,
+          planningPrompt: planningPrompt ?? null,
+          forceRefresh,
+          signal: lock.signal,
+        });
+        if (!result) {
+          return NextResponse.json(
+            { error: "AI planning unavailable" },
+            { status: 503 },
+          );
+        }
+        return NextResponse.json(result);
+      } finally {
+        lock.finish();
+      }
+    }
     const requestId = crypto.randomUUID();
     logger.info("request.start", {
       requestId,
@@ -178,6 +218,17 @@ export async function POST(request: Request) {
     }
 
     if (wantsStream) {
+      let streamLock: ReturnType<typeof startTaskPlanGeneration> | null = null;
+      if (taskId) {
+        try {
+          streamLock = startTaskPlanGeneration(taskId);
+        } catch (error) {
+          if (error instanceof TaskPlanGenerationInFlightError) {
+            return planGenerationConflictResponse(taskId);
+          }
+          throw error;
+        }
+      }
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
@@ -315,6 +366,8 @@ export async function POST(request: Request) {
             } catch {
               // ignore double-close / cancelled stream
             }
+          } finally {
+            streamLock?.finish();
           }
         },
       });
@@ -385,6 +438,16 @@ export async function POST(request: Request) {
       reasoning: planResult.reasoning,
     }));
   } catch (error) {
+    if (error instanceof TaskPlanGenerationInFlightError) {
+      return planGenerationConflictResponse(parsedTaskIdForConflict ?? "unknown");
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json(
+        { error: "Task plan generation stopped", code: "TASK_PLAN_GENERATION_STOPPED" },
+        { status: 499 },
+      );
+    }
+
     logger.error("request.error", {
       feature: "generate_plan",
       error: error instanceof Error ? error.message : String(error),
