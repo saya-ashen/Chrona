@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ */
@@ -23,16 +23,48 @@ vi.mock("@/components/schedule/schedule-editor-form", () => ({
   ScheduleEditorForm: () => <div data-testid="schedule-editor-form" />,
 }));
 
+const taskConfigSubmitHandlers: Array<(input: unknown) => Promise<void> | void> = [];
+const taskConfigDraftStateHandlers: Array<(state: unknown) => void> = [];
+
 // Mock the task config form
 vi.mock("@/components/schedule/task-config-form", () => ({
-  TaskConfigForm: () => <div data-testid="task-config-form" />,
+  TaskConfigForm: ({
+    onSubmitAction,
+    onDraftStateChange,
+  }: {
+    onSubmitAction: (input: unknown) => Promise<void> | void;
+    onDraftStateChange?: (state: unknown) => void;
+  }) => {
+    taskConfigSubmitHandlers.push(onSubmitAction);
+    if (onDraftStateChange) {
+      taskConfigDraftStateHandlers.push(onDraftStateChange);
+    }
+    return <div data-testid="task-config-form" />;
+  },
 }));
 
+const taskDecompositionPanelProps = vi.fn();
+
 // Mock the task decomposition panel
-vi.mock("@/components/schedule/task-decomposition-panel", () => ({
-  TaskDecompositionPanel: ({ activeAcceptedPlanId }: { activeAcceptedPlanId?: string | null }) => (
-    <div data-testid="task-decomposition-panel" data-active-accepted-plan-id={activeAcceptedPlanId ?? ""} />
-  ),
+vi.mock("@/components/schedule/task-planning-panel", () => ({
+  TaskDecompositionPanel: (props: {
+    activeAcceptedPlanId?: string | null;
+    title?: string;
+    description?: string | null;
+    priority?: string;
+    dueAt?: Date | null;
+  }) => {
+    taskDecompositionPanelProps(props);
+    return (
+      <div
+        data-testid="task-decomposition-panel"
+        data-active-accepted-plan-id={props.activeAcceptedPlanId ?? ""}
+        data-title={props.title ?? ""}
+        data-description={props.description ?? ""}
+        data-draft-dirty={String(Boolean((props as { hasUnsavedConfigChanges?: boolean }).hasUnsavedConfigChanges))}
+      />
+    );
+  },
 }));
 
 // Mock the task context links
@@ -115,6 +147,8 @@ const defaultSheetProps = {
 
 afterEach(() => {
   cleanup();
+  taskConfigSubmitHandlers.length = 0;
+  taskConfigDraftStateHandlers.length = 0;
   vi.clearAllMocks();
   mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
 });
@@ -189,5 +223,106 @@ describe("SelectedBlockSheet – layout order", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("does not repeatedly push identical clean draft state back into the parent", async () => {
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    const notifyDraftState = taskConfigDraftStateHandlers.at(-1);
+    expect(notifyDraftState).toBeTypeOf("function");
+
+    const cleanState = {
+      isDirty: false,
+      values: {
+        title: "Test task",
+        description: "Task description",
+        priority: "Medium",
+        dueAt: new Date(2026, 3, 15, 11, 0),
+      },
+    };
+
+    await act(async () => {
+      notifyDraftState?.(cleanState);
+    });
+    const callCountAfterFirstCleanState = taskDecompositionPanelProps.mock.calls.length;
+
+    await act(async () => {
+      notifyDraftState?.(cleanState);
+    });
+
+    expect(taskDecompositionPanelProps.mock.calls.length).toBe(callCountAfterFirstCleanState);
+  });
+
+  it("marks the AI planning sidebar dirty when task config has unsaved edits", async () => {
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    const notifyDraftState = taskConfigDraftStateHandlers.at(-1);
+    expect(notifyDraftState).toBeTypeOf("function");
+
+    await act(async () => {
+      notifyDraftState?.({
+        isDirty: true,
+        values: {
+          title: "Unsaved draft title",
+          description: "Unsaved draft description",
+          priority: "Urgent",
+          dueAt: new Date(2026, 3, 21, 13, 0),
+        },
+      });
+    });
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-draft-dirty", "true");
+    expect(taskDecompositionPanelProps).toHaveBeenLastCalledWith(expect.objectContaining({
+      hasUnsavedConfigChanges: true,
+      unsavedConfigDraft: expect.objectContaining({
+        title: "Unsaved draft title",
+        description: "Unsaved draft description",
+        priority: "Urgent",
+      }),
+    }));
+  });
+
+  it("clears the dirty marker and updates the AI sidebar after the task config is saved", async () => {
+    const onSaveTaskConfigAction = vi.fn().mockResolvedValue(undefined);
+    render(<SelectedBlockSheet {...defaultSheetProps} onSaveTaskConfigAction={onSaveTaskConfigAction} />);
+
+    const notifyDraftState = taskConfigDraftStateHandlers.at(-1);
+    await act(async () => {
+      notifyDraftState?.({
+        isDirty: true,
+        values: {
+          title: "Unsaved draft title",
+          description: "Unsaved draft description",
+          priority: "Urgent",
+          dueAt: new Date(2026, 3, 21, 13, 0),
+        },
+      });
+    });
+
+    const submit = taskConfigSubmitHandlers.at(-1);
+    expect(submit).toBeTypeOf("function");
+
+    await act(async () => {
+      await submit?.({
+        title: "Unsaved draft title",
+        description: "Unsaved draft description",
+        priority: "Urgent",
+        dueAt: new Date(2026, 3, 21, 13, 0),
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {},
+        runtimeInputVersion: "openclaw-v1",
+        runtimeModel: null,
+        prompt: null,
+        runtimeConfig: null,
+      });
+    });
+
+    expect(onSaveTaskConfigAction).toHaveBeenCalledOnce();
+    expect(taskDecompositionPanelProps).toHaveBeenLastCalledWith(expect.objectContaining({
+      title: "Unsaved draft title",
+      description: "Unsaved draft description",
+      priority: "Urgent",
+      hasUnsavedConfigChanges: false,
+    }));
   });
 });

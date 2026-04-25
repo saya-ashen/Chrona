@@ -8,6 +8,7 @@ import { buildQuickCreateDraft, toDateForDay } from "@/components/schedule/sched
 import { buttonVariants } from "@/components/ui/button";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
+import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import { useAutoComplete, type StructuredSuggestion } from "@/hooks/use-ai";
 import { createLogger, summarizeText } from "@/lib/logger";
 
@@ -118,13 +119,17 @@ export function ScheduleCommandBar({
   selectedDay,
   isPending,
   onSubmit,
+  autoSuggestionsEnabled,
 }: {
   id?: string;
   selectedDay: string;
   isPending: boolean;
   onSubmit: (draft: QuickCreateDraft) => Promise<void>;
+  autoSuggestionsEnabled?: boolean;
 }) {
   const { messages } = useI18n();
+  const aiPreferences = useScheduleAiPreferences();
+  const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
   const copy = useMemo(() => getSchedulePageCopy(messages.components?.schedulePage), [messages.components?.schedulePage]);
   const cmdBarCopy = {
     generatingSuggestions: "Generating suggestions...",
@@ -140,12 +145,12 @@ export function ScheduleCommandBar({
   const suppressRef = useRef(false);
 
   const normalizedValue = value.trim();
-  const autoCompleteInput = !suppressRef.current && !isComposing && normalizedValue.length >= 3 ? normalizedValue : null;
+  const autoCompleteInput = resolvedAutoSuggestionsEnabled && !suppressRef.current && !isComposing && normalizedValue.length >= 3 ? normalizedValue : null;
   const { structuredSuggestions, isLoading: aiLoading, error: autoCompleteError, phase, statusMessage, toolCalls, toolResults, partialText } = useAutoComplete(
     autoCompleteInput,
   );
 
-  const showPanel = showSuggestions && ((structuredSuggestions?.length ?? 0) > 0 || (aiLoading && phase !== "idle"));
+  const showPanel = resolvedAutoSuggestionsEnabled && showSuggestions && ((structuredSuggestions?.length ?? 0) > 0 || (aiLoading && phase !== "idle"));
   const processTrace = trace ?? (aiLoading || toolCalls.length > 0 || toolResults.length > 0 || Boolean(partialText)
     ? {
         requestId: "live-auto-complete",
@@ -292,7 +297,7 @@ export function ScheduleCommandBar({
               suppressRef.current = false;
               setValue(event.target.value);
               setSubmitError(null);
-              if (!isComposing) setShowSuggestions(true);
+              if (resolvedAutoSuggestionsEnabled && !isComposing) setShowSuggestions(true);
               logger.debug("quick_create.input_change", {
                 rawInput: summarizeText(event.target.value),
                 normalizedInput: summarizeText(event.target.value.trim()),
@@ -306,10 +311,10 @@ export function ScheduleCommandBar({
               setIsComposing(false);
               suppressRef.current = false;
               setValue(event.currentTarget.value);
-              if (event.currentTarget.value.trim().length >= 3) setShowSuggestions(true);
+              if (resolvedAutoSuggestionsEnabled && event.currentTarget.value.trim().length >= 3) setShowSuggestions(true);
             }}
             onFocus={() => {
-              if (!isComposing) setShowSuggestions(true);
+              if (resolvedAutoSuggestionsEnabled && !isComposing) setShowSuggestions(true);
             }}
             onBlur={() => {
               blurTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 200);

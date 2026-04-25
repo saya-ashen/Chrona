@@ -1,6 +1,7 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
@@ -269,6 +270,26 @@ export async function updateTask(input: {
   });
 
   await rebuildTaskProjection(task.id);
+
+  const shouldRegeneratePlan = changedFields.some((field) =>
+    [
+      "title",
+      "description",
+      "priority",
+      "dueAt",
+      "scheduledStartAt",
+      "scheduledEndAt",
+      "runtimeAdapterKey",
+      "runtimeInput",
+      "runtimeInputVersion",
+      "runtimeModel",
+      "prompt",
+      "runtimeConfig",
+    ].includes(field),
+  );
+  if (shouldRegeneratePlan) {
+    enqueueTaskPlanGeneration({ taskId: task.id, reason: "task_updated", forceRefresh: true });
+  }
 
   return {
     taskId: task.id,

@@ -10,15 +10,75 @@ vi.mock("@/i18n/client", () => ({
 const mockUseAutoComplete = vi.fn(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
 const mockUseSmartAutomation = vi.fn(() => ({ suggestion: null, isLoading: false }));
 const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
+const samplePlanGraph = {
+  id: "plan-1",
+  taskId: "task-1",
+  status: "draft",
+  revision: 1,
+  source: "ai",
+  generatedBy: "generate-task-plan",
+  prompt: null,
+  summary: "2 planned nodes",
+  changeSummary: null,
+  createdAt: "2026-04-20T09:00:00.000Z",
+  updatedAt: "2026-04-20T09:05:00.000Z",
+  nodes: [
+    {
+      id: "node-1",
+      type: "step",
+      title: "Draft legal filing checklist",
+      objective: "Collect filing requirements",
+      description: "Collect filing requirements",
+      status: "pending",
+      phase: "execution",
+      estimatedMinutes: 30,
+      priority: "High",
+      executionMode: "automatic",
+      linkedTaskId: null,
+      requiresHumanInput: false,
+      requiresHumanApproval: false,
+      autoRunnable: true,
+      blockingReason: null,
+      completionSummary: null,
+      metadata: null,
+    },
+    {
+      id: "node-2",
+      type: "step",
+      title: "Confirm state deadlines",
+      objective: "Check every target state",
+      description: "Check every target state",
+      status: "pending",
+      phase: "execution",
+      estimatedMinutes: 45,
+      priority: "Urgent",
+      executionMode: "manual",
+      linkedTaskId: null,
+      requiresHumanInput: false,
+      requiresHumanApproval: false,
+      autoRunnable: false,
+      blockingReason: null,
+      completionSummary: null,
+      metadata: null,
+    },
+  ],
+  edges: [
+    { id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "sequential", metadata: null },
+  ],
+};
 
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: () => mockUseAutoComplete(),
+  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
   useSmartAutomation: () => mockUseSmartAutomation(),
-  useSmartDecomposition: () => mockUseSmartDecomposition(),
+  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
 }));
 
 vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
   AutomationSuggestionPanel: () => null,
+}));
+
+vi.mock("@/components/work/task-plan-graph", () => ({
+  TaskPlanGraph: () => <div data-testid="task-plan-graph" />,
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
@@ -45,6 +105,23 @@ describe("TaskCreateDialog – Core functionality", () => {
   it("returns null when not open", () => {
     const { container } = render(<TaskCreateDialog {...defaultProps} isOpen={false} />);
     expect(container.innerHTML).toBe("");
+  });
+
+  it("keeps AI suggestions disabled by default but auto-starts planning when a planning handler exists", () => {
+    const onApplyDecomposition = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TaskCreateDialog
+        {...defaultProps}
+        initialTitle="Draft report"
+        onApplyDecomposition={onApplyDecomposition}
+      />,
+    );
+
+    expect(mockUseAutoComplete).toHaveBeenLastCalledWith(null);
+    expect(mockUseSmartDecomposition).toHaveBeenLastCalledWith(expect.objectContaining({
+      title: "Draft report",
+    }));
   });
 
   it("renders dialog with title 'Add task' when open", () => {
@@ -144,32 +221,8 @@ describe("TaskCreateDialog – Core functionality", () => {
   it("exposes merged AI planning UI only when handler is provided and preserves priorities on apply", async () => {
     const user = userEvent.setup();
     const onApplyDecomposition = vi.fn().mockResolvedValue(undefined);
-    const decompositionResult = {
-      subtasks: [
-        {
-          title: "Draft legal filing checklist",
-          description: "Collect filing requirements",
-          estimatedMinutes: 30,
-          priority: "High",
-          order: 1,
-          dependsOnPrevious: false,
-        },
-        {
-          title: "Confirm state deadlines",
-          description: "Check every target state",
-          estimatedMinutes: 45,
-          priority: "Urgent",
-          order: 2,
-          dependsOnPrevious: true,
-        },
-      ],
-      totalEstimatedMinutes: 75,
-      feasibilityScore: 82,
-      warnings: [],
-    };
-
     mockUseSmartDecomposition.mockImplementation((() => ({
-      result: decompositionResult,
+      result: { planGraph: samplePlanGraph },
       isLoading: false,
       error: null,
     })) as any);
@@ -184,11 +237,15 @@ describe("TaskCreateDialog – Core functionality", () => {
       />,
     );
 
-    expect(screen.getByText("AI 任务规划")).toBeInTheDocument();
+    expect(screen.getByText("AI Task Planning")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /apply plan/i }));
 
-    expect(onApplyDecomposition).toHaveBeenCalledWith(decompositionResult);
-    expect(onApplyDecomposition.mock.calls[0]?.[0]?.subtasks).toEqual(
+    expect(onApplyDecomposition).toHaveBeenCalledWith(expect.objectContaining({
+      result: expect.objectContaining({ planGraph: samplePlanGraph }),
+      title: "Campaign setup",
+      priority: "Medium",
+    }));
+    expect(onApplyDecomposition.mock.calls[0]?.[0]?.result?.planGraph?.nodes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ priority: "High" }),
         expect.objectContaining({ priority: "Urgent" }),

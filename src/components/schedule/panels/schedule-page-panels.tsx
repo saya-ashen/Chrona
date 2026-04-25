@@ -5,7 +5,7 @@ import {
   ChevronDown,
   GripVertical,
 } from "lucide-react";
-import { type DragEvent, useCallback, useState } from "react";
+import { type DragEvent, useCallback, useRef, useState } from "react";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
 import type { ScheduleSlot, TaskPlanGraphResponse, TaskPlanNode } from "@/modules/ai/types";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
@@ -77,6 +77,8 @@ import {
 } from "@/components/schedule/schedule-page-utils";
 import {
   TaskConfigForm,
+  type TaskConfigDraftState,
+  type TaskConfigFormDraft,
   type TaskConfigFormInput,
   type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
@@ -283,6 +285,18 @@ export function SelectedBlockSheet({
   // Accepted plan state — only shown on left after user confirms
   const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanGraphResponse | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [planningTaskDraft, setPlanningTaskDraft] = useState<TaskConfigFormDraft>(() => toPlanningTaskDraft(item));
+  const [taskConfigDraftState, setTaskConfigDraftState] = useState<TaskConfigDraftState | null>(null);
+  const lastTaskConfigDraftStateKeyRef = useRef<string | null>(null);
+  const handleTaskConfigDraftStateChange = useCallback((state: TaskConfigDraftState) => {
+    const nextKey = serializeTaskConfigDraftState(state);
+    if (lastTaskConfigDraftStateKeyRef.current === nextKey) {
+      return;
+    }
+
+    lastTaskConfigDraftStateKeyRef.current = nextKey;
+    setTaskConfigDraftState(state);
+  }, []);
 
   const handleAcceptedPlanLoaded = useCallback((saved: {
     id: string;
@@ -323,6 +337,19 @@ export function SelectedBlockSheet({
       };
     });
   }, []);
+
+  const handleSaveConfigBeforeRegenerate = async () => {
+    if (!taskConfigDraftState?.values) {
+      return;
+    }
+
+    await onSaveTaskConfigAction(item.taskId, taskConfigDraftState.values);
+    setPlanningTaskDraft(taskConfigDraftState.values);
+    setTaskConfigDraftState({
+      isDirty: false,
+      values: taskConfigDraftState.values,
+    });
+  };
 
   const handleApplyPlan = async (result: TaskPlanGraphResponse) => {
     if (!result.savedPlan?.id) return;
@@ -468,9 +495,12 @@ export function SelectedBlockSheet({
                         initialValues={toTaskConfigInitialValues(item)}
                         submitLabel={copy.saveTaskConfig}
                         pendingLabel={copy.saving}
-                        onSubmitAction={(input) =>
-                          onSaveTaskConfigAction(item.taskId, input)
-                        }
+                        onDraftStateChange={handleTaskConfigDraftStateChange}
+                        onSubmitAction={async (input) => {
+                          await onSaveTaskConfigAction(item.taskId, input);
+                          setPlanningTaskDraft(input);
+                          setTaskConfigDraftState({ isDirty: false, values: input });
+                        }}
                       />
                     </div>
                   </div>
@@ -516,14 +546,17 @@ export function SelectedBlockSheet({
 
                 <TaskDecompositionPanel
                   taskId={item.taskId}
-                  title={item.title}
-                  description={item.description}
-                  priority={item.priority}
-                  dueAt={item.dueAt}
+                  title={planningTaskDraft.title}
+                  description={planningTaskDraft.description}
+                  priority={planningTaskDraft.priority}
+                  dueAt={planningTaskDraft.dueAt}
                   autoRequest
                   onPlanLoaded={handleAcceptedPlanLoaded}
                   onApply={handleApplyPlan}
                   activeAcceptedPlanId={acceptedPlan?.savedPlan?.id ?? null}
+                  hasUnsavedConfigChanges={Boolean(taskConfigDraftState?.isDirty)}
+                  unsavedConfigDraft={taskConfigDraftState?.values ?? null}
+                  onSaveConfigBeforeRegenerate={handleSaveConfigBeforeRegenerate}
                 />
               </div>
             </aside>
@@ -564,6 +597,25 @@ function QueueTaskConfigEditor({
       onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
     />
   );
+}
+
+function toPlanningTaskDraft(item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt">): TaskConfigFormDraft {
+  return {
+    title: item.title,
+    description: item.description ?? "",
+    priority: item.priority,
+    dueAt: item.dueAt,
+  };
+}
+
+function serializeTaskConfigDraftState(state: TaskConfigDraftState) {
+  return JSON.stringify({
+    isDirty: state.isDirty,
+    values: {
+      ...state.values,
+      dueAt: state.values.dueAt?.toISOString() ?? null,
+    },
+  });
 }
 
 function getQueueSuggestedDuration(item: UnscheduledItem) {

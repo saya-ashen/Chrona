@@ -876,7 +876,9 @@
       "advancedDescription": "工作区管理和更深层的运行控制放在日常任务流之外。",
       "openAdvancedSettings": "打开高级设置",
       "aiClientsDescription": "管理 AI 客户端，配置各智能功能使用的 Client",
-      "manageAiClients": "管理 AI Clients"
+      "manageAiClients": "管理 AI Clients",
+      "scheduleAiTitle": "日程 AI 自动化",
+      "scheduleAiDescription": "控制日程工作流中哪些 AI 动作可以自动运行。"
     },
     "aiClientsPage": {
       "title": "AI Clients",

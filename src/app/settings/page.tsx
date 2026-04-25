@@ -1,6 +1,7 @@
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
+import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { resolveLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -39,6 +40,10 @@ export default async function SettingsPage(props: {
             </LocalizedLink>
           </div>
         </div>
+        <ScheduleAiSettingsPanel
+          title={t.scheduleAiTitle}
+          description={t.scheduleAiDescription}
+        />
         <div className="rounded-xl border bg-muted/30 p-4">
           <div className="space-y-1">
             <h2 className="text-sm font-medium text-foreground">{t.advancedTitle}</h2>
