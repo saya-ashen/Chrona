@@ -1,7 +1,6 @@
 import { PlanningHeader } from "@/components/schedule/planning-header";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { DayTimeline } from "@/components/schedule/schedule-page-timeline";
-import { EmptyState } from "@/components/schedule/schedule-page-panels";
 import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
 import type {
   SchedulePageData,
@@ -11,6 +10,7 @@ import type {
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
+import { EmptyState } from "./panels/schedule-panel-primitives";
 
 export function SchedulePageHeader({
   copy,
@@ -168,14 +168,14 @@ export function SchedulePageMainPanel({
   onCreateTaskBlock: (input: any) => Promise<void>;
   onScheduledDragStart: (item: SchedulePageData["scheduled"][number]) => void;
   onDragEnd: () => void;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) => Promise<void>;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <SurfaceCard
-        variant="highlight"
-        className="flex min-h-0 flex-1 flex-col"
-      >
+      <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -228,5 +228,3 @@ export function SchedulePageMainPanel({
     </div>
   );
 }
-
-

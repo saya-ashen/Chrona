@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useState } from "react";
-import { invalidateMemory } from "@/app/actions/task-actions";
+import { invalidateMemory } from "@/lib/task-actions-client";
 import { MemoryConsole } from "@/components/memory/memory-console";
 
 type MemoryPageClientProps = {

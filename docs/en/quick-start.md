@@ -32,14 +32,28 @@ bun run db:seed
 
 Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is not listed here as a primary setup command until that workflow is stabilized.
 
-## Start the web app
+## Start the web app + local API server
 
 ```bash
 bun run dev
 ```
 
 Then open:
-- http://localhost:3000
+- http://localhost:3100
+
+Development ports:
+- SPA dev server: `http://localhost:3100`
+- local API server: `http://localhost:3101`
+
+Production/local-first serving flow:
+
+```bash
+bun run build
+bun run start
+```
+
+Then open:
+- http://localhost:3101
 
 ## Optional: install the Chrona OpenClaw structured-result plugin
 
@@ -72,8 +86,8 @@ Default bridge URL:
 - http://localhost:7677
 
 Bridge notes from verification:
-- the actual entrypoint is `packages/providers/openclaw/bridge/src/server.ts`
-- you can also run `bun packages/providers/openclaw/bridge/src/server.ts` directly
+- the actual entrypoint is `packages/providers/openclaw/bridge/src/index.ts`
+- you can also run `bun packages/providers/openclaw/bridge/src/index.ts` directly
 - if port `7677` is already in use, the bridge exits immediately with an address-in-use error
 - successful startup prints a `bridge.started` log line
 
@@ -112,6 +126,9 @@ Current direction:
 
 ```bash
 bun run dev
+bun run build
+bun run start
+bun run typecheck
 bun run test
 bun run chrona --help
 ```

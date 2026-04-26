@@ -16,6 +16,7 @@ export interface BridgeFeatureRequest<TInput = Record<string, unknown>> {
   sessionId?: string;
   sessionKey?: string;
   input: TInput;
+  instructions?: string;
   timeout?: number;
 }
 

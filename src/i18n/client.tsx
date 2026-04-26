@@ -2,8 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { defaultLocale, type Locale } from "@/i18n/config";
-import type { Messages } from "@/i18n/get-dictionary";
-import defaultMessages from "@/i18n/messages/en.json";
+import { fallbackMessages, type Messages } from "@/i18n/messages";
 
 type I18nContextValue = {
   locale: Locale;
@@ -13,8 +12,8 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue>({
   locale: defaultLocale,
-  messages: defaultMessages,
-  t: (key) => getMessage(defaultMessages, key),
+  messages: fallbackMessages,
+  t: (key) => getMessage(fallbackMessages, key),
 });
 
 function getMessage(messages: Messages, key: string) {

@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { AiClientsManager } from "@/components/settings/ai-clients-manager";
 import { useI18n } from "@/i18n/client";
+import { useAppRouter } from "@/lib/router";
 
 type AiClientsDialogProps = {
   isOpen: boolean;
@@ -13,7 +13,7 @@ type AiClientsDialogProps = {
 
 export function AiClientsDialog({ isOpen, closeHref }: AiClientsDialogProps) {
   const { t } = useI18n();
-  const router = useRouter();
+  const router = useAppRouter();
 
   useEffect(() => {
     if (!isOpen) return;

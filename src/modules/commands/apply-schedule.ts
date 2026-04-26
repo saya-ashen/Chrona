@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
+import { validateScheduleWindow } from "@chrona/domain";
 
 export async function applySchedule(input: {
   taskId: string;

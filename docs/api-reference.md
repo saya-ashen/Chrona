@@ -1,6 +1,8 @@
 # API 参考
 
-所有 API 端点均基于 Next.js App Router，无需认证。
+Chrona 现在由独立的本地 Hono API server 提供所有业务 API；前端 SPA 在开发模式下通过 Vite 代理访问 `/api/*`，生产模式下由同一个本地 server 托管静态资源与 API。
+
+默认情况下无需认证。
 
 ## 任务管理 `/api/tasks`
 

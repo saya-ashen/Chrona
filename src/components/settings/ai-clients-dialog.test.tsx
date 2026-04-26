@@ -4,8 +4,8 @@ import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 
 const push = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push }),
+vi.mock("@/lib/router", () => ({
+  useAppRouter: () => ({ push }),
 }));
 
 vi.mock("@/i18n/client", () => ({

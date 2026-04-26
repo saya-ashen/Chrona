@@ -8,7 +8,7 @@ import type {
   ScheduleSlot,
   TimeslotSuggestion,
   TimeslotSuggestionResult,
-} from "@/modules/ai/types";
+} from "@chrona/contracts/ai";
 
 /**
  * Format a Date as a compact time string (HH:MM).

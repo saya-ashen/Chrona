@@ -81,13 +81,25 @@ bun run db:seed
 
 > Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is intentionally not listed as a primary README command until the Prisma workflow is stabilized.
 
-4. Start the web app
+4. Start the web app + local API server
 
 ```bash
 bun run dev
 ```
 
-5. Optional but recommended for structured OpenClaw tasks: install the Chrona OpenClaw plugin
+5. Build the SPA
+
+```bash
+bun run build
+```
+
+6. Start the production-style local server
+
+```bash
+bun run start
+```
+
+7. Optional but recommended for structured OpenClaw tasks: install the Chrona OpenClaw plugin
 
 ```bash
 bun run openclaw:plugin:install
@@ -101,7 +113,7 @@ What this command does:
 
 The plugin provides explicit business tools such as `suggest_task_completions` and `generate_task_plan_graph`. Chrona treats those tool inputs as the primary machine-readable source of truth instead of relying on assistant free text.
 
-6. Optional: start the OpenClaw bridge when testing agent execution
+8. Optional: start the OpenClaw bridge when testing agent execution
 
 ```bash
 bun run openclaw:bridge
@@ -109,12 +121,17 @@ bun run openclaw:bridge
 
 Bridge notes:
 - default bridge URL: `http://localhost:7677`
-- actual entrypoint: `packages/providers/openclaw/bridge/src/server.ts`
-- you can also run it directly with `bun packages/providers/openclaw/bridge/src/server.ts`
+- actual entrypoint: `packages/providers/openclaw/bridge/src/index.ts`
+- you can also run it directly with `bun packages/providers/openclaw/bridge/src/index.ts`
 - if port `7677` is already in use, the bridge will fail to bind until you stop the existing process
 - successful startup now prints a `bridge.started` log line
 
-Open http://localhost:3000.
+Open http://localhost:3100.
+
+Dev ports:
+- SPA dev server: `http://localhost:3100`
+- local API server: `http://localhost:3101`
+- production/local-first entrypoint after build: `bun run start` serves API + static SPA from the local server
 
 ## Product Roadmap
 

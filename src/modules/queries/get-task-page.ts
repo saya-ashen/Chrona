@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+
+type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
 function readBlockReason(
   task: {
@@ -38,6 +41,13 @@ export async function getTaskPage(taskId: string) {
   await syncTaskRunForRead(taskId);
 
   const savedAiPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? (await getLatestTaskPlanGraph(taskId));
+  const aiPlanGenerationStatus: TaskPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
+    ? "generating"
+    : savedAiPlan?.status === "accepted"
+      ? "accepted"
+      : savedAiPlan
+        ? "waiting_acceptance"
+        : "idle";
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -108,6 +118,7 @@ export async function getTaskPage(taskId: string) {
             plan: savedAiPlan.plan,
           }
         : null,
+      aiPlanGenerationStatus,
       blockReason: readBlockReason(task),
       dependencies: task.dependencies.map((dependency) => ({
         id: dependency.id,

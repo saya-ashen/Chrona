@@ -1,6 +1,6 @@
 import { PrismaClient } from "@/generated/prisma/client";
 
-import { resolveSqliteAdapterUrl } from "@/lib/db-url";
+import { resolveSqliteAdapterUrl } from "@chrona/db/sqlite-url";
 
 const DATABASE_URL = process.env.DATABASE_URL || "file:./prisma/dev.db";
 

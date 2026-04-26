@@ -14,24 +14,24 @@ Chrona 采用 **CQRS（命令查询职责分离）** 结合 **事件溯源（Eve
 ## 整体架构图
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                     客户端层                              │
-│  ┌────────────┐  ┌────────────┐  ┌────────────────────┐  │
-│  │  Web UI    │  │  CLI 工具   │  │  AI Agent (外部)   │  │
-│  │  React 19  │  │  chrona │  │ OpenClaw CLI Bridge│  │
-│  └─────┬──────┘  └─────┬──────┘  └────────┬───────────┘  │
-└────────┼───────────────┼──────────────────┼──────────────┘
-         │               │                  │
-         ▼               ▼                  ▼
-┌──────────────────────────────────────────────────────────┐
-│                     API 层 (Next.js App Router)          │
-│  /api/tasks/*   /api/ai/*   /api/schedule/*              │
-│  /api/inbox/*   /api/memory/*  /api/work/*               │
-│  Server Actions (task-actions.ts)                        │
-└─────────────────────┬────────────────────────────────────┘
-                      │
-         ┌────────────┼────────────┐
-         ▼            ▼            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                          客户端层                             │
+│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐  │
+│  │ Vite React SPA   │  │ Chrona CLI   │  │ AI Agent /     │  │
+│  │ React Router     │  │ chrona       │  │ OpenClaw Bridge│  │
+│  └────────┬─────────┘  └──────┬───────┘  └────────┬───────┘  │
+└───────────┼────────────────────┼───────────────────┼──────────┘
+            │                    │                   │
+            ▼                    ▼                   ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  本地 API / 静态托管层 (Hono)                │
+│  /api/tasks/*   /api/ai/*   /api/schedule/*                  │
+│  /api/inbox/*   /api/memory/*  /api/work/*                   │
+│  production: serves apps/web/dist as static SPA              │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                  ┌────────────┼────────────┐
+                  ▼            ▼            ▼
 ┌──────────────┐ ┌─────────┐ ┌──────────┐
 │   命令层      │ │ 查询层   │ │  AI 层   │
 │  commands/   │ │ queries/ │ │   ai/    │
@@ -62,7 +62,7 @@ Chrona 采用 **CQRS（命令查询职责分离）** 结合 **事件溯源（Eve
 ┌──────────────────────────────────┐
 │      外部运行时层                 │
 │   OpenClaw CLI Bridge (HTTP)     │
-│   运行 AI 智能体任务              │
+│   Runtime adapters / Agent exec  │
 └──────────────────────────────────┘
 ```
 
@@ -71,7 +71,7 @@ Chrona 采用 **CQRS（命令查询职责分离）** 结合 **事件溯源（Eve
 ### 写入路径（Command Path）
 
 ```
-用户操作 → API 路由 → 命令处理器 → 数据库变更 → 追加规范事件 → 重建投影
+用户操作 → Hono API 路由 → 命令处理器 → 数据库变更 → 追加规范事件 → 重建投影
 ```
 
 示例：创建任务
@@ -90,7 +90,7 @@ POST /api/tasks
 ### 读取路径（Query Path）
 
 ```
-用户请求 → API 路由/页面组件 → 查询处理器 → 读取投影 + 关联数据 → 组装页面数据
+用户请求 → Hono API / SPA loader → 查询处理器 → 读取投影 + 关联数据 → 组装页面数据
 ```
 
 示例：加载排期页面
@@ -142,37 +142,6 @@ commands/  ──────────▶  events/
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── layout.tsx          # 根布局
-│   ├── page.tsx            # 首页
-│   ├── actions/            # Server Actions
-│   ├── api/                # API 路由
-│   │   ├── tasks/          # 任务 CRUD + 生命周期
-│   │   ├── ai/             # AI 智能端点
-│   │   ├── schedule/       # 排期投影
-│   │   ├── inbox/          # 收件箱投影
-│   │   ├── memory/         # 记忆投影
-│   │   └── work/           # 工作台投影
-│   ├── inbox/              # 收件箱页面
-│   ├── memory/             # 记忆控制台页面
-│   ├── schedule/           # 排期页面
-│   ├── tasks/              # 任务中心页面
-│   ├── settings/           # 设置页面
-│   ├── workspaces/         # 工作空间页面
-│   └── [lang]/             # 国际化路由（镜像所有页面）
-│
-├── packages/
-│   ├── cli/                # Chrona CLI workspace package
-│   │   ├── src/index.ts    # 入口 (commander)
-│   │   ├── src/commands/   # 子命令
-│   │   └── src/lib/        # API 客户端 + 输出格式化
-│   ├── runtime-client/     # 共享运行时客户端与 OpenClaw 通信层
-│   ├── openclaw-bridge/    # Bridge HTTP 服务封装
-│   └── openclaw-plugin-structured-result/ # OpenClaw business tools 插件
-│
-├── services/
-│   └── openclaw-bridge/    # Bridge 启动入口（委托到 packages/providers/openclaw/bridge）
-│
 ├── components/             # React 组件
 │   ├── ui/                 # 基础 UI 组件
 │   ├── control-plane-shell.tsx  # 应用外壳
@@ -182,10 +151,6 @@ src/
 │   ├── memory/             # 记忆控制台组件
 │   └── tasks/              # 任务中心组件
 │
-├── hooks/                  # 自定义 React Hooks
-├── i18n/                   # 国际化配置
-├── lib/                    # 共享工具
-│
 ├── modules/                # 核心业务逻辑
 │   ├── ai/                 # AI 智能服务
 │   ├── commands/           # 命令处理器（写入）
@@ -193,13 +158,39 @@ src/
 │   ├── projections/        # 投影重建
 │   ├── queries/            # 查询处理器（读取）
 │   ├── runtime/            # 运行时适配器
-│   │   └── openclaw/       # OpenClaw 集成
 │   ├── tasks/              # 任务领域逻辑
 │   ├── workspaces/         # 工作空间逻辑
 │   └── ui/                 # UI 导航配置
 │
+├── i18n/                   # 国际化配置与消息
+├── lib/                    # 共享工具
+├── server/                 # 本地服务启动辅助（runtime bootstrap 等）
+├── styles/                 # 全局样式
 ├── generated/prisma/       # Prisma 生成的客户端
 └── test/                   # 测试配置
+
+apps/
+├── web/                    # Vite React SPA 入口
+│   └── src/                # React Router、loaders、SPA shell
+└── server/                 # 本地 Hono API server + 静态托管
+    └── src/
+        ├── app.ts          # Hono app composition
+        ├── routes/api.ts   # API 路由
+        ├── static/         # SPA dist 托管
+        └── index*.ts       # Bun / Node 启动入口
+
+packages/
+├── common/cli/             # Chrona CLI workspace package
+├── common/runtime-core/    # 共享 runtime contracts
+├── common/ai-features/     # 共享 AI feature surface
+├── providers/openclaw/bridge/
+├── providers/openclaw/integration/
+├── providers/openclaw/plugin-structured-result/
+├── contracts/
+├── db/
+├── domain/
+├── runtime/
+└── runtime-openclaw/
 ```
 
 ## 页面架构
@@ -215,9 +206,9 @@ src/
 | 设置 | `/settings` | 系统配置 |
 
 每个页面遵循相同的数据加载模式：
-1. 页面组件（Server Component）调用对应的查询函数
+1. React Router loader / API 调用获取对应查询数据
 2. 查询函数从投影和数据库组装完整的页面数据
-3. 页面数据传递给客户端组件渲染
+3. SPA 客户端组件渲染并通过本地 API server 发起后续变更请求
 
 ## 关键设计决策
 
@@ -238,5 +229,6 @@ src/
 
 ### 4. OpenClaw 运行时
 - 通过 CLI Bridge 的 HTTP 接口与本地 OpenClaw CLI 通信
+- 前端 SPA、CLI、runtime-client 共享独立 API server 提供的语义化端点
 - 支持会话管理与运行轮询；审批在 bridge 模式下采用简化/noop 处理
 - 运行时适配器模式支持扩展其他 AI 执行引擎

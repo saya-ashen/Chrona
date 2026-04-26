@@ -36,7 +36,7 @@ bun run dev
 ```
 
 默认访问地址：
-- http://localhost:3000
+- http://localhost:3100
 
 生产构建命令保留如下，但本次文档更新未专门跑完整构建验证：
 
@@ -71,8 +71,8 @@ bun run openclaw:bridge
 ```
 
 说明：
-- 实际入口是 `packages/providers/openclaw/bridge/src/server.ts`
-- 也可以直接运行 `bun packages/providers/openclaw/bridge/src/server.ts`
+- 实际入口是 `packages/providers/openclaw/bridge/src/index.ts`
+- 也可以直接运行 `bun packages/providers/openclaw/bridge/src/index.ts`
 - 默认监听 `http://localhost:7677`
 - 如果端口 `7677` 已被占用，bridge 会立刻退出并报 address-in-use 错误
 - 成功启动后会打印 `bridge.started` 日志

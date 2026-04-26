@@ -161,7 +161,7 @@ describe("OpenClawBridgeClient", () => {
       feature: "generate_plan",
       prompt: "Build a plan",
       runtimeSessionKey: "tenant-a:plan-1",
-      systemPrompt: "You are a planner",
+      instructions: "You are a planner",
     });
 
     expect(calls).toHaveLength(1);
@@ -170,8 +170,8 @@ describe("OpenClawBridgeClient", () => {
       sessionKey: "tenant-a:plan-1",
       input: {
         prompt: "Build a plan",
-        systemPrompt: "You are a planner",
       },
+      instructions: "You are a planner",
       timeout: 300,
     });
     expect(result).toMatchObject({

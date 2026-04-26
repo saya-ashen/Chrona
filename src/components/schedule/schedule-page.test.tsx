@@ -7,13 +7,10 @@ const refresh = vi.fn();
 const fetchScheduleProjection = vi.fn();
 const createTaskFromSchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
-const acceptScheduleProposal = vi.fn();
-const rejectScheduleProposal = vi.fn();
 const updateTaskConfigFromSchedule = vi.fn();
-const startRun = vi.fn().mockResolvedValue({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1", runtimeRunRef: "runtime-1" });
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+vi.mock("@/lib/router", () => ({
+  useAppRouter: () => ({ push, refresh }),
 }));
 
 vi.mock("@/i18n/client", () => ({
@@ -25,13 +22,10 @@ vi.mock("@/i18n/routing", () => ({
   localizeHref: (_locale: string, href: string) => href,
 }));
 
-vi.mock("@/app/actions/task-actions", () => ({
+vi.mock("@/lib/task-actions-client", () => ({
   createTaskFromSchedule: (...args: unknown[]) => createTaskFromSchedule(...args),
   applySchedule: (...args: unknown[]) => applySchedule(...args),
-  acceptScheduleProposal: (...args: unknown[]) => acceptScheduleProposal(...args),
-  rejectScheduleProposal: (...args: unknown[]) => rejectScheduleProposal(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
-  startRun: (...args: unknown[]) => startRun(...args),
 }));
 
 vi.mock("@/components/schedule/planning-header", () => ({
@@ -162,17 +156,35 @@ Object.defineProperty(globalThis, "fetch", {
   value: (...args: Parameters<typeof fetch>) => fetchScheduleProjection(...args),
 });
 
-fetchScheduleProjection.mockResolvedValue({
-  ok: true,
-  json: async () => createData(),
+fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
+  if (typeof input === "string" && input.endsWith("/run")) {
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" }),
+    });
+  }
+
+  return Promise.resolve({
+    ok: true,
+    json: async () => createData(),
+  });
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  fetchScheduleProjection.mockResolvedValue({
-    ok: true,
-    json: async () => createData(),
+  fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
+    if (typeof input === "string" && input.endsWith("/run")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" }),
+      });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => createData(),
+    });
   });
 });
 
@@ -403,7 +415,13 @@ describe("SchedulePage data display", () => {
     await user.click(runButton);
 
     await waitFor(() => {
-      expect(startRun).toHaveBeenCalledWith({ taskId: "task-1" });
+      expect(fetchScheduleProjection).toHaveBeenCalledWith(
+        "/api/tasks/task-1/run",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
     });
   });
 

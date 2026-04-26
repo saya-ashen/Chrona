@@ -107,10 +107,58 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     type: "object",
     additionalProperties: true,
     properties: {
-      summary: { type: "string" },
-      reasoning: { type: "string" },
-      nodes: { type: "array", items: { type: "object" } },
-      edges: { type: "array", items: { type: "object" } },
+      summary: {
+        type: "string",
+        description: "One concise sentence describing the generated plan.",
+      },
+      reasoning: {
+        type: "string",
+        description: "Brief rationale for the decomposition. Do not ask questions here.",
+      },
+      nodes: {
+        type: "array",
+        description: "Execution nodes in dependency order. Provide at least one node.",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            id: { type: "string", description: "Stable local id, e.g. node-1." },
+            type: {
+              type: "string",
+              enum: ["step", "checkpoint", "decision", "user_input", "deliverable", "tool_action"],
+            },
+            title: { type: "string" },
+            objective: { type: "string" },
+            description: { type: "string" },
+            phase: { type: "string" },
+            estimatedMinutes: { type: "number" },
+            priority: { type: "string", enum: ["Low", "Medium", "High", "Urgent"] },
+            executionMode: { type: "string", enum: ["automatic", "manual", "hybrid"] },
+            requiresHumanInput: { type: "boolean" },
+            requiresHumanApproval: { type: "boolean" },
+          },
+          required: ["id", "type", "title", "objective"],
+        },
+      },
+      edges: {
+        type: "array",
+        description: "Directed dependencies between nodes. Use [] only when there is a single independent node.",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            id: { type: "string", description: "Stable local id, e.g. edge-1." },
+            fromNodeId: { type: "string" },
+            toNodeId: { type: "string" },
+            type: {
+              type: "string",
+              enum: ["blocks", "parallel", "informs", "feeds_output"],
+            },
+          },
+          required: ["id", "fromNodeId", "toNodeId", "type"],
+        },
+      },
     },
     required: ["summary", "nodes", "edges"],
   },

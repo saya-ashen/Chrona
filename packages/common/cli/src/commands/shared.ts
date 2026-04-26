@@ -20,7 +20,7 @@ export type ClientResolver = () => ApiClient;
 
 export function createClientOptions(command: Command): Command {
   return command.addOption(
-    new Option("--base-url <url>", "Chrona app API base URL").default("http://localhost:3000"),
+    new Option("--base-url <url>", "Chrona app API base URL").default("http://localhost:3101"),
   );
 }
 

@@ -56,15 +56,23 @@ const task = {
 } as const;
 
 describe("TaskAiSidebar", () => {
-  it("asks the backend for the current plan when no saved AI plan exists", () => {
+  it("does not auto-request plan generation when no saved AI plan exists", () => {
     render(<TaskAiSidebar task={{ ...task, savedAiPlan: null }} />);
 
     expect(taskDecompositionPanelProps).toHaveBeenCalledWith(
       expect.objectContaining({
-        autoRequest: true,
+        autoRequest: false,
         forceRefresh: false,
       }),
     );
+    expect(screen.getByText(/AI Task Planning/i)).toBeInTheDocument();
+  });
+
+  it("shows an in-progress state without mounting the generation panel while a plan is being created", () => {
+    render(<TaskAiSidebar task={{ ...task, savedAiPlan: null, aiPlanGenerationStatus: "generating" }} />);
+
+    expect(screen.getByText(/Task plan is being generated/i)).toBeInTheDocument();
+    expect(taskDecompositionPanelProps).not.toHaveBeenCalled();
   });
 
   it("shows saved draft plans as a compact flow summary instead of the full planning panel", () => {

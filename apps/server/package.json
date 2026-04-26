@@ -1,0 +1,11 @@
+{
+  "name": "@chrona/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:bun": "bun run src/index.bun.ts",
+    "start": "tsx src/index.ts",
+    "start:bun": "bun run src/index.bun.ts"
+  }
+}
