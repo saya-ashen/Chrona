@@ -6,7 +6,7 @@
 
 ### 1. Runtime core
 
-位置：`packages/runtime-core`
+位置：`packages/common/runtime-core`
 
 职责：
 
@@ -16,15 +16,15 @@
 
 主要文件：
 
-- `packages/runtime-core/src/types.ts`
-- `packages/runtime-core/src/config-spec.ts`
-- `packages/runtime-core/src/index.ts`
+- `packages/common/runtime-core/src/types.ts`
+- `packages/common/runtime-core/src/config-spec.ts`
+- `packages/common/runtime-core/src/index.ts`
 
 ---
 
 ### 2. OpenClaw integration
 
-位置：`packages/openclaw-integration`
+位置：`packages/providers/openclaw/integration`
 
 职责：
 
@@ -55,7 +55,7 @@
 
 ### 关于 `bridge-client` 的职责说明
 
-`packages/openclaw-integration/src/transport/bridge-client.ts` 不只是“HTTP client”。
+`packages/providers/openclaw/integration/src/transport/bridge-client.ts` 不只是“HTTP client”。
 
 它当前还保留一层 OpenClaw bridge adapter-side compatibility state：
 
@@ -75,7 +75,7 @@
 
 ### 3. AI features
 
-位置：`packages/ai-features`
+位置：`packages/common/ai-features`
 
 职责：
 
@@ -153,7 +153,7 @@
 
 ### Bridge server
 
-位置：`packages/openclaw-bridge`
+位置：`packages/providers/openclaw/bridge`
 
 职责：
 
@@ -163,7 +163,7 @@
 
 ### Bridge client
 
-位置：`packages/openclaw-integration/src/transport/bridge-client.ts`
+位置：`packages/providers/openclaw/integration/src/transport/bridge-client.ts`
 
 职责：
 
@@ -229,7 +229,7 @@
 
 接在：
 
-- `packages/ai-features/src/core/providers.ts`
+- `packages/common/ai-features/src/core/providers.ts`
 - 或提取为新的 feature provider integration package
 
 原则：
@@ -252,19 +252,19 @@
 
 ### 哪些是 OpenClaw integration？
 
-`packages/openclaw-integration`
+`packages/providers/openclaw/integration`
 
 ### 哪些是 runtime core？
 
-`packages/runtime-core`
+`packages/common/runtime-core`
 
 ### 哪些是 AI features？
 
-`packages/ai-features`
+`packages/common/ai-features`
 
 ### 哪些是 bridge service？
 
-`packages/openclaw-bridge`
+`packages/providers/openclaw/bridge`
 
 ### suggestion / plan 走哪条链？
 

@@ -42,7 +42,7 @@
 
 当前：
 
-- `packages/openclaw-bridge/src/server.ts` 是 HTTP bridge server
+- `packages/providers/openclaw/bridge/src/server.ts` 是 HTTP bridge server
 - `packages/runtime-client/src/openclaw/bridge-client.ts` 是它的调用端
 
 但目录上它们分属两个语义不清的区域，读代码时不容易一眼看出：
@@ -71,7 +71,7 @@
 
 ## 目标分层设计
 
-### A. `packages/runtime-core`
+### A. `packages/common/runtime-core`
 
 职责：纯 runtime 抽象与无后端特定逻辑的通用 config spec 工具。
 
@@ -93,7 +93,7 @@
 - orchestrator implementation
 - structured result parsing
 
-### B. `packages/openclaw-integration`
+### B. `packages/providers/openclaw/integration`
 
 职责：所有 OpenClaw-specific 集成代码。
 
@@ -121,7 +121,7 @@
 - `bridge-client.ts` 不是纯 transport-only client；它还承载 bridge-side compatibility cache，用于把 blocking bridge response 映射为 runtime-style session/history API。
 - 这部分 cache 目前保留在 integration 层，不上移到 runtime-core，因为它是 OpenClaw bridge 适配逻辑的一部分，而不是通用 runtime 抽象。
 
-### C. `packages/ai-features`
+### C. `packages/common/ai-features`
 
 职责：同步生成型 AI feature 层。
 
@@ -144,7 +144,7 @@
 - suggestion / plan 等同步 structured dispatch 走 feature 层
 - run/session/approval 走 runtime 层
 
-### D. `packages/openclaw-bridge`
+### D. `packages/providers/openclaw/bridge`
 
 职责保持不变：
 
@@ -169,9 +169,9 @@
 
 ### 新增包
 
-- `packages/runtime-core`
-- `packages/openclaw-integration`
-- `packages/ai-features`
+- `packages/common/runtime-core`
+- `packages/providers/openclaw/integration`
+- `packages/common/ai-features`
 
 ### 兼容策略
 
@@ -200,16 +200,16 @@
 
 复制并迁移：
 
-- `packages/runtime-client/src/types.ts` -> `packages/runtime-core/src/types.ts`
-- `packages/runtime-client/src/config-spec.ts` -> `packages/runtime-core/src/config-spec.ts`
+- `packages/runtime-client/src/types.ts` -> `packages/common/runtime-core/src/types.ts`
+- `packages/runtime-client/src/config-spec.ts` -> `packages/common/runtime-core/src/config-spec.ts`
 - `packages/runtime-client/src/index.ts` -> 改为 facade
-- `packages/runtime-core/src/index.ts` -> 新建 canonical export
+- `packages/common/runtime-core/src/index.ts` -> 新建 canonical export
 
-### 2. 把 OpenClaw-specific 代码收敛到 `packages/openclaw-integration`
+### 2. 把 OpenClaw-specific 代码收敛到 `packages/providers/openclaw/integration`
 
 迁移：
 
-- `packages/runtime-client/src/openclaw/*` -> `packages/openclaw-integration/src/*`
+- `packages/runtime-client/src/openclaw/*` -> `packages/providers/openclaw/integration/src/*`
 
 并按职责重新组织为：
 
@@ -227,10 +227,10 @@
 
 同时：
 
-- `packages/openclaw-integration/src/index.ts` 提供统一出口
-- `packages/openclaw-integration/src/openclaw/*` 提供旧路径兼容 re-export，避免大面积 import 断裂
+- `packages/providers/openclaw/integration/src/index.ts` 提供统一出口
+- `packages/providers/openclaw/integration/src/openclaw/*` 提供旧路径兼容 re-export，避免大面积 import 断裂
 
-### 3. 把 AI feature 代码收敛到 `packages/ai-features`
+### 3. 把 AI feature 代码收敛到 `packages/common/ai-features`
 
 迁移：
 
@@ -244,15 +244,15 @@
 
 到：
 
-- `packages/ai-features/src/core/*`
-- `packages/ai-features/src/features/index.ts`
-- `packages/ai-features/src/index.ts`
+- `packages/common/ai-features/src/core/*`
+- `packages/common/ai-features/src/features/index.ts`
+- `packages/common/ai-features/src/index.ts`
 
 然后把原 `src/modules/ai/client/*` 改为 facade。
 
 ### 4. 调整 bridge server 依赖
 
-- `packages/openclaw-bridge/src/server.ts`
+- `packages/providers/openclaw/bridge/src/server.ts`
   - 从 `@chrona/runtime-client/openclaw/*` 改为 `@chrona/openclaw-integration/*`
 
 ### 5. 调整 service / app 层依赖
@@ -317,10 +317,10 @@
 
 重构完成后，读代码的人可以快速回答：
 
-- OpenClaw bridge server 在哪？ -> `packages/openclaw-bridge`
-- OpenClaw bridge client / protocol / structured result 在哪？ -> `packages/openclaw-integration`
-- runtime core contracts 在哪？ -> `packages/runtime-core`
-- suggestion / plan / conflicts / timeslots / chat 在哪？ -> `packages/ai-features`
+- OpenClaw bridge server 在哪？ -> `packages/providers/openclaw/bridge`
+- OpenClaw bridge client / protocol / structured result 在哪？ -> `packages/providers/openclaw/integration`
+- runtime core contracts 在哪？ -> `packages/common/runtime-core`
+- suggestion / plan / conflicts / timeslots / chat 在哪？ -> `packages/common/ai-features`
 - API/service 怎么调用？ -> `src/modules/ai/ai-service.ts` / task runtime routes
 
 应用代码已迁移到 canonical package 路径；兼容层现在只剩待删除的历史壳。

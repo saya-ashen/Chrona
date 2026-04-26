@@ -1,0 +1,17 @@
+{
+  "name": "@chrona/openclaw-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/openclaw-integration": "workspace:*",
+    "hono": "^4.9.6"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./app": "./src/app.ts",
+    "./server": "./src/server.ts",
+    "./*": "./src/*"
+  }
+}
+

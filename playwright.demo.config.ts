@@ -22,7 +22,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: `DATABASE_URL="${DEMO_DATABASE_URL}" bun run db:seed && DATABASE_URL="${DEMO_DATABASE_URL}" bun run dev -- --webpack --hostname 127.0.0.1 --port 3100`,
+    command: `DATABASE_URL="${DEMO_DATABASE_URL}" bun run db:seed && bun run dev`,
     url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
   },
