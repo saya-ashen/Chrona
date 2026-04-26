@@ -431,9 +431,15 @@ describe("openclaw bridge hono app", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ instructions: "run" }),
     });
+    const legacyChatRes = await app.request("http://bridge.local/v1/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "legacy" }] }),
+    });
 
     expect(featureRes.status).toBe(200);
     expect(executionRes.status).toBe(200);
+    expect(legacyChatRes.status).toBe(404);
     expect(calls).toHaveLength(2);
     expect(calls[0]?.route).toEqual({ kind: "feature", feature: "suggest", stream: false });
     expect(calls[1]?.route).toEqual({ kind: "execution", stream: false });

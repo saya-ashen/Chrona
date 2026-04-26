@@ -1,8 +1,7 @@
 /**
- * AI Client — Unified module for all AI interactions.
+ * @deprecated Import from `@chrona/ai-features` directly in new code.
  *
- * This file is a backward-compatibility barrel that re-exports everything
- * from the split submodules under ./client/.
+ * Backward-compatibility barrel retained only for in-repo migration safety.
+ * TODO(chrona-refactor): delete this facade when remaining app imports are migrated.
  */
-
 export * from "@chrona/ai-features";

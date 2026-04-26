@@ -24,6 +24,8 @@ function readRuntimeText(input: RuntimeInput, key: string) {
 }
 
 export function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
+  // Backward-compat mapping for legacy task columns (`runtimeModel`/`prompt`/`runtimeConfig`).
+  // TODO(chrona-runtime): remove once all reads/writes use `runtimeInput` only.
   const runtimeModel = readRuntimeText(runtimeInput, "model");
   const prompt = readRuntimeText(runtimeInput, "prompt");
   const runtimeConfig = { ...runtimeInput };
@@ -43,6 +45,8 @@ export function buildCompatRuntimeInput(input: {
   prompt?: string | null;
   runtimeConfig?: unknown;
 }) {
+  // Backward-compat for callers still passing split legacy runtime fields.
+  // TODO(chrona-runtime): delete after legacy task columns are fully retired.
   const compatInput: RuntimeInput = isRuntimeInput(input.runtimeConfig)
     ? { ...input.runtimeConfig }
     : {};

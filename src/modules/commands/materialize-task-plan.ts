@@ -49,6 +49,9 @@ function createTaskProjectionData(params: {
 }
 
 function isMaterializableNode(node: TaskPlanNode) {
+  // Canonical graph contract only emits automatic/manual/hybrid.
+  // `child_task` is accepted here as a legacy persisted value to keep old plans re-materializable.
+  // TODO(chrona-refactor): remove `child_task` fallback after all stored v1 plans are migrated.
   return node.executionMode === "automatic" || node.executionMode === "child_task";
 }
 
@@ -109,6 +112,8 @@ export async function materializeTaskPlan(input: { taskId: string }) {
             model: "gpt-5.4",
             prompt: node.objective,
           },
+          // TODO(chrona-runtime): bump to a non-legacy runtime input version once
+          // the runtime schema migration lands end-to-end.
           runtimeInputVersion: "openclaw-legacy-v1",
           runtimeModel: "gpt-5.4",
           prompt: node.objective,

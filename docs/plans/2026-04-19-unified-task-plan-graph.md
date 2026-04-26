@@ -106,7 +106,7 @@ export type TaskPlanEdgeType =
   | "unblocks"
   | "feeds_output";
 
-export type TaskPlanNodeExecutionMode = "none" | "child_task" | "inline_action";
+export type TaskPlanNodeExecutionMode = "automatic" | "manual" | "hybrid";
 
 export type TaskPlanNode = {
   id: string;
@@ -119,8 +119,12 @@ export type TaskPlanNode = {
   estimatedMinutes: number | null;
   priority: "Low" | "Medium" | "High" | "Urgent" | null;
   executionMode: TaskPlanNodeExecutionMode;
+  requiresHumanInput: boolean;
+  requiresHumanApproval: boolean;
+  autoRunnable: boolean;
+  blockingReason: "needs_user_input" | "needs_approval" | "external_dependency" | null;
   linkedTaskId: string | null;
-  needsUserInput: boolean;
+  completionSummary: string | null;
   metadata: Record<string, unknown> | null;
 };
 
@@ -174,11 +178,18 @@ Examples:
 
 ### 3.2 What becomes a child task
 
-Only nodes with `executionMode: "child_task"` should be materialized into real `Task` records.
+Current execution semantics:
+- `automatic`: no human gate, can be started by scheduler/automation when dependencies are ready.
+- `manual`: requires explicit human action (input, decision, or approval) before progressing.
+- `hybrid`: mixed node kept for compatibility while prompt generation is still being tightened.
 
-This solves the current mismatch:
-- not every planning item should become a subtask,
-- but true executable units still can become subtasks.
+Node-level booleans are the executable contract used by server/store/UI/tests:
+- `autoRunnable` must only be `true` when `executionMode === "automatic"` and both human gates are false.
+- `requiresHumanInput` and `requiresHumanApproval` explicitly describe which human gate blocks progress.
+
+Materialization rule in current implementation:
+- canonical path materializes `executionMode: "automatic"` nodes into child tasks.
+- legacy fallback still accepts historical `"child_task"` values from previously persisted plans during migration.
 
 ### 3.3 How pages consume the plan
 
@@ -269,7 +280,8 @@ Target:
 ### 5.2 Materialization flow
 
 New flow needed:
-- create / sync child tasks from plan nodes marked `executionMode: "child_task"`
+- create / sync child tasks from plan nodes marked `executionMode: "automatic"`
+- while migration is ongoing, still tolerate persisted legacy `executionMode: "child_task"` payloads
 
 Create a dedicated command:
 - `src/modules/commands/materialize-task-plan.ts`
