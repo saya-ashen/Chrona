@@ -94,6 +94,11 @@ describe("TaskPlanGraph", () => {
     expect(legend).toHaveTextContent("分支到");
     expect(legend).toHaveTextContent("解除阻塞");
     expect(legend).toHaveTextContent("输出流向");
+    expect(legend).toHaveTextContent("step · 普通步骤");
+    expect(legend).toHaveTextContent("user_input · 用户输入");
+    expect(legend).toHaveTextContent("decision · 决策/审批");
+    expect(legend).toHaveTextContent("deliverable · 交付结果");
+    expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
     expect(legendOverlay?.className).toContain("absolute");
@@ -112,11 +117,13 @@ describe("TaskPlanGraph", () => {
     const currentNode = screen.getByTestId("task-plan-node-node-current");
     expect(currentNode.getAttribute("data-node-current")).toBe("true");
     expect(currentNode.getAttribute("data-node-selected")).toBe("false");
+    expect(currentNode.getAttribute("data-node-shape")).toBe("rounded");
     expect(currentNode).not.toHaveTextContent("等待你处理");
     expect(currentNode).toHaveTextContent("user_input");
 
     const childNode = screen.getByTestId("task-plan-node-node-child");
     expect(childNode.getAttribute("data-node-tone")).toBe("child-task");
+    expect(childNode.getAttribute("data-node-shape")).toBe("rounded");
     expect(childNode).not.toHaveTextContent("待处理");
     expect(childNode).toHaveTextContent("execution");
   });
@@ -180,6 +187,7 @@ describe("TaskPlanGraph", () => {
 
     expect(graph).toHaveAttribute("data-graph-editable", "false");
     expect(deliverableNode.getAttribute("data-node-selected")).toBe("true");
+    expect(deliverableNode.getAttribute("data-node-shape")).toBe("pill");
     expect(deliverableNode).toHaveTextContent("产出说明文档");
     expect(deliverableNode).toHaveTextContent("delivery");
     expect(deliverableNode).toHaveTextContent("deliverable");
@@ -197,6 +205,61 @@ describe("TaskPlanGraph", () => {
     const canvas = within(graph).getByTestId("task-plan-graph-canvas");
     const scrollShell = within(graph).getByTestId("task-plan-graph-scroll");
     expect(Number.parseInt(canvas.style.height, 10)).toBeGreaterThanOrEqual(Number.parseInt(scrollShell.style.height || "0", 10));
+  });
+
+  it("maps semantic node types to flowchart-like shapes", () => {
+    render(
+      <TaskPlanGraph
+        mode="full"
+        plan={{
+          state: "ready",
+          currentStepId: "node-tool",
+          steps: [
+            {
+              id: "node-decision",
+              title: "决定是否扩展范围",
+              objective: "需要在两个方案之间做选择",
+              phase: "planning",
+              status: "pending",
+              requiresHumanInput: false,
+              type: "decision",
+              executionMode: "manual",
+              linkedTaskId: null,
+            },
+            {
+              id: "node-tool",
+              title: "调用检索工具",
+              objective: "自动拉取信息",
+              phase: "execution",
+              status: "in_progress",
+              requiresHumanInput: false,
+              type: "tool_action",
+              executionMode: "automatic",
+              linkedTaskId: null,
+            },
+            {
+              id: "node-checkpoint",
+              title: "核对结果完整性",
+              objective: "确认结果符合预期",
+              phase: "review",
+              status: "pending",
+              requiresHumanInput: false,
+              type: "checkpoint",
+              executionMode: "hybrid",
+              linkedTaskId: null,
+            },
+          ],
+          edges: [
+            { id: "edge-1", fromNodeId: "node-decision", toNodeId: "node-tool", type: "branches_to" },
+            { id: "edge-2", fromNodeId: "node-tool", toNodeId: "node-checkpoint", type: "sequential" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("task-plan-node-node-decision")).toHaveAttribute("data-node-shape", "diamond");
+    expect(screen.getByTestId("task-plan-node-node-tool")).toHaveAttribute("data-node-shape", "hex");
+    expect(screen.getByTestId("task-plan-node-node-checkpoint")).toHaveAttribute("data-node-shape", "parallelogram");
   });
 
   it("automatically switches to full mode when enough width is available", () => {

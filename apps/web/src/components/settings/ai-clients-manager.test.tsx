@@ -64,7 +64,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My OpenClaw Client"), {
-      target: { value: "Bridge Client" },
+      target: { value: "OpenClaw Client" },
     });
 
     const testButton = screen.getByRole("button", { name: "Test availability" });
@@ -93,9 +93,9 @@ describe("AiClientsManager", () => {
         clients: [
           {
             id: "client_1",
-            name: "Broken Bridge",
+            name: "Broken Gateway",
             type: "openclaw",
-            config: { bridgeUrl: "http://localhost:7677" },
+            config: { gatewayUrl: "http://localhost:7677", gatewayToken: "secret-token" },
             isDefault: false,
             enabled: true,
             bindings: ["suggest"],
@@ -107,16 +107,16 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("Broken Bridge");
+    await screen.findByText("Broken Gateway");
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ ok: true, available: false, reason: "Bridge health endpoint returned 503" }),
+      json: async () => ({ ok: true, available: false, reason: "Gateway health endpoint returned 503" }),
     });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
     await screen.findByText("Unavailable");
-    expect(screen.getByText("Bridge health endpoint returned 503")).toBeInTheDocument();
+    expect(screen.getByText("Gateway health endpoint returned 503")).toBeInTheDocument();
   });
 });

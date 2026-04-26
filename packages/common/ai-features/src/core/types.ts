@@ -27,7 +27,8 @@ export interface AiClientRecord {
 }
 
 export interface OpenClawClientConfig {
-  bridgeUrl: string;
+  gatewayUrl: string;
+  gatewayToken: string;
   timeoutSeconds?: number;
 }
 
@@ -302,4 +303,10 @@ export type StreamEvent =
   | { type: "result"; suggestions: SmartSuggestResponse }
   | { type: "result"; plan: GenerateTaskPlanResponse }
   | { type: "done"; text: string; structured?: StructuredAgentResult | null }
-  | { type: "error"; message: string };
+  | {
+      type: "error";
+      message: string;
+      rawText?: string;
+      structured?: StructuredAgentResult | null;
+      diagnostics?: Record<string, unknown>;
+    };

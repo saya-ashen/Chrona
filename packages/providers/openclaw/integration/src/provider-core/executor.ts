@@ -35,6 +35,44 @@ function previewText(value: string, maxLength = 1200): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+function summarizeToolCalls(
+  toolCalls: Array<{
+    tool: string;
+    callId: string;
+    input: Record<string, unknown>;
+    result?: string;
+    status?: string;
+  }>,
+): Array<Record<string, unknown>> {
+  return toolCalls.map((toolCall) => ({
+    tool: toolCall.tool,
+    callId: toolCall.callId,
+    status: toolCall.status ?? null,
+    inputPreview: previewText(JSON.stringify(toolCall.input ?? {}), 240),
+    resultPreview:
+      typeof toolCall.result === "string"
+        ? previewText(toolCall.result, 240)
+        : null,
+  }));
+}
+
+function summarizeToolCallOutputs(
+  toolCallOutputs: Array<{
+    callId: string;
+    output: unknown;
+  }>,
+): Array<Record<string, unknown>> {
+  return toolCallOutputs.map((toolCallOutput) => ({
+    callId: toolCallOutput.callId,
+    outputPreview:
+      typeof toolCallOutput.output === "string"
+        ? previewText(toolCallOutput.output, 240)
+        : toolCallOutput.output == null
+          ? null
+          : previewText(JSON.stringify(toolCallOutput.output), 240),
+  }));
+}
+
 const sessionPreviousResponseMap = new Map<string, string>();
 const sessionPendingToolOutputMap = new Map<
   string,
@@ -151,13 +189,19 @@ function stringifyFeatureInput(
     parts.push(`Estimated duration: ${estimatedDuration} minutes`);
   }
 
-  parts.push(
-    "",
-    "Output requirements",
-    "- Call generate_task_plan_graph exactly once.",
-    "- Include summary, nodes, and edges as top-level fields.",
-    "- Do not return prose instead of the tool call.",
-  );
+    parts.push(
+      "",
+      "Output requirements",
+      "- Call generate_task_plan_graph exactly once.",
+      "- Include summary, nodes, and edges as top-level fields.",
+      "- For each node, include id, type, title, objective, and estimatedMinutes when possible.",
+      "- For each node, explicitly set executor to either 'human' or 'automation'.",
+      "- Use executor='automation' ONLY when the node can be completed entirely in software without human input, approval, payment, travel, pickup, waiting, or other manual action.",
+      "- Use executor='human' for approvals, choices, clarification, communication, payment, pickup, travel, waiting, receiving items, and any physical/manual action.",
+      "- Do NOT emit executionMode, autoRunnable, blockingReason, status, linkedTaskId, or completionSummary; Chrona derives them.",
+      "- Use type=user_input for human clarification/input, decision for approval/choice gates, and tool_action only for truly automatable actions.",
+      "- Do not return prose instead of the tool call.",
+    );
 
   return parts.join("\n");
 }
@@ -352,17 +396,12 @@ export function buildGatewayBody(
       body.tools = [
         {
           type: "function",
-          function: {
-            name: requiredTool,
-            description: toolDescription(requiredTool),
-            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
-          },
+          name: requiredTool,
+          description: toolDescription(requiredTool),
+          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
         },
       ];
-      body.tool_choice = {
-        type: "function",
-        function: { name: requiredTool },
-      };
+      body.tool_choice = "required";
     }
 
     return body;
@@ -434,11 +473,19 @@ export async function checkGatewayAvailable(
   environment: BridgeEnvironment = DEFAULT_OPENCLAW_ENVIRONMENT,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${environment.gatewayHttpUrl}/v1/health`, {
+    const res = await fetch(`${environment.gatewayHttpUrl}/health`, {
       headers: gatewayHeaders(environment),
       signal: AbortSignal.timeout(3000),
     });
-    return res.ok;
+    if (!res.ok) {
+      return false;
+    }
+
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; status?: string }
+      | null;
+
+    return body?.ok === true && body.status === "live";
   } catch {
     return false;
   }
@@ -503,19 +550,20 @@ export async function executeGatewayRequest(
 
   if (!response.ok) {
     const errBody = responseText;
+    const detailedError = `Gateway /v1/responses failed (${response.status}): ${errBody.slice(0, 1200)}`;
     const bridgeResponse: BridgeResponse = {
       sessionId,
       output: "",
       toolCalls: [],
       toolCallOutputs: [],
       usage: null,
-      error: `Gateway /v1/responses failed (${response.status}): ${errBody.slice(0, 300)}`,
+      error: detailedError,
       durationMs: Date.now() - startedAt,
       structured: buildStructuredResult({
         sessionId,
         output: "",
         toolCalls: [],
-        error: `Gateway /v1/responses failed (${response.status})`,
+        error: detailedError,
         feature: route.kind === "feature" ? route.feature : null,
       }),
       feature: null,
@@ -581,6 +629,26 @@ export async function executeGatewayRequest(
       }),
       feature,
     };
+    logger.info("openclaw.gateway.parsed", {
+      sessionId,
+      sessionKey,
+      route: routeLabel(route),
+      responseId,
+      responseStatus: bridgeResponse.responseStatus ?? null,
+      semanticError,
+      outputPreview: previewText(outputText, 400),
+      toolCalls: summarizeToolCalls(toolCalls),
+      toolCallOutputs: summarizeToolCallOutputs(toolCallOutputs),
+      structured: bridgeResponse.structured
+        ? {
+            ok: bridgeResponse.structured.ok,
+            error: bridgeResponse.structured.error,
+            feature: bridgeResponse.structured.feature ?? null,
+            toolName: bridgeResponse.structured.toolName ?? null,
+            source: bridgeResponse.structured.source ?? null,
+          }
+        : null,
+    });
     return { response: bridgeResponse, events: [] };
   }
 
@@ -704,6 +772,28 @@ export async function executeGatewayRequest(
     }),
     feature,
   };
+
+  logger.info("openclaw.gateway.parsed", {
+    sessionId,
+    sessionKey,
+    route: routeLabel(route),
+    responseId,
+    responseStatus: bridgeResponse.responseStatus ?? null,
+    semanticError,
+    outputPreview: previewText(outputText, 400),
+    toolCalls: summarizeToolCalls(toolCalls),
+    toolCallOutputs: summarizeToolCallOutputs(toolCallOutputs),
+    structured: bridgeResponse.structured
+      ? {
+          ok: bridgeResponse.structured.ok,
+          error: bridgeResponse.structured.error,
+          feature: bridgeResponse.structured.feature ?? null,
+          toolName: bridgeResponse.structured.toolName ?? null,
+          source: bridgeResponse.structured.source ?? null,
+        }
+      : null,
+    eventCount: events.length,
+  });
 
   return { response: bridgeResponse, events };
 }

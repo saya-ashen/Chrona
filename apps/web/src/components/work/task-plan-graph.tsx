@@ -152,6 +152,15 @@ type EdgeLegendItem = {
   width: number;
 };
 
+type NodeShape = "rounded" | "diamond" | "pill" | "hex" | "parallelogram";
+
+type NodeLegendItem = {
+  type: string;
+  label: string;
+  shape: NodeShape;
+  tone: NodeTone;
+};
+
 function getEdgeLabel(type: string, c: GraphCopyType) {
   switch (type) {
     case "depends_on":
@@ -343,40 +352,126 @@ function buildEdgeLegend(graphCopy: GraphCopyType): EdgeLegendItem[] {
   ];
 }
 
-function EdgeLegend({ items }: { items: EdgeLegendItem[] }) {
+function nodeShapeForStep(step: PlanStep): NodeShape {
+  switch (step.type) {
+    case "decision":
+      return "diamond";
+    case "deliverable":
+      return "pill";
+    case "tool_action":
+      return "hex";
+    case "checkpoint":
+      return "parallelogram";
+    default:
+      return "rounded";
+  }
+}
+
+function nodeLegendLabel(type: string) {
+  switch (type) {
+    case "decision":
+      return `${type} · 决策/审批`;
+    case "deliverable":
+      return `${type} · 交付结果`;
+    case "tool_action":
+      return `${type} · 自动执行`;
+    case "checkpoint":
+      return `${type} · 检查点`;
+    case "user_input":
+      return `${type} · 用户输入`;
+    default:
+      return `${type} · 普通步骤`;
+  }
+}
+
+function buildNodeLegend(): NodeLegendItem[] {
+  const steps: PlanStep[] = [
+    { id: "legend-step", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "step" },
+    { id: "legend-user", title: "", objective: "", phase: "", status: "waiting_for_user", requiresHumanInput: true, type: "user_input" },
+    { id: "legend-checkpoint", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "checkpoint" },
+    { id: "legend-decision", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "decision" },
+    { id: "legend-tool", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "tool_action", executionMode: "automatic" },
+    { id: "legend-deliverable", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "deliverable" },
+  ];
+
+  return steps.map((step) => ({
+    type: step.type ?? "step",
+    label: nodeLegendLabel(step.type ?? "step"),
+    shape: nodeShapeForStep(step),
+    tone: getNodeTone(step),
+  }));
+}
+
+function ShapeChip({ shape, tone, className }: { shape: NodeShape; tone: NodeTone; className?: string }) {
+  const s = TONE_STYLES[tone];
+  const base = cn("block h-4 w-6 border shadow-sm", s.border, s.bg, className);
+
+  if (shape === "diamond") {
+    return <span aria-hidden="true" className={cn(base, "rotate-45 rounded-[2px]")} />;
+  }
+
+  if (shape === "pill") {
+    return <span aria-hidden="true" className={cn(base, "rounded-full")} />;
+  }
+
+  if (shape === "hex") {
+    return <span aria-hidden="true" className={cn(base, "rounded-[6px]")} style={{ clipPath: "polygon(18% 0%, 82% 0%, 100% 50%, 82% 100%, 18% 100%, 0% 50%)" }} />;
+  }
+
+  if (shape === "parallelogram") {
+    return <span aria-hidden="true" className={cn(base, "rounded-[4px]")} style={{ clipPath: "polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%)" }} />;
+  }
+
+  return <span aria-hidden="true" className={cn(base, "rounded-xl")} />;
+}
+
+function EdgeLegend({ edgeItems, nodeItems }: { edgeItems: EdgeLegendItem[]; nodeItems: NodeLegendItem[] }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[6] flex justify-end p-3">
       <div
         className="rounded-2xl border border-border/60 bg-background/92 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.12)] backdrop-blur"
         data-testid="task-plan-graph-legend"
       >
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div
-              key={item.type}
-              className="flex items-center gap-2 text-[11px] text-muted-foreground"
-            >
-              <svg
-                aria-hidden="true"
-                className="shrink-0"
-                height="8"
-                viewBox="0 0 28 8"
-                width="28"
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-1.5">
+            {edgeItems.map((item) => (
+              <div
+                key={item.type}
+                className="flex items-center gap-2 text-[11px] text-muted-foreground"
               >
-                <line
-                  stroke={item.stroke}
-                  strokeDasharray={item.dash}
-                  strokeLinecap="round"
-                  strokeWidth={item.width}
-                  x1="1"
-                  x2="27"
-                  y1="4"
-                  y2="4"
-                />
-              </svg>
-              <span>{item.label}</span>
-            </div>
-          ))}
+                <svg
+                  aria-hidden="true"
+                  className="shrink-0"
+                  height="8"
+                  viewBox="0 0 28 8"
+                  width="28"
+                >
+                  <line
+                    stroke={item.stroke}
+                    strokeDasharray={item.dash}
+                    strokeLinecap="round"
+                    strokeWidth={item.width}
+                    x1="1"
+                    x2="27"
+                    y1="4"
+                    y2="4"
+                  />
+                </svg>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5" data-testid="task-plan-graph-node-legend">
+            {nodeItems.map((item) => (
+              <div
+                key={item.type}
+                className="flex items-center gap-2 text-[11px] text-muted-foreground"
+              >
+                <ShapeChip shape={item.shape} tone={item.tone} />
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -402,6 +497,25 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const { step, tone, isCurrent, isSelected, onToggle, graphCopy } = data;
   const s = TONE_STYLES[tone];
+  const shape = nodeShapeForStep(step);
+  const shapeClassName =
+    shape === "pill"
+      ? "rounded-[999px]"
+      : shape === "diamond"
+        ? "rounded-[10px]"
+        : shape === "hex"
+          ? "rounded-[12px]"
+          : shape === "parallelogram"
+            ? "rounded-[10px]"
+            : "rounded-2xl";
+  const shapeStyle =
+    shape === "diamond"
+      ? { clipPath: "polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)" }
+      : shape === "hex"
+        ? { clipPath: "polygon(12% 0%, 88% 0%, 100% 28%, 100% 72%, 88% 100%, 12% 100%, 0% 72%, 0% 28%)" }
+        : shape === "parallelogram"
+          ? { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" }
+          : undefined;
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
@@ -415,17 +529,20 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         onClick={() => onToggle(step.id)}
         data-testid={`task-plan-node-${step.id}`}
         data-node-tone={tone}
+        data-node-shape={shape}
         data-node-current={isCurrent ? "true" : "false"}
         data-node-selected={isSelected ? "true" : "false"}
         className={cn(
-          "rf-node-button group relative w-full rounded-2xl border px-3 py-2.5 text-left transition-all duration-200",
+          "rf-node-button group relative w-full border px-3 py-2.5 text-left transition-all duration-200",
           "shadow-[0_8px_18px_rgba(15,23,42,0.06)] hover:shadow-[0_10px_22px_rgba(15,23,42,0.09)]",
+          shapeClassName,
           s.border,
           s.bg,
           isCurrent && "ring-2",
           isCurrent && s.ring,
           isSelected && !isCurrent && "ring-1 ring-foreground/10",
         )}
+        style={shapeStyle}
       >
         <div className="flex items-start gap-2.5">
           <div className="mt-1 flex flex-col items-center gap-1">
@@ -836,6 +953,7 @@ type TaskPlanGraphFrameProps = {
   nodes: FlowGraphNode[];
   edges: Edge[];
   edgeLegend: EdgeLegendItem[];
+  nodeLegend: NodeLegendItem[];
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
   handleNodeDragStart: (event: React.MouseEvent<Element>) => void;
   handleNodeDrag: (event: React.MouseEvent<Element>) => void;
@@ -849,6 +967,7 @@ function TaskPlanGraphFrame({
   nodes,
   edges,
   edgeLegend,
+  nodeLegend,
   handleNodeClick,
   handleNodeDragStart,
   handleNodeDrag,
@@ -913,7 +1032,7 @@ function TaskPlanGraphFrame({
             />
           </div>
         </div>
-        <EdgeLegend items={edgeLegend} />
+        <EdgeLegend edgeItems={edgeLegend} nodeItems={nodeLegend} />
       </div>
     </div>
   );
@@ -961,6 +1080,7 @@ export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
   const [nodes, setNodes] = useNodesState<FlowGraphNode>(layout.nodes);
   const [edges, setEdges] = useEdgesState(layout.edges);
   const edgeLegend = useMemo(() => buildEdgeLegend(graphCopy), [graphCopy]);
+  const nodeLegend = useMemo(() => buildNodeLegend(), []);
   const compactSections = useMemo(() => buildCompactSections(plan), [plan]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(
@@ -1150,6 +1270,7 @@ export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
                   nodes={nodes}
                   edges={edges}
                   edgeLegend={edgeLegend}
+                  nodeLegend={nodeLegend}
                   handleNodeClick={handleNodeClick}
                   handleNodeDragStart={handleNodeDragStart}
                   handleNodeDrag={handleNodeDrag}
@@ -1172,6 +1293,7 @@ export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
         nodes={nodes}
         edges={edges}
         edgeLegend={edgeLegend}
+        nodeLegend={nodeLegend}
         handleNodeClick={handleNodeClick}
         handleNodeDragStart={handleNodeDragStart}
         handleNodeDrag={handleNodeDrag}
