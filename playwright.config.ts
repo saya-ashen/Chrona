@@ -14,7 +14,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && DATABASE_URL="${E2E_DATABASE_URL}" bun run dev -- --hostname 127.0.0.1 --port 3100`,
+    command: `DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && bun run dev`,
     url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
   },

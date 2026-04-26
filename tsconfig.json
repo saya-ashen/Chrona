@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -14,28 +15,34 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": ["./src/*"],
-      "@chrona/runtime-core": ["./packages/runtime-core/src/index.ts"],
-      "@chrona/runtime-core/*": ["./packages/runtime-core/src/*"],
-      "@chrona/openclaw-integration": ["./packages/openclaw-integration/src/index.ts"],
-      "@chrona/openclaw-integration/*": ["./packages/openclaw-integration/src/*"],
-      "@chrona/ai-features": ["./packages/ai-features/src/index.ts"],
-      "@chrona/ai-features/*": ["./packages/ai-features/src/*"],
-      "@chrona/openclaw-bridge": ["./packages/openclaw-bridge/src/server.ts"]
+      "@web/*": ["./apps/web/src/*"],
+      "@server/*": ["./apps/server/src/*"],
+      "@chrona/runtime-core": ["./packages/common/runtime-core/src/index.ts"],
+      "@chrona/runtime-core/*": ["./packages/common/runtime-core/src/*"],
+      "@chrona/openclaw-integration": ["./packages/providers/openclaw/integration/src/index.ts"],
+      "@chrona/openclaw-integration/*": ["./packages/providers/openclaw/integration/src/*"],
+      "@chrona/ai-features": ["./packages/common/ai-features/src/index.ts"],
+      "@chrona/ai-features/*": ["./packages/common/ai-features/src/*"],
+      "@chrona/domain": ["./packages/domain/src/index.ts"],
+      "@chrona/domain/*": ["./packages/domain/src/*"],
+      "@chrona/contracts": ["./packages/contracts/src/index.ts"],
+      "@chrona/contracts/*": ["./packages/contracts/src/*"],
+      "@chrona/db": ["./packages/db/src/index.ts"],
+      "@chrona/db/*": ["./packages/db/src/*"],
+      "@chrona/runtime": ["./packages/runtime/src/index.ts"],
+      "@chrona/runtime/*": ["./packages/runtime/src/*"],
+      "@chrona/runtime-openclaw": ["./packages/runtime-openclaw/src/index.ts"],
+      "@chrona/runtime-openclaw/*": ["./packages/runtime-openclaw/src/*"],
+      "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"],
+      "@chrona/openclaw-bridge/*": ["./packages/providers/openclaw/bridge/src/*"],
+      "@chrona/web/*": ["./apps/web/src/*"]
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
   "exclude": ["node_modules"]

@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "bun", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@chrona/runtime/*": ["../../packages/runtime/src/*"],
+      "@chrona/runtime": ["../../packages/runtime/src/index.ts"],
+      "@chrona/db/*": ["../../packages/db/src/*"],
+      "@chrona/db": ["../../packages/db/src/index.ts"],
+      "@chrona/contracts/*": ["../../packages/contracts/src/*"],
+      "@chrona/contracts": ["../../packages/contracts/src/index.ts"],
+      "@chrona/ai-features/*": ["../../packages/common/ai-features/src/*"],
+      "@chrona/ai-features": ["../../packages/common/ai-features/src/index.ts"],
+      "@chrona/domain/*": ["../../packages/domain/src/*"],
+      "@chrona/domain": ["../../packages/domain/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+}

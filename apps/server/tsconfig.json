@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@chrona/runtime/*": ["../../packages/runtime/src/*"],
+      "@chrona/runtime": ["../../packages/runtime/src/index.ts"],
+      "@chrona/db/*": ["../../packages/db/src/*"],
+      "@chrona/db": ["../../packages/db/src/index.ts"],
+      "@chrona/openclaw-integration/*": ["../../packages/providers/openclaw/integration/src/*"],
+      "@chrona/openclaw-integration": ["../../packages/providers/openclaw/integration/src/index.ts"],
+      "@chrona/contracts/*": ["../../packages/contracts/src/*"],
+      "@chrona/contracts": ["../../packages/contracts/src/index.ts"],
+      "@chrona/ai-features/*": ["../../packages/common/ai-features/src/*"],
+      "@chrona/ai-features": ["../../packages/common/ai-features/src/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../../packages/**/*.ts",
+    "../../packages/**/*.tsx"
+  ]
+}

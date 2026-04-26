@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dir, "../..");
-const pluginDir = resolve(repoRoot, "packages/openclaw-plugin-structured-result");
+const pluginDir = resolve(repoRoot, "packages/providers/openclaw/plugin-structured-result");
 const builtDir = resolve(pluginDir, "dist");
 const builtEntry = resolve(builtDir, "index.js");
 const builtManifest = resolve(builtDir, "openclaw.plugin.json");

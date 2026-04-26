@@ -1,0 +1,12 @@
+{
+  "name": "@chrona/ai-features",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/openclaw-integration": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
