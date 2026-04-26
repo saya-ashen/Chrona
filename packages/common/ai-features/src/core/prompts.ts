@@ -33,21 +33,33 @@ Put the final graph directly into that tool input.
 CRITICAL RULES:
 1. Separate automatic steps from manual/human steps into DIFFERENT nodes
 2. Never combine "do X automatically then ask user to confirm" into one node — split them
-3. Nodes that can run without human involvement should have executionMode: "automatic"
-4. Nodes requiring user input, approval, or decisions should have executionMode: "manual"
-5. Nodes with both automatic and manual parts should be split, not marked "hybrid"
+3. Nodes requiring user input, approval, physical movement, payment, pickup, or in-person action must be represented as human-facing nodes
+4. Nodes that Chrona/runtime could plausibly execute via tools, APIs, or automation should use type: "tool_action"
+5. Nodes with both automatic and manual parts should be split into separate nodes
 6. If information is insufficient, create an explicit "human clarification" node rather than letting automatic nodes depend on vague assumptions
 7. Maximize parallelism: if two automatic nodes have no dependency, don't chain them sequentially
 8. Every node needing human input must set requiresHumanInput: true
 9. Every node needing human approval must set requiresHumanApproval: true
-10. autoRunnable should be true ONLY when executionMode is "automatic" AND requiresHumanInput is false AND requiresHumanApproval is false
+10. Do NOT emit executionMode, autoRunnable, blockingReason, status, linkedTaskId, or completionSummary — Chrona computes those fields after parsing
 11. NEVER produce a purely linear chain — real tasks have independent sub-streams that can run in parallel
 12. Group nodes into parallel lanes where possible: e.g. "gather materials" and "prepare template" can happen simultaneously
 13. Use fan-out (one node → multiple successors) and fan-in (multiple nodes → one join node) patterns
 14. A DAG with N nodes should typically have fewer than N-1 sequential edges — if every edge is sequential, you are doing it wrong
+15. For every node, you MUST explicitly set executor to either "human" or "automation"
+16. Use executor: "automation" ONLY if the step can be completed entirely by software/runtime without a human providing new information or doing a physical action
+17. Use executor: "human" for approvals, choices, clarifications, communication, payment, pickup, waiting, travel, receiving items, or any offline/manual work
+18. If a node has executor: "automation", then requiresHumanInput and requiresHumanApproval should normally both be false
 
 Node types: step | checkpoint | decision | user_input | deliverable | tool_action
 Edge types: sequential | depends_on | branches_to | unblocks | feeds_output
+
+Node type guidance:
+- user_input: a human must provide information, make a choice, confirm, or clarify
+- decision: a human approval/decision gate that determines the next path
+- tool_action: an action that automation/tools could execute without a human physically doing it
+- checkpoint: verification/review milestone
+- deliverable: final obtained artifact or outcome
+- step: generic work step when none of the above fits
 
 Put this inside result:
 {
@@ -59,14 +71,11 @@ Put this inside result:
     "title": "...",
     "objective": "What this node achieves",
     "description": "Details or null",
-    "status": "pending",
     "estimatedMinutes": N,
     "priority": "Low|Medium|High|Urgent",
-    "executionMode": "automatic|manual|hybrid",
+    "executor": "human|automation",
     "requiresHumanInput": false,
-    "requiresHumanApproval": false,
-    "autoRunnable": true,
-    "blockingReason": null
+    "requiresHumanApproval": false
   }],
   "edges": [{
     "id": "edge-1",

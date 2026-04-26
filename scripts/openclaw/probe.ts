@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { OpenClawBridgeClient } from "@chrona/openclaw-integration";
+import { OpenClawEmbeddedClient } from "@chrona/openclaw-integration";
 import { evaluateOpenClawGate } from "@chrona/openclaw-integration";
 import {
   collectOpenClawGateChecks,
@@ -7,8 +7,7 @@ import {
 } from "@chrona/openclaw-integration";
 
 async function main() {
-  const client = new OpenClawBridgeClient({
-    baseUrl: process.env.OPENCLAW_BRIDGE_URL,
+  const client = new OpenClawEmbeddedClient({
     timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
   });
 

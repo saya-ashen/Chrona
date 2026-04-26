@@ -11,6 +11,7 @@ import type {
   DispatchTaskInput,
 } from "./types";
 import { AiClientError } from "./types";
+import { createLogger } from "@chrona/db/legacy-lib/logger";
 import {
   coerceStructuredResult,
   parseTextJsonWithFallback,
@@ -30,6 +31,8 @@ import {
 } from "@chrona/openclaw-integration";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
+
+const logger = createLogger("ai-features.openclaw.providers");
 
 function toBridgeFeature(feature: AiFeature): BridgeFeature {
   switch (feature) {
@@ -120,6 +123,12 @@ async function fetchOpenClawBridge(
   const { response: bridge } = await executeGatewayRequest(
     route,
     requestBody,
+    logger,
+    {
+      ...DEFAULT_OPENCLAW_ENVIRONMENT,
+      gatewayHttpUrl: config.gatewayUrl,
+      gatewayToken: config.gatewayToken,
+    },
   );
 
   if (bridge.error) {
@@ -181,9 +190,13 @@ export async function openclawHealthCheck(
   config: OpenClawClientConfig,
 ): Promise<boolean> {
   try {
+    if (!config.gatewayUrl.trim() || !config.gatewayToken.trim()) {
+      return false;
+    }
     return await checkGatewayAvailable({
       ...DEFAULT_OPENCLAW_ENVIRONMENT,
-      gatewayHttpUrl: config.bridgeUrl || DEFAULT_OPENCLAW_ENVIRONMENT.gatewayHttpUrl,
+      gatewayHttpUrl: config.gatewayUrl,
+      gatewayToken: config.gatewayToken,
     });
   } catch {
     return false;

@@ -128,17 +128,34 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
               type: "string",
               enum: ["step", "checkpoint", "decision", "user_input", "deliverable", "tool_action"],
             },
-            title: { type: "string" },
-            objective: { type: "string" },
-            description: { type: "string" },
-            phase: { type: "string" },
-            estimatedMinutes: { type: "number" },
-            priority: { type: "string", enum: ["Low", "Medium", "High", "Urgent"] },
-            executionMode: { type: "string", enum: ["automatic", "manual", "hybrid"] },
-            requiresHumanInput: { type: "boolean" },
-            requiresHumanApproval: { type: "boolean" },
+            title: { type: "string", description: "Short node label shown to the user." },
+            objective: { type: "string", description: "What this node achieves when completed." },
+            description: { type: "string", description: "Optional implementation detail for the node." },
+            phase: { type: "string", description: "Optional coarse stage label." },
+            estimatedMinutes: { type: "number", description: "Best-effort duration estimate for just this node." },
+            priority: {
+              type: "string",
+              enum: ["Low", "Medium", "High", "Urgent"],
+              description: "Relative urgency of this node.",
+            },
+            executor: {
+              type: "string",
+              enum: ["human", "automation"],
+              description:
+                "Who must perform the node. Use 'automation' ONLY when Chrona/runtime could complete it entirely in software without a person acting in the physical world or supplying new information. Use 'human' for approvals, choices, clarifications, payment, pickup, travel, waiting, receiving items, and any in-person/manual action.",
+            },
+            requiresHumanInput: {
+              type: "boolean",
+              description:
+                "Set true when this node cannot proceed until a person provides missing information, makes a choice, or confirms details.",
+            },
+            requiresHumanApproval: {
+              type: "boolean",
+              description:
+                "Set true when this node is an approval/review/sign-off gate that must be explicitly approved by a person.",
+            },
           },
-          required: ["id", "type", "title", "objective"],
+          required: ["id", "type", "title", "objective", "executor", "requiresHumanInput", "requiresHumanApproval"],
         },
       },
       edges: {
@@ -149,11 +166,13 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
           additionalProperties: true,
           properties: {
             id: { type: "string", description: "Stable local id, e.g. edge-1." },
-            fromNodeId: { type: "string" },
-            toNodeId: { type: "string" },
+            fromNodeId: { type: "string", description: "Upstream/source node id." },
+            toNodeId: { type: "string", description: "Downstream/target node id." },
             type: {
               type: "string",
-              enum: ["blocks", "parallel", "informs", "feeds_output"],
+              enum: ["sequential", "depends_on", "branches_to", "unblocks", "feeds_output"],
+              description:
+                "Edge meaning. sequential = ordinary next step; depends_on = target cannot start until source completes; branches_to = source leads to one branch path; unblocks = source removes a blocker from target; feeds_output = target consumes output/artifact from source.",
             },
           },
           required: ["id", "fromNodeId", "toNodeId", "type"],

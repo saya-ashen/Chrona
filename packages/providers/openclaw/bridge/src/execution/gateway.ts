@@ -125,15 +125,20 @@ function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unk
     parts.push(`Estimated duration: ${estimatedDuration} minutes`);
   }
 
-  parts.push(
-    "",
-    "Output requirements",
-    "- Call generate_task_plan_graph exactly once.",
-    "- Include summary, nodes, and edges as top-level fields.",
-    "- Each node should include id, type, title, objective, and estimatedMinutes when possible.",
-    "- Each edge should include id, fromNodeId, toNodeId, and type; use edges: [] only if there is a single independent node.",
-    "- Do not return prose instead of the tool call.",
-  );
+    parts.push(
+      "",
+      "Output requirements",
+      "- Call generate_task_plan_graph exactly once.",
+      "- Include summary, nodes, and edges as top-level fields.",
+      "- Each node should include id, type, title, objective, and estimatedMinutes when possible.",
+      "- For each node, explicitly set executor to either 'human' or 'automation'.",
+      "- Use executor='automation' ONLY when the node can be completed entirely in software without human input, approval, payment, travel, pickup, waiting, or other manual action.",
+      "- Use executor='human' for approvals, choices, clarification, communication, payment, pickup, travel, waiting, receiving items, and any physical/manual action.",
+      "- Do NOT emit executionMode, autoRunnable, blockingReason, status, linkedTaskId, or completionSummary; Chrona derives them.",
+      "- Use type=user_input for human clarification/input, decision for approval/choice gates, and tool_action only for truly automatable actions.",
+      "- Each edge should include id, fromNodeId, toNodeId, and type; use edges: [] only if there is a single independent node.",
+      "- Do not return prose instead of the tool call.",
+    );
 
   return parts.join("\n");
 }
@@ -322,18 +327,13 @@ export function buildGatewayBody(
       body.tools = [
         {
           type: "function",
-          function: {
-            name: requiredTool,
-            description: toolDescription(requiredTool),
-            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
-          },
+          name: requiredTool,
+          description: toolDescription(requiredTool),
+          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
         },
       ];
 
-      body.tool_choice = {
-        type: "function",
-        function: { name: requiredTool },
-      };
+      body.tool_choice = "required";
     }
 
     return body;

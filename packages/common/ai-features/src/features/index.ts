@@ -94,6 +94,58 @@ function normalizeEdgeType(value: unknown): TaskPlanEdgeType {
   }
 }
 
+function normalizeExecutor(value: unknown): "human" | "automation" | null {
+  return value === "human" || value === "automation" ? value : null;
+}
+
+function deriveNodeExecution(node: Partial<TaskPlanNode>): {
+  executionMode: TaskPlanNode["executionMode"];
+  requiresHumanInput: boolean;
+  requiresHumanApproval: boolean;
+  autoRunnable: boolean;
+  blockingReason: TaskPlanNode["blockingReason"];
+} {
+  const type = normalizeNodeType(node.type);
+  const executor = normalizeExecutor((node as Record<string, unknown>).executor);
+
+  const requiresHumanApproval = Boolean(node.requiresHumanApproval);
+
+  const requiresHumanInput =
+    Boolean(node.requiresHumanInput) ||
+    type === "user_input" ||
+    (type === "decision" && !requiresHumanApproval);
+
+  const derivedExecutor =
+    executor ??
+    (type === "tool_action"
+      ? "automation"
+      : type === "user_input" || type === "decision" || type === "deliverable"
+        ? "human"
+        : requiresHumanInput || requiresHumanApproval
+          ? "human"
+          : "automation");
+
+  const executionMode: TaskPlanNode["executionMode"] =
+    derivedExecutor === "human" || requiresHumanInput || requiresHumanApproval
+      ? "manual"
+      : "automatic";
+
+  const autoRunnable =
+    executionMode === "automatic" && !requiresHumanInput && !requiresHumanApproval;
+
+  return {
+    executionMode,
+    requiresHumanInput,
+    requiresHumanApproval,
+    autoRunnable,
+    blockingReason: requiresHumanInput
+      ? ("needs_user_input" as const)
+      : requiresHumanApproval
+        ? ("needs_approval" as const)
+        : null,
+  };
+}
+
 function ensureObject(value: unknown, context: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new AiClientError(
@@ -191,14 +243,7 @@ export function normalizeGeneratePlanResponse(input: {
   const nodes: TaskPlanNode[] =
     ((parsed.nodes as Array<Partial<TaskPlanNode>> | undefined) ?? []).map(
       (node, index) => {
-        const execMode =
-          node.executionMode === "manual" || node.executionMode === "hybrid"
-            ? node.executionMode
-            : "automatic";
-        const requiresInput = Boolean(node.requiresHumanInput);
-        const requiresApproval = Boolean(node.requiresHumanApproval);
-        const autoRunnable =
-          execMode === "automatic" && !requiresInput && !requiresApproval;
+        const execution = deriveNodeExecution(node);
 
         return {
           id: node.id ?? `node-${index + 1}`,
@@ -213,15 +258,11 @@ export function normalizeGeneratePlanResponse(input: {
               ? node.estimatedMinutes
               : 30,
           priority: normalizePriority(node.priority),
-          executionMode: execMode,
-          requiresHumanInput: requiresInput,
-          requiresHumanApproval: requiresApproval,
-          autoRunnable,
-          blockingReason: requiresInput
-            ? ("needs_user_input" as const)
-            : requiresApproval
-              ? ("needs_approval" as const)
-              : null,
+          executionMode: execution.executionMode,
+          requiresHumanInput: execution.requiresHumanInput,
+          requiresHumanApproval: execution.requiresHumanApproval,
+          autoRunnable: execution.autoRunnable,
+          blockingReason: execution.blockingReason,
           linkedTaskId: node.linkedTaskId ?? null,
           completionSummary: node.completionSummary ?? null,
           metadata: node.metadata ?? null,

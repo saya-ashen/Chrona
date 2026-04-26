@@ -90,33 +90,70 @@ function mapSubtask(
 }
 
 async function testOpenClaw(config: Record<string, unknown>) {
-  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
-  if (!bridgeUrl) {
-    return { available: false, reason: "Bridge URL is required" };
+  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
+  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
+  if (!gatewayUrl) {
+    return { available: false, reason: "Gateway URL is required" };
+  }
+  if (!gatewayToken) {
+    return { available: false, reason: "Gateway token is required" };
   }
 
   try {
-    const res = await fetch(`${bridgeUrl}/v1/health`, {
+    const res = await fetch(`${gatewayUrl}/health`, {
+      headers: {
+        Authorization: `Bearer ${gatewayToken}`,
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(3000),
     });
+
+    const contentType = res.headers.get("content-type") ?? "";
+    const bodyText = await res.text();
+
     if (!res.ok) {
       return {
         available: false,
-        reason: `Bridge health endpoint returned ${res.status}`,
+        reason: `Gateway health endpoint returned ${res.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ""}`,
       };
     }
-    const body = (await res.json()) as { status?: string };
-    if (body.status !== "ok") {
+
+    const trimmedBody = bodyText.trim();
+    if (trimmedBody.startsWith("<!doctype") || trimmedBody.startsWith("<html")) {
       return {
         available: false,
-        reason: `Bridge health status was ${body.status ?? "unknown"}`,
+        reason: "Gateway URL returned an HTML page instead of the OpenClaw JSON health response. Check that the Gateway URL points to the actual API origin and is not a website/login page/reverse-proxy fallback.",
       };
     }
-    return { available: true, reason: "Bridge is reachable" };
+
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return {
+        available: false,
+        reason: `Gateway health endpoint returned non-JSON content-type: ${contentType || "unknown"}`,
+      };
+    }
+
+    let body: { ok?: boolean; status?: string };
+    try {
+      body = JSON.parse(bodyText) as { ok?: boolean; status?: string };
+    } catch {
+      return {
+        available: false,
+        reason: `Gateway health endpoint returned invalid JSON: ${bodyText.slice(0, 200) || "empty response"}`,
+      };
+    }
+
+    if (!(body.ok === true && body.status === "live")) {
+      return {
+        available: false,
+        reason: `Gateway health response was ok=${String(body.ok)} status=${body.status ?? "unknown"}`,
+      };
+    }
+    return { available: true, reason: "Gateway is reachable" };
   } catch (errorValue) {
     return {
       available: false,
-      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach bridge",
+      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach gateway",
     };
   }
 }
@@ -146,6 +183,37 @@ function buildSavedPlanSummary(savedPlan: {
     revision: savedPlan.revision,
     summary: savedPlan.summary,
     updatedAt: savedPlan.updatedAt,
+  };
+}
+
+function summarizeStructuredPlanDebug(structured: unknown) {
+  if (!structured || typeof structured !== "object") return null;
+  const record = structured as {
+    error?: unknown;
+    source?: unknown;
+    toolName?: unknown;
+    rawOutput?: unknown;
+    bridgeToolCalls?: Array<{ tool?: unknown; status?: unknown }>;
+    validationIssues?: unknown;
+  };
+
+  return {
+    error: typeof record.error === "string" ? record.error : null,
+    source: typeof record.source === "string" ? record.source : null,
+    toolName: typeof record.toolName === "string" ? record.toolName : null,
+    rawOutputPreview:
+      typeof record.rawOutput === "string"
+        ? summarizeText(record.rawOutput, 240)
+        : null,
+    bridgeToolCalls: Array.isArray(record.bridgeToolCalls)
+      ? record.bridgeToolCalls.map((toolCall) => ({
+          tool: typeof toolCall.tool === "string" ? toolCall.tool : null,
+          status: typeof toolCall.status === "string" ? toolCall.status : null,
+        }))
+      : [],
+    validationIssues: Array.isArray(record.validationIssues)
+      ? record.validationIssues
+      : [],
   };
 }
 
@@ -1326,6 +1394,23 @@ export function createApiRouter() {
                 } else if (event.type === "partial") {
                   if (!safeEnqueue("partial", { text: event.text })) break;
                 } else if (event.type === "result" && "plan" in event) {
+                  if (event.plan.nodes.length === 0) {
+                    const message =
+                      event.plan.structured?.error?.trim() ||
+                      "AI returned an empty task plan with zero nodes.";
+                    logger.warn("request.empty_plan", {
+                      requestId,
+                      feature: "generate_plan",
+                      taskId: taskId ?? null,
+                      planSummary: event.plan.summary,
+                      structured: summarizeStructuredPlanDebug(
+                        event.plan.structured,
+                      ),
+                    });
+                    if (!safeEnqueue("error", { message })) break;
+                    requestFinished = true;
+                    break;
+                  }
                   const draftPlan: TaskPlanGraph = {
                     id: `graph-${taskId || "adhoc"}-${Date.now()}`,
                     taskId: taskId ?? "",
@@ -1370,6 +1455,23 @@ export function createApiRouter() {
                   }
                   if (!safeEnqueue("result", finalResponse)) break;
                 } else if (event.type === "error") {
+                  logger.error("request.plan_generation_error", {
+                    requestId,
+                    feature: "generate_plan",
+                    taskId: taskId ?? null,
+                    error: event.message,
+                    rawTextPreview:
+                      typeof event.rawText === "string"
+                        ? summarizeText(event.rawText, 400)
+                        : null,
+                    structured: summarizeStructuredPlanDebug(
+                      event.structured,
+                    ),
+                    diagnostics:
+                      event.diagnostics && typeof event.diagnostics === "object"
+                        ? event.diagnostics
+                        : null,
+                  });
                   if (!safeEnqueue("error", { message: event.message })) break;
                   requestFinished = true;
                   break;

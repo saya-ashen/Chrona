@@ -154,29 +154,36 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.tools).toEqual([
       {
         type: "function",
-        function: {
-          name: "generate_task_plan_graph",
-          description: expect.stringContaining("Create and persist the Chrona task plan graph"),
-          parameters: expect.any(Object),
-        },
+        name: "generate_task_plan_graph",
+        description: expect.stringContaining("Create and persist the Chrona task plan graph"),
+        parameters: expect.any(Object),
       },
     ]);
-    const tool = (body.tools as Array<{ function: { parameters: Record<string, unknown> } }>)[0];
-    const parameters = tool.function.parameters as {
+    const tool = (body.tools as Array<{ parameters: Record<string, unknown> }>)[0];
+    const parameters = tool.parameters as {
       required?: string[];
       properties?: Record<string, { required?: string[]; items?: { required?: string[] } }>;
     };
     expect(parameters.required).toEqual(expect.arrayContaining(["summary", "nodes", "edges"]));
     expect(parameters.properties?.nodes?.items?.required).toEqual(
-      expect.arrayContaining(["id", "type", "title", "objective"]),
+      expect.arrayContaining(["id", "type", "title", "objective", "executor", "requiresHumanInput", "requiresHumanApproval"]),
     );
+    const nodeProperties =
+      (parameters.properties?.nodes?.items as {
+        properties?: Record<string, { enum?: string[]; description?: string }>;
+      } | undefined)?.properties ?? {};
+    expect(nodeProperties.executionMode).toBeUndefined();
+    expect(nodeProperties.executor?.enum).toEqual(["human", "automation"]);
+    expect(String(nodeProperties.executor?.description)).toContain("Use 'automation' ONLY");
     expect(parameters.properties?.edges?.items?.required).toEqual(
       expect.arrayContaining(["id", "fromNodeId", "toNodeId", "type"]),
     );
-    expect(body.tool_choice).toEqual({
-      type: "function",
-      function: { name: "generate_task_plan_graph" },
-    });
+    expect(
+      ((parameters.properties?.edges?.items as {
+        properties?: Record<string, { enum?: string[] }>;
+      } | undefined)?.properties?.type?.enum ?? []).sort(),
+    ).toEqual(["branches_to", "depends_on", "feeds_output", "sequential", "unblocks"]);
+    expect(body.tool_choice).toBe("required");
   });
 
   it("prefers explicit feature instructions when provided", () => {
@@ -680,8 +687,12 @@ describe("openclaw bridge gateway endpoints", () => {
     globalThis.fetch = (async (input, init) => {
       const url = getRequestUrl(input);
       if (url.includes("/v1/responses")) {
-        const req = JSON.parse(String(init?.body ?? "{}")) as { tool_choice?: { function?: { name?: string } } };
-        const toolName = req.tool_choice?.function?.name;
+        const req = JSON.parse(String(init?.body ?? "{}")) as {
+          tool_choice?: string;
+          tools?: Array<{ name?: string }>;
+        };
+        const toolName =
+          req.tool_choice === "required" ? req.tools?.[0]?.name : undefined;
         if (toolName === "suggest_task_completions") {
           return Response.json({
             id: "resp-suggest",

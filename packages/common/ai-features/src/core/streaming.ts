@@ -16,13 +16,18 @@ import type {
   SuggestTimeslotRequest,
   ChatRequest,
 } from "./types";
+import { createLogger } from "@chrona/db/legacy-lib/logger";
 import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type {
   BridgeFeatureRequest,
   BridgeResponse,
   NDJSONEvent,
 } from "@chrona/openclaw-integration/bridge/contracts";
-import { executeGatewayRequest, type RouteKind } from "@chrona/openclaw-integration";
+import {
+  DEFAULT_OPENCLAW_ENVIRONMENT,
+  executeGatewayRequest,
+  type RouteKind,
+} from "@chrona/openclaw-integration";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
@@ -36,11 +41,7 @@ function summarizeText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-const logger = {
-  info: (_message: string, _payload?: Record<string, unknown>) => {},
-  warn: (_message: string, _payload?: Record<string, unknown>) => {},
-  error: (_message: string, _payload?: Record<string, unknown>) => {},
-};
+const logger = createLogger("ai-features.openclaw.streaming");
 
 function getStreamPath(feature: AiFeature): string | null {
   switch (feature) {
@@ -141,7 +142,16 @@ export async function* openclawStream(
         stream: true,
       };
 
-      const { response, events } = await executeGatewayRequest(route, requestBody);
+      const { response, events } = await executeGatewayRequest(
+        route,
+        requestBody,
+        logger,
+        {
+          ...DEFAULT_OPENCLAW_ENVIRONMENT,
+          gatewayHttpUrl: config.gatewayUrl,
+          gatewayToken: config.gatewayToken,
+        },
+      );
 
       logger.info("openclaw.stream.response", {
         feature,
@@ -418,6 +428,127 @@ function extractPreferredPlanGraphFromStructured(
     : null;
 }
 
+function previewText(value: string, maxLength: number): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length <= maxLength
+    ? trimmed
+    : `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+function describeGeneratePlanFailure(params: {
+  text: string;
+  structured:
+    | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
+    | null
+    | undefined;
+  latestToolInput: Record<string, unknown> | null;
+  structuredToolGraph: Record<string, unknown> | null;
+}): string {
+  const parts: string[] = [
+    "OpenClaw did not return a usable generate_task_plan_graph result.",
+  ];
+
+  if (params.latestToolInput) {
+    parts.push("A live tool_call was seen, but its payload could not be normalized into a valid plan.");
+  } else if (params.structuredToolGraph) {
+    parts.push("A structured bridge tool payload existed, but no live tool_call event was emitted.");
+  } else {
+    parts.push("No generate_task_plan_graph tool payload was found in either streamed tool_call events or the final structured result.");
+  }
+
+  const structuredRecord = params.structured as
+    | {
+        ok?: boolean;
+        error?: string | null;
+        toolName?: string | null;
+        source?: string | null;
+        bridgeToolCalls?: Array<{ tool?: string; status?: string }>;
+      }
+    | null
+    | undefined;
+
+  if (typeof structuredRecord?.error === "string" && structuredRecord.error.trim()) {
+    parts.push(`Structured error: ${structuredRecord.error.trim()}`);
+  }
+  if (typeof structuredRecord?.toolName === "string" && structuredRecord.toolName.trim()) {
+    parts.push(`Structured toolName: ${structuredRecord.toolName.trim()}`);
+  }
+  if (typeof structuredRecord?.source === "string" && structuredRecord.source.trim()) {
+    parts.push(`Structured source: ${structuredRecord.source.trim()}`);
+  }
+  if (Array.isArray(structuredRecord?.bridgeToolCalls) && structuredRecord!.bridgeToolCalls.length > 0) {
+    const toolSummary = structuredRecord!.bridgeToolCalls
+      .map((toolCall) => `${toolCall.tool ?? "unknown"}${toolCall.status ? `(${toolCall.status})` : ""}`)
+      .join(", ");
+    parts.push(`Bridge tool calls seen: ${toolSummary}`);
+  }
+
+  const textPreview = previewText(params.text, 240);
+  if (textPreview) {
+    parts.push(`Raw output preview: ${textPreview}`);
+  }
+
+  return parts.join(" ");
+}
+
+function buildGeneratePlanDiagnostics(params: {
+  text: string;
+  structured:
+    | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
+    | null
+    | undefined;
+  latestToolInput: Record<string, unknown> | null;
+  structuredToolGraph: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const structuredRecord = params.structured as
+    | {
+        ok?: boolean;
+        error?: string | null;
+        feature?: string | null;
+        toolName?: string | null;
+        source?: string | null;
+        sessionId?: string | null;
+        runId?: string | null;
+        bridgeToolCalls?: Array<{
+          tool?: string;
+          callId?: string;
+          status?: string;
+          input?: unknown;
+        }>;
+      }
+    | null
+    | undefined;
+
+  return {
+    hasLiveToolCall: Boolean(params.latestToolInput),
+    hasStructuredToolGraph: Boolean(params.structuredToolGraph),
+    rawTextPreview: previewText(params.text, 400),
+    structured: structuredRecord
+      ? {
+          ok: structuredRecord.ok ?? null,
+          error: structuredRecord.error ?? null,
+          feature: structuredRecord.feature ?? null,
+          toolName: structuredRecord.toolName ?? null,
+          source: structuredRecord.source ?? null,
+          sessionId: structuredRecord.sessionId ?? null,
+          runId: structuredRecord.runId ?? null,
+          bridgeToolCalls: Array.isArray(structuredRecord.bridgeToolCalls)
+            ? structuredRecord.bridgeToolCalls.map((toolCall) => ({
+                tool: toolCall.tool ?? null,
+                callId: toolCall.callId ?? null,
+                status: toolCall.status ?? null,
+                inputPreview:
+                  toolCall.input && typeof toolCall.input === "object"
+                    ? previewText(JSON.stringify(toolCall.input), 240)
+                    : null,
+              }))
+            : [],
+        }
+      : null,
+  };
+}
+
 export function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
   if (request.sessionKey?.trim()) {
     return request.sessionKey.trim();
@@ -471,20 +602,61 @@ export async function* generatePlanStream(
       const structuredToolGraph = extractPreferredPlanGraphFromStructured(
         event.structured ?? null,
       );
-      let parsed: unknown = latestToolInput ??
-        structuredToolGraph ?? { summary: "", nodes: [], edges: [] };
+      let parsed: unknown = latestToolInput ?? structuredToolGraph ?? null;
       if (!latestToolInput && !structuredToolGraph) {
         try {
-          parsed = text ? JSON.parse(text) : parsed;
+          parsed = text ? JSON.parse(text) : null;
         } catch {
-          parsed = { summary: text || "", nodes: [], edges: [] };
+          parsed = null;
         }
+      }
+      if (!parsed || typeof parsed !== "object") {
+        const diagnostics = buildGeneratePlanDiagnostics({
+          text,
+          structured: event.structured ?? null,
+          latestToolInput,
+          structuredToolGraph,
+        });
+        yield {
+          type: "error",
+          message: describeGeneratePlanFailure({
+            text,
+            structured: event.structured ?? null,
+            latestToolInput,
+            structuredToolGraph,
+          }),
+          rawText: text,
+          structured: event.structured ?? null,
+          diagnostics,
+        };
+        return;
       }
       const plan = normalizeGeneratePlanResponse({
         parsed,
         source: client.type,
         structured: event.structured,
       });
+      if (plan.nodes.length === 0) {
+        const diagnostics = buildGeneratePlanDiagnostics({
+          text,
+          structured: event.structured ?? null,
+          latestToolInput,
+          structuredToolGraph,
+        });
+        yield {
+          type: "error",
+          message: `${describeGeneratePlanFailure({
+            text,
+            structured: event.structured ?? null,
+            latestToolInput,
+            structuredToolGraph,
+          })} Normalized plan contained zero nodes.`,
+          rawText: text,
+          structured: event.structured ?? null,
+          diagnostics,
+        };
+        return;
+      }
       yield { type: "result", plan };
       yield { type: "done", text, structured: latestStructured ?? null };
       return;
