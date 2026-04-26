@@ -1,1 +1,2 @@
-export * from "./sqlite-url";
+export * from "./generated/prisma/client";
+export { db } from "./legacy-lib/db";

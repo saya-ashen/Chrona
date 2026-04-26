@@ -4,7 +4,7 @@ import {
   defaultLocale,
   getPreferredLocale,
   hasLocale,
-} from "../../../src/i18n/config";
+} from "../../web/src/i18n/config";
 
 import { createApiRouter } from "./routes/api";
 import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";

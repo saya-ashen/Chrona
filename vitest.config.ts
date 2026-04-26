@@ -16,7 +16,7 @@ export default defineConfig({
       "src/modules/db/**/*.test.ts",
     ],
     environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["./apps/web/src/test/setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

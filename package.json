@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "dev": "bun run dev:full",
-    "dev:web": "bun run --cwd apps/web dev",
+    "dev:web": "bun run --cwd apps/web dev --host 0.0.0.0",
     "dev:full": "bunx concurrently -k -n web,server \"bun run dev:web\" \"bun run server:dev:bun\"",
     "build": "bun run --cwd apps/web build",
     "build:full": "bun run build && bun run server:bundle-check",

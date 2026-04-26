@@ -17,11 +17,14 @@
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@web/*": ["./apps/web/src/*"],
+      "@server/*": ["./apps/server/src/*"],
       "@chrona/runtime-core": ["./packages/common/runtime-core/src/index.ts"],
       "@chrona/runtime-core/*": ["./packages/common/runtime-core/src/*"],
       "@chrona/openclaw-integration": ["./packages/providers/openclaw/integration/src/index.ts"],
       "@chrona/openclaw-integration/*": ["./packages/providers/openclaw/integration/src/*"],
       "@chrona/ai-features": ["./packages/common/ai-features/src/index.ts"],
+      "@chrona/ai-features/*": ["./packages/common/ai-features/src/*"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],
       "@chrona/domain/*": ["./packages/domain/src/*"],
       "@chrona/contracts": ["./packages/contracts/src/index.ts"],
@@ -29,8 +32,12 @@
       "@chrona/db": ["./packages/db/src/index.ts"],
       "@chrona/db/*": ["./packages/db/src/*"],
       "@chrona/runtime": ["./packages/runtime/src/index.ts"],
+      "@chrona/runtime/*": ["./packages/runtime/src/*"],
       "@chrona/runtime-openclaw": ["./packages/runtime-openclaw/src/index.ts"],
-      "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"]
+      "@chrona/runtime-openclaw/*": ["./packages/runtime-openclaw/src/*"],
+      "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"],
+      "@chrona/openclaw-bridge/*": ["./packages/providers/openclaw/bridge/src/*"],
+      "@chrona/web/*": ["./apps/web/src/*"]
     }
   },
   "include": [
