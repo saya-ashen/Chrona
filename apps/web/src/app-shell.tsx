@@ -6,12 +6,13 @@ import { I18nProvider } from "@/i18n/client";
 import type { AppBootData } from "./pages";
 
 export function AppShell() {
-  const { locale, dictionary } = useLoaderData() as AppBootData;
+  const data = useLoaderData() as AppBootData;
+  const { locale, dictionary } = data;
 
   return (
     <I18nProvider locale={locale} messages={dictionary}>
       <ControlPlaneShell>
-        <Outlet />
+        <Outlet context={data} />
       </ControlPlaneShell>
     </I18nProvider>
   );

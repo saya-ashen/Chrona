@@ -1,4 +1,4 @@
-import { Navigate, useLoaderData, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 
 import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
@@ -46,12 +46,16 @@ export type WorkspaceOverviewRouteData = {
 };
 
 export function LocaleLandingPage() {
-  const { locale } = useLoaderData() as AppBootData;
-  return <Navigate to={localizeHref(locale, "/schedule")} replace />;
+  const params = useParams();
+  return <Navigate to={localizeHref(params.lang ?? "en", "/schedule")} replace />;
+}
+
+function useAppBootOutletData() {
+  return useOutletContext<AppBootData>();
 }
 
 export function ScheduleRoutePage() {
-  const { defaultWorkspace, schedule } = useLoaderData() as AppBootData;
+  const { defaultWorkspace, schedule } = useAppBootOutletData();
   const [searchParams] = useSearchParams();
 
   return (
@@ -66,7 +70,7 @@ export function ScheduleRoutePage() {
 }
 
 export function InboxRoutePage() {
-  const { defaultWorkspace, inbox, dictionary } = useLoaderData() as AppBootData;
+  const { defaultWorkspace, inbox, dictionary } = useAppBootOutletData();
   const t = dictionary.pages.inbox;
 
   return (
@@ -85,7 +89,7 @@ export function InboxRoutePage() {
 }
 
 export function MemoryRoutePage() {
-  const { defaultWorkspace, memory, dictionary } = useLoaderData() as AppBootData;
+  const { defaultWorkspace, memory, dictionary } = useAppBootOutletData();
   const t = dictionary.pages.memory;
 
   return (
@@ -104,7 +108,7 @@ export function MemoryRoutePage() {
 }
 
 export function SettingsRoutePage() {
-  const { locale, workspaces, dictionary } = useLoaderData() as AppBootData;
+  const { locale, workspaces, dictionary } = useAppBootOutletData();
   const [searchParams] = useSearchParams();
   const t = dictionary.pages.settings;
   const panel = searchParams.get("panel");
@@ -160,7 +164,7 @@ export function SettingsRoutePage() {
 }
 
 export function WorkspacesRoutePage() {
-  const { workspaces, dictionary } = useLoaderData() as AppBootData;
+  const { workspaces, dictionary } = useAppBootOutletData();
   const t = dictionary.pages.workspaces;
 
   return (

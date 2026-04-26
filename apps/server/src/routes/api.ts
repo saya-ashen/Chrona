@@ -1,55 +1,55 @@
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import { TaskStatus } from "../../../../src/generated/prisma/client";
-import { db } from "../../../../src/lib/db";
+import { TaskStatus } from "@chrona/db/generated/prisma/client";
+import { db } from "@chrona/db";
 import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
-import type { StructuredSuggestion } from "../../../../src/hooks/ai/types";
-import { createLogger, summarizeText } from "../../../../src/lib/logger";
-import { aiAnalyzeConflicts, aiGeneratePlan, aiGeneratePlanStream, aiSuggestStream, aiSuggestTimeslots, getAIClientInfo, isAIAvailable } from "../../../../src/modules/ai/ai-service";
-import type { TaskSnapshot, ScheduleHealthSnapshot } from "../../../../src/modules/ai/ai-service";
-import { analyzeConflictsSmart } from "../../../../src/modules/ai/conflict-analyzer";
-import { suggestAutomationSmart } from "../../../../src/modules/ai/automation-suggester";
-import { suggestTimeslots } from "../../../../src/modules/ai/timeslot-suggester";
-import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput, TaskPlanEdge, TaskPlanGraph, TaskPlanNode, TaskPlanStatus } from "../../../../src/modules/ai/types";
-import { acceptTaskResult } from "../../../../src/modules/commands/accept-task-result";
-import { applySchedule } from "../../../../src/modules/commands/apply-schedule";
-import { clearSchedule } from "../../../../src/modules/commands/clear-schedule";
-import { createFollowUpTask } from "../../../../src/modules/commands/create-follow-up-task";
-import { createTask } from "../../../../src/modules/commands/create-task";
-import { decideScheduleProposal } from "../../../../src/modules/commands/decide-schedule-proposal";
-import { generateTaskPlanForTask } from "../../../../src/modules/commands/generate-task-plan-for-task";
-import { invalidateMemory } from "../../../../src/modules/commands/invalidate-memory";
-import { markTaskDone } from "../../../../src/modules/commands/mark-task-done";
-import { materializeTaskPlan } from "../../../../src/modules/commands/materialize-task-plan";
-import { provideInput } from "../../../../src/modules/commands/provide-input";
-import { proposeSchedule } from "../../../../src/modules/commands/propose-schedule";
-import { reopenTask } from "../../../../src/modules/commands/reopen-task";
-import { resolveApproval } from "../../../../src/modules/commands/resolve-approval";
-import { resumeRun } from "../../../../src/modules/commands/resume-run";
-import { retryRun } from "../../../../src/modules/commands/retry-run";
-import { sendOperatorMessage } from "../../../../src/modules/commands/send-operator-message";
-import { startRun } from "../../../../src/modules/commands/start-run";
+import type { StructuredSuggestion } from "@chrona/contracts/legacy-hooks/ai/types";
+import { createLogger, summarizeText } from "@chrona/db/legacy-lib/logger";
+import { aiAnalyzeConflicts, aiGeneratePlan, aiGeneratePlanStream, aiSuggestStream, aiSuggestTimeslots, getAIClientInfo, isAIAvailable } from "@chrona/runtime/modules/ai/ai-service";
+import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/runtime/modules/ai/ai-service";
+import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analyzer";
+import { suggestAutomationSmart } from "@chrona/runtime/modules/ai/automation-suggester";
+import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
+import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput, TaskPlanEdge, TaskPlanGraph, TaskPlanNode, TaskPlanStatus } from "@chrona/runtime/modules/ai/types";
+import { acceptTaskResult } from "@chrona/runtime/modules/commands/accept-task-result";
+import { applySchedule } from "@chrona/runtime/modules/commands/apply-schedule";
+import { clearSchedule } from "@chrona/runtime/modules/commands/clear-schedule";
+import { createFollowUpTask } from "@chrona/runtime/modules/commands/create-follow-up-task";
+import { createTask } from "@chrona/runtime/modules/commands/create-task";
+import { decideScheduleProposal } from "@chrona/runtime/modules/commands/decide-schedule-proposal";
+import { generateTaskPlanForTask } from "@chrona/runtime/modules/commands/generate-task-plan-for-task";
+import { invalidateMemory } from "@chrona/runtime/modules/commands/invalidate-memory";
+import { markTaskDone } from "@chrona/runtime/modules/commands/mark-task-done";
+import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
+import { provideInput } from "@chrona/runtime/modules/commands/provide-input";
+import { proposeSchedule } from "@chrona/runtime/modules/commands/propose-schedule";
+import { reopenTask } from "@chrona/runtime/modules/commands/reopen-task";
+import { resolveApproval } from "@chrona/runtime/modules/commands/resolve-approval";
+import { resumeRun } from "@chrona/runtime/modules/commands/resume-run";
+import { retryRun } from "@chrona/runtime/modules/commands/retry-run";
+import { sendOperatorMessage } from "@chrona/runtime/modules/commands/send-operator-message";
+import { startRun } from "@chrona/runtime/modules/commands/start-run";
 import {
   isTaskPlanGenerationRunning,
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
   TASK_PLAN_GENERATION_IN_FLIGHT_CODE,
-} from "../../../../src/modules/commands/task-plan-generation-registry";
-import { updateTask } from "../../../../src/modules/commands/update-task";
-import { appendCanonicalEvent } from "../../../../src/modules/events/append-canonical-event";
-import { getInbox } from "../../../../src/modules/queries/get-inbox";
-import { getMemoryConsole } from "../../../../src/modules/queries/get-memory-console";
-import { getSchedulePage } from "../../../../src/modules/queries/get-schedule-page";
-import { getTaskPage } from "../../../../src/modules/queries/get-task-page";
-import { getWorkspaceOverview } from "../../../../src/modules/queries/get-workspace-overview";
-import { getWorkspaces } from "../../../../src/modules/queries/get-workspaces";
-import { getWorkPage, WorkPageTaskNotFoundError } from "../../../../src/modules/queries/get-work-page";
-import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, acceptTaskPlanGraph, saveTaskPlanGraph } from "../../../../src/modules/tasks/task-plan-graph-store";
-import { ensureDefaultTaskSession } from "../../../../src/modules/task-execution/task-sessions";
-import { getDefaultWorkspace } from "../../../../src/modules/workspaces/get-default-workspace";
+} from "@chrona/runtime/modules/commands/task-plan-generation-registry";
+import { updateTask } from "@chrona/runtime/modules/commands/update-task";
+import { appendCanonicalEvent } from "@chrona/runtime/modules/events/append-canonical-event";
+import { getInbox } from "@chrona/runtime/modules/queries/get-inbox";
+import { getMemoryConsole } from "@chrona/runtime/modules/queries/get-memory-console";
+import { getSchedulePage } from "@chrona/runtime/modules/queries/get-schedule-page";
+import { getTaskPage } from "@chrona/runtime/modules/queries/get-task-page";
+import { getWorkspaceOverview } from "@chrona/runtime/modules/queries/get-workspace-overview";
+import { getWorkspaces } from "@chrona/runtime/modules/queries/get-workspaces";
+import { getWorkPage, WorkPageTaskNotFoundError } from "@chrona/runtime/modules/queries/get-work-page";
+import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, acceptTaskPlanGraph, saveTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
+import { ensureDefaultTaskSession } from "@chrona/runtime/modules/task-execution/task-sessions";
+import { getDefaultWorkspace } from "@chrona/runtime/modules/workspaces/get-default-workspace";
 
 import {
   error,
@@ -1710,7 +1710,7 @@ export function createApiRouter() {
         return error(c, "taskId and workspaceId are required", 400);
       }
 
-      const { dispatchNextTaskAction } = await import("../../../../src/modules/commands/dispatch-next-task-action");
+      const { dispatchNextTaskAction } = await import("@chrona/runtime/modules/commands/dispatch-next-task-action");
       return json(c, await dispatchNextTaskAction({
         taskId,
         workspaceId,
