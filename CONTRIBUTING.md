@@ -21,39 +21,38 @@ bun run dev
 
 ## Project Architecture
 
-Chrona is in an incremental monorepo-layering migration. Current canonical direction:
+Chrona is a Vite + Hono monorepo:
 
-- **`apps/web/`** — Vite React SPA entry (React Router, loaders, browser shell)
-- **`apps/server/`** — independent local Hono API server and static SPA host
-- **`src/components/`** — React UI components
-- **`src/i18n/`** — locale config and message bundles
+- **`apps/web/`** — Vite React SPA (React Router, loaders, browser shell)
+- **`apps/server/`** — Hono API server and static SPA host
 - **`packages/domain/`** — pure domain rules and derivations
-- **`packages/contracts/`** — shared DTOs, schemas, contracts
-- **`packages/db/`** — database bootstrap and future repositories
-- **`packages/runtime/`** — provider-agnostic runtime surface
-- **`packages/runtime-openclaw/`** — OpenClaw-specific runtime surface
-- **`src/modules/commands/` / `queries/` / `projections/`** — current application/service layer reused by the local server
-- **`packages/providers/openclaw/**`** — provider bridge/integration implementation
+- **`packages/contracts/`** — shared DTOs, Zod schemas, API contracts
+- **`packages/db/`** — Prisma bootstrap and repositories
+- **`packages/runtime/`** — provider-agnostic runtime (commands, queries, projections)
+- **`packages/runtime-openclaw/`** — OpenClaw-specific runtime
+- **`packages/providers/openclaw/`** — OpenClaw bridge & integration
+- **`packages/providers/hermes/`** — Hermes provider (future)
+
+See [docs/architecture.md](./docs/architecture.md) for detailed architecture and data flow.
 
 ## Code Style
 
 - **TypeScript strict mode** — No `any` types
 - **Bun** — Use `bun` instead of `npm` for all commands
-- **Imports** — Use `@/` path aliases (e.g., `@/modules/ai/types`)
 - **Components** — Named exports preferred over default exports
-- **i18n** — All user-facing strings must be in `src/i18n/messages/{en,zh}.json`
+- **i18n** — All user-facing strings must be in `apps/web/src/i18n/messages/{en,zh}.json`
 
 ## Making Changes
 
-Before any AI-assisted edit, record this header in the task/report:
+Before any AI-assisted edit, record this header:
 
-- Layer:
-- Files to change:
-- Boundary check:
-- Expected behavior:
-- Tests to run:
+- **Layer:**
+- **Files to change:**
+- **Boundary check:**
+- **Expected behavior:**
+- **Tests to run:**
 
-AI contributors must not cross layers without a concrete reason. Prefer moving files, adding facades, and fixing imports over rewriting behavior.
+Do not cross layers without a concrete reason. Prefer moving files, adding facades, and fixing imports over rewriting behavior.
 
 1. **Create a branch** from `main`
 2. **Write tests** for new features (Vitest for unit, Playwright for E2E)
@@ -61,7 +60,7 @@ AI contributors must not cross layers without a concrete reason. Prefer moving f
    ```bash
    bun run lint               # ESLint
    bun run test               # Unit tests
-   bunx tsc --noEmit          # Type check
+   bun run typecheck          # TypeScript type check
    bun run check:boundaries   # dependency-cruiser import boundaries
    ```
 4. **Commit** with conventional commit messages:
@@ -74,35 +73,31 @@ AI contributors must not cross layers without a concrete reason. Prefer moving f
 
 ## Adding a New Module
 
-1. Create command handlers in `src/modules/commands/`
-2. Create query handlers in `src/modules/queries/`
-3. Create projections in `src/modules/projections/`
-4. Add or extend Hono routes in `apps/server/src/routes/api.ts`
-5. Create UI components in `src/components/<module>/`
-6. Add i18n keys to both `en.json` and `zh.json`
-7. Add/update SPA routes in `apps/web/src/router.tsx` and page bindings in `apps/web/src/pages.tsx`
+1. Create command/query/projection handlers in `packages/runtime/src/modules/`
+2. Add or extend Hono routes in `apps/server/src/routes/`
+3. Create UI components in `apps/web/src/components/`
+4. Add i18n keys to both `en.json` and `zh.json`
+5. Add/update SPA routes in `apps/web/src/router.tsx`
 
 ## Adding a Runtime Adapter
 
-1. Create adapter directory in `src/modules/runtime/<name>/`
-2. Implement `RuntimeAdapterDefinition` and `RuntimeExecutionAdapter` interfaces
-3. Register in `src/modules/task-execution/execution-registry.ts`
-4. Add config spec in the relevant execution module
-5. Add tests in `__tests__/`
+1. Create adapter directory in `packages/providers/<name>/`
+2. Implement the runtime adapter interface
+3. Register in the execution registry
+4. Add tests in `__tests__/`
 
 ## Testing
 
 - **Unit tests** — `bun run test` (Vitest)
 - **Watch mode** — `bun run test:watch`
 - **E2E tests** — `bun run test:e2e` (Playwright)
-- **OpenClaw integration** — `bun run test:openclaw:integration`
 
 ## Reporting Issues
 
 Please include:
 - Steps to reproduce
 - Expected vs actual behavior
-- Environment (OS, Bun version, Node version)
+- Environment (OS, Bun version)
 - Console errors or screenshots
 
 ## License

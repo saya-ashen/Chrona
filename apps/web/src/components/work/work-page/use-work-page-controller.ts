@@ -141,9 +141,7 @@ export function useWorkPageController(
     }
 
     const intervalMs = Number(
-      process.env.VITE_WORK_POLL_INTERVAL_MS ??
-        process.env.NEXT_PUBLIC_WORK_POLL_INTERVAL_MS ??
-        10000,
+      process.env.VITE_WORK_POLL_INTERVAL_MS ?? 10000,
     );
 
     const interval = window.setInterval(() => {

@@ -10,156 +10,76 @@ The project focuses on making planning and execution feel like one connected sys
 
 ## Documentation
 
-Language entry points:
-- [English docs](./docs/en/README.md)
-- [中文文档](./docs/zh/README.md)
-
-Key docs:
-- [Quick start (EN)](./docs/en/quick-start.md)
-- [快速开始（中文）](./docs/zh/quick-start.md)
-- [Architecture](./docs/architecture.md)
-- [API reference](./docs/api-reference.md)
-- [Getting started details](./docs/getting-started.md)
-
-## Demo
-
-README demo assets are generated automatically from a Playwright-driven interaction script.
-
-Primary command:
-
-```bash
-bun run demo:readme-gif
-```
-
-What it does:
-1. Ensures the Playwright Chromium browser is installed
-2. Seeds the local demo database
-3. Starts the app on `http://127.0.0.1:3100`
-4. Runs `e2e/demo.readme.spec.ts` to open the schedule quick-add dialog, fill the form fields, save the task block, and scroll through the result
-5. Records a Playwright video
-6. Converts that video into a GIF with `ffmpeg`
-7. Writes the final artifact to `./docs/assets/demo/chrona-readme-demo.gif`
-
-Source files for the automated demo pipeline:
-- Playwright demo config: `./playwright.demo.config.ts`
-- Demo interaction script: `./e2e/demo.readme.spec.ts`
-- GIF export script: `./scripts/demo/readme-gif.ts`
-
-README embed:
-
-![Chrona automated README demo](./docs/assets/demo/chrona-readme-demo.gif)
-
-Quick start:
-- English: ./docs/en/quick-start.md
-- 中文: ./docs/zh/quick-start.md
-
-Roadmaps:
-- [Roadmap (EN)](./docs/en/roadmap.md)
-- [路线图（中文）](./docs/zh/roadmap.md)
+| Document | Description |
+|----------|-------------|
+| [Quick Start (EN)](./docs/en/quick-start.md) | Setup and first run |
+| [快速开始（中文）](./docs/zh/quick-start.md) | Chinese quick start |
+| [Architecture](./docs/architecture.md) | System design and data flow |
+| [Data Model](./docs/data-model.md) | Database schema reference |
+| [API Reference](./docs/api-reference.md) | REST API endpoints |
+| [Roadmap (EN)](./docs/en/roadmap.md) / [路线图](./docs/zh/roadmap.md) | Product roadmap |
 
 ## Quick Start
 
-> For full setup details, environment variables, and runtime options, see [./docs/en/quick-start.md](./docs/en/quick-start.md).
-
-1. Install dependencies
+> For full setup details, see [./docs/en/quick-start.md](./docs/en/quick-start.md).
 
 ```bash
 bun install
-```
-
-2. Generate the Prisma client
-
-```bash
 bunx prisma generate
-```
-
-3. Seed the local database
-
-```bash
 bun run db:seed
-```
-
-> Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is intentionally not listed as a primary README command until the Prisma workflow is stabilized.
-
-4. Start the web app + local API server
-
-```bash
 bun run dev
 ```
 
-5. Build the SPA
+Open http://localhost:3100.
+
+Development ports:
+- SPA dev server: `http://localhost:3100`
+- Local API server: `http://localhost:3101`
+
+Production build:
 
 ```bash
 bun run build
-```
-
-6. Start the production-style local server
-
-```bash
 bun run start
 ```
 
-7. Optional but recommended for structured OpenClaw tasks: install the Chrona OpenClaw plugin
+## Project Structure
 
-```bash
-bun run openclaw:plugin:install
 ```
-
-What this command does:
-- builds `packages/providers/openclaw/plugin-structured-result`
-- installs it into your local OpenClaw as `chrona-structured-result`
-- enables the plugin
-- attempts a gateway restart so the tool becomes available immediately
-
-The plugin provides explicit business tools such as `suggest_task_completions` and `generate_task_plan_graph`. Chrona treats those tool inputs as the primary machine-readable source of truth instead of relying on assistant free text.
-
-8. Optional: start the OpenClaw bridge when testing agent execution
-
-```bash
-bun run openclaw:bridge
+apps/
+  web/          — Vite React SPA (React Router)
+  server/       — Hono API server + static SPA host
+packages/
+  common/       — AI features, CLI, runtime core
+  contracts/    — Shared DTOs, Zod schemas
+  db/           — Prisma bootstrap, repositories
+  domain/       — Pure business rules
+  runtime/      — Commands, queries, projections
+  runtime-openclaw/ — OpenClaw runtime adapter
+  providers/    — Provider bridges (OpenClaw, Hermes)
 ```
-
-Bridge notes:
-- default bridge URL: `http://localhost:7677`
-- actual entrypoint: `packages/providers/openclaw/bridge/src/index.ts`
-- you can also run it directly with `bun packages/providers/openclaw/bridge/src/index.ts`
-- if port `7677` is already in use, the bridge will fail to bind until you stop the existing process
-- successful startup now prints a `bridge.started` log line
-
-Open http://localhost:3100.
-
-Dev ports:
-- SPA dev server: `http://localhost:3100`
-- local API server: `http://localhost:3101`
-- production/local-first entrypoint after build: `bun run start` serves API + static SPA from the local server
 
 ## Product Roadmap
 
 ### 1. Schedule Creation and Arrangement
 
-This part of Chrona is about converting rough intent into a usable plan on the calendar.
-
-Current and planned capabilities:
-- intelligent task suggestions while creating schedule items
+- Intelligent task suggestions while creating schedule items
 - AI-assisted task planning before execution
-- turning loose ideas into structured task plans
-- making schedule creation, review, and adjustment fast enough for daily use
+- Turning loose ideas into structured task plans
+- Fast schedule creation, review, and adjustment
 
 ### 2. Automatic Task Completion
 
-This part of Chrona is about letting scheduled tasks run through agents with minimal manual coordination.
-
-Current direction:
-- automatically run an agent according to the schedule
-- execute the task against its runtime configuration
-- automatically update the task plan as work progresses
-- keep execution status and planning status connected instead of drifting apart
+- Run agents according to schedule
+- Execute tasks with runtime configuration
+- Automatically update task plans as work progresses
+- Keep execution status and planning status synchronized
 
 ### Backend Runtime Direction
 
-Chrona is being designed to support multiple backend execution paths behind one product surface:
-- bare LLM backends
+Chrona supports multiple runtime backends behind one product surface:
 - OpenClaw
-- Hermes
+- Hermes (planned)
+- Bare LLM (planned)
 
-The goal is to keep the scheduling and task model stable while allowing different runtime providers to power planning, execution, and follow-up updates.
+The scheduling and task model stays stable while different runtime providers power planning, execution, and follow-up updates.

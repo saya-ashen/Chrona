@@ -1,30 +1,30 @@
-# 系统架构
+# System Architecture
 
-## 架构模式：CQRS + 事件溯源
+## Architecture Pattern: CQRS + Event Sourcing
 
-Chrona 采用 **CQRS（命令查询职责分离）** 结合 **事件溯源（Event Sourcing）** 的架构模式。所有的状态变更都通过命令（Command）触发，产生规范事件（Canonical Event）持久化到事件存储，然后重建物化投影（Materialized Projection）供查询层读取。
+Chrona uses **CQRS (Command Query Responsibility Segregation)** combined with **Event Sourcing**. All state changes are triggered by commands, which produce canonical events persisted to the event store, then rebuild materialized projections for the query layer.
 
-### 为什么选择这种架构？
+### Why this architecture?
 
-1. **完整审计轨迹**：每次操作都记录为不可变事件，可追溯任务的完整生命周期
-2. **读写分离**：写入路径（命令）和读取路径（查询）独立优化
-3. **可重建状态**：投影可随时从事件序列重建，保证数据一致性
-4. **AI 友好**：事件流天然适合 AI 智能体的决策和分析
+1. **Complete audit trail** — every operation is recorded as an immutable event, tracing the full task lifecycle
+2. **Read/write separation** — write path (commands) and read path (queries) are independently optimizable
+3. **Rebuildable state** — projections can be rebuilt from the event sequence at any time, ensuring data consistency
+4. **AI-friendly** — event streams are naturally suited for AI agent decision-making and analysis
 
-## 整体架构图
+## Architecture Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                          客户端层                             │
+│                        Client Layer                           │
 │  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐  │
 │  │ Vite React SPA   │  │ Chrona CLI   │  │ AI Agent /     │  │
 │  │ React Router     │  │ chrona       │  │ OpenClaw Bridge│  │
 │  └────────┬─────────┘  └──────┬───────┘  └────────┬───────┘  │
-└───────────┼────────────────────┼───────────────────┼──────────┘
-            │                    │                   │
-            ▼                    ▼                   ▼
+└───────────┼───────────────────┼────────────────────┼──────────┘
+            │                   │                    │
+            ▼                   ▼                    ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                  本地 API / 静态托管层 (Hono)                │
+│                Local API / Static Host (Hono)                 │
 │  /api/tasks/*   /api/ai/*   /api/schedule/*                  │
 │  /api/inbox/*   /api/memory/*  /api/work/*                   │
 │  production: serves apps/web/dist as static SPA              │
@@ -33,88 +33,82 @@ Chrona 采用 **CQRS（命令查询职责分离）** 结合 **事件溯源（Eve
                   ┌────────────┼────────────┐
                   ▼            ▼            ▼
 ┌──────────────┐ ┌─────────┐ ┌──────────┐
-│   命令层      │ │ 查询层   │ │  AI 层   │
-│  commands/   │ │ queries/ │ │   ai/    │
-│              │ │          │ │          │
-│ createTask   │ │ getWork  │ │ conflict │
-│ startRun     │ │ getSchedule│ │ decompose│
-│ applySchedule│ │ getInbox │ │ suggest  │
-│ resolveApproval│ │ getTask │ │ timeslot │
+│  Command      │ │ Query   │ │  AI     │
+│  handlers     │ │handlers │ │ features│
 └──────┬───────┘ └────┬─────┘ └──────────┘
        │              │
        ▼              ▼
 ┌──────────────┐ ┌──────────────┐
-│   事件层      │ │   投影层      │
-│   events/    │ │ projections/ │
-│              │ │              │
-│ appendEvent  │ │ rebuildTask  │
-│ (不可变日志)  │ │ Projection   │
+│   Events     │ │ Projections  │
+│   (immutable)│ │ (materialized│
+│              │ │  views)      │
 └──────┬───────┘ └──────────────┘
        │
        ▼
 ┌──────────────────────────────────┐
-│        数据存储层                 │
+│        Data Storage              │
 │   SQLite + Prisma ORM            │
-│   15 个模型 / 事件日志 / 投影表   │
+│   15 models / event log /        │
+│   projection tables              │
 └──────────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────────┐
-│      外部运行时层                 │
+│      External Runtime Layer      │
 │   OpenClaw CLI Bridge (HTTP)     │
 │   Runtime adapters / Agent exec  │
 └──────────────────────────────────┘
 ```
 
-## 数据流详解
+## Data Flow
 
-### 写入路径（Command Path）
+### Write Path (Command Path)
 
 ```
-用户操作 → Hono API 路由 → 命令处理器 → 数据库变更 → 追加规范事件 → 重建投影
+User action → Hono API route → Command handler → DB mutation → Append canonical event → Rebuild projection
 ```
 
-示例：创建任务
+Example: Create a task
 
 ```
 POST /api/tasks
   → createTask(input)
-    → db.task.create(...)           // 持久化任务
-    → appendCanonicalEvent({        // 记录事件
+    → db.task.create(...)
+    → appendCanonicalEvent({
         eventType: "TaskCreated",
         payload: { title, priority, ... }
       })
-    → rebuildTaskProjection(taskId) // 更新物化视图
+    → rebuildTaskProjection(taskId)
 ```
 
-### 读取路径（Query Path）
+### Read Path (Query Path)
 
 ```
-用户请求 → Hono API / SPA loader → 查询处理器 → 读取投影 + 关联数据 → 组装页面数据
+User request → Hono API / SPA loader → Query handler → Read projection + related data → Assemble page data
 ```
 
-示例：加载排期页面
+Example: Load schedule page
 
 ```
 GET /schedule
   → getSchedulePage(workspaceId, selectedDay)
-    → 读取 TaskProjection（已排期/未排期/风险项）
-    → 计算 focusZones（专注区域分析）
-    → 计算 automationCandidates（自动化候选）
-    → 执行 analyzeConflicts()（冲突检测）
-    → 聚合 planningSummary（规划摘要）
-    → 返回 SchedulePageData
+    → Read TaskProjection (scheduled/unscheduled/at-risk)
+    → Compute focus zones
+    → Compute automation candidates
+    → Run analyzeConflicts()
+    → Aggregate planning summary
+    → Return SchedulePageData
 ```
 
-### AI 增强路径
+### AI Enhancement Path
 
 ```
-用户输入 → AI API 路由 → 规则引擎 / LLM / OpenClaw → 结构化建议 → 用户确认 → 命令执行
+User input → AI API route → Rule engine / LLM / OpenClaw → Structured suggestion → User confirmation → Command execution
 ```
 
-设计原则：所有 AI 建议都是"建议-确认"模式，不直接修改数据。
+Design principle: all AI suggestions are "suggest-confirm" — they never directly mutate data.
 
-## 模块依赖关系
+## Module Dependencies
 
 ```
 commands/  ──────────▶  events/
@@ -125,110 +119,101 @@ commands/  ──────────▶  events/
     ├──────────────▶  tasks/  ◀─── queries/
     │                                │
     └──────────────▶  runtime/       │
-                         │           │
-                         ▼           ▼
-                    openclaw/     ai/ (conflict, suggest, decompose)
+                          │           │
+                          ▼           ▼
+                     openclaw/     ai/ (conflict, suggest, decompose)
 ```
 
-**依赖规则：**
-- `commands/` 可依赖 `events/`, `projections/`, `runtime/`, `tasks/`
-- `queries/` 可依赖 `projections/`, `tasks/`, `runtime/`, `ai/`
-- `tasks/` 只依赖 `runtime/`（获取配置规格）
-- `projections/` 只依赖 `tasks/`（状态派生）
-- `events/` 无依赖（最底层）
-- `ai/` 可依赖 `queries/`（插件工具需要读取数据）
+**Dependency rules:**
+- `commands/` may depend on `events/`, `projections/`, `runtime/`, `tasks/`
+- `queries/` may depend on `projections/`, `tasks/`, `runtime/`, `ai/`
+- `tasks/` depends only on `runtime/` (to get config specs)
+- `projections/` depends only on `tasks/` (state derivation)
+- `events/` has no dependencies (bottom layer)
+- `ai/` may depend on `queries/` (plugin tools need to read data)
 
-## 目录结构
+## Directory Structure
 
 ```
-src/
-├── components/             # React 组件
-│   ├── ui/                 # 基础 UI 组件
-│   ├── control-plane-shell.tsx  # 应用外壳
-│   ├── schedule/           # 排期 UI 组件集
-│   ├── work/               # 工作台 UI 组件集
-│   ├── inbox/              # 收件箱组件
-│   ├── memory/             # 记忆控制台组件
-│   └── tasks/              # 任务中心组件
-│
-├── modules/                # 核心业务逻辑
-│   ├── ai/                 # AI 智能服务
-│   ├── commands/           # 命令处理器（写入）
-│   ├── events/             # 事件存储
-│   ├── projections/        # 投影重建
-│   ├── queries/            # 查询处理器（读取）
-│   ├── runtime/            # 运行时适配器
-│   ├── tasks/              # 任务领域逻辑
-│   ├── workspaces/         # 工作空间逻辑
-│   └── ui/                 # UI 导航配置
-│
-├── i18n/                   # 国际化配置与消息
-├── lib/                    # 共享工具
-├── server/                 # 本地服务启动辅助（runtime bootstrap 等）
-├── styles/                 # 全局样式
-├── generated/prisma/       # Prisma 生成的客户端
-└── test/                   # 测试配置
-
 apps/
-├── web/                    # Vite React SPA 入口
-│   └── src/                # React Router、loaders、SPA shell
-└── server/                 # 本地 Hono API server + 静态托管
-    └── src/
-        ├── app.ts          # Hono app composition
-        ├── routes/api.ts   # API 路由
-        ├── static/         # SPA dist 托管
-        └── index*.ts       # Bun / Node 启动入口
+  web/                          — Vite React SPA entry
+    src/
+      router.tsx                — React Router SPA routes
+      pages.tsx                 — Page bindings
+      components/               — UI components
+        schedule/               — Schedule cockpit
+        work/                   — Work/task execution view
+        inbox/                  — Inbox triage
+        memory/                 — Memory console
+        tasks/                  — Task center
+        ui/                     — Shared UI primitives
+      i18n/                     — Locale config and message bundles
+      styles/                   — Global styles
+  server/                       — Local Hono API server + static host
+    src/
+      app.ts                    — Hono app composition
+      routes/api.ts             — API routes
+      index.ts                  — Bun/Node entry point
 
 packages/
-├── common/cli/             # Chrona CLI workspace package
-├── common/runtime-core/    # 共享 runtime contracts
-├── common/ai-features/     # 共享 AI feature surface
-├── providers/openclaw/bridge/
-├── providers/openclaw/integration/
-├── providers/openclaw/plugin-structured-result/
-├── contracts/
-├── db/
-├── domain/
-├── runtime/
-└── runtime-openclaw/
+  contracts/                    — Shared DTOs, Zod schemas, API contracts
+  db/                           — Prisma bootstrap, repositories, generated client
+  domain/                       — Pure business rules, state derivations
+  runtime/                      — Provider-agnostic runtime
+    src/modules/
+      commands/                 — Command handlers (write)
+      queries/                  — Query handlers (read)
+      projections/              — Projection rebuilders
+      events/                   — Canonical event store
+      tasks/                    — Task domain logic
+      runtime/                  — Runtime adapter registry
+      ai/                       — AI feature handlers
+      workspaces/               — Workspace logic
+  runtime-openclaw/             — OpenClaw-specific runtime
+  common/
+    cli/                        — Chrona CLI
+    ai-features/                — Shared AI feature surface
+  providers/
+    openclaw/                   — OpenClaw bridge, integration, plugin
+    hermes/                     — Hermes provider (future)
 ```
 
-## 页面架构
+## Page Architecture
 
-| 页面 | 路由 | 说明 |
-|------|------|------|
-| 仪表盘 | `/` | 工作空间概览，最近活动 |
-| 任务中心 | `/tasks` | 可筛选的任务列表，状态分组 |
-| 排期 | `/schedule` | Google Calendar 风格的排期驾驶舱 |
-| 收件箱 | `/inbox` | 待审批、待输入、排期建议等待处理项 |
-| 记忆 | `/memory` | AI 智能体的持久化知识库 |
-| 工作台 | `/workspaces/[id]/work/[taskId]` | 任务执行深度视图 |
-| 设置 | `/settings` | 系统配置 |
+| Page | Route | Description |
+|------|-------|-------------|
+| Dashboard | `/` | Workspace overview, recent activity |
+| Task Center | `/tasks` | Filterable task list, status grouping |
+| Schedule | `/schedule` | Google Calendar-style scheduling cockpit |
+| Inbox | `/inbox` | Pending approvals, inputs, suggestions |
+| Memory | `/memory` | AI agent persistent knowledge base |
+| Work | `/workspaces/[id]/work/[taskId]` | Deep task execution view |
+| Settings | `/settings` | System configuration |
 
-每个页面遵循相同的数据加载模式：
-1. React Router loader / API 调用获取对应查询数据
-2. 查询函数从投影和数据库组装完整的页面数据
-3. SPA 客户端组件渲染并通过本地 API server 发起后续变更请求
+Each page follows the same data loading pattern:
+1. React Router loader / API call fetches the corresponding query data
+2. Query functions assemble full page data from projections and the database
+3. SPA client components render and issue subsequent mutation requests through the local API server
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. SQLite 而非 PostgreSQL
-- 简化部署：单文件数据库，无需额外服务
-- 足够的性能：面向个人/小团队使用场景
-- Prisma ORM 提供类型安全的数据访问
+### 1. SQLite over PostgreSQL
+- Simplified deployment: single-file database, no extra service
+- Sufficient performance for personal/small team use
+- Prisma ORM provides type-safe data access
 
-### 2. 事件溯源但非纯 ES
-- 命令同时写入业务表和事件表（不是纯 ES 的从事件重建状态）
-- 事件用于审计、工作流追踪和 UI 时间线展示
-- 投影表作为优化的读取视图，由事件触发重建
+### 2. Event Sourcing (pragmatic, not pure ES)
+- Commands write to both business tables and event tables simultaneously
+- Events are used for auditing, workflow tracking, and UI timelines
+- Projection tables serve as optimized read views, rebuilt on event triggers
 
-### 3. AI 双引擎策略
-- **规则引擎**：确定性逻辑（冲突检测、时间建议等），无需 LLM
-- **LLM 增强**：需要语义理解时调用 LLM（任务分解、自动建议等）
-- 每个 AI 功能都有规则引擎兜底，LLM 不可用时不影响核心功能
+### 3. Dual AI engine strategy
+- **Rule engine** — deterministic logic (conflict detection, time suggestions) without LLM
+- **LLM enhancement** — calls LLM when semantic understanding is needed (task decomposition, auto-suggest)
+- Every AI feature has a rule engine fallback; core functionality is never blocked by LLM availability
 
-### 4. OpenClaw 运行时
-- 通过 CLI Bridge 的 HTTP 接口与本地 OpenClaw CLI 通信
-- 前端 SPA、CLI、runtime-client 共享独立 API server 提供的语义化端点
-- 支持会话管理与运行轮询；审批在 bridge 模式下采用简化/noop 处理
-- 运行时适配器模式支持扩展其他 AI 执行引擎
+### 4. OpenClaw runtime
+- Communicates with local OpenClaw CLI via HTTP bridge
+- Frontend SPA, CLI, and runtime client share the semantic endpoints on the independent API server
+- Supports session management and run polling; approval handling is simplified in bridge mode
+- Runtime adapter pattern enables extending to other AI execution engines
