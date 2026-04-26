@@ -1,306 +1,306 @@
-# 数据模型
+# Data Model
 
-## 概览
+## Overview
 
-Chrona 使用 SQLite 数据库，通过 Prisma 7 ORM 管理 15 个数据模型。数据模型围绕"任务生命周期"设计，覆盖工作空间管理、任务执行、审批流程、排期规划、事件审计等领域。
+Chrona uses SQLite as its database, managed through Prisma 7 ORM with 15 data models. The data model is designed around the task lifecycle, covering workspace management, task execution, approval workflows, scheduling, and event auditing.
 
-## 实体关系图
+## Entity Relationship Diagram
 
 ```
-Workspace (工作空间)
+Workspace
   │
-  ├── Task (任务) ──────────────┐
-  │     │                       │
-  │     ├── Run (执行)          │ TaskDependency (依赖关系)
-  │     │    ├── Approval       │
-  │     │    ├── Artifact       │
+  ├── Task ──────────────────┐
+  │     │                     │
+  │     ├── Run              TaskDependency
+  │     │    ├── Approval
+  │     │    ├── Artifact
   │     │    ├── ConversationEntry
   │     │    ├── ToolCallDetail
   │     │    └── RuntimeCursor
   │     │
-  │     ├── TaskSession (会话)
-  │     ├── TaskProjection (投影)
-  │     ├── ScheduleProposal (排期建议)
-  │     └── Task (子任务, 自引用)
+  │     ├── TaskSession
+  │     ├── TaskProjection
+  │     ├── ScheduleProposal
+  │     └── Task (subtasks, self-referencing)
   │
-  ├── Memory (记忆)
-  └── Event (事件日志)
+  ├── Memory
+  └── Event
 ```
 
-## 模型详解
+## Model Details
 
-### Workspace（工作空间）
+### Workspace
 
-工作空间是顶层容器，隔离不同项目的任务和数据。
+Top-level container that isolates tasks and data across projects.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String (CUID) | 主键 |
-| name | String | 工作空间名称 |
-| description | String? | 描述 |
-| defaultRuntime | String? | 默认运行时适配器 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String (CUID) | Primary key |
+| name | String | Workspace name |
+| description | String? | Description |
+| defaultRuntime | String? | Default runtime adapter |
 | status | WorkspaceStatus | Active / Archived |
-| createdAt | DateTime | 创建时间 |
-| updatedAt | DateTime | 更新时间 |
+| createdAt | DateTime | Creation time |
+| updatedAt | DateTime | Last update time |
 
-### Task（任务）
+### Task
 
-核心实体，代表一个待执行的任务。
+Core entity representing a unit of work to be executed.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String (CUID) | 主键 |
-| workspaceId | String | 所属工作空间 |
-| title | String | 任务标题 |
-| description | String? | 任务描述 |
-| status | TaskStatus | 任务状态 |
-| priority | TaskPriority | 优先级 (Low/Medium/High/Urgent) |
-| ownerType | OwnerType | 所有者类型 (human/agent) |
-| **运行时配置** | | |
-| runtimeAdapterKey | String? | 运行时适配器标识 (如 "openclaw") |
-| runtimeInput | String? | 运行时输入数据 (JSON) |
-| runtimeInputVersion | String? | 输入版本 |
-| runtimeModel | String? | AI 模型名称 |
-| prompt | String? | 执行提示词 |
-| runtimeConfig | String? | 运行时配置 (JSON) |
-| **排期字段** | | |
-| dueAt | DateTime? | 截止时间 |
-| scheduledStartAt | DateTime? | 计划开始时间 |
-| scheduledEndAt | DateTime? | 计划结束时间 |
-| scheduleStatus | ScheduleStatus | 排期状态 |
-| scheduleSource | ScheduleSource? | 排期来源 (human/ai/system) |
-| **关联** | | |
-| parentTaskId | String? | 父任务 ID（子任务关系） |
-| latestRunId | String? | 最新执行 ID |
-| budgetLimit | Int? | 预算限制 |
-| blockReason | String? | 阻塞原因 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String (CUID) | Primary key |
+| workspaceId | String | Parent workspace |
+| title | String | Task title |
+| description | String? | Task description |
+| status | TaskStatus | Task status |
+| priority | TaskPriority | Priority (Low/Medium/High/Urgent) |
+| ownerType | OwnerType | Owner type (human/agent) |
+| **Runtime config** | | |
+| runtimeAdapterKey | String? | Runtime adapter key (e.g. "openclaw") |
+| runtimeInput | String? | Runtime input data (JSON) |
+| runtimeInputVersion | String? | Input version |
+| runtimeModel | String? | AI model name |
+| prompt | String? | Execution prompt |
+| runtimeConfig | String? | Runtime configuration (JSON) |
+| **Scheduling** | | |
+| dueAt | DateTime? | Due date |
+| scheduledStartAt | DateTime? | Scheduled start time |
+| scheduledEndAt | DateTime? | Scheduled end time |
+| scheduleStatus | ScheduleStatus | Schedule status |
+| scheduleSource | ScheduleSource? | Schedule source (human/ai/system) |
+| **Relations** | | |
+| parentTaskId | String? | Parent task ID (subtask relationship) |
+| latestRunId | String? | Latest run ID |
+| budgetLimit | Int? | Budget limit |
+| blockReason | String? | Reason for being blocked |
 
-**索引：**
+**Indexes:**
 - `[workspaceId, status]`
 - `[workspaceId, priority]`
 - `[workspaceId, scheduleStatus]`
 
-### Run（执行）
+### Run
 
-一次 AI 智能体的执行实例。一个任务可有多次执行。
+An AI agent execution instance. A task can have multiple runs.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String (CUID) | 主键 |
-| taskId | String | 所属任务 |
-| runtimeName | String | 运行时名称 |
-| status | RunStatus | 执行状态 |
-| startedAt | DateTime | 开始时间 |
-| endedAt | DateTime? | 结束时间 |
-| errorSummary | String? | 错误摘要 |
-| runtimeRunRef | String? | 运行时侧的执行引用 (唯一) |
-| resumeToken | String? | 恢复令牌 |
-| triggeredBy | String? | 触发者 |
-| retryable | Boolean | 是否可重试 |
-| resumeSupported | Boolean | 是否支持恢复 |
-| pendingInputPrompt | String? | 等待输入的提示文本 |
-| pendingInputType | String? | 等待输入的类型 |
-| lastSyncedAt | DateTime? | 最后同步时间 |
-| syncStatus | String? | 同步状态 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String (CUID) | Primary key |
+| taskId | String | Parent task |
+| runtimeName | String | Runtime name |
+| status | RunStatus | Execution status |
+| startedAt | DateTime | Start time |
+| endedAt | DateTime? | End time |
+| errorSummary | String? | Error summary |
+| runtimeRunRef | String? | Runtime-side run reference (unique) |
+| resumeToken | String? | Resume token |
+| triggeredBy | String? | Trigger source |
+| retryable | Boolean | Whether retryable |
+| resumeSupported | Boolean | Whether resume is supported |
+| pendingInputPrompt | String? | Prompt text while waiting for input |
+| pendingInputType | String? | Type of input being awaited |
+| lastSyncedAt | DateTime? | Last sync time |
+| syncStatus | String? | Sync status |
 
-**RunStatus 枚举：**
+**RunStatus enum:**
 - `Pending` → `Running` → `Completed` / `Failed` / `Cancelled`
 - `Running` → `WaitingForInput` / `WaitingForApproval` → `Running`
 
-### Approval（审批）
+### Approval
 
-AI 智能体执行过程中的审批请求。
+Approval requests during AI agent execution.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| runId | String | 所属执行 |
-| type | String | 审批类型 |
-| title | String | 标题 |
-| summary | String? | 摘要 |
-| riskLevel | String? | 风险等级 |
-| status | ApprovalStatus | 审批状态 |
-| resolvedAt | DateTime? | 决议时间 |
-| resolvedBy | String? | 决议者 |
-| resolution | String? | 决议内容 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| runId | String | Parent run |
+| type | String | Approval type |
+| title | String | Title |
+| summary | String? | Summary |
+| riskLevel | String? | Risk level |
+| status | ApprovalStatus | Approval status |
+| resolvedAt | DateTime? | Resolution time |
+| resolvedBy | String? | Resolver |
+| resolution | String? | Resolution content |
 
-**ApprovalStatus：** Pending → Approved / Rejected / EditedAndApproved / Expired
+**ApprovalStatus:** Pending → Approved / Rejected / EditedAndApproved / Expired
 
-### Artifact（产出物）
+### Artifact
 
-执行产生的文件、报告等输出。
+Output generated by a run (files, reports, etc.).
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| runId | String | 所属执行 |
-| type | ArtifactType | 类型 (file/patch/summary/report/terminal_output/url) |
-| title | String | 标题 |
-| uri | String? | 资源地址 |
-| contentPreview | String? | 内容预览 |
-| metadata | String? | 元数据 (JSON) |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| runId | String | Parent run |
+| type | ArtifactType | Type (file/patch/summary/report/terminal_output/url) |
+| title | String | Title |
+| uri | String? | Resource URI |
+| contentPreview | String? | Content preview |
+| metadata | String? | Metadata (JSON) |
 
-### ConversationEntry（会话记录）
+### ConversationEntry
 
-执行过程中的对话消息。
+Conversation messages during execution.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| runId | String | 所属执行 |
-| role | String | 角色 (user/assistant/system) |
-| content | String | 消息内容 |
-| sequence | Int | 序列号 |
-| externalRef | String? | 外部引用 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| runId | String | Parent run |
+| role | String | Role (user/assistant/system) |
+| content | String | Message content |
+| sequence | Int | Sequence number |
+| externalRef | String? | External reference |
 
-### ToolCallDetail（工具调用）
+### ToolCallDetail
 
-执行过程中的工具调用记录。
+Tool call records during execution.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| runId | String | 所属执行 |
-| toolName | String | 工具名称 |
-| status | String | 状态 |
-| argumentsSummary | String? | 参数摘要 |
-| resultSummary | String? | 结果摘要 |
-| errorSummary | String? | 错误摘要 |
-| externalRef | String? | 外部引用 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| runId | String | Parent run |
+| toolName | String | Tool name |
+| status | String | Status |
+| argumentsSummary | String? | Arguments summary |
+| resultSummary | String? | Result summary |
+| errorSummary | String? | Error summary |
+| externalRef | String? | External reference |
 
-### TaskProjection（任务投影）
+### TaskProjection
 
-任务的物化视图，为 UI 优化的非规范化数据。每次命令执行后自动重建。
+Materialized view of a task, denormalized data optimized for the UI. Automatically rebuilt after each command.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| taskId | String | 关联任务 (主键) |
-| displayState | String | 显示状态（派生自多个维度） |
-| blockType | String? | 阻塞类型 |
-| blockScope | String? | 阻塞范围 |
-| actionRequired | String? | 所需操作 |
-| pendingApprovalCount | Int | 待审批数量 |
-| approvalPendingCount | Int | 审批挂起数量 |
-| scheduleStatus | String? | 排期状态 |
-| latestArtifactTitle | String? | 最新产出物标题 |
-| lastActivityAt | DateTime? | 最后活动时间 |
+| Field | Type | Description |
+|-------|------|-------------|
+| taskId | String | Parent task (primary key) |
+| displayState | String | Display state (derived from multiple dimensions) |
+| blockType | String? | Block type |
+| blockScope | String? | Block scope |
+| actionRequired | String? | Required action |
+| pendingApprovalCount | Int | Pending approvals |
+| approvalPendingCount | Int | Approval pending count |
+| scheduleStatus | String? | Schedule status |
+| latestArtifactTitle | String? | Latest artifact title |
+| lastActivityAt | DateTime? | Last activity time |
 
-**displayState 可能的值：**
+**displayState possible values:**
 - `Draft`, `Ready`, `Queued`, `Running`
 - `WaitingForApproval`, `WaitingForInput`
 - `Blocked`, `Failed`, `Completed`, `Done`, `Cancelled`
 - `AttentionNeeded`, `SyncStale`
 
-### TaskSession（任务会话）
+### TaskSession
 
-管理任务与运行时之间的会话。
+Manages the session between a task and a runtime.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| taskId | String | 所属任务 |
-| sessionKey | String | 会话键 (唯一) |
-| runtimeName | String | 运行时名称 |
-| status | String | 会话状态 |
-| activeRunId | String? | 当前活跃执行 ID |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| taskId | String | Parent task |
+| sessionKey | String | Session key (unique) |
+| runtimeName | String | Runtime name |
+| status | String | Session status |
+| activeRunId | String? | Currently active run ID |
 
-### TaskDependency（任务依赖）
+### TaskDependency
 
-任务间的依赖关系。
+Dependency relationships between tasks.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| taskId | String | 任务 ID |
-| dependsOnTaskId | String | 被依赖的任务 ID |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| taskId | String | Task ID |
+| dependsOnTaskId | String | Depended-on task ID |
 | type | TaskDependencyType | blocks / relates_to / child_of |
 
-**唯一约束：** `[taskId, dependsOnTaskId]`
+**Unique constraint:** `[taskId, dependsOnTaskId]`
 
-### ScheduleProposal（排期建议）
+### ScheduleProposal
 
-AI 或系统生成的排期变更建议。
+AI or system-generated schedule change proposals.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| taskId | String | 目标任务 |
-| source | ScheduleSource | 来源 (ai/human/system) |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| taskId | String | Target task |
+| source | ScheduleSource | Source (ai/human/system) |
 | status | ScheduleProposalStatus | Pending / Accepted / Rejected |
-| proposedBy | String? | 提议者 |
-| summary | String? | 变更摘要 |
-| proposedStartAt | DateTime? | 建议开始时间 |
-| proposedEndAt | DateTime? | 建议结束时间 |
-| proposedDueAt | DateTime? | 建议截止时间 |
+| proposedBy | String? | Proposer |
+| summary | String? | Change summary |
+| proposedStartAt | DateTime? | Proposed start time |
+| proposedEndAt | DateTime? | Proposed end time |
+| proposedDueAt | DateTime? | Proposed due date |
 
-### Memory（记忆）
+### Memory
 
-AI 智能体的持久化知识条目。
+Persistent knowledge entries for AI agents.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| workspaceId | String | 所属工作空间 |
-| taskId | String? | 关联任务 |
-| content | String | 记忆内容 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| workspaceId | String | Parent workspace |
+| taskId | String? | Related task |
+| content | String | Memory content |
 | scope | MemoryScope | user / workspace / project / task |
 | sourceType | MemorySourceType | user_input / agent_inferred / imported / system_rule |
-| confidence | Float | 置信度 |
+| confidence | Float | Confidence level |
 | status | MemoryStatus | Active / Inactive / Conflicted / Expired |
-| expiresAt | DateTime? | 过期时间 |
+| expiresAt | DateTime? | Expiration time |
 
-### Event（事件日志）
+### Event
 
-不可变的规范事件日志，所有状态变更的审计轨迹。
+Immutable canonical event log — the audit trail for all state changes.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| eventType | String | 事件类型 (如 TaskCreated, RunStarted) |
-| workspaceId | String | 所属工作空间 |
-| taskId | String? | 关联任务 |
-| runId | String? | 关联执行 |
-| actorType | String | 操作者类型 (human/agent/system) |
-| actorId | String? | 操作者 ID |
-| source | String | 来源 |
-| payload | String? | 事件负载 (JSON) |
-| dedupeKey | String | 去重键 (唯一) |
-| ingestSequence | Int | 摄入序列号 (自增) |
-| createdAt | DateTime | 创建时间 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| eventType | String | Event type (e.g. TaskCreated, RunStarted) |
+| workspaceId | String | Parent workspace |
+| taskId | String? | Related task |
+| runId | String? | Related run |
+| actorType | String | Actor type (human/agent/system) |
+| actorId | String? | Actor ID |
+| source | String | Source |
+| payload | String? | Event payload (JSON) |
+| dedupeKey | String | Deduplication key (unique) |
+| ingestSequence | Int | Ingestion sequence (auto-increment) |
+| createdAt | DateTime | Creation time |
 
-### RuntimeCursor（运行时游标）
+### RuntimeCursor
 
-跟踪与外部运行时的同步状态。
+Tracks sync state with an external runtime.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String | 主键 |
-| runId | String | 所属执行 (唯一) |
-| nextCursor | String? | 下一个同步游标 |
-| lastEventRef | String? | 最后事件引用 |
-| healthStatus | String? | 健康状态 |
-| updatedAt | DateTime | 更新时间 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | String | Primary key |
+| runId | String | Parent run (unique) |
+| nextCursor | String? | Next sync cursor |
+| lastEventRef | String? | Last event reference |
+| healthStatus | String? | Health status |
+| updatedAt | DateTime | Last update time |
 
-## 枚举类型总览
+## Enum Overview
 
 ```typescript
-// 任务状态流转
+// Task status lifecycle
 TaskStatus: Draft → Ready → Queued → Running → Completed → Done
                                    ↗ Scheduled ↘
                          WaitingForInput / WaitingForApproval
                                     Blocked / Failed / Cancelled
 
-// 优先级
+// Priority
 TaskPriority: Low | Medium | High | Urgent
 
-// 排期状态
+// Schedule status
 ScheduleStatus: Unscheduled | Scheduled | InProgress | AtRisk
               | Interrupted | Overdue | Completed
 
-// 执行状态
+// Run status
 RunStatus: Pending | Running | WaitingForInput | WaitingForApproval
          | Failed | Completed | Cancelled
 
-// 审批状态
+// Approval status
 ApprovalStatus: Pending | Approved | Rejected | EditedAndApproved | Expired
 ```

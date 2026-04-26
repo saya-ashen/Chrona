@@ -55,45 +55,9 @@ bun run start
 Then open:
 - http://localhost:3101
 
-## Optional: install the Chrona OpenClaw structured-result plugin
-
-If you want structured OpenClaw task results, install the local plugin:
-
-```bash
-bun run openclaw:plugin:install
-```
-
-What it does:
-- builds `packages/providers/openclaw/plugin-structured-result`
-- installs it into local OpenClaw as `chrona-structured-result`
-- enables the plugin
-- attempts a gateway restart
-
-Notes from verification:
-- install and enable completed successfully in this repository
-- gateway restart may still report a local service-management issue, so manually restart your OpenClaw gateway/bridge process if needed
-- OpenClaw may warn that `plugins.allow` is empty; if you want stricter trust configuration, pin allowed plugin ids in your OpenClaw config
-
-## Optional: start the OpenClaw bridge
-
-If you want to test agent execution through the OpenClaw bridge:
-
-```bash
-bun run openclaw:bridge
-```
-
-Default bridge URL:
-- http://localhost:7677
-
-Bridge notes from verification:
-- the actual entrypoint is `packages/providers/openclaw/bridge/src/index.ts`
-- you can also run `bun packages/providers/openclaw/bridge/src/index.ts` directly
-- if port `7677` is already in use, the bridge exits immediately with an address-in-use error
-- successful startup prints a `bridge.started` log line
-
 ## Runtime directions
 
-Chrona’s backend is being designed to support multiple runtime backends behind the same product surface:
+Chrona's backend is being designed to support multiple runtime backends behind the same product surface:
 - bare LLM
 - OpenClaw
 - Hermes
@@ -130,10 +94,10 @@ bun run build
 bun run start
 bun run typecheck
 bun run test
-bun run chrona --help
 ```
 
 ## Next reading
 
 - Product roadmap: ./roadmap.md
 - Architecture: ../architecture.md
+- API Reference: ../api-reference.md

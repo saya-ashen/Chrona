@@ -12,10 +12,6 @@ const ACTIVE_RUN_STATUSES = [
   RunStatus.WaitingForInput,
 ];
 
-function shouldSkipRuntimeSync() {
-  return process.env.NEXT_PHASE === "phase-production-build";
-}
-
 async function markSyncDegraded(run: { id: string; runtimeName: string | null }, message: string) {
   const now = new Date();
   const runtimeName = run.runtimeName ?? "openclaw";
@@ -48,10 +44,6 @@ async function markSyncDegraded(run: { id: string; runtimeName: string | null },
 }
 
 export async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
-  if (shouldSkipRuntimeSync()) {
-    return;
-  }
-
   const run = await db.run.findUniqueOrThrow({
     where: { id: runId },
     select: { id: true, runtimeName: true },
@@ -67,10 +59,6 @@ export async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
 }
 
 export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter?: OpenClawAdapter) {
-  if (shouldSkipRuntimeSync()) {
-    return;
-  }
-
   const staleBefore = new Date(Date.now() - SYNC_STALE_MS);
   const runs = await db.run.findMany({
     where: {
@@ -113,10 +101,6 @@ export async function syncTaskRunForRead(
   adapter?: OpenClawAdapter,
   options?: { forceActive?: boolean },
 ) {
-  if (shouldSkipRuntimeSync()) {
-    return;
-  }
-
   const run = await db.run.findFirst({
     where: {
       taskId,

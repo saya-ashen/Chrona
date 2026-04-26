@@ -4,14 +4,14 @@ module.exports = {
       name: "no-components-into-server-modules",
       comment: "Server/application modules must not depend on React component files.",
       severity: "error",
-      from: { path: "^src/modules/(commands|queries|projections|events|workspaces|scheduler|runtime-sync|task-execution)/" },
+      from: { path: "^packages/runtime/src/modules/(commands|queries|projections|events|workspaces|scheduler|runtime-sync|task-execution)/" },
       to: { path: "^src/components/" },
     },
     {
       name: "no-direct-db-from-api-routes",
       comment: "API routes should call server-layer functions instead of importing Prisma bootstrap directly.",
       severity: "warn",
-      from: { path: "^src/app/api/" },
+      from: { path: "^apps/server/src/routes/" },
       to: { path: "^src/lib/db\.ts$" },
     },
     {
@@ -20,7 +20,7 @@ module.exports = {
       severity: "error",
       from: { path: "^packages/domain/" },
       to: {
-        path: "^(src/components/|src/app/|src/generated/prisma/|node_modules/react|node_modules/next|@prisma/|react|next)",
+        path: "^(apps/web/src/components/|apps/server/src/|packages/db/src/generated/prisma/|node_modules/react|@prisma/|react)",
       },
     },
     {
@@ -36,7 +36,7 @@ module.exports = {
       path: "node_modules",
     },
     exclude: {
-      path: "^(\.next|coverage|dist|build|src/generated/prisma/)"
+      path: "^(coverage|dist|build|packages/db/src/generated/prisma/)"
     },
     tsPreCompilationDeps: true,
     combinedDependencies: true,

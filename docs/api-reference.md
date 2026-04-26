@@ -1,24 +1,24 @@
-# API 参考
+# API Reference
 
-Chrona 现在由独立的本地 Hono API server 提供所有业务 API；前端 SPA 在开发模式下通过 Vite 代理访问 `/api/*`，生产模式下由同一个本地 server 托管静态资源与 API。
+Chrona uses an independent local Hono API server for all business APIs. The frontend SPA proxies `/api/*` through Vite in development; in production, the same local server hosts both static assets and APIs.
 
-默认情况下无需认证。
+No authentication is required by default.
 
-## 任务管理 `/api/tasks`
+## Task Management `/api/tasks`
 
-### 列出任务
+### List Tasks
 
 ```
 GET /api/tasks?workspaceId={id}&status={status}&limit={n}
 ```
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| workspaceId | string | ✅ | 工作空间 ID |
-| status | TaskStatus | ❌ | 状态筛选 |
-| limit | number | ❌ | 数量限制（默认 50，最大 200） |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| workspaceId | string | Yes | Workspace ID |
+| status | TaskStatus | No | Status filter |
+| limit | number | No | Result limit (default 50, max 200) |
 
-**响应 200：**
+**Response 200:**
 ```json
 {
   "tasks": [{ "id": "...", "title": "...", "status": "Ready", ... }],
@@ -26,53 +26,53 @@ GET /api/tasks?workspaceId={id}&status={status}&limit={n}
 }
 ```
 
-### 创建任务
+### Create Task
 
 ```
 POST /api/tasks
 Content-Type: application/json
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "workspaceId": "default",
-  "title": "分析用户行为数据",
-  "description": "使用 Python 分析最近30天数据",
+  "title": "Analyze user behavior data",
+  "description": "Analyze 30 days of data using Python",
   "priority": "High",
   "dueAt": "2025-01-20T00:00:00Z",
   "runtimeAdapterKey": "openclaw",
   "runtimeModel": "gpt-4o",
-  "prompt": "分析用户行为数据并生成报告"
+  "prompt": "Analyze user behavior data and generate a report"
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| workspaceId | string | ✅ | 工作空间 ID |
-| title | string | ✅ | 任务标题 |
-| description | string | ❌ | 描述 |
-| priority | TaskPriority | ❌ | Low/Medium/High/Urgent |
-| dueAt | ISO DateTime | ❌ | 截止时间 |
-| runtimeAdapterKey | string | ❌ | 运行时适配器 (如 "openclaw") |
-| runtimeInput | string | ❌ | 运行时输入 (JSON) |
-| runtimeInputVersion | string | ❌ | 输入版本 |
-| runtimeModel | string | ❌ | AI 模型名称 |
-| prompt | string | ❌ | 执行提示词 |
-| runtimeConfig | string | ❌ | 额外配置 (JSON) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspaceId | string | Yes | Workspace ID |
+| title | string | Yes | Task title |
+| description | string | No | Description |
+| priority | TaskPriority | No | Low/Medium/High/Urgent |
+| dueAt | ISO DateTime | No | Due date |
+| runtimeAdapterKey | string | No | Runtime adapter (e.g. "openclaw") |
+| runtimeInput | string | No | Runtime input (JSON) |
+| runtimeInputVersion | string | No | Input version |
+| runtimeModel | string | No | AI model name |
+| prompt | string | No | Execution prompt |
+| runtimeConfig | string | No | Additional config (JSON) |
 
-**响应 201：**
+**Response 201:**
 ```json
 { "taskId": "cm...", ... }
 ```
 
-### 获取任务详情
+### Get Task
 
 ```
 GET /api/tasks/{taskId}
 ```
 
-**响应 200：**
+**Response 200:**
 ```json
 {
   "task": {
@@ -85,104 +85,104 @@ GET /api/tasks/{taskId}
 }
 ```
 
-### 更新任务
+### Update Task
 
 ```
 PATCH /api/tasks/{taskId}
 Content-Type: application/json
 ```
 
-**请求体：** 与创建相同的字段，均为可选。支持部分更新。
+**Request body:** Same fields as create, all optional. Partial updates supported.
 
-**响应 200：** 更新后的任务。
+**Response 200:** Updated task.
 
-### 删除任务
+### Delete Task
 
 ```
 DELETE /api/tasks/{taskId}
 ```
 
-**行为：** 级联删除所有关联数据（执行、会话、审批、产出物、事件、投影等）。
+**Behavior:** Cascades to all related data (runs, sessions, approvals, artifacts, events, projections).
 
-**响应 200：**
+**Response 200:**
 ```json
 { "success": true, "taskId": "cm..." }
 ```
 
 ---
 
-## 任务操作
+## Task Operations
 
-### 启动执行
+### Start Run
 
 ```
 POST /api/tasks/{taskId}/run
 ```
 
-**请求体：**
+**Request body:**
 ```json
-{ "prompt": "可选的覆盖 prompt" }
+{ "prompt": "Optional prompt override" }
 ```
 
-**响应 201：** 执行结果。
+**Response 201:** Run result.
 
-**前提条件：** 任务必须可运行（有 runtimeAdapterKey 和 prompt）。
+**Precondition:** Task must be runnable (has runtimeAdapterKey and prompt).
 
-### 标记完成
+### Mark Done
 
 ```
 POST /api/tasks/{taskId}/done
 ```
 
-### 重新打开
+### Reopen
 
 ```
 POST /api/tasks/{taskId}/reopen
 ```
 
-### 发送消息
+### Send Message
 
 ```
 POST /api/tasks/{taskId}/message
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
-  "message": "请增加数据可视化部分",
-  "runId": "可选，不提供则自动选择最新活跃执行"
+  "message": "Add data visualization section",
+  "runId": "Optional; auto-selects latest active run if omitted"
 }
 ```
 
-### 提供输入
+### Provide Input
 
 ```
 POST /api/tasks/{taskId}/input
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
-  "inputText": "用户输入的内容",
-  "runId": "可选"
+  "inputText": "User-provided input",
+  "runId": "Optional"
 }
 ```
 
-### 生成计划
+### Generate Plan
 
 ```
 POST /api/tasks/{taskId}/plan
 ```
 
-**响应：** 生成的执行计划。
+**Response:** Generated execution plan.
 
-### 应用排期
+### Apply Schedule
 
 ```
 POST /api/tasks/{taskId}/schedule
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "scheduledStartAt": "2025-01-15T14:00:00Z",
@@ -192,34 +192,34 @@ POST /api/tasks/{taskId}/schedule
 }
 ```
 
-### 清除排期
+### Clear Schedule
 
 ```
 DELETE /api/tasks/{taskId}/schedule
 ```
 
-### 列出子任务
+### List Subtasks
 
 ```
 GET /api/tasks/{taskId}/subtasks
 ```
 
-**响应 200：**
+**Response 200:**
 ```json
 { "subtasks": [...], "count": 3 }
 ```
 
-### 创建子任务
+### Create Subtask
 
 ```
 POST /api/tasks/{taskId}/subtasks
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
-  "title": "子任务标题",
-  "description": "描述",
+  "title": "Subtask title",
+  "description": "Description",
   "priority": "Medium",
   "dueAt": "2025-01-18T00:00:00Z"
 }
@@ -227,53 +227,53 @@ POST /api/tasks/{taskId}/subtasks
 
 ---
 
-## AI 智能端点 `/api/ai`
+## AI Endpoints `/api/ai`
 
-### 任务分解
+### Decompose Task
 
 ```
 POST /api/ai/decompose-task
 ```
 
-**请求体（两种模式）：**
+**Request body (two modes):**
 
 ```json
-// 模式1：基于已有任务
+// Mode 1: from existing task
 { "taskId": "cm..." }
 
-// 模式2：基于临时数据
+// Mode 2: from ad-hoc data
 {
-  "title": "准备季度报告",
-  "description": "包含销售、运营、财务数据",
+  "title": "Prepare quarterly report",
+  "description": "Includes sales, operations, financial data",
   "priority": "High",
   "estimatedMinutes": 120
 }
 ```
 
-**响应 200：**
+**Response 200:**
 ```json
 {
   "subtasks": [
-    { "title": "收集销售数据", "estimatedMinutes": 30, "priority": "High" },
-    { "title": "编写运营分析", "estimatedMinutes": 45, "priority": "Medium" }
+    { "title": "Collect sales data", "estimatedMinutes": 30, "priority": "High" },
+    { "title": "Write operations analysis", "estimatedMinutes": 45, "priority": "Medium" }
   ],
   "totalEstimatedMinutes": 120,
   "feasibilityScore": 0.85
 }
 ```
 
-### 批量分解（分解 + 创建）
+### Batch Decompose (decompose + create)
 
 ```
 POST /api/ai/batch-decompose
 ```
 
-**请求体：**
+**Request body:**
 ```json
 { "taskId": "cm..." }
 ```
 
-**响应 201：**
+**Response 201:**
 ```json
 {
   "parentTaskId": "cm...",
@@ -286,27 +286,27 @@ POST /api/ai/batch-decompose
 }
 ```
 
-### 自动补全
+### Auto-Complete
 
 ```
 POST /api/ai/auto-complete
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
-  "title": "分析",
+  "title": "Analyze",
   "workspaceId": "default"
 }
 ```
 
-**响应 200：**
+**Response 200:**
 ```json
 {
   "suggestions": [
     {
-      "title": "分析用户行为数据",
-      "description": "使用数据分析工具处理用户行为日志",
+      "title": "Analyze user behavior data",
+      "description": "Use data analysis tools to process user behavior logs",
       "priority": "Medium",
       "estimatedMinutes": 60
     }
@@ -315,26 +315,26 @@ POST /api/ai/auto-complete
 }
 ```
 
-**优先级链：** OpenClaw CLI Bridge → 直接 LLM → 中文关键词规则引擎
+**Priority chain:** OpenClaw CLI Bridge → Direct LLM → Chinese keyword rule engine
 
-### 自动化建议
+### Suggest Automation
 
 ```
 POST /api/ai/suggest-automation
 ```
 
-**请求体：**
+**Request body:**
 ```json
 { "taskId": "cm..." }
 ```
 
-### 时间段建议
+### Suggest Timeslot
 
 ```
 POST /api/ai/suggest-timeslot
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "workspaceId": "default",
@@ -343,13 +343,13 @@ POST /api/ai/suggest-timeslot
 }
 ```
 
-### 冲突分析
+### Analyze Conflicts
 
 ```
 POST /api/ai/analyze-conflicts
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "workspaceId": "default",
@@ -357,34 +357,34 @@ POST /api/ai/analyze-conflicts
 }
 ```
 
-**响应 200：**
+**Response 200:**
 ```json
 {
   "conflicts": [
     {
       "type": "time_overlap",
       "severity": "high",
-      "description": "任务 A 和任务 B 在 14:00-15:00 时间重叠",
+      "description": "Task A and Task B overlap at 14:00-15:00",
       "involvedTaskIds": ["cm1...", "cm2..."]
     }
   ],
   "suggestions": [
     {
       "type": "reschedule",
-      "description": "将任务 B 移至 15:00-16:00",
+      "description": "Move Task B to 15:00-16:00",
       "changes": [...]
     }
   ]
 }
 ```
 
-### 应用建议
+### Apply Suggestion
 
 ```
 POST /api/ai/apply-suggestion
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "workspaceId": "default",
@@ -399,13 +399,13 @@ POST /api/ai/apply-suggestion
 }
 ```
 
-### 工具调用（OpenClaw 插件用）
+### Tool Call (for OpenClaw plugin)
 
 ```
 POST /api/ai/suggest-tool-call
 ```
 
-**请求体：**
+**Request body:**
 ```json
 {
   "tool_name": "schedule.list_tasks",
@@ -414,38 +414,38 @@ POST /api/ai/suggest-tool-call
 }
 ```
 
-**可用工具：**
-- `schedule.list_tasks` — 列出任务
-- `schedule.get_health` — 获取排期健康
-- `schedule.check_conflicts` — 检查冲突
+**Available tools:**
+- `schedule.list_tasks` — List tasks
+- `schedule.get_health` — Get schedule health
+- `schedule.check_conflicts` — Check conflicts
 
 ---
 
-## 投影/页面数据 `/api/{page}/projection`
+## Projection/Page Data `/api/{page}/projection`
 
-### 排期投影
+### Schedule Projection
 
 ```
 GET /api/schedule/projection?workspaceId={id}
 ```
 
-返回 `SchedulePageData`（参见 [模块文档 - getSchedulePage](./modules.md#getschedulepageworkspaceid-selectedday)）。
+Returns `SchedulePageData`.
 
-### 工作台投影
+### Work Projection
 
 ```
 GET /api/work/{taskId}/projection
 ```
 
-返回 `WorkPageData`。
+Returns `WorkPageData`.
 
-### 收件箱投影
+### Inbox Projection
 
 ```
 GET /api/inbox/projection?workspaceId={id}
 ```
 
-### 记忆投影
+### Memory Projection
 
 ```
 GET /api/memory/projection?workspaceId={id}
@@ -453,20 +453,20 @@ GET /api/memory/projection?workspaceId={id}
 
 ---
 
-## 错误处理
+## Error Handling
 
-所有 API 返回标准错误格式：
+All APIs return a standard error format:
 
 ```json
 {
-  "error": "错误描述",
+  "error": "Error description",
   "code": "ERROR_CODE"
 }
 ```
 
-| 状态码 | 说明 |
-|--------|------|
-| 400 | 请求参数无效 |
-| 404 | 资源不存在 |
-| 409 | 状态冲突（如任务已完成不能再次标记完成） |
-| 500 | 服务器内部错误 |
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid request parameters |
+| 404 | Resource not found |
+| 409 | State conflict (e.g. task already done cannot be marked done again) |
+| 500 | Internal server error |
