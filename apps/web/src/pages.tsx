@@ -11,6 +11,7 @@ import { WorkPageClient } from "@/components/work/work-page-client";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { WorkspaceOverview } from "@/components/workspaces/workspace-overview";
 import type { Locale } from "@/i18n/config";
+import { resolveLocale } from "@/i18n/config";
 import { localizeHref } from "@/i18n/routing";
 import type { getDictionary } from "@/i18n/get-dictionary";
 
@@ -47,7 +48,7 @@ export type WorkspaceOverviewRouteData = {
 
 export function LocaleLandingPage() {
   const params = useParams();
-  return <Navigate to={localizeHref(params.lang ?? "en", "/schedule")} replace />;
+  return <Navigate to={localizeHref(resolveLocale(params.lang), "/schedule")} replace />;
 }
 
 function useAppBootOutletData() {

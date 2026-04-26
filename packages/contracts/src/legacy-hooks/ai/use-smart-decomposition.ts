@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchJSON } from "@/hooks/ai/types";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
-import type { StreamToolCall, StreamToolResult, StreamPhase } from "@/hooks/ai/types";
-import { createLogger, summarizeText } from "@/lib/logger";
+import { fetchJSON } from "./types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { StreamToolCall, StreamToolResult, StreamPhase } from "./types";
+import { createLogger, summarizeText } from "../logger";
 
 const logger = createLogger("hook.use-smart-decomposition");
 

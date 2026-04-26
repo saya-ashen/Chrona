@@ -288,9 +288,12 @@ export async function syncRunFromRuntime(input: {
 
   if (run.task.parentTaskId) {
     const acceptedPlan = await getAcceptedTaskPlanGraph(run.task.parentTaskId);
-    if (acceptedPlan) {
+    const acceptedPlanWithTaskId = acceptedPlan?.taskId
+      ? { ...acceptedPlan, taskId: acceptedPlan.taskId }
+      : null;
+    if (acceptedPlanWithTaskId) {
       await syncAcceptedTaskPlanForTask({
-        savedPlan: acceptedPlan,
+        savedPlan: acceptedPlanWithTaskId,
         linkedTaskId: run.taskId,
         taskStatus: snapshot.status,
       });
@@ -344,5 +347,3 @@ export async function syncRunFromRuntime(input: {
 
   await rebuildTaskProjection(run.taskId);
 }
-
-

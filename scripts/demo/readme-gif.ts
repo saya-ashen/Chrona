@@ -6,7 +6,7 @@ import {
   buildGifCommands,
   createDemoArtifactPaths,
   findRecordedVideo,
-} from "../../src/lib/demo-artifacts";
+} from "../../packages/db/src/legacy-lib/demo-artifacts";
 
 function quote(value: string) {
   return value.includes(" ") ? JSON.stringify(value) : value;

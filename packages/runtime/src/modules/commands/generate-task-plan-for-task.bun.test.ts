@@ -83,7 +83,7 @@ describe("generateTaskPlanForTask", () => {
 
     const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
 
-    expect(result?.savedPlan.summary).toBe("Plan for Updated task title");
+    expect(result?.savedPlan?.summary).toBe("Plan for Updated task title");
     expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
       taskId: task.id,
       title: "Updated task title",

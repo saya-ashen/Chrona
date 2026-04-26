@@ -9,7 +9,7 @@ import {
   RESEARCH_RUNTIME_ADAPTER_KEY,
   RESEARCH_RUNTIME_INPUT_VERSION,
   validateResearchTaskConfig,
-} from "@/modules/research-execution/config";
+} from "../research-execution/config";
 import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
@@ -81,5 +81,4 @@ export function validateRuntimeTaskConfig(key: string, input: unknown): RuntimeI
 export function listRuntimeAdapterKeys() {
   return [...runtimeRegistry.keys()];
 }
-
 

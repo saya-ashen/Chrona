@@ -66,7 +66,7 @@ export async function syncParentTaskStateFromAcceptedPlan(parentTaskId: string) 
     data: {
       status: nextStatus,
       completedAt: shouldComplete ? parentTask.completedAt ?? new Date() : null,
-      blockReason: nextStatus === TaskStatus.Blocked ? parentTask.blockReason : Prisma.DbNull,
+      blockReason: nextStatus === TaskStatus.Blocked ? (parentTask.blockReason ?? Prisma.DbNull) : Prisma.DbNull,
     },
   });
   await rebuildTaskProjection(parentTaskId);

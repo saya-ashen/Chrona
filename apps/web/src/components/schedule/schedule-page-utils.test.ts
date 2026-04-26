@@ -44,7 +44,7 @@ import {
 } from "@/components/schedule/schedule-page-utils";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
-vi.mock("@/modules/tasks/derive-task-runnability", () => ({
+vi.mock("@chrona/runtime/modules/tasks/derive-task-runnability", () => ({
   deriveTaskRunnability: () => ({ isRunnable: false, state: "not_configured", summary: "Not configured" }),
 }));
 

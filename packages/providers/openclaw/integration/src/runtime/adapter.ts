@@ -1,5 +1,5 @@
 import type { OpenClawRuntimeClient } from "./runtime-client";
-import { OpenClawBridgeClient } from "../transport/bridge-client";
+import { OpenClawEmbeddedClient } from "../transport/embedded-client";
 import { createMockOpenClawAdapter } from "./mock-adapter";
 import {
   getOpenClawTaskConfigSpec,
@@ -76,8 +76,7 @@ export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
     return createMockOpenClawAdapter();
   }
 
-  const client = new OpenClawBridgeClient({
-    baseUrl: process.env.OPENCLAW_BRIDGE_URL,
+  const client = new OpenClawEmbeddedClient({
     timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
   });
   return createLiveOpenClawAdapter(client);
@@ -185,5 +184,4 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
 
   return adapter;
 }
-
 

@@ -49,10 +49,11 @@ function createTaskProjectionData(params: {
 }
 
 function isMaterializableNode(node: TaskPlanNode) {
+  const executionMode = (node as Record<string, unknown>).executionMode;
   // Canonical graph contract only emits automatic/manual/hybrid.
   // `child_task` is accepted here as a legacy persisted value to keep old plans re-materializable.
   // TODO(chrona-refactor): remove `child_task` fallback after all stored v1 plans are migrated.
-  return node.executionMode === "automatic" || node.executionMode === "child_task";
+  return executionMode === "automatic" || executionMode === "child_task";
 }
 
 function isSequentialMaterializedEdge(edge: TaskPlanEdge, materializedNodeIds: Set<string>) {

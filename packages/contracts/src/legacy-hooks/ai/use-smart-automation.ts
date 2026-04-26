@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { fetchJSON } from "@/hooks/ai/types";
-import type { AutomationSuggestion } from "@/modules/ai/types";
+import { fetchJSON } from "./types";
+import type { AutomationSuggestion } from "@chrona/contracts/ai";
 
 export interface SmartAutomationTaskInput {
   title: string;

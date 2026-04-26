@@ -22,6 +22,7 @@ import type {
   BridgeResponse,
   NDJSONEvent,
 } from "@chrona/openclaw-integration/bridge/contracts";
+import { executeGatewayRequest, type RouteKind } from "@chrona/openclaw-integration";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
@@ -44,9 +45,9 @@ const logger = {
 function getStreamPath(feature: AiFeature): string | null {
   switch (feature) {
     case "suggest":
-      return "/v1/features/suggest/stream";
+      return "suggest";
     case "generate_plan":
-      return "/v1/features/generate-plan/stream";
+      return "generate_plan";
     default:
       return null;
   }
@@ -134,84 +135,45 @@ export async function* openclawStream(
         instructions: SYSTEM_PROMPTS[feature],
         timeout,
       };
+      const route: RouteKind = {
+        kind: "feature",
+        feature: streamPath as RouteKind extends { kind: "feature"; feature: infer F } ? F : never,
+        stream: true,
+      };
 
-      const res = await fetch(`${config.bridgeUrl}${streamPath}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout((timeout + 15) * 1000),
-      });
+      const { response, events } = await executeGatewayRequest(route, requestBody);
 
       logger.info("openclaw.stream.response", {
         feature,
         scope,
         sessionId,
-        ok: res.ok,
-        status: res.status,
-        contentType: res.headers.get("Content-Type"),
+        ok: !response.error,
+        status: response.responseStatus,
       });
 
-      if (res.ok && res.body) {
-        yield { type: "status", message: "AI 正在思考..." };
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let fullText = "";
-        let finalStructured: StructuredAgentResult | null = null;
+      yield { type: "status", message: "AI 正在思考..." };
+      let fullText = "";
+      let finalStructured: StructuredAgentResult | null = response.structured ?? null;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          let eventType = "";
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              eventType = line.slice(7).trim();
-              continue;
-            }
-            if (!line.startsWith("data: ")) continue;
-
-            const raw = line.slice(6).trim();
-            try {
-              if (eventType === "done") {
-                const response = JSON.parse(raw) as BridgeResponse;
-                fullText = response.output ?? fullText;
-                finalStructured = response.structured ?? null;
-                yield {
-                  type: "done",
-                  text: fullText,
-                  structured: finalStructured,
-                };
-                return;
-              }
-
-              const event = parseBridgeEvent(JSON.parse(raw) as NDJSONEvent);
-              if (!event) continue;
-              if (event.type === "partial") {
-                fullText += event.text;
-              }
-              yield event;
-              if (event.type === "error") {
-                return;
-              }
-            } catch {
-              // ignore malformed SSE chunks
-            }
-            eventType = "";
-          }
+      for (const rawEvent of events) {
+        const event = parseBridgeEvent(rawEvent as NDJSONEvent);
+        if (!event) continue;
+        if (event.type === "partial") {
+          fullText += event.text;
         }
-
-        yield {
-          type: "done",
-          text: fullText,
-          structured: finalStructured,
-        };
-        return;
+        yield event;
+        if (event.type === "error") {
+          return;
+        }
       }
+
+      fullText = response.output ?? fullText;
+      yield {
+        type: "done",
+        text: fullText,
+        structured: finalStructured,
+      };
+      return;
     } catch (error) {
       logger.warn("openclaw.stream.fallback_to_blocking", {
         feature,

@@ -66,6 +66,7 @@ export {
   applyTaskConfigToItem,
   toTaskConfigInitialValues,
   buildQuickCreateDraft,
+  parseQuickCreateCommand,
 } from "@/components/schedule/utils/item-transforms";
 
 // state

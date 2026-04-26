@@ -9,6 +9,9 @@ export async function updateTaskPlanNodeSummary(input: {
   if (!acceptedPlan) {
     throw new Error("Accepted task plan graph not found");
   }
+  if (!acceptedPlan.taskId) {
+    throw new Error("Accepted task plan graph is missing taskId");
+  }
 
   const nextPlan = {
     ...acceptedPlan.plan,

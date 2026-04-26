@@ -22,6 +22,12 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
 } from "@chrona/openclaw-integration/bridge/contracts";
+import {
+  checkGatewayAvailable,
+  DEFAULT_OPENCLAW_ENVIRONMENT,
+  executeGatewayRequest,
+  type RouteKind,
+} from "@chrona/openclaw-integration";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
@@ -39,25 +45,6 @@ function toBridgeFeature(feature: AiFeature): BridgeFeature {
       return "chat";
     case "dispatch_task":
       return "dispatch_task";
-  }
-}
-
-function getBridgePath(feature: AiFeature, stream = false): string {
-  switch (feature) {
-    case "suggest":
-      return stream ? "/v1/features/suggest/stream" : "/v1/features/suggest";
-    case "generate_plan":
-      return stream
-        ? "/v1/features/generate-plan/stream"
-        : "/v1/features/generate-plan";
-    case "conflicts":
-      return "/v1/features/analyze-conflicts";
-    case "timeslots":
-      return "/v1/features/suggest-timeslot";
-    case "chat":
-      return "/v1/features/chat";
-    case "dispatch_task":
-      return "/v1/features/dispatch-task";
   }
 }
 
@@ -124,32 +111,16 @@ async function fetchOpenClawBridge(
     timeout,
   };
 
-  const res = await fetch(`${config.bridgeUrl}${getBridgePath(feature)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout((timeout + 15) * 1000),
-  });
+  const route: RouteKind = {
+    kind: "feature",
+    feature: toBridgeFeature(feature),
+    stream: false,
+  };
 
-  const rawText = await res.text().catch(() => "");
-  let bridge: BridgeResponse;
-  try {
-    bridge = JSON.parse(rawText) as BridgeResponse;
-  } catch {
-    throw new AiClientError(
-      `Bridge returned non-JSON response (${res.status}): ${rawText.slice(0, 200)}`,
-      "openclaw",
-      "internal",
-    );
-  }
-
-  if (!res.ok) {
-    throw new AiClientError(
-      bridge.error ?? `Bridge returned ${res.status}`,
-      "openclaw",
-      "internal",
-    );
-  }
+  const { response: bridge } = await executeGatewayRequest(
+    route,
+    requestBody,
+  );
 
   if (bridge.error) {
     throw new AiClientError(bridge.error, "openclaw", "internal");
@@ -210,12 +181,10 @@ export async function openclawHealthCheck(
   config: OpenClawClientConfig,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${config.bridgeUrl}/v1/health`, {
-      signal: AbortSignal.timeout(3000),
+    return await checkGatewayAvailable({
+      ...DEFAULT_OPENCLAW_ENVIRONMENT,
+      gatewayHttpUrl: config.bridgeUrl || DEFAULT_OPENCLAW_ENVIRONMENT.gatewayHttpUrl,
     });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { status: string };
-    return body.status === "ok";
   } catch {
     return false;
   }

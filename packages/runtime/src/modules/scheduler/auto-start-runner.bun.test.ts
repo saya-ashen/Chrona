@@ -13,20 +13,31 @@ describe("auto-start scheduler runner", () => {
   const originalClearInterval = globalThis.clearInterval;
   const originalEnv = { ...process.env };
   const intervalCalls: Array<{ fn: () => void; ms: number }> = [];
-  const clearedHandles: unknown[] = [];
+  const clearedHandles: Array<ReturnType<typeof setInterval>> = [];
 
   beforeEach(() => {
     intervalCalls.length = 0;
     clearedHandles.length = 0;
     autoStartScheduledPlanTasksMock.mockClear();
     process.env = { ...originalEnv };
-    globalThis.setInterval = ((fn: TimerHandler, ms?: number) => {
-      intervalCalls.push({ fn: fn as () => void, ms: Number(ms ?? 0) });
-      return { __fake: true } as unknown as ReturnType<typeof setInterval>;
-    }) as typeof setInterval;
-    globalThis.clearInterval = ((handle: unknown) => {
-      clearedHandles.push(handle);
-    }) as typeof clearInterval;
+    const fakeSetInterval = (fn: TimerHandler, ms?: number) => {
+      const callback: () => void =
+        typeof fn === "function"
+          ? () => {
+              (fn as () => void)();
+            }
+          : () => {};
+      intervalCalls.push({ fn: callback, ms: Number(ms ?? 0) });
+      return originalSetInterval(() => undefined, 60_000);
+    };
+    globalThis.setInterval = fakeSetInterval as unknown as typeof setInterval;
+    const fakeClearInterval = (handle?: Parameters<typeof clearInterval>[0]) => {
+      if (handle !== undefined) {
+        clearedHandles.push(handle as ReturnType<typeof setInterval>);
+      }
+      originalClearInterval(handle);
+    };
+    globalThis.clearInterval = fakeClearInterval as unknown as typeof clearInterval;
   });
 
   afterEach(() => {

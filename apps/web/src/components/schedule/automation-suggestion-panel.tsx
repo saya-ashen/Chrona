@@ -1,1 +1,1 @@
-export * from "@/components/schedule/panels/automation-suggestion-panel";
+export * from "./panels/automation-suggestion-panel";

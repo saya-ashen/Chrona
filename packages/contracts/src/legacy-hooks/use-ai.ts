@@ -15,21 +15,21 @@ export type {
   StreamToolCall,
   StreamToolResult,
   StreamPhase,
-} from "@/hooks/ai/types";
+} from "./ai/types";
 
-export { useAutoComplete } from "@/hooks/ai/use-auto-complete";
-export { useApplySuggestion } from "@/hooks/ai/use-apply-suggestion";
+export { useAutoComplete } from "./ai/use-auto-complete";
+export { useApplySuggestion } from "./ai/use-apply-suggestion";
 export {
   useSmartAutomation,
   type SmartAutomationTaskInput,
-} from "@/hooks/ai/use-smart-automation";
+} from "./ai/use-smart-automation";
 export {
   useSmartDecomposition,
   useBatchApplyPlan,
   useBatchApplyPlan as useBatchDecompose,
   type SmartDecompositionTaskInput,
-} from "@/hooks/ai/use-smart-decomposition";
+} from "./ai/use-smart-decomposition";
 export {
   useSmartTimeslot,
   type SmartTimeslotTaskInput,
-} from "@/hooks/ai/use-smart-timeslot";
+} from "./ai/use-smart-timeslot";

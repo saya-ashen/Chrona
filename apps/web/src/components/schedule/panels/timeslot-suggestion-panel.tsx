@@ -3,7 +3,7 @@
 import { AlertCircle, Calendar, Clock, MapPin, Star } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { suggestTimeslots } from "@/modules/ai/timeslot-suggester";
+import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
 import type {
   ScheduleSlot,
   TimeslotSuggestion,

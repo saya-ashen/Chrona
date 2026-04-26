@@ -1,1 +1,1 @@
-export * from "@/components/schedule/panels/timeslot-suggestion-panel";
+export * from "./panels/timeslot-suggestion-panel";

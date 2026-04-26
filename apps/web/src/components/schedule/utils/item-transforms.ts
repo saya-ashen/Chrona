@@ -10,7 +10,7 @@ import type {
   TimelineCreateInput,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { deriveTaskRunnability } from "@chrona/runtime/modules/tasks/derive-task-runnability";
 import { formatDateKey, parseDayKey, startOfDay } from "@/components/schedule/utils/date";
 
 function roundUpToQuarterHour(value: Date) {

@@ -3,12 +3,13 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { db } from "@/lib/db";
 import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import type { DispatchTaskOutput } from "@chrona/ai-features";
+import type { TaskDispatchPolicy } from "@chrona/ai-features";
 
 const DEFAULT_DISPATCH_POLICY = {
   minConfidenceForAutoExecute: 0.9,
-  allowedAutoActions: ["materialize_node"] as const,
+  allowedAutoActions: ["materialize_node"],
   requireHumanApprovalByDefault: true,
-};
+} satisfies TaskDispatchPolicy;
 
 export async function dispatchNextTaskAction(input: {
   taskId: string;
@@ -125,4 +126,3 @@ export async function dispatchNextTaskAction(input: {
 
   return result;
 }
-

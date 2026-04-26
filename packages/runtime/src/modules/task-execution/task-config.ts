@@ -4,7 +4,7 @@ import {
   getRuntimeTaskConfigSpec,
   resolveRuntimeAdapterKey,
   validateRuntimeTaskConfig,
-} from "@/modules/task-execution/registry";
+} from "./registry";
 import type { RuntimeInput } from "@chrona/runtime-core";
 
 export function isRuntimeInput(value: unknown): value is RuntimeInput {
