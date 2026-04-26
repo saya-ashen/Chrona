@@ -1,2 +1,2 @@
-export * from "./index";
-export * from "./legacy-hooks/ai/types";
+export * from "./ai/types";
+export * from "./use-ai";

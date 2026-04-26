@@ -1,1 +1,1 @@
-export * from "@/components/schedule/panels/preparation-checklist";
+export * from "./panels/preparation-checklist";

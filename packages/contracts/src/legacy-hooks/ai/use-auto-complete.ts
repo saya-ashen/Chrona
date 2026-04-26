@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { createLogger, summarizeText } from "@/lib/logger";
+import { createLogger, summarizeText } from "../logger";
 
 const logger = createLogger("hook.use-auto-complete");
 import type {
@@ -10,7 +10,7 @@ import type {
   StreamPhase,
   StreamToolCall,
   StreamToolResult,
-} from "@/hooks/ai/types";
+} from "./types";
 
 export function useAutoComplete(title: string | null, debounceMs = 800) {
   const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestion[]>([]);

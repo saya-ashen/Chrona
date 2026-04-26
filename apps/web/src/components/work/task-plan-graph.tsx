@@ -99,6 +99,8 @@ type FlowNodeData = {
   onToggle: (nodeId: string) => void;
 };
 
+type FlowGraphNode = Node<FlowNodeData, "taskPlanNode">;
+
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 124;
 const EXPANDED_NODE_EXTRA_HEIGHT = 112;
@@ -397,7 +399,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PlanNodeCard({ data }: NodeProps<FlowNodeData>) {
+function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const { step, tone, isCurrent, isSelected, onToggle, graphCopy } = data;
   const s = TONE_STYLES[tone];
 
@@ -615,7 +617,7 @@ function buildFlowLayout(input: {
     MAX_VIEWPORT_HEIGHT,
   );
 
-  const nodes: Node<FlowNodeData>[] = input.steps.map((step) => {
+  const nodes: FlowGraphNode[] = input.steps.map((step) => {
     const layoutNode = graph.node(step.id) ?? {
       x: 0,
       y: 0,
@@ -676,7 +678,7 @@ function buildFlowLayout(input: {
 }
 
 function syncNodeState(
-  nodes: Node<FlowNodeData>[],
+  nodes: FlowGraphNode[],
   input: {
     currentStepId: string | null;
     selectedStepId: string | null;
@@ -831,10 +833,10 @@ function CompactOutlineNode({
 type TaskPlanGraphFrameProps = {
   graphCopy: GraphCopyType;
   layout: ReturnType<typeof buildFlowLayout>;
-  nodes: Node<FlowNodeData>[];
+  nodes: FlowGraphNode[];
   edges: Edge[];
   edgeLegend: EdgeLegendItem[];
-  handleNodeClick: NodeMouseHandler<Node<FlowNodeData>>;
+  handleNodeClick: NodeMouseHandler<FlowGraphNode>;
   handleNodeDragStart: (event: React.MouseEvent<Element>) => void;
   handleNodeDrag: (event: React.MouseEvent<Element>) => void;
   handleNodeDragStop: (event: React.MouseEvent<Element>) => void;
@@ -908,7 +910,6 @@ function TaskPlanGraphFrame({
                 [0, 0],
                 [layout.contentWidth, layout.contentHeight],
               ]}
-              zIndexMode="hierarchy"
             />
           </div>
         </div>
@@ -957,12 +958,12 @@ export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
     ],
   );
 
-  const [nodes, setNodes] = useNodesState<FlowNodeData>(layout.nodes);
+  const [nodes, setNodes] = useNodesState<FlowGraphNode>(layout.nodes);
   const [edges, setEdges] = useEdgesState(layout.edges);
   const edgeLegend = useMemo(() => buildEdgeLegend(graphCopy), [graphCopy]);
   const compactSections = useMemo(() => buildCompactSections(plan), [plan]);
 
-  const handleNodeClick = useCallback<NodeMouseHandler<Node<FlowNodeData>>>(
+  const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(
     (event, node) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("button[data-testid^='task-plan-node-']")) {

@@ -7,9 +7,9 @@ vi.mock("@/i18n/client", () => ({
   useLocale: () => "en",
 }));
 
-const mockUseAutoComplete = vi.fn(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
+const mockUseAutoComplete = vi.fn((_input: unknown) => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
 const mockUseSmartAutomation = vi.fn(() => ({ suggestion: null, isLoading: false }));
-const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
+const mockUseSmartDecomposition = vi.fn((_input: unknown) => ({ result: null, isLoading: false, error: null }));
 const samplePlanGraph = {
   id: "plan-1",
   taskId: "task-1",
@@ -96,9 +96,9 @@ const defaultProps = {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  mockUseAutoComplete.mockImplementation(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
+  mockUseAutoComplete.mockImplementation((_input: unknown) => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
   mockUseSmartAutomation.mockImplementation(() => ({ suggestion: null, isLoading: false }));
-  mockUseSmartDecomposition.mockImplementation(() => ({ result: null, isLoading: false, error: null }));
+  mockUseSmartDecomposition.mockImplementation((_input: unknown) => ({ result: null, isLoading: false, error: null }));
 });
 
 describe("TaskCreateDialog – Core functionality", () => {

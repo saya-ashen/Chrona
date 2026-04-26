@@ -1,4 +1,4 @@
-import { startAutoStartScheduler } from "../modules/scheduler/auto-start-runner";
+import { startAutoStartScheduler } from "@chrona/runtime/modules/scheduler/auto-start-runner";
 
 let schedulerStarted = false;
 

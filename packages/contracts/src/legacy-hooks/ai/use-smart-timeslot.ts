@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { fetchJSON } from "@/hooks/ai/types";
-import type { TimeslotSuggestionResult } from "@/modules/ai/types";
+import { fetchJSON } from "./types";
+import type { TimeslotSuggestionResult } from "@chrona/contracts/ai";
 
 export interface SmartTimeslotTaskInput {
   workspaceId: string;

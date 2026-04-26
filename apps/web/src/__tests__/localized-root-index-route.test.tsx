@@ -9,7 +9,7 @@ import type { AppBootData } from "../pages";
 
 const bootData: AppBootData = {
   locale: "en",
-  dictionary: {
+  dictionary: ({
     common: {},
     navigation: {},
     pages: {
@@ -40,7 +40,7 @@ const bootData: AppBootData = {
       memoryConsole: {},
       taskPage: {},
     },
-  } as AppBootData["dictionary"],
+  } as unknown) as AppBootData["dictionary"],
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
   schedule: {} as AppBootData["schedule"],
   inbox: {} as AppBootData["inbox"],

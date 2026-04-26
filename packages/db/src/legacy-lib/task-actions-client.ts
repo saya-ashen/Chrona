@@ -1,4 +1,4 @@
-import { deleteJson, patchJson, postJson, requestJson } from "@/lib/http-client";
+import { deleteJson, patchJson, postJson, requestJson } from "./http-client";
 
 type TaskMutationResult = {
   taskId: string;

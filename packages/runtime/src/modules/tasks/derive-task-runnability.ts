@@ -1,6 +1,6 @@
 import { readMissingRequiredPaths, readRequiredFieldLabel } from "@chrona/runtime-core";
-import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
-import { resolveTaskRuntimeConfig } from "@/modules/task-execution/task-config";
+import { getRuntimeTaskConfigSpec } from "../task-execution/registry";
+import { resolveTaskRuntimeConfig } from "../task-execution/task-config";
 
 type DeriveTaskRunnabilityInput = {
   runtimeAdapterKey?: string | null;
@@ -92,4 +92,3 @@ export function deriveTaskRunnability(
     missingFields,
   };
 }
-

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { fetchJSON, type StructuredSuggestion } from "@/hooks/ai/types";
+import { fetchJSON, type StructuredSuggestion } from "./types";
 
 export function useApplySuggestion() {
   const [isLoading, setIsLoading] = useState(false);

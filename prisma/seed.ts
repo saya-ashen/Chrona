@@ -9,7 +9,7 @@ import {
   TaskPriority,
   TaskStatus,
   WorkspaceStatus,
-} from "../src/generated/prisma/client";
+} from "../packages/db/src/generated/prisma/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
 const adapter = new PrismaBunSqlite({

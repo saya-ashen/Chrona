@@ -102,6 +102,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   approvalPending: "Approval pending",
   conflictPreviewLabel: "Conflict — resolve overlap before committing this block.",
   resizePreviewLabel: "Resize block",
+  adjustBlock: "Adjust block",
   resizeHandleLabel: "Resize",
   quickCreatePlaceholder: "Task title, @ 14:30, for 90m, !high",
   quickCreateSubmit: "Add block",

@@ -46,7 +46,7 @@ import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
-import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
+import { getRuntimeAdapterDefinition } from "@chrona/runtime/modules/task-execution/registry";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 import { useAppRouter } from "@/lib/router";
@@ -71,7 +71,8 @@ export function SchedulePage({
     () => getSchedulePageCopy(messages.components?.schedulePage),
     [messages.components?.schedulePage],
   );
-  const [viewData, setViewData] = useState<SchedulePageData>(data);
+  const hydratedData = useMemo(() => hydrateSchedulePageData(data), [data]);
+  const [viewData, setViewData] = useState<SchedulePageData>(() => hydratedData);
   const [draggedTask, setDraggedTask] = useState<{
     kind: "queue" | "scheduled";
     taskId: string;
@@ -125,8 +126,8 @@ export function SchedulePage({
   }, [actionFailedMessage, router, workspaceId]);
 
   useEffect(() => {
-    setViewData(hydrateSchedulePageData(data));
-  }, [data]);
+    setViewData(hydratedData);
+  }, [hydratedData]);
 
   useEffect(() => {
     setLocalSelectedTaskId(selectedTaskId);
@@ -259,7 +260,7 @@ export function SchedulePage({
       setIsPending,
       setErrorMessage,
       refreshProjection,
-      resetViewData: () => setViewData(data),
+      resetViewData: () => setViewData(hydratedData),
       clearDraggedTask: () => setDraggedTask(null),
       actionFailedMessage,
     });
@@ -283,7 +284,7 @@ export function SchedulePage({
       setIsPending,
       setErrorMessage,
       refreshProjection,
-      resetViewData: () => setViewData(data),
+      resetViewData: () => setViewData(hydratedData),
       actionFailedMessage,
     });
   }
@@ -307,7 +308,7 @@ export function SchedulePage({
       setIsPending,
       setErrorMessage,
       refreshProjection,
-      resetViewData: () => setViewData(data),
+      resetViewData: () => setViewData(hydratedData),
       actionFailedMessage,
     });
   }
@@ -392,7 +393,7 @@ export function SchedulePage({
       setIsPending,
       setErrorMessage,
       refreshProjection,
-      resetViewData: () => setViewData(data),
+      resetViewData: () => setViewData(hydratedData),
       actionFailedMessage,
     });
   }

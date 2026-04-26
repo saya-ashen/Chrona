@@ -1,4 +1,4 @@
-import type { TaskPlanGraph, TaskPlanNode } from "@/modules/ai/types";
+import type { SavedTaskPlanGraph, TaskPlanGraph, TaskPlanNode } from "@/modules/ai/types";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
 type SyncPlanNodeFromTaskInput = {
@@ -50,17 +50,7 @@ export function syncTaskPlanNodeFromTask(input: SyncPlanNodeFromTaskInput): Task
 }
 
 export async function syncAcceptedTaskPlanForTask(input: {
-  savedPlan: {
-    workspaceId: string;
-    taskId: string;
-    plan: TaskPlanGraph;
-    prompt?: string | null;
-    status?: string;
-    source?: string;
-    generatedBy?: string | null;
-    summary?: string | null;
-    changeSummary?: string | null;
-  };
+  savedPlan: SavedTaskPlanGraph & { taskId: string };
   linkedTaskId: string;
   taskStatus: string;
   completionSummary?: string | null;

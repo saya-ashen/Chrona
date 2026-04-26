@@ -10,7 +10,7 @@ import type { AppBootData } from "../pages";
 
 const bootData: AppBootData = {
   locale: "en",
-  dictionary: {
+  dictionary: ({
     common: {},
     navigation: {},
     pages: {
@@ -41,9 +41,9 @@ const bootData: AppBootData = {
       memoryConsole: {},
       taskPage: {},
     },
-  } as AppBootData["dictionary"],
+  } as unknown) as AppBootData["dictionary"],
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
-  schedule: hydrateSchedulePageData({
+  schedule: hydrateSchedulePageData(({
     defaultRuntimeAdapterKey: "openclaw",
     runtimeAdapters: [],
     summary: {
@@ -78,7 +78,7 @@ const bootData: AppBootData = {
     listItems: [],
     conflicts: [],
     suggestions: [],
-  } as AppBootData["schedule"]),
+  } as unknown as AppBootData["schedule"])) as unknown as AppBootData["schedule"],
   inbox: {} as AppBootData["inbox"],
   memory: {} as AppBootData["memory"],
   workspaces: [] as AppBootData["workspaces"],
