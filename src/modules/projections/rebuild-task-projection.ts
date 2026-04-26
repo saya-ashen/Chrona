@@ -1,8 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS } from "@/modules/runtime-sync/freshness";
-import { deriveScheduleState } from "@/modules/tasks/derive-schedule-state";
-import { deriveTaskState } from "@/modules/tasks/derive-task-state";
+import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
 
 export async function rebuildTaskProjection(taskId: string) {
   const task = await db.task.findUniqueOrThrow({

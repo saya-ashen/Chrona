@@ -320,7 +320,10 @@ export function ScheduleCommandBar({
               blurTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
             onKeyDown={(event) => {
-              const nativeEvent = event.nativeEvent as KeyboardEvent["nativeEvent"] & { isComposing?: boolean; keyCode?: number };
+              const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent & {
+                isComposing?: boolean;
+                keyCode?: number;
+              };
               if (nativeEvent.isComposing || nativeEvent.keyCode === 229) return;
               if (event.key === "Enter") {
                 event.preventDefault();

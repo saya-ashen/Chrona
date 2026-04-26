@@ -28,6 +28,7 @@ export function summarizeBridgeRequest(
       route: routeLabel(route),
       sessionId: request.sessionId ?? null,
       timeout: request.timeout ?? null,
+      instructionsChars: request.instructions?.length ?? 0,
       input: summarizeInput(request.input),
     };
   }
@@ -69,6 +70,10 @@ export function normalizeFeatureRequest(
         ? request.sessionKey
         : undefined,
     input: input as Record<string, unknown>,
+    instructions:
+      typeof request.instructions === "string" && request.instructions.trim()
+        ? request.instructions
+        : undefined,
     timeout: typeof request.timeout === "number" ? request.timeout : undefined,
   };
 }

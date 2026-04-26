@@ -72,7 +72,7 @@ export function AiInsightsPanel({
         description={item.description}
         priority={item.priority}
         dueAt={item.dueAt}
-        autoRequest
+        autoRequest={false}
         onPlanLoaded={onPlanLoaded}
         onApply={onApplyDecomposition}
       />

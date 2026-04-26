@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   startTransition,
   useCallback,
@@ -50,6 +49,7 @@ import type { TaskConfigFormInput } from "@/components/schedule/task-config-form
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
+import { useAppRouter } from "@/lib/router";
 
 type SchedulePageRouteProps = SchedulePageProps & {
   selectedDay?: string;
@@ -64,7 +64,7 @@ export function SchedulePage({
   selectedTaskId,
   selectedView,
 }: SchedulePageRouteProps) {
-  const router = useRouter();
+  const router = useAppRouter();
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = useMemo(
@@ -315,10 +315,19 @@ export function SchedulePage({
   async function handleAcceptProposal(proposalId: string) {
     await runSchedulePageAction({
       action: async () => {
-        const { acceptScheduleProposal } = await import(
-          "@/app/actions/task-actions"
-        );
-        await acceptScheduleProposal(proposalId, "Accepted on schedule page");
+        const response = await fetch("/api/schedule/proposals/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proposalId,
+            decision: "Accepted",
+            resolutionNote: "Accepted on schedule page",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(actionFailedMessage);
+        }
       },
       setIsPending,
       setErrorMessage,
@@ -330,10 +339,19 @@ export function SchedulePage({
   async function handleRejectProposal(proposalId: string) {
     await runSchedulePageAction({
       action: async () => {
-        const { rejectScheduleProposal } = await import(
-          "@/app/actions/task-actions"
-        );
-        await rejectScheduleProposal(proposalId, "Rejected on schedule page");
+        const response = await fetch("/api/schedule/proposals/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proposalId,
+            decision: "Rejected",
+            resolutionNote: "Rejected on schedule page",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(actionFailedMessage);
+        }
       },
       setIsPending,
       setErrorMessage,
@@ -385,8 +403,15 @@ export function SchedulePage({
         if (!canBackendAutoRun(taskId)) {
           throw new Error(copy.automationUnsupportedRuntime);
         }
-        const { startRun } = await import("@/app/actions/task-actions");
-        await startRun({ taskId });
+        const response = await fetch(`/api/tasks/${taskId}/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+          throw new Error(actionFailedMessage);
+        }
       },
       setIsPending,
       setErrorMessage,

@@ -37,7 +37,7 @@ export interface OpenClawRuntimeClient {
     feature: BridgeFeature;
     prompt: string;
     runtimeSessionKey?: string;
-    systemPrompt?: string;
+    instructions?: string;
     timeoutSeconds?: number;
   }): Promise<OpenClawStructuredRunResult<T>>;
   getStructuredResult<T = unknown>(

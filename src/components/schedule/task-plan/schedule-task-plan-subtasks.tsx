@@ -2,7 +2,6 @@
 
 import { ListTree } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { markTaskDone, reopenTask } from "@/app/actions/task-actions";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -10,6 +9,7 @@ import { useLocale } from "@/i18n/client";
 import { useI18n } from "@/i18n/client";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { getPriorityTone } from "@/components/schedule/schedule-page-utils";
+import { markTaskDone, reopenTask } from "@/lib/task-actions-client";
 import { cn } from "@/lib/utils";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
 

@@ -22,6 +22,7 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
 } from "@chrona/openclaw-integration/bridge/contracts";
+import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
 function toBridgeFeature(feature: AiFeature): BridgeFeature {
@@ -119,6 +120,7 @@ async function fetchOpenClawBridge(
     sessionId,
     sessionKey,
     input: buildFeatureInput(feature, input),
+    instructions: SYSTEM_PROMPTS[feature],
     timeout,
   };
 

@@ -7,7 +7,7 @@ vi.mock("@/i18n/client", () => ({
 }));
 
 const taskDecompositionPanelProps = vi.fn();
-vi.mock("@/components/schedule/task-decomposition-panel", () => ({
+vi.mock("@/components/schedule/task-planning-panel", () => ({
   TaskDecompositionPanel: (props: unknown) => {
     taskDecompositionPanelProps(props);
     return <div data-testid="task-decomposition-panel" />;
@@ -63,7 +63,7 @@ describe("AiInsightsPanel", () => {
     expect(screen.getByTestId("task-decomposition-panel")).toBeInTheDocument();
   });
 
-  it("passes task context into the merged task plan panel", () => {
+  it("passes task context into the merged task plan panel without auto-requesting on open", () => {
     const onApplyDecomposition = vi.fn();
 
     render(
@@ -77,7 +77,7 @@ describe("AiInsightsPanel", () => {
         description: "A test task",
         priority: "Medium",
         dueAt: mockItem.dueAt,
-        autoRequest: true,
+        autoRequest: false,
         onApply: onApplyDecomposition,
       }),
     );

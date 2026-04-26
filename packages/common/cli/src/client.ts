@@ -88,7 +88,7 @@ export class ApiClient {
   readonly baseUrl: string;
 
   constructor(config: ClientConfig = {}) {
-    this.baseUrl = normalizeBaseUrl(config.baseUrl ?? "http://localhost:3000");
+    this.baseUrl = normalizeBaseUrl(config.baseUrl ?? "http://localhost:3101");
   }
 
   private async request<T>(

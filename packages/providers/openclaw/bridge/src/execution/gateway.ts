@@ -44,21 +44,29 @@ function summarizeHeaders(headers: Record<string, string>): Record<string, unkno
 }
 
 const sessionPreviousResponseMap = new Map<string, string>();
+const sessionPendingToolOutputMap = new Map<
+  string,
+  Array<{ type: "function_call_output"; call_id: string; output: string }>
+>();
 
 type OpenResponsesTurnState = {
   sessionKey: string;
   previousResponseId?: string;
+  pendingToolOutputs: Array<{ type: "function_call_output"; call_id: string; output: string }>;
 };
 
-function featureInstructions(feature: BridgeFeature): string {
+function defaultFeatureInstructions(feature: BridgeFeature): string {
   switch (feature) {
     case "suggest":
       return "Return suggestions only via function call suggest_task_completions.";
     case "generate_plan":
       return [
         "You are Chrona's task planning assistant.",
-        "Create a practical task execution plan graph from the current task snapshot only.",
-        "Return the plan graph only via function call generate_task_plan_graph.",
+        "Your job is to immediately create a practical execution plan graph from the current task snapshot only.",
+        "Do not ask follow-up questions, do not request more context, and do not answer with free text.",
+        "Make reasonable assumptions when details are sparse.",
+        "Call generate_task_plan_graph exactly once with a complete graph payload.",
+        "The graph payload must include summary, nodes, and edges. nodes and edges must always be present; use edges: [] only for a single independent node.",
         "Do not rely on previous task title/description context when a new task snapshot is provided.",
       ].join("\n");
     case "dispatch_task":
@@ -72,6 +80,16 @@ function featureInstructions(feature: BridgeFeature): string {
   }
 }
 
+function toolDescription(toolName: string): string {
+  if (toolName === "generate_task_plan_graph") {
+    return [
+      "Create and persist the Chrona task plan graph for the provided task snapshot.",
+      "Return a complete graph with summary, nodes, and edges; do not ask follow-up questions.",
+    ].join(" ");
+  }
+  return `Chrona structured feature tool: ${toolName}`;
+}
+
 function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unknown>): string {
   if (feature !== "generate_plan") {
     return JSON.stringify(input);
@@ -81,7 +99,15 @@ function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unk
     input.task && typeof input.task === "object" && !Array.isArray(input.task)
       ? (input.task as Record<string, unknown>)
       : input;
-  const parts: string[] = ["Task to plan"];
+  const parts: string[] = [
+    "Create an execution-ready plan graph for the task below.",
+    "Use only the information provided in this message. Do not ask follow-up questions.",
+    "Make reasonable assumptions if the task is underspecified, and directly call generate_task_plan_graph.",
+    "The plan should be concise but actionable: 3-7 nodes for normal tasks, with clear dependencies.",
+    "Prefer automatic execution nodes when no human approval/input is truly required.",
+    "",
+    "Task to plan",
+  ];
 
   if (typeof task.title === "string" && task.title.trim()) {
     parts.push(`Title: ${task.title.trim()}`);
@@ -99,30 +125,138 @@ function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unk
     parts.push(`Estimated duration: ${estimatedDuration} minutes`);
   }
 
+  parts.push(
+    "",
+    "Output requirements",
+    "- Call generate_task_plan_graph exactly once.",
+    "- Include summary, nodes, and edges as top-level fields.",
+    "- Each node should include id, type, title, objective, and estimatedMinutes when possible.",
+    "- Each edge should include id, fromNodeId, toNodeId, and type; use edges: [] only if there is a single independent node.",
+    "- Do not return prose instead of the tool call.",
+  );
+
   return parts.join("\n");
 }
 
-function normalizeOpenResponsesSessionKey(value: string | undefined): string {
+function normalizeSessionSegment(value: string | undefined, fallback: string): string {
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
+function timestampSessionSegment(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join("");
+}
+
+function buildReadableSessionId(route: RouteKind, request: BridgeRequest): string {
+  if (route.kind === "feature") {
+    const featureRequest = request as BridgeFeatureRequest<Record<string, unknown>>;
+    const input = featureRequest.input ?? {};
+    const task =
+      input.task && typeof input.task === "object" && !Array.isArray(input.task)
+        ? (input.task as Record<string, unknown>)
+        : input;
+    const taskId = typeof task.taskId === "string" ? task.taskId : undefined;
+    const title = typeof task.title === "string" ? task.title : undefined;
+    return `${normalizeSessionSegment(route.feature, "feature")}-${normalizeSessionSegment(taskId ?? title, "adhoc")}-${timestampSessionSegment()}`;
+  }
+
+  const execution = request as BridgeExecutionTaskRequest;
+  return `execution-${normalizeSessionSegment(execution.taskId ?? execution.taskTitle, "adhoc")}-${timestampSessionSegment()}`;
+}
+
+function resolveSessionId(route: RouteKind, request: BridgeRequest): string {
+  return request.sessionId?.trim() || buildReadableSessionId(route, request);
+}
+
+function normalizeOpenResponsesSessionKey(
+  value: string | undefined,
+  fallbackSessionId: string,
+): string {
   const trimmed = value?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : crypto.randomUUID();
+  return trimmed && trimmed.length > 0 ? trimmed : fallbackSessionId;
 }
 
 function resolveOpenResponsesTurnState(
   request: BridgeRequest,
   fallbackSessionId: string,
 ): OpenResponsesTurnState {
-  const requestRecord = request as Record<string, unknown>;
+  const requestRecord = request as unknown as Record<string, unknown>;
   const requestedSessionKey =
     typeof requestRecord.sessionKey === "string"
       ? requestRecord.sessionKey
       : undefined;
   const sessionKey = normalizeOpenResponsesSessionKey(
-    requestedSessionKey ?? request.sessionId ?? fallbackSessionId,
+    requestedSessionKey ?? request.sessionId,
+    fallbackSessionId,
   );
   return {
     sessionKey,
     previousResponseId: sessionPreviousResponseMap.get(sessionKey),
+    pendingToolOutputs: sessionPendingToolOutputMap.get(sessionKey) ?? [],
   };
+}
+
+function buildToolAcknowledgementOutput(
+  route: RouteKind,
+  toolCall: { tool: string; input: Record<string, unknown> },
+): string {
+  if (route.kind === "feature" && route.feature === "generate_plan") {
+    const nodes = Array.isArray(toolCall.input.nodes) ? toolCall.input.nodes.length : 0;
+    const edges = Array.isArray(toolCall.input.edges) ? toolCall.input.edges.length : 0;
+    return JSON.stringify({
+      ok: true,
+      message: "Chrona accepted the generated task plan graph.",
+      tool: toolCall.tool,
+      nodes,
+      edges,
+    });
+  }
+
+  return JSON.stringify({
+    ok: true,
+    message: "Chrona accepted the structured tool result.",
+    tool: toolCall.tool,
+  });
+}
+
+function buildToolOutputItems(
+  route: RouteKind,
+  toolCalls: Array<{ callId: string; tool: string; input: Record<string, unknown> }>,
+): Array<{ type: "function_call_output"; call_id: string; output: string }> {
+  return toolCalls.map((toolCall) => ({
+    type: "function_call_output" as const,
+    call_id: toolCall.callId,
+    output: buildToolAcknowledgementOutput(route, toolCall),
+  }));
+}
+
+function shouldAcknowledgeFeatureToolCalls(
+  route: RouteKind,
+  toolCalls: Array<{ callId: string; tool: string }>,
+  toolCallOutputs: Array<{ callId: string }>,
+): boolean {
+  if (route.kind !== "feature") return false;
+  const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
+  if (!requiredTool) return false;
+  if (toolCalls.length === 0) return false;
+  if (!toolCalls.some((toolCall) => toolCall.tool === requiredTool)) return false;
+  const acknowledged = new Set(toolCallOutputs.map((output) => output.callId));
+  return toolCalls.some((toolCall) => !acknowledged.has(toolCall.callId));
 }
 
 function stringifyExecutionInput(
@@ -158,7 +292,7 @@ export function buildGatewayBody(
   sessionId: string,
   environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
 ): Record<string, unknown> {
-  const { sessionKey, previousResponseId } = resolveOpenResponsesTurnState(
+  const { sessionKey, previousResponseId, pendingToolOutputs } = resolveOpenResponsesTurnState(
     request,
     sessionId,
   );
@@ -168,11 +302,15 @@ export function buildGatewayBody(
       Record<string, unknown>
     >;
     const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
+    const featureInstructions =
+      featureRequest.instructions?.trim() || defaultFeatureInstructions(route.feature);
     const body: Record<string, unknown> = {
       model: "openclaw",
       user: sessionKey,
-      instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions(route.feature)}`,
-      input: stringifyFeatureInput(route.feature, featureRequest.input),
+      instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions}`,
+      input: pendingToolOutputs.length > 0
+        ? [...pendingToolOutputs, stringifyFeatureInput(route.feature, featureRequest.input)]
+        : stringifyFeatureInput(route.feature, featureRequest.input),
       stream: route.stream,
     };
 
@@ -184,9 +322,11 @@ export function buildGatewayBody(
       body.tools = [
         {
           type: "function",
-          name: requiredTool,
-          description: `Chrona structured feature tool: ${requiredTool}`,
-          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          function: {
+            name: requiredTool,
+            description: toolDescription(requiredTool),
+            parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          },
         },
       ];
 
@@ -202,7 +342,9 @@ export function buildGatewayBody(
   const execution = request as BridgeExecutionTaskRequest;
   const body: Record<string, unknown> = {
     model: "openclaw",
-    input: stringifyExecutionInput(execution),
+    input: pendingToolOutputs.length > 0
+      ? [...pendingToolOutputs, stringifyExecutionInput(execution)]
+      : stringifyExecutionInput(execution),
     stream: route.stream,
     max_output_tokens:
       typeof execution.runtimeInput?.maxTokens === "number"
@@ -291,8 +433,8 @@ export async function executeGatewayRequest(
   logger: BridgeLogger,
   environment: BridgeEnvironment = DEFAULT_BRIDGE_ENVIRONMENT,
 ): Promise<ExecutionResult> {
-  const sessionId = request.sessionId ?? crypto.randomUUID();
-  const { sessionKey } = resolveOpenResponsesTurnState(request, sessionId);
+  const sessionId = resolveSessionId(route, request);
+  const { sessionKey, pendingToolOutputs } = resolveOpenResponsesTurnState(request, sessionId);
   const startedAt = Date.now();
   const body = buildGatewayBody(route, request, sessionId, environment);
 
@@ -316,15 +458,15 @@ export async function executeGatewayRequest(
     body,
   });
 
-  const response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
+  let response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
-  const responseClone = response.clone();
-  const responseText = await responseClone.text().catch(() => "");
+  let responseClone = response.clone();
+  let responseText = await responseClone.text().catch(() => "");
   let responseJsonPreview: unknown = null;
   try {
     responseJsonPreview = responseText ? JSON.parse(responseText) : null;
@@ -378,6 +520,12 @@ export async function executeGatewayRequest(
     if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
     const { toolCalls, toolCallOutputs } = parseFunctionItems(gateway);
+    if (pendingToolOutputs.length > 0) {
+      sessionPendingToolOutputMap.delete(sessionKey);
+    }
+    if (responseId && shouldAcknowledgeFeatureToolCalls(route, toolCalls, toolCallOutputs)) {
+      sessionPendingToolOutputMap.set(sessionKey, buildToolOutputItems(route, toolCalls));
+    }
     const outputText = extractOutputText(gateway);
 
     let feature = null;
@@ -498,6 +646,12 @@ export async function executeGatewayRequest(
 
   const { toolCalls, toolCallOutputs } =
     parseFunctionItems(finalGatewayResponse);
+  if (pendingToolOutputs.length > 0) {
+    sessionPendingToolOutputMap.delete(sessionKey);
+  }
+  if (responseId && shouldAcknowledgeFeatureToolCalls(route, toolCalls, toolCallOutputs)) {
+    sessionPendingToolOutputMap.set(sessionKey, buildToolOutputItems(route, toolCalls));
+  }
   const outputText = extractOutputText(finalGatewayResponse);
 
   let feature = null;
@@ -556,6 +710,7 @@ export async function executeGatewayRequest(
 
 export function resetBridgeSessions(): void {
   sessionPreviousResponseMap.clear();
+  sessionPendingToolOutputMap.clear();
 }
 
 export function executionErrorData(

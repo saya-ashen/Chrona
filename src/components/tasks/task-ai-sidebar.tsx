@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Bot, Sparkles, RotateCcw, Check } from "lucide-react";
+import { useState } from "react";
+import { Bot, Sparkles, RotateCcw, Check, Loader2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
@@ -204,6 +204,8 @@ function TaskCockpitGraphSection({ plan }: { plan: SavedTaskAiPlanSummary | null
   );
 }
 
+type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
+
 type TaskAiSidebarTask = {
   id: string;
   workspaceId: string;
@@ -221,6 +223,7 @@ type TaskAiSidebarTask = {
   runnabilityState?: string;
   ownerType?: string;
   savedAiPlan?: SavedTaskAiPlanSummary | null;
+  aiPlanGenerationStatus?: TaskPlanGenerationStatus;
 };
 
 type TaskAiSidebarProps = {
@@ -243,10 +246,10 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
   const [isAccepting, setIsAccepting] = useState(false);
 
   const accepted = activePlan?.status === "accepted";
-  const initialAutoRequest = useMemo(
-    () => activePlan === null || forceRefresh,
-    [activePlan, forceRefresh],
-  );
+  const planGenerationStatus = task.aiPlanGenerationStatus
+    ?? (accepted ? "accepted" : activePlan ? "waiting_acceptance" : "idle");
+  const isGenerationInProgress = planGenerationStatus === "generating";
+  const shouldShowPlanningPanel = forceRefresh || (!activePlan && !isGenerationInProgress);
 
   async function handleApplyDecomposition(result: TaskPlanGraphResponse) {
     setFeedback(null);
@@ -403,9 +406,19 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
             ) : null}
           </div>
 
-          {activePlan && !forceRefresh ? (
+          {isGenerationInProgress ? (
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
+              <div className="flex items-center gap-2 font-medium">
+                <Loader2 className="size-4 animate-spin" />
+                Task plan is being generated
+              </div>
+              <p className="mt-2 text-xs text-primary/75">
+                Chrona is creating the plan in the background. This panel will show the draft once generation completes.
+              </p>
+            </div>
+          ) : activePlan && !forceRefresh ? (
             <CompactPlanSummary plan={activePlan} />
-          ) : (
+          ) : shouldShowPlanningPanel ? (
             <TaskDecompositionPanel
               key={`${refreshToken}:${forceRefresh ? "fresh" : activePlan?.id ?? "none"}`}
               taskId={task.id}
@@ -413,13 +426,13 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
               description={task.description}
               priority={task.priority}
               dueAt={task.dueAt ? new Date(task.dueAt) : null}
-              autoRequest={initialAutoRequest}
+              autoRequest={forceRefresh}
               planningPrompt={planningPrompt}
               forceRefresh={forceRefresh}
               onApply={handleApplyDecomposition}
               onPlanLoaded={handlePlanLoaded}
             />
-          )}
+          ) : null}
 
           {feedback ? (
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

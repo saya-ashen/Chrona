@@ -6,7 +6,7 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
-import { validateScheduleWindow } from "@/modules/tasks/validate-schedule-window";
+import { validateScheduleWindow } from "@chrona/domain";
 
 function normalizeOptionalTextField(value: string | null | undefined, field: string) {
   if (value === undefined) {

@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { useAppPathname } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ type ControlPlaneShellProps = {
 
 export function ControlPlaneShell({ children }: ControlPlaneShellProps) {
   const { t } = useI18n();
-  const pathname = usePathname() ?? "/schedule";
+  const pathname = useAppPathname() ?? "/schedule";
 
   return (
     <div className="flex h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_26%),linear-gradient(180deg,rgba(15,23,42,0.02),transparent_18%)] bg-background text-foreground">

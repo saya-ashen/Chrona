@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { applySchedule, clearSchedule } from "@/app/actions/task-actions";
+import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName } from "@/components/ui/field";
 import { useI18n } from "@/i18n/client";

@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 import {
   acceptTaskResult,
   approveApproval,
@@ -20,7 +19,8 @@ import {
   retryRun,
   sendOperatorMessage,
   startRun,
-} from "@/app/actions/task-actions";
+} from "@/lib/task-actions-client";
+import { useAppRouter } from "@/lib/router";
 import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
 import { parseDateInputForSubmission } from "./work-page-formatters";
 
@@ -44,7 +44,7 @@ export function useWorkPageController(
     ...initialData,
     composerValue: initialData.composerValue ?? "",
   };
-  const router = useRouter();
+  const router = useAppRouter();
 
   const [data, setData] = useState<WorkPageData>(normalizedInitialData);
   const [heroErrorMessage, setHeroErrorMessage] = useState<string | null>(null);
@@ -141,7 +141,9 @@ export function useWorkPageController(
     }
 
     const intervalMs = Number(
-      process.env.NEXT_PUBLIC_WORK_POLL_INTERVAL_MS ?? 10000,
+      process.env.VITE_WORK_POLL_INTERVAL_MS ??
+        process.env.NEXT_PUBLIC_WORK_POLL_INTERVAL_MS ??
+        10000,
     );
 
     const interval = window.setInterval(() => {
@@ -179,6 +181,7 @@ export function useWorkPageController(
 
         if (currentRun.status === "WaitingForInput") {
           await provideInput({
+            taskId: data.taskShell.id,
             runId: currentRun.id,
             inputText,
           });
@@ -190,6 +193,7 @@ export function useWorkPageController(
           currentRun.status === "WaitingForApproval"
         ) {
           await sendOperatorMessage({
+            taskId: data.taskShell.id,
             runId: currentRun.id,
             message: inputText,
           });

@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { AdvancedSettingsPanel } from "@/components/settings/advanced-settings-panel";
 import { useI18n } from "@/i18n/client";
+import { useAppRouter } from "@/lib/router";
 
 type WorkspaceSummary = {
   id: string;
@@ -22,7 +22,7 @@ type AdvancedSettingsDialogProps = {
 
 export function AdvancedSettingsDialog({ isOpen, closeHref, workspaces }: AdvancedSettingsDialogProps) {
   const { t } = useI18n();
-  const router = useRouter();
+  const router = useAppRouter();
 
   useEffect(() => {
     if (!isOpen) return;

@@ -90,7 +90,9 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
         "features/analyze-conflicts",
         "features/suggest-timeslot",
         "features/chat",
+        "features/dispatch-task",
         "execution/task",
+        "execution/task/stream",
       ],
     };
   }
@@ -140,7 +142,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     feature: BridgeFeature;
     prompt: string;
     runtimeSessionKey?: string;
-    systemPrompt?: string;
+    instructions?: string;
     timeoutSeconds?: number;
   }): Promise<OpenClawStructuredRunResult<T>> {
     const sessionKey = input.runtimeSessionKey ?? crypto.randomUUID();
@@ -151,8 +153,8 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       sessionKey,
       input: {
         prompt: input.prompt,
-        ...(input.systemPrompt ? { systemPrompt: input.systemPrompt } : {}),
       },
+      ...(input.instructions ? { instructions: input.instructions } : {}),
       timeout: input.timeoutSeconds ?? this.timeoutSeconds,
     };
     const response = await this.postJson<BridgeResponse>(

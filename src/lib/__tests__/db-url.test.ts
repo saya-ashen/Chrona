@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveSqliteAdapterUrl } from "@/lib/db-url";
+import { resolveSqliteAdapterUrl } from "@chrona/db/sqlite-url";
 
 describe("resolveSqliteAdapterUrl", () => {
   it("keeps file URLs for the Bun adapter", () => {

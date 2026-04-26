@@ -1,6 +1,6 @@
 # OpenClaw Bridge Server API
 
-位置：`packages/providers/openclaw/bridge/src/server.ts`
+位置：`packages/providers/openclaw/bridge/src/index.ts`
 
 这个 bridge server 是运行在本机的 Bun HTTP 服务，用来包装 `openclaw agent --local --json`。它现在提供按语义拆分的 RESTful API：feature endpoint 负责明确业务能力，execution endpoint 负责通用任务执行。
 
@@ -17,7 +17,7 @@
 在仓库根目录执行：
 
 ```bash
-bun packages/providers/openclaw/bridge/src/server.ts
+bun packages/providers/openclaw/bridge/src/index.ts
 ```
 
 ## 总览

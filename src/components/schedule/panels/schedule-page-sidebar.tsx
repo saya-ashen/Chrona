@@ -1,14 +1,8 @@
-import {
-  ScheduleMiniCalendar,
-} from "@/components/schedule/schedule-mini-calendar";
+import { ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
 import { ScheduleActionRail } from "@/components/schedule/schedule-action-rail";
 import { ScheduleAutomationPanel } from "@/components/schedule/panels/schedule-automation-panel";
-import {
-  EmptyState,
-  QueueCard,
-} from "@/components/schedule/schedule-page-panels";
+import { QueueCard } from "@/components/schedule/schedule-page-panels";
 import type {
-  QuickCreateDraft,
   SchedulePageData,
   SecondaryPlanningView,
   UnscheduledItem,
@@ -19,6 +13,7 @@ import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy"
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import { EmptyState } from "./schedule-panel-primitives";
 
 /**
  * Schedule page sidebar — now split into two parts:
@@ -103,7 +98,9 @@ export function ScheduleRightSidebar({
   onRunAutomationCandidate: (taskId: string) => Promise<void>;
 }) {
   const recordsByTaskId = new Map(
-    [...viewData.listItems, ...viewData.scheduled, ...viewData.unscheduled].map((item) => [item.taskId, item]),
+    [...viewData.listItems, ...viewData.scheduled, ...viewData.unscheduled].map(
+      (item) => [item.taskId, item],
+    ),
   );
 
   return (
@@ -120,82 +117,95 @@ export function ScheduleRightSidebar({
             label: copy.unscheduledQueue,
             title: copy.unscheduledQueue,
             description: copy.unscheduledQueueDescription,
-            body: viewData.unscheduled.length === 0 ? (
-              <EmptyState>{copy.noUnscheduledWork}</EmptyState>
-            ) : (
-              <div className="space-y-2">
-                {viewData.unscheduled.map((item) => (
-                  <QueueCard
-                    key={item.taskId}
-                    item={item}
-                    runtimeAdapters={data.runtimeAdapters}
-                    defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
-                    isPending={isPending}
-                    isDragging={
-                      draggedTask?.kind === "queue" &&
-                      draggedTask.taskId === item.taskId
-                    }
-                    isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                    onToggle={() => toggleQueueCard(item.taskId)}
-                    onMutatedAction={refreshProjection}
-                    onSaveTaskConfigAction={handleTaskConfigSave}
-                    onDragStart={handleQueueDragStart}
-                    onDragEnd={handleQueueDragEnd}
-                  />
-                ))}
-              </div>
-            ),
+            body:
+              viewData.unscheduled.length === 0 ? (
+                <EmptyState>{copy.noUnscheduledWork}</EmptyState>
+              ) : (
+                <div className="space-y-2">
+                  {viewData.unscheduled.map((item) => (
+                    <QueueCard
+                      key={item.taskId}
+                      item={item}
+                      runtimeAdapters={data.runtimeAdapters}
+                      defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                      isPending={isPending}
+                      isDragging={
+                        draggedTask?.kind === "queue" &&
+                        draggedTask.taskId === item.taskId
+                      }
+                      isExpanded={expandedQueueTaskIds.includes(item.taskId)}
+                      onToggle={() => toggleQueueCard(item.taskId)}
+                      onMutatedAction={refreshProjection}
+                      onSaveTaskConfigAction={handleTaskConfigSave}
+                      onDragStart={handleQueueDragStart}
+                      onDragEnd={handleQueueDragEnd}
+                    />
+                  ))}
+                </div>
+              ),
           },
           {
             value: "risks",
             label: copy.risksMetric,
             title: copy.conflictsTitle,
             description: copy.noScheduleRisks,
-            body: viewData.risks.length === 0 ? (
-              <EmptyState>{copy.noScheduleRisks}</EmptyState>
-            ) : (
-              <div className="space-y-2">
-                {viewData.risks.map((item) => (
-                  <div key={item.taskId} className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm">
-                    {item.title}
-                  </div>
-                ))}
-              </div>
-            ),
+            body:
+              viewData.risks.length === 0 ? (
+                <EmptyState>{copy.noScheduleRisks}</EmptyState>
+              ) : (
+                <div className="space-y-2">
+                  {viewData.risks.map((item) => (
+                    <div
+                      key={item.taskId}
+                      className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm"
+                    >
+                      {item.title}
+                    </div>
+                  ))}
+                </div>
+              ),
           },
           {
             value: "proposals",
             label: copy.aiProposalsTitle,
             title: copy.aiProposalsTitle,
             description: copy.noAiProposals,
-            body: viewData.proposals.length === 0 ? (
-              <EmptyState>{copy.noAiProposals}</EmptyState>
-            ) : (
-              <div className="space-y-2">
-                {viewData.proposals.map((proposal) => (
-                  <div key={proposal.proposalId} className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm">
-                    {proposal.title}
-                  </div>
-                ))}
-              </div>
-            ),
+            body:
+              viewData.proposals.length === 0 ? (
+                <EmptyState>{copy.noAiProposals}</EmptyState>
+              ) : (
+                <div className="space-y-2">
+                  {viewData.proposals.map((proposal) => (
+                    <div
+                      key={proposal.proposalId}
+                      className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm"
+                    >
+                      {proposal.title}
+                    </div>
+                  ))}
+                </div>
+              ),
           },
           {
             value: "conflicts",
             label: copy.conflictDetectionTitle,
             title: copy.conflictDetectionTitle,
             description: copy.conflictDetectionEmpty,
-            body: viewData.conflicts.length === 0 ? (
-              <EmptyState>{copy.conflictDetectionEmpty}</EmptyState>
-            ) : (
-              <div className="space-y-2">
-                {viewData.conflicts.map((conflict) => (
-                  <div key={conflict.id} className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm">
-                    {conflict.description}
-                  </div>
-                ))}
-              </div>
-            ),
+            body:
+              viewData.conflicts.length === 0 ? (
+                <EmptyState>{copy.conflictDetectionEmpty}</EmptyState>
+              ) : (
+                <div className="space-y-2">
+                  {viewData.conflicts.map((conflict) => (
+                    <div
+                      key={conflict.id}
+                      className="rounded-2xl border border-border/60 bg-background/80 p-3 text-sm"
+                    >
+                      {conflict.description}
+                    </div>
+                  ))}
+                </div>
+              ),
           },
         ]}
       />

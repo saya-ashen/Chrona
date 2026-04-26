@@ -11,6 +11,7 @@ describe("OpenClaw session identity", () => {
 
     expect(identity.sessionKey).toBe("chrona:openclaw:task:task-001:default");
     expect(identity.sessionId).toStartWith("ai-generate_plan-");
+    expect(identity.sessionId).toMatch(/-\d{8}-\d{6}-[a-f0-9]{10}$/);
     expect(identity.sessionId.length).toBeLessThanOrEqual(100);
   });
 

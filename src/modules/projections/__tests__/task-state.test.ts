@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskState } from "@/modules/tasks/derive-task-state";
+import { deriveTaskState } from "@chrona/domain";
 
 describe("deriveTaskState", () => {
   it("marks the task blocked when the active run waits for approval", () => {

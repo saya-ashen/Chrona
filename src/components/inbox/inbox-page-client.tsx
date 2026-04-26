@@ -7,7 +7,7 @@ import {
   editAndApproveApproval,
   rejectApproval,
   rejectScheduleProposal,
-} from "@/app/actions/task-actions";
+} from "@/lib/task-actions-client";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { InboxList } from "@/components/inbox/inbox-list";
 

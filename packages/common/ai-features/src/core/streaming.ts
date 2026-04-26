@@ -27,6 +27,7 @@ import {
   normalizeSuggestResponse,
 } from "../features";
 import { buildFeatureInput, openclawCall } from "./providers";
+import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
@@ -130,6 +131,7 @@ export async function* openclawStream(
         sessionId,
         sessionKey,
         input: buildStreamingInput(feature, input),
+        instructions: SYSTEM_PROMPTS[feature],
         timeout,
       };
 

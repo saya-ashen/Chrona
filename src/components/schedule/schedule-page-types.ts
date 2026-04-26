@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+import type { TaskPlanGraph } from "@/modules/ai/types";
 
 export type SchedulePageSummary = {
   scheduledCount: number;
@@ -77,6 +78,18 @@ export type ScheduleRuntimeFields = {
   runnabilitySummary: string;
 };
 
+export type ScheduleTaskPlanSnapshot = {
+  id: string;
+  status: "draft" | "accepted" | "superseded" | "archived";
+  prompt: string | null;
+  revision?: number;
+  summary?: string | null;
+  updatedAt: string;
+  plan?: TaskPlanGraph;
+};
+
+export type ScheduleAiPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
+
 export type ScheduleRecord = {
   taskId: string;
   workspaceId: string;
@@ -97,6 +110,8 @@ export type ScheduleRecord = {
   latestRunStatus: string | null;
   scheduleProposalCount: number;
   lastActivityAt: Date | null;
+  savedAiPlan?: ScheduleTaskPlanSnapshot | null;
+  aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 } & ScheduleRuntimeFields;
 
 export type ScheduleProposal = {
@@ -162,6 +177,8 @@ export type ScheduleCardItem = {
   isRunnable?: boolean;
   runnabilityState?: string;
   runnabilitySummary?: string;
+  savedAiPlan?: ScheduleTaskPlanSnapshot | null;
+  aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 };
 
 export type ScheduledItem = SchedulePageData["scheduled"][number];

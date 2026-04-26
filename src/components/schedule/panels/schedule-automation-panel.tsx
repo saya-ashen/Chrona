@@ -1,6 +1,9 @@
-import type { ScheduleAutomationCandidate, SchedulePageData } from "@/components/schedule/schedule-page-types";
+import type {
+  ScheduleAutomationCandidate,
+  SchedulePageData,
+} from "@/components/schedule/schedule-page-types";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import { EmptyState } from "@/components/schedule/schedule-page-panels";
+import { EmptyState } from "./schedule-panel-primitives";
 
 type Props = {
   candidates: ScheduleAutomationCandidate[];
@@ -35,15 +38,21 @@ export function ScheduleAutomationPanel({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">{copy.automationBackendOnlyHint}</p>
+      <p className="text-xs text-muted-foreground">
+        {copy.automationBackendOnlyHint}
+      </p>
       {sortCandidates(candidates).map((candidate) => {
         const record = recordsByTaskId.get(candidate.taskId);
         const runtimeKey =
-          record?.runtimeAdapterKey
-          ?? (typeof (record?.runtimeInput as { adapterKey?: unknown } | undefined)?.adapterKey === "string"
-            ? String((record?.runtimeInput as { adapterKey?: unknown }).adapterKey)
+          record?.runtimeAdapterKey ??
+          (typeof (record?.runtimeInput as { adapterKey?: unknown } | undefined)
+            ?.adapterKey === "string"
+            ? String(
+                (record?.runtimeInput as { adapterKey?: unknown }).adapterKey,
+              )
             : null);
-        const canRun = candidate.kind === "auto_run" && runtimeKey === "openclaw";
+        const canRun =
+          candidate.kind === "auto_run" && runtimeKey === "openclaw";
 
         return (
           <div
@@ -55,7 +64,9 @@ export function ScheduleAutomationPanel({
                 <p className="truncate text-sm font-medium text-foreground">
                   {record?.title ?? candidate.taskId}
                 </p>
-                <p className="text-xs text-muted-foreground">{candidate.reason}</p>
+                <p className="text-xs text-muted-foreground">
+                  {candidate.reason}
+                </p>
               </div>
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 {candidate.priority}
@@ -64,11 +75,21 @@ export function ScheduleAutomationPanel({
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{candidate.kind}</span>
-              {record?.runtimeAdapterKey ? <span>· {record.runtimeAdapterKey}</span> : null}
-              {record?.runnabilitySummary ? <span>· {record.runnabilitySummary}</span> : null}
-              {candidate.executionMode ? <span>· {candidate.executionMode}</span> : null}
-              {candidate.sessionStrategy ? <span>· {candidate.sessionStrategy}</span> : null}
-              {candidate.readyNodeIds?.length ? <span>· {candidate.readyNodeIds.length} ready nodes</span> : null}
+              {record?.runtimeAdapterKey ? (
+                <span>· {record.runtimeAdapterKey}</span>
+              ) : null}
+              {record?.runnabilitySummary ? (
+                <span>· {record.runnabilitySummary}</span>
+              ) : null}
+              {candidate.executionMode ? (
+                <span>· {candidate.executionMode}</span>
+              ) : null}
+              {candidate.sessionStrategy ? (
+                <span>· {candidate.sessionStrategy}</span>
+              ) : null}
+              {candidate.readyNodeIds?.length ? (
+                <span>· {candidate.readyNodeIds.length} ready nodes</span>
+              ) : null}
             </div>
 
             {candidate.kind === "auto_run" ? (
@@ -78,7 +99,9 @@ export function ScheduleAutomationPanel({
                   className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void onRunCandidate(candidate.taskId)}
                   disabled={!canRun || isPending}
-                  title={!canRun ? copy.automationUnsupportedRuntime : undefined}
+                  title={
+                    !canRun ? copy.automationUnsupportedRuntime : undefined
+                  }
                 >
                   {copy.automationRunNow}
                 </button>

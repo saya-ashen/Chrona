@@ -80,6 +80,8 @@ type TaskPageProps = {
           }>;
         };
       } | null;
+      aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
+      aiPlanGenerationError?: string | null;
       blockReason: {
         blockType?: string;
         actionRequired?: string;
@@ -467,6 +469,7 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
             runnabilityState: data.task.runnabilityState,
             ownerType: data.task.ownerType,
             savedAiPlan: data.task.savedAiPlan ?? null,
+            aiPlanGenerationStatus: data.task.aiPlanGenerationStatus,
           }}
         />
 

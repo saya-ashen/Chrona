@@ -21,16 +21,19 @@ bun run dev
 
 ## Project Architecture
 
-Chrona uses a CQRS/Event Sourcing architecture:
+Chrona is in an incremental monorepo-layering migration. Current canonical direction:
 
-- **`src/modules/commands/`** — Write operations that produce domain events
-- **`src/modules/queries/`** — Read operations from projections
-- **`src/modules/projections/`** — Event-to-read-model projections
-- **`src/modules/events/`** — Domain event recording
-- **`src/modules/runtime/`** — AI runtime adapter abstraction
+- **`apps/web/`** — Vite React SPA entry (React Router, loaders, browser shell)
+- **`apps/server/`** — independent local Hono API server and static SPA host
 - **`src/components/`** — React UI components
-- **`src/app/api/`** — Next.js API routes
-- **`src/app/[lang]/`** — i18n page routes
+- **`src/i18n/`** — locale config and message bundles
+- **`packages/domain/`** — pure domain rules and derivations
+- **`packages/contracts/`** — shared DTOs, schemas, contracts
+- **`packages/db/`** — database bootstrap and future repositories
+- **`packages/runtime/`** — provider-agnostic runtime surface
+- **`packages/runtime-openclaw/`** — OpenClaw-specific runtime surface
+- **`src/modules/commands/` / `queries/` / `projections/`** — current application/service layer reused by the local server
+- **`packages/providers/openclaw/**`** — provider bridge/integration implementation
 
 ## Code Style
 
@@ -42,13 +45,24 @@ Chrona uses a CQRS/Event Sourcing architecture:
 
 ## Making Changes
 
+Before any AI-assisted edit, record this header in the task/report:
+
+- Layer:
+- Files to change:
+- Boundary check:
+- Expected behavior:
+- Tests to run:
+
+AI contributors must not cross layers without a concrete reason. Prefer moving files, adding facades, and fixing imports over rewriting behavior.
+
 1. **Create a branch** from `main`
 2. **Write tests** for new features (Vitest for unit, Playwright for E2E)
 3. **Run checks** before committing:
    ```bash
-   bun run lint          # ESLint
-   bun run test          # Unit tests
-   npx tsc --noEmit      # Type check
+   bun run lint               # ESLint
+   bun run test               # Unit tests
+   bunx tsc --noEmit          # Type check
+   bun run check:boundaries   # dependency-cruiser import boundaries
    ```
 4. **Commit** with conventional commit messages:
    - `feat:` — New feature
@@ -63,10 +77,10 @@ Chrona uses a CQRS/Event Sourcing architecture:
 1. Create command handlers in `src/modules/commands/`
 2. Create query handlers in `src/modules/queries/`
 3. Create projections in `src/modules/projections/`
-4. Create API routes in `src/app/api/`
+4. Add or extend Hono routes in `apps/server/src/routes/api.ts`
 5. Create UI components in `src/components/<module>/`
 6. Add i18n keys to both `en.json` and `zh.json`
-7. Add page routes in `src/app/[lang]/<module>/`
+7. Add/update SPA routes in `apps/web/src/router.tsx` and page bindings in `apps/web/src/pages.tsx`
 
 ## Adding a Runtime Adapter
 

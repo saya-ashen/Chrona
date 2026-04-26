@@ -79,6 +79,9 @@ function buildPlanResponse(input: {
 
 export async function generateTaskPlanForTask(input: {
   taskId: string;
+  title?: string;
+  description?: string | null;
+  estimatedMinutes?: number;
   planningPrompt?: string | null;
   forceRefresh?: boolean;
   signal?: AbortSignal;
@@ -117,20 +120,24 @@ export async function generateTaskPlanForTask(input: {
     throw new DOMException("Task plan generation aborted", "AbortError");
   }
 
-  const estimatedMinutes = task.scheduledStartAt && task.scheduledEndAt
-    ? Math.round((task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000)
-    : undefined;
+  const estimatedMinutes = typeof input.estimatedMinutes === "number"
+    ? input.estimatedMinutes
+    : task.scheduledStartAt && task.scheduledEndAt
+      ? Math.round((task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000)
+      : undefined;
+  const title = input.title?.trim() || task.title;
+  const description = input.description ?? task.description ?? undefined;
 
   logger.info("request.start", {
     taskId: task.id,
-    title: summarizeText(task.title),
+    title: summarizeText(title),
     forceRefresh: Boolean(input.forceRefresh),
   });
 
   const planResult = await aiGeneratePlan({
     taskId: task.id,
-    title: task.title,
-    description: task.description ?? undefined,
+    title,
+    description,
     estimatedMinutes,
     sessionKey: sharedTaskSessionKey,
     signal: input.signal,

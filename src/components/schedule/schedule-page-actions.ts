@@ -1,10 +1,8 @@
 import {
-  acceptScheduleProposal,
   applySchedule,
   createTaskFromSchedule,
-  rejectScheduleProposal,
   updateTaskConfigFromSchedule,
-} from "@/app/actions/task-actions";
+} from "@/lib/task-actions-client";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   type SchedulePageCopy,

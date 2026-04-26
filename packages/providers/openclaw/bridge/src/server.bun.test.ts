@@ -108,6 +108,7 @@ describe("openclaw bridge gateway helpers", () => {
       route: "features.suggest",
       sessionId: "sess-1",
       timeout: 123,
+      instructionsChars: 0,
       input: { keys: ["title", "workspaceId"] },
     });
   });
@@ -136,24 +137,64 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.user).toBe("tenant-a:plan-1");
     expect(String(body.instructions)).toContain("You are Chrona's task planning assistant");
     expect(String(body.instructions)).toContain("generate_task_plan_graph");
+    expect(String(body.instructions)).toContain("Do not ask follow-up questions");
+    expect(String(body.instructions)).toContain("Call generate_task_plan_graph exactly once");
+    expect(String(body.input)).toContain("Create an execution-ready plan graph for the task below.");
+    expect(String(body.input)).toContain("Use only the information provided");
+    expect(String(body.input)).toContain("Make reasonable assumptions");
     expect(String(body.input)).toContain("Task to plan");
     expect(String(body.input)).toContain("Title: Plan thesis defense slides");
     expect(String(body.input)).toContain("Description: Prepare a concise deck for the final defense");
     expect(String(body.input)).toContain("Estimated duration: 180 minutes");
+    expect(String(body.input)).toContain("Output requirements");
+    expect(String(body.input)).toContain("nodes");
+    expect(String(body.input)).toContain("edges");
     expect(String(body.input)).not.toContain("taskId");
     expect(String(body.input)).not.toContain("sessionKey");
     expect(body.tools).toEqual([
       {
         type: "function",
-        name: "generate_task_plan_graph",
-        description: "Chrona structured feature tool: generate_task_plan_graph",
-        parameters: expect.any(Object),
+        function: {
+          name: "generate_task_plan_graph",
+          description: expect.stringContaining("Create and persist the Chrona task plan graph"),
+          parameters: expect.any(Object),
+        },
       },
     ]);
+    const tool = (body.tools as Array<{ function: { parameters: Record<string, unknown> } }>)[0];
+    const parameters = tool.function.parameters as {
+      required?: string[];
+      properties?: Record<string, { required?: string[]; items?: { required?: string[] } }>;
+    };
+    expect(parameters.required).toEqual(expect.arrayContaining(["summary", "nodes", "edges"]));
+    expect(parameters.properties?.nodes?.items?.required).toEqual(
+      expect.arrayContaining(["id", "type", "title", "objective"]),
+    );
+    expect(parameters.properties?.edges?.items?.required).toEqual(
+      expect.arrayContaining(["id", "fromNodeId", "toNodeId", "type"]),
+    );
     expect(body.tool_choice).toEqual({
       type: "function",
       function: { name: "generate_task_plan_graph" },
     });
+  });
+
+  it("prefers explicit feature instructions when provided", () => {
+    const body = buildGatewayBody(
+      { kind: "feature", feature: "suggest", stream: false },
+      {
+        sessionId: "sess-suggest",
+        sessionKey: "tenant-a:suggest-1",
+        instructions: "Use domain-specific suggestion guidance.",
+        input: { input: "draft agenda" },
+      },
+      "sess-suggest",
+    );
+
+    expect(String(body.instructions)).toContain("Use domain-specific suggestion guidance.");
+    expect(String(body.instructions)).not.toContain(
+      "Return suggestions only via function call suggest_task_completions.",
+    );
   });
 
   it("builds execution body using openresponses session/model semantics", () => {
@@ -182,6 +223,46 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.max_output_tokens).toBe(777);
     expect(String(body.input)).toContain("Task title: Run task");
     expect(String(body.input)).toContain('"model": "gpt-5"');
+  });
+
+  it("builds readable default session ids when no session is provided", async () => {
+    const port = 18668;
+    const requestBodies: Array<Record<string, unknown>> = [];
+    const entries: BridgeLogEntry[] = [];
+
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
+        requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+        return Response.json({
+          id: "resp-default-session",
+          status: "completed",
+          output: [{ type: "message", content: [{ type: "output_text", text: "done" }] }],
+        });
+      }
+      return realFetch(input, init);
+    }) as typeof fetch;
+
+    const server = startBridgeServer({
+      port,
+      logger: createBridgeLogger({ minLevel: "info", sink: (entry) => entries.push(entry) }),
+    });
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/v1/execution/task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-42", taskTitle: "Draft release notes", instructions: "Run task" }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(String(body.sessionId)).toMatch(/^execution-task-42-\d{8}-\d{6}$/);
+      expect(requestBodies[0]?.user).toBe(body.sessionId);
+      const startEntry = entries.find((entry) => entry.event === "bridge.request.start");
+      expect(String(startEntry?.data?.sessionId)).toBe(body.sessionId);
+    } finally {
+      server.stop(true);
+    }
   });
 
   it("adds openclaw headers for model, message channel, and explicit session key", () => {
@@ -455,6 +536,99 @@ describe("openclaw bridge gateway endpoints", () => {
         toolName: "generate_task_plan_graph",
       });
       expect(body.usage).toEqual({ inputTokens: 10, outputTokens: 20, totalTokens: 30 });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  it("defers function_call_output acknowledgement until the same session is used again", async () => {
+    const port = 18671;
+    const requestBodies: Array<Record<string, unknown>> = [];
+
+    globalThis.fetch = (async (input, init) => {
+      const url = getRequestUrl(input);
+      if (url.includes("/v1/responses")) {
+        const req = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        requestBodies.push(req);
+        if (requestBodies.length === 1) {
+          return Response.json({
+            id: "resp-plan-tool-call",
+            status: "requires_action",
+            output: [
+              {
+                type: "function_call",
+                call_id: "call-plan-1",
+                name: "generate_task_plan_graph",
+                arguments: JSON.stringify({
+                  summary: "Plan created",
+                  nodes: [{ id: "n1", type: "step", title: "Clarify investment goal", objective: "Define target university investment project" }],
+                  edges: [],
+                }),
+              },
+            ],
+          });
+        }
+        return Response.json({
+          id: "resp-plan-finished",
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              content: [{ type: "output_text", text: "Next task turn finished." }],
+            },
+          ],
+        });
+      }
+      return realFetch(input, init);
+    }) as typeof fetch;
+
+    const server = startBridgeServer({
+      port,
+      logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
+    });
+
+    try {
+      const payload = {
+        sessionKey: "task:task-1",
+        input: { taskId: "task-1", title: "Plan task" },
+      };
+      const first = await fetch(`http://127.0.0.1:${port}/v1/features/generate-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      expect(first.status).toBe(200);
+      const firstBody = await first.json();
+      expect(firstBody.feature.payload.summary).toBe("Plan created");
+      expect(firstBody.toolCallOutputs).toEqual([]);
+      expect(requestBodies).toHaveLength(1);
+
+      const second = await fetch(`http://127.0.0.1:${port}/v1/features/generate-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      expect(second.status).toBe(422);
+      expect(requestBodies).toHaveLength(2);
+      expect(requestBodies[1].previous_response_id).toBe("resp-plan-tool-call");
+      expect(requestBodies[1].input).toEqual([
+        {
+          type: "function_call_output",
+          call_id: "call-plan-1",
+          output: expect.stringContaining("Chrona accepted the generated task plan graph"),
+        },
+        expect.stringContaining("Create an execution-ready plan graph"),
+      ]);
+
+      const third = await fetch(`http://127.0.0.1:${port}/v1/features/generate-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      expect(third.status).toBe(422);
+      expect(requestBodies).toHaveLength(3);
+      expect(Array.isArray(requestBodies[2].input)).toBeFalse();
+      expect(String(requestBodies[2].input)).toContain("Create an execution-ready plan graph");
     } finally {
       server.stop(true);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import {
   Scissors,
@@ -29,6 +30,16 @@ export interface TaskDecompositionPanelProps {
   autoRequest?: boolean;
   planningPrompt?: string;
   forceRefresh?: boolean;
+  savedPlan?: {
+    id: string;
+    status: "draft" | "accepted" | "superseded" | "archived";
+    prompt: string | null;
+    revision?: number;
+    summary?: string | null;
+    updatedAt: string;
+    plan?: TaskPlanGraphData;
+  } | null;
+  generationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
   onApply?: (result: TaskPlanGraphResponse) => Promise<void> | void;
   onPlanLoaded?: (savedPlan: {
     id: string;
@@ -88,6 +99,8 @@ export function TaskDecompositionPanel({
   autoRequest = false,
   planningPrompt,
   forceRefresh,
+  savedPlan = null,
+  generationStatus = "idle",
   onApply,
   onPlanLoaded,
   activeAcceptedPlanId = null,
@@ -144,7 +157,7 @@ export function TaskDecompositionPanel({
     toolResults,
   } = useSmartDecomposition(planInput);
 
-  const savedPlanMeta = useMemo(() => {
+  const hookSavedPlanMeta = useMemo(() => {
     if (!result?.savedPlan) {
       return null;
     }
@@ -154,10 +167,26 @@ export function TaskDecompositionPanel({
       plan: result.planGraph,
     };
   }, [result]);
+  const savedPlanMeta = hookSavedPlanMeta ?? savedPlan;
+  const displayPlanGraph = result?.planGraph ?? savedPlanMeta?.plan ?? null;
+  const displayResult = result ?? (savedPlanMeta?.plan
+    ? {
+        source: "saved",
+        planGraph: savedPlanMeta.plan,
+        savedPlan: {
+          id: savedPlanMeta.id,
+          status: savedPlanMeta.status,
+          prompt: savedPlanMeta.prompt,
+          revision: savedPlanMeta.revision ?? 0,
+          summary: savedPlanMeta.summary ?? null,
+          updatedAt: savedPlanMeta.updatedAt,
+        },
+      }
+    : null);
 
   const planGraph = useMemo(() => {
-    const graph = result?.planGraph;
-    if (!graph || !Array.isArray(graph.nodes)) {
+    const graph = displayPlanGraph;
+    if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
       return null;
     }
 
@@ -191,9 +220,9 @@ export function TaskDecompositionPanel({
         type: edge.type,
       })),
     };
-  }, [result]);
+  }, [displayPlanGraph]);
 
-  const graphSummary = useMemo(() => summarizePlanGraph(result?.planGraph ?? null), [result]);
+  const graphSummary = useMemo(() => summarizePlanGraph(displayPlanGraph ?? null), [displayPlanGraph]);
   const isAppliedPlan = Boolean(
     activeAcceptedPlanId
       && savedPlanMeta?.id
@@ -269,35 +298,27 @@ export function TaskDecompositionPanel({
   }, [autoRequest]);
 
   useEffect(() => {
-    onPlanLoaded?.(savedPlanMeta);
-  }, [onPlanLoaded, savedPlanMeta]);
+    if (!hookSavedPlanMeta) {
+      return;
+    }
 
-  if (!requested) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setRequestSnapshot(latestRequestSnapshot());
-          setRequested(true);
-        }}
-        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background/50 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-      >
-        <Scissors className="size-4" />
-        <span>{decompCopy.aiTaskPlanning}</span>
-        <Sparkles className="ml-auto size-3" />
-      </button>
-    );
-  }
+    onPlanLoaded?.(hookSavedPlanMeta);
+  }, [onPlanLoaded, hookSavedPlanMeta]);
 
-  if (isLoading) {
+  const isGenerationRunning = isLoading || generationStatus === "generating";
+
+  const renderPanelHeader = (action?: ReactNode) => (
+    <div className="flex items-center justify-end gap-3">
+      <span className="sr-only">{decompCopy.aiTaskPlanning}</span>
+      {action}
+    </div>
+  );
+
+  if (isGenerationRunning) {
     return (
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-        <div className="flex items-center justify-between gap-3 text-sm text-primary">
-          <div className="flex items-center gap-2">
-            <Bot className="size-4 animate-pulse" />
-            <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
-          </div>
-          {taskId ? (
+      <div className="rounded-xl border border-transparent bg-transparent p-0">
+        {renderPanelHeader(
+          taskId ? (
             <button
               type="button"
               onClick={() => void handleStopGeneration()}
@@ -307,7 +328,11 @@ export function TaskDecompositionPanel({
               <Square className="size-3" />
               {isStoppingGeneration ? "Stopping..." : "Stop"}
             </button>
-          ) : null}
+          ) : null,
+        )}
+        <div className="mt-3 flex items-center gap-2 text-sm text-primary">
+          <Bot className="size-4 animate-pulse" />
+          <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
         </div>
         {stopGenerationError ? (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -398,15 +423,33 @@ export function TaskDecompositionPanel({
     </div>
   ) : null;
 
-  if (!result || !planGraph) return saveBeforeRegenerateDialog;
+  if (!displayResult || !planGraph) {
+    return (
+      <div className="space-y-3 rounded-xl border border-transparent bg-transparent p-0">
+        {renderPanelHeader(
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10"
+          >
+            <Sparkles className="size-3.5" />
+            Generate plan
+          </button>,
+        )}
+        {saveBeforeRegenerateDialog}
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.08),transparent_42%),hsl(var(--background)/0.78)] px-3 py-3 text-sm text-muted-foreground">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border/60">
+            <Sparkles className="size-4" />
+          </span>
+          <span className="font-medium text-foreground">No plan yet</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-primary">
-          <Scissors className="size-4" />
-          AI Task Plan
-        </div>
+    <div className="space-y-3 rounded-xl border border-transparent bg-transparent p-0">
+      {renderPanelHeader(
         <button
           type="button"
           onClick={handleRegenerate}
@@ -414,19 +457,23 @@ export function TaskDecompositionPanel({
         >
           <RotateCcw className="size-3.5" />
           Regenerate plan
-        </button>
-      </div>
+        </button>,
+      )}
 
       {saveBeforeRegenerateDialog}
 
-      <div className="grid gap-2 rounded-lg border border-border/50 bg-background/70 p-3 text-xs text-muted-foreground sm:grid-cols-2">
-        <div className="flex items-center gap-1.5">
-          <Clock className="size-3.5 text-primary" />
-          <span>Total: {graphSummary.totalEstimatedMinutes} min</span>
+      <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+        <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm">
+          <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Clock className="size-3.5" />
+          </span>
+          <span className="font-medium text-foreground">{graphSummary.totalEstimatedMinutes} min</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Scissors className="size-3.5 text-primary" />
-          <span>{graphSummary.nodeCount} planned nodes</span>
+        <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm">
+          <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Scissors className="size-3.5" />
+          </span>
+          <span className="font-medium text-foreground">{graphSummary.nodeCount} nodes</span>
         </div>
       </div>
 
@@ -442,9 +489,11 @@ export function TaskDecompositionPanel({
       ) : null}
 
       {isAppliedPlan ? (
-        <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/70 px-3 py-2.5 text-xs text-muted-foreground">
-          <CheckCircle2 className="size-4 shrink-0 text-primary" />
-          <span>Accepted plan is active in the main panel.</span>
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-xs font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
+            <CheckCircle2 className="size-4" />
+          </span>
+          <span>Active in main panel</span>
         </div>
       ) : (
         <>
@@ -456,7 +505,7 @@ export function TaskDecompositionPanel({
             <div className="flex justify-end rounded-lg border border-border/40 bg-background/70 px-3 py-2">
               <button
                 type="button"
-                onClick={() => onApply(result)}
+                onClick={() => displayResult && onApply(displayResult)}
                 className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/20"
               >
                 <Check className="size-4" />

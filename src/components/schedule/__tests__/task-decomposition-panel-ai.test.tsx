@@ -130,7 +130,7 @@ afterEach(() => {
 });
 
 describe("TaskDecompositionPanel – opt-in behavior", () => {
-  it("shows trigger button and does not request a plan when autoRequest is disabled", () => {
+  it("renders the planning panel expanded and checks status without requesting a plan when autoRequest is disabled", () => {
     mockUseSmartDecomposition.mockReturnValue({
       result: null,
       isLoading: false,
@@ -145,10 +145,142 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
     render(<TaskDecompositionPanel {...defaultProps} />);
 
     expect(screen.getByText(/AI Task Planning/i)).toBeInTheDocument();
+    expect(screen.getByText(/No plan yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate plan/i })).toBeInTheDocument();
     expect(mockUseSmartDecomposition).toHaveBeenCalledWith(null);
   });
 
-  it("requests plan generation after clicking trigger button", async () => {
+  it("renders the saved plan passed from the task instead of replacing it with an empty status panel", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: false,
+      error: null,
+      phase: "idle",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    render(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        savedPlan={{
+          ...samplePlanResponse.savedPlan!,
+          plan: samplePlanResponse.planGraph,
+        }}
+      />,
+    );
+
+    expect(mockUseSmartDecomposition).toHaveBeenCalledWith(null);
+    expect(screen.queryByText(/No plan yet/i)).not.toBeInTheDocument();
+    expect(screen.getByText("AI Task Planning")).toBeInTheDocument();
+    expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
+    expect(screen.getByText("120 min")).toBeInTheDocument();
+  });
+
+  it("shows backend generation state when the task already has an active plan job", () => {
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: false,
+      error: null,
+      phase: "idle",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    render(<TaskDecompositionPanel {...defaultProps} generationStatus="generating" />);
+
+    expect(mockUseSmartDecomposition).toHaveBeenCalledWith(null);
+    expect(screen.getByText(/AI Task Planning/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI is planning task/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
+
+
+  it("notifies the parent only for newly generated hook plans, not empty polling results or the incoming savedPlan prop", async () => {
+    const onPlanLoaded = vi.fn();
+    mockUseSmartDecomposition.mockReturnValue({
+      result: null,
+      isLoading: false,
+      error: null,
+      phase: "idle",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    const { rerender } = render(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        savedPlan={{
+          ...samplePlanResponse.savedPlan!,
+          plan: samplePlanResponse.planGraph,
+        }}
+        onPlanLoaded={onPlanLoaded}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("AI Task Planning")).toBeInTheDocument());
+    expect(onPlanLoaded).not.toHaveBeenCalled();
+
+    const regeneratedResponse: TaskPlanGraphResponse = {
+      ...samplePlanResponse,
+      planGraph: {
+        ...samplePlanResponse.planGraph,
+        id: "plan-2",
+        summary: "new generated plan",
+        revision: 3,
+        updatedAt: "2026-04-25T12:00:00.000Z",
+      },
+      savedPlan: {
+        id: "plan-2",
+        status: "draft",
+        prompt: null,
+        revision: 3,
+        summary: "new generated plan",
+        updatedAt: "2026-04-25T12:00:00.000Z",
+      },
+    };
+
+    mockUseSmartDecomposition.mockReturnValue({
+      result: regeneratedResponse,
+      isLoading: false,
+      error: null,
+      phase: "done",
+      statusMessage: null,
+      partialText: "",
+      toolCalls: [],
+      toolResults: [],
+    });
+
+    rerender(
+      <TaskDecompositionPanel
+        {...defaultProps}
+        savedPlan={{
+          ...samplePlanResponse.savedPlan!,
+          plan: samplePlanResponse.planGraph,
+        }}
+        onPlanLoaded={onPlanLoaded}
+      />,
+    );
+
+    await waitFor(() => expect(onPlanLoaded).toHaveBeenCalledTimes(1));
+    expect(onPlanLoaded).toHaveBeenCalledWith(expect.objectContaining({
+      id: "plan-2",
+      status: "draft",
+      plan: expect.objectContaining({
+        id: "plan-2",
+        summary: "new generated plan",
+      }),
+    }));
+  });
+
+  it("requests plan generation after clicking the generate action", async () => {
     const user = userEvent.setup();
     mockUseSmartDecomposition.mockReturnValue({
       result: null,
@@ -163,7 +295,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} />);
 
-    await user.click(screen.getByText(/AI Task Planning/i));
+    await user.click(screen.getByRole("button", { name: /Generate plan/i }));
 
     expect(mockUseSmartDecomposition).toHaveBeenCalledWith(expect.objectContaining({
       taskId: "task_1",
@@ -172,7 +304,8 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
       priority: "High",
       dueAt: new Date(2026, 3, 20),
       estimatedMinutes: 120,
-      requestKey: 0,
+      requestKey: 1,
+      forceRefresh: true,
     }));
   });
 });
@@ -192,7 +325,7 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
-    expect(screen.queryByText(/AI Task Planning/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/AI Task Planning/i)).toBeInTheDocument();
     expect(mockUseSmartDecomposition).toHaveBeenCalledWith(expect.objectContaining({
       taskId: "task_1",
       title: "Review and update documentation",
@@ -310,13 +443,13 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
 
     render(<TaskDecompositionPanel {...defaultProps} autoRequest />);
 
-    expect(screen.getByText("AI Task Plan")).toBeInTheDocument();
+    expect(screen.getByText("AI Task Planning")).toBeInTheDocument();
     expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
     expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Update API reference").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Update deployment guide").length).toBeGreaterThan(0);
-    expect(screen.getByText("Total: 120 min")).toBeInTheDocument();
-    expect(screen.getByText("3 planned nodes")).toBeInTheDocument();
+    expect(screen.getByText("120 min")).toBeInTheDocument();
+    expect(screen.getByText("3 nodes")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /apply plan/i })).toBeInTheDocument();
   });
 
@@ -356,7 +489,7 @@ describe("TaskDecompositionPanel – autoRequest mode", () => {
     expect(screen.getByRole("button", { name: /regenerate plan/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply plan/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/accepted plan is active in the main panel/i)).toBeInTheDocument();
+    expect(screen.getByText(/active in main panel/i)).toBeInTheDocument();
   });
 
   it("does not automatically re-request just because the parent props change after a save", () => {

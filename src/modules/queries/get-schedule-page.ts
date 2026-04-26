@@ -9,7 +9,8 @@ import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness"
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo } from "@/modules/ai/types";
-import { getAcceptedTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
+import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
 
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
@@ -286,7 +287,46 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   const listItems = projections.map((item) => mapProjectionItem(item));
-  const topLevelItems = listItems.filter((item) => item.parentTaskId === null);
+  const planSnapshots = new Map<string, {
+    id: string;
+    status: "draft" | "accepted" | "superseded" | "archived";
+    prompt: string | null;
+    revision?: number;
+    summary?: string | null;
+    updatedAt: string;
+    plan?: NonNullable<Awaited<ReturnType<typeof getLatestTaskPlanGraph>>>["plan"];
+  }>();
+  const planStatuses = new Map<string, "idle" | "generating" | "waiting_acceptance" | "accepted">();
+  await Promise.all(listItems.map(async (item) => {
+    const savedPlan = (await getAcceptedTaskPlanGraph(item.taskId)) ?? (await getLatestTaskPlanGraph(item.taskId));
+    if (savedPlan) {
+      planSnapshots.set(item.taskId, {
+        id: savedPlan.id,
+        status: savedPlan.status,
+        prompt: savedPlan.prompt,
+        revision: savedPlan.revision,
+        summary: savedPlan.summary,
+        updatedAt: savedPlan.updatedAt,
+        plan: savedPlan.plan,
+      });
+    }
+    planStatuses.set(
+      item.taskId,
+      isTaskPlanGenerationRunning(item.taskId)
+        ? "generating"
+        : savedPlan?.status === "accepted"
+          ? "accepted"
+          : savedPlan
+            ? "waiting_acceptance"
+            : "idle",
+    );
+  }));
+  const listItemsWithPlanState = listItems.map((item) => ({
+    ...item,
+    savedAiPlan: planSnapshots.get(item.taskId) ?? null,
+    aiPlanGenerationStatus: planStatuses.get(item.taskId) ?? "idle",
+  }));
+  const topLevelItems = listItemsWithPlanState.filter((item) => item.parentTaskId === null);
 
   const scheduled = topLevelItems
     .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
@@ -367,7 +407,7 @@ export async function getSchedulePage(workspaceId: string) {
     scheduled,
     unscheduled,
     risks,
-    listItems: topLevelItems,
+    listItems: listItemsWithPlanState,
     proposals: mappedProposals,
     conflicts: conflictAnalysis.conflicts as unknown as ScheduleConflict[],
     suggestions: conflictAnalysis.suggestions as unknown as ScheduleSuggestion[],

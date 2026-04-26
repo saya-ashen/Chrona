@@ -1,5 +1,6 @@
+import type { ElementType, ReactNode } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
@@ -14,8 +15,36 @@ vi.mock("@/i18n/routing", () => ({
   localizeHref: (_locale: string, href: string) => href,
 }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+vi.mock("@/components/i18n/localized-link", () => ({
+  LocalizedLink: ({ children, href, ...props }: { href: string; children?: React.ReactNode }) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
+vi.mock("@/lib/router", () => ({
+  useAppRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  AppLink: ({ to, children, ...props }: { to: string; children?: React.ReactNode }) => (
+    <a href={to} {...props}>{children}</a>
+  ),
+}));
+
+
+vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
+
+
+vi.mock("@/components/ui/status-badge", () => ({
+  StatusBadge: ({ children, tone }: { children?: React.ReactNode; tone?: string }) => (
+    <span data-tone={tone}>{children}</span>
+  ),
+}));
+
+
+vi.mock("@/components/ui/surface-card", () => ({
+  SurfaceCard: ({ children, as: Component = "div", ...props }: { children?: ReactNode; as?: ElementType }) => (
+    <Component {...props}>{children}</Component>
+  ),
+  SurfaceCardHeader: ({ children, ...props }: { children?: ReactNode }) => <div {...props}>{children}</div>,
+  SurfaceCardTitle: ({ children, ...props }: { children?: ReactNode }) => <h3 {...props}>{children}</h3>,
 }));
 
 // Mock the schedule editor form
@@ -45,6 +74,27 @@ vi.mock("@/components/schedule/task-config-form", () => ({
 
 const taskDecompositionPanelProps = vi.fn();
 
+
+
+vi.mock("@/components/schedule/panels/selected-block-sheet/selected-block-main-column", () => ({
+  SelectedBlockMainColumn: ({ onTaskConfigDraftStateChange, onSaveTaskConfig }: { onTaskConfigDraftStateChange: (state: unknown) => void; onSaveTaskConfig: (input: unknown) => Promise<void> | void }) => {
+    taskConfigDraftStateHandlers.push(onTaskConfigDraftStateChange);
+    taskConfigSubmitHandlers.push(onSaveTaskConfig);
+    return (
+      <div data-testid="selected-block-main-column">
+        <div data-testid="schedule-editor-form" />
+        <div data-testid="task-config-form" />
+      </div>
+    );
+  },
+}));
+
+vi.mock("@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header", () => ({
+  SelectedBlockSheetHeader: ({ item }: { item: { title: string } }) => (
+    <div data-testid="selected-block-sheet-header"><h2 id="schedule-task-sheet-title">{item.title}</h2></div>
+  ),
+}));
+
 // Mock the task decomposition panel
 vi.mock("@/components/schedule/task-planning-panel", () => ({
   TaskDecompositionPanel: (props: {
@@ -62,6 +112,8 @@ vi.mock("@/components/schedule/task-planning-panel", () => ({
         data-title={props.title ?? ""}
         data-description={props.description ?? ""}
         data-draft-dirty={String(Boolean((props as { hasUnsavedConfigChanges?: boolean }).hasUnsavedConfigChanges))}
+        data-saved-plan-id={(props as { savedPlan?: { id?: string } | null }).savedPlan?.id ?? ""}
+        data-generation-status={(props as { generationStatus?: string }).generationStatus ?? ""}
       />
     );
   },
@@ -73,15 +125,20 @@ vi.mock("@/components/ui/task-context-links", () => ({
 }));
 
 // Mock fetch for subtasks
-const mockFetch = vi.fn().mockResolvedValue({
-  ok: true,
-  json: async () => [],
-});
+const mockFetch = vi.fn();
 
 Object.defineProperty(globalThis, "fetch", {
   configurable: true,
   value: (...args: Parameters<typeof fetch>) => mockFetch(...args),
 });
+
+function createJsonResponse(body: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  };
+}
 
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
@@ -145,12 +202,37 @@ const defaultSheetProps = {
     taskId ? `/schedule/${day}/${taskId}` : `/schedule/${day}`,
 };
 
+beforeEach(() => {
+  vi.useFakeTimers();
+  mockFetch.mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+
+    if (url.includes("/api/tasks/") && url.includes("/plan-state")) {
+      return Promise.resolve(createJsonResponse({
+        taskId: "task-1",
+        aiPlanGenerationStatus: "idle",
+        savedAiPlan: null,
+      }));
+    }
+
+    if (url.includes("/api/ai/task-plan/accept")) {
+      return Promise.resolve(createJsonResponse({ ok: true }));
+    }
+
+    return Promise.resolve(createJsonResponse([]));
+  });
+});
+
 afterEach(() => {
   cleanup();
   taskConfigSubmitHandlers.length = 0;
   taskConfigDraftStateHandlers.length = 0;
   vi.clearAllMocks();
-  mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+  vi.useRealTimers();
 });
 
 /* ------------------------------------------------------------------ */
@@ -280,6 +362,294 @@ describe("SelectedBlockSheet – layout order", () => {
         priority: "Urgent",
       }),
     }));
+  });
+
+  it("updates the AI sidebar immediately when a regenerated draft plan is loaded", async () => {
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "idle");
+
+    const latestPanelProps = taskDecompositionPanelProps.mock.calls.at(-1)?.[0] as {
+      onPlanLoaded?: (savedPlan: unknown) => void;
+    };
+    expect(latestPanelProps.onPlanLoaded).toBeTypeOf("function");
+
+    await act(async () => {
+      latestPanelProps.onPlanLoaded?.({
+        id: "plan-new",
+        status: "draft",
+        prompt: null,
+        revision: 3,
+        summary: "new generated plan",
+        updatedAt: "2026-04-25T12:00:00.000Z",
+        plan: {
+          id: "plan-new",
+          taskId: "task-1",
+          status: "draft",
+          revision: 3,
+          source: "ai",
+          generatedBy: "generate-task-plan",
+          prompt: null,
+          summary: "new generated plan",
+          changeSummary: null,
+          createdAt: "2026-04-25T12:00:00.000Z",
+          updatedAt: "2026-04-25T12:00:00.000Z",
+          nodes: [],
+          edges: [],
+        },
+      });
+    });
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-new");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
+  });
+
+
+  it("syncs the sidebar status and plan when the selected task prop changes", async () => {
+    const { rerender } = render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
+
+    rerender(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
+
+    const itemWithNewPlan: ScheduledItem = {
+      ...mockItem,
+      aiPlanGenerationStatus: "waiting_acceptance",
+      savedAiPlan: {
+        id: "plan-from-parent",
+        status: "draft",
+        prompt: null,
+        revision: 4,
+        summary: "parent refreshed plan",
+        updatedAt: "2026-04-25T13:00:00.000Z",
+        plan: {
+          id: "plan-from-parent",
+          taskId: "task-1",
+          status: "draft",
+          revision: 4,
+          source: "ai",
+          generatedBy: "generate-task-plan",
+          prompt: null,
+          summary: "parent refreshed plan",
+          changeSummary: null,
+          createdAt: "2026-04-25T13:00:00.000Z",
+          updatedAt: "2026-04-25T13:00:00.000Z",
+          nodes: [],
+          edges: [],
+        },
+      },
+    };
+
+    rerender(<SelectedBlockSheet {...defaultSheetProps} item={itemWithNewPlan} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-from-parent");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
+  });
+
+  it("polls the lightweight task plan-state endpoint instead of refreshing schedule projection while generation runs", async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/task-1/plan-state")) {
+        return Promise.resolve(createJsonResponse({
+          taskId: "task-1",
+          aiPlanGenerationStatus: "waiting_acceptance",
+          savedAiPlan: {
+            id: "plan-polled",
+            status: "draft",
+            prompt: null,
+            revision: 5,
+            summary: "polled draft",
+            updatedAt: "2026-04-25T14:45:00.000Z",
+            plan: {
+              id: "plan-polled",
+              taskId: "task-1",
+              status: "draft",
+              revision: 5,
+              source: "ai",
+              generatedBy: "generate-task-plan",
+              prompt: null,
+              summary: "polled draft",
+              changeSummary: null,
+              createdAt: "2026-04-25T14:45:00.000Z",
+              updatedAt: "2026-04-25T14:45:00.000Z",
+              nodes: [],
+              edges: [],
+            },
+          },
+        }));
+      }
+
+      if (url.includes("/api/schedule/projection")) {
+        throw new Error("schedule projection should not be fetched during plan polling");
+      }
+
+      if (url.includes("/api/ai/task-plan/accept")) {
+        return Promise.resolve(createJsonResponse({ ok: true }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1900);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-polled");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+    expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
+  });
+
+  it("probes the lightweight task plan-state endpoint for a newly created task without a saved plan", async () => {
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+    expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
+  });
+
+  it("does not collapse back to no-plan when polling briefly returns idle during generation", async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/task-1/plan-state")) {
+        return Promise.resolve(createJsonResponse({
+          taskId: "task-1",
+          aiPlanGenerationStatus: "idle",
+          savedAiPlan: null,
+        }));
+      }
+
+      if (url.includes("/api/ai/task-plan/accept")) {
+        return Promise.resolve(createJsonResponse({ ok: true }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1900);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+  });
+
+  it("keeps polling while generation remains unchanged across responses", async () => {
+    let pollCount = 0;
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/task-1/plan-state")) {
+        pollCount += 1;
+        return Promise.resolve(createJsonResponse({
+          taskId: "task-1",
+          aiPlanGenerationStatus: "generating",
+          savedAiPlan: null,
+        }));
+      }
+
+      if (url.includes("/api/ai/task-plan/accept")) {
+        return Promise.resolve(createJsonResponse({ ok: true }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1900);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1900);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(pollCount).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
+  });
+
+  it("continues new-task probing when idle snapshots stay unchanged", async () => {
+    let pollCount = 0;
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/task-1/plan-state")) {
+        pollCount += 1;
+        return Promise.resolve(createJsonResponse({
+          taskId: "task-1",
+          aiPlanGenerationStatus: "idle",
+          savedAiPlan: null,
+        }));
+      }
+
+      if (url.includes("/api/ai/task-plan/accept")) {
+        return Promise.resolve(createJsonResponse({ ok: true }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(450);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1400);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(1400);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(pollCount).toBe(3);
   });
 
   it("clears the dirty marker and updates the AI sidebar after the task config is saved", async () => {

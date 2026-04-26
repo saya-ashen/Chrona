@@ -68,9 +68,9 @@ const samplePlanGraph = {
 };
 
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
+  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(args[0]),
   useSmartAutomation: () => mockUseSmartAutomation(),
-  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
+  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(args[0]),
 }));
 
 vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
