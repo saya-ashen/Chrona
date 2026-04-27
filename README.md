@@ -1,3 +1,5 @@
+[English](./README.md) | [中文](./README.zh.md)
+
 # Chrona
 
 AI-native task control plane — plan, schedule, and execute work through AI agents.
