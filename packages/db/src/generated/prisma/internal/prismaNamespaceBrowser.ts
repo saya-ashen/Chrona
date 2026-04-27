@@ -66,7 +66,8 @@ export const ModelName = {
   ScheduleProposal: 'ScheduleProposal',
   RuntimeCursor: 'RuntimeCursor',
   AiClient: 'AiClient',
-  AiFeatureBinding: 'AiFeatureBinding'
+  AiFeatureBinding: 'AiFeatureBinding',
+  TaskAssistantMessage: 'TaskAssistantMessage'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -371,6 +372,21 @@ export const AiFeatureBindingScalarFieldEnum = {
 } as const
 
 export type AiFeatureBindingScalarFieldEnum = (typeof AiFeatureBindingScalarFieldEnum)[keyof typeof AiFeatureBindingScalarFieldEnum]
+
+
+export const TaskAssistantMessageScalarFieldEnum = {
+  id: 'id',
+  taskId: 'taskId',
+  role: 'role',
+  content: 'content',
+  proposal: 'proposal',
+  applied: 'applied',
+  appliedAt: 'appliedAt',
+  sequence: 'sequence',
+  createdAt: 'createdAt'
+} as const
+
+export type TaskAssistantMessageScalarFieldEnum = (typeof TaskAssistantMessageScalarFieldEnum)[keyof typeof TaskAssistantMessageScalarFieldEnum]
 
 
 export const SortOrder = {

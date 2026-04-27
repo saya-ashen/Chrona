@@ -28,10 +28,10 @@ export function ControlPlaneShell({ children }: ControlPlaneShellProps) {
               className="group flex min-w-0 items-center gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm transition-colors hover:border-primary/30 hover:bg-background"
             >
               <img
-                src="/chrona_icon_app.svg"
+                src="/favicon.png"
                 alt=""
                 aria-hidden="true"
-                className="h-9 w-9 shrink-0 rounded-xl ring-1 ring-inset ring-primary/15"
+                className="h-9 w-9 shrink-0 rounded-xl object-cover dark:mix-blend-screen mix-blend-multiply"
               />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold tracking-tight text-foreground">{t("nav.brandTitle")}</span>

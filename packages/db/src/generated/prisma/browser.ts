@@ -97,3 +97,8 @@ export type AiClient = Prisma.AiClientModel
  * 
  */
 export type AiFeatureBinding = Prisma.AiFeatureBindingModel
+/**
+ * Model TaskAssistantMessage
+ * 
+ */
+export type TaskAssistantMessage = Prisma.TaskAssistantMessageModel

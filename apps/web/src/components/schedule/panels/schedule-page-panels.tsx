@@ -4,6 +4,7 @@ import {
   Calendar,
   ChevronDown,
   GripVertical,
+  Trash2,
 } from "lucide-react";
 import { type DragEvent, useState } from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -12,7 +13,6 @@ import type {
   ScheduleProposal,
   TodayFocusItem,
   UnscheduledItem,
-  ScheduledItem,
 } from "@/components/schedule/schedule-page-types";
 import {
   formatDateTime,
@@ -125,6 +125,7 @@ export function QueueCard({
   onMutatedAction,
   onSaveTaskConfigAction,
   onScheduleSlot,
+  onDeleteTask,
   onDragStart,
   onDragEnd,
 }: {
@@ -142,21 +143,23 @@ export function QueueCard({
     input: TaskConfigFormInput,
   ) => Promise<void>;
   onScheduleSlot?: (taskId: string, startAt: Date, endAt: Date) => void;
+  onDeleteTask?: (taskId: string) => void;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
 }) {
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const suggestedDurationMinutes = getQueueSuggestedDuration(item);
   const [showTimeslots, setShowTimeslots] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <SurfaceCard
       as="div"
       variant="inset"
       className={cn(
-        "rounded-2xl p-0",
+        "rounded-xl p-0 transition-colors",
         isDragging && "border-primary/40 bg-primary/5",
       )}
     >
@@ -166,121 +169,91 @@ export function QueueCard({
         onDragStart={(event) => onDragStart(item, event)}
         onDragEnd={onDragEnd}
         className={cn(
-          "flex cursor-grab items-start gap-3 rounded-2xl px-4 py-3 active:cursor-grabbing",
-          isPending && "cursor-not-allowed",
+          "flex items-center gap-2 rounded-xl px-3 py-2.5 cursor-grab active:cursor-grabbing select-none",
+          isPending && "cursor-not-allowed opacity-60",
         )}
       >
-        <div className="mt-0.5 rounded-xl border border-dashed border-border/70 bg-background/70 p-2 text-muted-foreground">
-          <GripVertical className="size-4" aria-hidden="true" />
+        <GripVertical className="size-3.5 text-muted-foreground/40 shrink-0" aria-hidden="true" />
+
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <span className="truncate text-[13px] font-medium">{item.title}</span>
+          <StatusBadge tone={getPriorityTone(item.priority)} className="text-[10px] px-1.5 py-0.5">
+            {item.priority}
+          </StatusBadge>
+          {item.dueAt ? (
+            <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">
+              {formatDateTime(item.dueAt, locale)}
+            </span>
+          ) : null}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 space-y-1">
-              <LocalizedLink
-                href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`}
-                draggable={false}
-                className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
-              >
-                {item.title}
-              </LocalizedLink>
-              <div className="flex flex-wrap gap-2">
-                <StatusBadge tone={getPriorityTone(item.priority)}>
-                  {item.priority}
-                </StatusBadge>
-                <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>
-                  {item.runnabilitySummary}
-                </StatusBadge>
-                {item.dueAt ? (
-                  <StatusBadge>
-                    {copy.due} {formatDateTime(item.dueAt, locale)}
-                  </StatusBadge>
-                ) : null}
-                {item.actionRequired ? (
-                  <StatusBadge tone="warning">
-                    {item.actionRequired}
-                  </StatusBadge>
-                ) : null}
-                {suggestedDurationMinutes ? (
-                  <StatusBadge>{suggestedDurationMinutes}m</StatusBadge>
-                ) : null}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onToggle}
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              <ChevronDown
-                className={cn(
-                  "size-4 transition-transform",
-                  isExpanded && "rotate-180",
-                )}
-              />
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {isPending ? copy.schedulingUpdating : copy.dragHint}
-          </p>
+
+        <div className="flex items-center gap-0.5 shrink-0">
           {suggestedDurationMinutes ? (
             <button
               type="button"
-              onClick={() => setShowTimeslots((v) => !v)}
+              onClick={(e) => { e.stopPropagation(); setShowTimeslots((v) => !v); }}
               className={cn(
-                "mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition",
-                showTimeslots
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-primary",
+                "rounded-md p-1 transition-colors",
+                showTimeslots ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
               )}
+              title="Suggest time slot"
             >
-              <Calendar className="size-3" />
-              {showTimeslots ? "Hide Suggestions" : "Suggest Time"}
+              <Calendar className="size-3.5" />
             </button>
           ) : null}
+          {onDeleteTask ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm((v) => !v); }}
+              className={cn(
+                "rounded-md p-1 transition-colors",
+                showDeleteConfirm ? "text-red-500 bg-red-50" : "text-muted-foreground/50 hover:text-red-500",
+              )}
+              title="Delete task"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="rounded-md p-1 text-muted-foreground/50 hover:text-foreground transition-colors"
+            title={isExpanded ? "Collapse" : "Expand"}
+          >
+            <ChevronDown className={cn("size-4 transition-transform", isExpanded && "rotate-180")} />
+          </button>
         </div>
       </div>
 
+      {showDeleteConfirm ? (
+        <div className="border-t border-red-100 bg-red-50/50 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-[11px] text-red-600">Delete "{item.title}"?</span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDeleteTask?.(item.taskId); }}
+              className="rounded-md bg-red-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-600 transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {isExpanded ? (
-        <div className="space-y-3 border-t border-border/60 px-4 py-4">
-          <DetailGrid
-            items={[
-              { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-              {
-                label: copy.pendingProposals,
-                value: String(item.scheduleProposalCount),
-              },
-              { label: copy.runnable, value: item.runnabilitySummary },
-              { label: copy.model, value: item.runtimeModel ?? "-" },
-              {
-                label: copy.latestRun,
-                value: item.latestRunStatus ?? copy.noActiveRun,
-              },
-            ]}
-          />
-
-          <SurfaceCard
-            as="div"
-            variant="default"
-            padding="sm"
-            className="rounded-2xl border-dashed"
-          >
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {copy.taskConfig}
-            </p>
-            <QueueTaskConfigEditor
-              item={item}
-              runtimeAdapters={runtimeAdapters}
-              defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-              isPending={isPending}
-              onSaveTaskConfigAction={onSaveTaskConfigAction}
-            />
-          </SurfaceCard>
-
-          <TaskContextLinks
-            workspaceId={item.workspaceId}
-            taskId={item.taskId}
-            latestRunStatus={item.latestRunStatus}
-            workLabel={t("common.openWorkbench")}
-          />
+        <div className="border-t border-border/60 px-3 py-3 space-y-3">
+          {item.actionRequired ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {item.actionRequired}
+            </div>
+          ) : null}
 
           {showTimeslots && suggestedDurationMinutes ? (
             <TimeslotSuggestionPanel
@@ -290,20 +263,13 @@ export function QueueCard({
               estimatedMinutes={suggestedDurationMinutes}
               dueAt={item.dueAt}
               currentSchedule={currentSchedule ?? []}
-              onSchedule={(startAt, endAt) =>
-                onScheduleSlot?.(item.taskId, startAt, endAt)
-              }
+              onSchedule={(startAt, endAt) => onScheduleSlot?.(item.taskId, startAt, endAt)}
             />
           ) : null}
 
-          <SurfaceCard
-            as="div"
-            variant="default"
-            padding="sm"
-            className="rounded-2xl border-dashed"
-          >
-            <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {copy.placeOnTimeline}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Schedule
             </p>
             <ScheduleEditorForm
               taskId={item.taskId}
@@ -312,7 +278,28 @@ export function QueueCard({
               submitLabel={copy.scheduleTask}
               onMutatedAction={onMutatedAction}
             />
-          </SurfaceCard>
+          </div>
+
+          <details className="group">
+            <summary className="cursor-pointer text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors select-none">
+              Task config & links
+            </summary>
+            <div className="mt-2 space-y-2">
+              <QueueTaskConfigEditor
+                item={item}
+                runtimeAdapters={runtimeAdapters}
+                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                isPending={isPending}
+                onSaveTaskConfigAction={onSaveTaskConfigAction}
+              />
+              <TaskContextLinks
+                workspaceId={item.workspaceId}
+                taskId={item.taskId}
+                latestRunStatus={item.latestRunStatus}
+                workLabel="Open Workbench"
+              />
+            </div>
+          </details>
         </div>
       ) : null}
     </SurfaceCard>
@@ -370,9 +357,7 @@ export function ProposalCard({
           <button
             type="button"
             disabled={isPending}
-            onClick={() => {
-              void onAccept(proposal.proposalId);
-            }}
+            onClick={() => void onAccept(proposal.proposalId)}
             className={buttonVariants({ variant: "default" })}
           >
             {copy.acceptProposal}
@@ -380,67 +365,11 @@ export function ProposalCard({
           <button
             type="button"
             disabled={isPending}
-            onClick={() => {
-              void onReject(proposal.proposalId);
-            }}
+            onClick={() => void onReject(proposal.proposalId)}
             className={buttonVariants({ variant: "outline" })}
           >
             {copy.rejectProposal}
           </button>
-        </div>
-      </div>
-    </SurfaceCard>
-  );
-}
-
-export function RiskCard({ item }: { item: ScheduledItem }) {
-  const locale = useLocale();
-  const { messages, t } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
-
-  return (
-    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
-      <div className="space-y-3 text-sm text-muted-foreground">
-        <div className="space-y-2">
-          <LocalizedLink
-            href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
-            className="text-base font-medium text-foreground transition-colors hover:text-primary"
-          >
-            {item.title}
-          </LocalizedLink>
-          <ItemMeta item={item} />
-        </div>
-        <DetailGrid
-          items={[
-            {
-              label: copy.risk,
-              value:
-                item.scheduleStatus ?? item.persistedStatus ?? copy.needsReview,
-            },
-            {
-              label: copy.action,
-              value: item.actionRequired ?? copy.reviewScheduleImpact,
-            },
-            {
-              label: copy.plannedWindow,
-              value: `${formatDateTime(item.scheduledStartAt, locale)} → ${formatDateTime(item.scheduledEndAt, locale)}`,
-            },
-            { label: copy.due, value: formatDateTime(item.dueAt, locale) },
-          ]}
-        />
-        <div className="flex flex-wrap gap-2">
-          <TaskContextLinks
-            workspaceId={item.workspaceId}
-            taskId={item.taskId}
-            latestRunStatus={item.latestRunStatus}
-            workLabel={t("common.openWorkbench")}
-          />
-          <LocalizedLink
-            href="/inbox"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {copy.openInbox}
-          </LocalizedLink>
         </div>
       </div>
     </SurfaceCard>
