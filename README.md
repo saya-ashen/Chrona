@@ -24,9 +24,19 @@ The project focuses on making planning and execution feel like one connected sys
 > For full setup details, see [./docs/en/quick-start.md](./docs/en/quick-start.md).
 
 ```bash
+# Clone and install (auto-generates Prisma client via postinstall)
+git clone https://github.com/your-org/Chrona.git
+cd Chrona
 bun install
-bunx prisma generate
-bun run db:seed
+
+# Configure environment
+cp .env.example .env
+# Edit .env to set API keys (AI_PROVIDER_API_KEY, etc.)
+
+# Initialize database and seed sample data
+bun run setup
+
+# Start dev servers
 bun run dev
 ```
 
@@ -36,7 +46,7 @@ Development ports:
 - SPA dev server: `http://localhost:3100`
 - Local API server: `http://localhost:3101`
 
-Production build:
+Production:
 
 ```bash
 bun run build
@@ -55,7 +65,6 @@ packages/
   db/           — Prisma bootstrap, repositories
   domain/       — Pure business rules
   runtime/      — Commands, queries, projections
-  runtime-openclaw/ — OpenClaw runtime adapter
   providers/    — Provider bridges (OpenClaw, Hermes)
 ```
 

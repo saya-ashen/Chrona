@@ -40,6 +40,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "setup": "bun run db:generate && bun run db:seed",
+    "postinstall": "prisma generate",
     "probe:openclaw": "bun scripts/openclaw/probe.ts"
   },
   "dependencies": {
