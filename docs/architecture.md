@@ -118,16 +118,16 @@ commands/  ──────────▶  events/
     │                      ▲
     ├──────────────▶  tasks/  ◀─── queries/
     │                                │
-    └──────────────▶  runtime/       │
-                          │           │
-                          ▼           ▼
-                     openclaw/     ai/ (conflict, suggest, decompose)
+    └──────────────▶  runtime-sync/  │
+                           │         │
+                           ▼         ▼
+                      openclaw/    ai/ (conflict, suggest, decompose)
 ```
 
 **Dependency rules:**
-- `commands/` may depend on `events/`, `projections/`, `runtime/`, `tasks/`
-- `queries/` may depend on `projections/`, `tasks/`, `runtime/`, `ai/`
-- `tasks/` depends only on `runtime/` (to get config specs)
+- `commands/` may depend on `events/`, `projections/`, `runtime-sync/`, `tasks/`
+- `queries/` may depend on `projections/`, `tasks/`, `runtime-sync/`, `ai/`
+- `tasks/` depends only on `runtime-sync/` (to get config specs)
 - `projections/` depends only on `tasks/` (state derivation)
 - `events/` has no dependencies (bottom layer)
 - `ai/` may depend on `queries/` (plugin tools need to read data)
@@ -153,9 +153,15 @@ apps/
     src/
       app.ts                    — Hono app composition
       routes/api.ts             — API routes
-      index.ts                  — Bun/Node entry point
+      index.ts                  — Node.js entry point
+      index.bun.ts              — Bun entry point (dev)
+      static/spa.ts             — SPA static file middleware
 
 packages/
+  cli/                          — Chrona npm entry point
+  common/
+    cli/                        — CLI commands (task, run, schedule, ai)
+    ai-features/                — Shared AI feature surface
   contracts/                    — Shared DTOs, Zod schemas, API contracts
   db/                           — Prisma bootstrap, repositories, generated client
   domain/                       — Pure business rules, state derivations
@@ -166,13 +172,11 @@ packages/
       projections/              — Projection rebuilders
       events/                   — Canonical event store
       tasks/                    — Task domain logic
-      runtime/                  — Runtime adapter registry
+      task-execution/           — Task session & execution registry
+      runtime-sync/             — Runtime sync & freshness
+      scheduler/                — Auto-start scheduled runs
       ai/                       — AI feature handlers
       workspaces/               — Workspace logic
-  runtime-openclaw/             — OpenClaw-specific runtime
-  common/
-    cli/                        — Chrona CLI
-    ai-features/                — Shared AI feature surface
   providers/
     openclaw/                   — OpenClaw bridge, integration, plugin
     hermes/                     — Hermes provider (future)
@@ -180,15 +184,19 @@ packages/
 
 ## Page Architecture
 
+All routes are locale-prefixed (e.g. `/en/schedule`, `/zh/workspaces/...`):
+
 | Page | Route | Description |
 |------|-------|-------------|
-| Dashboard | `/` | Workspace overview, recent activity |
-| Task Center | `/tasks` | Filterable task list, status grouping |
-| Schedule | `/schedule` | Google Calendar-style scheduling cockpit |
-| Inbox | `/inbox` | Pending approvals, inputs, suggestions |
-| Memory | `/memory` | AI agent persistent knowledge base |
-| Work | `/workspaces/[id]/work/[taskId]` | Deep task execution view |
-| Settings | `/settings` | System configuration |
+| Landing | `/:lang` | Workspace overview, recent activity |
+| Schedule | `/:lang/schedule` | Calendar-style scheduling cockpit |
+| Inbox | `/:lang/inbox` | Pending approvals, inputs, suggestions |
+| Memory | `/:lang/memory` | AI agent persistent knowledge base |
+| Workspaces | `/:lang/workspaces` | Workspace list |
+| Workspace Overview | `/:lang/workspaces/:id` | Workspace dashboard |
+| Task Detail | `/:lang/workspaces/:id/tasks/:taskId` | Task detail & plan graph |
+| Work | `/:lang/workspaces/:id/work/:taskId` | Task execution view |
+| Settings | `/:lang/settings` | System & AI client configuration |
 
 Each page follows the same data loading pattern:
 1. React Router loader / API call fetches the corresponding query data
@@ -217,3 +225,16 @@ Each page follows the same data loading pattern:
 - Frontend SPA, CLI, and runtime client share the semantic endpoints on the independent API server
 - Supports session management and run polling; approval handling is simplified in bridge mode
 - Runtime adapter pattern enables extending to other AI execution engines
+
+## Server Modes
+
+### Development
+- Vite dev server for SPA on `http://localhost:3100`
+- Hono API server on `http://localhost:3101`
+- Run with: `bun run dev`
+
+### Production (npm)
+- Single Hono server on `http://localhost:3101` (or `$PORT`)
+- Serves both static SPA files and API routes
+- Run with: `chrona start`
+- First launch auto-creates database and config files
