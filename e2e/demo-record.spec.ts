@@ -57,6 +57,17 @@ test.describe.serial("Chrona README demo recordings", () => {
     });
     await page.waitForTimeout(500);
 
+    // ── Scroll dialog content so "Apply Plan" is visible ──
+    await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (!dialog) return;
+      const el = Array.from(dialog.querySelectorAll("button")).find(
+        (b) => b.textContent?.includes("Apply Plan"),
+      ) as HTMLElement | undefined;
+      el?.scrollIntoView({ block: "center" });
+    });
+    await page.waitForTimeout(300);
+
     // ── Click "Apply Plan" ──
     await page.getByRole("button", { name: "Apply Plan" }).click({ force: true });
 
@@ -110,6 +121,15 @@ test.describe.serial("Chrona README demo recordings", () => {
     // Wait for it to disappear (response complete)
     await page.getByText("Thinking...").waitFor({ state: "hidden", timeout: 120_000 });
     await page.waitForTimeout(800);
+
+    // ── Scroll to "Accept Plan" button ──
+    await page.evaluate(() => {
+      const el = Array.from(document.querySelectorAll("button")).find(
+        (b) => b.textContent?.includes("Accept Plan"),
+      ) as HTMLElement | undefined;
+      el?.scrollIntoView({ block: "center" });
+    });
+    await page.waitForTimeout(300);
 
     // ── Click "Accept Plan" ──
     await page.getByRole("button", { name: "Accept Plan" }).click({ force: true });
