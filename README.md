@@ -59,21 +59,13 @@ Add `--base-url` to point at a different server.
 
 ## Demo
 
-![Schedule Cockpit](./docs/assets/demo-schedule.gif)
+![AI Plan Generation](./docs/assets/demo-plan.gif)
 
-*Calendar view with timeline, task blocks, drag-and-drop scheduling, and unscheduled queue.*
+*Schedule cockpit — create a task, describe the work, and let AI generate a step-by-step execution plan with typed nodes, dependencies, and time estimates.*
 
-![Quick Add + AI Plan](./docs/assets/demo-quick-add.gif)
+![AI Assistant](./docs/assets/demo-assistant.gif)
 
-*Create a task via Quick Add: fill title & description, AI generates a step-by-step execution plan with nodes, dependencies, and time estimates.*
-
-![Task Workspace](./docs/assets/demo-workspace.gif)
-
-*Task detail page showing the plan graph (16 nodes, typed steps, dependency edges), task metadata, and the AI assistant sidebar.*
-
-![Settings](./docs/assets/demo-settings.gif)
-
-*Configure AI clients (LLM + OpenClaw), auto-scheduling toggles, and advanced workspace controls.*
+*Task workspace — ask the AI assistant to review the plan and suggest improvements. Accept proposed changes to update the plan in place.*
 
 ## Architecture
 

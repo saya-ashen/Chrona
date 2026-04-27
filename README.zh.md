@@ -53,23 +53,13 @@ chrona ai suggest --title "..."     获取 AI 任务建议
 
 ## 演示
 
-![日程驾驶舱](./docs/assets/demo-schedule.gif)
+![AI 规划生成](./docs/assets/demo-plan.gif)
 
-*日历视图，包含时间线、任务块、拖拽排程和待排队列。*
+*日程驾驶舱 — 创建任务、描述工作内容，由 AI 生成包含类型化节点、依赖关系和工时估算的分步执行计划。*
 
-![快速创建 + AI 规划](./docs/assets/demo-quick-add.gif)
+![AI 助理](./docs/assets/demo-assistant.gif)
 
-*通过快速创建对话框新建任务：填写标题和描述，AI 生成包含节点、依赖关系与工时估算的分步执行计划。*
-
-![任务工作区](./docs/assets/demo-workspace.gif)
-
-*任务详情页展示规划图（16 个节点，类型化步骤，依赖连线）、任务元数据和 AI 助理侧边栏。*
-
-![设置页](./docs/assets/demo-settings.gif)
-
-![设置页](./docs/assets/demo-settings.gif)
-
-*配置 AI 客户端（LLM + OpenClaw）、自动排程开关和高级工作区控制。*
+*任务工作区 — 向 AI 助理请求审查计划并提出改进建议，接受变更以更新当前计划。*
 
 ## 架构
 
