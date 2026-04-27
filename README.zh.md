@@ -57,9 +57,15 @@ chrona ai suggest --title "..."     获取 AI 任务建议
 
 *日历视图，包含时间线、任务块、拖拽排程和待排队列。*
 
-![任务工作区](./docs/assets/demo-task.gif)
+![快速创建 + AI 规划](./docs/assets/demo-quick-add.gif)
 
-*AI 生成的任务规划图，包含步骤类型、依赖关系、工时估算和重新生成。*
+*通过快速创建对话框新建任务：填写标题和描述，AI 生成包含节点、依赖关系与工时估算的分步执行计划。*
+
+![任务工作区](./docs/assets/demo-workspace.gif)
+
+*任务详情页展示规划图（16 个节点，类型化步骤，依赖连线）、任务元数据和 AI 助理侧边栏。*
+
+![设置页](./docs/assets/demo-settings.gif)
 
 ![设置页](./docs/assets/demo-settings.gif)
 
