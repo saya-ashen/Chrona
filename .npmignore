@@ -17,4 +17,8 @@ __tests__
 .env
 .env.local
 prisma/dev.db
+prisma/*.db
+prisma/*.db-journal
+prisma/seed.ts
 apps/web/node_modules
+apps/web/src
