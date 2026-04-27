@@ -1,40 +1,63 @@
 import { readFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import * as path from "node:path";
 
 import type { MiddlewareHandler } from "hono";
-import { serveStatic } from "hono/serve-static";
+
+const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
 
 function getSpaDistPath() {
   return path.resolve(process.cwd(), process.env.CHROMA_WEB_DIST ?? "apps/web/dist");
 }
 
-async function tryRead(filePath: string) {
-  try {
-    return await readFile(filePath);
-  } catch {
-    return null;
-  }
-}
-
 export function createSpaStaticMiddleware(): MiddlewareHandler {
   const root = getSpaDistPath();
 
-  return serveStatic({
-    root,
-    getContent: async (assetPath) => {
-      const normalized = assetPath.replace(/^\/+/, "");
-      const explicitFile = path.resolve(root, normalized);
-      const direct = await tryRead(explicitFile);
-      if (direct) {
-        return direct;
-      }
+  return async (c) => {
+    const urlPath = new URL(c.req.url).pathname;
+    const safeName = urlPath.replace(/\.\./g, "").replace(/\/\//g, "/");
+    const filePath = path.resolve(root, safeName.replace(/^\/+/, "") || "index.html");
 
-      const fallback = await tryRead(path.resolve(root, "index.html"));
-      return fallback;
-    },
-  });
+    let body: Buffer;
+    try {
+      await stat(filePath);
+      body = await readFile(filePath);
+    } catch {
+      try {
+        body = await readFile(path.resolve(root, "index.html"));
+      } catch {
+        return c.notFound();
+      }
+    }
+
+    const ext = path.extname(filePath);
+    const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
+
+    return new Response(new Uint8Array(body), {
+      status: 200,
+      headers: { "Content-Type": contentType },
+    });
+  };
 }
 
 export async function hasSpaDist() {
-  return Boolean(await tryRead(path.resolve(getSpaDistPath(), "index.html")));
+  try {
+    return Boolean(await stat(path.resolve(getSpaDistPath(), "index.html")));
+  } catch {
+    return false;
+  }
 }
