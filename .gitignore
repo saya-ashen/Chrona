@@ -54,5 +54,5 @@ prisma/dev.db
 apps/web/dist/
 
 # misc generated
-src/
-assets/
+/src/
+/assets/

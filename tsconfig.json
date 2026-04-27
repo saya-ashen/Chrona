@@ -42,9 +42,7 @@
       "@chrona/db/*": ["./packages/db/src/*"],
       "@chrona/runtime": ["./packages/runtime/src/index.ts"],
       "@chrona/runtime/*": ["./packages/runtime/src/*"],
-      "@chrona/runtime-openclaw": ["./packages/runtime-openclaw/src/index.ts"],
-      "@chrona/runtime-openclaw/*": ["./packages/runtime-openclaw/src/*"],
-      "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"],
+    "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"],
       "@chrona/openclaw-bridge/*": ["./packages/providers/openclaw/bridge/src/*"],
       "@chrona/web/*": ["./apps/web/src/*"]
     }

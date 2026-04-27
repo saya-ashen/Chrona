@@ -2,7 +2,7 @@ generator client {
   provider   = "prisma-client"
   engineType = "client"
   runtime    = "bun"
-  output     = "../src/generated/prisma"
+  output     = "../packages/db/src/generated/prisma"
 }
 
 datasource db {
@@ -136,7 +136,7 @@ model Workspace {
 }
 
 model Task {
-  id                  String             @id @default(cuid())
+  id                  String                 @id @default(cuid())
   workspaceId         String
   title               String
   description         String?
@@ -155,25 +155,25 @@ model Task {
   dueAt               DateTime?
   scheduledStartAt    DateTime?
   scheduledEndAt      DateTime?
-  scheduleStatus      ScheduleStatus     @default(Unscheduled)
+  scheduleStatus      ScheduleStatus         @default(Unscheduled)
   scheduleSource      ScheduleSource?
   budgetLimit         Int?
   blockReason         Json?
   defaultSessionId    String?
   latestRunId         String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
   completedAt         DateTime?
-  workspace           Workspace          @relation(fields: [workspaceId], references: [id])
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id])
   runs                Run[]
-  sessions            TaskSession[]      @relation("TaskSessions")
+  sessions            TaskSession[]          @relation("TaskSessions")
   approvals           Approval[]
   artifacts           Artifact[]
   memories            Memory[]
   events              Event[]
   projection          TaskProjection?
-  dependencies        TaskDependency[]   @relation("TaskDependencies")
-  dependentTasks      TaskDependency[]   @relation("TaskDependents")
+  dependencies        TaskDependency[]       @relation("TaskDependencies")
+  dependentTasks      TaskDependency[]       @relation("TaskDependents")
   scheduleProposals   ScheduleProposal[]
   assistantMessages   TaskAssistantMessage[]
 
@@ -444,26 +444,26 @@ enum AiClientType {
 }
 
 model AiClient {
-  id          String       @id @default(cuid())
-  name        String
-  type        AiClientType
+  id        String             @id @default(cuid())
+  name      String
+  type      AiClientType
   /// JSON config — shape depends on type:
   ///   openclaw: { bridgeUrl, timeoutSeconds }
   ///   llm: { baseUrl, apiKey, model, temperature }
-  config      Json
-  isDefault   Boolean      @default(false)
-  enabled     Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  bindings    AiFeatureBinding[]
+  config    Json
+  isDefault Boolean            @default(false)
+  enabled   Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  bindings  AiFeatureBinding[]
 }
 
 model AiFeatureBinding {
-  id          String   @id @default(cuid())
-  feature     String   /// e.g. "suggest", "decompose", "conflicts", "timeslots", "chat"
-  clientId    String
-  client      AiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  feature   String /// e.g. "suggest", "decompose", "conflicts", "timeslots", "chat"
+  clientId  String
+  client    AiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@unique([feature])
 }
@@ -475,9 +475,9 @@ model AiFeatureBinding {
 model TaskAssistantMessage {
   id        String    @id @default(cuid())
   taskId    String
-  role      String    /// "user" | "assistant"
+  role      String /// "user" | "assistant"
   content   String
-  proposal  String?   /// JSON-serialized TaskWorkspaceUpdateProposal
+  proposal  String? /// JSON-serialized TaskWorkspaceUpdateProposal
   applied   Boolean   @default(false)
   appliedAt DateTime?
   sequence  Int
