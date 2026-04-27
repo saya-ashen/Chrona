@@ -3,6 +3,17 @@
   "version": "0.1.0",
   "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
   "license": "MIT",
+  "bin": {
+    "chrona": "./packages/cli/src/main.ts"
+  },
+  "files": [
+    "apps",
+    "packages",
+    "prisma",
+    "scripts",
+    "tsconfig.json",
+    ".env.example"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/your-org/Chrona.git"
@@ -42,7 +53,9 @@
     "db:migrate": "prisma migrate dev",
     "setup": "bun run db:generate && bun run db:seed",
     "postinstall": "prisma generate",
-    "probe:openclaw": "bun scripts/openclaw/probe.ts"
+    "probe:openclaw": "bun scripts/openclaw/probe.ts",
+    "cli:build": "bun build packages/cli/src/main.ts --outdir=packages/cli/dist --target=bun",
+    "prepublishOnly": "bun run build && bun run cli:build"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
