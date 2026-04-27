@@ -52,6 +52,7 @@ prisma/dev.db
 
 # build output
 apps/web/dist/
+apps/web/node_modules/.vite/
 
 # misc generated
 /src/
