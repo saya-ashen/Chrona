@@ -1,6 +1,5 @@
 import chalk from "chalk";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Table = require("cli-table3");
+import Table from "cli-table3";
 
 export type OutputFormat = "json" | "table";
 

@@ -42,7 +42,7 @@ function ensureDb() {
 }
 
 function startServer() {
-  const serverPath = resolve(appDir, "apps/server/src/index.bun.ts");
+  const serverPath = resolve(appDir, "apps/server/src/index.ts");
   const serverProcess = spawn("bun", ["run", serverPath], {
     cwd: appDir,
     stdio: "inherit",
@@ -84,12 +84,12 @@ function openBrowser(port: number) {
 
 async function delegateToCli(args: string[]) {
   const cliPath = resolve(appDir, "packages/common/cli/src/index.ts");
-  const process = spawn("bun", ["run", cliPath, ...args], {
+  const proc = spawn("bun", ["run", cliPath, ...args], {
     cwd: appDir,
     stdio: "inherit",
   });
   return new Promise<void>((resolve) => {
-    process.on("exit", (code) => resolve());
+    proc.on("exit", () => resolve());
   });
 }
 
@@ -117,17 +117,11 @@ async function main() {
   console.log(`🚀 Starting Chrona on http://localhost:${port}`);
   console.log("");
 
-  const server = startServer();
+  startServer();
 
   setTimeout(() => {
     openBrowser(port);
   }, 1500);
-
-  const exitPromise = new Promise<void>((resolve) => {
-    server.on("exit", () => resolve());
-  });
-
-  await exitPromise;
 }
 
 await main();

@@ -51,8 +51,13 @@ prisma/dev.db
 .env.local
 
 # build output
+/dist/
+/packages/cli/dist/
 apps/web/dist/
 apps/web/node_modules/.vite/
+
+# npm pack
+*.tgz
 
 # misc generated
 /src/
