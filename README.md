@@ -25,7 +25,7 @@ The project focuses on making planning and execution feel like one connected sys
 
 ```bash
 # Clone and install (auto-generates Prisma client via postinstall)
-git clone https://github.com/your-org/Chrona.git
+git clone https://github.com/saya-ashen/Chrona.git
 cd Chrona
 bun install
 

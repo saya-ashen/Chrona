@@ -30,7 +30,7 @@ case "$INSTALL_METHOD" in
       echo "Chrona already installed at $INSTALL_DIR. Updating..."
       git -C "$INSTALL_DIR" pull --ff-only
     else
-      git clone https://github.com/your-org/Chrona.git "$INSTALL_DIR"
+      git clone https://github.com/saya-ashen/Chrona.git "$INSTALL_DIR"
     fi
     cd "$INSTALL_DIR"
     bun install
