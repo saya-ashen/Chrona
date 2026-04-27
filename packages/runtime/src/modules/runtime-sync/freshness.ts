@@ -1,7 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createRuntimeAdapter, type OpenClawAdapter } from "@chrona/openclaw-integration/runtime/adapter";
-import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 
 export const SYNC_STALE_MS = 5 * 60 * 1000;
 
@@ -51,6 +50,7 @@ export async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
 
   try {
     const activeAdapter = adapter ?? (await createRuntimeAdapter());
+    const { syncRunFromRuntime } = await import("@/modules/runtime-sync/sync-run");
     await syncRunFromRuntime({ runId, adapter: activeAdapter });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Runtime sync failed";
