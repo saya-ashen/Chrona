@@ -1,50 +1,14 @@
 import type { BridgeFeature } from "../transport/bridge-types";
 import type { BridgeEnvironment } from "./types";
 
-function normalizeGatewayHttpUrl(url: string, sourceEnvName: string): string {
-  const trimmed = url.trim();
-
-  if (trimmed.startsWith("ws://")) {
-    if (sourceEnvName === "OPENCLAW_GATEWAY_URL") {
-      return `http://${trimmed.slice("ws://".length)}`.replace(/\/+$/, "");
-    }
-    throw new Error(
-      `${sourceEnvName} must be an http(s) URL for the Gateway OpenResponses compatibility endpoint, not a ws(s) URL`,
-    );
-  }
-
-  if (trimmed.startsWith("wss://")) {
-    if (sourceEnvName === "OPENCLAW_GATEWAY_URL") {
-      return `https://${trimmed.slice("wss://".length)}`.replace(/\/+$/, "");
-    }
-    throw new Error(
-      `${sourceEnvName} must be an http(s) URL for the Gateway OpenResponses compatibility endpoint, not a ws(s) URL`,
-    );
-  }
-
-  return trimmed.replace(/\/+$/, "");
-}
-
-const openResponsesUrl = process.env.OPENCLAW_OPENRESPONSES_URL;
-const legacyGatewayUrl = process.env.OPENCLAW_GATEWAY_URL;
-
 export const DEFAULT_OPENCLAW_ENVIRONMENT: BridgeEnvironment = {
-  defaultPort: Number(process.env.OPENCLAW_BRIDGE_PORT ?? "7677"),
-  gatewayHttpUrl: normalizeGatewayHttpUrl(
-    openResponsesUrl ?? legacyGatewayUrl ?? "http://127.0.0.1:18789",
-    openResponsesUrl
-      ? "OPENCLAW_OPENRESPONSES_URL"
-      : legacyGatewayUrl
-        ? "OPENCLAW_GATEWAY_URL"
-        : "default",
-  ),
-  gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN ?? "",
-  agentId: process.env.OPENCLAW_AGENT_ID ?? "main",
-  model: process.env.OPENCLAW_MODEL?.trim() || undefined,
-  messageChannel: process.env.OPENCLAW_MESSAGE_CHANNEL?.trim() || undefined,
+  defaultPort: 7677,
+  gatewayHttpUrl: "",
+  gatewayToken: "",
+  agentId: "main",
+  model: undefined,
+  messageChannel: undefined,
 };
-
-export { normalizeGatewayHttpUrl };
 
 export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   suggest_task_completions: {

@@ -1,103 +1,102 @@
 # Chrona Quick Start
 
-## What Chrona does
+## What is Chrona
 
-Chrona is currently organized around two main product blocks:
-- schedule creation and arrangement
-- automatic task completion
+Chrona is an AI-native task control plane with two core loops:
 
-The schedule side helps users go from rough intent to a concrete calendar block and task plan.
-The task side is moving toward scheduled, agent-driven execution with automatic plan updates.
+- **Schedule** — turn rough intent into concrete time blocks and structured task plans
+- **Execute** — let AI agents carry tasks forward with continuously updated plans
 
 ## Prerequisites
 
-- Bun 1.x
-- Git
-- SQLite via Prisma (local default setup)
+- **Node.js >= 20** — the only runtime requirement
+- No Bun, no build tools, no Docker needed
 
 ## Install
 
 ```bash
-git clone <repo-url> Chrona
-cd Chrona
-bun install
+npm install -g @chrona-org/cli
 ```
 
-## Initialize local development
+## Start
 
 ```bash
-bunx prisma generate
-bun run db:seed
+chrona start
 ```
 
-Note: `bunx prisma db push` is currently not reliable in this repository on this environment, so it is not listed here as a primary setup command until that workflow is stabilized.
+First run does everything automatically:
+- Creates `~/.local/share/chrona/` (data)
+- Creates `~/.config/chrona/.env` (config, from the bundled template)
+- Creates the SQLite database and runs schema migrations
+- Opens `http://localhost:3101` in your browser
 
-## Start the web app + local API server
+The web app runs entirely locally — no cloud account, no SaaS.
+
+### Data directories
+
+| Platform | Data | Config |
+|----------|------|--------|
+| Linux | `~/.local/share/chrona/` | `~/.config/chrona/` |
+| macOS | `~/Library/Application Support/chrona/` | `~/Library/Preferences/chrona/` |
+| Windows | `%APPDATA%/chrona/` | `%APPDATA%/chrona/` |
+
+Override with env vars: `CHRONA_DATA_DIR`, `CHRONA_CONFIG_DIR`.
+
+## Configure AI Backends
+
+Open **Settings > AI Clients** in the web app to add and configure AI backends.
+
+Two backend types are supported:
+
+### LLM (OpenRouter-compatible API)
+
+Any OpenRouter-compatible endpoint. Configure via the web UI — add an LLM client with your API key and model name.
+
+### OpenClaw Gateway
+
+Add an OpenClaw client in the web UI with your gateway URL and token. Test connectivity from the Settings page after configuring.
+
+## CLI Usage
+
+The `chrona` command also functions as a CLI client for the local API:
 
 ```bash
-bun run dev
+chrona task list                          # List tasks
+chrona task create --title "Research X"   # Create a task
+chrona task show <id>                     # Show task details
+chrona run start <task-id>               # Start agent run
+chrona schedule list                     # List scheduled tasks
+chrona ai suggest --title "idea"         # AI task suggestions
 ```
 
-Then open:
-- http://localhost:3100
+All commands accept `--base-url` to target a different API server.
 
-Development ports:
-- SPA dev server: `http://localhost:3100`
-- local API server: `http://localhost:3101`
+## Product Flow
 
-Production/local-first serving flow:
+### 1. Create & schedule
+
+Create tasks in the web app or via CLI. Use the Schedule page's calendar view to drag tasks into time slots. AI features help with auto-complete, plan generation, and timeslot suggestions.
+
+### 2. Configure execution
+
+Each task can be assigned a runtime adapter (e.g. `openclaw`), an AI model, and an execution prompt. The task workspace provides a visual plan graph that you can edit, reorder, and materialize into child tasks.
+
+### 3. Run & observe
+
+Start an agent run on a task. Watch the live conversation, tool calls, and approvals in the Work view. Agents can request input or approval mid-run. Execution progress automatically updates the plan.
+
+## Server Options
 
 ```bash
-bun run build
-bun run start
+chrona start                     # Default on port 3101
+PORT=3100 chrona start           # Custom port
+HOST=0.0.0.0 chrona start        # Bind to all interfaces
 ```
 
-Then open:
-- http://localhost:3101
+The server hosts both the API and the static SPA from the same port in production mode.
 
-## Runtime directions
+## Next Reading
 
-Chrona's backend is being designed to support multiple runtime backends behind the same product surface:
-- bare LLM
-- OpenClaw
-- Hermes
-
-This means planning and execution should stay product-consistent even if the actual runtime provider changes.
-
-## Current product flow
-
-### A. Schedule creation and arrangement
-
-The scheduling side is focused on helping users create and refine work blocks.
-
-Planned/active ideas include:
-- intelligent prompts when creating schedule items
-- AI-assisted task planning
-- turning loose text into structured task plans
-- fast review and editing inside the scheduling cockpit
-
-### B. Task automatic completion
-
-The task side is focused on agent execution.
-
-Current direction:
-- run an agent automatically according to the schedule
-- let the agent complete the task with the configured runtime
-- automatically update the plan as execution progresses
-- keep planning and execution synchronized
-
-## Useful commands
-
-```bash
-bun run dev
-bun run build
-bun run start
-bun run typecheck
-bun run test
-```
-
-## Next reading
-
-- Product roadmap: ./roadmap.md
-- Architecture: ../architecture.md
-- API Reference: ../api-reference.md
+- [Roadmap](./roadmap.md) — what's planned
+- [Architecture](../architecture.md) — CQRS + Event Sourcing design
+- [API Reference](../api-reference.md) — REST API docs
