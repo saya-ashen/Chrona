@@ -1,6 +1,6 @@
 {
   "name": "chrona",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
   "license": "MIT",
   "bin": {
