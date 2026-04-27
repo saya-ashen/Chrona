@@ -63,9 +63,13 @@ Add `--base-url` to point at a different server.
 
 *Calendar view with timeline, task blocks, drag-and-drop scheduling, and unscheduled queue.*
 
-![Task Workspace](./docs/assets/demo-task.gif)
+![Quick Add + AI Plan](./docs/assets/demo-quick-add.gif)
 
-*AI-generated task plan graph with step types, dependencies, estimates, and regenerations.*
+*Create a task via Quick Add: fill title & description, AI generates a step-by-step execution plan with nodes, dependencies, and time estimates.*
+
+![Task Workspace](./docs/assets/demo-workspace.gif)
+
+*Task detail page showing the plan graph (16 nodes, typed steps, dependency edges), task metadata, and the AI assistant sidebar.*
 
 ![Settings](./docs/assets/demo-settings.gif)
 
