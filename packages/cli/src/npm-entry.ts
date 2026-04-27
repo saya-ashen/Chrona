@@ -124,13 +124,11 @@ function banner() {
 function openBrowser(port: number) {
   const url = `http://localhost:${port}`;
   try {
-    if (process.platform === "darwin") {
-      spawn("open", [url], { stdio: "ignore", detached: true }).unref();
-    } else if (process.platform === "win32") {
-      spawn("cmd", ["/c", "start", url], { stdio: "ignore", detached: true }).unref();
-    } else {
-      spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
-    }
+    const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+    const args = process.platform === "win32" ? ["", url] : [url];
+    const proc = spawn(cmd, args, { stdio: "ignore", detached: true });
+    proc.on("error", () => {}); // suppress ENOENT on headless systems
+    proc.unref();
   } catch {
     // best-effort
   }
