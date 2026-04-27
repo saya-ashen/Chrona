@@ -49,3 +49,10 @@ agent-dashboard-app/
 prisma/dev.db
 .env
 .env.local
+
+# build output
+apps/web/dist/
+
+# misc generated
+src/
+assets/
