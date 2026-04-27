@@ -25,6 +25,20 @@ function ensureEnv() {
   console.log("");
 }
 
+function ensureBuild() {
+  const distIndex = resolve(appDir, "apps/web/dist/index.html");
+  if (existsSync(distIndex)) return;
+
+  console.log("🔨 Building frontend...");
+  try {
+    execSync("bun run build", { cwd: appDir, stdio: "inherit" });
+    console.log("✅ Build complete.");
+  } catch {
+    console.log("⚠️  Build failed. Run 'bun run build' manually.");
+  }
+  console.log("");
+}
+
 function ensureDb() {
   const dbUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
   const dbPath = dbUrl.replace(/^file:/, "");
@@ -105,6 +119,7 @@ async function main() {
 
   ensureEnv();
   ensureDb();
+  ensureBuild();
 
   const port = Number.parseInt(process.env.PORT ?? "3101", 10);
 
