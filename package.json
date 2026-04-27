@@ -1,5 +1,5 @@
 {
-  "name": "chrona",
+  "name": "@chrona-org/cli",
   "version": "0.1.1",
   "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
   "license": "MIT",
