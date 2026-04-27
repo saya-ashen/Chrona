@@ -399,7 +399,8 @@ export const ModelName = {
   ScheduleProposal: 'ScheduleProposal',
   RuntimeCursor: 'RuntimeCursor',
   AiClient: 'AiClient',
-  AiFeatureBinding: 'AiFeatureBinding'
+  AiFeatureBinding: 'AiFeatureBinding',
+  TaskAssistantMessage: 'TaskAssistantMessage'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding"
+    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1603,6 +1604,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TaskAssistantMessage: {
+      payload: Prisma.$TaskAssistantMessagePayload<ExtArgs>
+      fields: Prisma.TaskAssistantMessageFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskAssistantMessageFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskAssistantMessageFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        findFirst: {
+          args: Prisma.TaskAssistantMessageFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskAssistantMessageFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        findMany: {
+          args: Prisma.TaskAssistantMessageFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>[]
+        }
+        create: {
+          args: Prisma.TaskAssistantMessageCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        createMany: {
+          args: Prisma.TaskAssistantMessageCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskAssistantMessageCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>[]
+        }
+        delete: {
+          args: Prisma.TaskAssistantMessageDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        update: {
+          args: Prisma.TaskAssistantMessageUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskAssistantMessageDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskAssistantMessageUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskAssistantMessageUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskAssistantMessageUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskAssistantMessagePayload>
+        }
+        aggregate: {
+          args: Prisma.TaskAssistantMessageAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskAssistantMessage>
+        }
+        groupBy: {
+          args: Prisma.TaskAssistantMessageGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskAssistantMessageGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskAssistantMessageCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskAssistantMessageCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1930,6 +2005,21 @@ export const AiFeatureBindingScalarFieldEnum = {
 export type AiFeatureBindingScalarFieldEnum = (typeof AiFeatureBindingScalarFieldEnum)[keyof typeof AiFeatureBindingScalarFieldEnum]
 
 
+export const TaskAssistantMessageScalarFieldEnum = {
+  id: 'id',
+  taskId: 'taskId',
+  role: 'role',
+  content: 'content',
+  proposal: 'proposal',
+  applied: 'applied',
+  appliedAt: 'appliedAt',
+  sequence: 'sequence',
+  createdAt: 'createdAt'
+} as const
+
+export type TaskAssistantMessageScalarFieldEnum = (typeof TaskAssistantMessageScalarFieldEnum)[keyof typeof TaskAssistantMessageScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2248,6 +2338,7 @@ export type GlobalOmitConfig = {
   runtimeCursor?: Prisma.RuntimeCursorOmit
   aiClient?: Prisma.AiClientOmit
   aiFeatureBinding?: Prisma.AiFeatureBindingOmit
+  taskAssistantMessage?: Prisma.TaskAssistantMessageOmit
 }
 
 /* Types for Logging */

@@ -7,7 +7,7 @@ import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapt
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
 import type { StructuredSuggestion } from "@chrona/contracts/legacy-hooks/ai/types";
 import { createLogger, summarizeText } from "@chrona/db/legacy-lib/logger";
-import { aiAnalyzeConflicts, aiGeneratePlan, aiGeneratePlanStream, aiSuggestStream, aiSuggestTimeslots, getAIClientInfo, isAIAvailable } from "@chrona/runtime/modules/ai/ai-service";
+import { aiAnalyzeConflicts, aiChat, aiGeneratePlan, aiGeneratePlanStream, aiSuggestStream, aiSuggestTimeslots, getAIClientInfo, isAIAvailable } from "@chrona/runtime/modules/ai/ai-service";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/runtime/modules/ai/ai-service";
 import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analyzer";
 import { suggestAutomationSmart } from "@chrona/runtime/modules/ai/automation-suggester";
@@ -312,6 +312,17 @@ async function deleteTaskWithRelations(taskId: string) {
     throw new HttpError(404, "Task not found");
   }
 
+  await appendCanonicalEvent({
+    eventType: "task.deleted",
+    workspaceId: task.workspaceId,
+    taskId: task.id,
+    actorType: "user",
+    actorId: "server-action",
+    source: "ui",
+    payload: { title: task.title },
+    dedupeKey: `task.deleted:${task.id}`,
+  });
+
   await db.$transaction(async (tx) => {
     await tx.taskProjection.deleteMany({ where: { taskId } });
     await tx.run.deleteMany({ where: { taskId } });
@@ -346,17 +357,6 @@ async function deleteTaskWithRelations(taskId: string) {
     }
 
     await tx.task.delete({ where: { id: taskId } });
-  });
-
-  await appendCanonicalEvent({
-    eventType: "task.deleted",
-    workspaceId: task.workspaceId,
-    taskId: task.id,
-    actorType: "user",
-    actorId: "server-action",
-    source: "ui",
-    payload: { title: task.title },
-    dedupeKey: `task.deleted:${task.id}`,
   });
 
   return { success: true, taskId };
@@ -2074,6 +2074,301 @@ export function createApiRouter() {
     }
   });
 
+  api.post("/tasks/:taskId/plan", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json();
+      const { operation, nodes, edges, nodePatches, deletedNodeIds, reorder, summary } =
+        body as {
+          operation: string;
+          nodes?: Array<Record<string, unknown>>;
+          edges?: Array<Record<string, unknown>>;
+          nodePatches?: Array<{ id: string } & Record<string, unknown>>;
+          deletedNodeIds?: string[];
+          reorder?: string[];
+          summary?: string;
+        };
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const currentPlanGraph = await getLatestTaskPlanGraph(taskId);
+      if (!currentPlanGraph) return error(c, "No plan found for this task", 404);
+
+      // Deep-clone to avoid mutating the fetched plan reference
+      const plan = {
+        ...currentPlanGraph.plan,
+        nodes: currentPlanGraph.plan.nodes.map((n: Record<string, unknown>) => ({ ...n })),
+        edges: currentPlanGraph.plan.edges.map((e: Record<string, unknown>) => ({ ...e })),
+      } as typeof currentPlanGraph.plan;
+      const now = new Date().toISOString();
+
+      switch (operation) {
+        case "add_node": {
+          if (!nodes || nodes.length === 0) {
+            return error(c, "add_node requires nodes[]", 400);
+          }
+          const newNodes = nodes.map((n, i) => ({
+            id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${i}`,
+            type: (typeof n.type === "string" ? n.type : "step") as import("@chrona/contracts/ai").TaskPlanNodeType,
+            title: typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`,
+            objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`),
+            description: typeof n.description === "string" && n.description.trim() ? n.description : null,
+            status: "pending" as import("@chrona/contracts/ai").TaskPlanNodeStatus,
+            phase: null as string | null,
+            estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : null,
+            priority: typeof n.priority === "string" ? n.priority as "Low" | "Medium" | "High" | "Urgent" | null : null,
+            executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode,
+            requiresHumanInput: Boolean(n.requiresHumanInput),
+            requiresHumanApproval: Boolean(n.requiresHumanApproval),
+            autoRunnable: !Boolean(n.requiresHumanInput) && !Boolean(n.requiresHumanApproval),
+            blockingReason: null as import("@chrona/contracts/ai").TaskPlanNodeBlockingReason,
+            linkedTaskId: null as string | null,
+            completionSummary: null as string | null,
+            metadata: null as Record<string, unknown> | null,
+          }));
+          plan.nodes = [...plan.nodes, ...newNodes] as typeof plan.nodes;
+          if (edges && edges.length > 0) {
+            plan.edges = [...plan.edges, ...edges.map((e, i) => ({
+              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
+              fromNodeId: e.fromNodeId as string,
+              toNodeId: e.toNodeId as string,
+              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
+              metadata: null as Record<string, unknown> | null,
+            }))] as typeof plan.edges;
+          }
+          break;
+        }
+        case "update_node": {
+          if (!nodePatches || nodePatches.length === 0) {
+            return error(c, "update_node requires nodePatches[]", 400);
+          }
+          const existingIds = new Set(plan.nodes.map((n) => n.id));
+          const unknownIds = nodePatches.map((p) => p.id).filter((id) => !existingIds.has(id));
+          if (unknownIds.length > 0) {
+            return error(c, `Unknown node id(s): ${unknownIds.join(", ")}`, 400);
+          }
+          const patchMap = new Map(nodePatches.map((p) => [p.id, p]));
+          plan.nodes = plan.nodes.map((node) => {
+            const patch = patchMap.get(node.id);
+            if (!patch) return node;
+            return {
+              ...node,
+              ...(typeof patch.title === "string" ? { title: patch.title } : {}),
+              ...(typeof patch.objective === "string" ? { objective: patch.objective } : {}),
+              ...(typeof patch.description === "string" ? { description: patch.description } : {}),
+              ...(typeof patch.estimatedMinutes === "number" ? { estimatedMinutes: patch.estimatedMinutes } : {}),
+              ...(typeof patch.status === "string" ? { status: patch.status as import("@chrona/contracts/ai").TaskPlanNodeStatus } : {}),
+              ...(typeof patch.priority === "string" ? { priority: patch.priority as import("@chrona/contracts/ai").TaskPlanNode["priority"] } : {}),
+              ...(typeof patch.executionMode === "string" ? { executionMode: patch.executionMode as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode } : {}),
+            };
+          });
+          break;
+        }
+        case "delete_node": {
+          if (!deletedNodeIds || deletedNodeIds.length === 0) {
+            return error(c, "delete_node requires deletedNodeIds[]", 400);
+          }
+          const deleteSet = new Set(deletedNodeIds);
+          plan.nodes = plan.nodes.filter((n) => !deleteSet.has(n.id));
+          plan.edges = plan.edges.filter(
+            (e) => !deleteSet.has(e.fromNodeId) && !deleteSet.has(e.toNodeId),
+          );
+          break;
+        }
+        case "update_dependencies": {
+          if (!edges || edges.length === 0) {
+            return error(c, "update_dependencies requires edges[]", 400);
+          }
+          const existingIds = new Set(plan.nodes.map((n) => n.id));
+          const missingFrom = edges.filter((e) => !existingIds.has(e.fromNodeId as string));
+          const missingTo = edges.filter((e) => !existingIds.has(e.toNodeId as string));
+          if (missingFrom.length > 0) {
+            return error(c, `Unknown fromNodeId(s): ${missingFrom.map((e) => e.fromNodeId).join(", ")}`, 400);
+          }
+          if (missingTo.length > 0) {
+            return error(c, `Unknown toNodeId(s): ${missingTo.map((e) => e.toNodeId).join(", ")}`, 400);
+          }
+          const newEdgeIds = new Set(edges.map((e) => `${e.fromNodeId}->${e.toNodeId}`));
+          plan.edges = [
+            ...plan.edges.filter((e) => !newEdgeIds.has(`${e.fromNodeId}->${e.toNodeId}`)),
+            ...edges.map((e, i) => ({
+              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
+              fromNodeId: e.fromNodeId as string,
+              toNodeId: e.toNodeId as string,
+              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
+              metadata: null as Record<string, unknown> | null,
+            })),
+          ] as typeof plan.edges;
+          break;
+        }
+        case "reorder_nodes": {
+          if (!reorder || reorder.length === 0) {
+            return error(c, "reorder_nodes requires reorder[]", 400);
+          }
+          const orderMap = new Map(reorder.map((id, i) => [id, i]));
+          const reordered = plan.nodes
+            .filter((n) => orderMap.has(n.id))
+            .sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+          const firstIndex = plan.nodes.findIndex((n) => orderMap.has(n.id));
+          const insertAt = firstIndex >= 0 ? firstIndex : plan.nodes.length;
+          const kept = plan.nodes.filter((n) => !orderMap.has(n.id));
+          plan.nodes = [...kept.slice(0, insertAt), ...reordered, ...kept.slice(insertAt)];
+          break;
+        }
+        case "update_plan_summary": {
+          if (summary !== undefined) {
+            plan.summary = summary;
+          }
+          break;
+        }
+        default:
+          return error(c, `Unsupported plan operation: ${operation}`, 400);
+      }
+
+      const savedPlan = await saveTaskPlanGraph({
+        workspaceId: task.workspaceId,
+        taskId,
+        plan,
+        prompt: currentPlanGraph.prompt,
+        status: currentPlanGraph.status,
+        source: "mixed",
+        generatedBy: currentPlanGraph.generatedBy,
+        summary: plan.summary ?? currentPlanGraph.summary,
+        changeSummary: `Applied plan patch: ${operation}`,
+      });
+
+      return json(c, {
+        taskId,
+        operation,
+        planGraph: savedPlan.plan,
+      }, 200);
+    } catch (cause) {
+      return internalServerError(c, "POST /api/tasks/:taskId/plan", cause, "Failed to apply plan patch");
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // Task Workspace Assistant — DB-backed messages
+  // ──────────────────────────────────────────────
+
+  api.post("/tasks/:taskId/assistant/messages", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json();
+      const { role, content, proposal } = body as {
+        role: string;
+        content: string;
+        proposal?: Record<string, unknown> | null;
+      };
+
+      if (!role || !content) {
+        return error(c, "role and content are required", 400);
+      }
+      if (role !== "user" && role !== "assistant") {
+        return error(c, "role must be 'user' or 'assistant'", 400);
+      }
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const lastMsg = await db.taskAssistantMessage.findFirst({
+        where: { taskId },
+        orderBy: { sequence: "desc" },
+        select: { sequence: true },
+      });
+      const sequence = (lastMsg?.sequence ?? -1) + 1;
+
+      const message = await db.taskAssistantMessage.create({
+        data: {
+          taskId,
+          role,
+          content,
+          proposal: proposal ? JSON.stringify(proposal) : null,
+          sequence,
+        },
+      });
+
+      return json(c, {
+        id: message.id,
+        taskId: message.taskId,
+        role: message.role,
+        content: message.content,
+        proposal: message.proposal ? (JSON.parse(message.proposal) as Record<string, unknown>) : null,
+        applied: message.applied,
+        appliedAt: message.appliedAt,
+        sequence: message.sequence,
+        createdAt: message.createdAt,
+      }, 201);
+    } catch (cause) {
+      return internalServerError(c, "POST /api/tasks/:taskId/assistant/messages", cause, "Failed to save message");
+    }
+  });
+
+  api.get("/tasks/:taskId/assistant/messages", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const messages = await db.taskAssistantMessage.findMany({
+        where: { taskId },
+        orderBy: { sequence: "asc" },
+      });
+
+      return json(c, {
+        messages: messages.map((m) => ({
+          id: m.id,
+          taskId: m.taskId,
+          role: m.role,
+          content: m.content,
+          proposal: m.proposal ? (JSON.parse(m.proposal) as Record<string, unknown>) : null,
+          applied: m.applied,
+          appliedAt: m.appliedAt,
+          sequence: m.sequence,
+          createdAt: m.createdAt,
+        })),
+      });
+    } catch (cause) {
+      return internalServerError(c, "GET /api/tasks/:taskId/assistant/messages", cause, "Failed to fetch messages");
+    }
+  });
+
+  api.patch("/tasks/:taskId/assistant/messages/:messageId/apply", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const messageId = c.req.param("messageId");
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const existing = await db.taskAssistantMessage.findFirst({
+        where: { id: messageId, taskId },
+      });
+      if (!existing) return error(c, "Message not found", 404);
+
+      const message = await db.taskAssistantMessage.update({
+        where: { id: messageId },
+        data: { applied: true, appliedAt: new Date() },
+      });
+
+      return json(c, {
+        id: message.id,
+        taskId: message.taskId,
+        role: message.role,
+        content: message.content,
+        proposal: message.proposal ? (JSON.parse(message.proposal) as Record<string, unknown>) : null,
+        applied: message.applied,
+        appliedAt: message.appliedAt,
+        sequence: message.sequence,
+        createdAt: message.createdAt,
+      });
+    } catch (cause) {
+      return internalServerError(c, "PATCH /api/tasks/:taskId/assistant/messages/:messageId/apply", cause, "Failed to mark applied");
+    }
+  });
+
   api.post("/ai/apply-suggestion", async (c) => {
     try {
       const body = await c.req.json();
@@ -2163,6 +2458,317 @@ export function createApiRouter() {
       });
     } catch (cause) {
       return internalServerError(c, "POST /api/ai/apply-suggestion", cause, "Failed to apply suggestion");
+    }
+  });
+
+  api.post("/ai/task-workspace/chat", async (c) => {
+    try {
+      const body = await c.req.json();
+      const taskId = typeof body.taskId === "string" ? body.taskId : "";
+      const message = typeof body.message === "string" ? body.message.trim() : "";
+      const currentTask = body.currentTask ?? null;
+      const currentPlan = body.currentPlan ?? null;
+      const history = Array.isArray(body.history) ? body.history : [];
+
+      if (!taskId) {
+        return error(c, "taskId is required", 400);
+      }
+      if (!message) {
+        return error(c, "message is required", 400);
+      }
+
+      const taskSnapshotText = currentTask
+        ? JSON.stringify(currentTask, null, 2)
+        : "No task data provided.";
+
+      const planSnapshotText = currentPlan
+        ? JSON.stringify(
+            {
+              id: currentPlan.id,
+              status: currentPlan.status,
+              revision: currentPlan.revision,
+              summary: currentPlan.summary,
+              nodeCount: currentPlan.nodes?.length ?? 0,
+              nodes: (currentPlan.nodes ?? []).map((n: Record<string, unknown>) => ({
+                id: n.id,
+                title: n.title,
+                status: n.status,
+                objective: n.objective,
+                estimatedMinutes: n.estimatedMinutes,
+                priority: n.priority,
+                executionMode: n.executionMode,
+                dependsOn: n.dependsOn,
+              })),
+              edges: (currentPlan.edges ?? []).map((e: Record<string, unknown>) => ({
+                fromNodeId: e.fromNodeId,
+                toNodeId: e.toNodeId,
+                type: e.type,
+              })),
+            },
+            null,
+            2,
+          )
+        : "No plan data provided.";
+
+      const systemPrompt = `You are the Task Workspace Assistant for Chrona.
+Your role is to help users modify the current task and its corresponding plan through natural language.
+
+## Current Task:
+${taskSnapshotText}
+
+## Current Plan:
+${planSnapshotText}
+
+## Data schemas (CRITICAL — use these exact field names):
+
+### Node fields when creating (add_node):
+{ "id": "unique-string", "type": "step"|"checkpoint"|"decision"|"user_input"|"deliverable"|"tool_action", "title": "string", "objective": "string", "description": "string or null", "status": "pending"|"in_progress"|"done"|"blocked"|"skipped", "estimatedMinutes": number|null, "priority": "Low"|"Medium"|"High"|"Urgent"|null, "executionMode": "automatic"|"manual"|"hybrid" }
+
+### NodePatch fields (update_node — only include fields to change):
+{ "id": "node-id", "title"?: "string", "objective"?: "string", "description"?: "string", "estimatedMinutes"?: number, "status"?: "pending"|"in_progress"|"done", "priority"?: "Low"|"Medium"|"High"|"Urgent", "executionMode"?: "automatic"|"manual"|"hybrid" }
+
+### Edge fields (for add_node and update_dependencies):
+{ "id"?: "edge-id", "fromNodeId": "existing-node-id", "toNodeId": "existing-node-id", "type": "depends_on"|"sequential"|"branches_to"|"unblocks"|"feeds_output" }
+
+## Available operations:
+
+### update_node
+Edit content of existing nodes. Use nodePatches[] with ONLY the fields to change plus the node "id". Edges are unchanged.
+When: "change node X title to Y", "clarify step 2", "mark node X as done"
+
+### add_node
+Add new nodes. Provide full node objects in nodes[] using the Node fields schema above. Provide connecting edges in edges[] using the Edge fields schema. Edge fromNodeId/toNodeId MUST reference existing node IDs from the current plan.
+When: "add a step for testing", "insert a review node"
+
+### delete_node
+Remove nodes by ID in deletedNodeIds[]. Edges involving deleted nodes are auto-removed.
+When: "remove the deployment step", "delete node X"
+
+### update_dependencies
+ADD new edges (or replace existing ones). Provide edges[] using the Edge fields schema. Edges not listed are KEPT. Duplicate fromNodeId→toNodeId pairs are ignored (idempotent).
+When: "connect X to Y", "add a dependency from A to B"
+
+### reorder_nodes
+Change the display order of specific nodes. Provide reorder[] with ONLY the node IDs being reordered, in the desired order. Other nodes keep their relative positions. The reordered block is placed at the position of the first reordered node.
+When: "move X before Y", "reorder the steps"
+
+### update_plan_summary
+Change only the plan's top-level summary text.
+When: "rename the plan", "change the plan description"
+
+### replace_plan
+Replace the entire plan graph. Use ONLY when user asks to regenerate or overhaul.
+When: "regenerate the whole plan", "start over"
+
+### materialize_child_tasks
+Convert plan nodes into child tasks.
+When: "materialize", "create subtasks", "sync to child tasks"
+
+## Choosing the right operation (EXAMPLES):
+- "update node X to say Y" → update_node with nodePatches: [{"id":"X", "title":"Y"}]
+- "clarify / make clearer / reword node X" → update_node with nodePatches: [{"id":"X", "objective":"..."}]
+- "add a step for testing after node B" → add_node with nodes: [{...}], edges: [{"fromNodeId":"B", "toNodeId":"new-id", "type":"sequential"}]
+- "remove the deployment step" → delete_node with deletedNodeIds: ["node-d"]
+- "connect step A to step C" → update_dependencies with edges: [{"fromNodeId":"A", "toNodeId":"C", "type":"depends_on"}]
+- "move review before design" → reorder_nodes with reorder: ["review-id", "design-id"]
+- "rename this plan to..." → update_plan_summary with summary: "New Name"
+- "regenerate the whole plan" → replace_plan with nodes/edges
+
+## NEVER use "custom" as an operation.
+
+## Rules:
+1. ONLY use proposals when the user explicitly asks for a change.
+2. Use the exact field names from the schemas above.
+3. All time fields must be ISO 8601 (e.g. "2026-04-26T15:00:00.000Z").
+4. Do NOT modify system fields (id, workspaceId, createdAt, updatedAt).
+5. requiresConfirmation: true for: replacing plan, deleting nodes, materializing, clearing prompt/description, modifying runtimeConfig, schedule adjustments.
+6. Priority: "Low"|"Medium"|"High"|"Urgent".
+7. Edge fromNodeId/toNodeId MUST match EXISTING node IDs from the current plan.
+8. For add_node edges, reference nodes by their real IDs from the plan snapshot.
+
+## Response format:
+Always respond as:
+{
+  "assistantMessage": "Your conversational reply.",
+  "proposal": {
+    "summary": "Brief summary of changes",
+    "confidence": "high"|"medium"|"low",
+    "taskPatch": { /* optional */ },
+    "planPatch": {
+      "operation": "update_node"|"add_node"|"delete_node"|"update_dependencies"|"reorder_nodes"|"update_plan_summary"|"replace_plan"|"materialize_child_tasks"
+      /* Include exactly one of: nodePatches[], nodes[]+edges[], deletedNodeIds[], edges[], reorder[], summary */
+    },
+    "warnings": [],
+    "requiresConfirmation": true|false
+  }
+}
+
+## Concrete response examples:
+
+### Example 1 — update a node title:
+{
+  "assistantMessage": "I've updated the Research node title to 'Deep Market Research'.",
+  "proposal": {
+    "summary": "Rename Research node",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "update_node",
+      "nodePatches": [{ "id": "node-a", "title": "Deep Market Research" }]
+    },
+    "requiresConfirmation": false
+  }
+}
+
+### Example 2 — add a node with an edge:
+{
+  "assistantMessage": "I've added a 'Code Review' step after the Design phase.",
+  "proposal": {
+    "summary": "Add Code Review step after Design",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "add_node",
+      "nodes": [{ "id": "node-review", "type": "checkpoint", "title": "Code Review", "objective": "Review code for quality", "executionMode": "manual" }],
+      "edges": [{ "fromNodeId": "node-b", "toNodeId": "node-review", "type": "sequential" }]
+    },
+    "requiresConfirmation": false
+  }
+}
+
+### Example 3 — add a dependency:
+{
+  "assistantMessage": "I've connected the Research node directly to the Review node.",
+  "proposal": {
+    "summary": "Add dependency from Research to Review",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "update_dependencies",
+      "edges": [{ "fromNodeId": "node-a", "toNodeId": "node-c", "type": "depends_on" }]
+    },
+    "requiresConfirmation": false
+  }
+}
+
+### Example 4 — delete a node:
+{
+  "assistantMessage": "I've removed the Shipping step from the plan.",
+  "proposal": {
+    "summary": "Remove Shipping node",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "delete_node",
+      "deletedNodeIds": ["node-d"]
+    },
+    "requiresConfirmation": true
+  }
+}
+
+### Example 5 — reorder nodes:
+{
+  "assistantMessage": "I've moved the Review step before Design.",
+  "proposal": {
+    "summary": "Reorder: Review before Design",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "reorder_nodes",
+      "reorder": ["node-c", "node-b"]
+    },
+    "requiresConfirmation": false
+  }
+}
+
+### Example 6 — update plan summary:
+{
+  "assistantMessage": "I've renamed the plan to 'Q2 Delivery Flow'.",
+  "proposal": {
+    "summary": "Rename plan",
+    "confidence": "high",
+    "planPatch": {
+      "operation": "update_plan_summary",
+      "summary": "Q2 Delivery Flow"
+    },
+    "requiresConfirmation": false
+  }
+}
+
+### Example 7 — conversational (no change):
+{
+  "assistantMessage": "Your plan has 4 steps in a linear A→B→C→D flow. The Research step is estimated at 30 minutes."
+}
+
+Only include \`proposal\` when the user has clearly asked for a specific modification.`;
+
+      const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        { role: "system", content: systemPrompt },
+      ];
+
+      for (const entry of history) {
+        if (
+          entry &&
+          typeof entry === "object" &&
+          (entry.role === "user" || entry.role === "assistant") &&
+          typeof entry.content === "string"
+        ) {
+          messages.push(entry as { role: "user" | "assistant"; content: string });
+        }
+      }
+
+      messages.push({ role: "user", content: message });
+
+      const response = await aiChat({
+        messages,
+        jsonMode: true,
+        temperature: 0.3,
+      });
+
+      if (!response) {
+        return json(c, {
+          assistantMessage:
+            "Sorry, I could not process your request. AI service may be unavailable.",
+        });
+      }
+
+      if (response.parsed && typeof response.parsed === "object") {
+        const parsed = response.parsed as Record<string, unknown>;
+
+        let assistantMessage: string;
+        let proposal: Record<string, unknown> | undefined;
+
+        if (typeof parsed.assistantMessage === "string") {
+          assistantMessage = parsed.assistantMessage;
+          proposal =
+            parsed.proposal && typeof parsed.proposal === "object"
+              ? (parsed.proposal as Record<string, unknown>)
+              : undefined;
+        } else if (typeof parsed.content === "string") {
+          try {
+            const inner = JSON.parse(parsed.content) as Record<string, unknown>;
+            assistantMessage =
+              typeof inner.assistantMessage === "string"
+                ? inner.assistantMessage
+                : parsed.content;
+            proposal =
+              inner.proposal && typeof inner.proposal === "object"
+                ? (inner.proposal as Record<string, unknown>)
+                : undefined;
+          } catch {
+            assistantMessage = parsed.content;
+          }
+        } else {
+          assistantMessage = response.content;
+        }
+
+        return json(c, { assistantMessage, proposal });
+      }
+
+      return json(c, {
+        assistantMessage: response.content,
+      });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to process AI chat";
+      if (message.includes("AI client") || message.includes("No AI client")) {
+        return json(c, { assistantMessage: "AI service is not configured. Please set up an AI client in Settings.", error: message }, 503);
+      }
+      return internalServerError(c, "POST /api/ai/task-workspace/chat", cause, "Failed to process AI workspace chat");
     }
   });
 

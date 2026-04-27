@@ -421,6 +421,21 @@ export function SchedulePage({
     });
   }
 
+  async function handleDeleteTask(taskId: string) {
+    await runSchedulePageAction({
+      action: async () => {
+        const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+        if (!response.ok) {
+          throw new Error(actionFailedMessage);
+        }
+      },
+      setIsPending,
+      setErrorMessage,
+      refreshProjection,
+      actionFailedMessage,
+    });
+  }
+
   const dialogDefaults = getQuickCreateDefaults(data);
 
   return (
@@ -485,9 +500,7 @@ export function SchedulePage({
           handleTaskConfigSave={handleTaskConfigSave}
           handleQueueDragStart={handleQueueDragStart}
           handleQueueDragEnd={handleQueueDragEnd}
-          secondaryView={secondaryView}
-          setSecondaryView={setSecondaryView}
-          onRunAutomationCandidate={handleRunAutomationCandidate}
+          onDeleteTask={handleDeleteTask}
         />
       </div>
 

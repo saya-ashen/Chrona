@@ -175,6 +175,7 @@ model Task {
   dependencies        TaskDependency[]   @relation("TaskDependencies")
   dependentTasks      TaskDependency[]   @relation("TaskDependents")
   scheduleProposals   ScheduleProposal[]
+  assistantMessages   TaskAssistantMessage[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -465,4 +466,23 @@ model AiFeatureBinding {
   createdAt   DateTime @default(now())
 
   @@unique([feature])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Task Workspace Assistant Messages
+// ────────────────────────────────────────────────────────────────────
+
+model TaskAssistantMessage {
+  id        String    @id @default(cuid())
+  taskId    String
+  role      String    /// "user" | "assistant"
+  content   String
+  proposal  String?   /// JSON-serialized TaskWorkspaceUpdateProposal
+  applied   Boolean   @default(false)
+  appliedAt DateTime?
+  sequence  Int
+  createdAt DateTime  @default(now())
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sequence])
 }

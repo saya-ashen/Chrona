@@ -6,7 +6,7 @@ import { SchedulePage } from "@/components/schedule/schedule-page";
 import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
-import { TaskPage } from "@/components/tasks/task-page";
+import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { WorkspaceOverview } from "@/components/workspaces/workspace-overview";
@@ -216,7 +216,7 @@ export function TaskDetailRoutePage() {
     return <Navigate to={`/${task.task.workspaceId}/tasks/${task.task.id}`} replace />;
   }
 
-  return <TaskPage data={task} copy={dictionary.components.taskPage} />;
+  return <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />;
 }
 
 export function WorkRoutePage() {
