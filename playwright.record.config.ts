@@ -27,7 +27,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:3101",
     trace: "off",
     video: "on",
-    viewport: { width: 1440, height: 960 },
+    viewport: { width: 1440, height: 1080 },
   },
   projects: [
     {
