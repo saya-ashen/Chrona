@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/Chrona.git
+git clone https://github.com/saya-ashen/Chrona.git
 cd Chrona
 bun install
 
