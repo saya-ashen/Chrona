@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync, copyFileSync } from "node:fs";
+import { existsSync, copyFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { execSync, spawn } from "node:child_process";
 
@@ -22,20 +22,6 @@ function ensureEnv() {
   copyFileSync(examplePath, envPath);
   console.log("📋 Created .env from .env.example");
   console.log("   Edit .env to configure API keys: " + envPath);
-  console.log("");
-}
-
-function ensureBuild() {
-  const distIndex = resolve(appDir, "apps/web/dist/index.html");
-  if (existsSync(distIndex)) return;
-
-  console.log("🔨 Building frontend...");
-  try {
-    execSync("bun run build", { cwd: appDir, stdio: "inherit" });
-    console.log("✅ Build complete.");
-  } catch {
-    console.log("⚠️  Build failed. Run 'bun run build' manually.");
-  }
   console.log("");
 }
 
@@ -119,7 +105,12 @@ async function main() {
 
   ensureEnv();
   ensureDb();
-  ensureBuild();
+
+  const distIndex = resolve(appDir, "apps/web/dist/index.html");
+  if (!existsSync(distIndex)) {
+    console.error("❌ Frontend build not found. Run: bun run build");
+    process.exit(1);
+  }
 
   const port = Number.parseInt(process.env.PORT ?? "3101", 10);
 
