@@ -1,8 +1,12 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
+import { createLogger } from "@chrona/db/legacy-lib/logger";
 
+const log = createLogger("apps.server");
 const host = process.env.HOST ?? "0.0.0.0";
 const port = Number.parseInt(process.env.PORT ?? "3101", 10);
+
+let isShuttingDown = false;
 
 export async function startBunServer() {
   bootstrapServerRuntime();
@@ -11,10 +15,40 @@ export async function startBunServer() {
   const server = Bun.serve({
     hostname: host,
     port,
-    fetch: app.fetch,
+    fetch: (request, server) => {
+      if (isShuttingDown) {
+        return new Response(JSON.stringify({ error: "Server is shutting down" }), {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return app.fetch(request);
+    },
   });
 
-  console.log(`[apps/server] listening on http://${host}:${port}`);
+  log.info("listening", { host, port });
+
+  async function shutdown(signal: string) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    log.info("shutdown started", { signal });
+
+    server.stop(true);
+
+    try {
+      const { db } = await import("@chrona/db/legacy-lib/db");
+      await db.$disconnect();
+    } catch (err) {
+      log.error("db disconnect failed", { error: String(err) });
+    }
+
+    log.info("shutdown complete", { signal });
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
   return server;
 }
 
