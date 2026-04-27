@@ -33,18 +33,21 @@ export function createSpaStaticMiddleware(): MiddlewareHandler {
     const filePath = path.resolve(root, safeName.replace(/^\/+/, "") || "index.html");
 
     let body: Buffer;
+    let servedPath: string;
     try {
       await stat(filePath);
       body = await readFile(filePath);
+      servedPath = filePath;
     } catch {
+      servedPath = path.resolve(root, "index.html");
       try {
-        body = await readFile(path.resolve(root, "index.html"));
+        body = await readFile(servedPath);
       } catch {
         return c.notFound();
       }
     }
 
-    const ext = path.extname(filePath);
+    const ext = path.extname(servedPath);
     const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
 
     return new Response(new Uint8Array(body), {
