@@ -8,6 +8,22 @@ import {
 
 import { createApiRouter } from "./routes/api";
 import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";
+import { createLogger } from "@chrona/db/legacy-lib/logger";
+import { apiKeyAuth } from "./middleware/auth";
+
+const log = createLogger("apps.server");
+
+function getAllowedOrigins() {
+  const raw = process.env.ALLOWED_ORIGINS;
+  if (!raw) return ["*"];
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function resolveOrigin(origin: string | undefined, allowed: string[]) {
+  if (allowed.includes("*")) return "*";
+  if (origin && allowed.includes(origin)) return origin;
+  return null;
+}
 
 function wantsHtml(acceptHeader: string | undefined) {
   return typeof acceptHeader === "string" && acceptHeader.includes("text/html");
@@ -17,9 +33,15 @@ export async function createServerApp() {
   const app = new Hono();
   const api = createApiRouter();
   const spaAvailable = await hasSpaDist();
+  const allowedOrigins = getAllowedOrigins();
+
+  app.use("/api/*", apiKeyAuth());
 
   app.use("*", async (c, next) => {
-    c.header("Access-Control-Allow-Origin", "*");
+    const origin = resolveOrigin(c.req.header("origin"), allowedOrigins);
+    if (origin) {
+      c.header("Access-Control-Allow-Origin", origin);
+    }
     c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     c.header("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
     await next();
@@ -68,7 +90,7 @@ export async function createServerApp() {
   });
 
   app.onError((error, c) => {
-    console.error("[apps/server] unhandled error", error);
+    log.error("unhandled error", { error: error instanceof Error ? error.message : String(error) });
     return c.json({ error: error instanceof Error ? error.message : "Internal server error" }, 500);
   });
 

@@ -14,6 +14,7 @@ import {
   WorkspaceOverviewRoutePage,
   WorkspacesRoutePage,
 } from "./pages";
+import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
   loadTaskPageData,
@@ -80,6 +81,10 @@ export function createAppRouter() {
           path: "workspaces/:workspaceId/work/:taskId",
           loader: loadWorkPageData,
           element: <WorkRoutePage />,
+        },
+        {
+          path: "*",
+          element: <NotFoundPage />,
         },
       ],
     },

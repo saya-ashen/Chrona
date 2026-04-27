@@ -3,9 +3,13 @@ import type { IncomingMessage } from "node:http";
 
 import { createServerApp } from "./app";
 import { bootstrapServerRuntime } from "./bootstrap";
+import { createLogger } from "@chrona/db/legacy-lib/logger";
 
+const log = createLogger("apps.server");
 const host = process.env.HOST ?? "0.0.0.0";
 const port = Number.parseInt(process.env.PORT ?? "3101", 10);
+
+let isShuttingDown = false;
 
 async function toWebRequest(request: IncomingMessage) {
   const protocol = (request.headers["x-forwarded-proto"] as string | undefined) ?? "http";
@@ -38,6 +42,13 @@ export async function startNodeServer() {
 
   const app = await createServerApp();
   const server = createServer((request, response) => {
+    if (isShuttingDown) {
+      response.statusCode = 503;
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ error: "Server is shutting down" }));
+      return;
+    }
+
     toWebRequest(request)
       .then((webRequest) => app.fetch(webRequest))
       .then(async (appResponse) => {
@@ -55,7 +66,7 @@ export async function startNodeServer() {
         response.end(buffer);
       })
       .catch((error) => {
-        console.error("[apps/server] request failed", error);
+        log.error("request failed", { error: String(error) });
         response.statusCode = 500;
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify({ error: "Internal server error" }));
@@ -67,7 +78,30 @@ export async function startNodeServer() {
     server.listen(port, host, () => resolve());
   });
 
-  console.log(`[apps/server] listening on http://${host}:${port}`);
+  log.info("listening", { host, port });
+
+  async function shutdown(signal: string) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    log.info("shutdown started", { signal });
+
+    server.closeIdleConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+
+    try {
+      const { db } = await import("@chrona/db/legacy-lib/db");
+      await db.$disconnect();
+    } catch (err) {
+      log.error("db disconnect failed", { error: String(err) });
+    }
+
+    log.info("shutdown complete", { signal });
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
   return server;
 }
 
