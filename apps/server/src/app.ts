@@ -70,6 +70,11 @@ export async function createServerApp() {
         return next();
       }
 
+      // Serve static assets directly — no locale redirect
+      if (pathname.startsWith("/assets/") || pathname.startsWith("/favicon.")) {
+        return serveSpa(c, next);
+      }
+
       const firstSegment = pathname.split("/").filter(Boolean)[0];
       if (!firstSegment || !hasLocale(firstSegment)) {
         const locale = defaultLocale;
