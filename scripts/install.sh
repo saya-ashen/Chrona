@@ -45,10 +45,10 @@ case "$INSTALL_METHOD" in
     echo ""
     echo "Installing Chrona via npm..."
     if command -v npm &> /dev/null; then
-      npm install -g chrona
+      npm install -g @chrona-org/cli
     else
       echo -e "${YELLOW}npm not found, using bun...${RESET}"
-      bun add -g chrona
+      bun add -g @chrona-org/cli
     fi
     echo ""
     echo -e "${GREEN}✅ Chrona installed!${RESET}"
