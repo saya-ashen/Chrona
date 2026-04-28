@@ -30,6 +30,8 @@
       "@server/*": ["./apps/server/src/*"],
       "@chrona/runtime-core": ["./packages/common/runtime-core/src/index.ts"],
       "@chrona/runtime-core/*": ["./packages/common/runtime-core/src/*"],
+      "@chrona/common-i18n": ["./packages/common/i18n/src/locale.ts"],
+      "@chrona/common-i18n/*": ["./packages/common/i18n/src/*"],
       "@chrona/openclaw-integration": ["./packages/providers/openclaw/integration/src/index.ts"],
       "@chrona/openclaw-integration/*": ["./packages/providers/openclaw/integration/src/*"],
       "@chrona/ai-features": ["./packages/common/ai-features/src/index.ts"],
