@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import dagre from "dagre";
+import dagre from "@dagrejs/dagre";
 import {
   Handle,
   MarkerType,
