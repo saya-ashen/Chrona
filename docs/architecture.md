@@ -1,240 +1,424 @@
 # System Architecture
 
-## Architecture Pattern: CQRS + Event Sourcing
+> **Pattern:** CQRS + Event Sourcing over SQLite
+> **Language:** TypeScript (strict)
+> **Runtime:** Node.js >= 20 / Bun
 
-Chrona uses **CQRS (Command Query Responsibility Segregation)** combined with **Event Sourcing**. All state changes are triggered by commands, which produce canonical events persisted to the event store, then rebuild materialized projections for the query layer.
+---
 
-### Why this architecture?
+## Table of Contents
 
-1. **Complete audit trail** — every operation is recorded as an immutable event, tracing the full task lifecycle
-2. **Read/write separation** — write path (commands) and read path (queries) are independently optimizable
-3. **Rebuildable state** — projections can be rebuilt from the event sequence at any time, ensuring data consistency
-4. **AI-friendly** — event streams are naturally suited for AI agent decision-making and analysis
+1. [Architecture at a Glance](#architecture-at-a-glance)
+2. [Why CQRS + Event Sourcing](#why-cqrs--event-sourcing)
+3. [C4: System Context](#c4-system-context)
+4. [C4: Container Diagram](#c4-container-diagram)
+5. [Data Flow](#data-flow)
+6. [Module Dependency Map](#module-dependency-map)
+7. [Suggest-Confirm AI Pattern](#suggest-confirm-ai-pattern)
+8. [Server Modes](#server-modes)
+9. [Architecture Decision Records](#architecture-decision-records-adrs)
+10. [Performance & Scale Characteristics](#performance--scale-characteristics)
 
-## Architecture Diagram
+---
 
+## Architecture at a Glance
+
+Chrona separates **commands** (writes) from **queries** (reads), using an append-only event log as the canonical source of truth. Materialized **projections** are rebuilt from events for efficient querying. AI features follow a **suggest-confirm** pattern — they produce proposals, never direct mutations.
+
+```mermaid
+graph TB
+    subgraph Client["Client Layer"]
+        SPA["React SPA<br/>Vite + React Router"]
+        CLI["Chrona CLI<br/>chrona task|run|ai"]
+        BRIDGE["OpenClaw Bridge<br/>HTTP agent gateway"]
+    end
+
+    subgraph API["API Layer (Hono)"]
+        ROUTES["/api/tasks/*<br/>/api/ai/*<br/>/api/schedule/*<br/>/api/inbox/*<br/>/api/memory/*"]
+        STATIC["Static SPA Host<br/>apps/web/dist"]
+    end
+
+    subgraph Runtime["Runtime Layer"]
+        CMDS["Commands<br/>createTask<br/>startRun<br/>scheduleTask"]
+        QRYS["Queries<br/>getSchedulePage<br/>getInbox<br/>getTaskDetail"]
+        AI["AI Features<br/>suggest<br/>generatePlan<br/>conflicts<br/>timeslots"]
+    end
+
+    subgraph Data["Data Layer"]
+        EVENTS["Events<br/>immutable log<br/>dedupeKey<br/>ingestSequence"]
+        PROJ["Projections<br/>materialized views<br/>TaskProjection<br/>SchedulePage"]
+        DB["SQLite<br/>Prisma 7<br/>dual adapter"]
+    end
+
+    subgraph External["External Runtime"]
+        OCB["OpenClaw<br/>CLI Bridge"]
+        LLM["LLM Providers<br/>OpenRouter-compatible"]
+    end
+
+    SPA -->|"fetch /api/*"| ROUTES
+    CLI -->|"fetch /api/*"| ROUTES
+    BRIDGE -->|"fetch /api/*"| ROUTES
+    ROUTES --> CMDS
+    ROUTES --> QRYS
+    ROUTES --> AI
+    CMDS --> EVENTS
+    CMDS --> DB
+    EVENTS --> PROJ
+    QRYS --> PROJ
+    QRYS --> DB
+    AI --> LLM
+    AI --> CMDS
+    BRIDGE --> OCB
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        Client Layer                           │
-│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │ Vite React SPA   │  │ Chrona CLI   │  │ AI Agent /     │  │
-│  │ React Router     │  │ chrona       │  │ OpenClaw Bridge│  │
-│  └────────┬─────────┘  └──────┬───────┘  └────────┬───────┘  │
-└───────────┼───────────────────┼────────────────────┼──────────┘
-            │                   │                    │
-            ▼                   ▼                    ▼
-┌──────────────────────────────────────────────────────────────┐
-│                Local API / Static Host (Hono)                 │
-│  /api/tasks/*   /api/ai/*   /api/schedule/*                  │
-│  /api/inbox/*   /api/memory/*  /api/work/*                   │
-│  production: serves apps/web/dist as static SPA              │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                  ┌────────────┼────────────┐
-                  ▼            ▼            ▼
-┌──────────────┐ ┌─────────┐ ┌──────────┐
-│  Command      │ │ Query   │ │  AI     │
-│  handlers     │ │handlers │ │ features│
-└──────┬───────┘ └────┬─────┘ └──────────┘
-       │              │
-       ▼              ▼
-┌──────────────┐ ┌──────────────┐
-│   Events     │ │ Projections  │
-│   (immutable)│ │ (materialized│
-│              │ │  views)      │
-└──────┬───────┘ └──────────────┘
-       │
-       ▼
-┌──────────────────────────────────┐
-│        Data Storage              │
-│   SQLite + Prisma ORM            │
-│   15 models / event log /        │
-│   projection tables              │
-└──────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────┐
-│      External Runtime Layer      │
-│   OpenClaw CLI Bridge (HTTP)     │
-│   Runtime adapters / Agent exec  │
-└──────────────────────────────────┘
+
+---
+
+## Why CQRS + Event Sourcing
+
+| Benefit | What it means for Chrona |
+|---------|--------------------------|
+| **Complete audit trail** | Every task lifecycle event is immutable and replayable — trace exactly what happened and when |
+| **Read/write separation** | Query projections are optimized for UI rendering; command logic is optimized for consistency |
+| **Rebuildable state** | Projections can be rebuilt from events at any time — no drift between write and read models |
+| **AI-friendly** | Event streams are naturally suited for AI agent consumption — agents reason over structured event history |
+| **Workflow transparency** | Multi-step processes (plan generation, agent execution, approvals) remain observable throughout |
+
+---
+
+## C4: System Context
+
+```mermaid
+C4Context
+    title System Context diagram for Chrona
+
+    Person(user, "User", "Operates Chrona via browser or CLI")
+    System(chrona, "Chrona", "AI-native task control plane<br/>Self-hosted, local SQLite")
+    System_Ext(openclaw, "OpenClaw", "External agent execution gateway")
+    System_Ext(llm, "LLM Providers", "OpenRouter / OpenAI-compatible APIs")
+
+    Rel(user, chrona, "Uses", "HTTPS (localhost)")
+    Rel(chrona, openclaw, "Bridges to", "HTTP/JSON")
+    Rel(chrona, llm, "Calls when needed", "HTTPS/SSE")
 ```
+
+---
+
+## C4: Container Diagram
+
+```mermaid
+C4Container
+    title Container diagram for Chrona
+
+    Person(user, "User", "Browser or terminal")
+
+    Container_Boundary(c1, "Chrona (single machine)") {
+        Container(web, "Web SPA", "React 19 + Vite", "Schedule, inbox, task workspace, work execution views")
+        Container(api, "API Server", "Hono (Node.js / Bun)", "REST API + static SPA hosting on :3101")
+        Container(db, "Database", "SQLite", "15 models via Prisma 7. Dual adapter: bun-sqlite / better-sqlite3")
+        Container(cli, "CLI", "Node.js binary", "chrona task|run|schedule|ai commands")
+    }
+
+    System_Ext(openclaw, "OpenClaw Bridge", "Bun HTTP service wrapping openclaw CLI")
+    System_Ext(llm, "LLM Providers", "OpenRouter / OpenAI API")
+
+    Rel(user, web, "Visits", "localhost:3101")
+    Rel(user, cli, "Runs", "terminal")
+    Rel(web, api, "fetch /api/*", "JSON")
+    Rel(cli, api, "fetch /api/*", "JSON")
+    Rel(api, db, "Prisma queries", "SQL")
+    Rel(api, openclaw, "Agent execution", "HTTP/SSE")
+    Rel(api, llm, "Plan generation, chat", "SSE stream")
+```
+
+---
 
 ## Data Flow
 
-### Write Path (Command Path)
+### Write Path
 
-```
-User action → Hono API route → Command handler → DB mutation → Append canonical event → Rebuild projection
+Every state mutation flows through the same pipeline:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as Hono API
+    participant CMD as Command Handler
+    participant DB as SQLite
+    participant EVT as Event Store
+    participant PROJ as Projection Builder
+
+    U->>API: POST /api/tasks
+    API->>CMD: createTask(input)
+    CMD->>DB: INSERT INTO Task
+    CMD->>EVT: appendCanonicalEvent(TaskCreated)
+    EVT->>PROJ: rebuildTaskProjection(taskId)
+    PROJ->>DB: UPSERT TaskProjection
+    API-->>U: 201 Created
 ```
 
-Example: Create a task
+**Example: Creating a task**
 
 ```
 POST /api/tasks
-  → createTask(input)
-    → db.task.create(...)
+  → createTask({ title: "Analyze data", priority: "High" })
+    → prisma.task.create({ ... })
     → appendCanonicalEvent({
         eventType: "TaskCreated",
-        payload: { title, priority, ... }
+        workspaceId: "default",
+        taskId: "cm_abc123",
+        actorType: "human",
+        payload: { title, priority }
       })
-    → rebuildTaskProjection(taskId)
+    → rebuildTaskProjection("cm_abc123")
+      → prisma.taskProjection.upsert({ displayState: "Draft", ... })
 ```
 
-### Read Path (Query Path)
+### Read Path
 
-```
-User request → Hono API / SPA loader → Query handler → Read projection + related data → Assemble page data
+All queries go through the same pipeline:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as Hono API
+    participant QRY as Query Handler
+    participant PROJ as Projection (cache)
+    participant DB as SQLite
+
+    U->>API: GET /api/schedule/projection?workspaceId=default
+    API->>QRY: getSchedulePage(workspaceId, date)
+    QRY->>PROJ: Read TaskProjection (scheduled)
+    QRY->>DB: Read related data (workspace, events)
+    QRY-->>API: SchedulePageData
+    API-->>U: 200 OK
 ```
 
-Example: Load schedule page
+**Example: Loading the schedule page**
 
 ```
 GET /schedule
   → getSchedulePage(workspaceId, selectedDay)
-    → Read TaskProjection (scheduled/unscheduled/at-risk)
-    → Compute focus zones
-    → Compute automation candidates
-    → Run analyzeConflicts()
+    → Read TaskProjection rows (filtered by scheduleStatus)
+    → Compute focus zones (high-priority task clusters)
+    → Compute automation candidates (Ready tasks with accepted plans)
+    → Run analyzeConflicts() (deterministic rule engine)
     → Aggregate planning summary
-    → Return SchedulePageData
+    → Return SchedulePageData { scheduled, unscheduled, atRisk, conflicts, ... }
 ```
 
-### AI Enhancement Path
+---
 
+## Module Dependency Map
+
+```mermaid
+graph TD
+    commands["commands/"] --> events["events/"]
+    commands --> projections["projections/"]
+    commands --> runtime-sync["runtime-sync/"]
+    commands --> tasks["tasks/"]
+    queries["queries/"] --> projections
+    queries --> tasks
+    queries --> runtime-sync
+    queries --> ai["ai/"]
+    ai --> queries
+    ai --> openclaw["providers/openclaw/"]
+    tasks --> runtime-sync
+    projections --> tasks
+    events["events/"]
+    subgraph External
+        openclaw
+    end
+    subgraph "Depends on nothing"
+        events
+    end
 ```
-User input → AI API route → Rule engine / LLM / OpenClaw → Structured suggestion → User confirmation → Command execution
+
+**Rules:**
+- `events/` — bottom layer, no dependencies
+- `commands/` → `events/`, `projections/`, `runtime-sync/`, `tasks/`
+- `queries/` → `projections/`, `tasks/`, `runtime-sync/`, `ai/`
+- `tasks/` → `runtime-sync/` only (for config specs)
+- `projections/` → `tasks/` only (state derivation)
+- `ai/` → `queries/` (plugins need to read data)
+
+---
+
+## Suggest-Confirm AI Pattern
+
+Chrona's core safety mechanism: **AI never writes directly to the data layer.**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as /api/ai/*
+    participant AI as AI Feature
+    participant LLM as LLM / OpenClaw
+    participant CMD as Command Handler
+
+    U->>API: generate-task-plan(taskId)
+    API->>AI: dispatch to bound AI client
+    AI->>LLM: stream plan generation
+    LLM-->>AI: SSE: partial nodes, edges, status
+    AI-->>API: streaming response
+    API-->>U: SSE stream (draft plan)
+    Note over U: User reviews draft plan
+    U->>API: accept-plan(taskId, planId)
+    API->>CMD: acceptTaskPlan(input)
+    CMD->>CMD: validate, apply mutations
+    CMD-->>U: 200 OK (plan materialized)
 ```
 
-Design principle: all AI suggestions are "suggest-confirm" — they never directly mutate data.
+**Every AI feature follows this flow:**
 
-## Module Dependencies
+1. **Request** — user triggers AI action
+2. **Stream** — AI generates a proposal (plan, timeslot, suggestion)
+3. **Review** — user inspects the proposal
+4. **Confirm** — user accepts → command handler executes the actual mutation
 
-```
-commands/  ──────────▶  events/
-    │                      │
-    │                      ▼
-    ├──────────────▶  projections/
-    │                      ▲
-    ├──────────────▶  tasks/  ◀─── queries/
-    │                                │
-    └──────────────▶  runtime-sync/  │
-                           │         │
-                           ▼         ▼
-                      openclaw/    ai/ (conflict, suggest, decompose)
-```
+This ensures: no silent data corruption, full auditability, and user remains the final authority.
 
-**Dependency rules:**
-- `commands/` may depend on `events/`, `projections/`, `runtime-sync/`, `tasks/`
-- `queries/` may depend on `projections/`, `tasks/`, `runtime-sync/`, `ai/`
-- `tasks/` depends only on `runtime-sync/` (to get config specs)
-- `projections/` depends only on `tasks/` (state derivation)
-- `events/` has no dependencies (bottom layer)
-- `ai/` may depend on `queries/` (plugin tools need to read data)
+**Features with rule-engine fallback:**
+
+| Feature | AI Path | Fallback (no LLM needed) |
+|---------|---------|---------------------------|
+| Conflict detection | LLM analysis | Deterministic time-overlap check |
+| Timeslot suggestion | LLM recommendation | Rule-based gap detection |
+| Auto-complete | LLM streaming | Keyword matching against existing tasks |
+| Task decomposition | LLM plan generation | Template-based breakdown |
+
+Core functionality never requires an LLM to be available.
+
+---
+
+## Server Modes
+
+| Mode | Frontend | Backend | Command |
+|------|----------|---------|---------|
+| **Development** | Vite dev server (HMR) on `:3100` | Hono API on `:3101` | `bun run dev` |
+| **Production (Bun)** | Built SPA served by Hono | Hono on `:3101` | `bun run server:start:bun` |
+| **Production (npm)** | Built SPA served by Hono | Hono on `:3101` | `chrona start` |
+
+In production mode, a single Hono server hosts both the static SPA (`apps/web/dist/`) and all API routes on the same port.
+
+---
+
+## Architecture Decision Records (ADRs)
+
+### ADR-1: SQLite over PostgreSQL
+
+**Date:** 2024 · **Status:** Accepted
+
+**Context:** Choose the database for a self-hosted, single-user control plane.
+
+**Decision:** SQLite.
+
+**Rationale:**
+- Zero operational overhead — single file, no separate service
+- Prisma 7 provides type-safe ORM with SQLite adapter
+- Sufficient for personal/small-team task volumes
+- Simplifies the `npm install -g` distribution model
+
+**Trade-off:** Lacks concurrent writer support. Acceptable because Chrona is a single-user local app with serial command processing.
+
+### ADR-2: Pragmatic Event Sourcing (not pure ES)
+
+**Date:** 2024 · **Status:** Accepted
+
+**Context:** Full event sourcing (replaying _all_ events to build _all_ state) is complex to implement and debug.
+
+**Decision:** Hybrid approach — commands write to both business tables (Task, Run, etc.) and the Event table simultaneously. Projections are rebuilt on event triggers but can also be recomputed from business tables if needed.
+
+**Rationale:**
+- Direct business table writes give immediate consistency for simple CRUD
+- Event log provides audit trail and AI-consumable history
+- Projection tables provide optimized UI reads without replaying full event streams
+- If events and business tables diverge, projections are the reconcilable surface
+
+### ADR-3: Dual AI Engine (rule engine + LLM)
+
+**Date:** 2024 · **Status:** Accepted
+
+**Context:** How to ensure core product functionality works even without an LLM configured.
+
+**Decision:** Every AI feature has a deterministic rule-engine implementation. LLM integration is an enhancement, not a requirement.
+
+**Rationale:**
+- Users should get basic value before configuring an LLM
+- Conflict detection and timeslot suggestion work with pure date math
+- Product remains useful at zero AI cost
+- LLM adds semantic understanding where the rule engine can't (e.g., "this task sounds like a bug fix, schedule it earlier")
+
+### ADR-4: Provider Adapter Pattern
+
+**Date:** 2025 · **Status:** Accepted
+
+**Context:** Support multiple AI runtimes (OpenClaw, Hermes, Opencode, bare LLM) without changing the product model.
+
+**Decision:** Define `RuntimeExecutionAdapter` in `packages/common/runtime-core/` as the canonical interface. Each provider (openclaw, hermes) implements it.
+
+**Rationale:**
+- Decouples provider-specific code from the runtime module
+- Tasks, schedules, and plans remain provider-agnostic
+- Enables A/B testing and gradual migration between runtimes
+
+---
+
+## Performance & Scale Characteristics
+
+| Dimension | Characteristic |
+|-----------|---------------|
+| **Target scale** | 1-10 workspaces, 100-1000 tasks per workspace |
+| **Database** | SQLite with WAL mode (concurrent reads) |
+| **Read path** | Projections pre-computed; single SELECT for most page loads |
+| **Write path** | Serial commands via CQRS pattern; typical latency < 50ms |
+| **AI operations** | Asynchronous via SSE streaming; non-blocking to API |
+| **Agent execution** | Delegated to external runtimes (OpenClaw bridge); Chrona polls for sync |
+| **Scheduler** | Configurable polling interval (`AUTO_START_SCHEDULER_INTERVAL_MS`); lightweight DB scan |
+
+---
 
 ## Directory Structure
 
 ```
 apps/
-  web/                          — Vite React SPA entry
+  web/                          — Vite React SPA
     src/
-      router.tsx                — React Router SPA routes
-      pages.tsx                 — Page bindings
-      components/               — UI components
-        schedule/               — Schedule cockpit
-        work/                   — Work/task execution view
-        inbox/                  — Inbox triage
-        memory/                 — Memory console
-        tasks/                  — Task center
-        ui/                     — Shared UI primitives
-      i18n/                     — Locale config and message bundles
-      styles/                   — Global styles
-  server/                       — Local Hono API server + static host
+      router.tsx                — React Router routes (locale-prefixed)
+      pages.tsx                 — Page component bindings
+      components/               — UI components (schedule, work, inbox, memory, tasks, ui)
+      i18n/                     — Locale config and message bundles (en.json, zh.json)
+      styles/                   — Global styles (Tailwind v4)
+  server/                       — Hono API server + static SPA host
     src/
-      app.ts                    — Hono app composition
-      routes/api.ts             — API routes
-      index.ts                  — Node.js entry point
-      index.bun.ts              — Bun entry point (dev)
+      app.ts                    — Hono app composition (CORS, locale redirect, middleware)
+      routes/api.ts             — API route handlers (40+ endpoints)
+      index.ts                  — Node.js entry
+      index.bun.ts              — Bun entry
       static/spa.ts             — SPA static file middleware
 
 packages/
-  cli/                          — Chrona npm entry point
+  cli/                          — npm entry point (@chrona-org/cli)
   common/
     cli/                        — CLI commands (task, run, schedule, ai)
-    ai-features/                — Shared AI feature surface
+    ai-features/                — Shared AI feature surface (generatePlan, suggest, conflicts)
+    runtime-core/               — RuntimeExecutionAdapter interface
   contracts/                    — Shared DTOs, Zod schemas, API contracts
-  db/                           — Prisma bootstrap, repositories, generated client
-  domain/                       — Pure business rules, state derivations
-  runtime/                      — Provider-agnostic runtime
+  db/                           — Prisma bootstrap, repository layer, generated client
+  domain/                       — Pure business rules, state derivations (no IO)
+  runtime/
     src/modules/
-      commands/                 — Command handlers (write)
-      queries/                  — Query handlers (read)
+      commands/                 — Command handlers (write path, 30+ handlers)
+      queries/                  — Query handlers (read path, 9 page queries)
       projections/              — Projection rebuilders
-      events/                   — Canonical event store
+      events/                   — Canonical event store interface
       tasks/                    — Task domain logic
-      task-execution/           — Task session & execution registry
-      runtime-sync/             — Runtime sync & freshness
+      task-execution/           — Session & execution registry
+      runtime-sync/             — Runtime sync & freshness management
       scheduler/                — Auto-start scheduled runs
       ai/                       — AI feature handlers
       workspaces/               — Workspace logic
   providers/
-    openclaw/                   — OpenClaw bridge, integration, plugin
-    hermes/                     — Hermes provider (future)
+    openclaw/                   — OpenClaw bridge (standalone Bun service) + integration (adapter)
+    hermes/                     — Hermes provider (planned)
+    opencode/                   — Opencode provider (planned)
 ```
-
-## Page Architecture
-
-All routes are locale-prefixed (e.g. `/en/schedule`, `/zh/workspaces/...`):
-
-| Page | Route | Description |
-|------|-------|-------------|
-| Landing | `/:lang` | Workspace overview, recent activity |
-| Schedule | `/:lang/schedule` | Calendar-style scheduling cockpit |
-| Inbox | `/:lang/inbox` | Pending approvals, inputs, suggestions |
-| Memory | `/:lang/memory` | AI agent persistent knowledge base |
-| Workspaces | `/:lang/workspaces` | Workspace list |
-| Workspace Overview | `/:lang/workspaces/:id` | Workspace dashboard |
-| Task Detail | `/:lang/workspaces/:id/tasks/:taskId` | Task detail & plan graph |
-| Work | `/:lang/workspaces/:id/work/:taskId` | Task execution view |
-| Settings | `/:lang/settings` | System & AI client configuration |
-
-Each page follows the same data loading pattern:
-1. React Router loader / API call fetches the corresponding query data
-2. Query functions assemble full page data from projections and the database
-3. SPA client components render and issue subsequent mutation requests through the local API server
-
-## Key Design Decisions
-
-### 1. SQLite over PostgreSQL
-- Simplified deployment: single-file database, no extra service
-- Sufficient performance for personal/small team use
-- Prisma ORM provides type-safe data access
-
-### 2. Event Sourcing (pragmatic, not pure ES)
-- Commands write to both business tables and event tables simultaneously
-- Events are used for auditing, workflow tracking, and UI timelines
-- Projection tables serve as optimized read views, rebuilt on event triggers
-
-### 3. Dual AI engine strategy
-- **Rule engine** — deterministic logic (conflict detection, time suggestions) without LLM
-- **LLM enhancement** — calls LLM when semantic understanding is needed (task decomposition, auto-suggest)
-- Every AI feature has a rule engine fallback; core functionality is never blocked by LLM availability
-
-### 4. OpenClaw runtime
-- Communicates with local OpenClaw CLI via HTTP bridge
-- Frontend SPA, CLI, and runtime client share the semantic endpoints on the independent API server
-- Supports session management and run polling; approval handling is simplified in bridge mode
-- Runtime adapter pattern enables extending to other AI execution engines
-
-## Server Modes
-
-### Development
-- Vite dev server for SPA on `http://localhost:3100`
-- Hono API server on `http://localhost:3101`
-- Run with: `bun run dev`
-
-### Production (npm)
-- Single Hono server on `http://localhost:3101` (or `$PORT`)
-- Serves both static SPA files and API routes
-- Run with: `chrona start`
-- First launch auto-creates database and config files

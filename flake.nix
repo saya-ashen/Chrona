@@ -53,6 +53,7 @@
             pkg-config
             openssl
             typescript-language-server
+            just
           ])
           ++ playwrightLibs;
 
