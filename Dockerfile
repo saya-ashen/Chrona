@@ -21,7 +21,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3101
-ENV CHROMA_WEB_DIST=apps/web/dist
+ENV CHRONA_WEB_DIST=apps/web/dist
 ENV DATABASE_URL="file:./prisma/chrona.db"
 
 COPY --from=spa-builder /app/apps/web/dist apps/web/dist
@@ -35,11 +35,10 @@ COPY prisma/schema.prisma prisma/
 COPY tsconfig.json .
 
 RUN bunx prisma generate
-RUN bunx prisma migrate deploy
 
 EXPOSE 3101
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3101/health || exit 1
 
-CMD ["bun", "run", "apps/server/src/index.bun.ts"]
+CMD ["sh", "-c", "bunx prisma migrate deploy && bun run apps/server/src/index.bun.ts"]
