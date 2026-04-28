@@ -6,6 +6,20 @@ import type {
 } from "./types";
 import { aiChat } from "./ai-service";
 
+function isAutomationSuggestion(
+  value: unknown,
+): value is AutomationSuggestion {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as Partial<AutomationSuggestion>;
+  return (
+    typeof candidate.executionMode === "string" &&
+    !!candidate.reminderStrategy &&
+    typeof candidate.confidence === "string" &&
+    Array.isArray(candidate.preparationSteps)
+  );
+}
+
 /**
  * タスクが定期的なものかどうかをタイトルと説明から判定する
  */
@@ -311,7 +325,7 @@ Respond in the same language as the input.`;
     maxTokens: 1000,
   });
 
-  return (chatResult?.parsed as AutomationSuggestion) ?? null;
+  return isAutomationSuggestion(chatResult?.parsed) ? chatResult.parsed : null;
 }
 
 export type {

@@ -12,7 +12,7 @@ import type {
   StreamToolResult,
 } from "./types";
 
-export function useAutoComplete(title: string | null, debounceMs = 800) {
+export function useAutoComplete(title: string | null, debounceMs = 500) {
   const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

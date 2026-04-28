@@ -17,9 +17,9 @@ const mockUseSmartAutomation = vi.fn();
 const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
 
 vi.mock("@/hooks/use-ai", () => ({
-  useAutoComplete: () => mockUseAutoComplete(),
-  useSmartAutomation: () => mockUseSmartAutomation(),
-  useSmartDecomposition: () => mockUseSmartDecomposition(),
+  useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
+  useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
+  useSmartDecomposition: (...args: unknown[]) => mockUseSmartDecomposition(...args),
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
@@ -77,7 +77,7 @@ describe("TaskCreateDialog – AI integration", () => {
       error: null,
     });
 
-    render(<TaskCreateDialog {...defaultProps} />);
+    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
     // Type enough characters to trigger auto-complete (>= 3 chars)
     const titleInput = screen.getByPlaceholderText("Add title");
@@ -131,7 +131,7 @@ describe("TaskCreateDialog – AI integration", () => {
       error: null,
     });
 
-    render(<TaskCreateDialog {...defaultProps} />);
+    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
     const titleInput = screen.getByPlaceholderText("Add title");
     await user.type(titleInput, "Prep");
@@ -190,7 +190,7 @@ describe("TaskCreateDialog – AI integration", () => {
       />,
     );
 
-    expect(screen.getByText("AI 任务规划")).toBeInTheDocument();
+    expect(screen.getAllByText("AI Task Planning").length).toBeGreaterThan(0);
   });
 
   it("does not show merged AI plan panel when decomposition handler is absent", () => {
@@ -212,7 +212,7 @@ describe("TaskCreateDialog – AI integration", () => {
       />,
     );
 
-    expect(screen.queryByText("AI 任务规划")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI Task Planning")).not.toBeInTheDocument();
   });
 
   it("handles empty suggestions gracefully", () => {
@@ -227,7 +227,7 @@ describe("TaskCreateDialog – AI integration", () => {
       error: null,
     });
 
-    render(<TaskCreateDialog {...defaultProps} />);
+    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
     // No AI dropdown should appear
     expect(screen.queryByText("AI Suggestions")).not.toBeInTheDocument();
@@ -268,7 +268,7 @@ describe("TaskCreateDialog – AI integration", () => {
       error: null,
     });
 
-    render(<TaskCreateDialog {...defaultProps} />);
+    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
     const titleInput = screen.getByPlaceholderText("Add title");
     await user.type(titleInput, "ab");
@@ -307,7 +307,7 @@ describe("TaskCreateDialog – AI integration", () => {
       error: null,
     });
 
-    render(<TaskCreateDialog {...defaultProps} />);
+    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
     const titleInput = screen.getByPlaceholderText("Add title");
     await user.type(titleInput, "Sugg");

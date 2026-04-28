@@ -5,8 +5,9 @@
  * Requires:
  *   - CPA endpoint reachable at https://cpa.saya.love/v1
  *   - Valid API key in DB or TEST_CPA_API_KEY env var
+ *   - RUN_LLM_INTEGRATION=1
  *
- * Run: bunx vitest run src/modules/ai/__tests__/plan-generation.integration.test.ts
+ * Run: RUN_LLM_INTEGRATION=1 bunx vitest run src/modules/ai/__tests__/plan-generation.integration.test.ts
  */
 
 import { describe, it, expect } from "vitest";
@@ -22,6 +23,7 @@ const LLM_CONFIG = {
   model: process.env.TEST_CPA_MODEL ?? "gpt-5.2",
   temperature: 0.7,
 };
+const RUN_LLM_INTEGRATION = process.env.RUN_LLM_INTEGRATION === "1";
 
 // Try to load API key from DB if not in env
 async function ensureApiKey() {
@@ -127,7 +129,7 @@ function parseGraphResponse(raw: string) {
 
 // -- Tests --
 
-describe("Plan generation (real LLM)", () => {
+describe.runIf(RUN_LLM_INTEGRATION)("Plan generation (real LLM)", () => {
   it("generates a valid graph with nodes and edges", async () => {
     await ensureApiKey();
 

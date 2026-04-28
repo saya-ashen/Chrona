@@ -69,10 +69,10 @@ describe("ExecutionTimeline", () => {
       />, 
     );
 
-    expect(screen.getByText("需要优先查看")).toBeInTheDocument();
+    expect(screen.getByText("Priority Review")).toBeInTheDocument();
     expect(screen.getByText("等待审批")).toBeInTheDocument();
     expect(screen.getByText("产出更新")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "展开其余 2 条背景记录" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand 2 more background records" })).toBeInTheDocument();
     expect(screen.queryByText("Plan updated")).not.toBeInTheDocument();
     expect(screen.queryByText("Synced")).not.toBeInTheDocument();
   });
@@ -111,11 +111,11 @@ describe("ExecutionTimeline", () => {
       />, 
     );
 
-    await user.click(screen.getByRole("button", { name: "展开其余 1 条背景记录" }));
+    await user.click(screen.getByRole("button", { name: "Expand 1 more background records" }));
 
-    const backgroundSection = screen.getByRole("region", { name: "背景记录" });
+    const backgroundSection = screen.getByRole("region", { name: "Background Records" });
     expect(within(backgroundSection).getByText("Plan updated")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "收起背景记录" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse background records" })).toBeInTheDocument();
   });
 
   it("sorts records by newest timestamp first before grouping", () => {
@@ -150,7 +150,7 @@ describe("ExecutionTimeline", () => {
       />,
     );
 
-    const prioritizedSection = screen.getByRole("region", { name: "需要优先查看" });
+    const prioritizedSection = screen.getByRole("region", { name: "Priority Review" });
     const titles = within(prioritizedSection)
       .getAllByText(/最新产出|较早产出/)
       .map((node) => node.textContent);
@@ -220,16 +220,16 @@ describe("ExecutionTimeline", () => {
       />,
     );
 
-    const currentRunSection = screen.getByRole("region", { name: "当前运行" });
-    const previousRunSection = screen.getByRole("region", { name: "历史运行 1" });
-    const taskContextSection = screen.getByRole("region", { name: "任务上下文" });
+    const currentRunSection = screen.getByRole("region", { name: "Current Run" });
+    const previousRunSection = screen.getByRole("region", { name: "Previous Run 1" });
+    const taskContextSection = screen.getByRole("region", { name: "Task Context" });
 
     expect(within(currentRunSection).getByText("等待补充约束")).toBeInTheDocument();
     expect(within(previousRunSection).getByText("上一轮首稿")).toBeInTheDocument();
     expect(within(taskContextSection).getByText("任务级规划更新")).toBeInTheDocument();
-    expect(within(currentRunSection).getByRole("button", { name: "展开其余 1 条背景记录" })).toBeInTheDocument();
+    expect(within(currentRunSection).getByRole("button", { name: "Expand 1 more background records" })).toBeInTheDocument();
 
-    await user.click(within(currentRunSection).getByRole("button", { name: "展开其余 1 条背景记录" }));
+    await user.click(within(currentRunSection).getByRole("button", { name: "Expand 1 more background records" }));
 
     expect(within(currentRunSection).getByText("同步完成")).toBeInTheDocument();
   });
@@ -256,6 +256,6 @@ describe("ExecutionTimeline", () => {
 
     expect(screen.getAllByText("Plan updated").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /背景记录/ })).not.toBeInTheDocument();
-    expect(screen.queryByText("需要优先查看")).not.toBeInTheDocument();
+    expect(screen.queryByText("Priority Review")).not.toBeInTheDocument();
   });
 });

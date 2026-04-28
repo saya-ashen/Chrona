@@ -1,5 +1,18 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/components/i18n/localized-link", () => ({
+  LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
+}));
+
+vi.mock("@/components/ui/status-badge", () => ({
+  StatusBadge: ({ children }: any) => <span>{children}</span>,
+}));
+
+vi.mock("@/components/ui/surface-card", () => ({
+  SurfaceCard: ({ children, ...props }: any) => <section {...props}>{children}</section>,
+}));
+
 import { ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
 
 describe("ScheduleMiniCalendar", () => {

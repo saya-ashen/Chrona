@@ -1,27 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { aiChat } from "../ai-service";
 import { analyzeConflictsSmart, analyzeConflicts } from "../conflict-analyzer";
 import type { ScheduledTaskInfo } from "../types";
 
-// ---------- Helpers ----------
-
-function mockFetchResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function makeLLMApiResponse(content: string, model = "gpt-4o-mini") {
-  return {
-    choices: [{ message: { content } }],
-    model,
-    usage: {
-      prompt_tokens: 10,
-      completion_tokens: 50,
-      total_tokens: 60,
-    },
-  };
-}
+vi.mock("../ai-service", () => ({
+  aiChat: vi.fn(),
+}));
 
 function d(hour: number, minute = 0): Date {
   return new Date(
@@ -47,16 +31,13 @@ function makeTask(
 // ---------- Tests ----------
 
 describe("analyzeConflictsSmart", () => {
-  const originalEnv = { ...process.env };
+  const aiChatMock = vi.mocked(aiChat);
 
   beforeEach(() => {
-    delete process.env.AI_PROVIDER_BASE_URL;
-    delete process.env.AI_PROVIDER_API_KEY;
-    delete process.env.AI_PROVIDER_MODEL;
+    aiChatMock.mockReset();
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
     vi.restoreAllMocks();
   });
 
@@ -194,12 +175,6 @@ describe("analyzeConflictsSmart", () => {
   // ─── Uses LLM for suggestions when available ─────────
 
   describe("uses LLM for suggestions when available", () => {
-    beforeEach(() => {
-      process.env.AI_PROVIDER_BASE_URL = "https://api.openai.com/v1";
-      process.env.AI_PROVIDER_API_KEY = "sk-test-key";
-      process.env.AI_PROVIDER_MODEL = "gpt-4o-mini";
-    });
-
     it("returns LLM-generated suggestions for conflicts", async () => {
       // Two overlapping tasks
       const tasks: ScheduledTaskInfo[] = [
@@ -246,9 +221,7 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        mockFetchResponse(makeLLMApiResponse(JSON.stringify(llmResult))),
-      );
+      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
 
       const result = await analyzeConflictsSmart(tasks);
 
@@ -306,23 +279,16 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      const fetchSpy = vi
-        .spyOn(global, "fetch")
-        .mockResolvedValue(
-          mockFetchResponse(makeLLMApiResponse(JSON.stringify(llmResult))),
-        );
+      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
 
       await analyzeConflictsSmart(tasks);
 
-      expect(fetchSpy).toHaveBeenCalledOnce();
-      const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+      expect(aiChatMock).toHaveBeenCalledOnce();
+      const request = aiChatMock.mock.calls[0][0];
+      expect(request.messages[0].role).toBe("system");
+      expect(request.messages[1].role).toBe("user");
 
-      // Should have system and user messages
-      expect(body.messages[0].role).toBe("system");
-      expect(body.messages[1].role).toBe("user");
-
-      // User message should contain task and conflict info
-      const userContent = body.messages[1].content;
+      const userContent = request.messages[1].content;
       expect(userContent).toContain("Task Alpha");
       expect(userContent).toContain("Task Beta");
       expect(userContent).toContain("overlap");
@@ -345,12 +311,9 @@ describe("analyzeConflictsSmart", () => {
         }),
       ];
 
-      const fetchSpy = vi.spyOn(global, "fetch");
-
       const result = await analyzeConflictsSmart(tasks);
 
-      // No conflicts => no LLM call
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(aiChatMock).not.toHaveBeenCalled();
       expect(result.conflicts.length).toBe(0);
       expect(result.suggestions.length).toBe(0);
     });
@@ -388,9 +351,7 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        mockFetchResponse(makeLLMApiResponse(JSON.stringify(llmResult))),
-      );
+      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
 
       const result = await analyzeConflictsSmart(tasks);
 
@@ -409,15 +370,8 @@ describe("analyzeConflictsSmart", () => {
   // ─── Falls back to rule-based suggestions when LLM fails ─
 
   describe("falls back to rule-based suggestions when LLM fails", () => {
-    beforeEach(() => {
-      process.env.AI_PROVIDER_BASE_URL = "https://api.openai.com/v1";
-      process.env.AI_PROVIDER_API_KEY = "sk-test-key";
-    });
-
     it("falls back on network error", async () => {
-      vi.spyOn(global, "fetch").mockRejectedValue(
-        new Error("Network error"),
-      );
+      aiChatMock.mockRejectedValue(new Error("Network error"));
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -448,9 +402,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back on HTTP 500 error", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        new Response("Internal Server Error", { status: 500 }),
-      );
+      aiChatMock.mockRejectedValue(new Error("HTTP 500"));
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -474,11 +426,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back on malformed JSON from LLM", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        mockFetchResponse(
-          makeLLMApiResponse("This is not JSON at all {{{"),
-        ),
-      );
+      aiChatMock.mockResolvedValue({ parsed: "This is not JSON at all {{{" } as Awaited<ReturnType<typeof aiChat>>);
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -503,9 +451,7 @@ describe("analyzeConflictsSmart", () => {
     it("falls back when LLM returns empty suggestions array", async () => {
       const llmResult = { suggestions: [] };
 
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        mockFetchResponse(makeLLMApiResponse(JSON.stringify(llmResult))),
-      );
+      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -529,12 +475,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back when LLM returns null", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        mockFetchResponse({
-          choices: [{ message: { content: "" } }],
-          model: "gpt-4o-mini",
-        }),
-      );
+      aiChatMock.mockResolvedValue(null);
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({

@@ -5,6 +5,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@chrona/common-i18n/*": ["../../packages/common/i18n/src/*"],
+      "@chrona/common-i18n": ["../../packages/common/i18n/src/locale.ts"],
       "@chrona/runtime/*": ["../../packages/runtime/src/*"],
       "@chrona/runtime": ["../../packages/runtime/src/index.ts"],
       "@chrona/db/*": ["../../packages/db/src/*"],
