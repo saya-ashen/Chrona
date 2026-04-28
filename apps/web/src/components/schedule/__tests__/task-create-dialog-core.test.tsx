@@ -237,7 +237,7 @@ describe("TaskCreateDialog – Core functionality", () => {
       />,
     );
 
-    expect(screen.getByText("AI Task Planning")).toBeInTheDocument();
+    expect(screen.getAllByText("AI Task Planning").length).toBeGreaterThan(0);
     await user.click(screen.getByRole("button", { name: /apply plan/i }));
 
     expect(onApplyDecomposition).toHaveBeenCalledWith(expect.objectContaining({

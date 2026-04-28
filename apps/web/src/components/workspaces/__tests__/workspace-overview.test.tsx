@@ -1,5 +1,45 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/components/i18n/localized-link", () => ({
+  LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
+}));
+
+vi.mock("@/components/ui/status-badge", () => ({
+  StatusBadge: ({ children }: any) => <span>{children}</span>,
+}));
+
+vi.mock("@/components/ui/surface-card", () => ({
+  SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SurfaceCardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SurfaceCardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SurfaceCardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+}));
+
+vi.mock("@/i18n/client", () => ({
+  useI18n: () => ({
+    t: (key: string) => {
+      const map: Record<string, string> = {
+        "components.workspaceOverview.runningTasks": "Running Tasks",
+        "components.workspaceOverview.waitingForApproval": "Waiting for Approval",
+        "components.workspaceOverview.blockedOrFailed": "Blocked / Failed Tasks",
+        "components.workspaceOverview.scheduleRisks": "Schedule Risks",
+        "components.workspaceOverview.upcomingDeadlines": "Upcoming Deadlines",
+        "components.workspaceOverview.recentlyUpdated": "Recently Updated Tasks",
+        "components.workspaceOverview.sectionDescription": "Overview section",
+        "components.workspaceOverview.noItems": "No items",
+        "components.workspaceOverview.noRunYet": "No run yet",
+        "components.workspaceOverview.openTask": "Open task",
+        "components.workspaceOverview.noActivityYet": "No activity yet",
+        "common.openTask": "Open Task",
+        "common.openWorkbench": "Open Workbench",
+        "common.startWork": "Start Work",
+      };
+      return map[key] ?? key;
+    },
+  }),
+}));
+
 import { WorkspaceOverview } from "@/components/workspaces/workspace-overview";
 
 describe("WorkspaceOverview", () => {

@@ -6,6 +6,7 @@ const push = vi.fn();
 
 vi.mock("@/lib/router", () => ({
   useAppRouter: () => ({ push }),
+  AppLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a>,
 }));
 
 vi.mock("@/i18n/client", () => ({

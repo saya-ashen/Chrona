@@ -75,7 +75,7 @@ export function useSmartAutomation(taskInput: SmartAutomationTaskInput | null) {
             setIsLoading(false);
           }
         });
-    }, 800);
+    }, 500);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

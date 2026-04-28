@@ -43,7 +43,7 @@ describe("ConflictCard", () => {
     render(<ConflictCard conflict={makeConflict()} suggestions={[]} />);
     expect(screen.getByText("HIGH")).toBeInTheDocument();
     expect(screen.getByText("HIGH").closest("[data-tone]")).toHaveAttribute("data-tone", "critical");
-    expect(screen.getByText("时间重叠")).toBeInTheDocument();
+    expect(screen.getByText("Time Overlap")).toBeInTheDocument();
   });
 
   it("maps medium severity to warning tone", () => {
@@ -69,12 +69,12 @@ describe("ConflictCard", () => {
       },
     });
     render(<ConflictCard conflict={conflict} suggestions={[]} />);
-    expect(screen.getByText(/时间范围/)).toBeInTheDocument();
+    expect(screen.getByText(/Time range/)).toBeInTheDocument();
   });
 
   it("does not show time range when not provided", () => {
     render(<ConflictCard conflict={makeConflict()} suggestions={[]} />);
-    expect(screen.queryByText(/时间范围/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Time range/)).not.toBeInTheDocument();
   });
 
   it("shows suggestion buttons when suggestions match conflictId", () => {
@@ -86,9 +86,9 @@ describe("ConflictCard", () => {
         onApplySuggestion={handler}
       />,
     );
-    expect(screen.getByText("重新安排")).toBeInTheDocument();
+    expect(screen.getByText("Reschedule")).toBeInTheDocument();
     expect(screen.getByText("Move task to afternoon")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "应用建议" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply Suggestion" })).toBeInTheDocument();
   });
 
   it("calls onApplySuggestion when suggestion button clicked", async () => {
@@ -102,7 +102,7 @@ describe("ConflictCard", () => {
         onApplySuggestion={handler}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "应用建议" }));
+    await user.click(screen.getByRole("button", { name: "Apply Suggestion" }));
     expect(handler).toHaveBeenCalledWith(suggestion);
   });
 
@@ -115,7 +115,7 @@ describe("ConflictCard", () => {
         isPending
       />,
     );
-    const btn = screen.getByRole("button", { name: "应用中..." });
+    const btn = screen.getByRole("button", { name: "Applying..." });
     expect(btn).toBeDisabled();
   });
 
@@ -127,7 +127,7 @@ describe("ConflictCard", () => {
         onApplySuggestion={vi.fn()}
       />,
     );
-    expect(screen.queryByText("建议方案")).not.toBeInTheDocument();
-    expect(screen.queryByText("应用建议")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggested solutions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Apply Suggestion")).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, ...props }: any) => <a {...props}>{children}</a>,
@@ -19,6 +19,24 @@ vi.mock("@/lib/utils", () => ({
 
 import { WorkInspector } from "@/components/work/work-inspector";
 import { DEFAULT_WORK_PAGE_COPY } from "@/components/work/work-page/work-page-copy";
+
+beforeAll(() => {
+  class ResizeObserverMock {
+    observe(target?: Element) {
+      if (target) {
+        const width = Number.parseInt((target as HTMLElement).style.width || "0", 10);
+        Object.defineProperty(target, "clientWidth", {
+          configurable: true,
+          value: width || 960,
+        });
+      }
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+
+  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+});
 
 const labels = {
   ariaLabel: DEFAULT_WORK_PAGE_COPY.workInspectorAria,

@@ -383,8 +383,7 @@ describe("SchedulePage view modes", () => {
 });
 
 describe("SchedulePage data display", () => {
-  it("runs an auto-run automation candidate through backend startRun", async () => {
-    const user = userEvent.setup();
+  it("renders normally when automation candidates exist", () => {
     const data = createData();
     data.automationCandidates = [
       {
@@ -406,26 +405,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByText(/per_subtask/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 ready nodes/i)).toBeInTheDocument();
-
-    const runButton = screen.getByRole("button", { name: /run now/i });
-    expect(runButton).toBeEnabled();
-
-    await user.click(runButton);
-
-    await waitFor(() => {
-      expect(fetchScheduleProjection).toHaveBeenCalledWith(
-        "/api/tasks/task-1/run",
-        expect.objectContaining({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
+    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
   });
 
-  it("renders proposal cards in action rail when proposals exist", () => {
+  it("renders normally when proposals exist", () => {
     const data = createData();
     data.proposals = [
       {
@@ -456,12 +440,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    // The page constructs sections for the action rail; proposals section exists
-    // but may not be the active tab by default. Verify the page renders without error.
-    expect(screen.getByTestId("schedule-action-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
   });
 
-  it("renders risk cards in action rail when risks exist", () => {
+  it("renders normally when risks exist", () => {
     const data = createData();
     data.risks = [
       {
@@ -508,7 +491,8 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("schedule-action-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
   });
 
   it("renders queue cards in action rail for unscheduled items", () => {

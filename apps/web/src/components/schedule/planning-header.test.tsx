@@ -34,15 +34,13 @@ describe("PlanningHeader", () => {
       />,
     );
 
-    expect(
-      screen.getByText("2h scheduled · 3 tasks waiting · 1 risk needs review"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Today · Wednesday")).toBeInTheDocument();
     expect(screen.getByText("Today load")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /quick add/i })).toHaveAttribute(
-      "href",
-      "#schedule-capture-bar",
-    );
-    expect(screen.getByRole("button", { name: /auto arrange/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /auto arrange/i })).toHaveAttribute("title", "Coming soon");
+    expect(screen.getByText("2h")).toBeInTheDocument();
+    expect(screen.getByText("Queue")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /quick add/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /timeline/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("button", { name: /auto arrange/i })).not.toBeInTheDocument();
   });
 });
