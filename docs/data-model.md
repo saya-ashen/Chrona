@@ -1,306 +1,444 @@
 # Data Model
 
-## Overview
+> **Database:** SQLite via Prisma 7
+> **Models:** 15
+> **Enums:** 10+
+> **Migration:** auto-run on first `chrona start`
 
-Chrona uses SQLite as its database, managed through Prisma 7 ORM with 15 data models. The data model is designed around the task lifecycle, covering workspace management, task execution, approval workflows, scheduling, and event auditing.
+---
+
+## Table of Contents
+
+1. [Entity Relationship Diagram](#entity-relationship-diagram)
+2. [Domain Aggregates](#domain-aggregates)
+3. [State Machines](#state-machines)
+4. [Index Strategy](#index-strategy)
+5. [Enum Reference](#enum-reference)
+
+---
 
 ## Entity Relationship Diagram
 
+```mermaid
+erDiagram
+    Workspace ||--o{ Task : contains
+    Workspace ||--o{ Memory : owns
+    Workspace ||--o{ Event : records
+    Task ||--o{ Run : executes
+    Task ||--o| TaskProjection : materializes
+    Task ||--o{ TaskSession : manages
+    Task ||--o{ TaskDependency : "depends on / blocks"
+    Task ||--o{ ScheduleProposal : receives
+    Task ||--o{ Task : "parent of (subtask)"
+    Run ||--o{ Approval : requires
+    Run ||--o{ Artifact : produces
+    Run ||--o{ ConversationEntry : records
+    Run ||--o{ ToolCallDetail : logs
+    Run ||--|| RuntimeCursor : syncs
+
+    Workspace {
+        string id PK
+        string name
+        string description
+        string defaultRuntime
+        string status
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Task {
+        string id PK
+        string workspaceId FK
+        string title
+        string description
+        string status
+        string priority
+        string ownerType
+        string runtimeAdapterKey
+        string runtimeInput
+        string runtimeInputVersion
+        string runtimeModel
+        string prompt
+        string runtimeConfig
+        datetime dueAt
+        datetime scheduledStartAt
+        datetime scheduledEndAt
+        string scheduleStatus
+        string scheduleSource
+        string parentTaskId FK
+        string latestRunId FK
+        int budgetLimit
+        string blockReason
+    }
+
+    Run {
+        string id PK
+        string taskId FK
+        string runtimeName
+        string status
+        datetime startedAt
+        datetime endedAt
+        string errorSummary
+        string runtimeRunRef
+        string resumeToken
+        string triggeredBy
+        boolean retryable
+        boolean resumeSupported
+        string pendingInputPrompt
+        string pendingInputType
+        datetime lastSyncedAt
+        string syncStatus
+    }
+
+    Approval {
+        string id PK
+        string runId FK
+        string type
+        string title
+        string summary
+        string riskLevel
+        string status
+        datetime resolvedAt
+        string resolvedBy
+        string resolution
+    }
+
+    Artifact {
+        string id PK
+        string runId FK
+        string type
+        string title
+        string uri
+        string contentPreview
+        string metadata
+    }
+
+    ConversationEntry {
+        string id PK
+        string runId FK
+        string role
+        string content
+        int sequence
+        string externalRef
+    }
+
+    ToolCallDetail {
+        string id PK
+        string runId FK
+        string toolName
+        string status
+        string argumentsSummary
+        string resultSummary
+        string errorSummary
+        string externalRef
+    }
+
+    TaskProjection {
+        string taskId PK
+        string displayState
+        string blockType
+        string blockScope
+        string actionRequired
+        int pendingApprovalCount
+        int approvalPendingCount
+        string scheduleStatus
+        string latestArtifactTitle
+        datetime lastActivityAt
+    }
+
+    TaskSession {
+        string id PK
+        string taskId FK
+        string sessionKey UK
+        string runtimeName
+        string status
+        string activeRunId
+    }
+
+    TaskDependency {
+        string id PK
+        string taskId FK
+        string dependsOnTaskId FK
+        string type
+    }
+
+    ScheduleProposal {
+        string id PK
+        string taskId FK
+        string source
+        string status
+        string proposedBy
+        string summary
+        datetime proposedStartAt
+        datetime proposedEndAt
+        datetime proposedDueAt
+    }
+
+    Memory {
+        string id PK
+        string workspaceId FK
+        string taskId FK
+        string content
+        string scope
+        string sourceType
+        float confidence
+        string status
+        datetime expiresAt
+    }
+
+    Event {
+        string id PK
+        string eventType
+        string workspaceId FK
+        string taskId FK
+        string runId FK
+        string actorType
+        string actorId
+        string source
+        string payload
+        string dedupeKey UK
+        int ingestSequence
+        datetime createdAt
+    }
+
+    RuntimeCursor {
+        string id PK
+        string runId UK
+        string nextCursor
+        string lastEventRef
+        string healthStatus
+        datetime updatedAt
+    }
 ```
-Workspace
-  │
-  ├── Task ──────────────────┐
-  │     │                     │
-  │     ├── Run              TaskDependency
-  │     │    ├── Approval
-  │     │    ├── Artifact
-  │     │    ├── ConversationEntry
-  │     │    ├── ToolCallDetail
-  │     │    └── RuntimeCursor
-  │     │
-  │     ├── TaskSession
-  │     ├── TaskProjection
-  │     ├── ScheduleProposal
-  │     └── Task (subtasks, self-referencing)
-  │
-  ├── Memory
-  └── Event
+
+---
+
+## Domain Aggregates
+
+### 1. Workspace Aggregate
+
+```
+Workspace (root)
+  ├── Task[]
+  │     ├── Run[]
+  │     │     ├── Approval[]
+  │     │     ├── Artifact[]
+  │     │     ├── ConversationEntry[]
+  │     │     ├── ToolCallDetail[]
+  │     │     └── RuntimeCursor (1:1)
+  │     ├── TaskSession[]
+  │     ├── TaskDependency[]
+  │     ├── ScheduleProposal[]
+  │     ├── TaskProjection (1:1)
+  │     └── Task[] (subtasks, recursive)
+  ├── Memory[]
+  └── Event[]
 ```
 
-## Model Details
+- **Workspace** is the top-level isolation boundary
+- **Task** is the core work unit, containing all execution data
+- **Run** models a single agent execution episode
+- **TaskProjection** is a denormalized materialized view optimized for list/schedule rendering
+- **Event** is the immutable audit log, cross-cutting all aggregates
 
-### Workspace
+### 2. Task Lifecycle Fields
 
-Top-level container that isolates tasks and data across projects.
+Tasks carry three categories of fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String (CUID) | Primary key |
-| name | String | Workspace name |
-| description | String? | Description |
-| defaultRuntime | String? | Default runtime adapter |
-| status | WorkspaceStatus | Active / Archived |
-| createdAt | DateTime | Creation time |
-| updatedAt | DateTime | Last update time |
+| Category | Fields | Purpose |
+|----------|--------|---------|
+| **Identity** | title, description, priority, ownerType | What the task is |
+| **Runtime** | runtimeAdapterKey, runtimeModel, prompt, runtimeConfig | How to execute it |
+| **Schedule** | scheduledStartAt, scheduledEndAt, dueAt, scheduleStatus, scheduleSource | When to execute it |
 
-### Task
+This separation enables tasks that have a schedule but no runtime config (planning phase) and tasks with a runtime config but no schedule (manual execution).
 
-Core entity representing a unit of work to be executed.
+### 3. Task Plan Graph (stored externally)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String (CUID) | Primary key |
-| workspaceId | String | Parent workspace |
-| title | String | Task title |
-| description | String? | Task description |
-| status | TaskStatus | Task status |
-| priority | TaskPriority | Priority (Low/Medium/High/Urgent) |
-| ownerType | OwnerType | Owner type (human/agent) |
-| **Runtime config** | | |
-| runtimeAdapterKey | String? | Runtime adapter key (e.g. "openclaw") |
-| runtimeInput | String? | Runtime input data (JSON) |
-| runtimeInputVersion | String? | Input version |
-| runtimeModel | String? | AI model name |
-| prompt | String? | Execution prompt |
-| runtimeConfig | String? | Runtime configuration (JSON) |
-| **Scheduling** | | |
-| dueAt | DateTime? | Due date |
-| scheduledStartAt | DateTime? | Scheduled start time |
-| scheduledEndAt | DateTime? | Scheduled end time |
-| scheduleStatus | ScheduleStatus | Schedule status |
-| scheduleSource | ScheduleSource? | Schedule source (human/ai/system) |
-| **Relations** | | |
-| parentTaskId | String? | Parent task ID (subtask relationship) |
-| latestRunId | String? | Latest run ID |
-| budgetLimit | Int? | Budget limit |
-| blockReason | String? | Reason for being blocked |
-
-**Indexes:**
-- `[workspaceId, status]`
-- `[workspaceId, priority]`
-- `[workspaceId, scheduleStatus]`
-
-### Run
-
-An AI agent execution instance. A task can have multiple runs.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String (CUID) | Primary key |
-| taskId | String | Parent task |
-| runtimeName | String | Runtime name |
-| status | RunStatus | Execution status |
-| startedAt | DateTime | Start time |
-| endedAt | DateTime? | End time |
-| errorSummary | String? | Error summary |
-| runtimeRunRef | String? | Runtime-side run reference (unique) |
-| resumeToken | String? | Resume token |
-| triggeredBy | String? | Trigger source |
-| retryable | Boolean | Whether retryable |
-| resumeSupported | Boolean | Whether resume is supported |
-| pendingInputPrompt | String? | Prompt text while waiting for input |
-| pendingInputType | String? | Type of input being awaited |
-| lastSyncedAt | DateTime? | Last sync time |
-| syncStatus | String? | Sync status |
-
-**RunStatus enum:**
-- `Pending` → `Running` → `Completed` / `Failed` / `Cancelled`
-- `Running` → `WaitingForInput` / `WaitingForApproval` → `Running`
-
-### Approval
-
-Approval requests during AI agent execution.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| runId | String | Parent run |
-| type | String | Approval type |
-| title | String | Title |
-| summary | String? | Summary |
-| riskLevel | String? | Risk level |
-| status | ApprovalStatus | Approval status |
-| resolvedAt | DateTime? | Resolution time |
-| resolvedBy | String? | Resolver |
-| resolution | String? | Resolution content |
-
-**ApprovalStatus:** Pending → Approved / Rejected / EditedAndApproved / Expired
-
-### Artifact
-
-Output generated by a run (files, reports, etc.).
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| runId | String | Parent run |
-| type | ArtifactType | Type (file/patch/summary/report/terminal_output/url) |
-| title | String | Title |
-| uri | String? | Resource URI |
-| contentPreview | String? | Content preview |
-| metadata | String? | Metadata (JSON) |
-
-### ConversationEntry
-
-Conversation messages during execution.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| runId | String | Parent run |
-| role | String | Role (user/assistant/system) |
-| content | String | Message content |
-| sequence | Int | Sequence number |
-| externalRef | String? | External reference |
-
-### ToolCallDetail
-
-Tool call records during execution.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| runId | String | Parent run |
-| toolName | String | Tool name |
-| status | String | Status |
-| argumentsSummary | String? | Arguments summary |
-| resultSummary | String? | Result summary |
-| errorSummary | String? | Error summary |
-| externalRef | String? | External reference |
-
-### TaskProjection
-
-Materialized view of a task, denormalized data optimized for the UI. Automatically rebuilt after each command.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| taskId | String | Parent task (primary key) |
-| displayState | String | Display state (derived from multiple dimensions) |
-| blockType | String? | Block type |
-| blockScope | String? | Block scope |
-| actionRequired | String? | Required action |
-| pendingApprovalCount | Int | Pending approvals |
-| approvalPendingCount | Int | Approval pending count |
-| scheduleStatus | String? | Schedule status |
-| latestArtifactTitle | String? | Latest artifact title |
-| lastActivityAt | DateTime? | Last activity time |
-
-**displayState possible values:**
-- `Draft`, `Ready`, `Queued`, `Running`
-- `WaitingForApproval`, `WaitingForInput`
-- `Blocked`, `Failed`, `Completed`, `Done`, `Cancelled`
-- `AttentionNeeded`, `SyncStale`
-
-### TaskSession
-
-Manages the session between a task and a runtime.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| taskId | String | Parent task |
-| sessionKey | String | Session key (unique) |
-| runtimeName | String | Runtime name |
-| status | String | Session status |
-| activeRunId | String? | Currently active run ID |
-
-### TaskDependency
-
-Dependency relationships between tasks.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| taskId | String | Task ID |
-| dependsOnTaskId | String | Depended-on task ID |
-| type | TaskDependencyType | blocks / relates_to / child_of |
-
-**Unique constraint:** `[taskId, dependsOnTaskId]`
-
-### ScheduleProposal
-
-AI or system-generated schedule change proposals.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| taskId | String | Target task |
-| source | ScheduleSource | Source (ai/human/system) |
-| status | ScheduleProposalStatus | Pending / Accepted / Rejected |
-| proposedBy | String? | Proposer |
-| summary | String? | Change summary |
-| proposedStartAt | DateTime? | Proposed start time |
-| proposedEndAt | DateTime? | Proposed end time |
-| proposedDueAt | DateTime? | Proposed due date |
-
-### Memory
-
-Persistent knowledge entries for AI agents.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| workspaceId | String | Parent workspace |
-| taskId | String? | Related task |
-| content | String | Memory content |
-| scope | MemoryScope | user / workspace / project / task |
-| sourceType | MemorySourceType | user_input / agent_inferred / imported / system_rule |
-| confidence | Float | Confidence level |
-| status | MemoryStatus | Active / Inactive / Conflicted / Expired |
-| expiresAt | DateTime? | Expiration time |
-
-### Event
-
-Immutable canonical event log — the audit trail for all state changes.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| eventType | String | Event type (e.g. TaskCreated, RunStarted) |
-| workspaceId | String | Parent workspace |
-| taskId | String? | Related task |
-| runId | String? | Related run |
-| actorType | String | Actor type (human/agent/system) |
-| actorId | String? | Actor ID |
-| source | String | Source |
-| payload | String? | Event payload (JSON) |
-| dedupeKey | String | Deduplication key (unique) |
-| ingestSequence | Int | Ingestion sequence (auto-increment) |
-| createdAt | DateTime | Creation time |
-
-### RuntimeCursor
-
-Tracks sync state with an external runtime.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| id | String | Primary key |
-| runId | String | Parent run (unique) |
-| nextCursor | String? | Next sync cursor |
-| lastEventRef | String? | Last event reference |
-| healthStatus | String? | Health status |
-| updatedAt | DateTime | Last update time |
-
-## Enum Overview
+Task plans are stored as graph objects outside the relational model:
 
 ```typescript
-// Task status lifecycle
-TaskStatus: Draft → Ready → Queued → Running → Completed → Done
-                                   ↗ Scheduled ↘
-                         WaitingForInput / WaitingForApproval
-                                    Blocked / Failed / Cancelled
+interface TaskPlanGraph {
+  id: string
+  taskId: string
+  status: "draft" | "accepted" | "archived"
+  summary: string | null
+  nodes: TaskPlanNode[]
+  edges: TaskPlanEdge[]
+  createdAt: Date
+  updatedAt: Date
+  generatedBy?: string  // AI client ID
+}
 
-// Priority
-TaskPriority: Low | Medium | High | Urgent
+interface TaskPlanNode {
+  id: string
+  type: "step" | "checkpoint" | "decision" | "user_input" | "deliverable" | "tool_action"
+  title: string
+  objective: string | null
+  status: "pending" | "in_progress" | "completed" | "blocked" | "skipped"
+  executionMode: "auto" | "manual" | "hybrid"
+  estimatedMinutes: number | null
+  actualMinutes: number | null
+  order: number
+  metadata: Record<string, unknown> | null
+}
 
-// Schedule status
-ScheduleStatus: Unscheduled | Scheduled | InProgress | AtRisk
-              | Interrupted | Overdue | Completed
-
-// Run status
-RunStatus: Pending | Running | WaitingForInput | WaitingForApproval
-         | Failed | Completed | Cancelled
-
-// Approval status
-ApprovalStatus: Pending | Approved | Rejected | EditedAndApproved | Expired
+interface TaskPlanEdge {
+  id: string
+  fromNodeId: string
+  toNodeId: string
+  type: "sequential" | "parallel" | "conditional" | "feedback" | "dependency"
+  label: string | null
+}
 ```
+
+The plan graph is mutable by users (via patch operations) and by AI (via suggest-confirm proposals).
+
+---
+
+## State Machines
+
+### Task Status Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Ready : plan accepted
+    Ready --> Queued : scheduled
+    Ready --> Running : manual start
+    Queued --> Running : auto-trigger
+    Running --> WaitingForInput : agent requests input
+    Running --> WaitingForApproval : agent requests approval
+    Running --> Blocked : dependency blocked
+    WaitingForInput --> Running : input provided
+    WaitingForApproval --> Running : approval resolved
+    Blocked --> Ready : dependency resolved
+    Running --> Failed : execution error
+    Running --> Completed : execution done
+    Completed --> Done : result accepted
+    Failed --> Ready : retry / reopen
+    Done --> Ready : reopen
+    Draft --> Cancelled : discard
+    Ready --> Cancelled : cancel
+```
+
+12 statuses. The display-state projection further refines these into UI-friendly labels (e.g., `AttentionNeeded` when pending approvals exist).
+
+### Run Status Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending : run created
+    Pending --> Running : execution starts
+    Running --> WaitingForInput : agent asks
+    Running --> WaitingForApproval : agent asks
+    WaitingForInput --> Running : input provided
+    WaitingForApproval --> Running : approval resolved
+    Running --> Completed : execution succeeds
+    Running --> Failed : error / timeout
+    Running --> Cancelled : user cancels
+    Failed --> Running : retry
+```
+
+### Approval Status Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending : agent requests
+    Pending --> Approved : user approves
+    Pending --> Rejected : user rejects
+    Pending --> EditedAndApproved : user edits + approves
+    Pending --> Expired : timeout
+```
+
+### Schedule Status Map
+
+| Status | Condition |
+|--------|-----------|
+| `Unscheduled` | No time block assigned |
+| `Scheduled` | Has future scheduledStartAt / scheduledEndAt |
+| `InProgress` | Currently within the scheduled window |
+| `AtRisk` | Scheduled start approaching, plan not accepted |
+| `Overdue` | Past dueAt without completion |
+| `Interrupted` | Scheduled window passed, not completed |
+| `Completed` | Task completed within or after schedule |
+
+---
+
+## Index Strategy
+
+| Table | Index | Purpose |
+|-------|-------|---------|
+| Task | `[workspaceId, status]` | Filter tasks by workspace + status (list views) |
+| Task | `[workspaceId, priority]` | Sort by priority within workspace |
+| Task | `[workspaceId, scheduleStatus]` | Schedule page — filter by schedule state |
+| TaskProjection | `taskId` (PK) | Lookup by task (1:1) |
+| TaskDependency | `UNIQUE [taskId, dependsOnTaskId]` | Guarantee no duplicate dependencies |
+| TaskSession | `sessionKey` (unique) | Lookup sessions by external key |
+| Run | `runtimeRunRef` (unique) | Lookup runs by runtime-side reference |
+| Run | `[taskId, status]` | Find active/pending runs for a task |
+| Event | `dedupeKey` (unique) | Ensure exactly-once event writing |
+| Event | `[workspaceId, createdAt]` | Time-ordered event streams per workspace |
+| RuntimeCursor | `runId` (unique) | 1:1 sync state per run |
+| Memory | `[workspaceId, status, scope]` | Query active memories by scope |
+
+---
+
+## Enum Reference
+
+### TaskStatus
+
+| Value | Description |
+|-------|-------------|
+| `Draft` | Initial state, no plan accepted |
+| `Ready` | Plan accepted, ready to schedule/run |
+| `Queued` | Scheduled and waiting for auto-start |
+| `Running` | Agent currently executing |
+| `WaitingForInput` | Agent paused, waiting for user input |
+| `WaitingForApproval` | Agent paused, waiting for user approval |
+| `Blocked` | Blocked by uncompleted dependency |
+| `Failed` | Execution failed with error |
+| `Completed` | Execution finished |
+| `Done` | Result accepted, task closed |
+| `Cancelled` | Task discarded |
+| `Scheduled` | (legacy, mapped to Queued) |
+
+### TaskPriority
+
+`Low` | `Medium` | `High` | `Urgent`
+
+### RunStatus
+
+`Pending` | `Running` | `WaitingForInput` | `WaitingForApproval` | `Failed` | `Completed` | `Cancelled`
+
+### ApprovalStatus
+
+`Pending` → `Approved` | `Rejected` | `EditedAndApproved` | `Expired`
+
+### MemoryStatus
+
+`Active` | `Inactive` | `Conflicted` | `Expired`
+
+### MemoryScope
+
+`user` — global user-level knowledge · `workspace` — workspace-scoped · `project` — project-scoped (future) · `task` — per-task
+
+### MemorySourceType
+
+`user_input` — manually entered · `agent_inferred` — deduced by AI · `imported` — external source · `system_rule` — fixed rules
+
+### ArtifactType
+
+`file` | `patch` | `summary` | `report` | `terminal_output` | `url`
+
+### TaskDependencyType
+
+`blocks` — predecessor must complete first · `relates_to` — informational link · `child_of` — parent-child hierarchy
+
+### ScheduleSource
+
+`human` | `ai` | `system`
+
+### OwnerType
+
+`human` | `agent`
