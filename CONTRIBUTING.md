@@ -103,8 +103,33 @@ Do not cross layers without reason. Prefer moving files and fixing imports over 
 ```bash
 bun run test              # Vitest unit tests
 bun run test:watch        # Watch mode
-bun run test:e2e          # Playwright E2E tests
+bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
 ```
+
+### E2E test layout
+
+```
+e2e/
+├── specs/                # CI-stable tests — what `bun run test:e2e` runs
+│   ├── schedule.spec.ts  # Schedule page flows (render, quick-add, validation, seed data)
+│   ├── task.spec.ts      # Task workspace flows (navigation, assistant, error states)
+│   └── control-plane.spec.ts  # Control-plane navigation
+├── demo/                 # Demo / recording scripts — NOT run in CI
+│   ├── demo.readme.spec.ts   # README GIF recording (mocked AI, video enabled)
+│   └── demo-record.spec.ts   # Manual recording (no webServer, requires `bun run dev`)
+└── helpers/              # Shared test helpers (future)
+```
+
+| Command | Scope | AI dependency | CI |
+|---------|-------|---------------|-----|
+| `bun run test:e2e` | `e2e/specs/` | Mocked only | Yes |
+| `bun run test:e2e:demo` | `e2e/demo/demo.readme.spec.ts` | Mocked | No |
+| `bun run test:e2e:record` | `e2e/demo/demo-record.spec.ts` | Real AI | No |
+
+Demo tests are separated because they include video recording, fixed viewports,
+`waitForTimeout` calls, and (in the record config) real AI calls —
+none of which belong in a CI pipeline that should be fast, deterministic,
+and self-contained.
 
 ## Adding an AI Runtime Adapter
 

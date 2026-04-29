@@ -49,6 +49,8 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:demo": "playwright test --config=playwright.demo.config.ts",
+    "test:e2e:record": "playwright test --config=playwright.record.config.ts",
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
     "db:seed": "bun prisma/seed.ts",
     "db:generate": "prisma generate",
