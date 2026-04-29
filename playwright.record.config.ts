@@ -16,8 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
  *   #      -vf "fps=10,scale=640:-1:flags=lanczos" output.gif
  */
 export default defineConfig({
-  testDir: "./e2e",
-  testMatch: ["demo-record.spec.ts"],
+  testDir: "./e2e/demo",
+  testMatch: ["**/demo-record.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,

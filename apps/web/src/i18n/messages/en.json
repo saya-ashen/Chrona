@@ -25,21 +25,6 @@
     "description": "Task-centric AI control plane for human and runtime collaboration."
   },
   "components": {
-    "taskCenterTable": {
-      "title": "Title",
-      "status": "Status",
-      "latestRun": "Latest Run",
-      "blockReason": "Block Reason",
-      "schedule": "Schedule",
-      "due": "Due",
-      "actions": "Actions",
-      "empty": "No tasks match this filter.",
-      "planningHint": "Open task for planning details, or jump straight into work.",
-      "noRun": "No run",
-      "openWork": "Open Work",
-      "startWork": "Start Work",
-      "openTask": "Open Task"
-    },
     "taskPage": {
       "eyebrow": "Secondary task detail",
       "fallbackDescription": "Use this page for reference, deep links, and heavier context that would clutter Schedule.",

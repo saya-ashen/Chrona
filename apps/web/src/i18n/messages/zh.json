@@ -25,21 +25,6 @@
     "description": "面向人与运行时协作的任务型 AI 控制台。"
   },
   "components": {
-    "taskCenterTable": {
-      "title": "标题",
-      "status": "状态",
-      "latestRun": "最近运行",
-      "blockReason": "阻塞原因",
-      "schedule": "日程",
-      "due": "截止时间",
-      "actions": "操作",
-      "empty": "没有任务符合当前筛选条件。",
-      "planningHint": "可打开任务查看规划细节，或直接进入工作台执行。",
-      "noRun": "暂无运行",
-      "openWork": "打开工作台",
-      "startWork": "开始执行",
-      "openTask": "打开任务"
-    },
     "taskPage": {
       "eyebrow": "辅助任务详情",
       "fallbackDescription": "这个页面用于查看参考信息、深链接和较重的上下文，避免把日程页塞得过满。",

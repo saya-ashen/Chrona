@@ -4,9 +4,19 @@ import { defineConfig, devices } from "@playwright/test";
 
 const DEMO_DATABASE_URL = `file:${resolve("prisma/dev.db")}`;
 
+/**
+ * Playwright config for README demo GIF recording.
+ *
+ * Runs only e2e/demo/demo.readme.spec.ts with a single worker,
+ * video enabled, and a fixed viewport suitable for GIF conversion.
+ *
+ * Usage:
+ *   bun run test:e2e:demo
+ *   # or: bunx playwright test --config=playwright.demo.config.ts
+ */
 export default defineConfig({
-  testDir: "./e2e",
-  testMatch: ["demo.readme.spec.ts"],
+  testDir: "./e2e/demo",
+  testMatch: ["**/demo.readme.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,
