@@ -6,7 +6,7 @@ This is a Vite + Hono monorepo. There is NO Next.js — do not generate Next.js 
 
 - **Frontend:** Vite + React 19 + React Router 7 (SPA under `apps/web/`)
 - **Backend:** Hono API server (Bun runtime under `apps/server/`)
-- **Database:** SQLite via Prisma 7 with `@prisma/adapter-better-sqlite3` (Node) / `prisma-adapter-bun-sqlite` (Bun)
+- **Database:** SQLite via Prisma 7 with `prisma-adapter-bun-sqlite` (Bun-only runtime)
 - **Language:** TypeScript strict everywhere
 - **AI runtime:** OpenClaw via structured-result bridge
 
