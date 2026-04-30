@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskAiSidebar } from "@/components/tasks/task-ai-sidebar";
 import { buttonVariants } from "@/components/ui/button";
@@ -213,6 +215,24 @@ function scheduleTone(status: string) {
 export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
   const runtimeConfigJson = formatJson(data.task.runtimeConfig);
   const copy = { ...DEFAULT_COPY, ...copyProp };
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/tasks/${data.task.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Failed to delete task" }));
+        throw new Error((err as { error?: string }).error ?? "Failed to delete task");
+      }
+      window.location.href = "/schedule";
+    } catch (cause) {
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [data.task.id]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -245,6 +265,34 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
                 >
                   {copy.openWorkbench}
                 </LocalizedLink>
+                {showDeleteConfirm ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className={buttonVariants({ variant: "destructive" })}
+                    >
+                      {isDeleting ? "Deleting..." : "Confirm Delete"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className={buttonVariants({ variant: "outline" })}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className={buttonVariants({ variant: "destructive" })}
+                  >
+                    <Trash2 className="mr-1 size-4" />
+                    Delete Task
+                  </button>
+                )}
               </div>
             </div>
 
