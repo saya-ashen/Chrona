@@ -54,5 +54,5 @@
     "**/*.tsx",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "e2e", ".worktrees"]
 }
