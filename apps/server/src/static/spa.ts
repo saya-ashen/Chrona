@@ -21,7 +21,9 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 function getSpaDistPath() {
-  return path.resolve(process.cwd(), process.env.CHROMA_WEB_DIST ?? "apps/web/dist");
+  const env = process.env.CHRONA_WEB_DIST;
+  if (env) return path.resolve(env);
+  return path.resolve(process.cwd(), "apps/web/dist");
 }
 
 export function createSpaStaticMiddleware(): MiddlewareHandler {
