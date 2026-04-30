@@ -1,22 +1,19 @@
 import { PrismaClient } from "@/generated/prisma/client";
 
-import { resolveSqliteAdapterUrl } from "@chrona/db/sqlite-url";
-
 const DATABASE_URL = process.env.DATABASE_URL || "file:./prisma/dev.db";
 
+if (typeof globalThis.Bun === "undefined") {
+  throw new Error(
+    "Chrona database runtime requires Bun. " +
+    "Please run Chrona through the npm launcher or set CHRONA_BUN_PATH.",
+  );
+}
+
 async function createAdapter() {
-  if (typeof globalThis.Bun !== "undefined") {
-    const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
+  const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
 
-    return new PrismaBunSqlite({
-      url: resolveSqliteAdapterUrl(DATABASE_URL, "bun"),
-    });
-  }
-
-  const { PrismaBetterSqlite3 } = await import("@prisma/adapter-better-sqlite3");
-
-  return new PrismaBetterSqlite3({
-    url: resolveSqliteAdapterUrl(DATABASE_URL, "node"),
+  return new PrismaBunSqlite({
+    url: DATABASE_URL,
   });
 }
 

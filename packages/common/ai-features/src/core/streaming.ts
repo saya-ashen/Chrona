@@ -16,7 +16,7 @@ import type {
   SuggestTimeslotRequest,
   ChatRequest,
 } from "./types";
-import { createLogger } from "@chrona/db/legacy-lib/logger";
+import { createLogger } from "@chrona/db/logger";
 import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type {
   BridgeFeatureRequest,

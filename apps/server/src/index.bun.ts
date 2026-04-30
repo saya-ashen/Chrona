@@ -1,6 +1,6 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
-import { createLogger } from "@chrona/db/legacy-lib/logger";
+import { createLogger } from "@chrona/db/logger";
 
 const log = createLogger("apps.server");
 const host = process.env.HOST ?? "0.0.0.0";
@@ -36,7 +36,7 @@ export async function startBunServer() {
     server.stop(true);
 
     try {
-      const { db } = await import("@chrona/db/legacy-lib/db");
+      const { db } = await import("@chrona/db/db");
       await db.$disconnect();
     } catch (err) {
       log.error("db disconnect failed", { error: String(err) });
