@@ -2,10 +2,9 @@
 
 /**
  * Build script for the npm-published CLI bundle.
- * Uses esbuild with custom tsconfig path resolution to produce
- * a single Node.js-compatible ESM bundle.
- *
- * Strategy: bundle all monorepo source code, externalize all npm packages.
+ * Produces two outputs:
+ *   1. dist/cli.js      — pure Node.js launcher (node:* imports only)
+ *   2. dist/bun-entry.js — Bun runtime with bundled workspace source
  */
 
 import * as esbuild from "esbuild";
@@ -29,44 +28,34 @@ const pathRules: PathRule[] = Object.entries(paths).map(([pattern, targets]) => 
 });
 
 function tryResolveFile(filePath: string): string | null {
-  // First check if the path already exists as-is
   try {
     if (statSync(filePath).isFile()) return filePath;
-  } catch {
-    // file doesn't exist — continue trying
-  }
+  } catch { /* not found */ }
 
-  // TypeScript convention: import "foo.js" resolves to "foo.ts"
   if (filePath.endsWith(".js")) {
     const tsPath = filePath.slice(0, -3) + ".ts";
-    try { if (statSync(tsPath).isFile()) return tsPath; } catch { /* not found */ }
+    try { if (statSync(tsPath).isFile()) return tsPath; } catch { /* */ }
     const tsxPath = filePath.slice(0, -3) + ".tsx";
-    try { if (statSync(tsxPath).isFile()) return tsxPath; } catch { /* not found */ }
+    try { if (statSync(tsxPath).isFile()) return tsxPath; } catch { /* */ }
   }
   if (filePath.endsWith(".mjs")) {
     const mtsPath = filePath.slice(0, -4) + ".mts";
-    try { if (statSync(mtsPath).isFile()) return mtsPath; } catch { /* not found */ }
+    try { if (statSync(mtsPath).isFile()) return mtsPath; } catch { /* */ }
   }
 
-  // Try appending common TypeScript/JavaScript extensions
   const extensions = [".ts", ".tsx", ".mts", ".js", ".mjs"];
   for (const ext of extensions) {
     try {
       const candidate = filePath + ext;
       if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // extension doesn't match — try next
-    }
+    } catch { /* */ }
   }
 
-  // Try index files
   for (const indexFile of ["/index.ts", "/index.js"]) {
     try {
       const candidate = filePath + indexFile;
       if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // index file not found
-    }
+    } catch { /* */ }
   }
 
   return null;
@@ -90,67 +79,100 @@ function isWorkspaceFile(absPath: string): boolean {
   return absPath.startsWith(ROOT + "/packages") || absPath.startsWith(ROOT + "/apps");
 }
 
-async function main() {
-  const entryFile = resolve(ROOT, "packages/cli/src/npm-entry.ts");
-  const outFile = resolve(ROOT, "dist/cli.js");
+function createResolverPlugin() {
+  return {
+    name: "chrona-resolver",
+    setup(build: esbuild.PluginBuild) {
+      build.onResolve({ filter: /.*/ }, (args) => {
+        // Let esbuild handle entry points normally
+        if (args.kind === "entry-point") return undefined;
 
-  const result = await esbuild.build({
-    entryPoints: [entryFile],
-    outfile: outFile,
+        // Skip esbuild's internal namespace imports
+        if (args.namespace !== "file") return undefined;
+
+        // Keep node:* builtins external
+        if (args.path.startsWith("node:")) {
+          return { external: true, path: args.path };
+        }
+        // Keep bun:* builtins external (for Bun runtime entry)
+        if (args.path.startsWith("bun:")) {
+          return { external: true, path: args.path };
+        }
+        // Keep @prisma/* external (npm package)
+        if (args.path.startsWith("@prisma/")) {
+          return { external: true, path: args.path };
+        }
+
+        // Try tsconfig path alias resolution first
+        const aliased = resolveTsconfigPath(args.path);
+        if (aliased) return { path: aliased };
+
+        // For relative imports, resolve absolute path and check if workspace
+        const abs = join(args.resolveDir, args.path);
+        if (isWorkspaceFile(abs) && tryResolveFile(abs)) {
+          return { path: tryResolveFile(abs) ?? abs };
+        }
+
+        // Everything else → external (npm packages, etc.)
+        return { external: true, path: args.path };
+      });
+    },
+  };
+}
+
+async function main() {
+  const { chmodSync } = await import("node:fs");
+
+  // ── Build 1: dist/cli.js (Node.js launcher) ──────────────────
+
+  const launcherEntry = resolve(ROOT, "packages/cli/src/npm-launcher.ts");
+  const launcherOut = resolve(ROOT, "dist/cli.js");
+
+  const launcherResult = await esbuild.build({
+    entryPoints: [launcherEntry],
+    outfile: launcherOut,
     bundle: true,
     platform: "node",
     target: "node20",
     format: "esm",
     banner: { js: "#!/usr/bin/env node" },
-    plugins: [
-      {
-        name: "chrona-resolver",
-        setup(build) {
-          // Resolve @chrona/* and @/ workspace path aliases → bundle
-          build.onResolve({ filter: /^@(chrona\/|\/)/ }, (args) => {
-            // @prisma/* should be external (npm package)
-            if (args.path.startsWith("@prisma/")) {
-              return { external: true, path: args.path };
-            }
-            const resolved = resolveTsconfigPath(args.path);
-            if (resolved) return { path: resolved };
-            return { external: true, path: args.path };
-          });
-
-          // For all file imports, decide: bundle workspace, externalize npm
-          build.onResolve({ filter: /.*/ }, (args) => {
-            if (args.kind === "entry-point") return undefined;
-            if (args.namespace !== "file") return undefined;
-
-            // Build the absolute path as esbuild would resolve it
-            const abs = join(args.resolveDir, args.path);
-
-            // Check if it actually resolves to an existing workspace file
-            if (isWorkspaceFile(abs) && tryResolveFile(abs)) {
-              return undefined; // bundle it
-            }
-
-            // Everything else → external
-            return { external: true, path: args.path };
-          });
-        },
-      },
-    ],
+    plugins: [createResolverPlugin()],
+    external: [], // launcher must not import any non-node:* deps
   });
 
-  if (result.errors.length > 0) {
-    console.error("Build failed:", result.errors);
+  if (launcherResult.errors.length > 0) {
+    console.error("Launcher build failed:", launcherResult.errors);
     process.exit(1);
   }
-
-  if (result.warnings.length > 0) {
-    console.warn("Build warnings:", result.warnings);
+  if (launcherResult.warnings.length > 0) {
+    console.warn("Launcher build warnings:", launcherResult.warnings);
   }
+  chmodSync(launcherOut, 0o755);
+  console.log("✓ Built", launcherOut);
 
-  const { chmodSync } = await import("node:fs");
-  chmodSync(outFile, 0o755);
+  // ── Build 2: dist/bun-entry.js (Bun runtime) ─────────────────
 
-  console.log("✓ Built", outFile);
+  const bunEntry = resolve(ROOT, "packages/cli/src/bun-entry.ts");
+  const bunOut = resolve(ROOT, "dist/bun-entry.js");
+
+  const bunResult = await esbuild.build({
+    entryPoints: [bunEntry],
+    outfile: bunOut,
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "esm",
+    plugins: [createResolverPlugin()],
+  });
+
+  if (bunResult.errors.length > 0) {
+    console.error("Bun entry build failed:", bunResult.errors);
+    process.exit(1);
+  }
+  if (bunResult.warnings.length > 0) {
+    console.warn("Bun entry build warnings:", bunResult.warnings);
+  }
+  console.log("✓ Built", bunOut);
 }
 
 main().catch((err) => {

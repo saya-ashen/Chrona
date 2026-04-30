@@ -8,6 +8,8 @@
  *   - RUN_LLM_INTEGRATION=1
  *
  * Run: RUN_LLM_INTEGRATION=1 bunx vitest run src/modules/ai/__tests__/plan-generation.integration.test.ts
+ *
+ * @vitest-environment bun
  */
 
 import { describe, it, expect } from "vitest";

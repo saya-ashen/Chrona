@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment bun
+ */
 import {
   ApprovalStatus,
   RunStatus,

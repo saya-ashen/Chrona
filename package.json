@@ -59,12 +59,16 @@
     "setup": "bun run db:generate && bun run db:seed",
     "probe:openclaw": "bun scripts/openclaw/probe.ts",
     "cli:build": "bun build packages/cli/src/main.ts --outdir=packages/cli/dist --target=bun",
-    "prepublishOnly": "bun run build && bun run build:npm"
+    "prepublishOnly": "bun run build && bun run build:npm",
+    "build:binaries": "bun run scripts/build-binaries.ts",
+    "build:binary:linux-x64": "bun run scripts/build-binaries.ts --target linux-x64",
+    "build:binary:linux-arm64": "bun run scripts/build-binaries.ts --target linux-arm64",
+    "build:binary:darwin-x64": "bun run scripts/build-binaries.ts --target darwin-x64",
+    "build:binary:darwin-arm64": "bun run scripts/build-binaries.ts --target darwin-arm64",
+    "build:binary:windows-x64": "bun run scripts/build-binaries.ts --target windows-x64"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.7.0",
     "@prisma/client": "7.8.0",
-    "better-sqlite3": "^12.8.0",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.3",
@@ -81,7 +85,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/bun": "^1.3.11",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -118,7 +121,6 @@
   ],
   "trustedDependencies": [
     "@prisma/engines",
-    "better-sqlite3",
     "esbuild",
     "prisma",
     "sharp",
