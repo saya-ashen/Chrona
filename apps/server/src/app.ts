@@ -8,7 +8,7 @@ import {
 
 import { createApiRouter } from "./routes/api";
 import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";
-import { createLogger } from "@chrona/db/legacy-lib/logger";
+import { createLogger } from "@chrona/db/logger";
 import { apiKeyAuth } from "./middleware/auth";
 
 const log = createLogger("apps.server");

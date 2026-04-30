@@ -1,1 +1,1 @@
-export type { StructuredSuggestion } from "./legacy-hooks/ai/types";
+export type { StructuredSuggestion } from "./hooks/ai/types";

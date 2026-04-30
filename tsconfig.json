@@ -21,9 +21,9 @@
       "@/components/*": ["./apps/web/src/components/*"],
       "@/hooks/*": ["./apps/web/src/hooks/*"],
       "@/i18n/*": ["./apps/web/src/i18n/*"],
-      "@/lib/db": ["./packages/db/src/legacy-lib/db.ts"],
+      "@/lib/db": ["./packages/db/src/db.ts"],
       "@/lib/logger": ["./apps/web/src/lib/logger.ts"],
-      "@/lib/demo-artifacts": ["./packages/db/src/legacy-lib/demo-artifacts.ts"],
+      "@/lib/demo-artifacts": ["./packages/db/src/demo-artifacts.ts"],
       "@/lib/*": ["./apps/web/src/lib/*"],
       "@/*": ["./src/*"],
       "@web/*": ["./apps/web/src/*"],
@@ -54,5 +54,5 @@
     "**/*.tsx",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "e2e", ".worktrees"]
+  "exclude": ["node_modules", "e2e", ".worktrees", "result", "dist"]
 }

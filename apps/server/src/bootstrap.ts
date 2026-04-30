@@ -1,1 +1,1 @@
-export { bootstrapServerRuntime } from "./legacy-server/bootstrap-runtime";
+export { bootstrapServerRuntime } from "./bootstrap-runtime";

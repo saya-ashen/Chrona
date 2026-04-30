@@ -1,1 +1,1 @@
-export { cn } from "@chrona/db/legacy-lib/utils";
+export { cn } from "@chrona/db/utils";

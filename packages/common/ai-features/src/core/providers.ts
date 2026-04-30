@@ -11,7 +11,7 @@ import type {
   DispatchTaskInput,
 } from "./types";
 import { AiClientError } from "./types";
-import { createLogger } from "@chrona/db/legacy-lib/logger";
+import { createLogger } from "@chrona/db/logger";
 import {
   coerceStructuredResult,
   parseTextJsonWithFallback,
