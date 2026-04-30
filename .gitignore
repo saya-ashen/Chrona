@@ -62,3 +62,4 @@ apps/web/node_modules/.vite/
 # misc generated
 /src/
 /assets/
+result
