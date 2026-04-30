@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Bot, Sparkles, RotateCcw, Check, Loader2 } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Bot, Sparkles, RotateCcw, Check, Loader2, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
@@ -244,6 +244,25 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
   const [refreshToken, setRefreshToken] = useState(0);
   const [forceRefresh, setForceRefresh] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Failed to delete task" }));
+        throw new Error((err as { error?: string }).error ?? "Failed to delete task");
+      }
+      window.location.href = "/schedule";
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : "Failed to delete task");
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [task.id]);
 
   const accepted = activePlan?.status === "accepted";
   const planGenerationStatus = task.aiPlanGenerationStatus
@@ -353,6 +372,37 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
             >
               Return to Schedule
             </LocalizedLink>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {showDeleteConfirm ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className={buttonVariants({ variant: "destructive", size: "sm" })}
+                >
+                  {isDeleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className={buttonVariants({ variant: "destructive", size: "sm" })}
+              >
+                <Trash2 className="mr-1 size-4" />
+                Delete Task
+              </button>
+            )}
           </div>
         </div>
       </SurfaceCard>
