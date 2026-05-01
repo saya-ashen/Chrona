@@ -7,6 +7,38 @@ import type {
 import { FEATURE_FUNCTION_TOOL } from "../shared/constants";
 import { parseJsonObject } from "../shared/json";
 
+function isPlanNodeArray(value: unknown) {
+  return Array.isArray(value) && value.every((item) => item && typeof item === "object");
+}
+
+function isPlanEdgeArray(value: unknown) {
+  return Array.isArray(value) && value.every((item) => item && typeof item === "object");
+}
+
+function validateFeaturePayload(
+  feature: BridgeFeature,
+  payload: unknown,
+): { ok: true } | { ok: false; error: string } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { ok: false, error: `Feature '${feature}' returned an invalid payload` };
+  }
+
+  if (feature === "generate_plan") {
+    const record = payload as Record<string, unknown>;
+    if (typeof record.summary !== "string") {
+      return { ok: false, error: "Feature 'generate_plan' payload.summary must be a string" };
+    }
+    if (!isPlanNodeArray(record.nodes)) {
+      return { ok: false, error: "Feature 'generate_plan' payload.nodes must be an array" };
+    }
+    if (!isPlanEdgeArray(record.edges)) {
+      return { ok: false, error: "Feature 'generate_plan' payload.edges must be an array" };
+    }
+  }
+
+  return { ok: true };
+}
+
 export function extractOutputText(response: Record<string, unknown>): string {
   const output = Array.isArray(response.output) ? response.output : [];
   const chunks: string[] = [];
@@ -55,6 +87,15 @@ export function buildFeatureResultFromResponse(
         error: `Feature '${feature}' requires function_call '${requiredTool}' in response.output`,
       };
     }
+
+    const payloadValidation = validateFeaturePayload(feature, matching.input);
+    if (!payloadValidation.ok) {
+      return {
+        featureResult: null,
+        error: payloadValidation.error,
+      };
+    }
+
     return {
       featureResult: {
         feature,

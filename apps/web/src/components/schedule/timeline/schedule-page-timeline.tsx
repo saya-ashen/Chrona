@@ -302,8 +302,10 @@ export function DayTimeline({
       return;
     }
 
+    const scrollNode = node;
+
     function syncViewportMinHeight() {
-      const availableHeight = Math.max(node.clientHeight - 16, 640);
+      const availableHeight = Math.max(scrollNode.clientHeight - 16, 640);
       const fittedHourHeight = Math.min(
         TIMELINE_HOUR_HEIGHT_MAX,
         Math.max(TIMELINE_HOUR_HEIGHT_MIN, Math.floor(availableHeight / 18)),

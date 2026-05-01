@@ -16,6 +16,8 @@ import {
 } from "@chrona/openclaw-bridge";
 import { runLiveOpenClaw } from "../bun-test-helpers";
 
+const liveGatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+
 // ---------------------------------------------------------------------------
 // Tests (skipped unless CHRONA_LIVE_OPENCLAW_TESTS=1)
 // ---------------------------------------------------------------------------
@@ -28,6 +30,7 @@ describe.skipIf(!runLiveOpenClaw)("OpenClaw bridge live smoke", () => {
   });
 
   it("GET /v1/health returns 200 with ok status", async () => {
+    expect(liveGatewayToken).toBeTruthy();
     const res = await app.request("http://bridge.local/v1/health");
 
     expect(res.status).toBe(200);
@@ -37,6 +40,7 @@ describe.skipIf(!runLiveOpenClaw)("OpenClaw bridge live smoke", () => {
   });
 
   it("POST /v1/features/generate-plan returns structured result", async () => {
+    expect(liveGatewayToken).toBeTruthy();
     const res = await app.request(
       "http://bridge.local/v1/features/generate-plan",
       {

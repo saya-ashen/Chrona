@@ -1,3 +1,4 @@
+import { expect } from "bun:test";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
 
@@ -12,6 +13,7 @@ export const runLiveOpenClaw = process.env.CHRONA_LIVE_OPENCLAW_TESTS === "1";
 // ---------------------------------------------------------------------------
 
 export async function resetTestDb() {
+  await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();
   await db.conversationEntry.deleteMany();
@@ -182,6 +184,78 @@ export async function seedDraftPlan(
     nodes,
     edges,
   };
+}
+
+export async function seedAcceptedPlan(
+  taskId: string,
+  workspaceId: string,
+  options?: SeedDraftPlanOptions,
+) {
+  const draft = await seedDraftPlan(taskId, workspaceId, options);
+  const memory = await db.memory.findUniqueOrThrow({ where: { id: draft.planId } });
+  const parsed = JSON.parse(memory.content) as Record<string, unknown>;
+
+  await db.memory.update({
+    where: { id: draft.planId },
+    data: {
+      content: JSON.stringify({
+        ...parsed,
+        status: "accepted",
+        plan: parsed.plan && typeof parsed.plan === "object"
+          ? { ...(parsed.plan as Record<string, unknown>), status: "accepted" }
+          : undefined,
+      }),
+      confidence: 1,
+    },
+  });
+
+  return draft;
+}
+
+export async function seedScheduleProposal(input: {
+  taskId: string;
+  workspaceId: string;
+  source?: "ai" | "human" | "system";
+  proposedBy?: string;
+  summary?: string;
+  dueAt?: Date | null;
+  scheduledStartAt?: Date | null;
+  scheduledEndAt?: Date | null;
+  status?: "Pending" | "Accepted" | "Rejected";
+}) {
+  const proposal = await db.scheduleProposal.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      source: input.source ?? "ai",
+      status: input.status ?? "Pending",
+      proposedBy: input.proposedBy ?? "test-agent",
+      summary: input.summary ?? "Suggested schedule",
+      dueAt: input.dueAt ?? null,
+      scheduledStartAt: input.scheduledStartAt ?? null,
+      scheduledEndAt: input.scheduledEndAt ?? null,
+      resolvedAt: input.status && input.status !== "Pending" ? new Date() : null,
+    },
+  });
+
+  return {
+    proposalId: proposal.id,
+    taskId: proposal.taskId,
+    workspaceId: proposal.workspaceId,
+  };
+}
+
+export async function json<T>(res: Response): Promise<T> {
+  return await res.json() as T;
+}
+
+export async function expectApiError(res: Response, expectedStatus: number) {
+  expect(res.status).toBe(expectedStatus);
+  const body = await json<{ error?: unknown; code?: unknown }>(res);
+  if (typeof body.error !== "string" || !body.error.trim()) {
+    throw new Error(`Expected API error body for status ${expectedStatus}`);
+  }
+  return body;
 }
 
 // ---------------------------------------------------------------------------

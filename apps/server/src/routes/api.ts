@@ -302,6 +302,73 @@ function toDateOrNull(value: unknown) {
   return typeof value === "string" && value ? new Date(value) : null;
 }
 
+function toDateOrUndefined(value: unknown) {
+  return value === undefined ? undefined : toDateOrNull(value);
+}
+
+function isInvalidDate(value: Date | null | undefined) {
+  return value instanceof Date && Number.isNaN(value.getTime());
+}
+
+function ensureValidDateFields(fields: Record<string, Date | null | undefined>) {
+  for (const [field, value] of Object.entries(fields)) {
+    if (isInvalidDate(value)) {
+      throw new HttpError(400, `${field} must be a valid date string`);
+    }
+  }
+}
+
+async function ensureTaskInWorkspace(taskId: string, workspaceId: string) {
+  const task = await db.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, workspaceId: true },
+  });
+
+  if (!task) {
+    throw new HttpError(404, "Task not found");
+  }
+
+  if (task.workspaceId !== workspaceId) {
+    throw new HttpError(404, "Task not found");
+  }
+
+  return task;
+}
+
+async function ensureProposalInWorkspace(proposalId: string, workspaceId: string) {
+  const proposal = await db.scheduleProposal.findUnique({
+    where: { id: proposalId },
+    select: { id: true, workspaceId: true },
+  });
+
+  if (!proposal) {
+    throw new HttpError(404, "Schedule proposal not found");
+  }
+
+  if (proposal.workspaceId !== workspaceId) {
+    throw new HttpError(404, "Schedule proposal not found");
+  }
+
+  return proposal;
+}
+
+async function ensurePlanInWorkspace(planId: string, taskId: string, workspaceId: string) {
+  const plan = await db.memory.findUnique({
+    where: { id: planId },
+    select: { id: true, taskId: true, workspaceId: true },
+  });
+
+  if (!plan || plan.taskId !== taskId) {
+    throw new HttpError(404, "Task plan graph not found");
+  }
+
+  if (plan.workspaceId !== workspaceId) {
+    throw new HttpError(404, "Task plan graph not found");
+  }
+
+  return plan;
+}
+
 async function deleteTaskWithRelations(taskId: string) {
   const task = await db.task.findUnique({
     where: { id: taskId },
@@ -403,6 +470,9 @@ export function createApiRouter() {
       const body = await c.req.json();
       const workspaceId = body.workspaceId;
       const title = body.title;
+      const dueAt = toDateOrNull(body.dueAt);
+      const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
+      const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
 
       if (!workspaceId) {
         return error(c, "workspaceId is required", 400);
@@ -412,12 +482,16 @@ export function createApiRouter() {
         return error(c, "title is required", 400);
       }
 
+      ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
+
       const result = await createTask({
         workspaceId,
         title,
         description: body.description,
         priority: body.priority,
-        dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
+        dueAt,
+        scheduledStartAt,
+        scheduledEndAt,
         runtimeAdapterKey: body.runtimeAdapterKey,
         runtimeInput: body.runtimeInput,
         runtimeInputVersion: body.runtimeInputVersion,
@@ -428,6 +502,19 @@ export function createApiRouter() {
 
       return json(c, result, 201);
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to create task";
+      if (message.includes("No 'Workspace' record") || message.includes("Expected a record")) {
+        return error(c, "Workspace not found", 404);
+      }
+      if (
+        message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
+        message.includes("must be a valid date string") ||
+        message.includes("runtimeConfig must be an object") ||
+        message.includes("cannot be empty") ||
+        message.includes("parentTaskId must reference a task in the same workspace")
+      ) {
+        return error(c, message, 400);
+      }
       return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
     }
   });
@@ -435,6 +522,10 @@ export function createApiRouter() {
   api.get("/tasks/:taskId", async (c) => {
     try {
       const taskId = c.req.param("taskId");
+      const workspaceId = c.req.query("workspaceId");
+      if (workspaceId) {
+        await ensureTaskInWorkspace(taskId, workspaceId);
+      }
       const task = await db.task.findUnique({
         where: { id: taskId },
         include: {
@@ -449,6 +540,10 @@ export function createApiRouter() {
 
       return json(c, { task });
     } catch (cause) {
+      const httpError = toHttpError(cause);
+      if (httpError) {
+        return error(c, httpError.message, httpError.status);
+      }
       return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
     }
   });
@@ -466,18 +561,29 @@ export function createApiRouter() {
     try {
       const taskId = c.req.param("taskId");
       const body = await c.req.json();
+      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+      if (workspaceId) {
+        await ensureTaskInWorkspace(taskId, workspaceId);
+      }
+
+      const dueAt = toDateOrNull(body.dueAt);
+      const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
+      const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
+      ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
+
+      if (body.status !== undefined && !VALID_TASK_STATUSES.has(body.status as TaskStatus)) {
+        return error(c, `Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`, 400);
+      }
+
       const result = await updateTask({
         taskId,
         title: body.title,
         description: body.description,
         priority: body.priority,
-        dueAt: body.dueAt !== undefined ? (body.dueAt ? new Date(body.dueAt) : null) : undefined,
-        scheduledStartAt: body.scheduledStartAt !== undefined
-          ? (body.scheduledStartAt ? new Date(body.scheduledStartAt) : null)
-          : undefined,
-        scheduledEndAt: body.scheduledEndAt !== undefined
-          ? (body.scheduledEndAt ? new Date(body.scheduledEndAt) : null)
-          : undefined,
+        status: body.status,
+        dueAt,
+        scheduledStartAt,
+        scheduledEndAt,
         runtimeAdapterKey: body.runtimeAdapterKey,
         runtimeInput: body.runtimeInput,
         runtimeInputVersion: body.runtimeInputVersion,
@@ -492,12 +598,24 @@ export function createApiRouter() {
       if (message.includes("Record to update not found") || message.includes("not found")) {
         return error(c, "Task not found", 404);
       }
+      if (
+        message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
+        message.includes("must be a valid date string") ||
+        message.includes("cannot be empty") ||
+        message.includes("runtimeConfig must be an object")
+      ) {
+        return error(c, message, 400);
+      }
       return internalServerError(c, "PATCH /api/tasks/:taskId", cause, "Failed to update task");
     }
   });
 
   api.delete("/tasks/:taskId", async (c) => {
     try {
+      const workspaceId = c.req.query("workspaceId");
+      if (workspaceId) {
+        await ensureTaskInWorkspace(c.req.param("taskId"), workspaceId);
+      }
       return json(c, await deleteTaskWithRelations(c.req.param("taskId")));
     } catch (cause) {
       const httpError = toHttpError(cause);
@@ -865,6 +983,16 @@ export function createApiRouter() {
     try {
       const taskId = c.req.param("taskId");
       const body = await c.req.json();
+      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+      if (workspaceId) {
+        await ensureTaskInWorkspace(taskId, workspaceId);
+      }
+
+      const dueAt = toDateOrNull(body.dueAt);
+      const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
+      const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
+      ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
+
       return json(
         c,
         await proposeSchedule({
@@ -872,16 +1000,25 @@ export function createApiRouter() {
           source: body.source,
           proposedBy: body.proposedBy,
           summary: body.summary,
-          dueAt: toDateOrNull(body.dueAt),
-          scheduledStartAt: toDateOrNull(body.scheduledStartAt),
-          scheduledEndAt: toDateOrNull(body.scheduledEndAt),
+          dueAt,
+          scheduledStartAt,
+          scheduledEndAt,
           assigneeAgentId: typeof body.assigneeAgentId === "string" ? body.assigneeAgentId : null,
         }),
         201,
       );
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to create schedule proposal";
-      return error(c, message, message.includes("not found") ? 404 : 500);
+      return error(
+        c,
+        message,
+        message.includes("not found")
+          ? 404
+          : message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
+              message.includes("must be a valid date string")
+            ? 400
+            : 500,
+      );
     }
   });
 
@@ -890,6 +1027,7 @@ export function createApiRouter() {
       const body = await c.req.json();
       const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
       const decision = body.decision;
+      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
       if (!proposalId) {
         return error(c, "proposalId is required", 400);
@@ -897,6 +1035,10 @@ export function createApiRouter() {
 
       if (decision !== "Accepted" && decision !== "Rejected") {
         return error(c, 'decision must be "Accepted" or "Rejected"', 400);
+      }
+
+      if (workspaceId) {
+        await ensureProposalInWorkspace(proposalId, workspaceId);
       }
 
       return json(
@@ -909,7 +1051,17 @@ export function createApiRouter() {
       );
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to resolve schedule proposal";
-      return error(c, message, message.includes("not found") || message.includes("No 'ScheduleProposal' record") ? 404 : 400);
+      return error(
+        c,
+        message,
+        message.includes("Schedule proposal not found") ||
+          message.includes("No 'ScheduleProposal' record") ||
+          message.includes("not found")
+          ? 404
+          : message.includes("Only pending schedule proposals can be resolved.")
+            ? 409
+            : 400,
+      );
     }
   });
 
@@ -965,9 +1117,15 @@ export function createApiRouter() {
       const body = await c.req.json();
       const taskId = typeof body.taskId === "string" ? body.taskId : "";
       const planId = typeof body.planId === "string" ? body.planId : "";
+      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
 
       if (!taskId || !planId) {
         return error(c, "taskId and planId are required", 400);
+      }
+
+      if (workspaceId) {
+        await ensureTaskInWorkspace(taskId, workspaceId);
+        await ensurePlanInWorkspace(planId, taskId, workspaceId);
       }
 
       const savedPlan = await acceptTaskPlanGraph({ taskId, planId });
@@ -984,7 +1142,7 @@ export function createApiRouter() {
       });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to accept task AI plan";
-      return error(c, message, 500);
+      return error(c, message, message.includes("not found") ? 404 : 500);
     }
   });
 
@@ -2018,9 +2176,55 @@ export function createApiRouter() {
         return error(c, "taskId is required", 400);
       }
 
+      if (typeof body.workspaceId === "string") {
+        await ensureTaskInWorkspace(taskId, body.workspaceId);
+      }
+
       const task = await db.task.findUnique({ where: { id: taskId } });
       if (!task) {
         return error(c, "Task not found", 404);
+      }
+
+      if (providedNodes !== undefined && !Array.isArray(providedNodes)) {
+        return error(c, "nodes must be an array", 400);
+      }
+
+      if (providedEdges !== undefined && !Array.isArray(providedEdges)) {
+        return error(c, "edges must be an array", 400);
+      }
+
+      if (providedNodes && providedNodes.length > 0) {
+        const hasInvalidNode = providedNodes.some((node) => {
+          if (!node || typeof node !== "object") return true;
+          const record = node as Record<string, unknown>;
+          return (
+            typeof record.id !== "string" ||
+            !record.id.trim() ||
+            typeof record.title !== "string" ||
+            !record.title.trim() ||
+            typeof record.objective !== "string" ||
+            !record.objective.trim()
+          );
+        });
+        if (hasInvalidNode) {
+          return error(c, "plan nodes must include id, title, and objective", 400);
+        }
+      }
+
+      if (providedEdges && providedEdges.length > 0) {
+        const validNodeIds = new Set((providedNodes ?? []).map((node) => node.id));
+        const hasInvalidEdge = providedEdges.some((edge) => {
+          if (!edge || typeof edge !== "object") return true;
+          const record = edge as Record<string, unknown>;
+          return (
+            typeof record.fromNodeId !== "string" ||
+            typeof record.toNodeId !== "string" ||
+            (validNodeIds.size > 0 && (!validNodeIds.has(record.fromNodeId) || !validNodeIds.has(record.toNodeId)))
+          );
+        });
+        if (hasInvalidEdge) {
+          return error(c, "plan edges must reference valid node ids", 400);
+        }
       }
 
       let graphPlan = null;
@@ -2063,11 +2267,24 @@ export function createApiRouter() {
         include: { projection: true },
         orderBy: { createdAt: "asc" },
       });
+      const acceptedPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? graphPlan;
+      const materializedNodeIds = new Set(
+        acceptedPlan?.plan.nodes
+          .filter((node) => typeof node.linkedTaskId === "string" && node.linkedTaskId.length > 0)
+          .map((node) => node.id) ?? [],
+      );
+      const requestedNodeIds = new Set((acceptedPlan?.plan.nodes ?? []).map((node) => node.id));
+      const skippedNodeIds = [...requestedNodeIds].filter((nodeId) => !materializedNodeIds.has(nodeId));
 
       return json(c, {
         parentTaskId: taskId,
         childTasks: createdTasks,
         planGraph: graphPlan.plan,
+        materialization: {
+          createdTaskIds: materialized.createdTaskIds,
+          updatedNodeIds: materialized.updatedNodeIds,
+          skippedNodeIds,
+        },
       }, 201);
     } catch (cause) {
       return internalServerError(c, "POST /api/ai/batch-apply-plan", cause, "Failed to apply task plan");

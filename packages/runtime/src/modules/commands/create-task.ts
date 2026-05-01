@@ -6,6 +6,7 @@ import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-ge
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
+import { validateScheduleWindow } from "@chrona/domain";
 
 function normalizeOptionalTextField(value: string | null | undefined, field: string) {
   if (value === undefined) {
@@ -48,6 +49,8 @@ export async function createTask(input: {
   priority?: "Low" | "Medium" | "High" | "Urgent";
   parentTaskId?: string | null;
   dueAt?: Date | null;
+  scheduledStartAt?: Date | null;
+  scheduledEndAt?: Date | null;
   runtimeAdapterKey?: string | null;
   runtimeInput?: Prisma.InputJsonObject | null;
   runtimeInputVersion?: string | null;
@@ -64,6 +67,11 @@ export async function createTask(input: {
   if (!title) {
     throw new Error("title is required");
   }
+
+  validateScheduleWindow({
+    scheduledStartAt: input.scheduledStartAt,
+    scheduledEndAt: input.scheduledEndAt,
+  });
 
   const workspace = await db.workspace.findUniqueOrThrow({
     where: { id: input.workspaceId },
@@ -120,6 +128,8 @@ export async function createTask(input: {
       ownerType: OwnerType.human,
       parentTaskId: input.parentTaskId ?? null,
       dueAt: input.dueAt ?? null,
+      scheduledStartAt: input.scheduledStartAt ?? null,
+      scheduledEndAt: input.scheduledEndAt ?? null,
     },
   });
 

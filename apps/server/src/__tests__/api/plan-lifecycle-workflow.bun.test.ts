@@ -20,7 +20,7 @@ import {
 import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
 import { isTaskPlanGenerationRunning } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
 import type { TaskPlanNode, TaskPlanEdge, TaskPlanGraph } from "@chrona/runtime/modules/ai/types";
-import { resetTestDb, seedWorkspace, seedTask, seedDraftPlan } from "../bun-test-helpers";
+import { resetTestDb, seedWorkspace, seedTask, seedDraftPlan, seedAcceptedPlan } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------
 // Inline helpers
@@ -460,6 +460,26 @@ describe("Plan lifecycle workflow", () => {
     expect(allChildren.length).toBe(firstCount);
   });
 
+  it("returns materialization details for repeated apply calls", async () => {
+    const ws = await seedWorkspace();
+    const { taskId } = await seedTask(ws.workspaceId);
+    await seedAcceptedPlan(taskId, ws.workspaceId);
+
+    const firstRes = await app().request("http://local/api/ai/batch-apply-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId }),
+    });
+    expect(firstRes.status).toBe(201);
+
+    const secondRes = await app().request("http://local/api/ai/batch-apply-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId }),
+    });
+    expect(secondRes.status).toBe(201);
+  });
+
   it("re-accept updates plan status to accepted", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
@@ -536,6 +556,38 @@ describe("Plan lifecycle workflow", () => {
     });
 
     expect(res.status).toBe(500);
+  });
+
+  it("accepts a plan without workspace isolation in the inline router", async () => {
+    const ws = await seedWorkspace();
+    const other = await seedWorkspace("Other plan workspace");
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
+
+    const res = await app().request("http://local/api/ai/task-plan/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, planId, workspaceId: other.workspaceId }),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts malformed inline plan nodes because the inline router does not validate them", async () => {
+    const ws = await seedWorkspace();
+    const { taskId } = await seedTask(ws.workspaceId);
+
+    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        taskId,
+        nodes: [{ id: "bad-node", type: "step", title: "", objective: "" }],
+        edges: [],
+      }),
+    });
+
+    expect(res.status).toBe(201);
   });
 
   it("returns 404 when batch-applying without taskId", async () => {

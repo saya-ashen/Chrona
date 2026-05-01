@@ -49,7 +49,7 @@
     "test:watch": "vitest",
     "test:api": "bun test apps/server/src/__tests__/api/ apps/server/src/routes/__tests__/",
     "test:bridge": "bun test apps/server/src/__tests__/bridge/ packages/providers/openclaw/bridge/src/ packages/providers/openclaw/integration/src/transport/",
-    "test:bun": "find . -name '*.bun.test.ts' ! -path '*/node_modules/*' ! -path '*/.direnv/*' -exec bun test {} +",
+    "test:bun": "bun run scripts/run-bun-tests.ts",
     "test:e2e": "playwright test",
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
     "db:seed": "bun prisma/seed.ts",
