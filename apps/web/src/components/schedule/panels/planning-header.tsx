@@ -52,7 +52,7 @@ export function PlanningHeader({
   return (
     <header
       aria-label={ariaLabel}
-      className="flex items-center gap-4 border-b border-border/40 bg-background px-5 py-2.5"
+      className="flex items-center gap-4 rounded-3xl border border-border/55 bg-white/90 px-5 py-3 shadow-[0_8px_28px_rgba(15,23,42,0.06)]"
     >
       {/* Title + Date */}
       <div className="flex items-center gap-3">
@@ -66,7 +66,7 @@ export function PlanningHeader({
       </div>
 
       {/* Day switcher */}
-      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
+      <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
         {dayLinks.map((link) => (
           <a
             key={link.label}
@@ -85,7 +85,7 @@ export function PlanningHeader({
       </div>
 
       {/* View toggle */}
-      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
+      <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
         <a
           href={timelineHref}
           aria-current={activeView === "timeline" ? "page" : undefined}
@@ -123,7 +123,7 @@ export function PlanningHeader({
           <div
             key={m.label}
             title={m.hint}
-            className="flex items-center gap-1 rounded-full border border-border/40 px-2 py-0.5"
+            className="flex items-center gap-1 rounded-full border border-border/50 bg-background/80 px-2 py-0.5"
           >
             <span className="text-[10px] text-muted-foreground">{m.label}</span>
             <span
