@@ -187,21 +187,13 @@ async function bundleWithEsbuild(target: string): Promise<string> {
 // ────── Archive helpers ─────────────────────────────────────────
 
 async function createTarGz(sourceDir: string, outFile: string) {
-  const parentDir = dirname(sourceDir);
-  const dirName = sourceDir.split("/").pop()!;
-  log("archive", `Creating ${outFile.replace(ROOT + "/", "")}`);
-  Bun.spawnSync(["tar", "-czf", outFile, "-C", parentDir, dirName], {
+  // Normalize paths for cross-platform tar (MSYS tar on Windows needs forward slashes)
+  const parentDir = dirname(sourceDir).replace(/\\/g, "/");
+  const dirName = sourceDir.replace(/\\/g, "/").split("/").pop()!;
+  const normalizedOut = outFile.replace(/\\/g, "/");
+  log("archive", `Creating ${normalizedOut.replace(ROOT.replace(/\\/g, "/") + "/", "")}`);
+  Bun.spawnSync(["tar", "-czf", normalizedOut, "-C", parentDir, dirName], {
     cwd: ROOT,
-    stdio: ["inherit", "inherit", "inherit"],
-  });
-}
-
-async function createZip(sourceDir: string, outFile: string) {
-  const parentDir = dirname(sourceDir);
-  const dirName = sourceDir.split("/").pop()!;
-  log("archive", `Creating ${outFile.replace(ROOT + "/", "")}`);
-  Bun.spawnSync(["zip", "-rq", outFile, dirName], {
-    cwd: parentDir,
     stdio: ["inherit", "inherit", "inherit"],
   });
 }
@@ -303,21 +295,14 @@ async function buildBinary(target: string) {
 
   // Step 7: Generate archive
   console.log("");
-  if (isWindows) {
-    const zipPath = resolve(ROOT, "dist", "releases", `${releaseName}.zip`);
-    await createZip(releaseDir, zipPath);
-    log("archive", zipPath);
-  } else {
-    const tarPath = resolve(ROOT, "dist", "releases", `${releaseName}.tar.gz`);
-    await createTarGz(releaseDir, tarPath);
-    log("archive", tarPath);
-  }
+  const tarPath = resolve(ROOT, "dist", "releases", `${releaseName}.tar.gz`);
+  await createTarGz(releaseDir, tarPath);
+  log("archive", tarPath);
 
   console.log("");
   console.log(`✓ Built ${releaseName}`);
   console.log(`  Binary:  ${binaryPath}`);
-  const archiveExt = isWindows ? "zip" : "tar.gz";
-  console.log(`  Archive: ${resolve(ROOT, "dist", "releases", `${releaseName}.${archiveExt}`)}`);
+  console.log(`  Archive: ${tarPath}`);
   console.log("");
 }
 
