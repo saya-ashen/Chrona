@@ -538,8 +538,8 @@ export function DayTimeline({
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-2xl">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-3">
+    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-[28px] border-border/55 bg-white/75">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-border/55 bg-white/80 p-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">
             {formatDayHeading(dayDate, locale, copy)}
@@ -563,10 +563,10 @@ export function DayTimeline({
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto rounded-2xl border border-border/60 bg-card/40 pr-2"
+        className="flex-1 overflow-y-auto rounded-3xl border border-border/55 bg-gradient-to-b from-white/88 to-slate-50/85 p-2 pr-0"
       >
-        <div className="flex gap-3">
-          <div className="sticky left-0 top-0 hidden w-16 shrink-0 self-start bg-background/95 py-2 sm:block">
+        <div className="flex gap-2">
+          <div className="sticky left-0 top-0 hidden w-20 shrink-0 self-start rounded-2xl border border-border/40 bg-white/90 py-3 pl-2 sm:block">
             <div className="relative" style={{ height: `${timelineHeight}px` }}>
               {compressedTimeline.hours.map((hour) => (
                 <div
@@ -574,7 +574,7 @@ export function DayTimeline({
                   className="absolute left-0 right-0"
                   style={{ top: `${hour.visualStart}px` }}
                 >
-                  <span className="-translate-y-1/2 text-xs text-muted-foreground">
+                  <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                     {formatTime(new Date(2026, 0, 1, hour.hour, 0), locale)}
                   </span>
                 </div>
@@ -583,7 +583,7 @@ export function DayTimeline({
                 className="absolute left-0 right-0"
                 style={{ top: `${timelineHeight}px` }}
               >
-                <span className="-translate-y-1/2 text-xs text-muted-foreground">
+                <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                   11:59 PM
                 </span>
               </div>
@@ -602,8 +602,8 @@ export function DayTimeline({
             }}
             onClick={handleTimelineClick}
             className={cn(
-              "relative flex-1 rounded-2xl border border-border/60 bg-card/60 outline-none transition-colors",
-              draggedItem && "border-primary/50 bg-primary/5",
+              "relative flex-1 rounded-2xl border border-border/60 bg-white/80 outline-none transition-colors",
+              draggedItem && "border-primary/50 bg-primary/[0.08]",
             )}
             style={{ height: `${timelineHeight}px` }}
           >
@@ -616,16 +616,34 @@ export function DayTimeline({
                   height: `${hour.visualHeight}px`,
                 }}
               >
-                <div className="absolute inset-x-0 top-0 border-t border-dashed border-border/70" />
+                <div className="absolute inset-x-0 top-0 border-t border-border/35" />
                 {!hour.active ? (
-                  <div className="absolute inset-x-3 inset-y-1 rounded-md bg-muted/35" />
+                  <div className="absolute inset-x-3 inset-y-1 rounded-xl bg-slate-100/85" />
                 ) : null}
               </div>
             ))}
             <div
-              className="absolute inset-x-0 border-t border-dashed border-border/70"
+              className="absolute inset-x-0 border-t border-border/35"
               style={{ top: `${timelineHeight}px` }}
             />
+
+            {compressedTimeline.hours.flatMap((hour) =>
+              [15, 30, 45].map((minuteOffset) => {
+                if (!hour.active) {
+                  return null;
+                }
+
+                const top = compressedTimeline.mapMinuteToY(hour.hour * 60 + minuteOffset);
+
+                return (
+                  <div
+                    key={`${hour.hour}-${minuteOffset}`}
+                    className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
+                    style={{ top: `${top}px` }}
+                  />
+                );
+              }),
+            )}
 
             {currentTimeMarker ? (
               <div
@@ -644,7 +662,7 @@ export function DayTimeline({
             ) : null}
 
             {items.length === 0 ? (
-              <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-2xl border border-dashed border-primary/30 bg-background/92 p-4 text-sm text-muted-foreground shadow-sm">
+              <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-3xl border border-dashed border-primary/30 bg-white/95 p-5 text-sm text-muted-foreground shadow-[0_12px_32px_rgba(15,23,42,0.09)]">
                 <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
                 <p className="mt-1">{copy.emptyDayLaneDescription}</p>
               </div>

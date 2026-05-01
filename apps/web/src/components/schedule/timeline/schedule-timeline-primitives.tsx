@@ -34,10 +34,10 @@ export function TimelinePlacementCard({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute left-3 right-3 rounded-2xl border p-3 shadow-sm",
+        "pointer-events-none absolute left-3 right-3 rounded-2xl border p-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)]",
         preview.hasConflict
-          ? "border-red-300 bg-red-50/95"
-          : "border-dashed border-primary/50 bg-primary/10",
+          ? "border-red-300 bg-red-50/98"
+          : "border-dashed border-primary/50 bg-primary/12",
       )}
       style={{
         top: `${preview.top}px`,
@@ -132,11 +132,11 @@ export function ScheduledTimelineBlock({
       }}
       aria-label={item.title}
       className={cn(
-        "absolute left-3 right-3 rounded-2xl border bg-background/95 p-3 shadow-sm transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "absolute left-3 right-3 rounded-2xl border bg-white/98 p-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] transition-all hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         hasConflict
           ? "border-red-400 bg-red-50/80 ring-1 ring-red-300/50"
           : isSelected
-            ? "border-primary ring-1 ring-primary/30"
+            ? "border-primary ring-1 ring-primary/30 shadow-[0_14px_28px_rgba(79,70,229,0.2)]"
             : "border-border",
         isHidden && "opacity-40",
       )}
