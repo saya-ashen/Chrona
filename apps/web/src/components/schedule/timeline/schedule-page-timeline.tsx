@@ -54,7 +54,8 @@ import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
-const TIMELINE_HOUR_HEIGHT = 76;
+const TIMELINE_HOUR_HEIGHT_MIN = 44;
+const TIMELINE_HOUR_HEIGHT_MAX = 62;
 function TimelineComposer({
   draft,
   timelineHeight,
@@ -207,19 +208,20 @@ export function DayTimeline({
   const defaultRuntimeInputVersion =
     runtimeAdapters.find((adapter) => adapter.key === defaultRuntimeAdapterKey)?.spec.version ??
     `${defaultRuntimeAdapterKey}-v1`;
-  const timelineHeight = TIMELINE_HOUR_HEIGHT * 24;
+  const [hourHeight, setHourHeight] = useState(52);
+  const timelineHeight = hourHeight * 24;
   const [viewportMinHeight, setViewportMinHeight] = useState(0);
   const effectiveTimelineHeight = Math.max(timelineHeight, viewportMinHeight);
   const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
 
   function mapMinuteToY(minute: number) {
     const clamped = Math.min(Math.max(minute, 0), 24 * 60);
-    return (clamped / 60) * TIMELINE_HOUR_HEIGHT;
+    return (clamped / 60) * hourHeight;
   }
 
   function mapYToMinute(y: number) {
     const clamped = Math.min(Math.max(y, 0), timelineHeight);
-    return (clamped / TIMELINE_HOUR_HEIGHT) * 60;
+    return (clamped / hourHeight) * 60;
   }
   const isToday = selectedDay === getTodayKey();
   const currentTimeMarker = useMemo(() => {
@@ -234,7 +236,7 @@ export function DayTimeline({
       top: mapMinuteToY(minute),
       label: formatTime(now, locale),
     };
-  }, [isToday, locale]);
+  }, [hourHeight, isToday, locale]);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const [interactionMode, setInteractionMode] = useState<TimelineInteractionMode>("idle");
@@ -301,7 +303,14 @@ export function DayTimeline({
     }
 
     function syncViewportMinHeight() {
-      setViewportMinHeight(Math.max(node.clientHeight - 16, 760));
+      const availableHeight = Math.max(node.clientHeight - 16, 640);
+      const fittedHourHeight = Math.min(
+        TIMELINE_HOUR_HEIGHT_MAX,
+        Math.max(TIMELINE_HOUR_HEIGHT_MIN, Math.floor(availableHeight / 18)),
+      );
+
+      setHourHeight(fittedHourHeight);
+      setViewportMinHeight(Math.max(availableHeight, fittedHourHeight * 14));
     }
 
     syncViewportMinHeight();
@@ -646,7 +655,7 @@ export function DayTimeline({
                 className="absolute inset-x-0"
                 style={{
                   top: `${mapMinuteToY(hour * 60)}px`,
-                  height: `${TIMELINE_HOUR_HEIGHT}px`,
+                  height: `${hourHeight}px`,
                 }}
               >
                 <div className="absolute inset-x-0 top-0 border-t border-border/35" />
