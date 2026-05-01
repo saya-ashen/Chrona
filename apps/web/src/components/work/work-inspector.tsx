@@ -12,7 +12,6 @@ const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const
 
 type InspectorSection = (typeof sections)[number];
 type StepStatus = "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
-type PlanStep = WorkInspectorProps["plan"]["steps"][number];
 
 type WorkInspectorProps = {
   plan: {
@@ -125,7 +124,6 @@ export function WorkInspector({
   plan,
   currentAction = null,
   currentException = null,
-  isPending = false,
   approvals,
   artifacts,
   toolCalls,
@@ -140,7 +138,6 @@ export function WorkInspector({
     tools: null,
     context: null,
   });
-  const currentStep = plan.steps.find((step) => step.id === plan.currentStepId) ?? null;
 
   function focusSection(nextSection: InspectorSection) {
     setActiveSection(nextSection);
@@ -220,10 +217,8 @@ export function WorkInspector({
           >
             {renderSectionPanel(section, {
               plan,
-              currentStep,
               currentAction,
               currentException,
-              isPending,
               approvals,
               artifacts,
               toolCalls,
@@ -241,10 +236,8 @@ function renderSectionPanel(
   section: InspectorSection,
   {
     plan,
-    currentStep,
     currentAction,
     currentException,
-    isPending,
     approvals,
     artifacts,
     toolCalls,
@@ -252,10 +245,8 @@ function renderSectionPanel(
     labels,
   }: {
     plan: WorkInspectorProps["plan"];
-    currentStep: PlanStep | null;
     currentAction: WorkInspectorProps["currentAction"];
     currentException: WorkInspectorProps["currentException"];
-    isPending: boolean;
     approvals: WorkInspectorProps["approvals"];
     artifacts: WorkInspectorProps["artifacts"];
     toolCalls: WorkInspectorProps["toolCalls"];

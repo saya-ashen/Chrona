@@ -85,7 +85,7 @@ export function useWorkPageController(
         }
 
         startTransition(() =>
-          setData((current) => ({
+          setData(() => ({
             ...next,
             composerValue: composerValueRef.current,
           })),

@@ -71,7 +71,6 @@ function getRevisionLabel(revision: string | null, panelCopy: { revisionUpdated:
 export function TaskPlanSidePanel({
   copy,
   plan,
-  isPending = false,
   currentAction = null,
   currentException = null,
 }: TaskPlanSidePanelProps) {

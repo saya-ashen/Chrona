@@ -185,7 +185,7 @@ test("full deterministic AI task flow persists plan updates", async ({
       );
       expect(bindingsResp.ok()).toBeTruthy();
       return createdClient;
-    }).then(async (createdClient) => {
+    }).then(async () => {
       // ── Create task ────────────────────────────────────────────
 
       await test.step("2. Create task via UI", async () => {

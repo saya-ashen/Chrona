@@ -21,7 +21,6 @@ import {
 import type {
   BridgeFeature,
   BridgeFeatureRequest,
-  BridgeResponse,
 } from "@chrona/openclaw-integration/bridge/contracts";
 import {
   checkGatewayAvailable,

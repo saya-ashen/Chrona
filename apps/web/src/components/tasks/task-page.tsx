@@ -227,7 +227,7 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
         throw new Error((err as { error?: string }).error ?? "Failed to delete task");
       }
       window.location.href = "/schedule";
-    } catch (cause) {
+    } catch {
       setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);

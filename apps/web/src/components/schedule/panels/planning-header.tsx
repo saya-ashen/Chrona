@@ -20,7 +20,6 @@ export function PlanningHeader({
   title,
   activeDayLabel,
   summary,
-  dateSwitcherLabel: _dateSwitcherLabel,
   dayLinks,
   metrics,
   actions,

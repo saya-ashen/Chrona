@@ -17,7 +17,7 @@ export async function startBunServer() {
   const server = Bun.serve({
     hostname: host,
     port,
-    fetch: (request, server) => {
+    fetch: (request) => {
       if (isShuttingDown) {
         return new Response(JSON.stringify({ error: "Server is shutting down" }), {
           status: 503,

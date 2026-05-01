@@ -455,7 +455,7 @@ describe("openclaw bridge hono app", () => {
       calls.push({ route, body });
       const response = makeResponse(
         route.kind === "feature"
-          ? { toolCalls: [{ tool: "suggest_task_completions", callId: "call-1", input: { suggestions: [] }, result: null, status: "completed" }] }
+          ? { toolCalls: [{ tool: "suggest_task_completions", callId: "call-1", input: { suggestions: [] }, result: undefined, status: "completed" }] }
           : {},
       );
       return { response, events: [] };

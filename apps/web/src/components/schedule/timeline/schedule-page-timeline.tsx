@@ -37,18 +37,13 @@ import {
   buildTimelinePlacementPreview,
   clampScheduledEndMinute,
   clampScheduledStartMinute,
-  describeOwner,
   formatDayHeading,
-  formatDurationMinutes,
   formatShortDay,
   formatTime,
-  formatTimeRange,
   getTodayKey,
   snapMinuteToGrid,
-  toDateForDay,
 } from "@/components/schedule/schedule-page-utils";
 import { type TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
-import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
@@ -58,8 +53,6 @@ const TIMELINE_HOUR_HEIGHT_MIN = 44;
 const TIMELINE_HOUR_HEIGHT_MAX = 62;
 function TimelineComposer({
   draft,
-  timelineHeight,
-  selectedDay,
   defaultRuntimeAdapterKey,
   defaultRuntimeInputVersion,
   isPending,
@@ -67,8 +60,6 @@ function TimelineComposer({
   onCreate,
 }: {
   draft: { top: number; height: number; startAt: Date; endAt: Date; startMinute: number; endMinute: number };
-  timelineHeight: number;
-  selectedDay: string;
   defaultRuntimeAdapterKey: string;
   defaultRuntimeInputVersion: string;
   isPending: boolean;
@@ -705,8 +696,6 @@ export function DayTimeline({
             {composerDraft ? (
               <TimelineComposer
                 draft={composerDraft}
-                timelineHeight={effectiveTimelineHeight}
-                selectedDay={selectedDay}
                 defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
                 defaultRuntimeInputVersion={defaultRuntimeInputVersion}
                 isPending={isPending}

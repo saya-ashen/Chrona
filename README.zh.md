@@ -9,7 +9,7 @@
   <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/v/@chrona-org/cli?color=blue" alt="npm 版本"></a>
   <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/dt/@chrona-org/cli" alt="npm 下载量"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="许可证: MIT"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D%2020-brightgreen" alt="Node.js >= 20"></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/bun-%3E%3D%201.3.11-black" alt="Bun >= 1.3.11"></a>
 </p>
 
 ---
@@ -70,7 +70,7 @@ Chrona 的长期目标不是只提醒用户做什么，而是让计划能够被�
 ## 快速开始
 
 ```bash
-npm install -g @chrona-org/cli    # 需要 Node.js >= 20
+npm install -g @chrona-org/cli    # 通过 npm 安装（内置 Bun 运行时）
 chrona start                       # 在浏览器中打开 http://localhost:3101
 ```
 
@@ -160,8 +160,8 @@ Chrona 基于 SQLite 构建 CQRS +
 | ---------- | --------------------------------------------- |
 | 前端       | React 19, React Router 7 (SPA)，基于 Vite     |
 | API 服务器 | Hono（同时提供 REST API 和静态 SPA）          |
-| 数据库     | SQLite，基于 Prisma 7（双适配器：Bun / Node） |
-| 运行时     | Node.js >= 20 (npm) / Bun (开发)              |
+| 数据库     | SQLite，基于 Prisma 7（Bun SQLite 适配器） |
+| 运行时     | Bun（应用运行时）；Node.js（仅用于构建工具） |
 | AI         | LLM 提供商 + OpenClaw 桥接                    |
 | 语言       | TypeScript (strict)                           |
 

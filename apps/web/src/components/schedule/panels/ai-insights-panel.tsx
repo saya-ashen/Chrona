@@ -32,7 +32,8 @@ export function AiInsightsPanel({
 }: {
   item: ScheduledItem;
   planResult: TaskPlanGraphResponse | null;
-  onPlanLoaded: (result: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onPlanLoaded?: (savedPlan: any) => void;
   onApplyDecomposition: (result: TaskPlanGraphResponse) => Promise<void>;
 }) {
   const compactNodes = toCompactPlan(planResult);

@@ -36,7 +36,7 @@ export function localizeHref(locale: Locale | undefined, href: string) {
   const [withoutHash, hash = ""] = href.split("#");
   const [pathname = "/", search = ""] = withoutHash.split("?");
   const normalizedPath = pathname === "/" ? "" : pathname;
-  const localizedPath = `/${activeLocale}${normalizedPath}` || `/${activeLocale}`;
+  const localizedPath = normalizedPath ? `/${activeLocale}${normalizedPath}` : `/${activeLocale}`;
 
   return `${localizedPath}${search ? `?${search}` : ""}${hash ? `#${hash}` : ""}`;
 }

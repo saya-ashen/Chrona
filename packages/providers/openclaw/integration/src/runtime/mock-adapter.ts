@@ -6,7 +6,6 @@ import type { OpenClawAdapter } from "./adapter";
 import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
-  OpenClawExecuteTaskInput,
   OpenClawExecuteTaskResult,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,

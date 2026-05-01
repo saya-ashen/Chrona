@@ -5,6 +5,7 @@ import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
 import type {
   SchedulePageData,
   ScheduleViewMode,
+  TimelineCreateInput,
   TimelineDragItem,
 } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
@@ -28,7 +29,9 @@ export function SchedulePageHeader({
   viewData: SchedulePageData;
   viewModel: SchedulePageViewModel;
   onOpenQuickAdd: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localizeHref: (locale: any, href: string) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildScheduleViewHref: (...args: any[]) => string;
 }) {
   return (
@@ -165,7 +168,7 @@ export function SchedulePageMainPanel({
     startAt: Date,
     endAt: Date,
   ) => Promise<void>;
-  onCreateTaskBlock: (input: any) => Promise<void>;
+  onCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
   onScheduledDragStart: (item: SchedulePageData["scheduled"][number]) => void;
   onDragEnd: () => void;
   onSaveTaskConfigAction: (

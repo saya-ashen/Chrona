@@ -24,7 +24,6 @@ import {
   type DispatchTaskInput,
   type DispatchTaskOutput,
   type StreamEvent,
-  AiClientError,
   suggest,
   generatePlan,
   analyzeConflicts,

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskEditForm } from "@/components/tasks/task-edit-form";
 import { TaskPlanPanel } from "@/components/tasks/task-plan-panel";
@@ -216,7 +215,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [plan, setPlan] = useState(data.task.savedAiPlan ?? null);
-  const [isRefetchingPlan, setIsRefetchingPlan] = useState(false);
+  const [_isRefetchingPlan, setIsRefetchingPlan] = useState(false);
   const [planGenerationStatus, setPlanGenerationStatus] = useState(data.task.aiPlanGenerationStatus ?? "idle");
 
   const fetchPlan = useCallback(async () => {

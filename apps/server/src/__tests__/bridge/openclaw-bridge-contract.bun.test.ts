@@ -5,7 +5,7 @@
  * mocked executeRequest — no real network calls.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import {
   createBridgeApp,
   createBridgeLogger,
@@ -133,11 +133,9 @@ describe("OpenClaw bridge contract", () => {
 
   it("POST /v1/features/generate-plan returns 200 with feature result on success", async () => {
     let capturedRoute: RouteKind | null = null;
-    let capturedBody: Record<string, unknown> | null = null;
 
-    mockedExecuteRequest = async (route, body) => {
+    mockedExecuteRequest = async (route) => {
       capturedRoute = route;
-      capturedBody = body as any;
       const planJson = JSON.stringify({
         summary: "A test plan",
         nodes: [{ id: "n1", type: "step", title: "Step 1", objective: "Do it", executor: "human", requiresHumanInput: false, requiresHumanApproval: false }],

@@ -9,7 +9,7 @@
 
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
-import type { Context } from "hono";
+
 import { db } from "@chrona/db";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import { createTask } from "@chrona/runtime/modules/commands/create-task";

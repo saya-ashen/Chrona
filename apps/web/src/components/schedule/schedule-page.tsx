@@ -13,7 +13,6 @@ import type {
   SchedulePageData,
   SchedulePageProps,
   SecondaryPlanningView,
-  QuickCreateDraft,
   ScheduledItem,
   TimelineCreateInput,
   UnscheduledItem,
@@ -28,12 +27,9 @@ import {
 import {
   getQuickCreateDefaults,
   handleApplyDecompositionFromDialogAction,
-  handleApplySuggestionAction,
   handleCreateTaskBlockAction,
-  handleQueueQuickCreateAction,
   handleScheduleDropAction,
   handleTaskConfigSaveAction,
-  handleQuickCreateAction,
   refreshScheduleProjection,
   runSchedulePageAction,
   buildDraggedItem,
@@ -46,7 +42,6 @@ import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
-import { getRuntimeAdapterDefinition } from "@chrona/runtime/modules/task-execution/registry";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 import { useAppRouter } from "@/lib/router";
@@ -92,26 +87,6 @@ export function SchedulePage({
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
 
-  const canBackendAutoRun = useCallback((taskId: string) => {
-    const item = viewData.listItems.find((entry) => entry.taskId === taskId)
-      ?? viewData.scheduled.find((entry) => entry.taskId === taskId)
-      ?? viewData.unscheduled.find((entry) => entry.taskId === taskId)
-      ?? null;
-    const runtimeKey =
-      item?.runtimeAdapterKey
-      ?? (typeof (item?.runtimeInput as { adapterKey?: unknown } | undefined)?.adapterKey === "string"
-        ? String((item?.runtimeInput as { adapterKey?: unknown }).adapterKey)
-        : null);
-    if (!runtimeKey) {
-      return false;
-    }
-
-    try {
-      return getRuntimeAdapterDefinition(runtimeKey).key === "openclaw";
-    } catch {
-      return false;
-    }
-  }, [viewData.listItems, viewData.scheduled, viewData.unscheduled]);
   const actionFailedMessage =
     messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
 
@@ -289,91 +264,6 @@ export function SchedulePage({
     });
   }
 
-  async function handleQuickCreate(draft: QuickCreateDraft) {
-    await handleQuickCreateAction({
-      draft,
-      data,
-      handleCreateTaskBlock,
-    });
-  }
-
-  async function handleQueueQuickCreate(
-    draft: QuickCreateDraft & { durationMinutes: number },
-  ) {
-    await handleQueueQuickCreateAction({
-      draft,
-      workspaceId,
-      data,
-      setAnnouncement,
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      resetViewData: () => setViewData(hydratedData),
-      actionFailedMessage,
-    });
-  }
-
-  async function handleAcceptProposal(proposalId: string) {
-    await runSchedulePageAction({
-      action: async () => {
-        const response = await fetch("/api/schedule/proposals/decision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            proposalId,
-            decision: "Accepted",
-            resolutionNote: "Accepted on schedule page",
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(actionFailedMessage);
-        }
-      },
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      actionFailedMessage,
-    });
-  }
-
-  async function handleRejectProposal(proposalId: string) {
-    await runSchedulePageAction({
-      action: async () => {
-        const response = await fetch("/api/schedule/proposals/decision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            proposalId,
-            decision: "Rejected",
-            resolutionNote: "Rejected on schedule page",
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(actionFailedMessage);
-        }
-      },
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      actionFailedMessage,
-    });
-  }
-
-  async function handleApplySuggestion(
-    suggestion: (typeof viewData.suggestions)[number],
-  ) {
-    await handleApplySuggestionAction({
-      suggestion,
-      workspaceId,
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      actionFailedMessage,
-    });
-  }
-
   function toggleQueueCard(taskId: string) {
     setExpandedQueueTaskIds((current) =>
       current.includes(taskId)
@@ -394,29 +284,6 @@ export function SchedulePage({
       setErrorMessage,
       refreshProjection,
       resetViewData: () => setViewData(hydratedData),
-      actionFailedMessage,
-    });
-  }
-
-  async function handleRunAutomationCandidate(taskId: string) {
-    await runSchedulePageAction({
-      action: async () => {
-        if (!canBackendAutoRun(taskId)) {
-          throw new Error(copy.automationUnsupportedRuntime);
-        }
-        const response = await fetch(`/api/tasks/${taskId}/run`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-
-        if (!response.ok) {
-          throw new Error(actionFailedMessage);
-        }
-      },
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
       actionFailedMessage,
     });
   }

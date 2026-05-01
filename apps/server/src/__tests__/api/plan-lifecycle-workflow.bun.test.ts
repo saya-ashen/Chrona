@@ -10,7 +10,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { db } from "@chrona/db";
-import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
+// MemoryScope, MemorySourceType, MemoryStatus from @chrona/db used via db proxy
 import {
   getLatestTaskPlanGraph,
   getAcceptedTaskPlanGraph,

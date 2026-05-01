@@ -464,15 +464,15 @@ export async function executeGatewayRequest(
     body,
   });
 
-  let response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
+  const response = await fetch(`${environment.gatewayHttpUrl}/v1/responses`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
-  let responseClone = response.clone();
-  let responseText = await responseClone.text().catch(() => "");
+  const responseClone = response.clone();
+  const responseText = await responseClone.text().catch(() => "");
   let responseJsonPreview: unknown = null;
   try {
     responseJsonPreview = responseText ? JSON.parse(responseText) : null;
