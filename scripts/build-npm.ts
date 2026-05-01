@@ -8,11 +8,11 @@
  */
 
 import * as esbuild from "esbuild";
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const TSCONFIG = JSON.parse(readFileSync(resolve(ROOT, "tsconfig.json"), "utf-8"));
+const TSCONFIG = JSON.parse(await Bun.file(resolve(ROOT, "tsconfig.json")).text());
 
 const paths: Record<string, string[]> = TSCONFIG.compilerOptions?.paths ?? {};
 const baseUrl = resolve(ROOT, TSCONFIG.compilerOptions?.baseUrl ?? ".");
@@ -90,10 +90,6 @@ function createResolverPlugin() {
         // Skip esbuild's internal namespace imports
         if (args.namespace !== "file") return undefined;
 
-        // Keep node:* builtins external
-        if (args.path.startsWith("node:")) {
-          return { external: true, path: args.path };
-        }
         // Keep bun:* builtins external (for Bun runtime entry)
         if (args.path.startsWith("bun:")) {
           return { external: true, path: args.path };
@@ -121,9 +117,7 @@ function createResolverPlugin() {
 }
 
 async function main() {
-  const { chmodSync } = await import("node:fs");
-
-  // ── Build 1: dist/cli.js (Node.js launcher) ──────────────────
+  // ── Build 1: dist/cli.js (Bun launcher) ──────────────────────
 
   const launcherEntry = resolve(ROOT, "packages/cli/src/npm-launcher.ts");
   const launcherOut = resolve(ROOT, "dist/cli.js");
@@ -133,9 +127,9 @@ async function main() {
     outfile: launcherOut,
     bundle: true,
     platform: "node",
-    target: "node20",
+    target: "esnext",
     format: "esm",
-    banner: { js: "#!/usr/bin/env node" },
+    banner: { js: "#!/usr/bin/env bun" },
     plugins: [createResolverPlugin()],
     external: [], // launcher must not import any non-node:* deps
   });
@@ -147,7 +141,6 @@ async function main() {
   if (launcherResult.warnings.length > 0) {
     console.warn("Launcher build warnings:", launcherResult.warnings);
   }
-  chmodSync(launcherOut, 0o755);
   console.log("✓ Built", launcherOut);
 
   // ── Build 2: dist/bun-entry.js (Bun runtime) ─────────────────
@@ -160,7 +153,7 @@ async function main() {
     outfile: bunOut,
     bundle: true,
     platform: "node",
-    target: "node20",
+    target: "esnext",
     format: "esm",
     plugins: [createResolverPlugin()],
   });

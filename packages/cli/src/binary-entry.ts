@@ -1,6 +1,5 @@
 import { existsSync, copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Database } from "bun:sqlite";
 
@@ -169,17 +168,13 @@ function banner() {
 function openBrowser(port: number) {
   const url = `http://localhost:${port}`;
   try {
-    const platform = process.platform;
-    let proc;
-    if (platform === "darwin") {
-      proc = spawn("open", [url], { stdio: "ignore", detached: true });
-    } else if (platform === "win32") {
-      proc = spawn("cmd", ["/c", "start", `""`, url], { stdio: "ignore", detached: true });
+    if (process.platform === "darwin") {
+      Bun.spawn(["open", url], { stdio: ["ignore", "ignore", "ignore"] });
+    } else if (process.platform === "win32") {
+      Bun.spawn(["cmd", "/c", "start", "", url], { stdio: ["ignore", "ignore", "ignore"] });
     } else {
-      proc = spawn("xdg-open", [url], { stdio: "ignore", detached: true });
+      Bun.spawn(["xdg-open", url], { stdio: ["ignore", "ignore", "ignore"] });
     }
-    proc.on("error", () => {});
-    proc.unref();
   } catch {
     // best-effort
   }

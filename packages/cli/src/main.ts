@@ -2,7 +2,6 @@
 
 import { existsSync, copyFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { execSync, spawn } from "node:child_process";
 
 const appDir = resolve(dirname(import.meta.dirname), "../..");
 
@@ -33,7 +32,7 @@ function ensureDb() {
 
   console.log("🗄️  Initializing database...");
   try {
-    execSync("bun run db:seed", { cwd: appDir, stdio: "inherit" });
+    Bun.spawnSync(["bun", "run", "db:seed"], { cwd: appDir, stdio: ["ignore", "inherit", "inherit"] });
     console.log("✅ Database ready.");
   } catch {
     console.log("⚠️  Database init failed. Run 'bun run setup' manually.");
@@ -42,10 +41,10 @@ function ensureDb() {
 }
 
 function startServer() {
-  const serverPath = resolve(appDir, "apps/server/src/index.ts");
-  const serverProcess = spawn("bun", ["run", serverPath], {
+  const serverPath = resolve(appDir, "apps/server/src/index.bun.ts");
+  const serverProcess = Bun.spawn(["bun", "run", serverPath], {
     cwd: appDir,
-    stdio: "inherit",
+    stdio: ["ignore", "inherit", "inherit"],
     env: {
       ...process.env,
       HOST: process.env.HOST ?? "0.0.0.0",
@@ -53,7 +52,7 @@ function startServer() {
     },
   });
 
-  serverProcess.on("exit", (code) => {
+  serverProcess.exited.then((code) => {
     process.exit(code ?? 0);
   });
 
@@ -71,11 +70,11 @@ function openBrowser(port: number) {
   const platform = process.platform;
   try {
     if (platform === "darwin") {
-      spawn("open", [url], { stdio: "ignore", detached: true }).unref();
+      Bun.spawn(["open", url], { stdio: ["ignore", "ignore", "ignore"] });
     } else if (platform === "win32") {
-      spawn("cmd", ["/c", "start", url], { stdio: "ignore", detached: true }).unref();
+      Bun.spawn(["cmd", "/c", "start", url], { stdio: ["ignore", "ignore", "ignore"] });
     } else {
-      spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
+      Bun.spawn(["xdg-open", url], { stdio: ["ignore", "ignore", "ignore"] });
     }
   } catch {
     // best-effort
@@ -84,13 +83,11 @@ function openBrowser(port: number) {
 
 async function delegateToCli(args: string[]) {
   const cliPath = resolve(appDir, "packages/common/cli/src/index.ts");
-  const proc = spawn("bun", ["run", cliPath, ...args], {
+  const proc = Bun.spawn(["bun", "run", cliPath, ...args], {
     cwd: appDir,
-    stdio: "inherit",
+    stdio: ["ignore", "inherit", "inherit"],
   });
-  return new Promise<void>((resolve) => {
-    proc.on("exit", () => resolve());
-  });
+  await proc.exited;
 }
 
 async function main() {

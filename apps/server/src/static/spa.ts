@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { stat } from "node:fs/promises";
 import * as path from "node:path";
 
 import type { MiddlewareHandler } from "hono";
@@ -34,17 +32,14 @@ export function createSpaStaticMiddleware(): MiddlewareHandler {
     const safeName = urlPath.replace(/\.\./g, "").replace(/\/\//g, "/");
     const filePath = path.resolve(root, safeName.replace(/^\/+/, "") || "index.html");
 
-    let body: Buffer;
     let servedPath: string;
-    try {
-      await stat(filePath);
-      body = await readFile(filePath);
+    let file = Bun.file(filePath);
+    if (await file.exists()) {
       servedPath = filePath;
-    } catch {
+    } else {
       servedPath = path.resolve(root, "index.html");
-      try {
-        body = await readFile(servedPath);
-      } catch {
+      file = Bun.file(servedPath);
+      if (!(await file.exists())) {
         return c.notFound();
       }
     }
@@ -52,7 +47,7 @@ export function createSpaStaticMiddleware(): MiddlewareHandler {
     const ext = path.extname(servedPath);
     const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
 
-    return new Response(new Uint8Array(body), {
+    return new Response(await file.bytes(), {
       status: 200,
       headers: { "Content-Type": contentType },
     });
@@ -60,9 +55,6 @@ export function createSpaStaticMiddleware(): MiddlewareHandler {
 }
 
 export async function hasSpaDist() {
-  try {
-    return Boolean(await stat(path.resolve(getSpaDistPath(), "index.html")));
-  } catch {
-    return false;
-  }
+  const indexPath = path.resolve(getSpaDistPath(), "index.html");
+  return await Bun.file(indexPath).exists();
 }
