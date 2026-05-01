@@ -206,6 +206,8 @@ export function DayTimeline({
     runtimeAdapters.find((adapter) => adapter.key === defaultRuntimeAdapterKey)?.spec.version ??
     `${defaultRuntimeAdapterKey}-v1`;
   const timelineHeight = compressedTimeline.totalVisualHeight;
+  const [viewportMinHeight, setViewportMinHeight] = useState(0);
+  const effectiveTimelineHeight = Math.max(timelineHeight, viewportMinHeight);
   const isToday = selectedDay === getTodayKey();
   const currentTimeMarker = useMemo(() => {
     if (!isToday) {
@@ -251,7 +253,7 @@ export function DayTimeline({
       ),
       Math.max(
         TIMELINE_COMPOSER_MARGIN,
-        timelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
+        effectiveTimelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
       ),
     );
     const visibleTop = scrollContainer.scrollTop;
@@ -277,7 +279,25 @@ export function DayTimeline({
         Math.max(composerBottom - scrollContainer.clientHeight + 16, 0),
       );
     }
-  }, [composerDraft, timelineHeight]);
+  }, [composerDraft, effectiveTimelineHeight]);
+
+  useEffect(() => {
+    const node = scrollContainerRef.current;
+    if (!node) {
+      return;
+    }
+
+    function syncViewportMinHeight() {
+      setViewportMinHeight(Math.max(node.clientHeight - 16, 760));
+    }
+
+    syncViewportMinHeight();
+    window.addEventListener("resize", syncViewportMinHeight);
+
+    return () => {
+      window.removeEventListener("resize", syncViewportMinHeight);
+    };
+  }, []);
 
   function getMinuteFromClientY(clientY: number) {
     const timeline = timelineRef.current;
@@ -567,7 +587,7 @@ export function DayTimeline({
       >
         <div className="flex gap-2">
           <div className="sticky left-0 top-0 hidden w-20 shrink-0 self-start rounded-2xl border border-border/40 bg-white/90 py-3 pl-2 sm:block">
-            <div className="relative" style={{ height: `${timelineHeight}px` }}>
+            <div className="relative" style={{ height: `${effectiveTimelineHeight}px` }}>
               {compressedTimeline.hours.map((hour) => (
                 <div
                   key={hour.hour}
@@ -581,7 +601,7 @@ export function DayTimeline({
               ))}
               <div
                 className="absolute left-0 right-0"
-                style={{ top: `${timelineHeight}px` }}
+                style={{ top: `${effectiveTimelineHeight}px` }}
               >
                 <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                   11:59 PM
@@ -605,7 +625,7 @@ export function DayTimeline({
               "relative flex-1 rounded-2xl border border-border/60 bg-white/80 outline-none transition-colors",
               draggedItem && "border-primary/50 bg-primary/[0.08]",
             )}
-            style={{ height: `${timelineHeight}px` }}
+            style={{ height: `${effectiveTimelineHeight}px` }}
           >
             {compressedTimeline.hours.map((hour) => (
               <div
@@ -618,32 +638,27 @@ export function DayTimeline({
               >
                 <div className="absolute inset-x-0 top-0 border-t border-border/35" />
                 {!hour.active ? (
-                  <div className="absolute inset-x-3 inset-y-1 rounded-xl bg-slate-100/85" />
+                  <div className="absolute inset-x-3 inset-y-1 rounded-xl bg-slate-100/45" />
                 ) : null}
               </div>
             ))}
             <div
               className="absolute inset-x-0 border-t border-border/35"
-              style={{ top: `${timelineHeight}px` }}
+              style={{ top: `${effectiveTimelineHeight}px` }}
             />
-
-            {compressedTimeline.hours.flatMap((hour) =>
-              [15, 30, 45].map((minuteOffset) => {
-                if (!hour.active) {
-                  return null;
-                }
-
-                const top = compressedTimeline.mapMinuteToY(hour.hour * 60 + minuteOffset);
+            {compressedTimeline.hours
+              .filter((hour) => hour.active)
+              .map((hour) => {
+                const halfHourTop = compressedTimeline.mapMinuteToY(hour.hour * 60 + 30);
 
                 return (
                   <div
-                    key={`${hour.hour}-${minuteOffset}`}
-                    className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200"
-                    style={{ top: `${top}px` }}
+                    key={`${hour.hour}-30`}
+                    className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200/70"
+                    style={{ top: `${halfHourTop}px` }}
                   />
                 );
-              }),
-            )}
+              })}
 
             {currentTimeMarker ? (
               <div
@@ -671,7 +686,7 @@ export function DayTimeline({
             {composerDraft ? (
               <TimelineComposer
                 draft={composerDraft}
-                timelineHeight={timelineHeight}
+                timelineHeight={effectiveTimelineHeight}
                 selectedDay={selectedDay}
                 defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
                 defaultRuntimeInputVersion={defaultRuntimeInputVersion}
