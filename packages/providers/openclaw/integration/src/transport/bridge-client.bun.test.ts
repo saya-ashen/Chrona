@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
-
+import { afterEach, describe, expect, it } from "bun:test";
 import { OpenClawBridgeClient } from "./bridge-client";
 import type { BridgeResponse } from "./bridge-types";
 

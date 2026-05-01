@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mock } from "bun:test";
+
+mock.module("@chrona/runtime/modules/tasks/derive-task-runnability", () => ({
+  deriveTaskRunnability: () => ({ isRunnable: false, state: "not_configured", summary: "Not configured" }),
+}));
+
 import {
   addDays,
   buildCompressedTimeline,
@@ -43,10 +48,6 @@ import {
   hydrateSchedulePageData,
 } from "@/components/schedule/schedule-page-utils";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
-
-vi.mock("@chrona/runtime/modules/tasks/derive-task-runnability", () => ({
-  deriveTaskRunnability: () => ({ isRunnable: false, state: "not_configured", summary: "Not configured" }),
-}));
 
 function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
   return {

@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+
+mock.module("../ai-service", () => ({
+  aiChat: mock(() => Promise.resolve(null)),
+}));
+
 import { aiChat } from "../ai-service";
 import { suggestAutomationSmart, suggestAutomation } from "../automation-suggester";
 import type { TaskAutomationInput } from "../types";
-
-vi.mock("../ai-service", () => ({
-  aiChat: vi.fn(),
-}));
 
 function makeTask(
   overrides: Partial<TaskAutomationInput> = {},
@@ -28,15 +29,16 @@ function makeTask(
 
 // ---------- Tests ----------
 
+const origWarn = console.warn;
+
 describe("suggestAutomationSmart", () => {
-  const aiChatMock = vi.mocked(aiChat);
 
   beforeEach(() => {
-    aiChatMock.mockReset();
+    (aiChat as ReturnType<typeof mock>).mockRestore();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    console.warn = origWarn;
   });
 
   // ─── Fallback to rule-based when LLM unavailable ──────
@@ -126,7 +128,7 @@ describe("suggestAutomationSmart", () => {
         reasoning: "Task has clear schedule and requirements",
       };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       const task = makeTask({
         title: "Deploy new version",
@@ -155,7 +157,7 @@ describe("suggestAutomationSmart", () => {
         confidence: "medium",
       };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       const task = makeTask({
         title: "Research AI frameworks",
@@ -166,8 +168,8 @@ describe("suggestAutomationSmart", () => {
 
       await suggestAutomationSmart(task);
 
-      expect(aiChatMock).toHaveBeenCalledOnce();
-      const request = aiChatMock.mock.calls[0][0];
+      expect(aiChat).toHaveBeenCalledTimes(1);
+      const request = (aiChat as ReturnType<typeof mock>).mock.calls[0][0] as { messages: Array<{ role: string; content: string }> };
       expect(request.messages.length).toBe(2);
       expect(request.messages[0].role).toBe("system");
       expect(request.messages[1].role).toBe("user");
@@ -184,8 +186,8 @@ describe("suggestAutomationSmart", () => {
 
   describe("falls back to rule-based when LLM throws", () => {
     it("falls back on network error", async () => {
-      aiChatMock.mockRejectedValue(new Error("Network error"));
-      vi.spyOn(console, "warn").mockImplementation(() => {});
+      (aiChat as ReturnType<typeof mock>).mockRejectedValue(new Error("Network error"));
+      console.warn = mock();
 
       const task = makeTask({
         title: "Weekly standup meeting",
@@ -201,8 +203,8 @@ describe("suggestAutomationSmart", () => {
     });
 
     it("falls back on HTTP 500 error", async () => {
-      aiChatMock.mockRejectedValue(new Error("HTTP 500"));
-      vi.spyOn(console, "warn").mockImplementation(() => {});
+      (aiChat as ReturnType<typeof mock>).mockRejectedValue(new Error("HTTP 500"));
+      console.warn = mock();
 
       const task = makeTask({
         title: "Deploy service",
@@ -217,8 +219,8 @@ describe("suggestAutomationSmart", () => {
     });
 
     it("falls back on malformed JSON from LLM", async () => {
-      aiChatMock.mockResolvedValue({ parsed: "Not valid JSON response {{{" } as Awaited<ReturnType<typeof aiChat>>);
-      vi.spyOn(console, "warn").mockImplementation(() => {});
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: "Not valid JSON response {{{" });
+      console.warn = mock();
 
       const task = makeTask({
         title: "Recurring daily standup",
@@ -232,8 +234,8 @@ describe("suggestAutomationSmart", () => {
     });
 
     it("falls back when LLM returns null content", async () => {
-      aiChatMock.mockResolvedValue(null);
-      vi.spyOn(console, "warn").mockImplementation(() => {});
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue(null);
+      console.warn = mock();
 
       const task = makeTask({
         title: "Read documentation",

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mock } from "bun:test";
 import {
   buildResearchRunPrompt,
   createResearchRuntimeAdapter,
@@ -74,7 +74,7 @@ describe("research task config", () => {
   });
 
   it("passes research settings through to execution via the composed prompt", async () => {
-    const createRun = vi.fn().mockResolvedValue({ runStarted: true });
+    const createRun = mock().mockResolvedValue({ runStarted: true });
     const baseAdapter: RuntimeExecutionAdapter = {
       createRun,
       sendOperatorMessage: async () => ({ accepted: true, runStarted: false }),

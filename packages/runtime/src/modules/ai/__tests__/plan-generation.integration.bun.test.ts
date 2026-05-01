@@ -7,12 +7,11 @@
  *   - Valid API key in DB or TEST_CPA_API_KEY env var
  *   - RUN_LLM_INTEGRATION=1
  *
- * Run: RUN_LLM_INTEGRATION=1 bunx vitest run src/modules/ai/__tests__/plan-generation.integration.test.ts
- *
- * @vitest-environment bun
+ * Run: RUN_LLM_INTEGRATION=1 bun test packages/runtime/src/modules/ai/__tests__/plan-generation.integration.bun.test.ts
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
+
 import { extractJSON, llmCall, SYSTEM_PROMPTS } from "@chrona/ai-features";
 import type { TaskPlanNode, TaskPlanEdge } from "../types";
 import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
@@ -131,7 +130,9 @@ function parseGraphResponse(raw: string) {
 
 // -- Tests --
 
-describe.runIf(RUN_LLM_INTEGRATION)("Plan generation (real LLM)", () => {
+const describeIf = RUN_LLM_INTEGRATION ? describe : describe.skip;
+
+describeIf("Plan generation (real LLM)", () => {
   it("generates a valid graph with nodes and edges", async () => {
     await ensureApiKey();
 
