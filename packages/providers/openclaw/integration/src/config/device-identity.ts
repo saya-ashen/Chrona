@@ -95,7 +95,7 @@ export async function loadOpenClawPersistedDeviceIdentity(options?: {
         base64UrlEncode(signBuffer(null, Buffer.from(payload, "utf8"), privateKey)),
     };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+    if ((error as { code?: string })?.code === "ENOENT") {
       return null;
     }
 

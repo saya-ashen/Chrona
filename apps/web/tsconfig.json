@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "types": ["vite/client", "bun", "node"],
+    "types": ["vite/client", "bun"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],

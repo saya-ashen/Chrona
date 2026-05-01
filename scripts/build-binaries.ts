@@ -16,9 +16,8 @@
  */
 
 import * as esbuild from "esbuild";
-import { existsSync, mkdirSync, cpSync, chmodSync, rmSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, chmodSync, rmSync, statSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
-import { execSync, execFileSync } from "node:child_process";
 
 const ROOT = resolve(import.meta.dirname, "..");
 
@@ -48,12 +47,12 @@ function log(step: string, ...args: string[]) {
 
 function bunRun(script: string) {
   log("bun", `run ${script}`);
-  execSync(`bun run ${script}`, { cwd: ROOT, stdio: "inherit" });
+  Bun.spawnSync(["bun", "run", script], { cwd: ROOT, stdio: ["inherit", "inherit", "inherit"] });
 }
 
 // ────── esbuild resolver (reuses build-npm.ts logic) ────────────
 
-const TSCONFIG = JSON.parse(readFileSync(resolve(ROOT, "tsconfig.json"), "utf-8"));
+const TSCONFIG = JSON.parse(await Bun.file(resolve(ROOT, "tsconfig.json")).text());
 const paths: Record<string, string[]> = TSCONFIG.compilerOptions?.paths ?? {};
 const baseUrl = resolve(ROOT, TSCONFIG.compilerOptions?.baseUrl ?? ".");
 
@@ -128,10 +127,7 @@ function createResolverPlugin() {
         if (args.namespace !== "file") return undefined;
 
         // Keep node:* builtins external
-        if (args.path.startsWith("node:")) {
-          return { external: true, path: args.path };
-        }
-        // Keep bun:* builtins external (Bun runtime provides them)
+      // Keep bun:* builtins external (Bun runtime provides them)
         if (args.path.startsWith("bun:")) {
           return { external: true, path: args.path };
         }
@@ -172,7 +168,7 @@ async function bundleWithEsbuild(target: string): Promise<string> {
     outfile: bundleOut,
     bundle: true,
     platform: "node",
-    target: "node20",
+    target: "esnext",
     format: "esm",
     plugins: [createResolverPlugin()],
   });
@@ -194,9 +190,9 @@ async function createTarGz(sourceDir: string, outFile: string) {
   const parentDir = dirname(sourceDir);
   const dirName = sourceDir.split("/").pop()!;
   log("archive", `Creating ${outFile.replace(ROOT + "/", "")}`);
-  execFileSync("tar", ["-czf", outFile, "-C", parentDir, dirName], {
+  Bun.spawnSync(["tar", "-czf", outFile, "-C", parentDir, dirName], {
     cwd: ROOT,
-    stdio: "inherit",
+    stdio: ["inherit", "inherit", "inherit"],
   });
 }
 
@@ -204,9 +200,9 @@ async function createZip(sourceDir: string, outFile: string) {
   const parentDir = dirname(sourceDir);
   const dirName = sourceDir.split("/").pop()!;
   log("archive", `Creating ${outFile.replace(ROOT + "/", "")}`);
-  execFileSync("zip", ["-rq", outFile, dirName], {
+  Bun.spawnSync(["zip", "-rq", outFile, dirName], {
     cwd: parentDir,
-    stdio: "inherit",
+    stdio: ["inherit", "inherit", "inherit"],
   });
 }
 
@@ -249,7 +245,8 @@ async function buildBinary(target: string) {
 
   // Step 5: Bun compile the bundled output
   log("compile", "Compiling binary...");
-  execFileSync("bun", [
+  Bun.spawnSync([
+    "bun",
     "build",
     bundlePath,
     "--compile",
@@ -257,7 +254,7 @@ async function buildBinary(target: string) {
     `--outfile=${binaryPath}`,
   ], {
     cwd: ROOT,
-    stdio: "inherit",
+    stdio: ["inherit", "inherit", "inherit"],
   });
 
   // Set executable permission for linux/mac

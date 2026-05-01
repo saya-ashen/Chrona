@@ -1,21 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  chmodSync,
-  unlinkSync,
-  renameSync,
-} from "node:fs";
 import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawn, spawnSync, execSync } from "node:child_process";
 
-// ──────────────────────────────────────────────────────────────
-// Package location
-// ──────────────────────────────────────────────────────────────
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageDir = resolve(__dirname, "..");
+const packageDir = resolve(dirname(import.meta.filename!), "..");
 
 // ──────────────────────────────────────────────────────────────
 // Environment / config
@@ -76,12 +61,12 @@ function getArch(): string {
 
 function checkBunVersion(bunPath: string): boolean {
   try {
-    const result = spawnSync(bunPath, ["--version"], {
-      encoding: "utf-8",
+    const result = Bun.spawnSync([bunPath, "--version"], {
+      stdio: ["pipe", "pipe", "pipe"],
       timeout: 10_000,
     });
-    if (result.status !== 0 || result.error) return false;
-    const version = result.stdout.trim();
+    if (result.exitCode !== 0 || !result.stdout) return false;
+    const version = result.stdout.toString().trim();
     if (version.localeCompare(BUN_VERSION, undefined, { numeric: true }) < 0) {
       console.error(`Chrona requires Bun >= ${BUN_VERSION}, found ${version} at ${bunPath}`);
       return false;
@@ -95,6 +80,11 @@ function checkBunVersion(bunPath: string): boolean {
 // ──────────────────────────────────────────────────────────────
 // Bun resolution
 // ──────────────────────────────────────────────────────────────
+
+function existsSync(p: string): boolean {
+  const f = Bun.file(p);
+  try { return f.size !== undefined; } catch { return false; }
+}
 
 function resolveBun(): string {
   // 1. CHRONA_BUN_PATH
@@ -111,9 +101,9 @@ function resolveBun(): string {
   // 2. PATH lookup
   try {
     const whichCmd = process.platform === "win32" ? "where" : "which";
-    const result = spawnSync(whichCmd, ["bun"], { encoding: "utf-8" });
-    if (result.status === 0 && result.stdout.trim()) {
-      const systemBun = result.stdout.trim().split("\n")[0].trim();
+    const result = Bun.spawnSync([whichCmd, "bun"], { stdio: ["pipe", "pipe", "pipe"] });
+    if (result.exitCode === 0 && result.stdout) {
+      const systemBun = result.stdout.toString().trim().split("\n")[0].trim();
       if (existsSync(systemBun) && checkBunVersion(systemBun)) {
         console.log(`Chrona uses Bun at ${systemBun}`);
         return systemBun;
@@ -150,12 +140,12 @@ function resolveBun(): string {
 
 function findDownloadTool(): "curl" | "wget" | null {
   try {
-    const r = spawnSync("curl", ["--version"], { stdio: "pipe", timeout: 5000 });
-    if (r.status === 0) return "curl";
+    const r = Bun.spawnSync(["curl", "--version"], { stdio: ["pipe", "pipe", "pipe"], timeout: 5000 });
+    if (r.exitCode === 0) return "curl";
   } catch { /* */ }
   try {
-    const r = spawnSync("wget", ["--version"], { stdio: "pipe", timeout: 5000 });
-    if (r.status === 0) return "wget";
+    const r = Bun.spawnSync(["wget", "--version"], { stdio: ["pipe", "pipe", "pipe"], timeout: 5000 });
+    if (r.exitCode === 0) return "wget";
   } catch { /* */ }
   return null;
 }
@@ -170,10 +160,13 @@ function downloadFile(url: string, dest: string): void {
     ? ["-fsSL", url, "-o", dest]
     : ["-q", url, "-O", dest];
 
-  execSync(`${tool} ${args.map(a => `"${a}"`).join(" ")}`, {
-    stdio: "pipe",
+  const result = Bun.spawnSync([tool, ...args], {
+    stdio: ["pipe", "pipe", "pipe"],
     timeout: 120_000,
   });
+  if (result.exitCode !== 0) {
+    throw new Error(`${tool} failed with exit code ${result.exitCode}`);
+  }
 }
 
 function downloadAndCacheBun(): string {
@@ -191,7 +184,7 @@ function downloadAndCacheBun(): string {
   }
 
   const runtimeDir = getRuntimeDir();
-  mkdirSync(runtimeDir, { recursive: true });
+  import.meta.require?.("node:fs").mkdirSync(runtimeDir, { recursive: true });
 
   // Try each variant until one works
   const variants = arch === "aarch64"
@@ -209,34 +202,37 @@ function downloadAndCacheBun(): string {
       console.log(`  Source: ${assetUrl}`);
       downloadFile(assetUrl, zipPath);
 
-      // Extract zip
-      mkdirSync(extractDir, { recursive: true });
-      execSync(`unzip -o "${zipPath}" -d "${extractDir}"`, {
-        stdio: "pipe",
+      import.meta.require?.("node:fs").mkdirSync(extractDir, { recursive: true });
+
+      const unzipResult = Bun.spawnSync(["unzip", "-o", zipPath, "-d", extractDir], {
+        stdio: ["pipe", "pipe", "pipe"],
         timeout: 30_000,
       });
-      unlinkSync(zipPath);
+      if (unzipResult.exitCode !== 0) {
+        throw new Error("unzip failed");
+      }
+
+      Bun.spawnSync(["rm", zipPath], { stdio: ["pipe", "pipe", "pipe"] });
 
       if (!existsSync(extractedBun)) {
         throw new Error("Bun binary not found after extraction");
       }
 
-      chmodSync(extractedBun, 0o755);
+      import.meta.require?.("node:fs").chmodSync(extractedBun, 0o755);
 
       const cachedPath = getCachedBunPath();
-      renameSync(extractedBun, cachedPath);
+      import.meta.require?.("node:fs").renameSync(extractedBun, cachedPath);
 
-      // Clean up extract directory
       try {
-        execSync(`rm -rf "${extractDir}"`, { stdio: "pipe" });
+        Bun.spawnSync(["rm", "-rf", extractDir], { stdio: ["pipe", "pipe", "pipe"] });
       } catch { /* best effort */ }
 
       console.log(`  Cached to ${cachedPath}`);
       return cachedPath;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      try { unlinkSync(zipPath); } catch { /* may not exist */ }
-      try { execSync(`rm -rf "${extractDir}"`, { stdio: "pipe" }); } catch { /* best effort */ }
+      try { Bun.spawnSync(["rm", zipPath], { stdio: ["pipe", "pipe", "pipe"] }); } catch { /* may not exist */ }
+      try { Bun.spawnSync(["rm", "-rf", extractDir], { stdio: ["pipe", "pipe", "pipe"] }); } catch { /* best effort */ }
     }
   }
 
@@ -264,8 +260,8 @@ function main() {
   }
 
   const args = process.argv.slice(2);
-  const child = spawn(bunPath, [bunEntryPath, ...args], {
-    stdio: "inherit",
+  const child = Bun.spawn([bunPath, bunEntryPath, ...args], {
+    stdio: ["inherit", "inherit", "inherit"],
     cwd: packageDir,
     env: {
       ...process.env,
@@ -273,24 +269,15 @@ function main() {
     },
   });
 
-  const forwardSignal = (signal: NodeJS.Signals) => {
-    child.kill(signal);
+  const forwardSignal = (signal: string) => {
+    child.kill(signal as unknown as number);
   };
   process.on("SIGINT", () => forwardSignal("SIGINT"));
   process.on("SIGTERM", () => forwardSignal("SIGTERM"));
   process.on("SIGHUP", () => forwardSignal("SIGHUP"));
 
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal as NodeJS.Signals);
-    } else {
-      process.exit(code ?? 1);
-    }
-  });
-
-  child.on("error", (err) => {
-    console.error(`❌  Failed to start Bun: ${err.message}`);
-    process.exit(1);
+  child.exited.then((exitCode) => {
+    process.exit(exitCode ?? 1);
   });
 }
 
