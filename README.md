@@ -9,7 +9,7 @@
   <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/v/@chrona-org/cli?color=blue" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/dt/@chrona-org/cli" alt="npm downloads"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D%2020-brightgreen" alt="Node.js >= 20"></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/bun-%3E%3D%201.3.11-black" alt="Bun >= 1.3.11"></a>
 </p>
 
 ---
@@ -82,8 +82,17 @@ information is needed.
 ## Quick start
 
 ```bash
-npm install -g @chrona-org/cli    # requires Node.js >= 20
+npm install -g @chrona-org/cli    # install via npm (Bun runtime is embedded)
 chrona start                       # opens http://localhost:3101 in your browser
+```
+
+Chrona runs on **Bun** only as the application runtime. The npm package ships
+with an embedded Bun binary — no separate Bun install is required when installing
+via npm. For local development, use Bun directly:
+
+```bash
+bun install
+bun run dev
 ```
 
 On first launch, Chrona automatically creates the SQLite database and
@@ -184,8 +193,8 @@ data by default.
 | ---------- | ------------------------------------------- |
 | Frontend   | React 19, React Router 7 SPA, Vite          |
 | API Server | Hono, serving both REST API and static SPA  |
-| Database   | SQLite, Prisma 7 dual adapter: Bun / Node   |
-| Runtime    | Node.js >= 20 via npm / Bun for development |
+| Database   | SQLite, Prisma 7 with Bun SQLite adapter    |
+| Runtime    | Bun (application runtime); Node.js (build tools only) |
 | AI         | LLM providers + OpenClaw bridge             |
 | Language   | TypeScript strict                           |
 
@@ -280,8 +289,8 @@ packages/
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Development uses Bun; npm builds are
-compiled and bundled artifacts.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Development requires Bun. The npm
+package is a compiled binary artifact with an embedded Bun runtime.
 
 ## License
 

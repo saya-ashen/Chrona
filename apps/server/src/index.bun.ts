@@ -1,10 +1,12 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
 import { createLogger } from "@chrona/db/logger";
+import { readEnv, resolvePort } from "./config/env";
 
+const env = readEnv();
 const log = createLogger("apps.server");
-const host = process.env.HOST ?? "0.0.0.0";
-const port = Number.parseInt(process.env.PORT ?? "3101", 10);
+const host = env.HOST;
+const port = resolvePort(env);
 
 let isShuttingDown = false;
 

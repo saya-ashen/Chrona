@@ -1,9 +1,10 @@
 import type { MiddlewareHandler } from "hono";
+import { readEnv } from "../config/env";
 
 const SKIP_PATHS = ["/api/health", "/health"];
 
 export function apiKeyAuth(): MiddlewareHandler {
-  const expectedKey = process.env.API_KEY;
+  const expectedKey = readEnv().API_KEY;
 
   if (!expectedKey) {
     return async (_c, next) => next();

@@ -10,6 +10,18 @@ This is a Vite + Hono monorepo. There is NO Next.js — do not generate Next.js 
 - **Language:** TypeScript strict everywhere
 - **AI runtime:** OpenClaw via structured-result bridge
 
+## Application runtime — Bun only
+
+Chrona only supports **Bun** as the application runtime. There is no Node.js server entry, no `tsx` dev path, and no `@hono/node-server` adapter. The server uses `Bun.serve()` directly.
+
+Build tools (Vite, Prisma, Vitest) may use Node.js toolchain internally, but the application itself and all dev/start scripts require Bun.
+
+- Server entry: `apps/server/src/index.bun.ts`
+- Dev: `bun run dev` (parallel web + server with `bun --watch`)
+- Start: `bun run server:start`
+- Tests: `bun run test:bun` for Bun-native tests, `bun run test` for Vitest (frontend/general)
+- CLI: `chrona start` launches server via Bun
+
 ## Boundary discipline
 
 Before any code change, state:

@@ -41,7 +41,7 @@ bun run build:npm     # Build the npm entry point (esbuild)
 Test locally:
 
 ```bash
-node dist/cli.js start
+bun dist/cli.js start
 ```
 
 ## Project Architecture
@@ -52,7 +52,7 @@ Chrona is a Vite + Hono monorepo:
 |---------|---------|
 | `apps/web/` | Vite React SPA (React Router) |
 | `apps/server/` | Hono API server + static SPA host |
-| `packages/cli/` | npm entry point (Node.js) |
+| `packages/cli/` | npm entry point (embeds Bun) |
 | `packages/common/cli/` | CLI commands (task, run, schedule, ai) |
 | `packages/contracts/` | Shared DTOs, Zod schemas |
 | `packages/db/` | Prisma bootstrap and repositories |
@@ -66,7 +66,7 @@ See [docs/architecture.md](./docs/architecture.md) for full design details.
 ## Code Style
 
 - **TypeScript strict** — No `any` types
-- **Bun** for dev; **Node.js** for the npm build
+- **Bun** for development and application runtime
 - **Components** — Named exports preferred
 - **i18n** — All user-facing strings in `apps/web/src/i18n/messages/{en,zh}.json`
 
@@ -75,11 +75,14 @@ See [docs/architecture.md](./docs/architecture.md) for full design details.
 1. **Create a branch** from `main`
 2. **Write tests** for new features (Vitest for unit, Playwright for E2E)
 3. **Run checks** before committing:
-   ```bash
-   bun run lint
-   bun run test
-   bun run typecheck
-   ```
+```bash
+bun run lint
+bun run typecheck
+bun run test              # Vitest unit tests
+bun run test:bun           # Bun-native tests
+bun run test:watch        # Watch mode
+bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
+```
 4. **Commit** with conventional messages:
    - `feat:` — New feature
    - `fix:` — Bug fix
@@ -102,6 +105,7 @@ Do not cross layers without reason. Prefer moving files and fixing imports over 
 
 ```bash
 bun run test              # Vitest unit tests
+bun run test:bun          # Bun-native tests
 bun run test:watch        # Watch mode
 bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
 ```

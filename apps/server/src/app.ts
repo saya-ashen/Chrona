@@ -10,13 +10,12 @@ import { createApiRouter } from "./routes/api";
 import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";
 import { createLogger } from "@chrona/db/logger";
 import { apiKeyAuth } from "./middleware/auth";
+import { readEnv, resolveAllowedOrigins } from "./config/env";
 
 const log = createLogger("apps.server");
 
 function getAllowedOrigins() {
-  const raw = process.env.ALLOWED_ORIGINS;
-  if (!raw) return ["*"];
-  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  return resolveAllowedOrigins(readEnv());
 }
 
 function resolveOrigin(origin: string | undefined, allowed: string[]) {
