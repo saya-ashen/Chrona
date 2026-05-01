@@ -175,7 +175,7 @@ export function SchedulePageMainPanel({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col">
+      <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col rounded-[30px]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -191,7 +191,7 @@ export function SchedulePageMainPanel({
           </div>
         </div>
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/55 bg-background/70 p-3">
           {activeView === "timeline" ? (
             activeGroup ? (
               <DayTimeline
