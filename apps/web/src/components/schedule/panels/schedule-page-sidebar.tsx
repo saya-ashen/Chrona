@@ -43,8 +43,10 @@ export function ScheduleLeftSidebar({
     taskId?: string,
   ) => string;
 }) {
+  const selectedDay = viewModel.calendarDays.find((day) => day.isSelected);
+
   return (
-    <div className="flex w-56 shrink-0 flex-col gap-3 overflow-y-auto">
+    <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1">
       <ScheduleMiniCalendar
         monthLabel={viewModel.calendarMonthLabel}
         days={viewModel.calendarDays.map((day) => ({
@@ -59,7 +61,28 @@ export function ScheduleLeftSidebar({
           ),
         }))}
       />
-    </div>
+
+      <SurfaceCard variant="default" padding="sm" className="space-y-3">
+        <SurfaceCardHeader>
+          <SurfaceCardTitle>Insights</SurfaceCardTitle>
+          <SurfaceCardDescription>Task distribution and risk signals</SurfaceCardDescription>
+        </SurfaceCardHeader>
+        <div className="space-y-2 text-sm">
+          <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
+            <p className="text-xs text-muted-foreground">Selected day</p>
+            <p className="mt-1 font-medium text-foreground">{selectedDay?.label ?? "-"}</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
+            <p className="text-xs text-muted-foreground">Scheduled items</p>
+            <p className="mt-1 text-lg font-semibold text-foreground">{selectedDay?.scheduledCount ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
+            <p className="text-xs text-muted-foreground">Risk items</p>
+            <p className="mt-1 text-lg font-semibold text-rose-600">{selectedDay?.riskCount ?? 0}</p>
+          </div>
+        </div>
+      </SurfaceCard>
+    </aside>
   );
 }
 
@@ -97,13 +120,13 @@ export function ScheduleRightSidebar({
   onDeleteTask: (taskId: string) => Promise<void>;
 }) {
   return (
-    <div className="w-72 shrink-0 overflow-y-auto">
-      <SurfaceCard padding="sm">
+    <aside className="min-h-0 overflow-y-auto pl-1">
+      <SurfaceCard padding="sm" className="sticky top-0">
         <SurfaceCardHeader>
           <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
           <SurfaceCardDescription>{copy.unscheduledQueueDescription}</SurfaceCardDescription>
         </SurfaceCardHeader>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 max-h-[calc(100vh-19rem)] space-y-2 overflow-y-auto pr-1">
           {viewData.unscheduled.length === 0 ? (
             <EmptyState>{copy.noUnscheduledWork}</EmptyState>
           ) : (
@@ -130,7 +153,7 @@ export function ScheduleRightSidebar({
           )}
         </div>
       </SurfaceCard>
-    </div>
+    </aside>
   );
 }
 

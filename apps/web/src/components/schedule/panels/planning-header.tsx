@@ -52,10 +52,10 @@ export function PlanningHeader({
   return (
     <header
       aria-label={ariaLabel}
-      className="flex items-center gap-4 border-b border-border/40 bg-background px-5 py-2.5"
+      className="flex items-center gap-4 rounded-3xl border border-border/60 bg-white/92 px-5 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
     >
       {/* Title + Date */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-[15rem] items-center gap-3">
         <div className="flex items-center gap-2">
           <Calendar className="size-4 text-muted-foreground" />
           <h1 className="text-base font-semibold tracking-tight text-foreground">{title}</h1>
@@ -66,7 +66,7 @@ export function PlanningHeader({
       </div>
 
       {/* Day switcher */}
-      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
+      <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
         {dayLinks.map((link) => (
           <a
             key={link.label}
@@ -85,7 +85,7 @@ export function PlanningHeader({
       </div>
 
       {/* View toggle */}
-      <div className="flex gap-0.5 rounded-lg border border-border/50 bg-muted/20 p-0.5">
+      <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
         <a
           href={timelineHref}
           aria-current={activeView === "timeline" ? "page" : undefined}
@@ -114,8 +114,11 @@ export function PlanningHeader({
         </a>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      <div className="hidden min-w-[13rem] flex-1 lg:block">
+        <p className="truncate rounded-xl border border-border/50 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
+          {summary}
+        </p>
+      </div>
 
       {/* Key metrics — compact pills */}
       <div className="flex items-center gap-1.5">
@@ -123,7 +126,7 @@ export function PlanningHeader({
           <div
             key={m.label}
             title={m.hint}
-            className="flex items-center gap-1 rounded-full border border-border/40 px-2 py-0.5"
+            className="flex items-center gap-1 rounded-full border border-border/50 bg-background/80 px-2 py-0.5"
           >
             <span className="text-[10px] text-muted-foreground">{m.label}</span>
             <span
