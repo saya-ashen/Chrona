@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
 
+const realProgressAcceptedPlan = await import("@/modules/commands/progress-accepted-task-plan");
+
 const progressAcceptedTaskPlanMock = mock(async () => ({
   parentTaskId: "parent",
   startedTaskIds: ["new-child"],
@@ -14,6 +16,7 @@ const progressAcceptedTaskPlanMock = mock(async () => ({
 
 mock.module("@/modules/commands/progress-accepted-task-plan", () => ({
   progressAcceptedTaskPlan: progressAcceptedTaskPlanMock,
+  syncParentTaskStateFromAcceptedPlan: realProgressAcceptedPlan.syncParentTaskStateFromAcceptedPlan,
 }));
 
 const { syncRunFromRuntime } = await import("@/modules/runtime-sync/sync-run");

@@ -10,6 +10,7 @@ export {
   executeGatewayRequest,
   gatewayHeaders,
   resetBridgeSessions,
+  setSessionPendingToolOutputs,
   statusForResponse,
 } from "./execution/gateway";
 export { createBridgeApp } from "./http/app";

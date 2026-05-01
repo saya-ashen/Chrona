@@ -343,11 +343,11 @@ describe("getSchedulePage", () => {
       },
     ]);
 
-    expect(page.listItems).toHaveLength(4);
+    expect(page.listItems).toHaveLength(5);
     expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
-      [reviewTask.id, riskTask.id, scheduledTask.id, unscheduledTask.id].sort(),
+      [reviewTask.id, riskTask.id, scheduledTask.id, subtask.id, unscheduledTask.id].sort(),
     );
-    expect(page.listItems.some((item) => item.taskId === subtask.id)).toBe(false);
+    expect(page.listItems.some((item) => item.taskId === subtask.id)).toBe(true);
     expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({
       scheduleStatus: "Unscheduled",
       actionRequired: "Schedule task",

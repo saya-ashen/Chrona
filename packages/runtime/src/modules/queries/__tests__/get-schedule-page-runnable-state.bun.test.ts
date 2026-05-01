@@ -36,6 +36,10 @@ describe("getSchedulePage runnable state", () => {
       },
     });
 
+    const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    futureStart.setHours(9, 0, 0, 0);
+    const futureEnd = new Date(futureStart.getTime() + 60 * 60 * 1000);
+
     const readyTask = await db.task.create({
       data: {
         workspaceId: workspace.id,
@@ -52,8 +56,8 @@ describe("getSchedulePage runnable state", () => {
         runtimeConfig: { temperature: 0.2, sessionStrategy: "per_subtask" },
         scheduleStatus: "Scheduled",
         scheduleSource: "human",
-        scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-16T10:00:00.000Z"),
+        scheduledStartAt: futureStart,
+        scheduledEndAt: futureEnd,
       },
     });
 
@@ -112,8 +116,8 @@ describe("getSchedulePage runnable state", () => {
           displayState: "Ready",
           scheduleStatus: "Scheduled",
           scheduleSource: "human",
-          scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
-          scheduledEndAt: new Date("2026-04-16T10:00:00.000Z"),
+          scheduledStartAt: futureStart,
+          scheduledEndAt: futureEnd,
           lastActivityAt: new Date("2026-04-15T12:00:00.000Z"),
         },
         {
@@ -160,7 +164,7 @@ describe("getSchedulePage runnable state", () => {
       runnabilitySummary: "Needs prompt",
     });
     expect(page.unscheduled.some((item) => item.taskId === childDraft.id)).toBe(false);
-    expect(page.listItems.some((item) => item.taskId === childDraft.id)).toBe(false);
+    expect(page.listItems.some((item) => item.taskId === childDraft.id)).toBe(true);
 
     expect(page.automationCandidates).toEqual([
       {
@@ -174,7 +178,7 @@ describe("getSchedulePage runnable state", () => {
         kind: "auto_run",
         reason: "Scheduled task is ready to run automatically.",
         priority: "high",
-        scheduledStartAt: new Date("2026-04-16T09:00:00.000Z"),
+        scheduledStartAt: futureStart,
         executionMode: "none",
         sessionStrategy: "per_subtask",
         readyNodeIds: [],

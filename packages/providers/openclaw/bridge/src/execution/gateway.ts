@@ -314,7 +314,10 @@ export function buildGatewayBody(
       user: sessionKey,
       instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions}`,
       input: pendingToolOutputs.length > 0
-        ? [...pendingToolOutputs, stringifyFeatureInput(route.feature, featureRequest.input)]
+        ? [
+            ...pendingToolOutputs,
+            { type: "input_text", text: stringifyFeatureInput(route.feature, featureRequest.input) },
+          ]
         : stringifyFeatureInput(route.feature, featureRequest.input),
       stream: route.stream,
     };
@@ -343,7 +346,10 @@ export function buildGatewayBody(
   const body: Record<string, unknown> = {
     model: "openclaw",
     input: pendingToolOutputs.length > 0
-      ? [...pendingToolOutputs, stringifyExecutionInput(execution)]
+      ? [
+          ...pendingToolOutputs,
+          { type: "input_text", text: stringifyExecutionInput(execution) },
+        ]
       : stringifyExecutionInput(execution),
     stream: route.stream,
     max_output_tokens:
@@ -485,6 +491,7 @@ export async function executeGatewayRequest(
   });
 
   if (!response.ok) {
+    sessionPendingToolOutputMap.delete(sessionKey);
     const errBody = responseText;
     logger.warn("bridge.gateway.response_error", {
       sessionId,
@@ -711,6 +718,13 @@ export async function executeGatewayRequest(
 export function resetBridgeSessions(): void {
   sessionPreviousResponseMap.clear();
   sessionPendingToolOutputMap.clear();
+}
+
+export function setSessionPendingToolOutputs(
+  sessionKey: string,
+  outputs: Array<{ type: "function_call_output"; call_id: string; output: string }>,
+): void {
+  sessionPendingToolOutputMap.set(sessionKey, outputs);
 }
 
 export function executionErrorData(

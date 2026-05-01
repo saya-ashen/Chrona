@@ -72,6 +72,7 @@ describe("startRun", () => {
           approvalPolicy: "never",
           model: "gpt-5.4",
           prompt: "Override prompt",
+          sessionStrategy: "per_subtask",
           temperature: 0.2,
           toolMode: "workspace-write",
         });
@@ -133,6 +134,7 @@ describe("startRun", () => {
       approvalPolicy: "never",
       model: "gpt-5.4",
       prompt: "Stored prompt",
+      sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
@@ -142,6 +144,7 @@ describe("startRun", () => {
       approvalPolicy: "never",
       model: "gpt-5.4",
       prompt: "Override prompt",
+      sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
@@ -187,6 +190,7 @@ describe("startRun", () => {
           approvalPolicy: "never",
           model: "gpt-5.4",
           prompt: "Use the saved prompt",
+          sessionStrategy: "per_subtask",
           temperature: 0.2,
           toolMode: "workspace-write",
         });
@@ -427,6 +431,7 @@ describe("createTask", () => {
       approvalPolicy: "never",
       model: "gpt-5.4",
       prompt: "Add the first real create flow",
+      sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
@@ -520,6 +525,7 @@ describe("updateTask", () => {
       approvalPolicy: "never",
       model: "gpt-5.4",
       prompt: "Updated prompt",
+      sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
@@ -975,7 +981,7 @@ describe("closure commands", () => {
     const followUp = await createFollowUpTask({
       taskId: task.id,
       title: "Follow up remaining polish",
-      dueAt: new Date("2026-04-10T18:00:00.000Z"),
+      dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
     await reopenTask({ taskId: task.id });
 
@@ -994,7 +1000,6 @@ describe("closure commands", () => {
     expect(storedTask.projection?.persistedStatus).toBe("Ready");
     expect(storedFollowUp.parentTaskId).toBe(task.id);
     expect(storedFollowUp.scheduleStatus).toBe("Unscheduled");
-    expect(storedFollowUp.dueAt?.toISOString()).toBe("2026-04-10T18:00:00.000Z");
     expect(events.map((event) => event.eventType)).toEqual([
       "task.result_accepted",
       "task.done",

@@ -6,6 +6,7 @@ import {
   createBridgeLogger,
   gatewayHeaders,
   resetBridgeSessions,
+  setSessionPendingToolOutputs,
   startBridgeServer,
   summarizeBridgeRequest,
   type BridgeExecutionTaskRequest,
@@ -393,6 +394,38 @@ describe("openclaw bridge gateway helpers", () => {
     expect(typeof (entries[0]?.data?.nested as Record<string, unknown>)?.text).toBe("string");
     expect(String((entries[0]?.data?.nested as Record<string, unknown>)?.text).length).not.toBe("1200");
   });
+
+  it("pending tool outputs do not cause mixed-type arrays in the input field", () => {
+    const sessionKey = "chrona:openclaw:task:t-multi:default";
+    const staleOutputs = [
+      { type: "function_call_output" as const, call_id: "call-1", output: '{"ok":true}' },
+      { type: "function_call_output" as const, call_id: "call-2", output: '{"ok":true}' },
+    ];
+    setSessionPendingToolOutputs(sessionKey, staleOutputs);
+
+    const request: BridgeFeatureRequest<{ title: string }> = {
+      sessionId: "sess-multi",
+      sessionKey,
+      input: { title: "Test task" },
+      timeout: 30,
+    };
+
+    const body = buildGatewayBody(
+      { kind: "feature", feature: "suggest", stream: false },
+      request,
+      "sess-multi",
+    );
+
+    const inputValue = body.input;
+    // When pending outputs exist, input must be an array of only typed objects
+    expect(Array.isArray(inputValue)).toBe(true);
+    for (const item of inputValue as unknown[]) {
+      expect(item && typeof item === "object" && !Array.isArray(item)).toBe(true);
+    }
+    // The function_call_output items must come first
+    expect((inputValue as Array<Record<string, unknown>>)[0]).toMatchObject({ type: "function_call_output", call_id: "call-1" });
+    expect((inputValue as Array<Record<string, unknown>>)[1]).toMatchObject({ type: "function_call_output", call_id: "call-2" });
+  });
 });
 
 describe("openclaw bridge hono app", () => {
@@ -420,7 +453,12 @@ describe("openclaw bridge hono app", () => {
       body: BridgeFeatureRequest | BridgeExecutionTaskRequest,
     ): Promise<ExecutionResult> => {
       calls.push({ route, body });
-      return { response: makeResponse(), events: [] };
+      const response = makeResponse(
+        route.kind === "feature"
+          ? { toolCalls: [{ tool: "suggest_task_completions", callId: "call-1", input: { suggestions: [] }, result: null, status: "completed" }] }
+          : {},
+      );
+      return { response, events: [] };
     };
     const app = createBridgeApp({
       logger: createBridgeLogger({ minLevel: "error", sink: () => {} }),
@@ -630,7 +668,10 @@ describe("openclaw bridge gateway endpoints", () => {
           call_id: "call-plan-1",
           output: expect.stringContaining("Chrona accepted the generated task plan graph"),
         },
-        expect.stringContaining("Create an execution-ready plan graph"),
+        {
+          type: "input_text",
+          text: expect.stringContaining("Create an execution-ready plan graph"),
+        },
       ]);
 
       const third = await fetch(`http://127.0.0.1:${port}/v1/features/generate-plan`, {
