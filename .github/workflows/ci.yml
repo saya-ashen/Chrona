@@ -20,6 +20,8 @@ jobs:
 
       - run: bunx prisma generate
 
+      - run: bunx prisma db push --skip-generate
+
       - run: bun run typecheck
 
       - run: bun run lint

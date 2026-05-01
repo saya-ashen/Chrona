@@ -17,8 +17,6 @@ jobs:
             runner: ubuntu-latest
           - target: linux-arm64
             runner: ubuntu-24.04-arm
-          - target: darwin-x64
-            runner: macos-13
           - target: darwin-arm64
             runner: macos-latest
           - target: windows-x64
@@ -49,35 +47,6 @@ jobs:
           name: chrona-${{ matrix.target }}
           path: dist/releases/chrona-${{ matrix.target }}.*
 
-  publish-npm:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - run: bun install --frozen-lockfile
-
-      - run: bunx prisma generate
-
-      - run: bun run build
-        env:
-          VITE_API_BASE_URL: ""
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
   create-release:
     needs: build-binary
     runs-on: ubuntu-latest
@@ -99,6 +68,5 @@ jobs:
           files: |
             artifacts/chrona-linux-x64/*
             artifacts/chrona-linux-arm64/*
-            artifacts/chrona-darwin-x64/*
             artifacts/chrona-darwin-arm64/*
             artifacts/chrona-windows-x64/*
