@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { buildFeatureResultFromResponse } from "../features/feature-contracts";
 import { createBridgeLogger } from "../logging/logger";
 import { validationErrorMessage, normalizeExecutionRequest, normalizeFeatureRequest } from "../parse/requests";
 import { matchRoute } from "../parse/routes";
@@ -12,6 +13,15 @@ import {
   executionErrorData,
   statusForResponse,
 } from "../execution/gateway";
+
+function sanitizeClientErrorMessage(error: unknown): string {
+  const message = toErrorMessage(error)
+    .replace(/\b(secret|token|password|api[-_]?key|authorization|cookie)\b[^\n]*/gi, "[REDACTED]")
+    .replace(/\n?stack:.*$/is, "")
+    .trim();
+
+  return message || "Bridge request failed";
+}
 
 export interface CreateBridgeAppOptions {
   logger?: BridgeLogger;
@@ -89,8 +99,32 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
 
     try {
       const { response, events } = await executeRequest(route, normalized);
+      const normalizedResponse =
+        route.kind === "feature" && !response.error
+          ? (() => {
+              const built = buildFeatureResultFromResponse(
+                route.feature,
+                response.output,
+                response.toolCalls,
+              );
+
+              if (!built.error) {
+                return response;
+              }
+
+              return {
+                ...response,
+                error: built.error,
+                feature: null,
+                structured: null,
+              };
+            })()
+          : response;
+
       if (!route.stream) {
-        return c.json(response, { status: statusForResponse(route, response) as 200 | 422 | 500 });
+        return c.json(normalizedResponse, {
+          status: statusForResponse(route, normalizedResponse) as 200 | 422 | 500,
+        });
       }
 
       const stream = new ReadableStream({
@@ -98,13 +132,13 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
           for (const event of events) {
             controller.enqueue(encodeSSE("event", event));
           }
-          controller.enqueue(encodeSSE("done", response));
+          controller.enqueue(encodeSSE("done", normalizedResponse));
           controller.close();
         },
       });
 
       return c.newResponse(stream, {
-        status: (response.error ? statusForResponse(route, response) : 200) as 200 | 422 | 500,
+        status: (normalizedResponse.error ? statusForResponse(route, normalizedResponse) : 200) as 200 | 422 | 500,
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
@@ -120,7 +154,7 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
       if (route.stream) {
         const stream = new ReadableStream({
           start(controller) {
-            controller.enqueue(encodeSSE("error", { error: toErrorMessage(error) }));
+            controller.enqueue(encodeSSE("error", { error: sanitizeClientErrorMessage(error) }));
             controller.close();
           },
         });
@@ -134,7 +168,7 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
         });
       }
 
-      return json({ error: toErrorMessage(error) }, { status: 500 });
+      return json({ error: sanitizeClientErrorMessage(error) }, { status: 500 });
     }
   });
 

@@ -103,6 +103,7 @@ export async function updateTask(input: {
   title?: string;
   description?: string | null;
   priority?: "Low" | "Medium" | "High" | "Urgent";
+  status?: "Draft" | "Ready" | "Running" | "Blocked" | "Completed" | "Done";
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
@@ -189,20 +190,28 @@ export async function updateTask(input: {
           : nextPrompt,
     runtimeConfig: input.runtimeInput !== undefined || adapterChanged ? runtimeConfig : nextRuntimeConfig,
   });
-  const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
-    runtimeInput: validatedRuntimeConfig.runtimeInput,
-    runtimeModel: validatedRuntimeConfig.runtimeModel,
-    prompt: validatedRuntimeConfig.prompt,
-    runtimeConfig: validatedRuntimeConfig.runtimeConfig,
-  });
-  const shouldManageStatus =
-    currentTask.status === TaskStatus.Draft || currentTask.status === TaskStatus.Ready;
-  const nextStatus = shouldManageStatus
-    ? runnability.isRunnable
-      ? TaskStatus.Ready
-      : TaskStatus.Draft
-    : undefined;
+  const nextStatus = (() => {
+    if (input.status) {
+      return TaskStatus[input.status];
+    }
+
+    const shouldManageStatus =
+      currentTask.status === TaskStatus.Draft || currentTask.status === TaskStatus.Ready;
+
+    if (!shouldManageStatus) {
+      return undefined;
+    }
+
+    const runnability = deriveTaskRunnability({
+      runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
+      runtimeInput: validatedRuntimeConfig.runtimeInput,
+      runtimeModel: validatedRuntimeConfig.runtimeModel,
+      prompt: validatedRuntimeConfig.prompt,
+      runtimeConfig: validatedRuntimeConfig.runtimeConfig,
+    });
+
+    return runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
+  })();
   const shouldPersistResolvedRuntimeConfig =
     input.runtimeInput !== undefined ||
     input.runtimeAdapterKey !== undefined ||
@@ -215,6 +224,7 @@ export async function updateTask(input: {
     input.title !== undefined ? "title" : null,
     input.description !== undefined ? "description" : null,
     input.priority !== undefined ? "priority" : null,
+    input.status !== undefined ? "status" : null,
     input.dueAt !== undefined ? "dueAt" : null,
     input.scheduledStartAt !== undefined ? "scheduledStartAt" : null,
     input.scheduledEndAt !== undefined ? "scheduledEndAt" : null,

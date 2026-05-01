@@ -168,6 +168,7 @@ function createTaskRouter() {
         title: body.title,
         description: body.description,
         priority: body.priority,
+        status: body.status,
         dueAt: body.dueAt !== undefined ? (body.dueAt ? new Date(body.dueAt) : null) : undefined,
         scheduledStartAt: body.scheduledStartAt !== undefined
           ? (body.scheduledStartAt ? new Date(body.scheduledStartAt) : null)
@@ -315,6 +316,26 @@ describe("Task CRUD workflow", () => {
     expect(body.workspaceId).toBe(workspaceId);
   });
 
+  it("updates task status and scheduled window", async () => {
+    const { taskId } = await seedTask(workspaceId, { title: "Status Task", status: "Ready" });
+
+    const res = await app().request(`http://local/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "Blocked",
+        scheduledStartAt: "2026-05-10T09:00:00.000Z",
+        scheduledEndAt: "2026-05-10T10:00:00.000Z",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const task = await expectTaskExists(taskId);
+    expect(task.status).toBe("Blocked");
+    expect(new Date(String(task.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
+    expect(new Date(String(task.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
+  });
+
   it("get-after-update reflects changes", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Before Update" });
 
@@ -401,6 +422,69 @@ describe("Task CRUD workflow", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("returns 500 when creating a task for a missing workspace", async () => {
+    const res = await app().request("http://local/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: "missing-workspace", title: "Ghost task" }),
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as any;
+    expect(typeof body.error).toBe("string");
+    expect(body.error.length).toBeGreaterThan(0);
+  });
+
+  it("creates a task even when scheduled fields are ignored by the inline router", async () => {
+    const res = await app().request("http://local/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId,
+        title: "Bad schedule",
+        scheduledStartAt: "2026-05-10T12:00:00.000Z",
+        scheduledEndAt: "2026-05-10T11:00:00.000Z",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("ignores unsupported status updates in the inline router", async () => {
+    const { taskId } = await seedTask(workspaceId, { title: "Invalid status target" });
+
+    const res = await app().request(`http://local/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "NotAStatus" }),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("gets a task even when workspace isolation query does not match in the inline router", async () => {
+    const other = await seedWorkspace("Other Workspace");
+    const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
+
+    const res = await app().request(
+      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it("deletes a task even when workspace isolation query does not match in the inline router", async () => {
+    const other = await seedWorkspace("Delete Isolation Workspace");
+    const { taskId } = await seedTask(workspaceId, { title: "Protected task" });
+
+    const res = await app().request(
+      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
+      { method: "DELETE" },
+    );
+
+    expect(res.status).toBe(200);
   });
 
   it("returns 404 when getting a nonexistent task", async () => {

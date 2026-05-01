@@ -33,11 +33,17 @@ const eslintConfig = defineConfig([
     }
   },
   globalIgnores([
-    "out/**",
-    "build/**",
-    "dist/**",
-    "coverage/**",
+    "**/.git/**",
+    "**/.worktrees/**",
+    "**/.next/**",
+    "**/node_modules/**",
+    "**/out/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/coverage/**",
     "agent-dashboard-app/**",
+    "packages/db/src/generated/prisma/**",
+    ".dependency-cruiser.cjs",
   ]),
 ]);
 

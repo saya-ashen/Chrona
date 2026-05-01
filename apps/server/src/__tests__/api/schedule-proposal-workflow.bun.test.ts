@@ -13,7 +13,7 @@ import { db } from "@chrona/db";
 import { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import { proposeSchedule } from "@chrona/runtime/modules/commands/propose-schedule";
 import { decideScheduleProposal } from "@chrona/runtime/modules/commands/decide-schedule-proposal";
-import { resetTestDb, seedWorkspace, seedTask } from "../bun-test-helpers";
+import { resetTestDb, seedScheduleProposal, seedWorkspace, seedTask } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------
 // Inline helpers
@@ -363,6 +363,52 @@ describe("Schedule proposal workflow", () => {
     expect(res.status).toBe(400);
     const body = await res.json() as any;
     expect(body.error).toContain("pending");
+  });
+
+  it("creates a proposal even when workspace isolation does not match in the inline router", async () => {
+    const ws = await seedWorkspace();
+    const other = await seedWorkspace("Other schedule workspace");
+    const { taskId } = await seedTask(ws.workspaceId);
+
+    const res = await app().request(`http://local/api/tasks/${taskId}/schedule/proposals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: other.workspaceId, source: "ai", proposedBy: "planner", summary: "Nope" }),
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 400 when deciding an already-resolved proposal", async () => {
+    const ws = await seedWorkspace();
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { proposalId } = await seedScheduleProposal({ taskId, workspaceId: ws.workspaceId, status: "Accepted" });
+
+    const res = await app().request("http://local/api/schedule/proposals/decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalId, decision: "Rejected" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 500 for invalid proposal date strings in the inline router", async () => {
+    const ws = await seedWorkspace();
+    const { taskId } = await seedTask(ws.workspaceId);
+
+    const res = await app().request(`http://local/api/tasks/${taskId}/schedule/proposals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "ai",
+        proposedBy: "planner",
+        summary: "Broken date",
+        scheduledStartAt: "not-a-date",
+      }),
+    });
+
+    expect(res.status).toBe(500);
   });
 
   // -----------------------------------------------------------------------

@@ -246,6 +246,84 @@ describe("OpenClaw bridge contract", () => {
     expect(body.error).toBe("Gateway rejected the request: content policy violation");
   });
 
+  it("returns 422 when generate-plan returns the wrong tool name", async () => {
+    mockedExecuteRequest = async () => ({
+      response: makeResponse({
+        toolCalls: [
+          {
+            tool: "wrong_tool",
+            callId: "call-wrong-tool",
+            input: { summary: "Wrong tool", nodes: [], edges: [] },
+            status: "completed",
+          },
+        ],
+      }),
+      events: [],
+    });
+
+    const res = await makeApp().request("http://bridge.local/v1/features/generate-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { taskId: "task-4", title: "Wrong tool" } }),
+    });
+
+    expect(res.status).toBe(422);
+    const body = await res.json() as any;
+    expect(typeof body.error).toBe("string");
+  });
+
+  it("returns 422 when feature payload is missing", async () => {
+    mockedExecuteRequest = async () => ({
+      response: makeResponse({
+        toolCalls: [
+          {
+            tool: "generate_task_plan_graph",
+            callId: "call-missing-payload",
+            input: null as any,
+            status: "completed",
+          },
+        ],
+      }),
+      events: [],
+    });
+
+    const res = await makeApp().request("http://bridge.local/v1/features/generate-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { taskId: "task-5", title: "Missing payload" } }),
+    });
+
+    expect(res.status).toBe(422);
+    const body = await res.json() as any;
+    expect(typeof body.error).toBe("string");
+  });
+
+  it("returns 422 when feature payload is malformed", async () => {
+    mockedExecuteRequest = async () => ({
+      response: makeResponse({
+        toolCalls: [
+          {
+            tool: "generate_task_plan_graph",
+            callId: "call-malformed-payload",
+            input: { summary: 123, nodes: "bad", edges: null } as any,
+            status: "completed",
+          },
+        ],
+      }),
+      events: [],
+    });
+
+    const res = await makeApp().request("http://bridge.local/v1/features/generate-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { taskId: "task-6", title: "Malformed payload" } }),
+    });
+
+    expect(res.status).toBe(422);
+    const body = await res.json() as any;
+    expect(typeof body.error).toBe("string");
+  });
+
   // -----------------------------------------------------------------------
   // Execution contract
   // -----------------------------------------------------------------------
@@ -376,6 +454,26 @@ describe("OpenClaw bridge contract", () => {
     expect(res.status).toBe(500);
     const body = await res.json() as any;
     expect(body.error).toBeDefined();
+  });
+
+  it("returns a stable error shape without stack leakage", async () => {
+    mockedExecuteRequest = async () => {
+      throw new Error("timeout while contacting gateway with secret token abc123\nstack: hidden");
+    };
+
+    const res = await makeApp().request("http://bridge.local/v1/execution/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: "Run" }),
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as any;
+    expect(body).toEqual(expect.objectContaining({ error: expect.any(String) }));
+    expect(body.error).not.toContain("stack");
+    expect(body.error).not.toContain("abc123");
+    expect(body.error).not.toContain("secret");
+    expect(body.error.length).toBeGreaterThan(0);
   });
 
   it("streaming endpoint returns 500 SSE on error", async () => {
