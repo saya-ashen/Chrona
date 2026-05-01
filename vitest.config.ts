@@ -13,7 +13,6 @@ export default defineConfig({
       ".worktrees/**",
       "e2e/**",
       "**/*.bun.test.ts",
-      "src/modules/db/**/*.test.ts",
     ],
     environment: "jsdom",
     setupFiles: ["./apps/web/src/test/setup.ts"],
