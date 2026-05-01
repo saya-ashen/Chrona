@@ -50,11 +50,16 @@ describe("applySchedule", () => {
       },
     });
 
+    const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    futureStart.setHours(9, 0, 0, 0);
+    const futureEnd = new Date(futureStart.getTime() + 2 * 60 * 60 * 1000);
+    const futureDue = new Date(futureStart.getTime() + 9 * 60 * 60 * 1000);
+
     const result = await applySchedule({
       taskId: task.id,
-      dueAt: new Date("2026-04-12T18:00:00.000Z"),
-      scheduledStartAt: new Date("2026-04-12T09:00:00.000Z"),
-      scheduledEndAt: new Date("2026-04-12T11:00:00.000Z"),
+      dueAt: futureDue,
+      scheduledStartAt: futureStart,
+      scheduledEndAt: futureEnd,
       scheduleSource: "human",
     });
 
@@ -71,9 +76,9 @@ describe("applySchedule", () => {
       taskId: task.id,
       workspaceId: workspace.id,
     });
-    expect(storedTask.dueAt?.toISOString()).toBe("2026-04-12T18:00:00.000Z");
-    expect(storedTask.scheduledStartAt?.toISOString()).toBe("2026-04-12T09:00:00.000Z");
-    expect(storedTask.scheduledEndAt?.toISOString()).toBe("2026-04-12T11:00:00.000Z");
+    expect(storedTask.dueAt?.toISOString()).toBe(futureDue.toISOString());
+    expect(storedTask.scheduledStartAt?.toISOString()).toBe(futureStart.toISOString());
+    expect(storedTask.scheduledEndAt?.toISOString()).toBe(futureEnd.toISOString());
     expect(storedTask.scheduleStatus).toBe("Scheduled");
     expect(storedTask.scheduleSource).toBe("human");
     expect(storedTask.projection?.scheduleStatus).toBe("Scheduled");
@@ -81,9 +86,9 @@ describe("applySchedule", () => {
     expect(scheduleEvents).toHaveLength(1);
     expect(scheduleEvents[0]?.payload).toEqual(
       expect.objectContaining({
-        due_at: "2026-04-12T18:00:00.000Z",
-        scheduled_start_at: "2026-04-12T09:00:00.000Z",
-        scheduled_end_at: "2026-04-12T11:00:00.000Z",
+        due_at: futureDue.toISOString(),
+        scheduled_start_at: futureStart.toISOString(),
+        scheduled_end_at: futureEnd.toISOString(),
         schedule_source: "human",
       }),
     );
@@ -249,6 +254,11 @@ describe("applySchedule", () => {
       },
     });
 
+    const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    futureStart.setHours(9, 0, 0, 0);
+    const futureEnd = new Date(futureStart.getTime() + 2 * 60 * 60 * 1000);
+    const futureDue = new Date(futureStart.getTime() + 9 * 60 * 60 * 1000);
+
     const proposal = await db.scheduleProposal.create({
       data: {
         workspaceId: workspace.id,
@@ -257,9 +267,9 @@ describe("applySchedule", () => {
         status: "Pending",
         proposedBy: "planner-agent",
         summary: "Use the planner suggestion",
-        dueAt: new Date("2026-04-14T18:00:00.000Z"),
-        scheduledStartAt: new Date("2026-04-14T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-14T11:00:00.000Z"),
+        dueAt: futureDue,
+        scheduledStartAt: futureStart,
+        scheduledEndAt: futureEnd,
       },
     });
 
@@ -286,7 +296,7 @@ describe("applySchedule", () => {
     expect(storedProposal.resolutionNote).toBe("Looks good");
     expect(storedTask.scheduleStatus).toBe("Scheduled");
     expect(storedTask.scheduleSource).toBe("ai");
-    expect(storedTask.dueAt?.toISOString()).toBe("2026-04-14T18:00:00.000Z");
+    expect(storedTask.dueAt?.toISOString()).toBe(futureDue.toISOString());
     expect(storedTask.projection?.scheduleProposalCount).toBe(0);
   });
 

@@ -233,7 +233,7 @@ describe("getWorkPage", () => {
               priority: "High",
               executionMode: "none",
               linkedTaskId: null,
-              needsUserInput: false,
+              requiresHumanInput: false,
               metadata: { order: 1 },
             },
             {
@@ -248,7 +248,7 @@ describe("getWorkPage", () => {
               priority: "High",
               executionMode: "none",
               linkedTaskId: null,
-              needsUserInput: false,
+              requiresHumanInput: false,
               metadata: { order: 2 },
             },
             {
@@ -263,7 +263,7 @@ describe("getWorkPage", () => {
               priority: "High",
               executionMode: "none",
               linkedTaskId: null,
-              needsUserInput: true,
+              requiresHumanInput: true,
               metadata: { order: 3 },
             },
             {
@@ -278,7 +278,7 @@ describe("getWorkPage", () => {
               priority: "Medium",
               executionMode: "none",
               linkedTaskId: null,
-              needsUserInput: false,
+              requiresHumanInput: false,
               metadata: { order: 4 },
             },
           ],
@@ -303,10 +303,10 @@ describe("getWorkPage", () => {
       currentStepId: "execute-task",
     });
     expect(page.taskPlan.steps).toEqual([
-      expect.objectContaining({ id: "understand-task", status: "done", needsUserInput: false, type: "step" }),
-      expect.objectContaining({ id: "gather-context", status: "done", needsUserInput: false, type: "step" }),
-      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", needsUserInput: true, type: "user_input" }),
-      expect.objectContaining({ id: "confirm-next-step", status: "pending", needsUserInput: false, type: "checkpoint" }),
+      expect.objectContaining({ id: "understand-task", status: "done", requiresHumanInput: false, type: "step" }),
+      expect.objectContaining({ id: "gather-context", status: "done", requiresHumanInput: false, type: "step" }),
+      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", requiresHumanInput: true, type: "user_input" }),
+      expect.objectContaining({ id: "confirm-next-step", status: "pending", requiresHumanInput: false, type: "checkpoint" }),
     ]);
   });
 
