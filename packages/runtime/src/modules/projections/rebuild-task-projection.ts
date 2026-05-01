@@ -43,15 +43,25 @@ export async function rebuildTaskProjection(taskId: string) {
     now: new Date(),
   });
 
+  // NOTE: Prisma 7 + WASM query compiler can crash when Prisma.DbNull is
+  // passed in an update alongside other nullable fields (e.g. after a
+  // clearSchedule call). Avoid it by skipping blockReason when the current
+  // stored value is already null and there is no new value to set.
+  const shouldClearBlockReason = !derived.blockReason && task.blockReason !== null;
+  const updateData: Record<string, unknown> = {
+    status: derived.persistedStatus,
+    scheduleStatus: schedule.scheduleStatus,
+  };
+  if (derived.blockReason) {
+    updateData.blockReason = derived.blockReason as Prisma.InputJsonValue;
+  } else if (shouldClearBlockReason) {
+    // Only use DbNull when we genuinely need to clear a previously-set value
+    updateData.blockReason = Prisma.DbNull;
+  }
+
   await db.task.update({
     where: { id: task.id },
-    data: {
-      status: derived.persistedStatus as never,
-      scheduleStatus: schedule.scheduleStatus as never,
-      blockReason: derived.blockReason
-        ? (derived.blockReason as Prisma.InputJsonValue)
-        : Prisma.DbNull,
-    },
+    data: updateData as never,
   });
 
   return db.taskProjection.upsert({

@@ -175,7 +175,7 @@ describe("DayTimeline", () => {
     expect(onScheduleDrop).toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "task-1", kind: "scheduled" }),
       new Date(2026, 3, 15, 9, 0, 0, 0),
-      new Date(2026, 3, 15, 10, 30, 0, 0),
+      new Date(2026, 3, 15, 9, 30, 0, 0),
     );
   });
 

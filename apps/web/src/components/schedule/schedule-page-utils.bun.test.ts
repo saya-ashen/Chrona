@@ -36,7 +36,6 @@ import {
   moveScheduledItem,
   normalizeScheduleView,
   parseDayKey,
-  parseQuickCreateCommand,
   snapMinuteToGrid,
   sortScheduledItems,
   startOfDay,

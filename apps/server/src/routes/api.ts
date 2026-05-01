@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
 import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
-import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
 import type { StructuredSuggestion } from "@chrona/contracts";
 import { createLogger, summarizeText } from "@chrona/db/logger";
 import { aiAnalyzeConflicts, aiChat, aiGeneratePlan, aiGeneratePlanStream, aiSuggestStream, aiSuggestTimeslots, getAIClientInfo, isAIAvailable } from "@chrona/runtime/modules/ai/ai-service";
@@ -300,10 +299,6 @@ function sseEncode(event: string, data: unknown) {
 
 function toDateOrNull(value: unknown) {
   return typeof value === "string" && value ? new Date(value) : null;
-}
-
-function toDateOrUndefined(value: unknown) {
-  return value === undefined ? undefined : toDateOrNull(value);
 }
 
 function isInvalidDate(value: Date | null | undefined) {
@@ -1364,8 +1359,6 @@ export function createApiRouter() {
         taskId,
         title,
         description,
-        priority: _priority,
-        dueAt: _dueAt,
         estimatedMinutes,
         planningPrompt,
         forceRefresh = false,
@@ -1521,6 +1514,7 @@ export function createApiRouter() {
                 try {
                   controller.close();
                 } catch {
+                  /* stream may already be closed */
                 } finally {
                   streamClosed = true;
                 }
@@ -1661,10 +1655,12 @@ export function createApiRouter() {
                   message: cause instanceof Error ? cause.message : "Failed to generate task plan",
                 })));
               } catch {
+                /* enqueue may fail if stream is closed */
               }
               try {
                 controller.close();
               } catch {
+                /* stream may already be closed */
               }
             } finally {
               streamLock?.finish();
@@ -1767,7 +1763,7 @@ export function createApiRouter() {
         return error(c, "Task not found", 404);
       }
 
-      let targetDate = date ? new Date(date) : new Date();
+      const targetDate = date ? new Date(date) : new Date();
       targetDate.setHours(0, 0, 0, 0);
       const nextDay = new Date(targetDate);
       nextDay.setDate(nextDay.getDate() + 1);
@@ -2035,6 +2031,7 @@ export function createApiRouter() {
             ).sessionKey;
           }
         } catch {
+          /* session creation may fail; continue with stream */
         }
       }
 
@@ -2318,8 +2315,6 @@ export function createApiRouter() {
         nodes: currentPlanGraph.plan.nodes.map((n: Record<string, unknown>) => ({ ...n })),
         edges: currentPlanGraph.plan.edges.map((e: Record<string, unknown>) => ({ ...e })),
       } as typeof currentPlanGraph.plan;
-      const now = new Date().toISOString();
-
       switch (operation) {
         case "add_node": {
           if (!nodes || nodes.length === 0) {
@@ -2338,7 +2333,7 @@ export function createApiRouter() {
             executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode,
             requiresHumanInput: Boolean(n.requiresHumanInput),
             requiresHumanApproval: Boolean(n.requiresHumanApproval),
-            autoRunnable: !Boolean(n.requiresHumanInput) && !Boolean(n.requiresHumanApproval),
+            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
             blockingReason: null as import("@chrona/contracts/ai").TaskPlanNodeBlockingReason,
             linkedTaskId: null as string | null,
             completionSummary: null as string | null,

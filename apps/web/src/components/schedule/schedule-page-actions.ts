@@ -331,7 +331,9 @@ export async function handleCreateTaskBlockAction({
   applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   pushRoute: (href: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localizeHref: (locale: any, href: string) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildScheduleViewHref: (...args: any[]) => string;
   setAnnouncement: (value: string) => void;
   setIsPending: (value: boolean) => void;
@@ -636,7 +638,9 @@ export async function handleApplyDecompositionFromDialogAction({
   activeView: ScheduleViewMode;
   locale: string;
   pushRoute: (href: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localizeHref: (locale: any, href: string) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildScheduleViewHref: (...args: any[]) => string;
   setShowQuickAddDialog: (value: boolean) => void;
   setLocalSelectedTaskId: (taskId: string) => void;

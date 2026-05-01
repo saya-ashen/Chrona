@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
-import { SurfaceCard, SurfaceCardHeader, SurfaceCardTitle } from "@/components/ui/surface-card";
+import { SurfaceCard } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
 
 export function ScheduleInlineQuickCreate({

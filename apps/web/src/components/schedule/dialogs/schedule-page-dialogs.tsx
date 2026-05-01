@@ -36,7 +36,9 @@ export function SchedulePageDialogs({
   workspaceId: string;
   routerPush: (href: string) => void;
   locale: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localizeHref: (locale: any, href: string) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 buildScheduleViewHref: (...args: any[]) => string;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
@@ -49,11 +51,10 @@ buildScheduleViewHref: (...args: any[]) => string;
     dueAt: Date | null;
   }) => Promise<void>;
 }) {
-  if (!showQuickAddDialog) {
-    return null;
-  }
 
   void data;
+  void viewModel;
+  void activeView;
   void workspaceId;
   void routerPush;
   void locale;

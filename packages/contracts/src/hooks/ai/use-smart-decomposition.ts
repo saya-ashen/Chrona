@@ -195,7 +195,7 @@ export function useSmartDecomposition(taskInput: SmartDecompositionTaskInput | n
     return () => {
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [inputKey]);
 
   return {

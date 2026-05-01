@@ -20,7 +20,6 @@ import { createLogger } from "@chrona/db/logger";
 import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type {
   BridgeFeatureRequest,
-  BridgeResponse,
   NDJSONEvent,
 } from "@chrona/openclaw-integration/bridge/contracts";
 import {
@@ -163,7 +162,7 @@ export async function* openclawStream(
 
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
-      let finalStructured: StructuredAgentResult | null = response.structured ?? null;
+      const finalStructured: StructuredAgentResult | null = response.structured ?? null;
 
       for (const rawEvent of events) {
         const event = parseBridgeEvent(rawEvent as NDJSONEvent);

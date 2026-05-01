@@ -17,14 +17,6 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
-/** Flush microtasks so Promises from mocked fetch settle inside act(). */
-async function flushPromises() {
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 0));
-    // need real setTimeout tick to process; advance fake timers by 0 as well
-  });
-}
-
 const sampleSuggestions: AutoCompleteSuggestion[] = [
   {
     title: "Write unit tests",
@@ -233,10 +225,7 @@ describe("useAutoComplete", () => {
   });
 
   it("should abort previous request when title changes", async () => {
-    let fetchCallCount = 0;
-    const fetchSpy = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-      fetchCallCount++;
-      return Promise.resolve(jsonResponse({ suggestions: sampleSuggestions }));
+    const fetchSpy = vi.fn().mockImplementation(() => {
     });
     vi.stubGlobal("fetch", fetchSpy);
 

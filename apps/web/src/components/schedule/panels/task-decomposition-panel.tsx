@@ -294,7 +294,6 @@ export function TaskDecompositionPanel({
     hasInitializedAutoRequestRef.current = true;
     setRequested(true);
     setRequestSnapshot(latestRequestSnapshot());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRequest]);
 
   useEffect(() => {

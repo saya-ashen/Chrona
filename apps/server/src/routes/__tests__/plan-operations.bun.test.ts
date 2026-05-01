@@ -77,7 +77,7 @@ function createPlanTestRouter() {
             executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as TaskPlanNodeExecutionMode,
             requiresHumanInput: Boolean(n.requiresHumanInput),
             requiresHumanApproval: Boolean(n.requiresHumanApproval),
-            autoRunnable: !Boolean(n.requiresHumanInput) && !Boolean(n.requiresHumanApproval),
+            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
             blockingReason: null as TaskPlanNodeBlockingReason,
             linkedTaskId: null as string | null,
             completionSummary: null as string | null,

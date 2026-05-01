@@ -13,7 +13,7 @@ Chrona is an AI-native task control plane with two core loops:
 
 | Requirement | Check |
 |------------|-------|
-| **Node.js >= 20** | `node --version` (for npm install only) |
+| **Node.js >= 20** | `node --version` (for npm install only — the npm package bundles Bun as the application runtime) |
 | **npm** | `npm --version` (bundled with Node.js) |
 
 ```bash
@@ -21,7 +21,7 @@ Chrona is an AI-native task control plane with two core loops:
 node --version  # must be >= 20.0.0
 ```
 
-Chrona runs on **Bun** as its application runtime. The npm package ships
+Chrona uses **Bun** as its application runtime. The npm package ships
 with an embedded Bun binary — no separate Bun install is required.
 
 ## Install

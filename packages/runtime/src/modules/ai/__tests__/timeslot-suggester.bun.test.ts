@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { suggestTimeslots } from "../timeslot-suggester";
 import type {
   TimeslotSuggestionInput,
-  ScheduleSlot,
 } from "../types";
 
 /**
@@ -235,7 +234,6 @@ describe("timeslot-suggester", () => {
       // The suggestion should NOT be between 10:00 and 11:00
       // (it would need 30min buffer + 30min task = 60 min but the usable gap is 0)
       const startTime = new Date(best.startAt).getTime();
-      const endTime = new Date(best.endAt).getTime();
 
       // It should be placed after t2 ends + buffer
       expect(startTime).toBeGreaterThanOrEqual(d(12, 30).getTime());

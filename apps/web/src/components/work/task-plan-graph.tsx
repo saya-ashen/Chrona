@@ -161,21 +161,6 @@ type NodeLegendItem = {
   tone: NodeTone;
 };
 
-function getEdgeLabel(type: string, c: GraphCopyType) {
-  switch (type) {
-    case "depends_on":
-      return c.edgeDependsOn;
-    case "branches_to":
-      return c.edgeBranchesTo;
-    case "unblocks":
-      return c.edgeUnblocks;
-    case "feeds_output":
-      return c.edgeFeedsOutput;
-    default:
-      return c.edgeSequential;
-  }
-}
-
 function getNodeTone(step: PlanStep): NodeTone {
   if (step.status === "blocked") return "blocked";
   if (step.requiresHumanInput || step.status === "waiting_for_user")

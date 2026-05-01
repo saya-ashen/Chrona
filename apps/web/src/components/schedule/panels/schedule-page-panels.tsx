@@ -17,7 +17,6 @@ import type {
 import {
   formatDateTime,
   getPriorityTone,
-  getRunnabilityTone,
   toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
 import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
