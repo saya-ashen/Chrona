@@ -439,7 +439,7 @@ export function SchedulePage({
   const dialogDefaults = getQuickCreateDefaults(data);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-border/55 bg-white/60 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -456,12 +456,12 @@ export function SchedulePage({
       />
 
       {errorMessage ? (
-        <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mx-2 mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm">
           Error: {errorMessage}
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-4 pb-4 pt-3">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)_340px] gap-4 overflow-hidden rounded-[24px] bg-slate-50/55 p-3">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}

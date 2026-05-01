@@ -24,7 +24,7 @@ export function ScheduleMiniCalendar({
   days: ScheduleMiniCalendarDay[];
 }) {
   return (
-    <SurfaceCard as="section" variant="inset" padding="sm" className="space-y-3 rounded-[28px]">
+    <SurfaceCard as="section" variant="default" padding="sm" className="space-y-4 rounded-[30px]">
       <div className="flex items-center justify-between gap-3 px-1">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -42,7 +42,7 @@ export function ScheduleMiniCalendar({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => (
           <LocalizedLink
             key={day.key}
@@ -50,12 +50,12 @@ export function ScheduleMiniCalendar({
             aria-current={day.isSelected ? "date" : undefined}
             aria-label={day.label}
             className={cn(
-              "group flex aspect-square min-h-10 flex-col items-center justify-center rounded-xl border text-xs transition",
+              "group flex aspect-square min-h-10 flex-col items-center justify-center rounded-2xl border text-xs transition-all duration-150",
               day.isSelected
-                ? "border-primary/30 bg-primary/10 text-primary shadow-sm"
+                ? "border-primary/30 bg-primary/12 text-primary shadow-[0_6px_18px_rgba(79,70,229,0.2)]"
                 : day.isToday
                   ? "border-border/80 bg-background text-foreground ring-2 ring-primary/20"
-                  : "border-transparent bg-transparent text-foreground hover:border-border/70 hover:bg-background/80",
+                  : "border-transparent bg-transparent text-foreground hover:-translate-y-0.5 hover:border-border/70 hover:bg-background/90",
               !day.isCurrentMonth && "text-muted-foreground/40",
             )}
           >
