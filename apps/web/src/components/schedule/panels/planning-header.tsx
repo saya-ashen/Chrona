@@ -52,10 +52,10 @@ export function PlanningHeader({
   return (
     <header
       aria-label={ariaLabel}
-      className="flex items-center gap-4 rounded-3xl border border-border/55 bg-white/90 px-5 py-3 shadow-[0_8px_28px_rgba(15,23,42,0.06)]"
+      className="flex items-center gap-4 rounded-3xl border border-border/60 bg-white/92 px-5 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
     >
       {/* Title + Date */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-[15rem] items-center gap-3">
         <div className="flex items-center gap-2">
           <Calendar className="size-4 text-muted-foreground" />
           <h1 className="text-base font-semibold tracking-tight text-foreground">{title}</h1>
@@ -114,8 +114,11 @@ export function PlanningHeader({
         </a>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      <div className="hidden min-w-[13rem] flex-1 lg:block">
+        <p className="truncate rounded-xl border border-border/50 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
+          {summary}
+        </p>
+      </div>
 
       {/* Key metrics — compact pills */}
       <div className="flex items-center gap-1.5">
