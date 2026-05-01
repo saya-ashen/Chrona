@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
-import { describe, expect, it } from "vitest";
 
 describe("deriveTaskRunnability", () => {
   it("returns not runnable when the model is missing", () => {
