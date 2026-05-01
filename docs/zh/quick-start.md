@@ -13,15 +13,16 @@ Chrona 是一个 AI 原生任务控制台，核心由两个循环组成：
 
 | 要求 | 验证方式 |
 |------|---------|
-| **Node.js >= 20** | `node --version` |
+| **Node.js >= 20** | `node --version`（仅用于 npm 安装） |
 | **npm** | `npm --version`（Node.js 自带） |
 
 ```bash
-# 验证 Node.js 版本
+# 验证 Node.js 版本（仅 npm 安装需要；运行时使用 Bun）
 node --version  # 必须 >= 20.0.0
 ```
 
-无需 Bun、Docker 或构建工具。
+Chrona 使用 **Bun** 作为应用运行时。npm 包内置了 Bun 二进制文件，
+无需单独安装 Bun。
 
 ## 安装
 

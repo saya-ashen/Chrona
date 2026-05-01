@@ -2,7 +2,7 @@
 
 > **Pattern:** CQRS + Event Sourcing over SQLite
 > **Language:** TypeScript (strict)
-> **Runtime:** Node.js >= 20 / Bun
+> **Runtime:** Bun (application runtime); Node.js (build tools only)
 
 ---
 
@@ -113,9 +113,9 @@ C4Container
 
     Container_Boundary(c1, "Chrona (single machine)") {
         Container(web, "Web SPA", "React 19 + Vite", "Schedule, inbox, task workspace, work execution views")
-        Container(api, "API Server", "Hono (Node.js / Bun)", "REST API + static SPA hosting on :3101")
-        Container(db, "Database", "SQLite", "15 models via Prisma 7. Dual adapter: bun-sqlite / better-sqlite3")
-        Container(cli, "CLI", "Node.js binary", "chrona task|run|schedule|ai commands")
+        Container(api, "API Server", "Hono (Bun)", "REST API + static SPA hosting on :3101")
+        Container(db, "Database", "SQLite", "15 models via Prisma 7 with Bun SQLite adapter")
+        Container(cli, "CLI", "Bun binary", "chrona task|run|schedule|ai commands")
     }
 
     System_Ext(openclaw, "OpenClaw Bridge", "Bun HTTP service wrapping openclaw CLI")
@@ -392,33 +392,5 @@ apps/
     src/
       app.ts                    — Hono app composition (CORS, locale redirect, middleware)
       routes/api.ts             — API route handlers (40+ endpoints)
-      index.ts                  — Node.js entry
-      index.bun.ts              — Bun entry
-      static/spa.ts             — SPA static file middleware
-
-packages/
-  cli/                          — npm entry point (@chrona-org/cli)
-  common/
-    cli/                        — CLI commands (task, run, schedule, ai)
-    ai-features/                — Shared AI feature surface (generatePlan, suggest, conflicts)
-    runtime-core/               — RuntimeExecutionAdapter interface
-  contracts/                    — Shared DTOs, Zod schemas, API contracts
-  db/                           — Prisma bootstrap, repository layer, generated client
-  domain/                       — Pure business rules, state derivations (no IO)
-  runtime/
-    src/modules/
-      commands/                 — Command handlers (write path, 30+ handlers)
-      queries/                  — Query handlers (read path, 9 page queries)
-      projections/              — Projection rebuilders
-      events/                   — Canonical event store interface
-      tasks/                    — Task domain logic
-      task-execution/           — Session & execution registry
-      runtime-sync/             — Runtime sync & freshness management
-      scheduler/                — Auto-start scheduled runs
-      ai/                       — AI feature handlers
-      workspaces/               — Workspace logic
-  providers/
-    openclaw/                   — OpenClaw bridge (standalone Bun service) + integration (adapter)
-    hermes/                     — Hermes provider (planned)
-    opencode/                   — Opencode provider (planned)
+      index.bun.ts              — Bun entry (primary)
 ```

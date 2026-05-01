@@ -24,8 +24,14 @@ jobs:
 
       - run: bun run lint
 
-      - name: Run tests
+      - name: Run tests (Vitest)
         run: bun run test -- --reporter=verbose
+        env:
+          DATABASE_URL: "file:./prisma/dev.db"
+          OPENCLAW_MODE: "mock"
+
+      - name: Run tests (Bun)
+        run: bun run test:bun
         env:
           DATABASE_URL: "file:./prisma/dev.db"
           OPENCLAW_MODE: "mock"

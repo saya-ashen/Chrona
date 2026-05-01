@@ -1,6 +1,7 @@
 import * as path from "node:path";
 
 import type { MiddlewareHandler } from "hono";
+import { readEnv } from "../config/env";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -19,8 +20,8 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 function getSpaDistPath() {
-  const env = process.env.CHRONA_WEB_DIST;
-  if (env) return path.resolve(env);
+  const envDist = readEnv().CHRONA_WEB_DIST;
+  if (envDist) return path.resolve(envDist);
   return path.resolve(process.cwd(), "apps/web/dist");
 }
 

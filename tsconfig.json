@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "target": "ES2017",
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "types": ["bun"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
