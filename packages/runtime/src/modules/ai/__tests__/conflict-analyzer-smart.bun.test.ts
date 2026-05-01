@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+
+mock.module("../ai-service", () => ({
+  aiChat: mock(() => Promise.resolve(null)),
+}));
+
 import { aiChat } from "../ai-service";
 import { analyzeConflictsSmart, analyzeConflicts } from "../conflict-analyzer";
 import type { ScheduledTaskInfo } from "../types";
-
-vi.mock("../ai-service", () => ({
-  aiChat: vi.fn(),
-}));
 
 function d(hour: number, minute = 0): Date {
   return new Date(
@@ -31,14 +32,9 @@ function makeTask(
 // ---------- Tests ----------
 
 describe("analyzeConflictsSmart", () => {
-  const aiChatMock = vi.mocked(aiChat);
 
   beforeEach(() => {
-    aiChatMock.mockReset();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    (aiChat as ReturnType<typeof mock>).mockRestore();
   });
 
   // ─── Always uses rule-based detection for conflicts ───
@@ -221,7 +217,7 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       const result = await analyzeConflictsSmart(tasks);
 
@@ -279,12 +275,12 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       await analyzeConflictsSmart(tasks);
 
-      expect(aiChatMock).toHaveBeenCalledOnce();
-      const request = aiChatMock.mock.calls[0][0];
+      expect(aiChat).toHaveBeenCalledTimes(1);
+      const request = (aiChat as ReturnType<typeof mock>).mock.calls[0][0] as { messages: Array<{ role: string; content: string }> };
       expect(request.messages[0].role).toBe("system");
       expect(request.messages[1].role).toBe("user");
 
@@ -313,7 +309,7 @@ describe("analyzeConflictsSmart", () => {
 
       const result = await analyzeConflictsSmart(tasks);
 
-      expect(aiChatMock).not.toHaveBeenCalled();
+      expect(aiChat).not.toHaveBeenCalled();
       expect(result.conflicts.length).toBe(0);
       expect(result.suggestions.length).toBe(0);
     });
@@ -351,7 +347,7 @@ describe("analyzeConflictsSmart", () => {
         ],
       };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       const result = await analyzeConflictsSmart(tasks);
 
@@ -371,7 +367,7 @@ describe("analyzeConflictsSmart", () => {
 
   describe("falls back to rule-based suggestions when LLM fails", () => {
     it("falls back on network error", async () => {
-      aiChatMock.mockRejectedValue(new Error("Network error"));
+      (aiChat as ReturnType<typeof mock>).mockRejectedValue(new Error("Network error"));
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -402,7 +398,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back on HTTP 500 error", async () => {
-      aiChatMock.mockRejectedValue(new Error("HTTP 500"));
+      (aiChat as ReturnType<typeof mock>).mockRejectedValue(new Error("HTTP 500"));
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -426,7 +422,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back on malformed JSON from LLM", async () => {
-      aiChatMock.mockResolvedValue({ parsed: "This is not JSON at all {{{" } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: "This is not JSON at all {{{" });
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -451,7 +447,7 @@ describe("analyzeConflictsSmart", () => {
     it("falls back when LLM returns empty suggestions array", async () => {
       const llmResult = { suggestions: [] };
 
-      aiChatMock.mockResolvedValue({ parsed: llmResult } as Awaited<ReturnType<typeof aiChat>>);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue({ parsed: llmResult });
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({
@@ -475,7 +471,7 @@ describe("analyzeConflictsSmart", () => {
     });
 
     it("falls back when LLM returns null", async () => {
-      aiChatMock.mockResolvedValue(null);
+      (aiChat as ReturnType<typeof mock>).mockResolvedValue(null);
 
       const tasks: ScheduledTaskInfo[] = [
         makeTask({

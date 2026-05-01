@@ -1,13 +1,10 @@
-/**
- * @vitest-environment bun
- */
 import {
   ApprovalStatus,
   RunStatus,
   TaskPriority,
   TaskStatus,
 } from "@/generated/prisma/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db as prisma } from "@/lib/db";
 
 describe("schema smoke", () => {
