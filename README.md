@@ -1,296 +1,525 @@
-[English](./README.md) | [中文](./README.zh.md)
+English | [中文](./README.zh.md)
 
 <p align="center">
-  <h1 align="center">Chrona</h1>
-  <p align="center">AI-native task control plane — connecting task planning, scheduling, and AI agent execution into one continuous workflow.</p>
+  <img src="apps/web/public/favicon.png" width="80" alt="Chrona logo" />
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/v/@chrona-org/cli?color=blue" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@chrona-org/cli"><img src="https://img.shields.io/npm/dt/@chrona-org/cli" alt="npm downloads"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
-  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/bun-%3E%3D%201.3.11-black" alt="Bun >= 1.3.11"></a>
+  <h1 align="center">Chrona</h1>
+  <p align="center"><strong>The control layer for AI-native work.</strong></p>
+  <p align="center">
+    From tasks to plans, from plans to schedules, and from schedules to agent execution across backends.
+  </p>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#vision">Vision</a> ·
+  <a href="#available-today">Available Today</a> ·
+  <a href="#being-built">Being Built</a> ·
+  <a href="#backend-ecosystem">Backend Ecosystem</a> ·
+  <a href="#openclaw">OpenClaw</a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/chrona-task-create.en.png" width="45%" alt="Chrona task create" />
+  <img src="docs/assets/chrona-task-plan-preview.en.png" width="45%" alt="Chrona task plan preview" />
 </p>
 
 ---
 
-Chrona is an AI-native task control plane that turns vague task ideas into
-executable plans and connects those plans to your schedule and AI agent runs.
+## Vision
 
-Describe a piece of work, let Chrona generate a step-by-step execution plan,
-schedule it on your calendar, and run AI agents when appropriate to help
-complete the task. Chrona runs local-first with SQLite, and uses a
-provider-agnostic adapter layer to connect different AI runtimes such as
-OpenClaw, LLM backends, and future Hermes / Opencode integrations.
+AI is moving from answering questions to doing work.
 
-## What makes Chrona different
+But today, most tools are still fragmented:
 
-Chrona is not just another Todo List, and it is not an isolated AI Chat window.
-It focuses on two core problems:
+- Todo apps record tasks, but do not understand how to complete them
+- Calendars manage time, but do not understand what each task requires
+- AI chats generate suggestions, but the output usually stays inside the
+  conversation
+- Agent runtimes can execute tasks, but lack personal task, plan, and schedule
+  context
 
-1. how AI can generate truly executable plans from personal context;
-2. how those plans can be connected to schedules and handed off to AI agents at
-   the right time.
+Chrona is built to connect these pieces.
 
-### 1. AI plan generation based on personal context
-
-Traditional task managers require users to manually break work down. Generic AI
-chat tools usually generate one-off checklists based only on the current prompt.
-Chrona aims to generate execution plans that fit the way each person actually
-works.
-
-Chrona can combine the task description, existing schedule, recent work context,
-historical tasks, runtime Skills, agent memory, and available tools to generate
-a plan graph with steps, dependencies, checkpoints, and human-in-the-loop
-decision points. The result is not a generic checklist, but an execution plan
-tailored to the current user, project, and schedule.
-
-### 2. A task system designed for automatic execution
-
-Chrona’s long-term goal is not just to remind users what to do, but to make
-planned work executable.
-
-After a task is decomposed and scheduled, Chrona can connect the plan to AI
-agent runs. The system distinguishes between steps that are safe to execute
-automatically and steps that require user input, confirmation, or approval. In
-the future, Chrona will support automatically triggering agent runs according to
-the schedule, completing steps that do not require human intervention, and
-interrupting the user only when judgment, authorization, or additional
-information is needed.
-
-> Automatic execution is still under active development. Today, Chrona focuses
-> on plan generation, the scheduling cockpit, human review, and supervised agent
-> runs.
-
-## Current capabilities
-
-- **Suggest-first, confirm-later** — AI does not directly mutate tasks, plans,
-  or schedules. It creates proposals that users can review and accept.
-- **AI plan graph generation** — Break tasks into steps, dependencies,
-  checkpoints, user inputs, and executable nodes.
-- **Scheduling cockpit** — Arrange tasks in a calendar view, inspect conflicts,
-  and receive AI-powered time slot suggestions.
-- **Supervised agent runs** — Start AI agent runs inside tasks and inspect
-  conversations, tool calls, approval requests, and execution state.
-- **Provider-agnostic adapter layer** — Connect LLM backends, OpenClaw, and
-  future Hermes / Opencode runtimes through one unified interface.
-- **Local-first** — Run with a local SQLite database and minimal setup. No cloud
-  service or account required.
-- **Event-sourced architecture** — Task lifecycles are recorded as immutable
-  events, enabling auditability, replay, and AI-friendly context construction.
-
-## Quick start
-
-```bash
-npm install -g @chrona-org/cli    # install via npm (Bun runtime is embedded)
-chrona start                       # opens http://localhost:3101 in your browser
+```text
+Task → Plan → Schedule → Execution
 ```
 
-Chrona runs on **Bun** only as the application runtime. The npm package ships
-with an embedded Bun binary — no separate Bun install is required when installing
-via npm. For local development, use Bun directly:
+Chrona aims to become the control layer for AI-native work:
+
+- You create a task
+- Chrona generates a structured plan
+- AI helps modify and refine that plan
+- Chrona places the plan into your schedule
+- At the right time, Chrona dispatches agents to execute the task
+- If information is missing, Chrona pauses and asks you for input
+- Once the missing context is provided, the task continues until completion
+
+This is not another todo app.
+
+Chrona is a system for continuously moving work forward.
+
+---
+
+## Current Status
+
+Chrona has two layers:
+
+```text
+Chrona
+├── Plan Layer       Available today
+└── Execution Layer  Being built
+```
+
+### Plan Layer
+
+The Plan Layer turns tasks into structured plans.
+
+This is the core part of Chrona available today.
+
+### Execution Layer
+
+The Execution Layer makes plans actually run.
+
+This is the next major stage of Chrona.
+
+Chrona will analyze executable paths inside a plan, determine which steps can be
+completed by AI, identify which steps require human input, and automatically
+advance tasks when they are scheduled.
+
+---
+
+## Install
+
+Download the binary for your platform from the latest release.
+
+| Platform            | Binary                   |
+| ------------------- | ------------------------ |
+| macOS Apple Silicon | `chrona-darwin-arm64`    |
+| macOS Intel         | `chrona-darwin-x64`      |
+| Linux x64           | `chrona-linux-x64`       |
+| Linux ARM64         | `chrona-linux-arm64`     |
+| Windows x64         | `chrona-windows-x64.exe` |
+
+macOS / Linux:
+
+```bash
+chmod +x chrona-darwin-arm64
+./chrona-darwin-arm64 start
+```
+
+Windows:
+
+```powershell
+.\chrona-windows-x64.exe start
+```
+
+Then open:
+
+```text
+http://localhost:3101
+```
+
+> No global npm package, no manual frontend/backend startup. Download the binary
+> for your platform and run it directly.
+
+---
+
+## Available Today
+
+Chrona currently ships the Plan Layer.
+
+You can use Chrona today to move from task to plan.
+
+### Create Tasks
+
+A task is the basic unit of work in Chrona.
+
+It can be a concrete todo item or a rough goal.
+
+For example:
+
+```text
+Rewrite the Chrona README so it clearly communicates the current product and future direction.
+```
+
+Chrona does not treat a task as a static checkbox.
+
+A task is the entry point for generating, refining, and eventually executing a
+plan.
+
+### Generate Plans
+
+Chrona can generate a structured plan from a task.
+
+A rough task becomes a clear sequence of steps:
+
+```text
+1. Analyze the current README
+2. Identify what Chrona already supports
+3. Separate current capabilities from upcoming execution features
+4. Rewrite the README hero section
+5. Add install and backend configuration instructions
+6. Review the document for clarity and overpromising
+```
+
+A plan turns a task from “something to do” into a path that can actually be
+moved forward.
+
+### Modify Plans with AI
+
+After a plan is generated, you can keep refining it with AI.
+
+For example:
+
+```text
+This plan feels too technical. Make it read more like a product introduction.
+```
+
+Or:
+
+```text
+Separate available features from features under development, but do not make the project sound too conservative.
+```
+
+Chrona updates the plan based on your feedback.
+
+This makes the plan an editable work object, not a one-off AI response.
+
+---
+
+## Being Built
+
+The next stage of Chrona is the Execution Layer.
+
+This is where Chrona becomes a true control layer for AI-native work.
+
+### Automatically Run Scheduled Tasks
+
+Chrona will be able to start tasks based on your schedule.
+
+For example:
+
+```text
+15:00 - 16:00 Rewrite Chrona README
+```
+
+When the scheduled time arrives, Chrona can enter the task context, load the
+related plan, and prepare execution.
+
+### Compute Executable Paths in a Plan
+
+Chrona will analyze plan steps and determine which paths can be executed
+automatically.
+
+For example:
+
+```text
+1. Read the current README                    Can run automatically
+2. Analyze issues in the current README        Can run automatically
+3. Ask the user about product positioning      Requires human input
+4. Rewrite the README based on positioning     Blocked by step 3
+5. Check whether the README overpromises       Can run automatically
+```
+
+AI should not blindly execute the entire plan.
+
+Chrona will reason about:
+
+- Whether a step has enough context
+- Whether user input is required
+- Whether user confirmation is needed
+- Whether the step depends on previous steps
+- Whether a specific backend can complete the step
+
+### Automatically Complete Steps Without Human Intervention
+
+For paths that do not require human input, Chrona will advance the work
+automatically.
+
+Examples include:
+
+- Reading files
+- Summarizing code structure
+- Analyzing documentation issues
+- Drafting content
+- Organizing candidate solutions
+- Checking formatting
+- Applying low-risk changes based on existing context
+
+### Pause for Human Input
+
+When required information is missing, Chrona should not make things up.
+
+It should pause and clearly ask for what it needs.
+
+For example:
+
+```text
+Need your input: Is the Chrona Execution Layer already able to run tasks automatically?
+```
+
+After the user provides the missing information, Chrona can continue the
+remaining steps.
+
+### Continue Unfinished Work
+
+The problem with ordinary AI chat is that once the conversation ends, the work
+often stops.
+
+Chrona is designed for continuity.
+
+When the user provides additional information, confirms an action, or adds new
+context, Chrona can resume from the interruption point instead of starting over.
+
+---
+
+## Backend Ecosystem
+
+Chrona should not be tied to a single model or agent runtime.
+
+Its goal is to become the control layer above multiple AI execution backends.
+
+### Currently Supported
+
+Chrona currently supports:
+
+| Backend           | Status    | Description                                         |
+| ----------------- | --------- | --------------------------------------------------- |
+| OpenAI-compatible | Supported | Works with OpenAI-compatible APIs                   |
+| OpenClaw          | Supported | Connects Chrona to agent workflows through OpenClaw |
+
+### Planned Support
+
+Chrona plans to integrate with more AI coding and agent backends:
+
+| Backend     | Status  | Goal                                         |
+| ----------- | ------- | -------------------------------------------- |
+| Claude Code | Planned | Connect to Claude Code workflows             |
+| Codex       | Planned | Connect to Codex-style code execution        |
+| opencode    | Planned | Connect to open-source coding agent runtimes |
+| Hermes      | Planned | Connect to Hermes agent/backend capabilities |
+
+Chrona’s long-term goal is not to become the UI for a single backend.
+
+It is designed to become the unified task, plan, schedule, and execution control
+layer above multiple backends.
+
+You can think of Chrona as:
+
+```text
+              ┌──────────────┐
+              │    Chrona    │
+              │ Control Layer │
+              └──────┬───────┘
+                     │
+     ┌───────────────┼────────────────┐
+     │               │                │
+OpenClaw      Claude Code          Codex
+     │               │                │
+  opencode        Hermes            ...
+```
+
+Different backends can execute different types of work.
+
+Chrona manages:
+
+- tasks
+- plans
+- schedules
+- execution state
+- human input
+- continuation
+- result tracking
+
+---
+
+## AI Backend Configuration
+
+### OpenAI-compatible
+
+Chrona can connect to OpenAI-compatible APIs.
+
+This includes:
+
+- OpenAI API
+- Local or self-hosted OpenAI-compatible endpoints
+- Other model services compatible with the OpenAI API format
+
+Typical configuration:
+
+```text
+Base URL
+API Key
+Model
+```
+
+### OpenClaw
+
+Chrona also supports OpenClaw as a backend.
+
+OpenClaw is especially useful as an agent workflow backend and is an important
+part of Chrona’s Execution Layer direction.
+
+---
+
+## OpenClaw
+
+Before using OpenClaw with Chrona, make sure the OpenClaw Responses endpoint is
+enabled.
+
+Add the following to your OpenClaw configuration:
+
+```json
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+Then open Chrona and go to:
+
+```text
+Settings → AI Clients
+```
+
+Add or enable the OpenClaw backend.
+
+### Why Responses?
+
+Chrona uses OpenClaw’s Responses capability to communicate with the backend.
+
+If this endpoint is not enabled, Chrona may be able to connect to OpenClaw but
+fail to use the related AI capabilities correctly.
+
+### Future Assisted Setup
+
+Chrona may provide automatic detection and assisted configuration in a future
+release:
+
+```bash
+chrona openclaw doctor
+chrona openclaw setup
+```
+
+Target experience:
+
+```text
+✓ OpenClaw binary found
+✓ Gateway reachable
+✗ Responses endpoint disabled
+
+Run `chrona openclaw setup` to enable it.
+```
+
+`setup` can write the required configuration after user confirmation and back up
+the original config file.
+
+---
+
+## Why Chrona?
+
+AI tools are getting stronger, but workflows are still fragmented.
+
+You may currently use:
+
+- A todo app to record tasks
+- A calendar to manage time
+- An AI chat to discuss solutions
+- A coding agent to execute code tasks
+- A documentation system to record results
+
+Chrona is built to connect these parts.
+
+It is not another isolated AI tool.
+
+It is a control system for AI-native workflows.
+
+| Tool Type    | Main Capability                                                          | Limitation                                           |
+| ------------ | ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| Todo App     | Records tasks                                                            | Does not understand task structure or generate plans |
+| Calendar     | Manages time                                                             | Does not know how tasks should be completed          |
+| AI Chat      | Generates suggestions                                                    | Hard to manage long-running task state               |
+| Coding Agent | Executes code tasks                                                      | Lacks personal task, plan, and schedule context      |
+| Chrona       | Unified control layer for tasks, plans, schedules, and backend execution | Execution Layer is being built progressively         |
+
+---
+
+## Roadmap
+
+### Plan Layer
+
+- [x] Create tasks
+- [x] Generate plans
+- [x] Modify plans with AI
+- [x] OpenAI-compatible backend
+- [x] OpenClaw backend
+
+### Execution Layer
+
+- [ ] Automatically start scheduled tasks
+- [ ] Analyze executable paths in a plan
+- [ ] Automatically execute steps that do not require human intervention
+- [ ] Pause and request user input when information is missing
+- [ ] Continue execution after user input is provided
+- [ ] Visualize execution progress
+- [ ] Write execution results back to tasks and plans
+
+### Backend Ecosystem
+
+- [x] OpenAI-compatible
+- [x] OpenClaw
+- [ ] Claude Code
+- [ ] Codex
+- [ ] opencode
+- [ ] Hermes
+- [ ] More agent runtimes
+
+---
+
+## Development
+
+Run Chrona from source:
 
 ```bash
 bun install
 bun run dev
 ```
 
-On first launch, Chrona automatically creates the SQLite database and
-configuration directory. Configure AI backends in **Settings > AI Clients**:
-
-- **LLM** — Any OpenRouter-compatible API, including OpenRouter or
-  OpenAI-compatible proxies
-- **OpenClaw** — Dedicated agent execution through the OpenClaw gateway bridge
-
-More backends, including Hermes and Opencode, are planned. Each backend is
-wrapped behind the unified `RuntimeExecutionAdapter` interface, so switching
-providers does not change your task model or workflow.
-
-## Features
-
-### Scheduling cockpit
-
-View, drag, and adjust scheduled task blocks in a calendar interface. Chrona can
-detect scheduling conflicts and suggest time slots based on task duration,
-context, and historical habits.
-
-![Schedule](./docs/assets/screenshot-schedule.png)
-
-### Task workspace with plan graph
-
-Chrona decomposes tasks into editable plan graphs, including steps,
-dependencies, checkpoints, user inputs, deliverables, and tool actions.
-AI-generated plans stream over SSE and can be reviewed, edited, and accepted
-before they take effect.
-
-### Supervised agent execution
-
-Start AI agent runs from tasks and inspect real-time conversations, tool calls,
-approval requests, in-run user input, and execution state. Chrona’s goal is to
-gradually increase the amount of work that can be automated while keeping users
-in control.
-
-### Persistent agent memory
-
-Agents can accumulate workspace-level knowledge across runs and reuse that
-context in future plan generation and task execution. Memory is queryable,
-revocable, and persisted across sessions.
-
-![Memory](./docs/assets/screenshot-memory.png)
-
-### Inbox triage
-
-A central dashboard for pending approvals, AI-generated schedule proposals, and
-task suggestions.
-
-![Inbox](./docs/assets/screenshot-inbox.png)
-
-### Multi-backend AI and provider adapters
-
-Chrona is designed to be **provider-agnostic** at the architecture level. AI
-runtimes are abstracted through the unified `RuntimeExecutionAdapter` interface,
-so the same task model and workflow can work across different backends.
-
-| Backend      | Type                              | Status      |
-| ------------ | --------------------------------- | ----------- |
-| **LLM**      | Any OpenRouter-compatible API     | ✅ Released |
-| **OpenClaw** | Dedicated agent execution gateway | ✅ Released |
-| **Hermes**   | Deep agent / tool orchestration   | 📋 Planned  |
-| **Opencode** | Opencode agent runtime            | 📋 Planned  |
-
-You can configure multiple AI clients and bind different capabilities, such as
-suggestion, decomposition, conflict detection, time slot selection, and chat, to
-different backends. For example, you can use OpenClaw to generate plans while
-routing conversation to an LLM backend.
-
-![AI Clients](./docs/assets/screenshot-ai-clients.png)
-
-### CLI client
-
-A full command-line interface for the local API server:
+Build binaries:
 
 ```bash
-chrona task list                     # list tasks
-chrona task create --title "..."     # create a task
-chrona run start <task-id>           # start an agent run
-chrona schedule list                 # list scheduled tasks
-chrona ai suggest --title "..."      # get AI task suggestions
+bun run build:binaries
 ```
 
-### Multilingual interface
-
-English and Chinese interfaces, with locale-based routing and `Accept-Language`
-negotiation.
-
-## Architecture
-
-Chrona is built on SQLite with CQRS + event sourcing. Commands write canonical
-events and rebuild projections; queries read materialized views. AI features
-follow a “suggest-first, confirm-later” pattern and do not directly mutate user
-data by default.
-
-| Layer      | Technology                                  |
-| ---------- | ------------------------------------------- |
-| Frontend   | React 19, React Router 7 SPA, Vite          |
-| API Server | Hono, serving both REST API and static SPA  |
-| Database   | SQLite, Prisma 7 with Bun SQLite adapter    |
-| Runtime    | Bun (application runtime); Node.js (build tools only) |
-| AI         | LLM providers + OpenClaw bridge             |
-| Language   | TypeScript strict                           |
-
-```text
-                  Client Layer
-┌──────────────┐  ┌──────────┐  ┌───────────────┐
-│ React SPA    │  │ CLI      │  │ OpenClaw      │
-│ React Router │  │ chrona   │  │ Bridge        │
-└──────┬───────┘  └────┬─────┘  └───────┬───────┘
-       └───────────────┼────────────────┘
-                       ▼
-         ┌─────────────────────────┐
-         │    Hono API Server      │
-         │  /api/tasks  /api/ai    │
-         │  /api/schedule ...      │
-         └───────────┬─────────────┘
-       ┌─────────────┼─────────────┐
-       ▼             ▼             ▼
-  ┌────────┐   ┌─────────┐   ┌──────────┐
-  │Command │   │ Query   │   │ AI Layer │
-  └───┬────┘   └────┬────┘   └──────────┘
-      ▼             ▼
- ┌────────┐   ┌─────────────┐
- │ Events │──▶│ Projections │
- │immutable│  │materialized │
- └────────┘   └─────────────┘
-      │
-      ▼
- ┌─────────────┐
- │   SQLite    │
- └─────────────┘
-```
-
-Full docs: [Architecture](./docs/architecture.md) |
-[Data Model](./docs/data-model.md) | [API Reference](./docs/api-reference.md)
-
-## Comparison
-
-|                                     | Chrona                                                                                                | Task managers<br/>(Linear, Todoist)      | AI chat apps<br/>(ChatGPT, Claude)             | Autonomous agents<br/>(AutoGPT, crewAI)           |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
-| **Task decomposition and planning** | AI-generated personalized plan graph using agent Skills and memory, editable by the user              | Manual lists / subtasks                  | One-off, no structured plan                    | Agent-generated, low user control                 |
-| **Calendar scheduling**             | Drag-and-drop + AI time slot suggestions                                                              | Available, but usually not AI-integrated | None                                           | None                                              |
-| **Autonomous execution**            | Planned: schedule-triggered runs with separation between automatic steps and human-intervention steps | None                                     | None                                           | Usually fully autonomous with limited supervision |
-| **AI change protection**            | Suggest-confirm proposal mode                                                                         | Not applicable                           | Replies only                                   | Direct actions, limited undo                      |
-| **Persistent agent memory**         | Scoped, queryable, revocable                                                                          | None                                     | Usually depends on single conversation context | Often temporary or run-based                      |
-| **Architecture**                    | CQRS + event sourcing                                                                                 | CRUD                                     | Stateless                                      | Varies                                            |
-| **Deployment**                      | Self-hosted, local SQLite                                                                             | Cloud SaaS                               | Cloud SaaS / API                               | Usually cloud or Docker                           |
-| **Open source**                     | MIT                                                                                                   | Proprietary                              | Proprietary                                    | Often open source                                 |
-| **Vendor lock-in**                  | Provider-agnostic adapters; freely switch backends                                                    | Not applicable                           | Tied to provider                               | Usually tied to a framework                       |
-
-## Roadmap
-
-| Phase                                             | Focus                                                                                                                                                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **One — Scheduling cockpit** _(current)_          | Smart task creation, AI plan generation, and scheduling UI as the daily cockpit                                                                                                      |
-| **Two — Plan-aware automatic execution** _(next)_ | Schedule-triggered agent runs, live plan progress tracking, automatic plan updates, and separation between automatic steps and steps requiring user input, confirmation, or approval |
-| **Three — Multi-runtime**                         | Unified workflows across LLM, OpenClaw, Hermes, and Opencode backends                                                                                                                |
-
-Full roadmap: [English](./docs/en/roadmap.md) | [中文](./docs/zh/roadmap.md)
-
-## Project structure
+Project structure:
 
 ```text
 apps/
-  web/          — Vite React SPA
-  server/       — Hono API server + static SPA
+  api/        API server
+  web/        Web UI
+
 packages/
-  cli/          — Chrona CLI entrypoint for npm
-  common/
-    cli/        — CLI commands: task, run, schedule, ai
-    ai-features/— AI feature layer
-  contracts/    — Shared DTOs, Zod schemas, API contracts
-  db/           — Prisma bootstrap and repositories
-  domain/       — Pure business rules
-  runtime/      — CQRS: commands, queries, projections, events
-  providers/
-    openclaw/   — OpenClaw bridge and integration
-    hermes/     — Hermes provider, planned
-    opencode/   — Opencode provider, planned
+  core/       Core domain logic
+  db/         Database schema and migrations
+  providers/ AI provider adapters
+  runtime/   Agent runtime integration
+
+docs/
+  architecture.md
+  quick-start.md
 ```
 
-## Documentation
-
-| Document                                                              | Description                 |
-| --------------------------------------------------------------------- | --------------------------- |
-| [Quick Start (EN)](./docs/en/quick-start.md)                          | English quick start         |
-| [快速开始（中文）](./docs/zh/quick-start.md)                          | Chinese quick start         |
-| [Architecture](./docs/architecture.md)                                | System design and data flow |
-| [Data Model](./docs/data-model.md)                                    | Database schema reference   |
-| [API Reference](./docs/api-reference.md)                              | REST API reference          |
-| [Roadmap (EN)](./docs/en/roadmap.md) / [路线图](./docs/zh/roadmap.md) | Product roadmap             |
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Development requires Bun. The npm
-package is a compiled binary artifact with an embedded Bun runtime.
+---
 
 ## License
 
