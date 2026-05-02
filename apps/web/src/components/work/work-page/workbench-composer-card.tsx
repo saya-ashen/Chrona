@@ -12,6 +12,7 @@ import type {
 } from "./work-page-types";
 
 type WorkbenchComposerCardProps = {
+  className?: string;
   composer: WorkbenchComposer | null;
   currentIntervention?: WorkPageData["currentIntervention"] | null;
   currentStepTitle?: string | null;
@@ -150,6 +151,7 @@ function renderActionWorkspace(
 }
 
 export function WorkbenchComposerCard({
+  className,
   composer,
   currentIntervention = null,
   currentStepTitle = null,
@@ -176,10 +178,21 @@ export function WorkbenchComposerCard({
 
   if (!composer) {
     return (
-      <div className="space-y-1 text-sm text-muted-foreground">
-        <p>{passiveDescription}</p>
-        <p className="text-xs text-muted-foreground/80">{passiveActions}</p>
-      </div>
+      <section
+        className={cn(
+          "rounded-[24px] border border-border/70 bg-card p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)]",
+          className,
+        )}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
+          <StatusBadge tone="success">已同步</StatusBadge>
+        </div>
+        <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+          <p>{passiveDescription}</p>
+          <p className="text-xs text-muted-foreground/80">{passiveActions}</p>
+        </div>
+      </section>
     );
   }
 
@@ -187,19 +200,28 @@ export function WorkbenchComposerCard({
     <form
       aria-label={copy.inputArea}
       key={`workbench-${composerResetKey}-${runId ?? "none"}-${composer.mode}`}
-      className="min-w-0 space-y-1.5"
+      className={cn(
+        "min-w-0 max-h-[min(34vh,360px)] overflow-y-auto rounded-[24px] border border-border/70 bg-card p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)]",
+        className,
+      )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{composer.statusHint}</span>
-        <span>{copy.keyboardHint}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
+            <StatusBadge tone="warning">阻塞中</StatusBadge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{composer.statusHint}</p>
+        </div>
+        <span className="text-xs text-muted-foreground">{copy.keyboardHint}</span>
       </div>
 
-      {renderActionWorkspace(currentIntervention, currentStepTitle, copy)}
+      <div className="mt-4">{renderActionWorkspace(currentIntervention, currentStepTitle, copy)}</div>
 
       {errorMessage ? (
         <p
           role="alert"
-          className="rounded-md border border-red-300/70 bg-red-500/10 px-3 py-2 text-sm text-red-700"
+          className="mt-4 rounded-2xl border border-red-300/70 bg-red-500/10 px-3 py-2 text-sm text-red-700"
         >
           {errorMessage}
         </p>
@@ -220,11 +242,15 @@ export function WorkbenchComposerCard({
         }}
         className={cn(
           textareaClassName,
-          "min-h-16 w-full min-w-0 resize-none border-border/80 bg-background px-3 py-2.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70",
+          "mt-4 min-h-28 w-full min-w-0 resize-none rounded-[18px] border-border/80 bg-background px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70",
         )}
       />
 
-      <div className="flex items-start justify-between gap-2">
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{composerValue.length}/2000</span>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-4">
         <div className="flex min-w-0 flex-wrap gap-1.5">
           {quickPrompts.length > 0 ? (
             <span className="flex items-center pr-1 text-xs text-muted-foreground">
@@ -239,7 +265,7 @@ export function WorkbenchComposerCard({
                 variant: "outline",
                 size: "sm",
                 className:
-                  "border-border/70 bg-muted/[0.2] text-foreground hover:bg-muted/50",
+                  "rounded-full border-border/70 bg-muted/[0.2] text-foreground hover:bg-muted/50",
               })}
               onClick={() =>
                 onComposerChange(
@@ -254,7 +280,7 @@ export function WorkbenchComposerCard({
           ))}
         </div>
 
-        <div className="shrink-0">
+        <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             disabled={isPending}
@@ -265,14 +291,26 @@ export function WorkbenchComposerCard({
               variant: composer.submitVariant ?? "default",
               size: "sm",
               className: cn(
-                "disabled:opacity-60",
+                "h-11 rounded-xl disabled:opacity-60",
                 composer.submitVariant === "outline"
                   ? "border-border/70 bg-background text-foreground hover:bg-muted/40"
-                  : "",
+                  : "bg-primary text-primary-foreground shadow-[0_10px_24px_rgba(37,99,235,0.25)]",
               ),
             })}
           >
             {composer.submitLabel}
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onComposerChange("")}
+            className={buttonVariants({
+              variant: "outline",
+              size: "sm",
+              className: "h-11 rounded-xl border-border/70 bg-background text-foreground hover:bg-muted/40",
+            })}
+          >
+            清空
           </button>
         </div>
       </div>
