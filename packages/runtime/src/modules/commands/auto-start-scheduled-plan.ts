@@ -14,7 +14,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
   const now = input?.now ?? new Date();
   const dueTasks = await db.task.findMany({
     where: {
-      scheduleStatus: "Scheduled",
+      scheduleStatus: { in: ["Scheduled", "Overdue"] },
       scheduledStartAt: { lte: now },
       status: { in: ["Ready", "Scheduled", "Queued"] },
     },

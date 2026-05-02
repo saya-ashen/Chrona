@@ -11,7 +11,7 @@ import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
 
 type InspectorSection = (typeof sections)[number];
-type StepStatus = "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
+type StepStatus = "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked" | "skipped";
 
 type WorkInspectorProps = {
   plan: {

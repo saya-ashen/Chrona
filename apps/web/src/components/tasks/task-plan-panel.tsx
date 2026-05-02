@@ -36,7 +36,7 @@ type PlanData = {
       title: string;
       objective: string;
       description: string | null;
-      status: "pending" | "in_progress" | "waiting_for_user" | "blocked" | "done" | "skipped";
+      status: "pending" | "in_progress" | "waiting_for_user" | "waiting_for_child" | "waiting_for_approval" | "blocked" | "done" | "skipped";
       phase: string | null;
       estimatedMinutes: number | null;
       priority: string | null;

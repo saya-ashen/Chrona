@@ -24,7 +24,7 @@ type PlanStep = {
   title: string;
   objective: string;
   phase: string;
-  status: "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
+  status: "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked" | "skipped";
   requiresHumanInput: boolean;
   type?: string;
   linkedTaskId?: string | null;
@@ -58,9 +58,12 @@ type TaskPlanGraphProps = {
 const DEFAULT_GRAPH_COPY = {
   ariaLabel: "任务计划图",
   statusInProgress: "进行中",
+  statusWaitingForChild: "子任务执行中",
   statusWaitingForUser: "等待你处理",
+  statusWaitingForApproval: "等待审批",
   statusDone: "已完成",
   statusBlocked: "已阻塞",
+  statusSkipped: "已跳过",
   statusPending: "待处理",
   edgeDependsOn: "依赖于",
   edgeBranchesTo: "分支到",
@@ -119,12 +122,18 @@ function getStatusLabel(status: PlanStep["status"], c: GraphCopyType) {
   switch (status) {
     case "in_progress":
       return c.statusInProgress;
+    case "waiting_for_child":
+      return c.statusWaitingForChild;
     case "waiting_for_user":
       return c.statusWaitingForUser;
+    case "waiting_for_approval":
+      return c.statusWaitingForApproval;
     case "done":
       return c.statusDone;
     case "blocked":
       return c.statusBlocked;
+    case "skipped":
+      return c.statusSkipped;
     default:
       return c.statusPending;
   }
@@ -134,12 +143,18 @@ function getCompactStatusLabel(status: PlanStep["status"], c: GraphCopyType) {
   switch (status) {
     case "in_progress":
       return c.statusInProgress;
+    case "waiting_for_child":
+      return "子任务执行中";
     case "waiting_for_user":
       return "需处理";
+    case "waiting_for_approval":
+      return "待审批";
     case "done":
       return c.statusDone;
     case "blocked":
       return c.statusBlocked;
+    case "skipped":
+      return "已跳过";
     default:
       return "待办";
   }
@@ -164,7 +179,10 @@ type NodeLegendItem = {
 
 function getNodeTone(step: PlanStep): NodeTone {
   if (step.status === "blocked") return "blocked";
+  if (step.status === "skipped") return "done";
   if (step.requiresHumanInput || step.status === "waiting_for_user")
+    return "waiting";
+  if (step.status === "waiting_for_child" || step.status === "waiting_for_approval")
     return "waiting";
   if (step.status === "in_progress") return "current";
   if (step.status === "done") return "done";

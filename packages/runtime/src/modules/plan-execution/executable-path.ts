@@ -2,6 +2,8 @@ import type { TaskPlanGraph } from "@/modules/ai/types";
 
 export type PlanExecutablePath = {
   readyNodeIds: string[];
+  waitingForChildNodeIds: string[];
+  waitingForDependencyNodeIds: string[];
   waitingForUserNodeIds: string[];
   waitingForApprovalNodeIds: string[];
   blockedNodeIds: string[];
@@ -12,6 +14,8 @@ export type PlanExecutablePath = {
   currentNodeId: string | null;
   terminalReason:
     | "has_ready_nodes"
+    | "waiting_for_child"
+    | "waiting_for_dependencies"
     | "waiting_for_user"
     | "waiting_for_approval"
     | "blocked"
@@ -66,6 +70,8 @@ export function computeExecutablePath(plan: TaskPlanGraph): PlanExecutablePath {
   if (plan.nodes.length === 0) {
     return {
       readyNodeIds: [],
+      waitingForChildNodeIds: [],
+      waitingForDependencyNodeIds: [],
       waitingForUserNodeIds: [],
       waitingForApprovalNodeIds: [],
       blockedNodeIds: [],
@@ -82,10 +88,12 @@ export function computeExecutablePath(plan: TaskPlanGraph): PlanExecutablePath {
   const doneNodeIds: string[] = [];
   const skippedNodeIds: string[] = [];
   const inProgressNodeIds: string[] = [];
+  const waitingForChildNodeIds: string[] = [];
   const pendingNodeIds: string[] = [];
   const readyNodeIds: string[] = [];
   const waitingForUserNodeIds: string[] = [];
   const waitingForApprovalNodeIds: string[] = [];
+  const waitingForDependencyNodeIds: string[] = [];
   const blockedNodeIds: string[] = [];
   const nodeReasons: Record<string, string> = {};
 
@@ -99,6 +107,18 @@ export function computeExecutablePath(plan: TaskPlanGraph): PlanExecutablePath {
         break;
       case "in_progress":
         inProgressNodeIds.push(node.id);
+        break;
+      case "waiting_for_child":
+        waitingForChildNodeIds.push(node.id);
+        break;
+      case "waiting_for_user":
+        waitingForUserNodeIds.push(node.id);
+        break;
+      case "waiting_for_approval":
+        waitingForApprovalNodeIds.push(node.id);
+        break;
+      case "blocked":
+        blockedNodeIds.push(node.id);
         break;
       default:
         pendingNodeIds.push(node.id);
@@ -122,7 +142,7 @@ export function computeExecutablePath(plan: TaskPlanGraph): PlanExecutablePath {
       const unmet = deps.filter((depId) => !topo.completedIds.has(depId));
 
       nodeReasons[nodeId] = `Waiting for dependencies: ${unmet.join(", ")}`;
-      blockedNodeIds.push(nodeId);
+      waitingForDependencyNodeIds.push(nodeId);
       topo.blockedIds.add(nodeId);
       continue;
     }
@@ -156,20 +176,27 @@ export function computeExecutablePath(plan: TaskPlanGraph): PlanExecutablePath {
     readyNodeIds.push(nodeId);
   }
 
-  const nonDone = plan.nodes.filter(
-    (n) => n.status !== "done" && n.status !== "skipped",
-  );
-
   const terminalReason = ((): PlanExecutablePath["terminalReason"] => {
+    const nonDone = plan.nodes.filter(
+      (n) => n.status !== "done" && n.status !== "skipped",
+    );
+
     if (nonDone.length === 0) return "all_done";
     if (readyNodeIds.length > 0) return "has_ready_nodes";
+    if (inProgressNodeIds.length > 0 || waitingForChildNodeIds.length > 0) {
+      return "waiting_for_child";
+    }
     if (waitingForUserNodeIds.length > 0) return "waiting_for_user";
     if (waitingForApprovalNodeIds.length > 0) return "waiting_for_approval";
+    if (blockedNodeIds.length > 0) return "blocked";
+    if (waitingForDependencyNodeIds.length > 0) return "waiting_for_dependencies";
     return "blocked";
   })();
 
   return {
     readyNodeIds,
+    waitingForChildNodeIds,
+    waitingForDependencyNodeIds,
     waitingForUserNodeIds,
     waitingForApprovalNodeIds,
     blockedNodeIds,

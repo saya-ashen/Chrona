@@ -31,6 +31,15 @@ describe("deriveAutoStartEligibility", () => {
       expect(result).toEqual({ ok: true, mode: "start_task" });
     });
 
+    it("returns ok when task scheduleStatus is Overdue but otherwise eligible", () => {
+      const result = deriveAutoStartEligibility({
+        task: makeTask({ scheduleStatus: "Overdue" }),
+        now,
+        activeRun: null,
+      });
+      expect(result).toEqual({ ok: true, mode: "start_task" });
+    });
+
     it("returns ok when task status is Ready", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ status: "Ready" }),

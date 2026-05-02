@@ -121,7 +121,7 @@ export type EvidenceItem = {
   href?: string | null;
 };
 
-export type TaskPlanStepStatus = "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked";
+export type TaskPlanStepStatus = "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked";
 
 export type TaskPlanProjectionStep = {
   id: string;

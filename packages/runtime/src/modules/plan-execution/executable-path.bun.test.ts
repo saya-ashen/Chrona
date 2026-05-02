@@ -3,11 +3,11 @@ import { computeExecutablePath, type PlanExecutablePath } from "./executable-pat
 import type { TaskPlanGraph } from "@/modules/ai/types";
 
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
+  const { id, ...rest } = overrides;
   return {
-    id: overrides.id,
     type: "step",
-    title: overrides.title ?? `Node ${overrides.id}`,
-    objective: overrides.objective ?? `Objective for ${overrides.id}`,
+    title: `Node ${id}`,
+    objective: `Objective for ${id}`,
     description: null,
     status: "pending",
     phase: null,
@@ -21,7 +21,8 @@ function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: str
     linkedTaskId: null,
     completionSummary: null,
     metadata: null,
-    ...overrides,
+    ...rest,
+    id,
   };
 }
 
@@ -52,6 +53,8 @@ function pick(path: PlanExecutablePath) {
     ready: path.readyNodeIds.sort(),
     waitingForUser: path.waitingForUserNodeIds.sort(),
     waitingForApproval: path.waitingForApprovalNodeIds.sort(),
+    waitingForChild: path.waitingForChildNodeIds.sort(),
+    waitingForDependency: path.waitingForDependencyNodeIds.sort(),
     blocked: path.blockedNodeIds.sort(),
     done: path.doneNodeIds.sort(),
     skipped: path.skippedNodeIds.sort(),
@@ -70,14 +73,15 @@ describe("computeExecutablePath", () => {
     expect(path.readyNodeIds).toEqual([]);
   });
 
-  it("linear plan: first node is ready, subsequent blocked by dependency", () => {
+  it("linear plan: first node is ready, subsequent waiting for dependency", () => {
     const plan = makePlan(
       [makeNode({ id: "a" }), makeNode({ id: "b" })],
       [makeEdge("a", "b")],
     );
     const path = pick(computeExecutablePath(plan));
     expect(path.ready).toEqual(["a"]);
-    expect(path.blocked).toEqual(["b"]);
+    expect(path.waitingForDependency).toEqual(["b"]);
+    expect(path.blocked).toEqual([]);
     expect(path.reason).toBe("has_ready_nodes");
   });
 
@@ -146,7 +150,7 @@ describe("computeExecutablePath", () => {
     expect(path.reason).toBe("blocked");
   });
 
-  it("predecessor blocked causes downstream blocked", () => {
+  it("predecessor blocked causes downstream waiting for dependency", () => {
     const plan = makePlan(
       [
         makeNode({ id: "a", autoRunnable: false }),
@@ -156,7 +160,8 @@ describe("computeExecutablePath", () => {
       [makeEdge("a", "b"), makeEdge("b", "c")],
     );
     const path = pick(computeExecutablePath(plan));
-    expect(path.blocked).toEqual(["a", "b", "c"]);
+    expect(path.blocked).toEqual(["a"]);
+    expect(path.waitingForDependency).toEqual(["b", "c"]);
     expect(path.reason).toBe("blocked");
   });
 
@@ -177,7 +182,7 @@ describe("computeExecutablePath", () => {
     expect(path.inProgress).toEqual(["a"]);
     expect(path.ready).toEqual([]);
     expect(path.currentNode).toBe("a");
-    expect(path.reason).toBe("blocked");
+    expect(path.reason).toBe("waiting_for_child");
   });
 
   it("all blocked -> blocked", () => {
