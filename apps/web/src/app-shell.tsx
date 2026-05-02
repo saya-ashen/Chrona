@@ -11,7 +11,7 @@ export function AppShell() {
 
   return (
     <I18nProvider locale={locale} messages={dictionary}>
-      <ControlPlaneShell>
+      <ControlPlaneShell defaultWorkspace={data.defaultWorkspace}>
         <Outlet context={data} />
       </ControlPlaneShell>
     </I18nProvider>

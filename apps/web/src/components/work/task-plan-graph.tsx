@@ -46,6 +46,7 @@ const AUTO_FULL_MODE_MIN_WIDTH = 720;
 
 type TaskPlanGraphProps = {
   mode?: TaskPlanGraphMode;
+  maxViewportHeight?: number;
   plan: {
     state: "empty" | "ready";
     currentStepId: string | null;
@@ -648,6 +649,7 @@ function buildFlowLayout(input: {
   selectedStepId: string | null;
   graphCopy: GraphCopyType;
   onToggle: (nodeId: string) => void;
+  maxViewportHeight: number;
 }) {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
@@ -716,7 +718,7 @@ function buildFlowLayout(input: {
   );
   const viewportHeight = Math.min(
     Math.max(contentHeight, MIN_VIEWPORT_HEIGHT),
-    MAX_VIEWPORT_HEIGHT,
+    input.maxViewportHeight,
   );
 
   const nodes: FlowGraphNode[] = input.steps.map((step) => {
@@ -1023,7 +1025,11 @@ function TaskPlanGraphFrame({
   );
 }
 
-export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
+export function TaskPlanGraph({
+  plan,
+  mode = "full",
+  maxViewportHeight = MAX_VIEWPORT_HEIGHT,
+}: TaskPlanGraphProps) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [isFullDialogOpen, setIsFullDialogOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -1051,11 +1057,13 @@ export function TaskPlanGraph({ plan, mode = "full" }: TaskPlanGraphProps) {
         selectedStepId,
         graphCopy,
         onToggle: handleToggleNode,
+        maxViewportHeight,
       }),
     [
       allEdges,
       graphCopy,
       handleToggleNode,
+      maxViewportHeight,
       plan.currentStepId,
       plan.steps,
       selectedStepId,
