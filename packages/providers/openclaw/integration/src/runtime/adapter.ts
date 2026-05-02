@@ -71,13 +71,26 @@ export type OpenClawAdapter = {
   getSessionStatus(runtimeSessionKey: string): Promise<OpenClawSessionStatus>;
 };
 
-export async function createRuntimeAdapter(): Promise<OpenClawAdapter> {
+export type OpenClawAdapterConfig = {
+  gatewayHttpUrl?: string;
+  gatewayToken?: string;
+};
+
+export async function createRuntimeAdapter(config?: OpenClawAdapterConfig): Promise<OpenClawAdapter> {
   if (process.env.OPENCLAW_MODE === "mock") {
     return createMockOpenClawAdapter();
   }
 
   const client = new OpenClawEmbeddedClient({
     timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
+    environment: config?.gatewayHttpUrl
+      ? {
+          defaultPort: 7677,
+          gatewayHttpUrl: config.gatewayHttpUrl,
+          gatewayToken: config.gatewayToken ?? "",
+          agentId: "main",
+        }
+      : undefined,
   });
   return createLiveOpenClawAdapter(client);
 }

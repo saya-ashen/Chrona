@@ -88,6 +88,18 @@ function mapSubtask(
   };
 }
 
+async function getOpenClawAdapter() {
+  const client = await db.aiClient.findFirst({
+    where: { type: "openclaw", isDefault: true, enabled: true },
+  });
+  const config = (client?.config as Record<string, unknown> | null) ?? {};
+  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
+  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
+  return createRuntimeAdapter(
+    gatewayUrl ? { gatewayHttpUrl: gatewayUrl, gatewayToken } : undefined,
+  );
+}
+
 async function testOpenClaw(config: Record<string, unknown>) {
   const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
   const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
@@ -694,7 +706,7 @@ export function createApiRouter() {
 
   api.post("/tasks/:taskId/run", async (c) => {
     try {
-      const adapter = await createRuntimeAdapter();
+      const adapter = await getOpenClawAdapter();
       const body = await c.req.json().catch(() => ({}));
       return json(
         c,
@@ -712,7 +724,7 @@ export function createApiRouter() {
 
   api.post("/tasks/:taskId/retry", async (c) => {
     try {
-      const adapter = await createRuntimeAdapter();
+      const adapter = await getOpenClawAdapter();
       const body = await c.req.json().catch(() => ({}));
       return json(c, await retryRun({ taskId: c.req.param("taskId"), prompt: body.prompt, adapter }));
     } catch (cause) {
@@ -740,7 +752,7 @@ export function createApiRouter() {
         }
         runId = latestRun.id;
       }
-      const adapter = await createRuntimeAdapter();
+      const adapter = await getOpenClawAdapter();
       return json(c, await provideInput({ runId, inputText: body.inputText, adapter }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to provide input";
@@ -767,7 +779,7 @@ export function createApiRouter() {
         }
         runId = latestRun.id;
       }
-      const adapter = await createRuntimeAdapter();
+      const adapter = await getOpenClawAdapter();
       return json(c, await sendOperatorMessage({ runId, message: body.message, adapter }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to send message";
@@ -781,7 +793,7 @@ export function createApiRouter() {
       if (!body.runId) {
         return error(c, "runId is required", 400);
       }
-      const adapter = await createRuntimeAdapter();
+      const adapter = await getOpenClawAdapter();
       return json(
         c,
         await resumeRun({

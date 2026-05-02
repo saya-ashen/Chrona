@@ -55,7 +55,8 @@ export function deriveAutoStartEligibility(input: {
     return { ok: false, reason: "invalid_task_status" };
   }
 
-  if (input.activeRun && ACTIVE_RUN_STATUSES.some((s) => s === input.activeRun.status)) {
+  const activeRun = input.activeRun;
+  if (activeRun && ACTIVE_RUN_STATUSES.some((s) => s === activeRun.status)) {
     return { ok: false, reason: "already_running" };
   }
 
