@@ -6,6 +6,8 @@ import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-stor
 import { computeExecutablePath } from "./executable-path";
 import { decideNodeExecutionSession } from "./session-policy";
 import { executePlanNode } from "./node-executor";
+import { detectPlanDrift } from "./replan-detector";
+import { applyPlanPatch } from "./apply-plan-patch";
 import type { TaskPlanNode, TaskPlanGraph } from "@/modules/ai/types";
 import type { PlanExecutablePath } from "./executable-path";
 
@@ -40,6 +42,10 @@ function mapTerminalReasonToStatus(
   switch (reason) {
     case "has_ready_nodes":
       return "running";
+    case "waiting_for_child":
+      return "running";
+    case "waiting_for_dependencies":
+      return "blocked";
     case "waiting_for_user":
       return "waiting_for_user";
     case "waiting_for_approval":
@@ -117,14 +123,17 @@ export async function advancePlanExecution(input: {
       payload: {
         terminalReason: path.terminalReason,
         readyCount: path.readyNodeIds.length,
+        waitingForChildCount: path.waitingForChildNodeIds.length,
+        waitingForDependencyCount: path.waitingForDependencyNodeIds.length,
         waitingForUserCount: path.waitingForUserNodeIds.length,
         waitingForApprovalCount: path.waitingForApprovalNodeIds.length,
         blockedCount: path.blockedNodeIds.length,
         doneCount: path.doneNodeIds.length,
+        inProgressCount: path.inProgressNodeIds.length,
       },
     });
 
-    if (path.terminalReason !== "has_ready_nodes") {
+    if (path.terminalReason !== "has_ready_nodes" && path.terminalReason !== "waiting_for_child") {
       const execStatus = mapTerminalReasonToStatus(path.terminalReason);
       const taskStatus = (() => {
         switch (execStatus) {
@@ -206,6 +215,12 @@ export async function advancePlanExecution(input: {
       };
     }
 
+    const sessionDecision = decideNodeExecutionSession({
+      node,
+      plan: currentPlan,
+      parentTaskId: input.taskId,
+    });
+
     currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
       status: "in_progress",
     });
@@ -227,21 +242,116 @@ export async function advancePlanExecution(input: {
       },
     });
 
-    const sessionDecision = decideNodeExecutionSession({
-      node,
-      plan: currentPlan,
-      parentTaskId: input.taskId,
-    });
+    const executingNode = {
+      ...node,
+      status: "in_progress" as const,
+    };
 
     const result = await executePlanNode({
       taskId: input.taskId,
       planId,
       mainSession,
-      node,
+      node: executingNode,
       plan: currentPlan,
       sessionDecision,
       trigger: input.trigger,
     });
+
+    const drift = detectPlanDrift({
+      node: executingNode,
+      nodeResult: result,
+      plan: currentPlan,
+      mainSessionSummary: null,
+    });
+
+    if (drift.needsReplan) {
+      if (drift.requiresUserConfirmation || drift.risk !== "low") {
+        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
+          status: "blocked",
+          metadata: {
+            ...((node.metadata as Record<string, unknown>) ?? {}),
+            replan: {
+              risk: drift.risk,
+              reason: drift.reason,
+              proposedPatch: drift.proposedPatch,
+            },
+          },
+        });
+
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId,
+          sessionId: mainSession.id,
+          eventType: "replan_proposed",
+          payload: {
+            nodeId: nextNodeId,
+            reason: drift.reason,
+            risk: drift.risk,
+            proposedPatch: drift.proposedPatch,
+          },
+        });
+
+        await db.task.update({
+          where: { id: input.taskId },
+          data: {
+            status: TaskStatus.WaitingForApproval,
+            blockReason: {
+              blockType: "replan_required",
+              scope: "plan",
+              actionRequired: drift.reason,
+              nodeId: nextNodeId,
+            },
+          },
+        });
+
+        await savePlanState(currentPlan, acceptedPlan);
+        await rebuildTaskProjection(input.taskId);
+
+        return {
+          taskId: input.taskId,
+          planId,
+          mainSessionId: mainSession.id,
+          status: "waiting_for_approval",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          waitingNodeIds: [],
+          blockedNodeIds: [nextNodeId],
+          message: drift.reason,
+        };
+      }
+
+      const patchResult = await applyPlanPatch({
+        taskId: input.taskId,
+        patch: drift.proposedPatch,
+        currentPlan: {
+          saved: {
+            ...acceptedPlan,
+            plan: currentPlan,
+          },
+          graph: currentPlan,
+        },
+      });
+
+      if (patchResult.success) {
+        const refreshed = await getAcceptedTaskPlanGraph(input.taskId);
+        if (refreshed) {
+          currentPlan = refreshed.plan;
+          await appendMainSessionEvent({
+            taskId: input.taskId,
+            planId,
+            sessionId: mainSession.id,
+            eventType: "replan_proposed",
+            payload: {
+              nodeId: nextNodeId,
+              reason: drift.reason,
+              risk: drift.risk,
+              autoApplied: true,
+            },
+          });
+          continue;
+        }
+      }
+    }
 
     executedNodeIds.push(nextNodeId);
 
@@ -309,7 +419,7 @@ export async function advancePlanExecution(input: {
 
       case "waiting_for_approval": {
         currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "waiting_for_user",
+          status: "waiting_for_approval",
         });
 
         await db.task.update({
@@ -346,6 +456,47 @@ export async function advancePlanExecution(input: {
           waitingNodeIds: [],
           blockedNodeIds: [],
           message: result.prompt,
+        };
+      }
+
+      case "child_running": {
+        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
+          status: "waiting_for_child",
+          metadata: {
+            ...((node.metadata as Record<string, unknown>) ?? {}),
+            childSessionId: result.evidence.childSessionId,
+            childRunId: result.evidence.runId,
+            childTaskId: result.evidence.childTaskId,
+            dispatchedAt: new Date().toISOString(),
+          },
+        });
+
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId,
+          sessionId: mainSession.id,
+          eventType: "child_run_started",
+          payload: {
+            nodeId: nextNodeId,
+            childSessionId: result.evidence.childSessionId,
+            childRunId: result.evidence.runId,
+            childTaskId: result.evidence.childTaskId,
+          },
+        });
+
+        await savePlanState(currentPlan, acceptedPlan);
+        await rebuildTaskProjection(input.taskId);
+
+        return {
+          taskId: input.taskId,
+          planId,
+          mainSessionId: mainSession.id,
+          status: "running",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          waitingNodeIds: [],
+          blockedNodeIds: [],
+          message: result.summary,
         };
       }
 

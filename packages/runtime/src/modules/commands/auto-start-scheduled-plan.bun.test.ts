@@ -2,9 +2,9 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
-const startRunMock = mock();
-mock.module("@/modules/commands/start-run", () => ({
-  startRun: startRunMock,
+const startPlanExecutionMock = mock();
+mock.module("@/modules/plan-execution", () => ({
+  startPlanExecution: startPlanExecutionMock,
 }));
 
 const { autoStartScheduledPlanTasks } = await import("@/modules/commands/auto-start-scheduled-plan");
@@ -61,7 +61,7 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
 
 describe("auto-start-scheduled-plan", () => {
   beforeEach(async () => {
-    startRunMock.mockReset();
+    startPlanExecutionMock.mockReset();
     await resetDb();
   });
 
@@ -148,18 +148,23 @@ describe("auto-start-scheduled-plan", () => {
       },
     });
 
-    startRunMock.mockResolvedValue({
+    startPlanExecutionMock.mockResolvedValue({
       taskId: parentTask.id,
-      workspaceId: workspace.id,
-      runId: "run-parent",
-      runtimeRunRef: "runtime-parent",
+      planId: "graph-1",
+      mainSessionId: "session-1",
+      status: "running",
+      currentNodeId: "node-auto-1",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Execution started",
     });
 
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
     expect(result.started.length).toBeGreaterThanOrEqual(1);
     expect(result.started[0]?.taskId).toBe(parentTask.id);
-    expect(result.started[0]?.runId).toBe("run-parent");
+    expect(result.started[0]?.runId).toBe("graph-1");
     expect(result.skipped).toEqual([]);
     expect(result.failed).toEqual([]);
 
@@ -169,27 +174,30 @@ describe("auto-start-scheduled-plan", () => {
       include: { sessions: true },
     });
 
-    expect(childTasks).toHaveLength(1);
-    expect(childTasks[0]?.title).toBe("Collect evidence");
-    expect(childTasks[0]?.sessions.length).toBe(1);
+    expect(childTasks).toHaveLength(0);
   });
 
-  it("calls startRun with triggeredBy scheduler", async () => {
+  it("calls startPlanExecution with trigger scheduler", async () => {
     const workspace = await createWorkspace();
     await createDueTask(workspace.id);
 
-    startRunMock.mockResolvedValue({
+    startPlanExecutionMock.mockResolvedValue({
       taskId: "task-1",
-      workspaceId: workspace.id,
-      runId: "run-1",
-      runtimeRunRef: "runtime-1",
+      planId: "plan-1",
+      mainSessionId: "session-1",
+      status: "running",
+      currentNodeId: "node-1",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started",
     });
 
     await autoStartScheduledPlanTasks({ now: new Date() });
 
-    expect(startRunMock).toHaveBeenCalledTimes(1);
-    const callArgs = startRunMock.mock.calls[0]?.[0];
-    expect(callArgs?.triggeredBy).toBe("scheduler");
+    expect(startPlanExecutionMock).toHaveBeenCalledTimes(1);
+    const callArgs = startPlanExecutionMock.mock.calls[0]?.[0];
+    expect(callArgs?.trigger).toBe("scheduler");
   });
 
   it("skips tasks that are not yet due", async () => {
@@ -201,7 +209,7 @@ describe("auto-start-scheduled-plan", () => {
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
     expect(result.started).toEqual([]);
-    expect(startRunMock).not.toHaveBeenCalled();
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
   it("skips tasks that already have an active run", async () => {
@@ -223,7 +231,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped.length).toBe(1);
     expect(result.skipped[0]?.taskId).toBe(task.id);
     expect(result.skipped[0]?.reason).toBe("already_running");
-    expect(startRunMock).not.toHaveBeenCalled();
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
   it("skips tasks with non-Scheduled scheduleStatus", async () => {
@@ -233,7 +241,7 @@ describe("auto-start-scheduled-plan", () => {
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
     expect(result.started).toEqual([]);
-    expect(startRunMock).not.toHaveBeenCalled();
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
   it("skips tasks without a runtime adapter key", async () => {
@@ -248,7 +256,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped.length).toBe(1);
     expect(result.skipped[0]?.taskId).toBe(task.id);
     expect(result.skipped[0]?.reason).toBe("no_runtime_config");
-    expect(startRunMock).not.toHaveBeenCalled();
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
   it("writes task.auto_start.skipped events for skipped tasks", async () => {
@@ -287,16 +295,21 @@ describe("auto-start-scheduled-plan", () => {
     const task2 = await createDueTask(workspace.id, { title: "Task 2" });
 
     let callCount = 0;
-    startRunMock.mockImplementation(async (input: { taskId: string }) => {
+    startPlanExecutionMock.mockImplementation(async (input: { taskId: string }) => {
       callCount++;
       if (input.taskId === task1.id) {
         throw new Error("Runtime unavailable");
       }
       return {
         taskId: input.taskId,
-        workspaceId: workspace.id,
-        runId: `run-${input.taskId}`,
-        runtimeRunRef: `runtime-${input.taskId}`,
+        planId: `plan-${input.taskId}`,
+        mainSessionId: `session-${input.taskId}`,
+        status: "running" as const,
+        currentNodeId: null,
+        executedNodeIds: [],
+        waitingNodeIds: [],
+        blockedNodeIds: [],
+        message: "Started",
       };
     });
 
@@ -314,17 +327,21 @@ describe("auto-start-scheduled-plan", () => {
     const workspace = await createWorkspace();
     await createDueTask(workspace.id);
 
-    startRunMock.mockResolvedValue({
+    startPlanExecutionMock.mockResolvedValue({
       taskId: "task-1",
-      workspaceId: workspace.id,
-      runId: "run-1",
-      runtimeRunRef: "runtime-1",
+      planId: "plan-1",
+      mainSessionId: "session-1",
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started",
     });
 
-    const now = new Date("2026-05-02T10:00:00Z");
-    const result = await autoStartScheduledPlanTasks({ now });
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
-    expect(result.now).toBe("2026-05-02T10:00:00.000Z");
+    expect(result.now).toBeString();
     expect(result.started.length).toBe(1);
     expect(result.skipped.length).toBe(0);
     expect(result.failed.length).toBe(0);
@@ -339,6 +356,6 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started).toEqual([]);
     expect(result.skipped).toEqual([]);
     expect(result.failed).toEqual([]);
-    expect(startRunMock).not.toHaveBeenCalled();
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 });

@@ -58,8 +58,8 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     return { kind: "main_session", reason: "Node already completed" };
   }
 
-  if (node.status === "in_progress") {
-    return { kind: "main_session", reason: "Node already in progress" };
+  if (node.status === "in_progress" || node.status === "waiting_for_child") {
+    return { kind: "main_session", reason: "Node already executing, let it continue" };
   }
 
   if (node.requiresHumanInput) {
@@ -118,19 +118,26 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     };
   }
 
-  if (CHILD_SESSION_NODE_TYPES.has(node.type)) {
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} type ${node.type} qualifies for child session`,
-      childTaskMode: node.type === "deliverable" ? "materialize_task" : "session_only",
-    };
-  }
-
   if (looksLikeMultiStep(node)) {
     return {
       kind: "child_session",
       reason: `Node ${node.id} appears to be multi-step, using child session`,
       childTaskMode: "materialize_task",
+    };
+  }
+
+  if (CHILD_SESSION_NODE_TYPES.has(node.type)) {
+    const isShort = (node.estimatedMinutes ?? 0) < LONG_ESTIMATED_MINUTES;
+    if (isShort) {
+      return {
+        kind: "main_session",
+        reason: `Node ${node.id} type ${node.type} is short (${node.estimatedMinutes}min) and simple, running in main session`,
+      };
+    }
+    return {
+      kind: "child_session",
+      reason: `Node ${node.id} type ${node.type} qualifies for child session`,
+      childTaskMode: node.type === "deliverable" ? "materialize_task" : "session_only",
     };
   }
 

@@ -52,7 +52,9 @@ function normalizeNodeType(value: unknown): TaskPlanNodeType {
 function normalizeNodeStatus(value: unknown): TaskPlanNodeStatus {
   switch (value) {
     case "in_progress":
+    case "waiting_for_child":
     case "waiting_for_user":
+    case "waiting_for_approval":
     case "blocked":
     case "done":
     case "skipped":

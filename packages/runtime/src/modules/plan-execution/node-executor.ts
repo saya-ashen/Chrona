@@ -1,5 +1,8 @@
 import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@/modules/ai/types";
 import type { NodeSessionDecision } from "./session-policy";
+import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session";
+import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
+import { db } from "@/lib/db";
 
 export type NodeExecutionEvidence = {
   sessionId?: string;
@@ -40,6 +43,12 @@ export type NodeExecutionResult =
       reason: string;
       evidence?: NodeExecutionEvidence;
       proposedPatch?: PlanUpdatePatch;
+    }
+  | {
+      status: "child_running";
+      summary: string;
+      evidence: NodeExecutionEvidence;
+      output?: unknown;
     }
   | {
       status: "failed";
@@ -123,17 +132,72 @@ export async function executePlanNode(
     case "child_session": {
       const instructions = buildInstructions(input);
 
-      console.log(
-        `[plan-execution] Starting child execution for node ${node.id}`,
-      );
+      let childSessionId: string | undefined;
+      let childRunId: string | undefined;
+      let childTaskId: string | undefined;
+
+      try {
+        const childSession = await ensureNodeChildSession({
+          taskId: input.taskId,
+          planId: input.planId,
+          nodeId: node.id,
+          nodeTitle: node.title,
+          runtimeName: input.mainSession.sessionKey.includes("openclaw") ? "openclaw" : undefined,
+        });
+
+        childSessionId = childSession.sessionId;
+        childTaskId = childSession.childTaskId;
+
+        if (!childSession.runId) {
+          const childRun = await startNodeChildRun({
+            taskId: input.taskId,
+            childSessionId: childSession.sessionId,
+            childSessionKey: childSession.sessionKey,
+            prompt: instructions,
+            runtimeName: input.mainSession.sessionKey.includes("openclaw") ? "openclaw" : undefined,
+          });
+          childRunId = childRun.runId;
+        } else {
+          childRunId = childSession.runId;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to start child run";
+        return {
+          status: "failed",
+          error: `Failed to start child execution for node ${node.id}: ${message}`,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      }
+
+      // Check if the child run completed synchronously (has assistant output)
+      if (childRunId) {
+        const hasAssistant = await db.conversationEntry.findFirst({
+          where: { runId: childRunId, role: "assistant" },
+          select: { id: true },
+        });
+        if (hasAssistant) {
+          return {
+            status: "done",
+            summary: `Node ${node.id}: ${node.title} completed via child session`,
+            evidence: {
+              sessionId: input.mainSession.id,
+              childSessionId,
+              runId: childRunId,
+              childTaskId,
+            },
+            output: { instructions },
+          };
+        }
+      }
 
       return {
-        status: "done",
-        summary: `Child execution started for node ${node.id}`,
+        status: "child_running",
+        summary: `Child execution started for node ${node.id}: ${node.title} (async)`,
         evidence: {
           sessionId: input.mainSession.id,
-          childSessionId: undefined,
-          childTaskId: node.linkedTaskId ?? undefined,
+          childSessionId,
+          runId: childRunId,
+          childTaskId,
         },
         output: {
           instructions,
@@ -145,22 +209,107 @@ export async function executePlanNode(
     case "main_session": {
       const instructions = buildInstructions(input);
 
-      console.log(
-        `[plan-execution] Executing node ${node.id} in main session`,
-      );
+      try {
+        const { RunStatus } = await import("@/generated/prisma/client");
 
-      return {
-        status: "done",
-        summary: `Executed node ${node.id} in main session`,
-        evidence: {
-          sessionId: input.mainSession.id,
-          runId: undefined,
-        },
-        output: {
-          instructions,
-          artificialIntelligenceGenerated: true,
-        },
-      };
+        const run = await db.run.create({
+          data: {
+            taskId: input.taskId,
+            taskSessionId: input.mainSession.id,
+            runtimeName: "openclaw",
+            runtimeSessionRef: input.mainSession.sessionKey,
+            status: RunStatus.Pending,
+            triggeredBy: "system",
+            startedAt: new Date(),
+            syncStatus: "healthy",
+          },
+        });
+
+        const adapter = await createRuntimeExecutionAdapter("openclaw");
+        const created = await adapter.createRun({
+          prompt: instructions,
+          runtimeInput: {},
+          runtimeSessionKey: input.mainSession.sessionKey,
+        });
+
+        if (!created.runStarted) {
+          await db.run.update({
+            where: { id: run.id },
+            data: { status: RunStatus.Failed, syncStatus: "healthy" },
+          });
+          return {
+            status: "failed",
+            error: `Runtime refused to start main session run for node ${node.id}`,
+            evidence: { sessionId: input.mainSession.id, runId: run.id },
+          };
+        }
+
+        // Persist the runtime output immediately — the adapter's in-memory sessions
+        // are lost when this function returns, so we must read output now.
+        const history = await adapter.readHistory({ runtimeSessionKey: input.mainSession.sessionKey }) as {
+          messages?: Array<{ role?: string; content?: string }>;
+        };
+
+        let runStatus: (typeof RunStatus)[keyof typeof RunStatus] = RunStatus.Completed;
+        let totalSaved = 0;
+        let hasAssistantOutput = false;
+
+        if (history?.messages?.length) {
+          for (let i = 0; i < history.messages.length; i++) {
+            const msg = history.messages[i];
+            if (typeof msg?.role === "string" && typeof msg?.content === "string" && msg.content.length > 0) {
+              await db.conversationEntry.create({
+                data: {
+                  runId: run.id,
+                  role: msg.role,
+                  content: msg.content,
+                  sequence: i + 1,
+                  runtimeTs: new Date(),
+                },
+              });
+              totalSaved++;
+              if (msg.role === "assistant") {
+                hasAssistantOutput = true;
+              }
+            }
+          }
+        }
+
+        if (totalSaved === 0 || !hasAssistantOutput) {
+          runStatus = RunStatus.Failed;
+        }
+
+        await db.run.update({
+          where: { id: run.id },
+          data: {
+            runtimeRunRef: created.runtimeRunRef ?? null,
+            status: runStatus,
+            syncStatus: "healthy",
+          },
+        });
+
+        return {
+          status: "done",
+          summary: `Started node ${node.id} execution in main session`,
+          evidence: {
+            sessionId: input.mainSession.id,
+            runId: run.id,
+            conversationEntryIds: [],
+          },
+          output: {
+            instructions,
+            runId: run.id,
+            runtimeRunRef: created.runtimeRunRef,
+          },
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to start main session run";
+        return {
+          status: "failed",
+          error: `Failed to start main session execution for node ${node.id}: ${message}`,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      }
     }
 
     default:

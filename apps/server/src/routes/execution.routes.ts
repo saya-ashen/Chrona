@@ -19,6 +19,8 @@ import { getAcceptedTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-pla
 import {
   startPlanExecution,
   continuePlanExecution,
+  advancePlanExecution,
+  settlePlanNodeFromRun,
 } from "@chrona/runtime/modules/plan-execution";
 
 import {
@@ -71,6 +73,64 @@ export function createExecutionRoutes() {
         return error(c, "Task not found", 404);
       }
       return error(c, message, 500);
+    }
+  });
+
+  api.post("/tasks/:taskId/execution/advance", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json().catch(() => ({}));
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, title: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      if (typeof body.runId === "string" && body.runId.trim()) {
+        const result = await settlePlanNodeFromRun({
+          taskId,
+          runId: body.runId,
+          reason: typeof body.reason === "string" ? body.reason : "child_run_completed",
+        });
+        return json(c, { workspaceId: task.workspaceId, ...result });
+      }
+
+      const result = await advancePlanExecution({
+        taskId,
+        trigger: "manual",
+      });
+      return json(c, { workspaceId: task.workspaceId, ...result });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to advance execution";
+      return error(c, message, message.includes("not found") ? 404 : 500);
+    }
+  });
+
+  api.post("/tasks/:taskId/execution/settle-run", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json();
+
+      if (!body.runId || typeof body.runId !== "string" || !body.runId.trim()) {
+        return error(c, "runId is required", 400);
+      }
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, title: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      const result = await settlePlanNodeFromRun({
+        taskId,
+        runId: body.runId,
+        reason: typeof body.reason === "string" ? body.reason : undefined,
+      });
+      return json(c, { workspaceId: task.workspaceId, ...result });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to settle run";
+      return error(c, message, message.includes("not found") ? 404 : 500);
     }
   });
 

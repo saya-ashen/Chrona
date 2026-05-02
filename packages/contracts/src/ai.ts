@@ -118,7 +118,15 @@ export interface GenerateTaskPlanRequest {
 
 export type TaskPlanStatus = "draft" | "accepted" | "superseded" | "archived";
 export type TaskPlanNodeType = "step" | "checkpoint" | "decision" | "user_input" | "deliverable" | "tool_action";
-export type TaskPlanNodeStatus = "pending" | "in_progress" | "waiting_for_user" | "blocked" | "done" | "skipped";
+export type TaskPlanNodeStatus =
+  | "pending"
+  | "in_progress"
+  | "waiting_for_child"
+  | "waiting_for_user"
+  | "waiting_for_approval"
+  | "blocked"
+  | "done"
+  | "skipped";
 export type TaskPlanEdgeType = "sequential" | "depends_on" | "branches_to" | "unblocks" | "feeds_output";
 export type TaskPlanNodeExecutionMode = "automatic" | "manual" | "hybrid";
 export type TaskPlanNodeBlockingReason = "needs_user_input" | "needs_approval" | "external_dependency" | null;

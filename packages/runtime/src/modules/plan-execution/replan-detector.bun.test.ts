@@ -4,11 +4,11 @@ import type { TaskPlanGraph } from "@/modules/ai/types";
 import type { NodeExecutionResult } from "./node-executor";
 
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
+  const { id, ...rest } = overrides;
   return {
-    id: overrides.id,
     type: "step",
-    title: overrides.title ?? `Node ${overrides.id}`,
-    objective: overrides.objective ?? `Objective for ${overrides.id}`,
+    title: `Node ${id}`,
+    objective: `Objective for ${id}`,
     description: null,
     status: "pending",
     phase: null,
@@ -22,7 +22,8 @@ function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: str
     linkedTaskId: null,
     completionSummary: null,
     metadata: null,
-    ...overrides,
+    ...rest,
+    id,
   };
 }
 

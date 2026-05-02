@@ -3,7 +3,9 @@ import type { OpenClawAdapterConfig } from "@chrona/openclaw-integration/runtime
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 import { db } from "@/lib/db";
 
-const runtimeExecutionFactories = new Map<string, (config?: OpenClawAdapterConfig) => Promise<RuntimeExecutionAdapter>>([
+type RuntimeExecutionFactory = (config?: OpenClawAdapterConfig) => Promise<RuntimeExecutionAdapter>;
+
+const runtimeExecutionFactories = new Map<string, RuntimeExecutionFactory>([
   [
     "openclaw",
     async (config) => (await import("@chrona/openclaw-integration/runtime/adapter")).createRuntimeAdapter(config),
@@ -13,6 +15,10 @@ const runtimeExecutionFactories = new Map<string, (config?: OpenClawAdapterConfi
     async () => (await import("@/modules/research-execution/adapter")).createResearchRuntimeAdapter(),
   ],
 ]);
+
+export function overrideRuntimeExecutionAdapter(key: string, factory: RuntimeExecutionFactory): void {
+  runtimeExecutionFactories.set(key, factory);
+}
 
 async function loadOpenClawAdapterConfig(): Promise<OpenClawAdapterConfig | undefined> {
   const client = await db.aiClient.findFirst({

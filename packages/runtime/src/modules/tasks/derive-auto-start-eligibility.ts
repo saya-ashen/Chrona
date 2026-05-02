@@ -37,7 +37,7 @@ export function deriveAutoStartEligibility(input: {
   now: Date;
   activeRun?: RunLike | null;
 }): AutoStartEligibility {
-  if (input.task.scheduleStatus !== "Scheduled") {
+  if (input.task.scheduleStatus !== "Scheduled" && input.task.scheduleStatus !== "Overdue") {
     return { ok: false, reason: "not_scheduled" };
   }
 
