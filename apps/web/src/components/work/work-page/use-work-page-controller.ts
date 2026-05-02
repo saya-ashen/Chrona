@@ -130,18 +130,24 @@ export function useWorkPageController(
   );
 
   useEffect(() => {
-    if (
-      isPending ||
-      !data.currentRun ||
-      !["Running", "WaitingForInput", "WaitingForApproval"].includes(
+    const planExecutionActive = data.planExecution
+      ? ["running", "started", "waiting_for_user", "waiting_for_approval", "blocked"].includes(
+          data.planExecution.status,
+        )
+      : false;
+
+    const runActive =
+      data.currentRun &&
+      ["Running", "WaitingForInput", "WaitingForApproval"].includes(
         data.currentRun.status,
-      )
-    ) {
+      );
+
+    if (isPending || (!planExecutionActive && !runActive)) {
       return;
     }
 
     const intervalMs = Number(
-      process.env.VITE_WORK_POLL_INTERVAL_MS ?? 10000,
+      import.meta.env.VITE_WORK_POLL_INTERVAL_MS ?? 10000,
     );
 
     const interval = window.setInterval(() => {
@@ -149,7 +155,7 @@ export function useWorkPageController(
     }, intervalMs);
 
     return () => window.clearInterval(interval);
-  }, [data.currentRun, isPending, refresh]);
+  }, [data.currentRun, data.planExecution, isPending, refresh]);
 
   const resetComposer = useCallback(() => {
     composerValueRef.current = "";
@@ -168,6 +174,43 @@ export function useWorkPageController(
 
       const didSucceed = await runScopedAction(async () => {
         const currentRun = data.currentRun;
+        const planExecution = data.planExecution;
+
+        if (planExecution) {
+          if (planExecution.status === "no_plan") {
+            throw new Error("No accepted plan. Create or accept a plan before execution.");
+          }
+
+          if (planExecution.status === "completed") {
+            throw new Error("Plan execution is complete. Reopen or create a follow-up task.");
+          }
+
+          if (
+            planExecution.status === "waiting_for_user" ||
+            planExecution.status === "waiting_for_approval" ||
+            planExecution.status === "blocked"
+          ) {
+            await provideInput({
+              taskId: data.taskShell.id,
+              inputText,
+            });
+            return;
+          }
+
+          if (planExecution.status === "running") {
+            await sendOperatorMessage({
+              taskId: data.taskShell.id,
+              message: inputText,
+            });
+            return;
+          }
+
+          await startRun({
+            taskId: data.taskShell.id,
+            prompt: inputText,
+          });
+          return;
+        }
 
         if (!currentRun) {
           await startRun({

@@ -184,6 +184,97 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       }
     : null;
 
+  const planExecution = (() => {
+    if (!savedPlan || savedPlan.status !== "accepted") {
+      return {
+        status: "no_plan" as const,
+        currentNodeId: null,
+        executedNodeIds: [] as string[],
+        waitingNodeIds: [] as string[],
+        blockedNodeIds: [] as string[],
+        message: "No accepted plan.",
+      };
+    }
+
+    const planNodes = savedPlan.plan.nodes;
+    const executed = planNodes
+      .filter((n) => n.status === "done" || n.status === "skipped")
+      .map((n) => n.id);
+    const waiting = planNodes
+      .filter((n) => n.status === "waiting_for_user")
+      .map((n) => n.id);
+    const blocked = planNodes
+      .filter((n) => n.status === "blocked")
+      .map((n) => n.id);
+    const inProgress = planNodes.find((n) => n.status === "in_progress");
+
+    const allDone = planNodes.every(
+      (n) => n.status === "done" || n.status === "skipped",
+    );
+
+    if (allDone) {
+      return {
+        status: "completed" as const,
+        currentNodeId: null,
+        executedNodeIds: executed,
+        waitingNodeIds: waiting,
+        blockedNodeIds: blocked,
+        message: "All plan nodes completed.",
+      };
+    }
+
+    if (task.status === "WaitingForInput" && waiting.length > 0) {
+      return {
+        status: "waiting_for_user" as const,
+        currentNodeId: waiting[0],
+        executedNodeIds: executed,
+        waitingNodeIds: waiting,
+        blockedNodeIds: blocked,
+        message: task.blockReason
+          ? (task.blockReason as { actionRequired?: string }).actionRequired ??
+            "Waiting for user input"
+          : "Waiting for user input",
+      };
+    }
+
+    if (task.status === "WaitingForApproval") {
+      return {
+        status: "waiting_for_approval" as const,
+        currentNodeId: inProgress?.id ?? null,
+        executedNodeIds: executed,
+        waitingNodeIds: waiting,
+        blockedNodeIds: blocked,
+        message: task.blockReason
+          ? (task.blockReason as { actionRequired?: string }).actionRequired ??
+            "Waiting for approval"
+          : "Waiting for approval",
+      };
+    }
+
+    if (task.status === "Blocked" && blocked.length > 0) {
+      return {
+        status: "blocked" as const,
+        currentNodeId: blocked[0],
+        executedNodeIds: executed,
+        waitingNodeIds: waiting,
+        blockedNodeIds: blocked,
+        message: task.blockReason
+          ? (task.blockReason as { actionRequired?: string }).actionRequired ??
+            "Execution is blocked"
+          : "Execution is blocked",
+      };
+    }
+
+    return {
+      status: "running" as const,
+      currentNodeId: inProgress?.id ?? null,
+      executedNodeIds: executed,
+      waitingNodeIds: waiting,
+      blockedNodeIds: blocked,
+      message: "Executing plan nodes.",
+    };
+  })();
+
   const latestOutput = buildLatestOutput({
     artifacts: currentRun?.artifacts.map((artifact) => ({
       id: artifact.id,
@@ -258,6 +349,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       toolCalls,
       scheduleImpact,
       copy: mergedCopy,
+      planExecution,
     }),
     latestOutput,
     scheduleImpact,
@@ -272,6 +364,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     workstreamItems,
     conversation,
     composerValue: "",
+    planExecution,
     inspector: {
       approvals,
       artifacts,

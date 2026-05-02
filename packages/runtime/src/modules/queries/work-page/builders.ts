@@ -191,6 +191,7 @@ export function buildCurrentIntervention({
   toolCalls,
   scheduleImpact,
   copy,
+  planExecution,
 }: {
   taskTitle: string;
   currentRun:
@@ -225,6 +226,11 @@ export function buildCurrentIntervention({
     summary: string;
   };
   copy: WorkPageCopy;
+  planExecution?: {
+    status: string;
+    message: string;
+    currentNodeId: string | null;
+  } | null;
 }) {
   const latestWorkstreamItem = [...workstreamItems].reverse()[0] ?? null;
   const latestToolIssue = [...toolCalls].reverse().find((tool) => tool.errorSummary || tool.status === "failed") ?? null;
@@ -256,14 +262,77 @@ export function buildCurrentIntervention({
   }
 
   if (!currentRun) {
+    if (planExecution && planExecution.status !== "no_plan" && planExecution.status !== "completed") {
+      switch (planExecution.status) {
+        case "waiting_for_user":
+          return {
+            kind: "input" as const,
+            title: copy.provideInput,
+            description: planExecution.message ?? blockReason?.actionRequired ?? copy.waitingForGuidance,
+            actionLabel: copy.sendToAgent,
+            defaultMessage: blockReason?.actionRequired ?? `Continue work on ${taskTitle}`,
+            whyNow: blockReason?.actionRequired ?? copy.pausedUntilReply,
+            evidence: [
+              makeEvidence({
+                label: copy.requestedGuidance,
+                value: planExecution.message ?? `Continue work on ${taskTitle}`,
+                tone: "warning",
+              }),
+              ...sharedEvidence,
+            ].slice(0, 3),
+          };
+        case "waiting_for_approval":
+          return {
+            kind: "approval" as const,
+            title: copy.resolveApproval,
+            description: planExecution.message ?? blockReason?.actionRequired ?? copy.blockedOnApproval,
+            actionLabel: copy.approveRejectEdit,
+            approvals,
+            whyNow: blockReason?.actionRequired ?? copy.humanDecisionRequired,
+            evidence: sharedEvidence.slice(0, 3),
+          };
+        case "blocked":
+          return {
+            kind: "retry" as const,
+            title: copy.recoverRun,
+            description: planExecution.message ?? blockReason?.actionRequired ?? copy.stoppedBeforeFinishing,
+            actionLabel: copy.retryRun,
+            defaultMessage: `Recover task: ${taskTitle}`,
+            whyNow: blockReason?.actionRequired ?? copy.executionStopped,
+            evidence: sharedEvidence.slice(0, 3),
+          };
+        case "running":
+        case "started":
+          return {
+            kind: "observe" as const,
+            title: copy.observeProgress,
+            description: planExecution.message ?? copy.runActiveDescription,
+            actionLabel: copy.watchWorkstream,
+            whyNow: copy.agentExecutingWhy,
+            evidence: sharedEvidence.slice(0, 3),
+          };
+      }
+    }
+
+    if (planExecution && planExecution.status === "no_plan") {
+      return {
+        kind: "idle" as const,
+        title: "Create a plan first",
+        description: "This task has no accepted execution plan. Generate or accept a plan before starting execution.",
+        actionLabel: "Generate Plan",
+        whyNow: "A plan is required before execution can begin.",
+        evidence: sharedEvidence,
+      };
+    }
+
     return {
-      kind: "idle",
+      kind: "idle" as const,
       title: copy.startExecution,
       description: copy.noRunActiveDescription,
       actionLabel: copy.startRunHere,
       whyNow: blockReason?.actionRequired ?? copy.noActiveRunWhy,
       evidence: sharedEvidence,
-    } as const;
+    };
   }
 
   switch (currentRun.status) {
