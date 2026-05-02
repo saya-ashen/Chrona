@@ -1,12 +1,15 @@
 {
   "nav": {
     "brandTitle": "Chrona",
-    "brandTagline": "以任务为中心的 AI 控制台",
+    "brandTagline": "人机协作的 AI 任务工作台",
     "workspaces": "工作区",
     "schedule": "日程",
+    "tasks": "任务",
+    "workbench": "工作台",
     "inbox": "收件箱",
     "memory": "记忆",
-    "settings": "设置"
+    "settings": "设置",
+    "newTask": "新建任务"
   },
   "locale": {
     "label": "语言",
@@ -22,7 +25,7 @@
   },
   "metadata": {
     "title": "Chrona",
-    "description": "面向人与运行时协作的任务型 AI 控制台。"
+    "description": "以任务为中心的 AI 执行工作台。"
   },
   "components": {
     "taskPage": {

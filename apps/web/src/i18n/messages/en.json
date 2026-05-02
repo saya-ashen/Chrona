@@ -1,12 +1,15 @@
 {
   "nav": {
     "brandTitle": "Chrona",
-    "brandTagline": "Task-centric AI control plane",
+    "brandTagline": "Human-AI task workbench",
     "workspaces": "Workspaces",
     "schedule": "Schedule",
+    "tasks": "Tasks",
+    "workbench": "Workbench",
     "inbox": "Inbox",
     "memory": "Memory",
-    "settings": "Settings"
+    "settings": "Settings",
+    "newTask": "New Task"
   },
   "locale": {
     "label": "Language",
@@ -22,7 +25,7 @@
   },
   "metadata": {
     "title": "Chrona",
-    "description": "Task-centric AI control plane for human and runtime collaboration."
+    "description": "AI task workbench for human-machine collaboration."
   },
   "components": {
     "taskPage": {
