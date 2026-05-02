@@ -3,6 +3,8 @@ import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams }
 import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "@/components/schedule/schedule-page";
+import { TaskListPage } from "@/components/tasks/task-list-page";
+import { WorkbenchHubPage } from "@/components/work/workbench-hub-page";
 import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
@@ -31,6 +33,33 @@ export type TaskPageRouteData = {
   locale: Locale;
   dictionary: Dictionary;
   task: Awaited<ReturnType<typeof import("@/modules/queries/get-task-page").getTaskPage>>;
+};
+
+export type TaskListRouteData = {
+  locale: Locale;
+  dictionary: Dictionary;
+  tasks: {
+    id: string;
+    workspaceId: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    dueAt: string | null;
+    updatedAt: string;
+    projection: {
+      runStatus: string | null;
+      isRunnable: boolean;
+    } | null;
+  }[];
+  workspaceId: string;
+};
+
+export type WorkbenchHubRouteData = {
+  locale: Locale;
+  dictionary: Dictionary;
+  tasks: TaskListRouteData["tasks"];
+  workspaceId: string;
 };
 
 export type WorkPageRouteData = {
@@ -162,6 +191,16 @@ export function SettingsRoutePage() {
       />
     </>
   );
+}
+
+export function TaskListRoutePage() {
+  const { tasks, workspaceId, dictionary } = useLoaderData() as TaskListRouteData;
+  return <TaskListPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
+}
+
+export function WorkbenchHubRoutePage() {
+  const { tasks, workspaceId, dictionary } = useLoaderData() as WorkbenchHubRouteData;
+  return <WorkbenchHubPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
 }
 
 export function WorkspacesRoutePage() {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Ellipsis, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskEditForm } from "@/components/tasks/task-edit-form";
 import { TaskPlanPanel } from "@/components/tasks/task-plan-panel";
@@ -189,10 +190,11 @@ function priorityTone(priority: string) {
   return "neutral" as const;
 }
 
-function scheduleTone(status: string) {
-  if (status === "Overdue") return "critical" as const;
-  if (status === "AtRisk") return "warning" as const;
-  if (status === "InProgress" || status === "Scheduled") return "info" as const;
+function statusTone(status: string) {
+  if (["Completed", "Done"].includes(status)) return "success" as const;
+  if (["Running", "Ready", "Queued", "Scheduled"].includes(status)) return "info" as const;
+  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "warning" as const;
+  if (["Failed", "Blocked"].includes(status)) return "critical" as const;
   return "neutral" as const;
 }
 
@@ -482,8 +484,23 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     };
   }, [plan]);
 
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    }
+    if (showMoreMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showMoreMenu]);
+
   return (
-    <div className="h-full overflow-y-auto grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="h-full overflow-y-auto space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
       <div className="space-y-6">
         <SurfaceCard className="space-y-6" padding="lg">
           <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-6">
@@ -492,59 +509,78 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
                 {task.title}
               </h1>
               <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone="info">{task.status}</StatusBadge>
+                <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge>
                 <StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge>
-                <StatusBadge tone={scheduleTone(task.scheduleStatus)}>
-                  {task.scheduleStatus}
-                </StatusBadge>
-                <StatusBadge tone={task.isRunnable ? "success" : "warning"}>
-                  {task.runnabilitySummary}
-                </StatusBadge>
+                {task.runnabilityState && (
+                  <StatusBadge tone={task.isRunnable ? "success" : "warning"}>
+                    {task.runnabilitySummary}
+                  </StatusBadge>
+                )}
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <LocalizedLink
                 href="/schedule"
-                className={buttonVariants({ variant: "default" })}
+                className={buttonVariants({ variant: "outline", className: "rounded-xl" })}
               >
                 {copy.backToSchedule}
               </LocalizedLink>
               <LocalizedLink
                 href={`/workspaces/${task.workspaceId}/work/${task.id}`}
-                className={buttonVariants({ variant: "outline" })}
+                className={buttonVariants({ variant: "default", className: "rounded-xl" })}
               >
                 {copy.openWorkbench}
               </LocalizedLink>
-              {showDeleteConfirm ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className={buttonVariants({ variant: "destructive" })}
-                  >
-                    {isDeleting ? "Deleting..." : "Confirm Delete"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className={buttonVariants({ variant: "outline" })}
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
+              <div className="relative" ref={moreMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className={buttonVariants({ variant: "destructive" })}
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={buttonVariants({ variant: "ghost", className: "rounded-xl size-9" })}
                 >
-                  Delete Task
+                  <Ellipsis className="size-4" />
                 </button>
-              )}
+                {showMoreMenu && (
+                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-2xl border border-border/70 bg-white p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.12)]">
+                    {!showDeleteConfirm ? (
+                      <button
+                        type="button"
+                        onClick={() => { setShowDeleteConfirm(true); setShowMoreMenu(false); }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="size-4" />
+                        Delete Task
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </div>
             </div>
           </SurfaceCardHeader>
+
+          {showDeleteConfirm && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-medium text-red-800">Are you sure you want to delete this task?</p>
+              <p className="mt-1 text-xs text-red-600">This action cannot be undone. All runs, plans, and data will be permanently removed.</p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className={buttonVariants({ variant: "destructive", size: "sm" })}
+                >
+                  {isDeleting ? "Deleting..." : "Confirm Delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <TaskEditForm
             task={editing}
@@ -579,7 +615,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         />
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto">
         <TaskWorkspaceAssistant
           taskId={task.id}
           buildCurrentTask={assistantBuildCurrentTask}
@@ -598,7 +634,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           }}
           isApplying={isApplying}
         />
-
       </aside>
     </div>
   );

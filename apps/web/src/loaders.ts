@@ -6,7 +6,9 @@ import { resolveLocale, type Locale } from "@/i18n/config";
 import { apiJson } from "./api";
 import type {
   AppBootData,
+  TaskListRouteData,
   TaskPageRouteData,
+  WorkbenchHubRouteData,
   WorkPageRouteData,
   WorkspaceOverviewRouteData,
 } from "./pages";
@@ -41,6 +43,50 @@ export async function loadAppBootData({ params, request }: LoaderFunctionArgs): 
     inbox,
     memory,
     workspaces,
+  };
+}
+
+export async function loadTaskListData({ params, request }: LoaderFunctionArgs): Promise<TaskListRouteData> {
+  const locale = await resolveRouteLocale(params);
+  const dictionary = await getDictionary(locale);
+  const origin = getOrigin(request);
+
+  const workspace = await apiJson<TaskListRouteData["workspaceId"] & { id: string }>(
+    `${origin}/api/workspaces/default`,
+  );
+  const workspaceId = workspace.id;
+
+  const result = await apiJson<{ tasks: TaskListRouteData["tasks"]; count: number }>(
+    `${origin}/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`,
+  );
+
+  return {
+    locale,
+    dictionary,
+    tasks: result.tasks,
+    workspaceId,
+  };
+}
+
+export async function loadWorkbenchHubData({ params, request }: LoaderFunctionArgs): Promise<WorkbenchHubRouteData> {
+  const locale = await resolveRouteLocale(params);
+  const dictionary = await getDictionary(locale);
+  const origin = getOrigin(request);
+
+  const workspace = await apiJson<{ id: string }>(
+    `${origin}/api/workspaces/default`,
+  );
+  const workspaceId = workspace.id;
+
+  const result = await apiJson<{ tasks: WorkbenchHubRouteData["tasks"]; count: number }>(
+    `${origin}/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`,
+  );
+
+  return {
+    locale,
+    dictionary,
+    tasks: result.tasks,
+    workspaceId,
   };
 }
 

@@ -10,15 +10,19 @@ import {
   ScheduleRoutePage,
   SettingsRoutePage,
   TaskDetailRoutePage,
+  TaskListRoutePage,
   WorkRoutePage,
+  WorkbenchHubRoutePage,
   WorkspaceOverviewRoutePage,
   WorkspacesRoutePage,
 } from "./pages";
 import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
+  loadTaskListData,
   loadTaskPageData,
   loadWorkPageData,
+  loadWorkbenchHubData,
   loadWorkspaceOverviewData,
 } from "./loaders";
 
@@ -58,6 +62,16 @@ export function createAppRouter() {
         {
           path: "memory",
           element: <MemoryRoutePage />,
+        },
+        {
+          path: "tasks",
+          loader: loadTaskListData,
+          element: <TaskListRoutePage />,
+        },
+        {
+          path: "workbench",
+          loader: loadWorkbenchHubData,
+          element: <WorkbenchHubRoutePage />,
         },
         {
           path: "settings",
