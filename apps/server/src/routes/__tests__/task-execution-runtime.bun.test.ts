@@ -4,7 +4,7 @@
  * Inline route handlers to avoid the full createApiRouter() cascade import.
  * Uses mock adapters with syncRunFromRuntime-compatible snapshots.
  */
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
@@ -189,11 +189,6 @@ describe("POST /api/tasks/:taskId/message", () => {
     await resetTestDb();
   });
 
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
-  });
-
   it("sends operator message to a Running run", async () => {
     const { workspaceId } = await seedWorkspace("Message Test");
     const { taskId } = await seedTask(workspaceId, {
@@ -367,11 +362,6 @@ describe("POST /api/tasks/:taskId/message", () => {
 describe("POST /api/tasks/:taskId/resume", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("resumes a WaitingForInput run", async () => {

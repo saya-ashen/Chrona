@@ -3,7 +3,7 @@
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import.
  */
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { ApprovalStatus, RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
@@ -196,11 +196,6 @@ describe("POST /api/tasks/:taskId/done", () => {
     await resetTestDb();
   });
 
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
-  });
-
   it("marks task as Done when latest run is Completed", async () => {
     const { workspaceId } = await seedWorkspace("Done Test");
     const { taskId } = await seedTask(workspaceId, {
@@ -337,11 +332,6 @@ describe("POST /api/tasks/:taskId/reopen", () => {
     await resetTestDb();
   });
 
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
-  });
-
   it("reopens a Done task back to Ready", async () => {
     const { workspaceId } = await seedWorkspace("Reopen Test");
     const { taskId } = await seedTask(workspaceId, {
@@ -424,11 +414,6 @@ describe("POST /api/tasks/:taskId/reopen", () => {
 describe("POST /api/tasks/:taskId/result/accept", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("accepts a completed run result", async () => {
@@ -522,11 +507,6 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
 describe("POST /api/tasks/:taskId/follow-up", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("creates a follow-up task with inherited config", async () => {
@@ -670,11 +650,6 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
 describe("POST /api/approvals/:approvalId/resolve", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   async function seedApproval(workspaceId: string, decision?: "Approved" | "Rejected") {

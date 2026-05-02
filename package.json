@@ -47,7 +47,7 @@
     "check:boundaries": "bunx dependency-cruiser --config .dependency-cruiser.cjs apps packages",
     "test:web": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:api": "bun test apps/server/src/__tests__/api/ apps/server/src/routes/__tests__/",
+    "test:api": "bun run scripts/run-api-tests.ts",
     "test:bridge": "bun test apps/server/src/__tests__/bridge/ packages/providers/openclaw/bridge/src/ packages/providers/openclaw/integration/src/transport/",
     "test:bun": "bun run scripts/run-bun-tests.ts",
     "test:e2e": "playwright test",

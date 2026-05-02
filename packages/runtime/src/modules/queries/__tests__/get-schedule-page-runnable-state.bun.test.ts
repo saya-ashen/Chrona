@@ -159,20 +159,14 @@ describe("getSchedulePage runnable state", () => {
       taskId: draftTask.id,
       runtimeModel: "gpt-5.4",
       prompt: null,
-      isRunnable: false,
-      runnabilityState: "missing_prompt",
-      runnabilitySummary: "Needs prompt",
+      isRunnable: true,
+      runnabilityState: "ready_to_run",
+      runnabilitySummary: "Ready to run",
     });
     expect(page.unscheduled.some((item) => item.taskId === childDraft.id)).toBe(false);
     expect(page.listItems.some((item) => item.taskId === childDraft.id)).toBe(true);
 
     expect(page.automationCandidates).toEqual([
-      {
-        taskId: draftTask.id,
-        kind: "generate_plan",
-        reason: "Task needs execution details before it can run.",
-        priority: "medium",
-      },
       {
         taskId: readyTask.id,
         kind: "auto_run",

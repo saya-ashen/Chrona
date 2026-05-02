@@ -3,7 +3,7 @@
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import.
  */
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
@@ -138,11 +138,6 @@ function app() {
 describe("POST /api/tasks/:taskId/run", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("creates a run and returns 201", async () => {
@@ -288,11 +283,6 @@ describe("POST /api/tasks/:taskId/retry", () => {
     await resetTestDb();
   });
 
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
-  });
-
   it("retries a Completed run and returns 200", async () => {
     const { workspaceId } = await seedWorkspace("Retry Test");
     const { taskId } = await seedTask(workspaceId, {
@@ -414,11 +404,6 @@ describe("POST /api/tasks/:taskId/retry", () => {
 describe("POST /api/tasks/:taskId/input", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("provides input to a WaitingForInput run", async () => {

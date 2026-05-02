@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
@@ -326,11 +326,6 @@ async function seedPlan(): Promise<SeedResult> {
 describe("POST /api/tasks/:taskId/plan", () => {
   beforeEach(async () => {
     await resetDb();
-  });
-
-  afterAll(async () => {
-    await resetDb();
-    await db.$disconnect();
   });
 
   describe("add_node", () => {
