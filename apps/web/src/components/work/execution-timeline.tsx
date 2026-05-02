@@ -53,6 +53,7 @@ const DEFAULT_COPY = {
   taskContextGroup: "Task Context",
   runGroupLatest: "Latest",
   runGroupCount: "Record Count",
+  startedByScheduler: "由调度器自动启动",
 } as const;
 
 const KEY_MILESTONE_KINDS = ["approval", "input", "failure", "result", "output"] as const;
@@ -198,6 +199,8 @@ function renderEventCard(
   copy: CopyType,
 ) {
   const payloadEntries = Object.entries(event.payload);
+  const isSchedulerStarted =
+    event.eventType === "run.started" && event.payload.triggered_by === "scheduler";
 
   return (
     <article
@@ -211,6 +214,11 @@ function renderEventCard(
             <span className={`rounded-full border px-2 py-1 text-[11px] ${getBadgeClass(event.kind)}`}>
               {event.badge ?? copy.progress}
             </span>
+            {isSchedulerStarted ? (
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] text-blue-700">
+                {copy.startedByScheduler}
+              </span>
+            ) : null}
             <p className="font-medium text-foreground">{event.title ?? event.eventType}</p>
           </div>
           <p className="text-[11px] font-mono text-muted-foreground">{formatDate(event.runtimeTs)}</p>
