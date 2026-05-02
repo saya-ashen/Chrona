@@ -1,0 +1,44 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "scripts/**/*.ts",
+    "prisma/seed.ts",
+    "vitest.config.ts",
+    "prisma.config.ts"
+  ],
+  "project": [
+    "scripts/**/*.{ts,tsx}",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!**/__tests__/**",
+    "!**/*.spec.ts"
+  ],
+  "ignore": [
+    "postcss.config.mjs",
+    "packages/db/src/generated/**"
+  ],
+  "ignoreDependencies": [
+    "esbuild"
+  ],
+  "rules": {
+    "classMembers": "off",
+    "enumMembers": "off"
+  },
+  "workspaces": {
+    "apps/server": {
+      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+    },
+    "apps/web": {
+      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+    },
+    "packages/*": {
+      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+    },
+    "packages/*/*": {
+      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+    },
+    "packages/*/*/*": {
+      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+    }
+  }
+}

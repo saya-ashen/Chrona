@@ -22,6 +22,39 @@ const eslintConfig = defineConfig([
         caughtErrorsIgnorePattern: "^_",
         destructuredArrayIgnorePattern: "^_",
       }],
+
+      "no-unreachable": "error",
+      "no-constant-condition": "warn",
+
+      "max-lines": ["warn", {
+        max: 500,
+        skipBlankLines: true,
+        skipComments: true,
+      }],
+      "max-lines-per-function": ["warn", {
+        max: 100,
+        skipBlankLines: true,
+        skipComments: true,
+      }],
+
+      complexity: ["warn", 12],
+      "max-depth": ["warn", 4],
+      "max-params": ["warn", 5],
+      "max-statements": ["warn", 50],
+    },
+  },
+  {
+    files: ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unnecessary-condition": "warn",
+      "@typescript-eslint/switch-exhaustiveness-check": "warn",
     },
   },
   {

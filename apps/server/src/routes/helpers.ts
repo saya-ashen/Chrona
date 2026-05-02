@@ -189,7 +189,7 @@ export function generateSuggestionSummary(s: { title: string; priority: string; 
   return `创建${s.estimatedMinutes}分钟的「${s.title}」任务，${priorityMap[s.priority] ?? s.priority}`;
 }
 
-export function normalizeSuggestionShape(parsed: unknown): StructuredSuggestion[] | null {
+function normalizeSuggestionShape(parsed: unknown): StructuredSuggestion[] | null {
   if (!parsed || typeof parsed !== "object") return null;
   const envelope = parsed as {
     suggestions?: Array<{
@@ -264,7 +264,7 @@ export function toDateOrNull(value: unknown) {
   return typeof value === "string" && value ? new Date(value) : null;
 }
 
-export function isInvalidDate(value: Date | null | undefined) {
+function isInvalidDate(value: Date | null | undefined) {
   return value instanceof Date && Number.isNaN(value.getTime());
 }
 
@@ -386,3 +386,5 @@ export async function deleteTaskWithRelations(taskId: string) {
 
   return { success: true, taskId };
 }
+
+

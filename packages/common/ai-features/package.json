@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@chrona/db": "workspace:*",
     "@chrona/openclaw-integration": "workspace:*"
   },
   "exports": {

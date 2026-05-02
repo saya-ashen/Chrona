@@ -43,7 +43,7 @@ export const DEFAULT_BRIDGE_ENVIRONMENT: BridgeEnvironment = {
   messageChannel: process.env.OPENCLAW_MESSAGE_CHANNEL?.trim() || undefined,
 };
 
-export { normalizeGatewayHttpUrl };
+
 
 export const FEATURE_ENDPOINTS: Array<{
   pathname: string;

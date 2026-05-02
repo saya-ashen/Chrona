@@ -1,6 +1,4 @@
-export function formatDate(value: string | null | undefined) {
-  return value ? value.slice(0, 10) : "-";
-}
+import type { WorkbenchCopy } from "./work-page-types";
 
 export function formatDateTime(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
@@ -8,23 +6,6 @@ export function formatDateTime(value: string | null | undefined) {
 
 export function isOverdueScheduleStatus(status: string | null | undefined) {
   return status === "AtRisk" || status === "Overdue";
-}
-
-export function getScheduleStatusLabel(status: string | null | undefined) {
-  switch (status) {
-    case "AtRisk":
-      return "At risk";
-    case "Overdue":
-      return "Overdue";
-    case "OnTrack":
-      return "On track";
-    case "Unscheduled":
-      return "Unscheduled";
-    case "Completed":
-      return "Completed";
-    default:
-      return status || "N/A";
-  }
 }
 
 export function getRunStatusLabel(status: string | null | undefined) {
@@ -46,40 +27,6 @@ export function getRunStatusLabel(status: string | null | undefined) {
   }
 }
 
-export function getApprovalStatusLabel(status: string | null | undefined) {
-  switch (status) {
-    case "Pending":
-      return "Pending";
-    case "Approved":
-      return "Approved";
-    case "Rejected":
-      return "Rejected";
-    case "Cancelled":
-      return "Cancelled";
-    default:
-      return status || "N/A";
-  }
-}
-
-export function getTaskLifecycleLabel(status: string | null | undefined) {
-  switch (status) {
-    case "Ready":
-      return "Pending";
-    case "Running":
-    case "InProgress":
-      return "In progress";
-    case "Blocked":
-      return "Blocked";
-    case "Done":
-    case "Completed":
-      return "Completed";
-    case "Cancelled":
-      return "Cancelled";
-    default:
-      return status || "N/A";
-  }
-}
-
 export function getSyncStatusLabel(
   status: string | null | undefined,
   copy: Pick<WorkbenchCopy, "healthySync" | "staleSync">,
@@ -95,38 +42,6 @@ export function getSyncStatusLabel(
   }
 }
 
-export function getArtifactTypeLabel(type: string | null | undefined) {
-  switch (type) {
-    case "document":
-      return "Document";
-    case "file":
-      return "File";
-    case "link":
-      return "Link";
-    case "image":
-      return "Image";
-    default:
-      return type || "N/A";
-  }
-}
-
-export function getToolCallStatusLabel(status: string | null | undefined) {
-  switch (status) {
-    case "completed":
-    case "success":
-      return "Completed";
-    case "running":
-    case "pending":
-      return "In progress";
-    case "failed":
-    case "error":
-      return "Failed";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return status || "N/A";
-  }
-}
 export function parseDateInputForSubmission(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
 
@@ -153,21 +68,3 @@ export function parseDateInputForSubmission(value: string) {
 
   return parsedDate;
 }
-export function isSafeExternalHref(href: string) {
-  try {
-    const protocol = new URL(href).protocol;
-    return (
-      protocol === "http:" ||
-      protocol === "https:" ||
-      protocol === "mailto:" ||
-      protocol === "tel:"
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function isInternalAppHref(href: string) {
-  return href.startsWith("/") && !href.startsWith("//");
-}
-import type { WorkbenchCopy } from "./work-page-types";

@@ -9,6 +9,7 @@
  * this shared-DB contention.
  */
 
+export {};
 const glob = new Bun.Glob("*.bun.test.ts");
 
 const dirs = [

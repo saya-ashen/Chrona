@@ -23,7 +23,7 @@ function sanitizeClientErrorMessage(error: unknown): string {
   return message || "Bridge request failed";
 }
 
-export interface CreateBridgeAppOptions {
+interface CreateBridgeAppOptions {
   logger?: BridgeLogger;
   environment?: BridgeEnvironment;
   checkGatewayAvailable?: () => Promise<boolean>;
@@ -174,3 +174,4 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
 
   return app;
 }
+

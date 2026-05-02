@@ -1,5 +1,5 @@
 import type { TaskPlanGraph, PlanUpdatePatch } from "@/modules/ai/types";
-import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import type { SavedTaskPlanGraph } from "@/modules/ai/types";
 
 export type ApplyPlanPatchInput = {
@@ -30,7 +30,7 @@ export async function applyPlanPatch(
       .map((n) => n.id),
   );
 
-  let updatedGraph = structuredClone(graph);
+  const updatedGraph = structuredClone(graph);
   const patchWarnings = patch.warnings ?? [];
 
   switch (patch.operation) {

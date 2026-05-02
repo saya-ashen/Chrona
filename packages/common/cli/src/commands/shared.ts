@@ -12,7 +12,7 @@ export interface CommonCommandOptions {
   output: OutputFormat;
 }
 
-export interface ClientOptions {
+interface ClientOptions {
   baseUrl: string;
 }
 
@@ -65,3 +65,4 @@ export function parseJsonOption<T>(value: string, label: string): T {
     printErrorAndExit(invalidJson(label));
   }
 }
+

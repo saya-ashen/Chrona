@@ -1,4 +1,4 @@
-export class HttpError extends Error {
+class HttpError extends Error {
   status: number;
   data: unknown;
 
@@ -65,3 +65,4 @@ export function deleteJson<T>(input: RequestInfo | URL, body?: unknown, init?: R
     ...init,
   });
 }
+

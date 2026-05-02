@@ -43,7 +43,7 @@ function sanitizeValue(value: unknown, key?: string): unknown {
   );
 }
 
-export function sanitizeForLog(data?: Record<string, unknown>): Record<string, unknown> | undefined {
+function sanitizeForLog(data?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!data) return undefined;
   return sanitizeValue(data) as Record<string, unknown>;
 }
@@ -82,3 +82,4 @@ export function createBridgeLogger(options?: {
     error: (event, data) => emit("error", event, data),
   };
 }
+

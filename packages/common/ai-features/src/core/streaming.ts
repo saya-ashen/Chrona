@@ -100,7 +100,7 @@ function parseBridgeEvent(evt: NDJSONEvent): StreamEvent | null {
   return null;
 }
 
-export async function* openclawStream(
+async function* openclawStream(
   config: OpenClawClientConfig,
   feature: AiFeature,
   scope: string,
@@ -206,7 +206,7 @@ export async function* openclawStream(
   }
 }
 
-export async function* llmStream(
+async function* llmStream(
   config: LLMClientConfig,
   systemPrompt: string,
   userMessage: string,
@@ -292,7 +292,7 @@ export async function* llmStream(
   yield { type: "done", text: fullText, structured: null };
 }
 
-export function dispatchStream(
+function dispatchStream(
   client: AiClientRecord,
   feature: AiFeature,
   input:
@@ -664,3 +664,4 @@ export async function* generatePlanStream(
     yield event;
   }
 }
+

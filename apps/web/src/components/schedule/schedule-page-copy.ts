@@ -1,58 +1,7 @@
-import type { TaskConfigPreset } from "@/components/schedule/task-config-form";
-
 export const TIMELINE_SLOT_MINUTES = 30;
 export const DEFAULT_SCHEDULE_BLOCK_MINUTES = 60;
 export const TIMELINE_COMPOSER_HEIGHT = 356;
 export const TIMELINE_COMPOSER_MARGIN = 12;
-
-export const TASK_CONFIG_PRESETS: TaskConfigPreset[] = [
-  {
-    id: "requirements-brief",
-    label: "Requirements brief",
-    description: "Clarify goals, constraints, and the first execution plan.",
-    values: {
-      priority: "Medium",
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: {
-        model: "gpt-5.4",
-        prompt:
-          "Clarify the task, capture constraints, and produce a short execution plan with the next concrete step.",
-        temperature: 0.2,
-      },
-    },
-  },
-  {
-    id: "bug-investigation",
-    label: "Bug investigation",
-    description:
-      "Reproduce the issue, identify root cause, and propose the safest fix.",
-    values: {
-      priority: "High",
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: {
-        model: "gpt-5.4",
-        prompt:
-          "Reproduce the issue, identify the root cause, describe the impact, and suggest the safest fix before making broader changes.",
-        temperature: 0.1,
-      },
-    },
-  },
-  {
-    id: "shipping-pass",
-    label: "Shipping pass",
-    description: "Complete the change, verify it, and summarize what shipped.",
-    values: {
-      priority: "Medium",
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: {
-        model: "gpt-5.4",
-        prompt:
-          "Implement the change, verify the result with the smallest reliable test loop, and summarize the final outcome and any follow-up.",
-        temperature: 0.2,
-      },
-    },
-  },
-];
 
 export const DEFAULT_SCHEDULE_PAGE_COPY = {
   planPrefix: "Plan",
@@ -239,3 +188,4 @@ export function getSchedulePageCopy(
     ...(messages ?? {}),
   };
 }
+

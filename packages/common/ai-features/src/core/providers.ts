@@ -154,7 +154,7 @@ export async function openclawCall(
   return result.text;
 }
 
-export async function openclawStructuredCall<T = unknown>(
+async function openclawStructuredCall<T = unknown>(
   config: OpenClawClientConfig,
   feature: AiFeature,
   scope: string,
@@ -185,7 +185,7 @@ export async function openclawStructuredCall<T = unknown>(
   };
 }
 
-export async function openclawHealthCheck(
+async function openclawHealthCheck(
   config: OpenClawClientConfig,
 ): Promise<boolean> {
   try {
@@ -285,7 +285,7 @@ export async function llmCall(
   return chunks.join("");
 }
 
-export function llmHealthCheck(config: LLMClientConfig): boolean {
+function llmHealthCheck(config: LLMClientConfig): boolean {
   return Boolean(config.baseUrl && config.apiKey);
 }
 
@@ -376,3 +376,6 @@ export async function checkClientHealth(
   }
   return llmHealthCheck(client.config as LLMClientConfig);
 }
+
+
+

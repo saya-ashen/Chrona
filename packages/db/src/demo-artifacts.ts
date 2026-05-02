@@ -1,13 +1,13 @@
 import { join } from "node:path";
 
-export type DemoArtifactPaths = {
+type DemoArtifactPaths = {
   artifactsDir: string;
   playwrightOutputDir: string;
   palettePath: string;
   gifPath: string;
 };
 
-export type GifCommandSet = {
+type GifCommandSet = {
   palette: string[];
   gif: string[];
 };
@@ -64,3 +64,5 @@ export function findRecordedVideo(files: string[]): string {
 
   return videos[0];
 }
+
+

@@ -90,7 +90,7 @@ export async function startNodeChildRun(input: {
 }): Promise<{ runId: string; runtimeRunRef: string | null }> {
   const runtimeName = input.runtimeName ?? "openclaw";
 
-  const { RunStatus, TaskStatus, Prisma } = await import("@/generated/prisma/client");
+  const { RunStatus } = await import("@/generated/prisma/client");
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },

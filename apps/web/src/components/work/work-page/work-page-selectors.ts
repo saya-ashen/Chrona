@@ -1,11 +1,9 @@
 import type {
-  CollaborationFeedItem,
   WorkbenchComposer,
   WorkbenchCopy,
   WorkPageClientProps,
 } from "./work-page-types";
 import {
-  formatDateTime,
   getRunStatusLabel,
   isOverdueScheduleStatus,
 } from "./work-page-formatters";
@@ -28,49 +26,6 @@ export function getTaskSummary(
     default:
       return copy.taskReadySummary;
   }
-}
-
-export function getTaskStatusMeta(
-  data: WorkPageClientProps["initialData"],
-  copy: WorkbenchCopy,
-) {
-  if (data.closure.isDone) {
-    return { label: copy.statusCompleted, tone: "success" as const };
-  }
-
-  if (!data.currentRun) {
-    if (data.planExecution) {
-      switch (data.planExecution.status) {
-        case "waiting_for_user":
-          return { label: copy.statusInProgress, tone: "info" as const };
-        case "waiting_for_approval":
-          return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
-        case "blocked":
-          return { label: copy.statusInterrupted, tone: "critical" as const };
-        case "completed":
-          return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
-        case "no_plan":
-          return { label: "Needs Plan", tone: "neutral" as const };
-        case "running":
-        case "started":
-          return { label: copy.statusInProgress, tone: "info" as const };
-      }
-    }
-    return { label: copy.statusNotStarted, tone: "neutral" as const };
-  }
-
-  if (
-    data.currentRun.status === "Failed" ||
-    data.currentRun.status === "Cancelled"
-  ) {
-    return { label: copy.statusInterrupted, tone: "critical" as const };
-  }
-
-  if (data.currentRun.status === "Completed") {
-    return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
-  }
-
-  return { label: copy.statusInProgress, tone: "info" as const };
 }
 
 export function getCurrentException(data: WorkPageClientProps["initialData"], copy: WorkbenchCopy) {
@@ -177,41 +132,8 @@ export function getCurrentPlanAction(
       return { label: copy?.planActionDefault ?? "View current action", href: "#next-action-hero" };
   }
 }
-export function buildConversationFeed(
-  data: WorkPageClientProps["initialData"],
-  copy: WorkbenchCopy,
-): CollaborationFeedItem[] {
-  return [...data.conversation]
-    .sort((a, b) => (a.runtimeTs ?? "").localeCompare(b.runtimeTs ?? ""))
-    .map((entry) => {
-      const isAgent =
-        entry.role.toLowerCase().includes("agent") ||
-        entry.role.toLowerCase().includes("assistant");
-      const kind: CollaborationFeedItem["kind"] = isAgent ? "agent" : "user";
 
-      return {
-        id: entry.id,
-        kind,
-        eyebrow: isAgent ? copy.agentLabel : copy.userLabel,
-        title: "",
-        body: entry.content,
-        meta: entry.runtimeTs ? formatDateTime(entry.runtimeTs) : null,
-      };
-    });
-}
-
-export function getScheduleSourceSummary(
-  taskShell: WorkPageClientProps["initialData"]["taskShell"],
-  copy: WorkbenchCopy,
-) {
-  if (taskShell.scheduledStartAt && taskShell.scheduledEndAt) {
-    return `${copy.sourceSchedule}: ${formatDateTime(taskShell.scheduledStartAt)} → ${formatDateTime(taskShell.scheduledEndAt)}`;
-  }
-
-  return `${copy.sourceSchedule}: ${copy.noScheduleWindow}`;
-}
-
-export function getComposerDefaultValue(
+function getComposerDefaultValue(
   taskTitle: string,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   copy?: WorkbenchCopy,
@@ -220,16 +142,9 @@ export function getComposerDefaultValue(
   return currentRun?.pendingInputPrompt ?? `${prefix}${taskTitle}`;
 }
 
-export function getStartRunDefaultValue(taskTitle: string, copy?: WorkbenchCopy) {
+function getStartRunDefaultValue(taskTitle: string, copy?: WorkbenchCopy) {
   const prefix = copy?.continueProcessingPrefix ?? "Continue: ";
   return `${prefix}${taskTitle}`;
-}
-
-export function getFollowUpDefaultTitle(
-  taskTitle: string,
-  copy: WorkbenchCopy,
-) {
-  return `${taskTitle} - ${copy.followUpDefaultSuffix}`;
 }
 
 export function getPassiveHeroGuidance(
