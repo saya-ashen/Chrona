@@ -11,11 +11,28 @@ import {
 import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
+export type RunTrigger = "user" | "scheduler" | "system" | "runtime";
+
+function resolveActor(triggeredBy: RunTrigger) {
+  switch (triggeredBy) {
+    case "scheduler":
+      return { actorType: "system", actorId: "auto-start-scheduler", source: "scheduler" };
+    case "system":
+      return { actorType: "system", actorId: "system-action", source: "system" };
+    case "runtime":
+      return { actorType: "runtime", actorId: "runtime-orchestrator", source: "runtime" };
+    default:
+      return { actorType: "user", actorId: "server-action", source: "ui" };
+  }
+}
+
 export async function startRun(input: {
   taskId: string;
   prompt?: string;
   adapter?: RuntimeExecutionAdapter;
+  triggeredBy?: RunTrigger;
 }) {
+  const triggeredBy: RunTrigger = input.triggeredBy ?? "user";
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     include: {
@@ -77,7 +94,7 @@ export async function startRun(input: {
       runtimeConfigSnapshot: runRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
       runtimeConfigVersion: runRuntimeConfig.runtimeInputVersion,
       status: RunStatus.Pending,
-      triggeredBy: "user",
+      triggeredBy,
       startedAt: new Date(),
     },
   });
@@ -121,21 +138,23 @@ export async function startRun(input: {
       },
     });
 
+    const actor = resolveActor(triggeredBy);
+
     await appendCanonicalEvent({
       eventType: "run.started",
       workspaceId: task.workspaceId,
       taskId: task.id,
       runId: run.id,
-      actorType: "user",
-      actorId: "server-action",
-      source: "ui",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      source: actor.source,
       payload: {
         runtime_name: runRuntimeConfig.runtimeAdapterKey,
         task_model: runRuntimeConfig.runtimeModel,
         runtime_run_ref: created.runtimeRunRef ?? null,
         runtime_session_key:
           created.runtimeSessionKey ?? created.runtimeSessionRef ?? taskSession.sessionKey,
-        triggered_by: "user",
+        triggered_by: triggeredBy,
       },
       dedupeKey: `run.started:${run.id}`,
     });
