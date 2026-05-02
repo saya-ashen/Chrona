@@ -39,6 +39,23 @@ export function getTaskStatusMeta(
   }
 
   if (!data.currentRun) {
+    if (data.planExecution) {
+      switch (data.planExecution.status) {
+        case "waiting_for_user":
+          return { label: copy.statusInProgress, tone: "info" as const };
+        case "waiting_for_approval":
+          return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
+        case "blocked":
+          return { label: copy.statusInterrupted, tone: "critical" as const };
+        case "completed":
+          return { label: copy.taskAwaitingReviewLabel, tone: "warning" as const };
+        case "no_plan":
+          return { label: "Needs Plan", tone: "neutral" as const };
+        case "running":
+        case "started":
+          return { label: copy.statusInProgress, tone: "info" as const };
+      }
+    }
     return { label: copy.statusNotStarted, tone: "neutral" as const };
   }
 
@@ -59,6 +76,20 @@ export function getTaskStatusMeta(
 export function getCurrentException(data: WorkPageClientProps["initialData"], copy: WorkbenchCopy) {
   if (data.reliability.isStale) {
     return copy.syncException;
+  }
+
+  const pe = data.planExecution;
+  if (pe && !data.currentRun) {
+    switch (pe.status) {
+      case "no_plan":
+        return "No accepted plan exists for this task.";
+      case "blocked":
+        return pe.message || copy.executionInterrupted;
+      case "waiting_for_user":
+        return pe.message || copy.waitingForInput;
+      case "waiting_for_approval":
+        return pe.message || copy.waitingForApproval;
+    }
   }
 
   switch (data.currentRun?.status) {
@@ -251,7 +282,60 @@ export function getWorkbenchComposer(
   closure: WorkPageClientProps["initialData"]["closure"],
   taskShell: WorkPageClientProps["initialData"]["taskShell"],
   copy: WorkbenchCopy,
+  planExecution?: WorkPageClientProps["initialData"]["planExecution"],
 ): WorkbenchComposer | null {
+  if (planExecution && planExecution.status !== "no_plan" && !currentRun) {
+    switch (planExecution.status) {
+      case "waiting_for_user":
+        return {
+          mode: "response",
+          description:
+            currentIntervention?.description ?? copy.responseRequiredDescription,
+          inputLabel: copy.taskArrangement,
+          submitLabel: copy.sendAndContinue,
+          defaultValue:
+            currentIntervention?.defaultMessage ??
+            taskShell.prompt ??
+            getComposerDefaultValue(taskShell.title, currentRun, copy),
+          statusHint: "Plan node requires your input",
+          submitVariant: "default",
+        };
+      case "waiting_for_approval":
+        return {
+          mode: "note",
+          description: planExecution.message ?? "The plan is blocked on an approval decision",
+          inputLabel: copy.conversationInput,
+          submitLabel: copy.sendNoteToAgent,
+          defaultValue: "",
+          statusHint: "Plan awaiting approval · Messages queued",
+          submitVariant: "outline",
+        };
+      case "blocked":
+        return {
+          mode: "retry",
+          description: planExecution.message ?? "The plan stopped before finishing",
+          inputLabel: copy.taskArrangement,
+          submitLabel: copy.retryRun,
+          defaultValue: taskShell.prompt ?? `${copy.recoverTaskPrefix}${taskShell.title}`,
+          statusHint: "Plan execution blocked",
+          submitVariant: "default",
+        };
+      case "running":
+      case "started":
+        return {
+          mode: "note",
+          description: copy.noteWhileRunningDescription,
+          inputLabel: copy.conversationInput,
+          submitLabel: copy.sendNoteToAgent,
+          defaultValue: "",
+          statusHint: `Plan executing · ${copy.noteQueuedForCheckpoint}`,
+          submitVariant: "outline",
+        };
+      case "completed":
+        return null;
+    }
+  }
+
   if (!currentRun) {
     return {
       mode: "start",

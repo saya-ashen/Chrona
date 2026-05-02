@@ -59,6 +59,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     data.closure,
     data.taskShell,
     copy,
+    data.planExecution,
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan, copy);
   const currentPlanStep = data.taskPlan.steps.find(

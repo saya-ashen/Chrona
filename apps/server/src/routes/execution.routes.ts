@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
-import { startRun } from "@chrona/runtime/modules/commands/start-run";
 import { retryRun } from "@chrona/runtime/modules/commands/retry-run";
 import { provideInput } from "@chrona/runtime/modules/commands/provide-input";
 import { sendOperatorMessage } from "@chrona/runtime/modules/commands/send-operator-message";
@@ -16,6 +15,11 @@ import { proposeSchedule } from "@chrona/runtime/modules/commands/propose-schedu
 import { decideScheduleProposal } from "@chrona/runtime/modules/commands/decide-schedule-proposal";
 import { resolveApproval } from "@chrona/runtime/modules/commands/resolve-approval";
 import { invalidateMemory } from "@chrona/runtime/modules/commands/invalidate-memory";
+import { getAcceptedTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
+import {
+  startPlanExecution,
+  continuePlanExecution,
+} from "@chrona/runtime/modules/plan-execution";
 
 import {
   getOpenClawAdapter,
@@ -36,11 +40,29 @@ export function createExecutionRoutes() {
 
   api.post("/tasks/:taskId/run", async (c) => {
     try {
-      const adapter = await getOpenClawAdapter();
+      const taskId = c.req.param("taskId");
       const body = await c.req.json().catch(() => ({}));
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, title: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      if (!acceptedPlan) {
+        return error(c, "No accepted plan. Create or accept a plan before execution.", 400);
+      }
+
+      const result = await startPlanExecution({
+        taskId,
+        trigger: "manual",
+        prompt: body.prompt,
+      });
+
       return json(
         c,
-        await startRun({ taskId: c.req.param("taskId"), prompt: body.prompt, adapter }),
+        { workspaceId: task.workspaceId, ...result },
         201,
       );
     } catch (cause) {
@@ -54,9 +76,27 @@ export function createExecutionRoutes() {
 
   api.post("/tasks/:taskId/retry", async (c) => {
     try {
-      const adapter = await getOpenClawAdapter();
+      const taskId = c.req.param("taskId");
       const body = await c.req.json().catch(() => ({}));
-      return json(c, await retryRun({ taskId: c.req.param("taskId"), prompt: body.prompt, adapter }));
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, title: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      if (acceptedPlan) {
+        const result = await startPlanExecution({
+          taskId,
+          trigger: "manual",
+          prompt: body.prompt,
+        });
+        return json(c, { workspaceId: task.workspaceId, ...result });
+      }
+
+      const adapter = await getOpenClawAdapter();
+      return json(c, await retryRun({ taskId, prompt: body.prompt, adapter }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to retry run";
       return error(c, message, message.includes("not found") ? 404 : 500);
@@ -70,6 +110,23 @@ export function createExecutionRoutes() {
       if (!body.inputText || (typeof body.inputText === "string" && !body.inputText.trim())) {
         return error(c, "inputText is required", 400);
       }
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, status: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      if (acceptedPlan && task.status === "WaitingForInput") {
+        const result = await continuePlanExecution({
+          taskId,
+          reason: "user_provided_input",
+          userInput: body.inputText,
+        });
+        return json(c, { workspaceId: task.workspaceId, ...result });
+      }
+
       let runId = body.runId as string | undefined;
       if (!runId) {
         const latestRun = await db.run.findFirst({
@@ -97,6 +154,24 @@ export function createExecutionRoutes() {
       if (!body.message || (typeof body.message === "string" && !body.message.trim())) {
         return error(c, "message is required", 400);
       }
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, workspaceId: true, status: true },
+      });
+      if (!task) return error(c, "Task not found", 404);
+
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      if (acceptedPlan) {
+        const trigger = task.status === "WaitingForInput" ? "user_provided_input" : "user_message";
+        const result = await continuePlanExecution({
+          taskId,
+          reason: trigger,
+          userInput: body.message,
+        });
+        return json(c, { workspaceId: task.workspaceId, ...result });
+      }
+
       let runId = body.runId as string | undefined;
       if (!runId) {
         const latestRun = await db.run.findFirst({

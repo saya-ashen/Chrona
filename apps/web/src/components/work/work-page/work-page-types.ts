@@ -165,6 +165,14 @@ export type WorkPageClientProps = {
       runtimeTs?: string | null;
     }>;
     composerValue?: string;
+    planExecution?: {
+      status: "no_plan" | "started" | "running" | "waiting_for_user" | "waiting_for_approval" | "blocked" | "completed";
+      currentNodeId: string | null;
+      executedNodeIds: string[];
+      waitingNodeIds: string[];
+      blockedNodeIds: string[];
+      message: string;
+    } | null;
     inspector: {
       approvals: Array<{
         id: string;
