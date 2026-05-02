@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 
@@ -21,11 +21,6 @@ function app() {
 describe("Real router smoke", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   it("runs task CRUD through the production router", async () => {

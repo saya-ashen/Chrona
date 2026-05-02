@@ -6,7 +6,7 @@
  * re-decide blocked, plus all negative cases.
  */
 
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { db } from "@chrona/db";
@@ -106,11 +106,6 @@ function app() {
 describe("Schedule proposal workflow", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   // -----------------------------------------------------------------------

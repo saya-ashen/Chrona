@@ -7,7 +7,7 @@
  * workflow, plus negative cases.
  */
 
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
@@ -223,11 +223,6 @@ describe("Task CRUD workflow", () => {
     await resetTestDb();
     const ws = await seedWorkspace("Task CRUD Workspace");
     workspaceId = ws.workspaceId;
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await (await import("@chrona/db")).db.$disconnect();
   });
 
   // -----------------------------------------------------------------------

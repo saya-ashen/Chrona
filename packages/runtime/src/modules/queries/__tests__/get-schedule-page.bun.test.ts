@@ -297,7 +297,7 @@ describe("getSchedulePage", () => {
     });
     expect(page.planningSummary).toEqual({
       scheduledMinutes: 300,
-      runnableQueueCount: 0,
+      runnableQueueCount: 1,
       conflictCount: 0,
       overloadedDayCount: 0,
       proposalCount: 1,
@@ -306,7 +306,7 @@ describe("getSchedulePage", () => {
       overdueCount: 1,
       atRiskCount: 0,
       readyToScheduleCount: 1,
-      autoRunnableCount: 0,
+      autoRunnableCount: 1,
       waitingOnUserCount: 1,
       dueSoonUnscheduledCount: 1,
       largestIdleWindowMinutes: 120,
@@ -340,6 +340,26 @@ describe("getSchedulePage", () => {
         kind: "remind",
         reason: "Risk item is waiting on user rescheduling.",
         priority: "high",
+      },
+      {
+        taskId: reviewTask.id,
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: "medium",
+        scheduledStartAt: todayThirteen,
+        executionMode: "none",
+        sessionStrategy: "per_subtask",
+        readyNodeIds: [],
+      },
+      {
+        taskId: scheduledTask.id,
+        kind: "auto_run",
+        reason: "Scheduled task is ready to run automatically.",
+        priority: "high",
+        scheduledStartAt: tomorrowNine,
+        executionMode: "none",
+        sessionStrategy: "per_subtask",
+        readyNodeIds: [],
       },
     ]);
 

@@ -6,7 +6,7 @@
  * accepted → batch-apply (materialization) → re-accept → re-apply.
  */
 
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { db } from "@chrona/db";
@@ -189,11 +189,6 @@ function app() {
 describe("Plan lifecycle workflow", () => {
   beforeEach(async () => {
     await resetTestDb();
-  });
-
-  afterAll(async () => {
-    await resetTestDb();
-    await db.$disconnect();
   });
 
   // -----------------------------------------------------------------------
