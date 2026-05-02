@@ -25,22 +25,11 @@ const baseAdapter = {
     version: "openclaw-v1",
     fields: [
       {
-        key: "model",
-        path: "model",
-        kind: "text" as const,
-        label: "Model",
-        description: "Choose the model",
-        required: true,
-        advanced: true,
-        constraints: { maxLength: 200 },
-      },
-      {
         key: "prompt",
         path: "prompt",
         kind: "textarea" as const,
         label: "Prompt / instructions",
         description: "Describe the task",
-        required: true,
         advanced: true,
         constraints: { maxLength: 20000 },
       },
@@ -55,7 +44,7 @@ const baseAdapter = {
         constraints: { min: 0, max: 2, step: 0.1 },
       },
     ],
-    runnability: { requiredPaths: ["model", "prompt"] },
+    runnability: { requiredPaths: [] },
   },
 };
 
@@ -106,27 +95,26 @@ describe("TaskConfigForm – field layout", () => {
     expect(details).not.toHaveAttribute("open");
   });
 
-  it("model field is inside advanced section (not visible by default)", () => {
+  it("prompt field is inside advanced section (not visible by default)", () => {
     render(<TaskConfigForm {...defaultProps} />);
 
-    // Model label should exist but be inside closed details
-    const modelLabel = screen.queryByText("Model");
-    if (modelLabel) {
+    // Prompt label should exist but be inside closed details
+    const promptLabel = screen.queryByText("Prompt / instructions");
+    if (promptLabel) {
       // It exists but should be inside a closed <details>
-      const details = modelLabel.closest("details");
+      const details = promptLabel.closest("details");
       expect(details).not.toHaveAttribute("open");
     }
   });
 
-  it("opening advanced fields reveals model and prompt", async () => {
+  it("opening advanced fields reveals prompt and temperature", async () => {
     const user = userEvent.setup();
     render(<TaskConfigForm {...defaultProps} />);
 
     // Click to expand advanced fields
     await user.click(screen.getByText("Advanced fields"));
 
-    // Now model and prompt should be visible
-    expect(screen.getByText("Model")).toBeInTheDocument();
+    // Now prompt and temperature should be visible
     expect(screen.getByText("Prompt / instructions")).toBeInTheDocument();
     expect(screen.getByText("Temperature")).toBeInTheDocument();
   });

@@ -70,7 +70,7 @@ export async function startRun(input: {
     runtimeConfig: runRuntimeConfig.runtimeInput,
   });
 
-  if (!runnability.isRunnable || !effectivePrompt) {
+  if (!runnability.isRunnable) {
     throw new Error(runnability.summary);
   }
 
@@ -101,7 +101,7 @@ export async function startRun(input: {
 
   try {
     const created = await adapter.createRun({
-      prompt: effectivePrompt,
+      prompt: effectivePrompt ?? "",
       runtimeInput: runRuntimeConfig.runtimeInput,
       runtimeSessionKey: taskSession.sessionKey,
     });

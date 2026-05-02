@@ -108,7 +108,7 @@ describe("runnable task config commands", () => {
 
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: result.taskId } });
 
-    expect(storedTask.status).toBe("Draft");
+    expect(storedTask.status).toBe("Ready");
     expect(storedTask.runtimeModel).toBeNull();
     expect(storedTask.prompt).toBeNull();
   });
@@ -395,7 +395,7 @@ describe("runnable task config commands", () => {
 
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
 
-    expect(storedTask.status).toBe("Draft");
+    expect(storedTask.status).toBe("Ready");
     expect(storedTask.prompt).toBeNull();
   });
 

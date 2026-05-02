@@ -149,8 +149,6 @@ const DEFAULT_COPY = {
   runtimeConfigurationTitle: "Runtime configuration",
   runtimeConfigurationDescription:
     "Keep the runnable definition visible here, but treat Schedule as the default place to edit it.",
-  model: "Model",
-  needsModel: "Needs model",
   runnability: "Runnability",
   prompt: "Prompt",
   noPrompt: "No prompt saved yet. Configure one in Schedule before execution.",
@@ -388,12 +386,6 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
               </SurfaceCardHeader>
 
               <dl className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-4">
-                  <dt>{copy.model}</dt>
-                  <dd className="text-right text-foreground">
-                    {data.task.runtimeModel ?? copy.needsModel}
-                  </dd>
-                </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt>{copy.runnability}</dt>
                   <dd className="text-right text-foreground">

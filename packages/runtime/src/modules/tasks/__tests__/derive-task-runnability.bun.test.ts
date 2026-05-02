@@ -2,37 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 
 describe("deriveTaskRunnability", () => {
-  it("returns not runnable when the model is missing", () => {
+  it("returns runnable for openclaw adapter with model and prompt", () => {
     expect(
       deriveTaskRunnability({
-        runtimeModel: null,
-        prompt: "Implement the schedule query",
-      }),
-    ).toMatchObject({
-      isRunnable: false,
-      state: "missing_model",
-      summary: "Needs model",
-      missingFields: ["model"],
-    });
-  });
-
-  it("returns not runnable when the prompt is missing", () => {
-    expect(
-      deriveTaskRunnability({
-        runtimeModel: "gpt-5.4",
-        prompt: "   ",
-      }),
-    ).toMatchObject({
-      isRunnable: false,
-      state: "missing_prompt",
-      summary: "Needs prompt",
-      missingFields: ["prompt"],
-    });
-  });
-
-  it("returns runnable when both model and prompt are present", () => {
-    expect(
-      deriveTaskRunnability({
+        runtimeAdapterKey: "openclaw",
         runtimeModel: "gpt-5.4",
         prompt: "Implement the schedule query",
       }),
@@ -44,26 +17,40 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("does not require advanced runtime config to mark a task runnable", () => {
+  it("returns runnable for openclaw adapter without model", () => {
     expect(
       deriveTaskRunnability({
-        runtimeModel: "gpt-5.4",
+        runtimeAdapterKey: "openclaw",
+        runtimeModel: null,
         prompt: "Implement the schedule query",
-        runtimeConfig: undefined,
       }),
     ).toMatchObject({
       isRunnable: true,
       state: "ready_to_run",
+      missingFields: [],
     });
   });
 
-  it("reads required fields from normalized runtime input", () => {
+  it("returns runnable for openclaw adapter with empty prompt", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "openclaw",
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
+      missingFields: [],
+    });
+  });
+
+  it("returns runnable for openclaw adapter with runtimeInput (no model needed)", () => {
     expect(
       deriveTaskRunnability({
         runtimeAdapterKey: "openclaw",
         runtimeInput: {
-          model: "gpt-5.4",
-          prompt: "Implement the schedule query",
+          prompt: "Hello",
           approvalPolicy: "never",
         },
         runtimeModel: null,
@@ -73,6 +60,81 @@ describe("deriveTaskRunnability", () => {
       isRunnable: true,
       state: "ready_to_run",
       missingFields: [],
+    });
+  });
+
+  it("returns runnable for openclaw adapter with no prompt", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {},
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
+      missingFields: [],
+    });
+  });
+
+  it("research adapter still requires prompt", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "research",
+        runtimeInput: {},
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: false,
+      state: "missing_prompt",
+      missingFields: ["prompt"],
+    });
+  });
+
+  it("research adapter is runnable with prompt", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "research",
+        runtimeInput: { prompt: "Do a deep research" },
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
+      missingFields: [],
+    });
+  });
+
+  it("default adapter (openclaw) with no explicit adapter key", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeModel: null,
+        prompt: null,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
+      missingFields: [],
+    });
+  });
+
+  it("does not require advanced runtime config to mark a task runnable", () => {
+    expect(
+      deriveTaskRunnability({
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: {
+          prompt: "Test",
+        },
+        runtimeModel: null,
+        prompt: null,
+        runtimeConfig: undefined,
+      }),
+    ).toMatchObject({
+      isRunnable: true,
+      state: "ready_to_run",
     });
   });
 });

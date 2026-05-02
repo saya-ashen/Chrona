@@ -9,24 +9,11 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
   version: OPENCLAW_RUNTIME_INPUT_VERSION,
   fields: [
     {
-      key: "model",
-      path: "model",
-      kind: "text",
-      label: "Model",
-      description: "Choose the model used for this run",
-      required: true,
-      advanced: true,
-      constraints: {
-        maxLength: 200,
-      },
-    },
-    {
       key: "prompt",
       path: "prompt",
       kind: "textarea",
       label: "Prompt / instructions",
       description: "Describe the task, constraints, and expected output",
-      required: true,
       advanced: true,
       constraints: {
         maxLength: 20000,
@@ -89,7 +76,7 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
     },
   ],
   runnability: {
-    requiredPaths: ["model", "prompt"],
+    requiredPaths: [],
   },
 };
 
