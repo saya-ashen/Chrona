@@ -6,7 +6,7 @@ import { stripLocalePrefix } from "@/i18n/routing";
 
 export type AppLinkProps = LinkProps;
 
-export type AppRouter = {
+type AppRouter = {
   push: (to: To) => void;
   refresh: () => void;
 };
@@ -36,3 +36,4 @@ export function useAppPathname() {
   const location = useLocation();
   return stripLocalePrefix(location.pathname);
 }
+

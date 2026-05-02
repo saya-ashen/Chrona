@@ -30,7 +30,7 @@ function getStorage() {
   return window.localStorage;
 }
 
-export function readScheduleAiPreferences(): ScheduleAiPreferences {
+function readScheduleAiPreferences(): ScheduleAiPreferences {
   const storage = getStorage();
 
   if (!storage) {
@@ -141,3 +141,4 @@ export function useScheduleAiPreferences(): ScheduleAiPreferences {
 
   return preferences;
 }
+

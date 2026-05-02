@@ -1,9 +1,9 @@
-import type { StructuredAgentResult, StructuredResultReliability } from "@chrona/openclaw-integration/protocol/structured-result";
+import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type { BridgeResponse } from "@chrona/openclaw-integration/bridge/contracts";
 
 import { AiClientError } from "./types";
 
-export type { StructuredAgentResult, StructuredResultReliability };
+export type { StructuredAgentResult };
 
 export type OpenClawStructuredMode = "text" | "structured";
 

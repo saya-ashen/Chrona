@@ -14,7 +14,7 @@ const envSchema = z.object({
   CHRONA_WEB_DIST: z.string().optional(),
 });
 
-export type Env = z.output<typeof envSchema>;
+type Env = z.output<typeof envSchema>;
 
 let cachedEnv: Env | null = null;
 
@@ -43,3 +43,4 @@ export function resolveAllowedOrigins(env: Env): string[] {
   if (!env.ALLOWED_ORIGINS || env.ALLOWED_ORIGINS === "*") return ["*"];
   return env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
 }
+

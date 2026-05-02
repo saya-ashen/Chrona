@@ -20,7 +20,7 @@ import { useSmartDecomposition } from "@/hooks/use-ai";
 
 import { useI18n } from "@/i18n/client";
 
-export interface TaskDecompositionPanelProps {
+interface TaskDecompositionPanelProps {
   taskId?: string;
   title: string;
   description?: string | null;
@@ -517,3 +517,4 @@ export function TaskDecompositionPanel({
     </div>
   );
 }
+

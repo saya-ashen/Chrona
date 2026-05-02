@@ -4,7 +4,7 @@ function isExternalHref(href: string) {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href);
 }
 
-export function hasLocalePrefix(pathname: string) {
+function hasLocalePrefix(pathname: string) {
   return locales.some((locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`));
 }
 
@@ -41,13 +41,5 @@ export function localizeHref(locale: Locale | undefined, href: string) {
   return `${localizedPath}${search ? `?${search}` : ""}${hash ? `#${hash}` : ""}`;
 }
 
-export function switchLocaleHref(pathname: string, locale: Locale, search?: string) {
-  const strippedPath = stripLocalePrefix(pathname);
-  const base = localizeHref(locale, strippedPath);
 
-  return search ? `${base}?${search}` : base;
-}
 
-export function getPathVariants(path: string) {
-  return [path, ...locales.map((locale) => localizeHref(locale, path))];
-}

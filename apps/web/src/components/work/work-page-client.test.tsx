@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +27,7 @@ vi.mock("./work-page/use-work-page-controller", () => ({
 
 import { WorkPageClient } from "@/components/work/work-page-client";
 import { useWorkPageController } from "@/components/work/work-page/use-work-page-controller";
-import { DEFAULT_WORK_PAGE_COPY } from "@/components/work/work-page/work-page-copy";
+
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
 
 const baseData: WorkPageData = {
@@ -324,7 +324,7 @@ describe("WorkPageClient", () => {
   });
 
   it("keeps the execution record view scrollable inside the workbench", async () => {
-    const user = userEvent.setup();
+    const _user = userEvent.setup();
     const originalInnerWidth = window.innerWidth;
     const originalInnerHeight = window.innerHeight;
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {

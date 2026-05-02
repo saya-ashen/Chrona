@@ -27,7 +27,6 @@ import { WorkbenchComposerCard } from "./work-page/workbench-composer-card";
 import {
   formatDateTime,
   getSyncStatusLabel,
-  parseDateInputForSubmission,
 } from "./work-page/work-page-formatters";
 import {
   getCurrentException,
@@ -481,4 +480,4 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   );
 }
 
-export { parseDateInputForSubmission };
+

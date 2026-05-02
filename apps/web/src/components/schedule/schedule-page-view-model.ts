@@ -20,7 +20,7 @@ import type {
   SecondaryPlanningView,
 } from "@/components/schedule/schedule-page-types";
 
-export type ScheduleCalendarDay = {
+type ScheduleCalendarDay = {
   key: string;
   label: string;
   shortLabel: string;
@@ -190,3 +190,4 @@ export function buildSchedulePageViewModel({
     activeRailLabel,
   };
 }
+

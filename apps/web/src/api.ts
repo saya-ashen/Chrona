@@ -1,4 +1,4 @@
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
@@ -37,3 +37,4 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 
   return payload as T;
 }
+

@@ -40,7 +40,7 @@ function scoreColor(score: number): string {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface TimeslotSuggestionPanelProps {
+interface TimeslotSuggestionPanelProps {
   taskId: string;
   title: string;
   priority: string;
@@ -222,3 +222,4 @@ export function TimeslotSuggestionPanel({
     </div>
   );
 }
+

@@ -1,5 +1,4 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
 
@@ -72,43 +71,4 @@ export function ScheduleMiniCalendar({
   );
 }
 
-export function CompactTodayFocus({
-  title,
-  items,
-  emptyMessage,
-}: {
-  title: string;
-  items: Array<{ taskId: string; title: string; reason: string; tone?: "neutral" | "info" | "warning" | "critical" | "success" }>;
-  emptyMessage: string;
-}) {
-  return (
-    <SurfaceCard as="section" variant="inset" padding="sm" className="space-y-3 rounded-[28px]">
-      <div className="px-1">
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          Focus
-        </p>
-        <h2 className="mt-1 text-sm font-semibold text-foreground">{title}</h2>
-      </div>
 
-      {items.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border/70 bg-background/70 px-3 py-3 text-xs leading-5 text-muted-foreground">
-          {emptyMessage}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {items.slice(0, 4).map((item) => (
-            <div
-              key={item.taskId}
-              className="rounded-2xl border border-border/70 bg-background/80 px-3 py-2.5"
-            >
-              <div className="flex items-start gap-2">
-                <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
-                <p className="min-w-0 flex-1 truncate text-sm text-foreground">{item.title}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </SurfaceCard>
-  );
-}

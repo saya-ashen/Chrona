@@ -8,7 +8,7 @@ type PlanningDayLink = {
   current?: boolean;
 };
 
-export type ScheduleCockpitMetric = {
+type ScheduleCockpitMetric = {
   label: string;
   value: string;
   hint: string;
@@ -158,3 +158,4 @@ export function PlanningHeader({
     </header>
   );
 }
+

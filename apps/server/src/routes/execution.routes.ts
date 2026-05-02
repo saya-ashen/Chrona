@@ -34,7 +34,6 @@ import {
   error,
   internalServerError,
   json,
-  toHttpError,
 } from "../lib/http";
 
 export function createExecutionRoutes() {

@@ -127,8 +127,5 @@ export function validationErrorMessage(route: RouteKind): string {
     : "Missing required field: instructions";
 }
 
-export function routeMethodList(): string {
-  return "GET,POST,OPTIONS";
-}
 
-export { isFeatureRequest, routeLabel };
+

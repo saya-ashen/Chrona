@@ -14,7 +14,7 @@ import { MemoryScope, MemorySourceType, MemoryStatus, RunStatus } from "@chrona/
 import { resetTestDb, seedWorkspace, seedTask } from "../bun-test-helpers";
 import { overrideRuntimeExecutionAdapter } from "@chrona/runtime/modules/task-execution/execution-registry";
 import { executePlanNode } from "@chrona/runtime/modules/plan-execution/node-executor";
-import type { TaskPlanNode, TaskPlanGraph } from "@chrona/contracts/ai";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 // ---------------------------------------------------------------------------
 // Smart mock adapter: stores messages in an in-memory Map and returns them

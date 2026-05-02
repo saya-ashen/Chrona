@@ -6,7 +6,7 @@ export interface TaskChange {
   dueAt?: string;
 }
 
-export interface CreateTaskInput {
+interface CreateTaskInput {
   workspaceId: string;
   title: string;
   description?: string;
@@ -18,14 +18,14 @@ export interface CreateTaskInput {
   runtimeConfig?: Record<string, unknown>;
 }
 
-export interface CreateSubtaskInput {
+interface CreateSubtaskInput {
   title: string;
   description?: string;
   priority?: string;
   dueAt?: string;
 }
 
-export interface UpdateTaskInput {
+interface UpdateTaskInput {
   title?: string;
   description?: string;
   priority?: string;
@@ -38,12 +38,12 @@ export interface UpdateTaskInput {
   runtimeConfig?: Record<string, unknown>;
 }
 
-export interface AutoCompleteInput {
+interface AutoCompleteInput {
   title: string;
   workspaceId?: string;
 }
 
-export interface GenerateTaskPlanInput {
+interface GenerateTaskPlanInput {
   taskId?: string;
   title?: string;
   description?: string;
@@ -52,18 +52,18 @@ export interface GenerateTaskPlanInput {
   forceRefresh?: boolean;
 }
 
-export interface BatchApplyPlanInput {
+interface BatchApplyPlanInput {
   taskId: string;
   nodes?: unknown[];
   edges?: unknown[];
 }
 
-export interface ApiErrorBody {
+interface ApiErrorBody {
   error?: string;
   message?: string;
 }
 
-export interface ClientConfig {
+interface ClientConfig {
   baseUrl?: string;
 }
 
@@ -228,3 +228,11 @@ export class ApiClient {
     return this.request<unknown>("GET", "/api/ai/status");
   }
 }
+
+
+
+
+
+
+
+

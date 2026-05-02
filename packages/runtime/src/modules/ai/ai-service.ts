@@ -12,7 +12,6 @@ import {
   type AiClientType,
   type AiFeature,
   type SmartSuggestRequest,
-  type SmartSuggestResponse,
   type GenerateTaskPlanRequest,
   type GenerateTaskPlanResponse,
   type AnalyzeConflictsRequest,
@@ -24,7 +23,6 @@ import {
   type DispatchTaskInput,
   type DispatchTaskOutput,
   type StreamEvent,
-  suggest,
   generatePlan,
   analyzeConflicts,
   suggestTimeslots,
@@ -84,12 +82,6 @@ async function getClientForFeature(feature: AiFeature): Promise<AiClientRecord |
 // ────────────────────────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────────────────────────
-
-export async function aiSuggest(request: SmartSuggestRequest): Promise<SmartSuggestResponse | null> {
-  const client = await getClientForFeature("suggest");
-  if (!client) return null;
-  return suggest(client, request);
-}
 
 export async function aiGeneratePlan(request: GenerateTaskPlanRequest): Promise<GenerateTaskPlanResponse | null> {
   const client = await getClientForFeature("generate_plan");
@@ -180,27 +172,9 @@ export async function getAIClientInfo(): Promise<Array<{
 }
 
 // Re-exports
-export { AiClientError } from "@chrona/ai-features";
 export type {
-  SmartSuggestRequest,
-  SmartSuggestResponse,
-  SmartSuggestion,
-  GenerateTaskPlanRequest,
-  GenerateTaskPlanResponse,
-  AnalyzeConflictsRequest,
-  AnalyzeConflictsResponse,
-  SuggestTimeslotRequest,
-  SuggestTimeslotResponse,
-  ChatRequest,
-  ChatResponse,
-  DispatchTaskInput,
-  DispatchTaskOutput,
   TaskSnapshot,
   ScheduleHealthSnapshot,
-  AiClientRecord,
-  AiClientType,
-  AiFeature,
-  StreamEvent,
 } from "@chrona/ai-features";
 
 

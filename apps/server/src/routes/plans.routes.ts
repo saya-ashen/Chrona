@@ -9,7 +9,6 @@ import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materializ
 import { ensureDefaultTaskSession } from "@chrona/runtime/modules/task-execution/task-sessions";
 import { aiGeneratePlan, aiGeneratePlanStream } from "@chrona/runtime/modules/ai/ai-service";
 import {
-  isTaskPlanGenerationRunning,
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
@@ -28,7 +27,6 @@ import {
   error,
   internalServerError,
   json,
-  toHttpError,
 } from "../lib/http";
 
 export function createPlansRoutes() {

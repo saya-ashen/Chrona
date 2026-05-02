@@ -14,6 +14,10 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
     "paths": {
       "@/generated/prisma/*": ["./packages/db/src/generated/prisma/*"],
       "@/modules/*": ["./packages/runtime/src/modules/*"],

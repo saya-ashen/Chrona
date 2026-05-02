@@ -3,7 +3,7 @@ import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-l
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
 import type { TaskPlanGraph } from "@/modules/ai/types";
 
-export type SchedulePageSummary = {
+type SchedulePageSummary = {
   scheduledCount: number;
   unscheduledCount: number;
   proposalCount: number;
@@ -28,7 +28,7 @@ export type SchedulePlanningSummary = {
   overloadedMinutes: number;
 };
 
-export type ScheduleFocusZone = {
+type ScheduleFocusZone = {
   dayKey: string;
   totalMinutes: number;
   deepWorkMinutes: number;
@@ -36,7 +36,7 @@ export type ScheduleFocusZone = {
   riskLevel: "low" | "medium" | "high";
 };
 
-export type ScheduleAutomationCandidate = {
+type ScheduleAutomationCandidate = {
   taskId: string;
   kind: "auto_schedule" | "generate_plan" | "remind" | "auto_run";
   reason: string;
@@ -47,25 +47,7 @@ export type ScheduleAutomationCandidate = {
   readyNodeIds?: string[];
 };
 
-export type ScheduleSubtask = {
-  id: string;
-  parentTaskId: string | null;
-  title: string;
-  description: string | null;
-  priority: string;
-  status: string;
-  persistedStatus: string;
-  scheduleStatus: string | null;
-  dueAt: Date | null;
-  scheduledStartAt: Date | null;
-  scheduledEndAt: Date | null;
-  completedAt: Date | null;
-  isCompleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type ScheduleRuntimeFields = {
+type ScheduleRuntimeFields = {
   parentTaskId: string | null;
   runtimeAdapterKey: string | null;
   runtimeInput: unknown;
@@ -78,7 +60,7 @@ export type ScheduleRuntimeFields = {
   runnabilitySummary: string;
 };
 
-export type ScheduleTaskPlanSnapshot = {
+type ScheduleTaskPlanSnapshot = {
   id: string;
   status: "draft" | "accepted" | "superseded" | "archived";
   prompt: string | null;
@@ -190,7 +172,7 @@ export type SecondaryPlanningView = "queue" | "risks" | "proposals" | "conflicts
 /**
  * 冲突类型
  */
-export type ConflictType =
+type ConflictType =
   | "time_overlap"
   | "overload"
   | "fragmentation"
@@ -199,7 +181,7 @@ export type ConflictType =
 /**
  * 冲突严重程度
  */
-export type ConflictSeverity = "low" | "medium" | "high";
+type ConflictSeverity = "low" | "medium" | "high";
 
 /**
  * 冲突详情
@@ -220,7 +202,7 @@ export type ScheduleConflict = {
 /**
  * 建议类型
  */
-export type SuggestionType =
+type SuggestionType =
   | "reschedule"
   | "split"
   | "merge"
@@ -230,7 +212,7 @@ export type SuggestionType =
 /**
  * 任务变更
  */
-export type TaskChange = {
+type TaskChange = {
   taskId: string;
   scheduledStartAt?: Date;
   scheduledEndAt?: Date;
@@ -282,18 +264,9 @@ export type CompressedTimelineHour = {
   active: boolean;
 };
 
-export type DragPreview = {
-  top: number;
-  height: number;
-  startMinute: number;
-  endMinute: number;
-  startAt: Date;
-  endAt: Date;
-};
-
 export type TimelineInteractionMode = "idle" | "dragging" | "resizing" | "creating";
 
-export type TimelineResizeEdge = "end";
+type TimelineResizeEdge = "end";
 
 export type TimelinePlacementPreview = {
   top: number;
@@ -342,3 +315,15 @@ export type QuickCreateDraft = {
   scheduledEndAt: Date | null;
   priority: "Low" | "Medium" | "High" | "Urgent";
 };
+
+
+
+
+
+
+
+
+
+
+
+

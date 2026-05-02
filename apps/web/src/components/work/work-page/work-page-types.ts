@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
 
 export type WorkPageClientProps = {
@@ -222,15 +220,8 @@ export type CollaborationFeedItem = {
   meta?: string | null;
 };
 
-export type WorkConversationSection = {
-  id: string;
-  eyebrow: string;
-  title: string;
-  content: ReactNode;
-  tone?: "default" | "accent";
-};
-
 export type WorkbenchCopy = {
   [Key in keyof typeof DEFAULT_WORK_PAGE_COPY]: string;
 };
 export type WorkPageData = WorkPageClientProps["initialData"];
+

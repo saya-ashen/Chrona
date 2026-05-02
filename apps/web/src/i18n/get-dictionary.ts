@@ -6,7 +6,7 @@ const dictionaries = {
   zh: () => import("@/i18n/messages/zh.json").then((module) => module.default),
 };
 
-export type { Messages } from "@/i18n/messages";
+
 
 export async function getDictionary(locale: Locale): Promise<Messages> {
   return dictionaries[locale]();

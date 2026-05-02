@@ -8,9 +8,7 @@ import {
   type SchedulePageCopy,
 } from "@/components/schedule/schedule-page-copy";
 import type {
-  QuickCreateDraft,
   SchedulePageData,
-  ScheduleSuggestion,
   ScheduleViewMode,
   ScheduledItem,
   TimelineCreateInput,
@@ -29,7 +27,6 @@ import {
   getBlockDurationMinutes,
   hydrateSchedulePageData,
   sortScheduledItems,
-  toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 
@@ -48,7 +45,7 @@ export function getQuickCreateDefaults(data: SchedulePageData) {
   };
 }
 
-export function getSuggestedDurationMinutes(
+function getSuggestedDurationMinutes(
   value: unknown,
   fallback = DEFAULT_SCHEDULE_BLOCK_MINUTES,
 ) {
@@ -107,7 +104,7 @@ export function buildDraggedItem({
   return null;
 }
 
-export function patchScheduledWindow(
+function patchScheduledWindow(
   current: SchedulePageData,
   taskId: string,
   startAt: Date,
@@ -409,139 +406,6 @@ export async function handleCreateTaskBlockAction({
   }
 }
 
-export async function handleQuickCreateAction({
-  draft,
-  data,
-  handleCreateTaskBlock,
-}: {
-  draft: QuickCreateDraft;
-  data: SchedulePageData;
-  handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
-}) {
-  const defaults = getQuickCreateDefaults(data);
-
-  const input: TimelineCreateInput = {
-    title: draft.title,
-    description: "",
-    priority: draft.priority,
-    dueAt: draft.dueAt,
-    runtimeAdapterKey: defaults.runtimeAdapterKey,
-    runtimeInput: {},
-    runtimeInputVersion: defaults.runtimeInputVersion,
-    runtimeModel: null,
-    prompt: null,
-    runtimeConfig: null,
-    scheduledStartAt: draft.scheduledStartAt ?? new Date(),
-    scheduledEndAt:
-      draft.scheduledEndAt ??
-      new Date(
-        (toTimestamp(draft.scheduledStartAt) ?? Date.now()) +
-          DEFAULT_SCHEDULE_BLOCK_MINUTES * 60 * 1000,
-      ),
-  };
-
-  await handleCreateTaskBlock(input);
-}
-
-export async function handleQueueQuickCreateAction({
-  draft,
-  workspaceId,
-  data,
-  setAnnouncement,
-  setIsPending,
-  setErrorMessage,
-  refreshProjection,
-  resetViewData,
-  actionFailedMessage,
-}: {
-  draft: QuickCreateDraft & { durationMinutes: number };
-  workspaceId: string;
-  data: SchedulePageData;
-  setAnnouncement: (value: string) => void;
-  setIsPending: (value: boolean) => void;
-  setErrorMessage: (value: string | null) => void;
-  refreshProjection: () => Promise<void>;
-  resetViewData: () => void;
-  actionFailedMessage: string;
-}) {
-  const defaults = getQuickCreateDefaults(data);
-
-  setAnnouncement(`Adding ${draft.title} to the queue.`);
-
-  try {
-    setIsPending(true);
-    setErrorMessage(null);
-
-    await createTaskFromSchedule({
-      workspaceId,
-      title: draft.title,
-      description: null,
-      priority: draft.priority,
-      dueAt: draft.dueAt,
-      runtimeAdapterKey: defaults.runtimeAdapterKey,
-      runtimeInput: {},
-      runtimeInputVersion: defaults.runtimeInputVersion,
-      runtimeModel: null,
-      prompt: null,
-      runtimeConfig: {
-        suggestedDurationMinutes: draft.durationMinutes,
-      },
-    });
-
-    await refreshProjection();
-  } catch (error) {
-    setErrorMessage(
-      error instanceof Error ? error.message : actionFailedMessage,
-    );
-    resetViewData();
-  } finally {
-    setIsPending(false);
-  }
-}
-
-export async function handleApplySuggestionAction({
-  suggestion,
-  workspaceId,
-  setIsPending,
-  setErrorMessage,
-  refreshProjection,
-  actionFailedMessage,
-}: {
-  suggestion: ScheduleSuggestion;
-  workspaceId: string;
-  setIsPending: (value: boolean) => void;
-  setErrorMessage: (value: string | null) => void;
-  refreshProjection: () => Promise<void>;
-  actionFailedMessage: string;
-}) {
-  try {
-    setIsPending(true);
-    setErrorMessage(null);
-
-    const response = await fetch("/api/ai/apply-suggestion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        suggestionId: suggestion.id,
-        changes: suggestion.changes,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to apply suggestion");
-    }
-
-    await refreshProjection();
-  } catch (error) {
-    setErrorMessage(
-      error instanceof Error ? error.message : actionFailedMessage,
-    );
-  } finally {
-    setIsPending(false);
-  }
-}
-
 export async function handleTaskConfigSaveAction({
   taskId,
   input,
@@ -698,3 +562,8 @@ export async function handleApplyDecompositionFromDialogAction({
     setIsPending(false);
   }
 }
+
+
+
+
+

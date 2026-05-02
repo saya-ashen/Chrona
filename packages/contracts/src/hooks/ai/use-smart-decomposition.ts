@@ -257,5 +257,4 @@ export function useBatchApplyPlan() {
   return { applyPlan, isLoading, error };
 }
 
-/** @deprecated Use useBatchApplyPlan instead */
-export const useBatchDecompose = useBatchApplyPlan;
+

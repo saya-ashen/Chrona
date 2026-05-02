@@ -1,4 +1,4 @@
-import { deleteJson, patchJson, postJson, requestJson } from "./http-client";
+import { deleteJson, patchJson, postJson } from "./http-client";
 
 type TaskMutationResult = {
   taskId: string;
@@ -13,19 +13,7 @@ type RunMutationResult = TaskMutationResult & {
   runId?: string;
 };
 
-type AcceptTaskPlanResult = {
-  savedPlan: {
-    id: string;
-    status: string;
-    prompt: string | null;
-    revision: number;
-    summary: string | null;
-    updatedAt: string;
-    plan: unknown;
-  };
-};
-
-export function createTask(input: {
+function createTask(input: {
   workspaceId: string;
   title: string;
   description?: string | null;
@@ -45,7 +33,7 @@ export function createTask(input: {
   });
 }
 
-export function updateTask(input: {
+function updateTask(input: {
   taskId: string;
   title?: string;
   description?: string | null;
@@ -126,14 +114,6 @@ export function provideInput(input: { taskId: string; runId?: string; inputText:
   });
 }
 
-export function resumeRun(input: { taskId: string; runId: string; inputText?: string; approvalId?: string }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/resume`, {
-    runId: input.runId,
-    inputText: input.inputText,
-    approvalId: input.approvalId,
-  });
-}
-
 export function sendOperatorMessage(input: { taskId: string; runId?: string; message: string }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/message`, {
     runId: input.runId,
@@ -151,24 +131,6 @@ export function reopenTask(input: { taskId: string }) {
 
 export function acceptTaskResult(input: { taskId: string }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/result/accept`);
-}
-
-export function proposeSchedule(input: {
-  taskId: string;
-  source: "ai" | "human" | "system";
-  proposedBy: string;
-  summary: string;
-  dueAt: Date | null;
-  scheduledStartAt: Date | null;
-  scheduledEndAt: Date | null;
-  assigneeAgentId?: string | null;
-}) {
-  return postJson<TaskMutationResult & { proposalId: string }>(`/api/tasks/${input.taskId}/schedule/proposals`, {
-    ...input,
-    dueAt: input.dueAt ? input.dueAt.toISOString() : null,
-    scheduledStartAt: input.scheduledStartAt ? input.scheduledStartAt.toISOString() : null,
-    scheduledEndAt: input.scheduledEndAt ? input.scheduledEndAt.toISOString() : null,
-  });
 }
 
 export function acceptScheduleProposal(proposalId: string, resolutionNote?: string) {
@@ -201,20 +163,6 @@ export function rejectApproval(approvalId: string) {
   });
 }
 
-export function resolveApproval(input: {
-  taskId: string;
-  approvalId: string;
-  decision: "Approved" | "Rejected" | "EditedAndApproved";
-  resolutionNote?: string;
-  editedContent?: string;
-}) {
-  return postJson<TaskMutationResult & { runId?: string }>(`/api/tasks/${input.taskId}/approvals/${input.approvalId}/resolve`, {
-    decision: input.decision,
-    resolutionNote: input.resolutionNote,
-    editedContent: input.editedContent,
-  });
-}
-
 export function editAndApproveApproval(formData: FormData) {
   const approvalId = String(formData.get("approvalId") ?? "");
   const editedContent = String(formData.get("editedContent") ?? "");
@@ -234,30 +182,6 @@ export function invalidateMemory(memoryId: string) {
   return postJson<{ memoryId: string; workspaceId: string; taskId: string | null }>(
     `/api/memories/${memoryId}/invalidate`,
   );
-}
-
-export function acceptTaskPlan(input: { taskId: string; planId: string }) {
-  return postJson<AcceptTaskPlanResult>("/api/ai/task-plan/accept", input);
-}
-
-export function listSubtasks(taskId: string) {
-  return requestJson<{ subtasks: unknown[]; count: number }>(`/api/tasks/${taskId}/subtasks`);
-}
-
-export function createSubtask(taskId: string, input: {
-  title: string;
-  description?: string | null;
-  priority?: string;
-  dueAt?: Date | null;
-}) {
-  return postJson<{ subtask: unknown }>(`/api/tasks/${taskId}/subtasks`, {
-    ...input,
-    dueAt: input.dueAt ? input.dueAt.toISOString() : input.dueAt ?? undefined,
-  });
-}
-
-export function deleteTask(taskId: string) {
-  return deleteJson<{ success: true; taskId: string }>(`/api/tasks/${taskId}`);
 }
 
 export function createFollowUpTask(input: {
