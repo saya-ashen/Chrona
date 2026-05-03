@@ -58,6 +58,7 @@ export function SchedulePage({
   selectedDay,
   selectedTaskId,
   selectedView,
+  showNewTask,
 }: SchedulePageRouteProps) {
   const router = useAppRouter();
   const locale = useLocale();
@@ -83,7 +84,7 @@ export function SchedulePage({
   const [isPending, setIsPending] = useState(false);
   const [secondaryView, setSecondaryView] =
     useState<SecondaryPlanningView>("queue");
-  const [showQuickAddDialog, setShowQuickAddDialog] = useState(false);
+  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false);
   const refreshRequestIdRef = useRef(0);
   const activeView = normalizeScheduleView(selectedView);
 
@@ -143,6 +144,12 @@ export function SchedulePage({
     viewData.unscheduled.length,
   ]);
 
+  useEffect(() => {
+    if (showNewTask) {
+      setShowNewTaskDialog(true);
+    }
+  }, [showNewTask]);
+
   const viewModel = useMemo(
     () =>
       buildSchedulePageViewModel({
@@ -194,6 +201,7 @@ export function SchedulePage({
 
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", item.taskId);
+    event.dataTransfer.setDragImage(document.createElement("img"), 0, 0);
     setDraggedTask({ kind: "queue", taskId: item.taskId });
     setErrorMessage(null);
     setAnnouncement(
@@ -230,7 +238,7 @@ export function SchedulePage({
         setExpandedQueueTaskIds((current) =>
           current.filter((value) => value !== taskId),
         ),
-      setLocalSelectedTaskId,
+      _setLocalSelectedTaskId: setLocalSelectedTaskId,
       setAnnouncement,
       setIsPending,
       setErrorMessage,
@@ -317,7 +325,7 @@ export function SchedulePage({
         activeView={activeView}
         viewData={viewData}
         viewModel={viewModel}
-        onOpenQuickAdd={() => setShowQuickAddDialog(true)}
+        onNavigate={(href) => router.push(href)}
         localizeHref={localizeHref}
         buildScheduleViewHref={buildScheduleViewHref}
       />
@@ -380,14 +388,24 @@ export function SchedulePage({
           runtimeAdapters={data.runtimeAdapters}
           defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
           isPending={isPending}
+          onClose={() => {
+            setLocalSelectedTaskId(undefined);
+            router.push(
+              localizeHref(
+                locale,
+                buildScheduleViewHref(viewModel.activeDay, activeView),
+              ),
+            );
+          }}
           onSaveTaskConfigAction={handleTaskConfigSave}
+          onDeleteTask={handleDeleteTask}
           onMutatedAction={refreshProjection}
           buildScheduleHref={buildScheduleHref}
         />
       ) : null}
 
       <SchedulePageDialogs
-        showQuickAddDialog={showQuickAddDialog}
+        showQuickAddDialog={showNewTaskDialog}
         isPending={isPending}
         dialogDefaults={dialogDefaults}
         data={data}
@@ -399,7 +417,7 @@ export function SchedulePage({
         localizeHref={localizeHref}
         buildScheduleViewHref={buildScheduleViewHref}
         actionFailedMessage={actionFailedMessage}
-        onCloseQuickAdd={() => setShowQuickAddDialog(false)}
+        onCloseQuickAdd={() => setShowNewTaskDialog(false)}
         handleCreateTaskBlock={handleCreateTaskBlock}
         handleApplyDecompositionFromDialog={async ({
           result,
@@ -422,7 +440,7 @@ export function SchedulePage({
             pushRoute: router.push,
             localizeHref,
             buildScheduleViewHref,
-            setShowQuickAddDialog,
+            setShowNewTaskDialog,
             setLocalSelectedTaskId,
             setIsPending,
             setErrorMessage,

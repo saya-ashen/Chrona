@@ -456,7 +456,7 @@ describe("tone and accent helpers", () => {
     it("returns correct classes", () => {
       expect(getPriorityAccent("Urgent")).toBe("bg-red-500");
       expect(getPriorityAccent("High")).toBe("bg-amber-500");
-      expect(getPriorityAccent("Medium")).toBe("bg-sky-500");
+      expect(getPriorityAccent("Medium")).toBe("bg-amber-400");
       expect(getPriorityAccent("Low")).toBe("bg-emerald-500");
       expect(getPriorityAccent("unknown")).toBe("bg-emerald-500");
     });
@@ -466,7 +466,7 @@ describe("tone and accent helpers", () => {
     it("returns correct tones", () => {
       expect(getPriorityTone("Urgent")).toBe("critical");
       expect(getPriorityTone("High")).toBe("warning");
-      expect(getPriorityTone("Medium")).toBe("info");
+      expect(getPriorityTone("Medium")).toBe("warning");
       expect(getPriorityTone("Low")).toBe("success");
     });
   });

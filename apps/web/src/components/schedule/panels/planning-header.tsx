@@ -1,5 +1,4 @@
-import { Calendar, Plus, LayoutList, Clock } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { Calendar, LayoutList, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PlanningDayLink = {
@@ -22,12 +21,13 @@ export function PlanningHeader({
   summary,
   dayLinks,
   metrics,
-  actions,
+  actions: _actions,
   activeView,
   timelineHref,
   listHref,
   timelineLabel,
   listLabel,
+  onNavigate,
 }: {
   ariaLabel: string;
   title: string;
@@ -42,9 +42,11 @@ export function PlanningHeader({
   listHref: string;
   timelineLabel: string;
   listLabel: string;
+  onNewTask?: () => void;
+  newTaskLabel?: string;
+  onNavigate?: (href: string) => void;
 }) {
-  const quickAddAction = actions.find((a) => a.onClick && !a.disabled);
-
+  void _actions;
   // Only show queue + risk metrics (first two)
   const keyMetrics = metrics.slice(0, 2);
 
@@ -67,9 +69,10 @@ export function PlanningHeader({
       {/* Day switcher */}
       <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
         {dayLinks.map((link) => (
-          <a
+          <button
             key={link.label}
-            href={link.href}
+            type="button"
+            onClick={() => onNavigate?.(link.href)}
             aria-current={link.current ? "date" : undefined}
             className={cn(
               "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
@@ -79,14 +82,15 @@ export function PlanningHeader({
             )}
           >
             {link.label}
-          </a>
+          </button>
         ))}
       </div>
 
       {/* View toggle */}
       <div className="flex gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5">
-        <a
-          href={timelineHref}
+        <button
+          type="button"
+          onClick={() => onNavigate?.(timelineHref)}
           aria-current={activeView === "timeline" ? "page" : undefined}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
@@ -97,9 +101,10 @@ export function PlanningHeader({
         >
           <Clock className="size-3" />
           {timelineLabel}
-        </a>
-        <a
-          href={listHref}
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate?.(listHref)}
           aria-current={activeView === "list" ? "page" : undefined}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
@@ -110,7 +115,7 @@ export function PlanningHeader({
         >
           <LayoutList className="size-3" />
           {listLabel}
-        </a>
+        </button>
       </div>
 
       <div className="hidden min-w-[13rem] flex-1 lg:block">
@@ -131,7 +136,7 @@ export function PlanningHeader({
             <span
               className={cn(
                 "text-xs font-semibold",
-                m.tone === "critical" ? "text-rose-600" : m.tone === "info" ? "text-blue-600" : "text-foreground",
+                m.tone === "critical" ? "text-rose-600" : m.tone === "info" ? "text-primary" : "text-foreground",
               )}
             >
               {m.value}
@@ -139,22 +144,6 @@ export function PlanningHeader({
           </div>
         ))}
       </div>
-
-      {/* Quick add */}
-      {quickAddAction ? (
-        <button
-          type="button"
-          onClick={quickAddAction.onClick}
-          title={quickAddAction.description}
-          className={cn(
-            buttonVariants({ variant: "default", size: "sm" }),
-            "h-7 gap-1 rounded-lg px-3 text-xs",
-          )}
-        >
-          <Plus className="size-3.5" />
-          {quickAddAction.label}
-        </button>
-      ) : null}
     </header>
   );
 }

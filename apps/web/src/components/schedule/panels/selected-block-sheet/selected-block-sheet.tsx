@@ -1,6 +1,5 @@
 "use client";
 
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { useI18n, useLocale } from "@/i18n/client";
 import { SelectedBlockAiSidebar } from "@/components/schedule/panels/selected-block-sheet/selected-block-ai-sidebar";
@@ -12,13 +11,15 @@ import { useSelectedBlockPlanState } from "@/components/schedule/panels/selected
 
 export function SelectedBlockSheet({
   item,
-  selectedDay,
+  selectedDay: _selectedDay,
   runtimeAdapters,
   defaultRuntimeAdapterKey,
   isPending,
+  onClose,
   onSaveTaskConfigAction,
+  onDeleteTask,
   onMutatedAction,
-  buildScheduleHref,
+  buildScheduleHref: _buildScheduleHref,
 }: SelectedBlockSheetProps) {
   const locale = useLocale();
   const { messages, t } = useI18n();
@@ -40,10 +41,11 @@ export function SelectedBlockSheet({
 
   return (
     <>
-      <LocalizedLink
-        href={buildScheduleHref(selectedDay)}
+      <button
+        type="button"
+        onClick={onClose}
         aria-label={copy.closeTaskDetails}
-        className="fixed inset-0 z-40 bg-slate-950/35"
+        className="fixed inset-0 z-40 bg-slate-950/35 cursor-default"
       />
       <section
         role="dialog"
@@ -54,11 +56,10 @@ export function SelectedBlockSheet({
         <div className="flex max-h-[92vh] min-h-0 flex-col md:max-h-[calc(100vh-2rem)]">
           <SelectedBlockSheetHeader
             item={item}
-            selectedDay={selectedDay}
             locale={locale}
             copy={copy}
             acceptedPlan={acceptedPlan}
-            buildScheduleHref={buildScheduleHref}
+            onClose={onClose}
           />
 
           <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[minmax(0,1fr)_320px]">
@@ -69,9 +70,9 @@ export function SelectedBlockSheet({
               defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
               isPending={isPending}
               acceptedPlan={acceptedPlan}
-              onMutatedAction={onMutatedAction}
               onTaskConfigDraftStateChange={handleTaskConfigDraftStateChange}
               onSaveTaskConfig={saveTaskConfig}
+              onDeleteTask={onDeleteTask}
             />
 
             <SelectedBlockAiSidebar

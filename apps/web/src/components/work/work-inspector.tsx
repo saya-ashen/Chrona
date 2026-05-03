@@ -267,15 +267,15 @@ function renderSectionPanel(
         {currentException ? <p className="text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
         {currentAction ? (
           isInternalAppHref(currentAction.href) ? (
-            <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+            <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
               {currentAction.label}
             </LocalizedLink>
           ) : currentAction.href.startsWith("#") ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
               {currentAction.label}
             </a>
           ) : isSafeExternalHref(currentAction.href) ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "sm" })}>
+            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
               {currentAction.label}
             </a>
           ) : null

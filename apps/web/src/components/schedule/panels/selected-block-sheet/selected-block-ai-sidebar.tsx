@@ -40,7 +40,7 @@ export function SelectedBlockAiSidebar({
     ? {
         icon: <Loader2 className="size-4 animate-spin" />,
         label: "Generating",
-        className: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+        className: "border-primary-border bg-primary-soft text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary",
       }
     : generationStatus === "waiting_acceptance"
       ? {

@@ -192,7 +192,7 @@ export function DayTimeline({
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
-  const compressedTimeline = useMemo(
+  const _compressedTimeline = useMemo(
     () => buildCompressedTimeline(items),
     [items],
   );
@@ -230,6 +230,8 @@ export function DayTimeline({
   }, [hourHeight, isToday, locale]);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const dragPreviewRef = useRef<TimelinePlacementPreview | null>(null);
+  const dragRafRef = useRef<number | null>(null);
   const [interactionMode, setInteractionMode] = useState<TimelineInteractionMode>("idle");
   const [dragPreview, setDragPreview] = useState<TimelinePlacementPreview | null>(null);
   const [composerDraft, setComposerDraft] = useState<TimelinePlacementPreview | null>(null);
@@ -348,18 +350,22 @@ export function DayTimeline({
   }
 
   function getDragPreview(clientY: number) {
+    const rawMinute = getMinuteFromClientY(clientY);
     const snappedStartMinute = clampScheduledStartMinute(
-      snapMinuteToGrid(getMinuteFromClientY(clientY)),
+      snapMinuteToGrid(rawMinute),
     );
     const durationMinutes = draggedItem?.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES;
     const endMinute = Math.min(snappedStartMinute + durationMinutes, 24 * 60);
 
-    return buildPlacementPreview(
+    const preview = buildPlacementPreview(
       snappedStartMinute,
       endMinute,
       "drag",
       draggedItem?.kind === "scheduled" ? draggedItem.taskId : undefined,
     );
+
+    const maxTop = Math.max(0, effectiveTimelineHeight - preview.height);
+    return { ...preview, top: Math.min(Math.max(preview.top, 0), maxTop) };
   }
 
   function createDraftAtMinute(minute: number) {
@@ -382,10 +388,23 @@ export function DayTimeline({
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setInteractionMode("dragging");
-    setComposerDraft(null);
-    updateResizeDraft(null);
-    setDragPreview(getDragPreview(event.clientY));
+
+    if (interactionMode !== "dragging") {
+      setInteractionMode("dragging");
+      setComposerDraft(null);
+      updateResizeDraft(null);
+    }
+
+    dragPreviewRef.current = getDragPreview(event.clientY);
+
+    if (dragRafRef.current === null) {
+      dragRafRef.current = requestAnimationFrame(() => {
+        dragRafRef.current = null;
+        if (dragPreviewRef.current) {
+          setDragPreview(dragPreviewRef.current);
+        }
+      });
+    }
   }
 
   function handleDragLeave(event: DragEvent<HTMLDivElement>) {
@@ -393,6 +412,21 @@ export function DayTimeline({
       return;
     }
 
+    if (dragRafRef.current !== null) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+    }
+    dragPreviewRef.current = null;
+    setInteractionMode("idle");
+    setDragPreview(null);
+  }
+
+  function clearDragState() {
+    if (dragRafRef.current !== null) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+    }
+    dragPreviewRef.current = null;
     setInteractionMode("idle");
     setDragPreview(null);
   }
@@ -403,9 +437,8 @@ export function DayTimeline({
     }
 
     event.preventDefault();
-    const preview = getDragPreview(event.clientY) ?? dragPreview;
-    setInteractionMode("idle");
-    setDragPreview(null);
+    const preview = getDragPreview(event.clientY) ?? dragPreviewRef.current;
+    clearDragState();
 
     if (!preview || preview.hasConflict) {
       return;
@@ -512,20 +545,38 @@ export function DayTimeline({
     setDragPreview(null);
     updateResizeDraft(initialDraft);
 
+    const resizePreviewRef = { current: initialDraft };
+    let resizeRaf: number | null = null;
+
     function handlePointerMove(moveEvent: globalThis.MouseEvent) {
       const snappedEndMinute = clampScheduledEndMinute(
         startMinute,
         snapMinuteToGrid(getMinuteFromClientY(moveEvent.clientY)),
       );
-      const nextPreview = buildPlacementPreview(startMinute, snappedEndMinute, "resize", item.taskId);
-      updateResizeDraft({ ...nextPreview, taskId: item.taskId, edge: "end" });
+
+      resizePreviewRef.current = {
+        ...buildPlacementPreview(startMinute, snappedEndMinute, "resize", item.taskId),
+        taskId: item.taskId,
+        edge: "end" as const,
+      };
+
+      if (resizeRaf === null) {
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = null;
+          updateResizeDraft(resizePreviewRef.current);
+        });
+      }
     }
 
     async function handlePointerUp() {
       window.removeEventListener("mousemove", handlePointerMove);
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
       setInteractionMode("idle");
 
-      const finalDraft = resizeDraftRef.current ?? initialDraft;
+      const finalDraft = resizePreviewRef.current;
       updateResizeDraft(null);
 
       if (finalDraft.hasConflict) {
@@ -588,11 +639,7 @@ export function DayTimeline({
           <p className="text-[11px] font-medium uppercase tracking-[0.16em]">
             {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
           </p>
-          {compressedTimeline.compressedGapCount > 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {compressedTimeline.compressedGapCount} {copy.quietHoursCompressedSuffix}
-            </p>
-          ) : null}
+          {" "}
         </div>
       </div>
 

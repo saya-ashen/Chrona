@@ -19,7 +19,7 @@ export function SchedulePageHeader({
   activeView,
   viewData,
   viewModel,
-  onOpenQuickAdd,
+  onNavigate,
   localizeHref,
   buildScheduleViewHref,
 }: {
@@ -28,7 +28,7 @@ export function SchedulePageHeader({
   activeView: ScheduleViewMode;
   viewData: SchedulePageData;
   viewModel: SchedulePageViewModel;
-  onOpenQuickAdd: () => void;
+  onNavigate: (href: string) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   localizeHref: (locale: any, href: string) => string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,11 +112,6 @@ export function SchedulePageHeader({
       ]}
       actions={[
         {
-          label: copy.cockpitQuickAdd,
-          onClick: onOpenQuickAdd,
-          description: copy.cockpitQuickAddHint,
-        },
-        {
           label: copy.cockpitReviewSuggestions,
           href: "#schedule-cockpit-sidebar",
           description: copy.cockpitReviewSuggestionsHint,
@@ -132,6 +127,7 @@ export function SchedulePageHeader({
           disabled: true,
         },
       ]}
+      onNavigate={onNavigate}
     />
   );
 }
@@ -187,7 +183,7 @@ export function SchedulePageMainPanel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {draggedItem ? (
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
                 {copy.dropMode}
               </span>
             ) : null}
