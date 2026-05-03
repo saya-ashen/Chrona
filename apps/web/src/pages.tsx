@@ -95,6 +95,7 @@ export function ScheduleRoutePage() {
       selectedDay={searchParams.get("day") ?? undefined}
       selectedTaskId={searchParams.get("task") ?? undefined}
       selectedView={searchParams.get("view") ?? undefined}
+      showNewTask={searchParams.get("new") === "1"}
     />
   );
 }

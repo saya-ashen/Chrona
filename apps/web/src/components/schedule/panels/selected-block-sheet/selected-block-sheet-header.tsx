@@ -1,6 +1,5 @@
 "use client";
 
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
@@ -10,18 +9,16 @@ import { CompactMetaPill, ItemMeta } from "../schedule-panel-primitives";
 
 export function SelectedBlockSheetHeader({
   item,
-  selectedDay,
   locale,
   copy,
   acceptedPlan,
-  buildScheduleHref,
+  onClose,
 }: {
   item: ScheduledItem;
-  selectedDay: string;
   locale: string;
   copy: SchedulePageCopy;
   acceptedPlan: TaskPlanGraphResponse | null;
-  buildScheduleHref: (day: string, taskId?: string) => string;
+  onClose: () => void;
 }) {
   return (
     <div className="border-b border-border/70 bg-muted/[0.12] px-5 py-4 md:px-6">
@@ -77,12 +74,13 @@ export function SelectedBlockSheetHeader({
             />
           </div>
         </div>
-        <LocalizedLink
-          href={buildScheduleHref(selectedDay)}
+        <button
+          type="button"
+          onClick={onClose}
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           {copy.close}
-        </LocalizedLink>
+        </button>
       </div>
     </div>
   );

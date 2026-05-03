@@ -234,10 +234,10 @@ const TONE_STYLES: Record<
     dot: "bg-cyan-500",
   },
   "tool-action": {
-    border: "border-indigo-400/60",
-    bg: "bg-indigo-50 dark:bg-indigo-950/30",
-    ring: "ring-indigo-400/30",
-    dot: "bg-indigo-500",
+    border: "border-primary/40",
+    bg: "bg-primary-soft dark:bg-primary/10",
+    ring: "ring-primary/30",
+    dot: "bg-primary",
   },
   done: {
     border: "border-slate-300/60",
@@ -252,10 +252,10 @@ const TONE_STYLES: Record<
     dot: "bg-rose-500",
   },
   current: {
-    border: "border-sky-400/60",
-    bg: "bg-sky-50 dark:bg-sky-950/30",
-    ring: "ring-sky-400/30",
-    dot: "bg-sky-500",
+    border: "border-amber-400/60",
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    ring: "ring-amber-400/30",
+    dot: "bg-amber-500",
   },
   default: {
     border: "border-border/50",

@@ -18,6 +18,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
+const DRAG_EMPTY_IMAGE = typeof Image !== "undefined" ? new Image() : null;
+if (DRAG_EMPTY_IMAGE) {
+  DRAG_EMPTY_IMAGE.src =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+}
+
 export function TimelinePlacementCard({
   preview,
   title,
@@ -115,6 +121,9 @@ export function ScheduledTimelineBlock({
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", item.taskId);
+        if (DRAG_EMPTY_IMAGE) {
+          event.dataTransfer.setDragImage(DRAG_EMPTY_IMAGE, 0, 0);
+        }
         onDragStart(item);
       }}
       onDragEnd={onDragEnd}

@@ -1033,7 +1033,7 @@ export function TaskConfigForm({
         </details>
 
         <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "sm" })}>
+          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "default" })}>
             {isPending ? pendingLabel : submitLabel}
           </button>
         </div>

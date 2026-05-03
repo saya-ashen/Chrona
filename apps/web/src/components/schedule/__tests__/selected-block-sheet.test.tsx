@@ -196,6 +196,7 @@ const defaultSheetProps = {
   ],
   defaultRuntimeAdapterKey: "openclaw",
   isPending: false,
+  onClose: vi.fn(),
   onSaveTaskConfigAction: vi.fn(),
   onMutatedAction: vi.fn(),
   buildScheduleHref: (day: string, taskId?: string) =>

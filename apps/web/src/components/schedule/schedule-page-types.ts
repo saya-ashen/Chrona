@@ -131,6 +131,7 @@ export type SchedulePageData = {
 export type SchedulePageProps = {
   workspaceId: string;
   data: SchedulePageData;
+  showNewTask?: boolean;
 };
 
 export type ScheduleCardItem = {

@@ -5,7 +5,7 @@ export function getPriorityAccent(priority: string) {
     case "high":
       return "bg-amber-500";
     case "medium":
-      return "bg-sky-500";
+      return "bg-amber-400";
     default:
       return "bg-emerald-500";
   }
@@ -18,7 +18,7 @@ export function getPriorityTone(priority: string) {
     case "high":
       return "warning" as const;
     case "medium":
-      return "info" as const;
+      return "warning" as const;
     default:
       return "success" as const;
   }

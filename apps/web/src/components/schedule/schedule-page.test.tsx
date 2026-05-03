@@ -334,10 +334,10 @@ describe("SchedulePage quick create", () => {
         data={createData()}
         selectedDay="2026-04-15"
         selectedView="timeline"
+        showNewTask
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /quick add/i }));
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
@@ -557,10 +557,10 @@ describe("SchedulePage error handling", () => {
         data={createData()}
         selectedDay="2026-04-15"
         selectedView="timeline"
+        showNewTask
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /quick add/i }));
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {

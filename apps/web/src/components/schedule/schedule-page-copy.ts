@@ -41,7 +41,6 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   dropOntoLane: "Drop work onto the lane",
   clickOrDrag: "Click any slot or drag to adjust",
   timelineCompressedPrefix: "Timeline compressed: 24h shown as",
-  quietHoursCompressedSuffix: "quiet hours compressed",
   emptyDayLane: "Empty day lane",
   emptyDayLaneDescription:
     "Drop a queued task anywhere on this lane to create the first block.",
@@ -108,8 +107,6 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   automationRunNow: "Run now",
   automationUnsupportedRuntime: "This runtime cannot be auto-executed from Chrona.",
   automationBackendOnlyHint: "Chrona only sends execution requests to backend-managed runtimes such as OpenClaw.",
-  cockpitQuickAdd: "Quick add",
-  cockpitQuickAddHint: "Jump to the lightweight capture bar.",
   cockpitReviewSuggestions: "Review suggestions",
   cockpitReviewSuggestionsHint: "Open the cockpit sidebar and triage the queue.",
   cockpitAutoArrange: "Auto arrange",

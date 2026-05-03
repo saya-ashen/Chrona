@@ -90,7 +90,7 @@ function actionLabel(task: TaskItem): { label: string; variant: "default" | "out
 
 const overviewCards = [
   { key: "needs_me", label: "Needs My Attention", icon: AlertTriangle, accent: "from-amber-50 to-white text-amber-700" },
-  { key: "ready", label: "Ready to Start", icon: Play, accent: "from-blue-50 to-white text-blue-700" },
+  { key: "ready", label: "Ready to Start", icon: Play, accent: "from-primary-soft to-white text-primary" },
   { key: "running", label: "Currently Running", icon: Sparkles, accent: "from-emerald-50 to-white text-emerald-700" },
   { key: "completed", label: "Recently Completed", icon: CheckCircle2, accent: "from-violet-50 to-white text-violet-700" },
 ] as const;
@@ -241,7 +241,7 @@ export function WorkbenchHubPage({ tasks, workspaceId: _workspaceId }: Props) {
                           href={`/workspaces/${task.workspaceId}/work/${task.id}`}
                           className={buttonVariants({
                             variant: action.variant,
-                            size: "sm",
+                            size: "default",
                             className: "rounded-xl",
                           })}
                         >

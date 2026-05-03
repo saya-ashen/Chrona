@@ -215,7 +215,7 @@ function renderEventCard(
               {event.badge ?? copy.progress}
             </span>
             {isSchedulerStarted ? (
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] text-blue-700">
+              <span className="rounded-full border border-primary-border bg-primary-soft px-2 py-1 text-[11px] text-primary">
                 {copy.startedByScheduler}
               </span>
             ) : null}

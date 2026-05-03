@@ -16,6 +16,7 @@ import type {
 } from "@/components/schedule/schedule-page-types";
 import {
   formatDateTime,
+  getPriorityAccent,
   getPriorityTone,
   toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
@@ -152,14 +153,14 @@ export function QueueCard({
   const suggestedDurationMinutes = getQueueSuggestedDuration(item);
   const [showTimeslots, setShowTimeslots] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const accent = getPriorityAccent(item.priority);
 
   return (
-    <SurfaceCard
-      as="div"
-      variant="inset"
+    <div
       className={cn(
-        "rounded-xl p-0 transition-colors",
+        "rounded-2xl border bg-white/98 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition-colors",
         isDragging && "border-primary/40 bg-primary/5",
+        !isDragging && "border-border",
       )}
     >
       <div
@@ -168,14 +169,16 @@ export function QueueCard({
         onDragStart={(event) => onDragStart(item, event)}
         onDragEnd={onDragEnd}
         className={cn(
-          "flex items-center gap-2 rounded-xl px-3 py-2.5 cursor-grab active:cursor-grabbing select-none",
+          "flex items-center gap-2.5 px-3 py-2.5 cursor-grab active:cursor-grabbing select-none",
           isPending && "cursor-not-allowed opacity-60",
         )}
       >
-        <GripVertical className="size-3.5 text-muted-foreground/40 shrink-0" aria-hidden="true" />
+        <div className={`w-1 shrink-0 self-stretch rounded-full ${accent}`} />
+
+        <GripVertical className="size-3.5 text-muted-foreground/30 shrink-0" aria-hidden="true" />
 
         <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium">{item.title}</span>
+          <span className="truncate text-[13px] font-medium text-foreground">{item.title}</span>
           <StatusBadge tone={getPriorityTone(item.priority)} className="text-[10px] px-1.5 py-0.5">
             {item.priority}
           </StatusBadge>
@@ -299,9 +302,9 @@ export function QueueCard({
               />
             </div>
           </details>
-        </div>
+         </div>
       ) : null}
-    </SurfaceCard>
+    </div>
   );
 }
 

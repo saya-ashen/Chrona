@@ -88,7 +88,7 @@ function PreferenceToggle({
       <span
         className={cn(
           "relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors",
-          checked ? "border-blue-500 bg-blue-500" : "border-border bg-muted",
+          checked ? "border-primary bg-primary" : "border-border bg-muted",
         )}
         aria-hidden="true"
       >

@@ -105,8 +105,8 @@ export function buildSchedulePageViewModel({
       ? todayGroup.key
       : null) ??
     firstPopulatedGroup ??
-    scheduledGroups[0]?.key ??
-    todayKey;
+    todayKey ??
+    scheduledGroups[0]?.key;
   const activeGroup =
     scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;

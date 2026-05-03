@@ -1,6 +1,7 @@
 "use client";
 
-import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { toTaskConfigInitialValues } from "@/components/schedule/schedule-page-utils";
@@ -10,9 +11,11 @@ import {
   type TaskConfigFormInput,
   type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
+import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import { cn } from "@/lib/utils";
 import { toPlanGraphPlan } from "./plan-utils";
 
 export function SelectedBlockMainColumn({
@@ -22,7 +25,7 @@ export function SelectedBlockMainColumn({
   defaultRuntimeAdapterKey,
   isPending,
   acceptedPlan,
-  onMutatedAction,
+  onDeleteTask,
   onTaskConfigDraftStateChange,
   onSaveTaskConfig,
 }: {
@@ -32,11 +35,12 @@ export function SelectedBlockMainColumn({
   defaultRuntimeAdapterKey: string;
   isPending: boolean;
   acceptedPlan: TaskPlanGraphResponse | null;
-  onMutatedAction: () => Promise<void>;
+  onDeleteTask?: (taskId: string) => void;
   onTaskConfigDraftStateChange: (state: TaskConfigDraftState) => void;
   onSaveTaskConfig: (input: TaskConfigFormInput) => Promise<void>;
 }) {
   const acceptedGraphPlan = toPlanGraphPlan(acceptedPlan);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <div
@@ -52,16 +56,6 @@ export function SelectedBlockMainColumn({
         >
           <div className="space-y-5">
             <div className="px-1">
-              <ScheduleEditorForm
-                taskId={item.taskId}
-                dueAt={item.dueAt}
-                scheduledStartAt={item.scheduledStartAt}
-                scheduledEndAt={item.scheduledEndAt}
-                submitLabel={copy.scheduleTask}
-                onMutatedAction={onMutatedAction}
-              />
-            </div>
-            <div className="border-t border-border/60 bg-muted/[0.12] px-1 pt-4">
               <TaskConfigForm
                 runtimeAdapters={runtimeAdapters}
                 defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
@@ -73,6 +67,41 @@ export function SelectedBlockMainColumn({
                 onSubmitAction={onSaveTaskConfig}
               />
             </div>
+            {onDeleteTask ? (
+              <div className="border-t border-border/60 px-1 pt-4">
+                {showDeleteConfirm ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2">
+                    <span className="flex-1 text-xs text-red-700">Delete &ldquo;{item.title}&rdquo;?</span>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteTask(item.taskId)}
+                      className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 transition-colors"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      "gap-1.5 text-xs text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50",
+                    )}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete task
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
         </SurfaceCard>
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/i18n/client", () => ({
@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 describe("DayTimeline", () => {
-  it("shows a conflict preview when a dragged block overlaps an existing scheduled block", () => {
+  it("shows a conflict preview when a dragged block overlaps an existing scheduled block", async () => {
     render(
       <DayTimeline
         items={[createScheduledItem()]}
@@ -86,7 +86,9 @@ describe("DayTimeline", () => {
       dataTransfer: { dropEffect: "move" },
     });
 
-    expect(screen.getByText(/conflict/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/conflict/i)).toBeInTheDocument();
+    });
   });
 
   it("shows a current-time marker when the selected day is today", () => {

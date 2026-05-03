@@ -264,8 +264,7 @@ export function WorkbenchComposerCard({
               className={buttonVariants({
                 variant: "outline",
                 size: "sm",
-                className:
-                  "rounded-full border-border/70 bg-muted/[0.2] text-foreground hover:bg-muted/50",
+                className: "rounded-full",
               })}
               onClick={() =>
                 onComposerChange(
@@ -289,12 +288,9 @@ export function WorkbenchComposerCard({
             }}
             className={buttonVariants({
               variant: composer.submitVariant ?? "default",
-              size: "sm",
+              size: "default",
               className: cn(
-                "h-11 rounded-xl disabled:opacity-60",
-                composer.submitVariant === "outline"
-                  ? "border-border/70 bg-background text-foreground hover:bg-muted/40"
-                  : "bg-primary text-primary-foreground shadow-[0_10px_24px_rgba(37,99,235,0.25)]",
+                "h-11 rounded-xl",
               ),
             })}
           >
@@ -306,8 +302,8 @@ export function WorkbenchComposerCard({
             onClick={() => onComposerChange("")}
             className={buttonVariants({
               variant: "outline",
-              size: "sm",
-              className: "h-11 rounded-xl border-border/70 bg-background text-foreground hover:bg-muted/40",
+              size: "default",
+              className: "h-11 rounded-xl",
             })}
           >
             清空

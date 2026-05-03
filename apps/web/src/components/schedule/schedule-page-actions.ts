@@ -213,7 +213,7 @@ export async function handleScheduleDropAction({
   copy,
   applyOptimisticViewData,
   removeExpandedQueueTask,
-  setLocalSelectedTaskId,
+  _setLocalSelectedTaskId,
   setAnnouncement,
   setIsPending,
   setErrorMessage,
@@ -230,7 +230,7 @@ export async function handleScheduleDropAction({
   copy: SchedulePageCopy;
   applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
   removeExpandedQueueTask: (taskId: string) => void;
-  setLocalSelectedTaskId: (taskId: string) => void;
+  _setLocalSelectedTaskId: (taskId: string) => void;
   setAnnouncement: (value: string) => void;
   setIsPending: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
@@ -275,7 +275,6 @@ export async function handleScheduleDropAction({
       applyOptimisticViewData((current) =>
         patchScheduledWindow(current, item.taskId, startAt, endAt, item.dueAt),
       );
-      setLocalSelectedTaskId(item.taskId);
     }
 
     await applySchedule({
@@ -484,7 +483,7 @@ export async function handleApplyDecompositionFromDialogAction({
   pushRoute,
   localizeHref,
   buildScheduleViewHref,
-  setShowQuickAddDialog,
+  setShowNewTaskDialog,
   setLocalSelectedTaskId,
   setIsPending,
   setErrorMessage,
@@ -506,7 +505,7 @@ export async function handleApplyDecompositionFromDialogAction({
   localizeHref: (locale: any, href: string) => string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildScheduleViewHref: (...args: any[]) => string;
-  setShowQuickAddDialog: (value: boolean) => void;
+  setShowNewTaskDialog: (value: boolean) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   setIsPending: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
@@ -545,7 +544,7 @@ export async function handleApplyDecompositionFromDialogAction({
       throw new Error("Failed to apply task plan");
     }
 
-    setShowQuickAddDialog(false);
+    setShowNewTaskDialog(false);
     setLocalSelectedTaskId(created.taskId);
     pushRoute(
       localizeHref(

@@ -19,6 +19,7 @@ import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "
 import { useSmartDecomposition } from "@/hooks/use-ai";
 
 import { useI18n } from "@/i18n/client";
+import { buttonVariants } from "@/components/ui/button";
 
 interface TaskDecompositionPanelProps {
   taskId?: string;
@@ -429,7 +430,7 @@ export function TaskDecompositionPanel({
           <button
             type="button"
             onClick={handleRegenerate}
-            className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10"
+            className={buttonVariants({ variant: "soft", size: "sm", className: "rounded-full" })}
           >
             <Sparkles className="size-3.5" />
             Generate plan

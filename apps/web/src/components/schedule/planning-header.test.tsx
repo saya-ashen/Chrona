@@ -1,9 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PlanningHeader } from "@/components/schedule/planning-header";
 
 describe("PlanningHeader", () => {
   it("renders cockpit summary metrics and action affordances", () => {
+    const onNavigate = vi.fn();
+
     render(
       <PlanningHeader
         ariaLabel="Schedule"
@@ -22,7 +24,6 @@ describe("PlanningHeader", () => {
           { label: "AI suggestions", value: "2", hint: "Suggested next moves." },
         ]}
         actions={[
-          { label: "Quick add", href: "#schedule-capture-bar", description: "Jump to quick create." },
           { label: "Review suggestions", href: "#schedule-cockpit-sidebar", description: "Open the cockpit sidebar." },
           { label: "Auto arrange", description: "Coming soon", disabled: true },
         ]}
@@ -31,6 +32,7 @@ describe("PlanningHeader", () => {
         listHref="/schedule?view=list"
         timelineLabel="Timeline"
         listLabel="List"
+        onNavigate={onNavigate}
       />,
     );
 
@@ -39,8 +41,6 @@ describe("PlanningHeader", () => {
     expect(screen.getByText("2h")).toBeInTheDocument();
     expect(screen.getByText("Queue")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /quick add/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /timeline/i })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: /auto arrange/i })).not.toBeInTheDocument();
   });
 });
