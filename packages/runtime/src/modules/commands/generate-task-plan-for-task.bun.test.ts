@@ -9,7 +9,7 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   nodes: [
     {
       id: "node-1",
-      type: "step",
+      type: "task",
       title: `Handle ${request.title}`,
       objective: request.description ?? request.title,
       description: request.description ?? null,
@@ -117,5 +117,33 @@ describe("generateTaskPlanForTask", () => {
 
     expect(result?.source).toBe("saved");
     expect(aiGeneratePlanMock).not.toHaveBeenCalled();
+  });
+
+  it("does not save an empty generated plan", async () => {
+    aiGeneratePlanMock.mockImplementationOnce(async () => ({
+      source: "test-ai",
+      summary: "",
+      reasoning: "",
+      nodes: [],
+      edges: [],
+    }));
+
+    const workspace = await db.workspace.create({
+      data: { name: "Invalid Plan", status: "Active", defaultRuntime: "openclaw" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Broken planner output",
+        status: "Ready",
+        priority: "Medium",
+        ownerType: "human",
+      },
+    });
+
+    const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    expect(result).toBeNull();
+    expect(await getLatestTaskPlanGraph(task.id)).toBeNull();
   });
 });

@@ -97,7 +97,7 @@ describe("progress-accepted-task-plan", () => {
         nodes: [
           {
             id: "a",
-            type: "step",
+            type: "task",
             title: "Step A",
             objective: "Do A",
             description: null,
@@ -116,7 +116,7 @@ describe("progress-accepted-task-plan", () => {
           },
           {
             id: "b",
-            type: "step",
+            type: "task",
             title: "Step B",
             objective: "Do B",
             description: null,
@@ -135,7 +135,7 @@ describe("progress-accepted-task-plan", () => {
           },
           {
             id: "c",
-            type: "step",
+            type: "task",
             title: "Step C",
             objective: "Do C",
             description: null,
@@ -221,7 +221,7 @@ describe("progress-accepted-task-plan", () => {
         nodes: [
           {
             id: "a",
-            type: "step",
+            type: "task",
             title: "Step A",
             objective: "Do A",
             description: null,

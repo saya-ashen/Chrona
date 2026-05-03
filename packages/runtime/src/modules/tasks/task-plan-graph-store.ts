@@ -38,14 +38,22 @@ function normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent"
 
 function normalizeNodeType(value: unknown): TaskPlanNodeType {
   switch (value) {
+    case "task":
     case "checkpoint":
-    case "decision":
-    case "user_input":
+    case "condition":
+    case "wait":
+      return value;
+    // Legacy type mappings
+    case "step":
     case "deliverable":
     case "tool_action":
-      return value;
+      return "task";
+    case "decision":
+      return "condition";
+    case "user_input":
+      return "checkpoint";
     default:
-      return "step";
+      return "task";
   }
 }
 
@@ -152,10 +160,7 @@ function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGrap
             fromNodeId: edge.fromNodeId,
             toNodeId: edge.toNodeId,
             type:
-              edge.type === "depends_on" ||
-              edge.type === "branches_to" ||
-              edge.type === "unblocks" ||
-              edge.type === "feeds_output"
+              edge.type === "depends_on"
                 ? edge.type
                 : "sequential",
             metadata: edge.metadata && typeof edge.metadata === "object" && !Array.isArray(edge.metadata)

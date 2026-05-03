@@ -107,7 +107,7 @@ describe("auto-start-scheduled-plan", () => {
         nodes: [
           {
             id: "node-auto-1",
-            type: "step",
+            type: "task",
             title: "Collect evidence",
             objective: "Collect evidence",
             description: null,
@@ -126,7 +126,7 @@ describe("auto-start-scheduled-plan", () => {
           },
           {
             id: "node-manual-1",
-            type: "user_input",
+            type: "checkpoint",
             title: "Confirm direction",
             objective: "Confirm direction",
             description: null,

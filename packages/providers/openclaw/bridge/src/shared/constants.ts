@@ -107,6 +107,14 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     type: "object",
     additionalProperties: true,
     properties: {
+      title: {
+        type: "string",
+        description: "Brief plan title.",
+      },
+      goal: {
+        type: "string",
+        description: "What this plan is meant to achieve.",
+      },
       summary: {
         type: "string",
         description: "One concise sentence describing the generated plan.",
@@ -126,7 +134,7 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
             id: { type: "string", description: "Stable local id, e.g. node-1." },
             type: {
               type: "string",
-              enum: ["step", "checkpoint", "decision", "user_input", "deliverable", "tool_action"],
+              enum: ["task", "checkpoint", "condition", "wait"],
             },
             title: { type: "string", description: "Short node label shown to the user." },
             objective: { type: "string", description: "What this node achieves when completed." },
@@ -155,7 +163,7 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
                 "Set true when this node is an approval/review/sign-off gate that must be explicitly approved by a person.",
             },
           },
-          required: ["id", "type", "title", "objective", "executor", "requiresHumanInput", "requiresHumanApproval"],
+          required: ["id", "type", "title"],
         },
       },
       edges: {
@@ -170,16 +178,16 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
             toNodeId: { type: "string", description: "Downstream/target node id." },
             type: {
               type: "string",
-              enum: ["sequential", "depends_on", "branches_to", "unblocks", "feeds_output"],
+              enum: ["sequential", "depends_on"],
               description:
-                "Edge meaning. sequential = ordinary next step; depends_on = target cannot start until source completes; branches_to = source leads to one branch path; unblocks = source removes a blocker from target; feeds_output = target consumes output/artifact from source.",
+                "sequential = ordinary next step; depends_on = target cannot start until source completes.",
             },
           },
           required: ["id", "fromNodeId", "toNodeId", "type"],
         },
       },
     },
-    required: ["summary", "nodes", "edges"],
+    required: ["title", "goal", "nodes", "edges"],
   },
   dispatch_next_task_action: {
     type: "object",

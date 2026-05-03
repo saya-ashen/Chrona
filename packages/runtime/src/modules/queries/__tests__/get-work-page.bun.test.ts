@@ -223,7 +223,7 @@ describe("getWorkPage", () => {
           nodes: [
             {
               id: "understand-task",
-              type: "step",
+              type: "task",
               title: "梳理目标与约束",
               objective: "确认目标。",
               description: null,
@@ -238,7 +238,7 @@ describe("getWorkPage", () => {
             },
             {
               id: "gather-context",
-              type: "step",
+              type: "task",
               title: "补齐上下文",
               objective: "整理背景。",
               description: null,
@@ -253,7 +253,7 @@ describe("getWorkPage", () => {
             },
             {
               id: "execute-task",
-              type: "user_input",
+              type: "checkpoint",
               title: "推进首轮产出",
               objective: "推进当前执行。",
               description: null,
@@ -303,9 +303,9 @@ describe("getWorkPage", () => {
       currentStepId: "execute-task",
     });
     expect(page.taskPlan.steps).toEqual([
-      expect.objectContaining({ id: "understand-task", status: "done", requiresHumanInput: false, type: "step" }),
-      expect.objectContaining({ id: "gather-context", status: "done", requiresHumanInput: false, type: "step" }),
-      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", requiresHumanInput: true, type: "user_input" }),
+      expect.objectContaining({ id: "understand-task", status: "done", requiresHumanInput: false, type: "task" }),
+      expect.objectContaining({ id: "gather-context", status: "done", requiresHumanInput: false, type: "task" }),
+      expect.objectContaining({ id: "execute-task", status: "waiting_for_user", requiresHumanInput: true, type: "checkpoint" }),
       expect.objectContaining({ id: "confirm-next-step", status: "pending", requiresHumanInput: false, type: "checkpoint" }),
     ]);
   });

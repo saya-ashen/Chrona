@@ -28,7 +28,11 @@ function makeBridgeResponse(overrides: Partial<BridgeResponse> = {}): BridgeResp
 
 describe("OpenClawBridgeClient", () => {
   it("sends execution requests with stable session key semantics", async () => {
-    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const calls: Array<{
+      url: string;
+      body: Record<string, unknown>;
+      headers: Headers;
+    }> = [];
 
     globalThis.fetch = (async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -36,6 +40,7 @@ describe("OpenClawBridgeClient", () => {
         calls.push({
           url,
           body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+          headers: new Headers(init?.headers),
         });
         return Response.json(
           makeBridgeResponse({
@@ -49,7 +54,10 @@ describe("OpenClawBridgeClient", () => {
       throw new Error(`unexpected fetch: ${url}`);
     }) as typeof fetch;
 
-    const client = new OpenClawBridgeClient({ baseUrl: "http://bridge.local" });
+    const client = new OpenClawBridgeClient({
+      baseUrl: "http://bridge.local",
+      authToken: "secret-token",
+    });
     const result = await client.createRun({
       prompt: "Analyze code",
       runtimeInput: { model: "gpt-5", prompt: "Task title from runtime input", maxTokens: 321 },
@@ -65,6 +73,7 @@ describe("OpenClawBridgeClient", () => {
       runtimeAdapterKey: "openclaw",
       runtimeInput: { model: "gpt-5", prompt: "Task title from runtime input", maxTokens: 321 },
     });
+    expect(calls[0]?.headers.get("authorization")).toBe("Bearer secret-token");
     expect(result).toEqual({
       runtimeRunRef: "resp-openresponses-1",
       runtimeSessionRef: "bridge-session-xyz",

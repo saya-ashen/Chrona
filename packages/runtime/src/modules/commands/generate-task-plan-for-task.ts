@@ -152,6 +152,15 @@ export async function generateTaskPlanForTask(input: {
     return null;
   }
 
+   if (planResult.nodes.length === 0) {
+     logger.warn("request.empty_plan", {
+       taskId: task.id,
+       source: planResult.source,
+       summary: summarizeText(planResult.summary),
+     });
+     return null;
+   }
+
   const draftPlan = buildDraftPlanGraph({
     taskId: task.id,
     prompt: input.planningPrompt ?? null,

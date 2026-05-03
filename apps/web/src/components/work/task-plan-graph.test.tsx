@@ -41,14 +41,16 @@ describe("TaskPlanGraph", () => {
               id: "node-current",
               title: "当前执行节点",
               objective: "这是一个比较长的说明，用来验证未展开时会被收敛成真正像节点的卡片，而不是把全部正文都摊开。",
-              phase: "user_input",
+              phase: "checkpoint",
               status: "waiting_for_user",
               requiresHumanInput: true,
-              type: "user_input",
+              type: "checkpoint",
+              displayType: "checkpoint",
               executionMode: "manual",
               linkedTaskId: null,
               estimatedMinutes: 20,
               priority: "High",
+              metadata: { checkpointType: "input", prompt: "你希望调整哪些参数？" },
             },
             {
               id: "node-child",
@@ -57,7 +59,8 @@ describe("TaskPlanGraph", () => {
               phase: "execution",
               status: "pending",
               requiresHumanInput: false,
-              type: "step",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: "child-1",
               estimatedMinutes: 45,
@@ -91,13 +94,10 @@ describe("TaskPlanGraph", () => {
     const legend = within(graph).getByTestId("task-plan-graph-legend");
     expect(legend).toHaveTextContent("顺序执行");
     expect(legend).toHaveTextContent("依赖于");
-    expect(legend).toHaveTextContent("分支到");
-    expect(legend).toHaveTextContent("解除阻塞");
-    expect(legend).toHaveTextContent("输出流向");
-    expect(legend).toHaveTextContent("step · 普通步骤");
-    expect(legend).toHaveTextContent("user_input · 用户输入");
-    expect(legend).toHaveTextContent("decision · 决策/审批");
-    expect(legend).toHaveTextContent("deliverable · 交付结果");
+    expect(legend).toHaveTextContent("任务");
+    expect(legend).toHaveTextContent("检查点");
+    expect(legend).toHaveTextContent("条件判断");
+    expect(legend).toHaveTextContent("等待");
     expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
@@ -117,15 +117,15 @@ describe("TaskPlanGraph", () => {
     const currentNode = screen.getByTestId("task-plan-node-node-current");
     expect(currentNode.getAttribute("data-node-current")).toBe("true");
     expect(currentNode.getAttribute("data-node-selected")).toBe("false");
-    expect(currentNode.getAttribute("data-node-shape")).toBe("rounded");
-    expect(currentNode).not.toHaveTextContent("等待你处理");
-    expect(currentNode).toHaveTextContent("user_input");
+    expect(currentNode.getAttribute("data-node-shape")).toBe("parallelogram");
+    expect(currentNode.getAttribute("data-node-display-type")).toBe("checkpoint");
+    expect(currentNode).toHaveTextContent("检查点");
+    expect(currentNode).toHaveTextContent("你希望调整哪些参数？");
 
     const childNode = screen.getByTestId("task-plan-node-node-child");
     expect(childNode.getAttribute("data-node-tone")).toBe("child-task");
     expect(childNode.getAttribute("data-node-shape")).toBe("rounded");
-    expect(childNode).not.toHaveTextContent("待处理");
-    expect(childNode).toHaveTextContent("execution");
+    expect(childNode.getAttribute("data-node-display-type")).toBe("task");
   });
 
   it("keeps nodes clickable in read-only mode and keeps the expanded node above others within the visible graph frame", () => {
@@ -143,7 +143,8 @@ describe("TaskPlanGraph", () => {
               phase: "planning",
               status: "done",
               requiresHumanInput: false,
-              type: "step",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: null,
             },
@@ -154,7 +155,8 @@ describe("TaskPlanGraph", () => {
               phase: "execution",
               status: "in_progress",
               requiresHumanInput: false,
-              type: "step",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: null,
             },
@@ -165,7 +167,8 @@ describe("TaskPlanGraph", () => {
               phase: "delivery",
               status: "pending",
               requiresHumanInput: false,
-              type: "deliverable",
+              type: "task",
+              displayType: "task",
               executionMode: "hybrid",
               linkedTaskId: "child-9",
               estimatedMinutes: 60,
@@ -174,7 +177,7 @@ describe("TaskPlanGraph", () => {
           ],
           edges: [
             { id: "edge-1", fromNodeId: "node-top", toNodeId: "node-current", type: "sequential" },
-            { id: "edge-2", fromNodeId: "node-current", toNodeId: "node-deliverable", type: "feeds_output" },
+            { id: "edge-2", fromNodeId: "node-current", toNodeId: "node-deliverable", type: "sequential" },
           ],
         }}
       />
@@ -187,11 +190,9 @@ describe("TaskPlanGraph", () => {
 
     expect(graph).toHaveAttribute("data-graph-editable", "false");
     expect(deliverableNode.getAttribute("data-node-selected")).toBe("true");
-    expect(deliverableNode.getAttribute("data-node-shape")).toBe("pill");
+    expect(deliverableNode.getAttribute("data-node-shape")).toBe("rounded");
+    expect(deliverableNode.getAttribute("data-node-display-type")).toBe("task");
     expect(deliverableNode).toHaveTextContent("产出说明文档");
-    expect(deliverableNode).toHaveTextContent("delivery");
-    expect(deliverableNode).toHaveTextContent("deliverable");
-    expect(deliverableNode).toHaveTextContent("待处理");
     expect(deliverableNode).toHaveTextContent("hybrid");
     expect(deliverableNode).toHaveTextContent("Urgent");
     expect(deliverableNode).toHaveTextContent("60 min");
@@ -213,27 +214,30 @@ describe("TaskPlanGraph", () => {
         mode="full"
         plan={{
           state: "ready",
-          currentStepId: "node-tool",
+          currentStepId: "node-task",
           steps: [
             {
-              id: "node-decision",
+              id: "node-condition",
               title: "决定是否扩展范围",
               objective: "需要在两个方案之间做选择",
               phase: "planning",
               status: "pending",
               requiresHumanInput: false,
-              type: "decision",
+              type: "condition",
+              displayType: "condition",
               executionMode: "manual",
               linkedTaskId: null,
+              metadata: { condition: "范围是否大于 100 项？", evaluationBy: "user", branches: [{ label: "是" }, { label: "否" }] },
             },
             {
-              id: "node-tool",
-              title: "调用检索工具",
+              id: "node-task",
+              title: "执行核心任务",
               objective: "自动拉取信息",
               phase: "execution",
               status: "in_progress",
               requiresHumanInput: false,
-              type: "tool_action",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: null,
             },
@@ -245,20 +249,22 @@ describe("TaskPlanGraph", () => {
               status: "pending",
               requiresHumanInput: false,
               type: "checkpoint",
+              displayType: "checkpoint",
               executionMode: "hybrid",
               linkedTaskId: null,
+              metadata: { checkpointType: "confirm", prompt: "结果是否完整？" },
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-decision", toNodeId: "node-tool", type: "branches_to" },
-            { id: "edge-2", fromNodeId: "node-tool", toNodeId: "node-checkpoint", type: "sequential" },
+            { id: "edge-1", fromNodeId: "node-condition", toNodeId: "node-task", type: "depends_on" },
+            { id: "edge-2", fromNodeId: "node-task", toNodeId: "node-checkpoint", type: "sequential" },
           ],
         }}
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-node-decision")).toHaveAttribute("data-node-shape", "diamond");
-    expect(screen.getByTestId("task-plan-node-node-tool")).toHaveAttribute("data-node-shape", "hex");
+    expect(screen.getByTestId("task-plan-node-node-condition")).toHaveAttribute("data-node-shape", "diamond");
+    expect(screen.getByTestId("task-plan-node-node-task")).toHaveAttribute("data-node-shape", "rounded");
     expect(screen.getByTestId("task-plan-node-node-checkpoint")).toHaveAttribute("data-node-shape", "parallelogram");
   });
 
@@ -278,7 +284,8 @@ describe("TaskPlanGraph", () => {
                 phase: "execution",
                 status: "in_progress",
                 requiresHumanInput: false,
-                type: "step",
+                type: "task",
+                displayType: "task",
                 executionMode: "automatic",
                 linkedTaskId: null,
               },
@@ -289,7 +296,8 @@ describe("TaskPlanGraph", () => {
                 phase: "follow-up",
                 status: "pending",
                 requiresHumanInput: false,
-                type: "step",
+                type: "task",
+                displayType: "task",
                 executionMode: "automatic",
                 linkedTaskId: "child-3",
               },
@@ -325,7 +333,8 @@ describe("TaskPlanGraph", () => {
               phase: "execution",
               status: "in_progress",
               requiresHumanInput: false,
-              type: "step",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: null,
             },
@@ -336,9 +345,11 @@ describe("TaskPlanGraph", () => {
               phase: "input",
               status: "waiting_for_user",
               requiresHumanInput: true,
-              type: "user_input",
+              type: "checkpoint",
+              displayType: "checkpoint",
               executionMode: "manual",
               linkedTaskId: null,
+              metadata: { checkpointType: "input", prompt: "确认范围" },
             },
             {
               id: "node-child",
@@ -347,7 +358,8 @@ describe("TaskPlanGraph", () => {
               phase: "follow-up",
               status: "pending",
               requiresHumanInput: false,
-              type: "step",
+              type: "task",
+              displayType: "task",
               executionMode: "automatic",
               linkedTaskId: "child-3",
             },
@@ -358,14 +370,15 @@ describe("TaskPlanGraph", () => {
               phase: "delivery",
               status: "pending",
               requiresHumanInput: false,
-              type: "deliverable",
+              type: "task",
+              displayType: "task",
               executionMode: "hybrid",
               linkedTaskId: null,
             },
           ],
           edges: [
             { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
-            { id: "edge-2", fromNodeId: "node-child", toNodeId: "node-deliverable", type: "feeds_output" },
+            { id: "edge-2", fromNodeId: "node-child", toNodeId: "node-deliverable", type: "sequential" },
           ],
         }}
       />

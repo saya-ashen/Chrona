@@ -1,5 +1,5 @@
 import type { OpenClawRuntimeClient } from "./runtime-client";
-import { OpenClawEmbeddedClient } from "../transport/embedded-client";
+import { OpenClawBridgeClient } from "../transport/bridge-client";
 import { createMockOpenClawAdapter } from "./mock-adapter";
 import {
   getOpenClawTaskConfigSpec,
@@ -72,8 +72,8 @@ export type OpenClawAdapter = {
 };
 
 export type OpenClawAdapterConfig = {
-  gatewayHttpUrl?: string;
-  gatewayToken?: string;
+  bridgeUrl?: string;
+  bridgeToken?: string;
 };
 
 export async function createRuntimeAdapter(config?: OpenClawAdapterConfig): Promise<OpenClawAdapter> {
@@ -81,16 +81,10 @@ export async function createRuntimeAdapter(config?: OpenClawAdapterConfig): Prom
     return createMockOpenClawAdapter();
   }
 
-  const client = new OpenClawEmbeddedClient({
+  const client = new OpenClawBridgeClient({
+    baseUrl: config?.bridgeUrl,
+    authToken: config?.bridgeToken,
     timeoutSeconds: process.env.OPENCLAW_TIMEOUT ? Number(process.env.OPENCLAW_TIMEOUT) : undefined,
-    environment: config?.gatewayHttpUrl
-      ? {
-          defaultPort: 7677,
-          gatewayHttpUrl: config.gatewayHttpUrl,
-          gatewayToken: config.gatewayToken ?? "",
-          agentId: "main",
-        }
-      : undefined,
   });
   return createLiveOpenClawAdapter(client);
 }
@@ -197,4 +191,3 @@ export function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenCl
 
   return adapter;
 }
-

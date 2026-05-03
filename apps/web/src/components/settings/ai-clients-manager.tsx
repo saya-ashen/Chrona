@@ -32,8 +32,8 @@ function buildClientPayload(input: {
   name: string;
   type: "openclaw" | "llm";
   isDefault: boolean;
-  gatewayUrl: string;
-  gatewayToken: string;
+  bridgeUrl: string;
+  bridgeToken: string;
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
@@ -41,8 +41,8 @@ function buildClientPayload(input: {
 }): ClientFormPayload {
   const config = input.type === "openclaw"
     ? {
-        gatewayUrl: input.gatewayUrl,
-        gatewayToken: input.gatewayToken,
+        bridgeUrl: input.bridgeUrl,
+        bridgeToken: input.bridgeToken,
         timeoutSeconds: Number(input.timeoutSeconds),
       }
     : { baseUrl: input.baseUrl, apiKey: input.apiKey, model: input.model };
@@ -162,8 +162,8 @@ function ClientForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<"openclaw" | "llm">(initial?.type ?? "openclaw");
   const [isDefault, setIsDefault] = useState(initial?.isDefault ?? false);
-  const [gatewayUrl, setGatewayUrl] = useState((initial?.config as { gatewayUrl?: string })?.gatewayUrl ?? "http://localhost:7677");
-  const [gatewayToken, setGatewayToken] = useState((initial?.config as { gatewayToken?: string })?.gatewayToken ?? "");
+  const [bridgeUrl, setBridgeUrl] = useState((initial?.config as { bridgeUrl?: string })?.bridgeUrl ?? "http://localhost:7677");
+  const [bridgeToken, setBridgeToken] = useState((initial?.config as { bridgeToken?: string })?.bridgeToken ?? "");
   const [timeoutSeconds, setTimeoutSeconds] = useState(String((initial?.config as { timeoutSeconds?: number })?.timeoutSeconds ?? 120));
   const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState((initial?.config as { apiKey?: string })?.apiKey ?? "");
@@ -175,8 +175,8 @@ function ClientForm({
     name,
     type,
     isDefault,
-    gatewayUrl,
-    gatewayToken,
+    bridgeUrl,
+    bridgeToken,
     timeoutSeconds,
     baseUrl,
     apiKey,
@@ -211,20 +211,20 @@ function ClientForm({
       {type === "openclaw" ? (
         <div className="grid gap-3 md:grid-cols-3">
           <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Gateway URL</span>
+            <span className="text-xs text-muted-foreground">Bridge URL</span>
             <input
               className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-              value={gatewayUrl}
-              onChange={(e) => setGatewayUrl(e.target.value)}
+              value={bridgeUrl}
+              onChange={(e) => setBridgeUrl(e.target.value)}
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Gateway Token</span>
+            <span className="text-xs text-muted-foreground">Bridge Token</span>
             <input
               className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
               type="password"
-              value={gatewayToken}
-              onChange={(e) => setGatewayToken(e.target.value)}
+              value={bridgeToken}
+              onChange={(e) => setBridgeToken(e.target.value)}
               placeholder="token"
             />
           </label>
@@ -459,7 +459,7 @@ export function AiClientsManager() {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {client.type === "openclaw" ? (
-                      <span>Gateway: {(client.config as { gatewayUrl?: string }).gatewayUrl ?? "—"}</span>
+                      <span>Bridge: {(client.config as { bridgeUrl?: string }).bridgeUrl ?? "—"}</span>
                     ) : (
                       <span>
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}

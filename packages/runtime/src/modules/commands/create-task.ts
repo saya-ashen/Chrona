@@ -73,10 +73,13 @@ export async function createTask(input: {
     scheduledEndAt: input.scheduledEndAt,
   });
 
-  const workspace = await db.workspace.findUniqueOrThrow({
+  const workspace = await db.workspace.findUnique({
     where: { id: input.workspaceId },
     select: { defaultRuntime: true },
   });
+  if (!workspace) {
+    throw new Error(`Workspace not found: ${input.workspaceId}`);
+  }
 
   if (input.parentTaskId) {
     const parentTask = await db.task.findUnique({

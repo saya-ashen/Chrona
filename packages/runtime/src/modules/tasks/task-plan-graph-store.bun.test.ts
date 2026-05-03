@@ -71,7 +71,7 @@ describe("task-plan-graph-store", () => {
           nodes: [
             {
               id: "node-1",
-              type: "step",
+              type: "task",
               title: "Auto step",
               objective: "Do something automatically",
               description: null,
@@ -90,7 +90,7 @@ describe("task-plan-graph-store", () => {
             },
             {
               id: "node-2",
-              type: "user_input",
+              type: "checkpoint",
               title: "Manual approval",
               objective: "Wait for user approval",
               description: null,
@@ -161,7 +161,7 @@ describe("task-plan-graph-store", () => {
           nodes: [
             {
               id: "node-1",
-              type: "step",
+              type: "task",
               title: "Collect inputs",
               objective: "Gather requirements",
               description: null,
@@ -213,7 +213,7 @@ describe("getReadyAutoRunnableNodes", () => {
 
   const autoNode = (id: string, status: "pending" | "done" = "pending") => ({
     id,
-    type: "step" as const,
+    type: "task" as const,
     title: `Auto ${id}`,
     objective: `Do ${id}`,
     description: null,
@@ -233,7 +233,7 @@ describe("getReadyAutoRunnableNodes", () => {
 
   const manualNode = (id: string, status: "pending" | "done" = "pending") => ({
     id,
-    type: "user_input" as const,
+    type: "checkpoint" as const,
     title: `Manual ${id}`,
     objective: `Wait ${id}`,
     description: null,

@@ -140,18 +140,24 @@ describe("openclaw bridge gateway helpers", () => {
     expect(String(body.instructions)).toContain("generate_task_plan_graph");
     expect(String(body.instructions)).toContain("Do not ask follow-up questions");
     expect(String(body.instructions)).toContain("Call generate_task_plan_graph exactly once");
-    expect(String(body.input)).toContain("Create an execution-ready plan graph for the task below.");
-    expect(String(body.input)).toContain("Use only the information provided");
-    expect(String(body.input)).toContain("Make reasonable assumptions");
-    expect(String(body.input)).toContain("Task to plan");
-    expect(String(body.input)).toContain("Title: Plan thesis defense slides");
-    expect(String(body.input)).toContain("Description: Prepare a concise deck for the final defense");
-    expect(String(body.input)).toContain("Estimated duration: 180 minutes");
-    expect(String(body.input)).toContain("Output requirements");
-    expect(String(body.input)).toContain("nodes");
-    expect(String(body.input)).toContain("edges");
-    expect(String(body.input)).not.toContain("taskId");
-    expect(String(body.input)).not.toContain("sessionKey");
+    expect(body.input).toEqual([
+      {
+        type: "input_text",
+        text: expect.stringContaining("Create an execution-ready plan graph for the task below."),
+      },
+    ]);
+    const inputText = ((body.input as Array<{ type: string; text?: string }>)[0]?.text) ?? "";
+    expect(inputText).toContain("Use only the information provided");
+    expect(inputText).toContain("Make reasonable assumptions");
+    expect(inputText).toContain("Task to plan");
+    expect(inputText).toContain("Title: Plan thesis defense slides");
+    expect(inputText).toContain("Description: Prepare a concise deck for the final defense");
+    expect(inputText).toContain("Estimated duration: 180 minutes");
+    expect(inputText).toContain("Output requirements");
+    expect(inputText).toContain("nodes");
+    expect(inputText).toContain("edges");
+    expect(inputText).not.toContain("taskId");
+    expect(inputText).not.toContain("sessionKey");
     expect(body.tools).toEqual([
       {
         type: "function",
@@ -165,9 +171,9 @@ describe("openclaw bridge gateway helpers", () => {
       required?: string[];
       properties?: Record<string, { required?: string[]; items?: { required?: string[] } }>;
     };
-    expect(parameters.required).toEqual(expect.arrayContaining(["summary", "nodes", "edges"]));
+    expect(parameters.required).toEqual(expect.arrayContaining(["title", "goal", "nodes", "edges"]));
     expect(parameters.properties?.nodes?.items?.required).toEqual(
-      expect.arrayContaining(["id", "type", "title", "objective", "executor", "requiresHumanInput", "requiresHumanApproval"]),
+      expect.arrayContaining(["id", "type", "title"]),
     );
     const nodeProperties =
       (parameters.properties?.nodes?.items as {
@@ -183,7 +189,7 @@ describe("openclaw bridge gateway helpers", () => {
       ((parameters.properties?.edges?.items as {
         properties?: Record<string, { enum?: string[] }>;
       } | undefined)?.properties?.type?.enum ?? []).sort(),
-    ).toEqual(["branches_to", "depends_on", "feeds_output", "sequential", "unblocks"]);
+    ).toEqual(["depends_on", "sequential"]);
     expect(body.tool_choice).toBe("required");
   });
 
@@ -229,8 +235,14 @@ describe("openclaw bridge gateway helpers", () => {
     expect(body.user).toBe("tenant-a:workflow-7788");
     expect(body.instructions).toBe("Do work");
     expect(body.max_output_tokens).toBe(777);
-    expect(String(body.input)).toContain("Task title: Run task");
-    expect(String(body.input)).toContain('"model": "gpt-5"');
+    expect(body.input).toEqual([
+      {
+        type: "input_text",
+        text: expect.stringContaining("Task title: Run task"),
+      },
+    ]);
+    const inputText = ((body.input as Array<{ type: string; text?: string }>)[0]?.text) ?? "";
+    expect(inputText).toContain('"model": "gpt-5"');
   });
 
   it("builds readable default session ids when no session is provided", async () => {
@@ -612,7 +624,7 @@ describe("openclaw bridge gateway endpoints", () => {
                 name: "generate_task_plan_graph",
                 arguments: JSON.stringify({
                   summary: "Plan created",
-                  nodes: [{ id: "n1", type: "step", title: "Clarify investment goal", objective: "Define target university investment project" }],
+                  nodes: [{ id: "n1", type: "task", title: "Clarify investment goal", objective: "Define target university investment project" }],
                   edges: [],
                 }),
               },
@@ -681,8 +693,12 @@ describe("openclaw bridge gateway endpoints", () => {
       });
       expect(third.status).toBe(422);
       expect(requestBodies).toHaveLength(3);
-      expect(Array.isArray(requestBodies[2].input)).toBeFalse();
-      expect(String(requestBodies[2].input)).toContain("Create an execution-ready plan graph");
+      expect(requestBodies[2].input).toEqual([
+        {
+          type: "input_text",
+          text: expect.stringContaining("Create an execution-ready plan graph"),
+        },
+      ]);
     } finally {
       server.stop(true);
     }

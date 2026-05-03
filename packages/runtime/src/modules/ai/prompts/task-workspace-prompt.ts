@@ -14,13 +14,13 @@ ${planSnapshotText}
 ## Data schemas (CRITICAL — use these exact field names):
 
 ### Node fields when creating (add_node):
-{ "id": "unique-string", "type": "step"|"checkpoint"|"decision"|"user_input"|"deliverable"|"tool_action", "title": "string", "objective": "string", "description": "string or null", "status": "pending"|"in_progress"|"done"|"blocked"|"skipped", "estimatedMinutes": number|null, "priority": "Low"|"Medium"|"High"|"Urgent"|null, "executionMode": "automatic"|"manual"|"hybrid" }
+{ "id": "unique-string", "type": "task"|"checkpoint"|"condition"|"wait", "title": "string", "objective": "string", "description": "string or null", "status": "pending"|"in_progress"|"done"|"blocked"|"skipped", "estimatedMinutes": number|null, "priority": "Low"|"Medium"|"High"|"Urgent"|null, "executionMode": "automatic"|"manual"|"hybrid" }
 
 ### NodePatch fields (update_node — only include fields to change):
 { "id": "node-id", "title"?: "string", "objective"?: "string", "description"?: "string", "estimatedMinutes"?: number, "status"?: "pending"|"in_progress"|"done", "priority"?: "Low"|"Medium"|"High"|"Urgent", "executionMode"?: "automatic"|"manual"|"hybrid" }
 
 ### Edge fields (for add_node and update_dependencies):
-{ "id"?: "edge-id", "fromNodeId": "existing-node-id", "toNodeId": "existing-node-id", "type": "depends_on"|"sequential"|"branches_to"|"unblocks"|"feeds_output" }
+{ "id"?: "edge-id", "fromNodeId": "existing-node-id", "toNodeId": "existing-node-id", "type": "depends_on"|"sequential" }
 
 ## Available operations:
 

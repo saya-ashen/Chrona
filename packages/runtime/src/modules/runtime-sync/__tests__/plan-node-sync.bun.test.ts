@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
@@ -25,11 +25,6 @@ async function resetDb() {
 describe("plan node sync on run completion", () => {
   beforeEach(async () => {
     await resetDb();
-  });
-
-  afterAll(async () => {
-    await resetDb();
-    await db.$disconnect();
   });
 
   it("marks linked plan nodes done and stores a completion summary placeholder when child run completes", async () => {
@@ -100,7 +95,7 @@ describe("plan node sync on run completion", () => {
         nodes: [
           {
             id: "node-child",
-            type: "step",
+            type: "task",
             title: "Child node task",
             objective: "Do the child task",
             description: null,

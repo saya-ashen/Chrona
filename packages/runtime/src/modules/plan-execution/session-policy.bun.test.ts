@@ -5,7 +5,7 @@ import type { TaskPlanGraph } from "@/modules/ai/types";
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
   const { id, ...rest } = overrides;
   return {
-    type: "step",
+    type: "task",
     title: `Node ${id}`,
     objective: `Objective for ${id}`,
     description: null,
@@ -86,23 +86,13 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("child_session");
   });
 
-  it("type deliverable -> main_session when short (estimatedMinutes=0)", () => {
-    const d = decide({ id: "a", type: "deliverable" });
+  it("type task -> main_session when short (estimatedMinutes=0)", () => {
+    const d = decide({ id: "a", type: "task" });
     expect(d.kind).toBe("main_session");
   });
 
-  it("type deliverable -> child_session when long enough", () => {
-    const d = decide({ id: "a", type: "deliverable", estimatedMinutes: 20 });
-    expect(d.kind).toBe("child_session");
-  });
-
-  it("type tool_action -> main_session when short (estimatedMinutes=0)", () => {
-    const d = decide({ id: "a", type: "tool_action" });
-    expect(d.kind).toBe("main_session");
-  });
-
-  it("type tool_action -> child_session when long enough", () => {
-    const d = decide({ id: "a", type: "tool_action", estimatedMinutes: 20 });
+  it("type task -> child_session when long enough", () => {
+    const d = decide({ id: "a", type: "task", estimatedMinutes: 20 });
     expect(d.kind).toBe("child_session");
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createMockOpenClawAdapter } from "@chrona/openclaw-integration/runtime/mock-adapter";
@@ -24,11 +24,6 @@ async function resetDb() {
 describe("syncRunFromRuntime", () => {
   beforeEach(async () => {
     await resetDb();
-  });
-
-  afterAll(async () => {
-    await resetDb();
-    await db.$disconnect();
   });
 
   it("maps waiting approvals, transcript messages, and tool calls idempotently", async () => {

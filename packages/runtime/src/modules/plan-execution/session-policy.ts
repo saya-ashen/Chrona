@@ -18,10 +18,7 @@ export type SessionPolicyInput = {
 
 const LONG_ESTIMATED_MINUTES = 20;
 
-const CHILD_SESSION_NODE_TYPES = new Set<string>([
-  "deliverable",
-  "tool_action",
-]);
+const CHILD_SESSION_NODE_TYPES = new Set<string>(["task"]);
 
 function looksLikeMultiStep(node: TaskPlanNode): boolean {
   const text = `${node.title} ${node.objective} ${node.description ?? ""}`.toLowerCase();
@@ -137,7 +134,7 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     return {
       kind: "child_session",
       reason: `Node ${node.id} type ${node.type} qualifies for child session`,
-      childTaskMode: node.type === "deliverable" ? "materialize_task" : "session_only",
+      childTaskMode: node.type === "task" ? "materialize_task" : "session_only",
     };
   }
 

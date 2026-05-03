@@ -27,10 +27,10 @@ async function loadOpenClawAdapterConfig(): Promise<OpenClawAdapterConfig | unde
   if (!client) return undefined;
   const config = client.config as Record<string, unknown> | null;
   if (!config) return undefined;
-  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
-  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
-  if (!gatewayUrl) return undefined;
-  return { gatewayHttpUrl: gatewayUrl, gatewayToken };
+  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
+  if (!bridgeUrl) return undefined;
+  return { bridgeUrl, bridgeToken };
 }
 
 export async function createRuntimeExecutionAdapter(key: string): Promise<RuntimeExecutionAdapter> {
@@ -47,5 +47,3 @@ export async function createRuntimeExecutionAdapter(key: string): Promise<Runtim
   }
   return factory();
 }
-
-

@@ -6,7 +6,7 @@ import type { NodeExecutionResult } from "./node-executor";
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
   const { id, ...rest } = overrides;
   return {
-    type: "step",
+    type: "task",
     title: `Node ${id}`,
     objective: `Objective for ${id}`,
     description: null,

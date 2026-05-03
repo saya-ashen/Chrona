@@ -67,7 +67,7 @@ function createPlanTestRouter() {
           }
           const newNodes = nodes.map((n, i) => ({
             id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${i}`,
-            type: (typeof n.type === "string" ? n.type : "step") as TaskPlanNodeType,
+            type: (typeof n.type === "string" ? n.type : "task") as TaskPlanNodeType,
             title: typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`,
             objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`),
             description: typeof n.description === "string" && n.description.trim() ? n.description : null,
@@ -90,7 +90,7 @@ function createPlanTestRouter() {
               id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
               fromNodeId: e.fromNodeId as string,
               toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as TaskPlanEdgeType,
+              type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
               metadata: null as Record<string, unknown> | null,
             }))] as typeof plan.edges;
           }
@@ -153,7 +153,7 @@ function createPlanTestRouter() {
               id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
               fromNodeId: e.fromNodeId as string,
               toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as TaskPlanEdgeType,
+              type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
               metadata: null as Record<string, unknown> | null,
             })),
           ] as typeof plan.edges;
@@ -179,7 +179,7 @@ function createPlanTestRouter() {
           }
           plan.nodes = nodes.map((n) => ({
             id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${Math.random()}`,
-            type: (typeof n.type === "string" ? n.type : "step") as TaskPlanNodeType,
+            type: (typeof n.type === "string" ? n.type : "task") as TaskPlanNodeType,
             title: typeof n.title === "string" && n.title.trim() ? n.title : "Untitled",
             objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : "Untitled"),
             description: typeof n.description === "string" && n.description.trim() ? n.description : null,
@@ -201,7 +201,7 @@ function createPlanTestRouter() {
                 id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
                 fromNodeId: e.fromNodeId as string,
                 toNodeId: e.toNodeId as string,
-                type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as TaskPlanEdgeType,
+                type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
                 metadata: null as Record<string, unknown> | null,
               }))
             : [];
@@ -291,14 +291,14 @@ async function seedPlan(): Promise<SeedResult> {
 
   const nodes = [
     {
-      id: "node-a", type: "step", title: "Research", objective: "Research the domain",
+      id: "node-a", type: "task", title: "Research", objective: "Research the domain",
       description: "Gather materials", status: "pending", phase: "preparation",
       estimatedMinutes: 30, priority: "High", executionMode: "automatic",
       requiresHumanInput: false, requiresHumanApproval: false, autoRunnable: true,
       blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
     },
     {
-      id: "node-b", type: "step", title: "Design", objective: "Design the solution",
+      id: "node-b", type: "task", title: "Design", objective: "Design the solution",
       description: null, status: "pending", phase: "design",
       estimatedMinutes: 60, priority: "Medium", executionMode: "automatic",
       requiresHumanInput: false, requiresHumanApproval: true, autoRunnable: false,
@@ -312,7 +312,7 @@ async function seedPlan(): Promise<SeedResult> {
       blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
     },
     {
-      id: "node-d", type: "deliverable", title: "Ship", objective: "Deploy to production",
+      id: "node-d", type: "task", title: "Ship", objective: "Deploy to production",
       description: null, status: "pending", phase: "execution",
       estimatedMinutes: 20, priority: "Urgent", executionMode: "automatic",
       requiresHumanInput: false, requiresHumanApproval: false, autoRunnable: true,
@@ -368,7 +368,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       const { taskId } = await seedPlan();
       const newNode = {
         id: "node-x",
-        type: "tool_action",
+        type: "task",
         title: "Auto-fix",
         objective: "Auto-fix lint issues",
         priority: "Low",
@@ -394,7 +394,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       expect(added).toBeTruthy();
       if (added) {
         expect(added.title).toBe("Auto-fix");
-        expect(added.type).toBe("tool_action");
+        expect(added.type).toBe("task");
         expect(added.status).toBe("pending");
       }
 
@@ -466,7 +466,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
         expect(updated.title).toBe("Deep Research");
         expect(updated.objective).toBe("Comprehensive study");
         expect(updated.status).toBe("pending");
-        expect(updated.type).toBe("step");
+        expect(updated.type).toBe("task");
       }
     });
 
@@ -594,8 +594,8 @@ describe("POST /api/tasks/:taskId/plan", () => {
         body: JSON.stringify({
           operation: "update_dependencies",
           edges: [
-            { fromNodeId: "node-a", toNodeId: "node-c", type: "branches_to" },
-            { fromNodeId: "node-a", toNodeId: "node-d", type: "unblocks" },
+            { fromNodeId: "node-a", toNodeId: "node-c", type: "depends_on" },
+            { fromNodeId: "node-a", toNodeId: "node-d", type: "sequential" },
           ],
         }),
       });
@@ -846,7 +846,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
           nodes: [
             {
               id: "the-one",
-              type: "deliverable",
+              type: "task",
               title: "Final Deliverable",
               objective: "Ship it",
               status: "in_progress",
@@ -865,7 +865,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       expect(body.planGraph.nodes.length).toBe(1);
       expect(body.planGraph.nodes[0].id).toBe("the-one");
       expect(body.planGraph.nodes[0].title).toBe("Final Deliverable");
-      expect(body.planGraph.nodes[0].type).toBe("deliverable");
+          expect(body.planGraph.nodes[0].type).toBe("task");
       expect(body.planGraph.nodes[0].status).toBe("in_progress");
       expect(body.planGraph.nodes[0].priority).toBe("Urgent");
       expect(body.planGraph.nodes[0].estimatedMinutes).toBe(120);
@@ -874,7 +874,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
 
   describe("materialize_child_tasks", () => {
     it("linkedTaskId is set on plan nodes after materialization", async () => {
-      const { workspaceId, taskId, planId } = await seedPlan();
+      const { workspaceId: _workspaceId, taskId, planId } = await seedPlan();
 
       // Accept the plan first
       await acceptTaskPlanGraph({ taskId, planId });

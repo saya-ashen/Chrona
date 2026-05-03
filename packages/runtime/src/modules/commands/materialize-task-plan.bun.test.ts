@@ -69,7 +69,7 @@ describe("materialize-task-plan", () => {
           nodes: [
             {
               id: "node-1",
-              type: "step",
+              type: "task",
               title: "Collect evidence",
               objective: "Prepare source inputs",
               description: "Gather all materials first",
@@ -85,7 +85,7 @@ describe("materialize-task-plan", () => {
             },
             {
               id: "node-2",
-              type: "step",
+              type: "task",
               title: "Draft summary",
               objective: "Write the first draft",
               description: "Create a concise summary",
