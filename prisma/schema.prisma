@@ -477,7 +477,7 @@ model TaskAssistantMessage {
   taskId    String
   role      String /// "user" | "assistant"
   content   String
-  proposal  String? /// JSON-serialized TaskWorkspaceUpdateProposal
+  proposal  Json? /// TaskWorkspaceUpdateProposal
   applied   Boolean   @default(false)
   appliedAt DateTime?
   sequence  Int

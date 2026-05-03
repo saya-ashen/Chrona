@@ -1,0 +1,3 @@
+-- TypeChanged:TaskAssistantMessage.proposal: Changed from String? to Json?
+-- This is a type-level change only (Prisma reinterprets the TEXT column as Json).
+-- No DDL needed for SQLite since both String and Json use TEXT storage.
