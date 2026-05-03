@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { getLatestTaskPlanGraph, saveTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
+import { acceptTaskPlanGraph, getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, saveTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
+import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
 import type {
   TaskPlanNodeType,
   TaskPlanNodeStatus,
@@ -170,6 +171,40 @@ function createPlanTestRouter() {
           const insertAt = firstIndex >= 0 ? firstIndex : plan.nodes.length;
           const kept = plan.nodes.filter((n) => !orderMap.has(n.id));
           plan.nodes = [...kept.slice(0, insertAt), ...reordered, ...kept.slice(insertAt)];
+          break;
+        }
+        case "replace_plan": {
+          if (!nodes || nodes.length === 0) {
+            return err(c, "replace_plan requires nodes[]", 400);
+          }
+          plan.nodes = nodes.map((n) => ({
+            id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${Math.random()}`,
+            type: (typeof n.type === "string" ? n.type : "step") as TaskPlanNodeType,
+            title: typeof n.title === "string" && n.title.trim() ? n.title : "Untitled",
+            objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : "Untitled"),
+            description: typeof n.description === "string" && n.description.trim() ? n.description : null,
+            status: (typeof n.status === "string" ? n.status : "pending") as TaskPlanNodeStatus,
+            phase: null as string | null,
+            estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : null,
+            priority: typeof n.priority === "string" ? n.priority as "Low" | "Medium" | "High" | "Urgent" | null : null,
+            executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as TaskPlanNodeExecutionMode,
+            requiresHumanInput: Boolean(n.requiresHumanInput),
+            requiresHumanApproval: Boolean(n.requiresHumanApproval),
+            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
+            blockingReason: null as TaskPlanNodeBlockingReason,
+            linkedTaskId: (typeof n.linkedTaskId === "string" ? n.linkedTaskId : null) as string | null,
+            completionSummary: null as string | null,
+            metadata: null as Record<string, unknown> | null,
+          }));
+          plan.edges = edges
+            ? edges.map((e, i) => ({
+                id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
+                fromNodeId: e.fromNodeId as string,
+                toNodeId: e.toNodeId as string,
+                type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as TaskPlanEdgeType,
+                metadata: null as Record<string, unknown> | null,
+              }))
+            : [];
           break;
         }
         case "update_plan_summary": {
@@ -746,6 +781,123 @@ describe("POST /api/tasks/:taskId/plan", () => {
 
       const nodeD = body.planGraph.nodes.find((n) => n.id === "node-d");
       expect(nodeD?.title).toBe("Deploy!");
+    });
+  });
+
+  describe("replace_plan", () => {
+    it("replaces the entire plan with new nodes and edges", async () => {
+      const { taskId } = await seedPlan();
+
+      const newNodes = [
+        { id: "node-x", type: "step", title: "X Step", objective: "Do X" },
+        { id: "node-y", type: "checkpoint", title: "Y Check", objective: "Check Y" },
+      ];
+      const newEdges = [
+        { fromNodeId: "node-x", toNodeId: "node-y", type: "sequential" },
+      ];
+
+      const res = await app().request(`http://local/api/tasks/${taskId}/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "replace_plan",
+          nodes: newNodes,
+          edges: newEdges,
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as { planGraph: { nodes: unknown[]; edges: unknown[] } };
+      expect(body.planGraph.nodes).toHaveLength(2);
+      expect(body.planGraph.edges).toHaveLength(1);
+    });
+
+    it("replaced plan has no old node IDs", async () => {
+      const { taskId } = await seedPlan();
+
+      const res = await app().request(`http://local/api/tasks/${taskId}/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "replace_plan",
+          nodes: [{ id: "node-x", type: "step", title: "Only Node", objective: "Sole objective" }],
+          edges: [],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as { planGraph: { nodes: { id: string }[]; edges: unknown[] } };
+      const nodeIds = body.planGraph.nodes.map((n) => n.id);
+      expect(nodeIds).not.toContain("node-a");
+      expect(nodeIds).not.toContain("node-b");
+      expect(nodeIds).not.toContain("node-c");
+      expect(nodeIds).not.toContain("node-d");
+      expect(nodeIds).toContain("node-x");
+    });
+
+    it("replaced plan has correct node fields", async () => {
+      const { taskId } = await seedPlan();
+
+      const res = await app().request(`http://local/api/tasks/${taskId}/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operation: "replace_plan",
+          nodes: [
+            {
+              id: "the-one",
+              type: "deliverable",
+              title: "Final Deliverable",
+              objective: "Ship it",
+              status: "in_progress",
+              priority: "Urgent",
+              estimatedMinutes: 120,
+            },
+          ],
+          edges: [],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as {
+        planGraph: { nodes: Array<{ id: string; title: string; type: string; status: string; priority: string; estimatedMinutes: number }> };
+      };
+      expect(body.planGraph.nodes.length).toBe(1);
+      expect(body.planGraph.nodes[0].id).toBe("the-one");
+      expect(body.planGraph.nodes[0].title).toBe("Final Deliverable");
+      expect(body.planGraph.nodes[0].type).toBe("deliverable");
+      expect(body.planGraph.nodes[0].status).toBe("in_progress");
+      expect(body.planGraph.nodes[0].priority).toBe("Urgent");
+      expect(body.planGraph.nodes[0].estimatedMinutes).toBe(120);
+    });
+  });
+
+  describe("materialize_child_tasks", () => {
+    it("linkedTaskId is set on plan nodes after materialization", async () => {
+      const { workspaceId, taskId, planId } = await seedPlan();
+
+      // Accept the plan first
+      await acceptTaskPlanGraph({ taskId, planId });
+
+      // Materialize
+      const materialized = await materializeTaskPlan({ taskId });
+
+      expect(materialized.createdTaskIds.length).toBeGreaterThan(0);
+
+      // Verify linkedTaskId on accepted plan nodes
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      expect(acceptedPlan).toBeTruthy();
+      const materializedNodes = acceptedPlan!.plan.nodes.filter(
+        (node: Record<string, unknown>) => typeof node.linkedTaskId === "string" && (node.linkedTaskId as string).length > 0,
+      );
+      expect(materializedNodes.length).toBeGreaterThan(0);
+
+      // Verify child tasks have correct parentTaskId
+      const childTasks = await db.task.findMany({
+        where: { id: { in: materialized.createdTaskIds } },
+      });
+      expect(childTasks.length).toBe(materialized.createdTaskIds.length);
+      expect(childTasks.every((t) => t.parentTaskId === taskId)).toBe(true);
     });
   });
 });

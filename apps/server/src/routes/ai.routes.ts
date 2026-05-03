@@ -212,7 +212,7 @@ export function createAiRoutes() {
         return error(c, "Client not found", 404);
       }
 
-      const validFeatures = features.filter((feature: string) => (VALID_AI_FEATURES as readonly string[]).includes(feature));
+      const validFeatures = [...new Set(features.filter((feature: string) => (VALID_AI_FEATURES as readonly string[]).includes(feature)))];
 
       // Feature bindings are globally unique: each feature can only be bound to one client at a time.
       // We must atomically remove existing bindings for the selected features (from any client)
