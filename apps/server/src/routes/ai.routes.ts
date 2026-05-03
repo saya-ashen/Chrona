@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@chrona/db";
 import { summarizeText } from "@chrona/db/logger";
-import type { StructuredSuggestion } from "@chrona/contracts";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/runtime/modules/ai/ai-service";
 import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput } from "@chrona/runtime/modules/ai/types";
 import {
@@ -18,6 +17,7 @@ import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analy
 import { suggestAutomationSmart } from "@chrona/runtime/modules/ai/automation-suggester";
 import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
 import { ensureDefaultTaskSession } from "@chrona/runtime/modules/task-execution/task-sessions";
+import { buildTaskWorkspaceSystemPrompt } from "@chrona/runtime/modules/ai/prompts/task-workspace-prompt";
 
 import {
   testOpenClaw,
@@ -33,6 +33,12 @@ import {
   internalServerError,
   json,
 } from "../lib/http";
+import {
+  createAiClientSchema,
+  taskWorkspaceChatSchema,
+  applySuggestionChangesSchema,
+  applySuggestionSingleSchema,
+} from "./schemas";
 
 export function createAiRoutes() {
   const ai = new Hono();
@@ -68,15 +74,13 @@ export function createAiRoutes() {
   ai.post("/ai/clients", async (c) => {
     try {
       const body = await c.req.json();
-      const { name, type, config, isDefault } = body;
 
-      if (!name || !type) {
-        return error(c, "name and type are required", 400);
+      const parsed = createAiClientSchema.safeParse(body);
+      if (!parsed.success) {
+        return error(c, parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), 400);
       }
 
-      if (type !== "openclaw" && type !== "llm") {
-        return error(c, "type must be 'openclaw' or 'llm'", 400);
-      }
+      const { name, type, config, isDefault } = parsed.data;
 
       if (isDefault) {
         await db.aiClient.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
@@ -87,7 +91,8 @@ export function createAiRoutes() {
           id: randomUUID().replace(/-/g, "").slice(0, 25),
           name,
           type,
-          config: config ?? {},
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          config: (config ?? {}) as any,
           isDefault: isDefault ?? false,
           enabled: true,
         },
@@ -209,26 +214,31 @@ export function createAiRoutes() {
 
       const validFeatures = features.filter((feature: string) => (VALID_AI_FEATURES as readonly string[]).includes(feature));
 
-      if (validFeatures.length > 0) {
-        await db.aiFeatureBinding.deleteMany({ where: { feature: { in: validFeatures } } });
-      }
+      // Feature bindings are globally unique: each feature can only be bound to one client at a time.
+      // We must atomically remove existing bindings for the selected features (from any client)
+      // and remove any stale bindings for this client, then create new bindings.
+      await db.$transaction(async (tx) => {
+        if (validFeatures.length > 0) {
+          await tx.aiFeatureBinding.deleteMany({ where: { feature: { in: validFeatures } } });
+        }
 
-      await db.aiFeatureBinding.deleteMany({
-        where: {
-          clientId,
-          feature: { notIn: validFeatures },
-        },
-      });
-
-      for (const feature of validFeatures) {
-        await db.aiFeatureBinding.create({
-          data: {
-            id: randomUUID().replace(/-/g, "").slice(0, 25),
-            feature,
+        await tx.aiFeatureBinding.deleteMany({
+          where: {
             clientId,
+            feature: { notIn: validFeatures },
           },
         });
-      }
+
+        for (const feature of validFeatures) {
+          await tx.aiFeatureBinding.create({
+            data: {
+              id: randomUUID().replace(/-/g, "").slice(0, 25),
+              feature,
+              clientId,
+            },
+          });
+        }
+      });
 
       return json(c, { bindings: validFeatures });
     } catch (cause) {
@@ -327,24 +337,6 @@ export function createAiRoutes() {
         return error(c, "Either taskId or title is required", 400);
       }
 
-      const input: TaskAutomationInput = taskId && !title
-        ? (() => {
-            const task = null as never;
-            return task;
-          })()
-        : {
-            taskId: taskId ?? "",
-            title,
-            description: description ?? "",
-            priority: priority ?? "Medium",
-            dueAt: dueAt ? new Date(dueAt) : null,
-            scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : null,
-            scheduledEndAt: scheduledEndAt ? new Date(scheduledEndAt) : null,
-            isRunnable: isRunnable ?? false,
-            runnabilityState: runnabilityState ?? "",
-            ownerType: ownerType ?? "",
-          };
-
       if (taskId && !title) {
         const task = await db.task.findUnique({ where: { id: taskId } });
         if (!task) {
@@ -363,6 +355,19 @@ export function createAiRoutes() {
           ownerType: task.ownerType ?? "",
         }));
       }
+
+      const input: TaskAutomationInput = {
+        taskId: taskId ?? "",
+        title,
+        description: description ?? "",
+        priority: priority ?? "Medium",
+        dueAt: dueAt ? new Date(dueAt) : null,
+        scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : null,
+        scheduledEndAt: scheduledEndAt ? new Date(scheduledEndAt) : null,
+        isRunnable: isRunnable ?? false,
+        runnabilityState: runnabilityState ?? "",
+        ownerType: ownerType ?? "",
+      };
 
       return json(c, await suggestAutomationSmart(input));
     } catch (cause) {
@@ -662,16 +667,11 @@ export function createAiRoutes() {
   ai.post("/ai/apply-suggestion", async (c) => {
     try {
       const body = await c.req.json();
-      if (body && typeof body === "object" && "changes" in body && Array.isArray(body.changes)) {
-        const { workspaceId, suggestionId, changes } = body as {
-          workspaceId: string;
-          suggestionId: string;
-          changes: Array<{ taskId: string; scheduledStartAt?: string; scheduledEndAt?: string; priority?: string }>;
-        };
 
-        if (!workspaceId || !suggestionId || !changes) {
-          return error(c, "workspaceId, suggestionId, and changes are required", 400);
-        }
+      // Try changes-array format first
+      const changesResult = applySuggestionChangesSchema.safeParse(body);
+      if (changesResult.success) {
+        const { workspaceId, suggestionId, changes } = changesResult.data;
 
         const taskIds = changes.map((change) => change.taskId);
         const tasks = await db.task.findMany({
@@ -682,61 +682,64 @@ export function createAiRoutes() {
           return error(c, "Some tasks do not belong to this workspace", 403);
         }
 
-        await Promise.all(changes.map((change) => db.taskProjection.update({
-          where: { taskId: change.taskId },
-          data: {
-            ...(change.scheduledStartAt && { scheduledStartAt: new Date(change.scheduledStartAt) }),
-            ...(change.scheduledEndAt && { scheduledEndAt: new Date(change.scheduledEndAt) }),
-            updatedAt: new Date(),
-          },
-        })));
+        await db.$transaction(async (tx) => {
+          await Promise.all(changes.map((change) => tx.taskProjection.update({
+            where: { taskId: change.taskId },
+            data: {
+              ...(change.scheduledStartAt && { scheduledStartAt: new Date(change.scheduledStartAt) }),
+              ...(change.scheduledEndAt && { scheduledEndAt: new Date(change.scheduledEndAt) }),
+              updatedAt: new Date(),
+            },
+          })));
+        });
 
         return json(c, { success: true, appliedChanges: changes.length, suggestionId });
       }
 
-      const { workspaceId, suggestion } = body as { workspaceId: string; suggestion: StructuredSuggestion };
-      if (!workspaceId || !suggestion?.action) {
-        return error(c, "workspaceId and suggestion with action are required", 400);
+      // Try single-suggestion format
+      const singleResult = applySuggestionSingleSchema.safeParse(body);
+      if (!singleResult.success) {
+        return error(c, singleResult.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), 400);
       }
 
-      if (suggestion.action.type !== "create_task") {
-        return error(c, `Unknown action type: ${suggestion.action.type}`, 400);
-      }
-
+      const { workspaceId, suggestion } = singleResult.data;
       const taskId = randomUUID();
       const now = new Date();
-      await db.task.create({
-        data: {
-          id: taskId,
-          workspaceId,
-          title: suggestion.action.title,
-          description: suggestion.action.description || null,
-          priority: suggestion.action.priority,
-          status: "Draft",
-          scheduleStatus: suggestion.action.scheduledStartAt ? "Scheduled" : "Unscheduled",
-          scheduleSource: "ai",
-          scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-          scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-          ownerType: "human",
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
-      await db.taskProjection.upsert({
-        where: { taskId },
-        create: {
-          taskId,
-          workspaceId,
-          persistedStatus: "Draft",
-          scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-          scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-          updatedAt: now,
-        },
-        update: {
-          scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-          scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-          updatedAt: now,
-        },
+      await db.$transaction(async (tx) => {
+        await tx.task.create({
+          data: {
+            id: taskId,
+            workspaceId,
+            title: suggestion.action.title,
+            description: suggestion.action.description || null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            priority: (suggestion.action.priority ?? "Medium") as any,
+            status: "Draft",
+            scheduleStatus: suggestion.action.scheduledStartAt ? "Scheduled" : "Unscheduled",
+            scheduleSource: "ai",
+            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
+            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
+            ownerType: "human",
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        await tx.taskProjection.upsert({
+          where: { taskId },
+          create: {
+            taskId,
+            workspaceId,
+            persistedStatus: "Draft",
+            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
+            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
+            updatedAt: now,
+          },
+          update: {
+            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
+            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
+            updatedAt: now,
+          },
+        });
       });
 
       return json(c, {
@@ -758,238 +761,55 @@ export function createAiRoutes() {
   ai.post("/ai/task-workspace/chat", async (c) => {
     try {
       const body = await c.req.json();
-      const taskId = typeof body.taskId === "string" ? body.taskId : "";
-      const message = typeof body.message === "string" ? body.message.trim() : "";
-      const currentTask = body.currentTask ?? null;
-      const currentPlan = body.currentPlan ?? null;
-      const history = Array.isArray(body.history) ? body.history : [];
 
-      if (!taskId) {
-        return error(c, "taskId is required", 400);
+      const parsed = taskWorkspaceChatSchema.safeParse(body);
+      if (!parsed.success) {
+        return error(c, parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), 400);
       }
-      if (!message) {
-        return error(c, "message is required", 400);
-      }
+
+      const { taskId: _taskId, message, currentTask, currentPlan, history: rawHistory } = parsed.data;
+      const history = rawHistory ?? [];
 
       const taskSnapshotText = currentTask
         ? JSON.stringify(currentTask, null, 2)
         : "No task data provided.";
 
       const planSnapshotText = currentPlan
-        ? JSON.stringify(
+        ? (() => {
+            const plan = currentPlan as Record<string, unknown>;
+            return JSON.stringify(
             {
-              id: currentPlan.id,
-              status: currentPlan.status,
-              revision: currentPlan.revision,
-              summary: currentPlan.summary,
-              nodeCount: currentPlan.nodes?.length ?? 0,
-              nodes: (currentPlan.nodes ?? []).map((n: Record<string, unknown>) => ({
-                id: n.id,
-                title: n.title,
-                status: n.status,
-                objective: n.objective,
-                estimatedMinutes: n.estimatedMinutes,
-                priority: n.priority,
-                executionMode: n.executionMode,
-                dependsOn: n.dependsOn,
-              })),
-              edges: (currentPlan.edges ?? []).map((e: Record<string, unknown>) => ({
-                fromNodeId: e.fromNodeId,
-                toNodeId: e.toNodeId,
-                type: e.type,
-              })),
+              id: plan.id,
+              status: plan.status,
+              revision: plan.revision,
+              summary: plan.summary,
+              nodeCount: (plan.nodes as unknown[])?.length ?? 0,
+              nodes: ((plan.nodes as unknown[]) ?? []).map((n) => {
+                const node = n as Record<string, unknown>;
+                return {
+                id: node.id,
+                title: node.title,
+                status: node.status,
+                objective: node.objective,
+                estimatedMinutes: node.estimatedMinutes,
+                priority: node.priority,
+                executionMode: node.executionMode,
+                dependsOn: node.dependsOn,
+              }}),
+              edges: ((plan.edges as unknown[]) ?? []).map((e) => {
+                const edge = e as Record<string, unknown>;
+                return {
+                fromNodeId: edge.fromNodeId,
+                toNodeId: edge.toNodeId,
+                type: edge.type,
+              }}),
             },
             null,
             2,
-          )
+          )})()
         : "No plan data provided.";
 
-      const systemPrompt = `You are the Task Workspace Assistant for Chrona.
-Your role is to help users modify the current task and its corresponding plan through natural language.
-
-## Current Task:
-${taskSnapshotText}
-
-## Current Plan:
-${planSnapshotText}
-
-## Data schemas (CRITICAL — use these exact field names):
-
-### Node fields when creating (add_node):
-{ "id": "unique-string", "type": "step"|"checkpoint"|"decision"|"user_input"|"deliverable"|"tool_action", "title": "string", "objective": "string", "description": "string or null", "status": "pending"|"in_progress"|"done"|"blocked"|"skipped", "estimatedMinutes": number|null, "priority": "Low"|"Medium"|"High"|"Urgent"|null, "executionMode": "automatic"|"manual"|"hybrid" }
-
-### NodePatch fields (update_node — only include fields to change):
-{ "id": "node-id", "title"?: "string", "objective"?: "string", "description"?: "string", "estimatedMinutes"?: number, "status"?: "pending"|"in_progress"|"done", "priority"?: "Low"|"Medium"|"High"|"Urgent", "executionMode"?: "automatic"|"manual"|"hybrid" }
-
-### Edge fields (for add_node and update_dependencies):
-{ "id"?: "edge-id", "fromNodeId": "existing-node-id", "toNodeId": "existing-node-id", "type": "depends_on"|"sequential"|"branches_to"|"unblocks"|"feeds_output" }
-
-## Available operations:
-
-### update_node
-Edit content of existing nodes. Use nodePatches[] with ONLY the fields to change plus the node "id". Edges are unchanged.
-When: "change node X title to Y", "clarify step 2", "mark node X as done"
-
-### add_node
-Add new nodes. Provide full node objects in nodes[] using the Node fields schema above. Provide connecting edges in edges[] using the Edge fields schema. Edge fromNodeId/toNodeId MUST reference existing node IDs from the current plan.
-When: "add a step for testing", "insert a review node"
-
-### delete_node
-Remove nodes by ID in deletedNodeIds[]. Edges involving deleted nodes are auto-removed.
-When: "remove the deployment step", "delete node X"
-
-### update_dependencies
-ADD new edges (or replace existing ones). Provide edges[] using the Edge fields schema. Edges not listed are KEPT. Duplicate fromNodeId→toNodeId pairs are ignored (idempotent).
-When: "connect X to Y", "add a dependency from A to B"
-
-### reorder_nodes
-Change the display order of specific nodes. Provide reorder[] with ONLY the node IDs being reordered, in the desired order. Other nodes keep their relative positions. The reordered block is placed at the position of the first reordered node.
-When: "move X before Y", "reorder the steps"
-
-### update_plan_summary
-Change only the plan's top-level summary text.
-When: "rename the plan", "change the plan description"
-
-### replace_plan
-Replace the entire plan graph. Use ONLY when user asks to regenerate or overhaul.
-When: "regenerate the whole plan", "start over"
-
-### materialize_child_tasks
-Convert plan nodes into child tasks.
-When: "materialize", "create subtasks", "sync to child tasks"
-
-## Choosing the right operation (EXAMPLES):
-- "update node X to say Y" → update_node with nodePatches: [{"id":"X", "title":"Y"}]
-- "clarify / make clearer / reword node X" → update_node with nodePatches: [{"id":"X", "objective":"..."}]
-- "add a step for testing after node B" → add_node with nodes: [{...}], edges: [{"fromNodeId":"B", "toNodeId":"new-id", "type":"sequential"}]
-- "remove the deployment step" → delete_node with deletedNodeIds: ["node-d"]
-- "connect step A to step C" → update_dependencies with edges: [{"fromNodeId":"A", "toNodeId":"C", "type":"depends_on"}]
-- "move review before design" → reorder_nodes with reorder: ["review-id", "design-id"]
-- "rename this plan to..." → update_plan_summary with summary: "New Name"
-- "regenerate the whole plan" → replace_plan with nodes/edges
-
-## NEVER use "custom" as an operation.
-
-## Rules:
-1. ONLY use proposals when the user explicitly asks for a change.
-2. Use the exact field names from the schemas above.
-3. All time fields must be ISO 8601 (e.g. "2026-04-26T15:00:00.000Z").
-4. Do NOT modify system fields (id, workspaceId, createdAt, updatedAt).
-5. requiresConfirmation: true for: replacing plan, deleting nodes, materializing, clearing prompt/description, modifying runtimeConfig, schedule adjustments.
-6. Priority: "Low"|"Medium"|"High"|"Urgent".
-7. Edge fromNodeId/toNodeId MUST match EXISTING node IDs from the current plan.
-8. For add_node edges, reference nodes by their real IDs from the plan snapshot.
-
-## Response format:
-Always respond as:
-{
-  "assistantMessage": "Your conversational reply.",
-  "proposal": {
-    "summary": "Brief summary of changes",
-    "confidence": "high"|"medium"|"low",
-    "taskPatch": { /* optional */ },
-    "planPatch": {
-      "operation": "update_node"|"add_node"|"delete_node"|"update_dependencies"|"reorder_nodes"|"update_plan_summary"|"replace_plan"|"materialize_child_tasks"
-      /* Include exactly one of: nodePatches[], nodes[]+edges[], deletedNodeIds[], edges[], reorder[], summary */
-    },
-    "warnings": [],
-    "requiresConfirmation": true|false
-  }
-}
-
-## Concrete response examples:
-
-### Example 1 — update a node title:
-{
-  "assistantMessage": "I've updated the Research node title to 'Deep Market Research'.",
-  "proposal": {
-    "summary": "Rename Research node",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "update_node",
-      "nodePatches": [{ "id": "node-a", "title": "Deep Market Research" }]
-    },
-    "requiresConfirmation": false
-  }
-}
-
-### Example 2 — add a node with an edge:
-{
-  "assistantMessage": "I've added a 'Code Review' step after the Design phase.",
-  "proposal": {
-    "summary": "Add Code Review step after Design",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "add_node",
-      "nodes": [{ "id": "node-review", "type": "checkpoint", "title": "Code Review", "objective": "Review code for quality", "executionMode": "manual" }],
-      "edges": [{ "fromNodeId": "node-b", "toNodeId": "node-review", "type": "sequential" }]
-    },
-    "requiresConfirmation": false
-  }
-}
-
-### Example 3 — add a dependency:
-{
-  "assistantMessage": "I've connected the Research node directly to the Review node.",
-  "proposal": {
-    "summary": "Add dependency from Research to Review",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "update_dependencies",
-      "edges": [{ "fromNodeId": "node-a", "toNodeId": "node-c", "type": "depends_on" }]
-    },
-    "requiresConfirmation": false
-  }
-}
-
-### Example 4 — delete a node:
-{
-  "assistantMessage": "I've removed the Shipping step from the plan.",
-  "proposal": {
-    "summary": "Remove Shipping node",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "delete_node",
-      "deletedNodeIds": ["node-d"]
-    },
-    "requiresConfirmation": true
-  }
-}
-
-### Example 5 — reorder nodes:
-{
-  "assistantMessage": "I've moved the Review step before Design.",
-  "proposal": {
-    "summary": "Reorder: Review before Design",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "reorder_nodes",
-      "reorder": ["node-c", "node-b"]
-    },
-    "requiresConfirmation": false
-  }
-}
-
-### Example 6 — update plan summary:
-{
-  "assistantMessage": "I've renamed the plan to 'Q2 Delivery Flow'.",
-  "proposal": {
-    "summary": "Rename plan",
-    "confidence": "high",
-    "planPatch": {
-      "operation": "update_plan_summary",
-      "summary": "Q2 Delivery Flow"
-    },
-    "requiresConfirmation": false
-  }
-}
-
-### Example 7 — conversational (no change):
-{
-  "assistantMessage": "Your plan has 4 steps in a linear A→B→C→D flow. The Research step is estimated at 30 minutes."
-}
-
-Only include \`proposal\` when the user has clearly asked for a specific modification.`;
+      const systemPrompt = buildTaskWorkspaceSystemPrompt(taskSnapshotText, planSnapshotText);
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: systemPrompt },

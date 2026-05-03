@@ -39,7 +39,6 @@ export type TaskAssistantMessageMinAggregateOutputType = {
   taskId: string | null
   role: string | null
   content: string | null
-  proposal: string | null
   applied: boolean | null
   appliedAt: Date | null
   sequence: number | null
@@ -51,7 +50,6 @@ export type TaskAssistantMessageMaxAggregateOutputType = {
   taskId: string | null
   role: string | null
   content: string | null
-  proposal: string | null
   applied: boolean | null
   appliedAt: Date | null
   sequence: number | null
@@ -85,7 +83,6 @@ export type TaskAssistantMessageMinAggregateInputType = {
   taskId?: true
   role?: true
   content?: true
-  proposal?: true
   applied?: true
   appliedAt?: true
   sequence?: true
@@ -97,7 +94,6 @@ export type TaskAssistantMessageMaxAggregateInputType = {
   taskId?: true
   role?: true
   content?: true
-  proposal?: true
   applied?: true
   appliedAt?: true
   sequence?: true
@@ -208,7 +204,7 @@ export type TaskAssistantMessageGroupByOutputType = {
   taskId: string
   role: string
   content: string
-  proposal: string | null
+  proposal: runtime.JsonValue | null
   applied: boolean
   appliedAt: Date | null
   sequence: number
@@ -243,7 +239,7 @@ export type TaskAssistantMessageWhereInput = {
   taskId?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   role?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   content?: Prisma.StringFilter<"TaskAssistantMessage"> | string
-  proposal?: Prisma.StringNullableFilter<"TaskAssistantMessage"> | string | null
+  proposal?: Prisma.JsonNullableFilter<"TaskAssistantMessage">
   applied?: Prisma.BoolFilter<"TaskAssistantMessage"> | boolean
   appliedAt?: Prisma.DateTimeNullableFilter<"TaskAssistantMessage"> | Date | string | null
   sequence?: Prisma.IntFilter<"TaskAssistantMessage"> | number
@@ -272,7 +268,7 @@ export type TaskAssistantMessageWhereUniqueInput = Prisma.AtLeast<{
   taskId?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   role?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   content?: Prisma.StringFilter<"TaskAssistantMessage"> | string
-  proposal?: Prisma.StringNullableFilter<"TaskAssistantMessage"> | string | null
+  proposal?: Prisma.JsonNullableFilter<"TaskAssistantMessage">
   applied?: Prisma.BoolFilter<"TaskAssistantMessage"> | boolean
   appliedAt?: Prisma.DateTimeNullableFilter<"TaskAssistantMessage"> | Date | string | null
   sequence?: Prisma.IntFilter<"TaskAssistantMessage"> | number
@@ -305,7 +301,7 @@ export type TaskAssistantMessageScalarWhereWithAggregatesInput = {
   taskId?: Prisma.StringWithAggregatesFilter<"TaskAssistantMessage"> | string
   role?: Prisma.StringWithAggregatesFilter<"TaskAssistantMessage"> | string
   content?: Prisma.StringWithAggregatesFilter<"TaskAssistantMessage"> | string
-  proposal?: Prisma.StringNullableWithAggregatesFilter<"TaskAssistantMessage"> | string | null
+  proposal?: Prisma.JsonNullableWithAggregatesFilter<"TaskAssistantMessage">
   applied?: Prisma.BoolWithAggregatesFilter<"TaskAssistantMessage"> | boolean
   appliedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskAssistantMessage"> | Date | string | null
   sequence?: Prisma.IntWithAggregatesFilter<"TaskAssistantMessage"> | number
@@ -316,7 +312,7 @@ export type TaskAssistantMessageCreateInput = {
   id?: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -329,7 +325,7 @@ export type TaskAssistantMessageUncheckedCreateInput = {
   taskId: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -340,7 +336,7 @@ export type TaskAssistantMessageUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -353,7 +349,7 @@ export type TaskAssistantMessageUncheckedUpdateInput = {
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -365,7 +361,7 @@ export type TaskAssistantMessageCreateManyInput = {
   taskId: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -376,7 +372,7 @@ export type TaskAssistantMessageUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -388,7 +384,7 @@ export type TaskAssistantMessageUncheckedUpdateManyInput = {
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -426,7 +422,6 @@ export type TaskAssistantMessageMaxOrderByAggregateInput = {
   taskId?: Prisma.SortOrder
   role?: Prisma.SortOrder
   content?: Prisma.SortOrder
-  proposal?: Prisma.SortOrder
   applied?: Prisma.SortOrder
   appliedAt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
@@ -438,7 +433,6 @@ export type TaskAssistantMessageMinOrderByAggregateInput = {
   taskId?: Prisma.SortOrder
   role?: Prisma.SortOrder
   content?: Prisma.SortOrder
-  proposal?: Prisma.SortOrder
   applied?: Prisma.SortOrder
   appliedAt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
@@ -495,7 +489,7 @@ export type TaskAssistantMessageCreateWithoutTaskInput = {
   id?: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -506,7 +500,7 @@ export type TaskAssistantMessageUncheckedCreateWithoutTaskInput = {
   id?: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -546,7 +540,7 @@ export type TaskAssistantMessageScalarWhereInput = {
   taskId?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   role?: Prisma.StringFilter<"TaskAssistantMessage"> | string
   content?: Prisma.StringFilter<"TaskAssistantMessage"> | string
-  proposal?: Prisma.StringNullableFilter<"TaskAssistantMessage"> | string | null
+  proposal?: Prisma.JsonNullableFilter<"TaskAssistantMessage">
   applied?: Prisma.BoolFilter<"TaskAssistantMessage"> | boolean
   appliedAt?: Prisma.DateTimeNullableFilter<"TaskAssistantMessage"> | Date | string | null
   sequence?: Prisma.IntFilter<"TaskAssistantMessage"> | number
@@ -557,7 +551,7 @@ export type TaskAssistantMessageCreateManyTaskInput = {
   id?: string
   role: string
   content: string
-  proposal?: string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: boolean
   appliedAt?: Date | string | null
   sequence: number
@@ -568,7 +562,7 @@ export type TaskAssistantMessageUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -579,7 +573,7 @@ export type TaskAssistantMessageUncheckedUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -590,7 +584,7 @@ export type TaskAssistantMessageUncheckedUpdateManyWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
-  proposal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  proposal?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   applied?: Prisma.BoolFieldUpdateOperationsInput | boolean
   appliedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
@@ -675,9 +669,9 @@ export type $TaskAssistantMessagePayload<ExtArgs extends runtime.Types.Extension
     role: string
     content: string
     /**
-     * JSON-serialized TaskWorkspaceUpdateProposal
+     * TaskWorkspaceUpdateProposal
      */
-    proposal: string | null
+    proposal: runtime.JsonValue | null
     applied: boolean
     appliedAt: Date | null
     sequence: number
@@ -1110,7 +1104,7 @@ export interface TaskAssistantMessageFieldRefs {
   readonly taskId: Prisma.FieldRef<"TaskAssistantMessage", 'String'>
   readonly role: Prisma.FieldRef<"TaskAssistantMessage", 'String'>
   readonly content: Prisma.FieldRef<"TaskAssistantMessage", 'String'>
-  readonly proposal: Prisma.FieldRef<"TaskAssistantMessage", 'String'>
+  readonly proposal: Prisma.FieldRef<"TaskAssistantMessage", 'Json'>
   readonly applied: Prisma.FieldRef<"TaskAssistantMessage", 'Boolean'>
   readonly appliedAt: Prisma.FieldRef<"TaskAssistantMessage", 'DateTime'>
   readonly sequence: Prisma.FieldRef<"TaskAssistantMessage", 'Int'>

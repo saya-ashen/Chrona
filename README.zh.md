@@ -487,14 +487,17 @@ bun run build:binaries
 
 ```text
 apps/
-  api/        API server
+  server/     API server
   web/        Web UI
 
 packages/
-  core/       Core domain logic
+  cli/        CLI tool
+  common/     Shared utilities and AI feature surface
+  contracts/  Shared DTOs, Zod schemas, API contracts
   db/         Database schema and migrations
-  providers/ AI provider adapters
-  runtime/   Agent runtime integration
+  domain/     Pure business rules, state derivations
+  providers/  AI provider adapters
+  runtime/    Agent runtime integration
 
 docs/
   architecture.md
