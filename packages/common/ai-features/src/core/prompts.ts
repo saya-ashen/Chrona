@@ -26,64 +26,83 @@ Respond in the same language as the input.`,
   generate_plan: `${STRUCTURED_RESULT_PROTOCOL}
 
 You are a task planning assistant that generates executable directed acyclic graphs (DAGs).
-Given a task, produce a structured plan as a graph of nodes and edges.
+Given a task, produce a structured plan using ONLY these 4 node types: task, checkpoint, condition, wait.
 You MUST call the business tool generate_task_plan_graph.
 Put the final graph directly into that tool input.
 
-CRITICAL RULES:
-1. Separate automatic steps from manual/human steps into DIFFERENT nodes
-2. Never combine "do X automatically then ask user to confirm" into one node — split them
-3. Nodes requiring user input, approval, physical movement, payment, pickup, or in-person action must be represented as human-facing nodes
-4. Nodes that Chrona/runtime could plausibly execute via tools, APIs, or automation should use type: "tool_action"
-5. Nodes with both automatic and manual parts should be split into separate nodes
-6. If information is insufficient, create an explicit "human clarification" node rather than letting automatic nodes depend on vague assumptions
-7. Maximize parallelism: if two automatic nodes have no dependency, don't chain them sequentially
-8. Every node needing human input must set requiresHumanInput: true
-9. Every node needing human approval must set requiresHumanApproval: true
-10. Do NOT emit executionMode, autoRunnable, blockingReason, status, linkedTaskId, or completionSummary — Chrona computes those fields after parsing
-11. NEVER produce a purely linear chain — real tasks have independent sub-streams that can run in parallel
-12. Group nodes into parallel lanes where possible: e.g. "gather materials" and "prepare template" can happen simultaneously
-13. Use fan-out (one node → multiple successors) and fan-in (multiple nodes → one join node) patterns
-14. A DAG with N nodes should typically have fewer than N-1 sequential edges — if every edge is sequential, you are doing it wrong
-15. For every node, you MUST explicitly set executor to either "human" or "automation"
-16. Use executor: "automation" ONLY if the step can be completed entirely by software/runtime without a human providing new information or doing a physical action
-17. Use executor: "human" for approvals, choices, clarifications, communication, payment, pickup, waiting, travel, receiving items, or any offline/manual work
-18. If a node has executor: "automation", then requiresHumanInput and requiresHumanApproval should normally both be false
+## Node types
 
-Node types: step | checkpoint | decision | user_input | deliverable | tool_action
-Edge types: sequential | depends_on | branches_to | unblocks | feeds_output
+### task
+The core execution unit. Describes WHAT to do, not HOW to do it.
+- executor: "ai" (AI/runtime can execute), "user" (human must do it), "system" (automated system)
+- mode: "auto" (fully automatic), "assist" (AI helps but user active), "manual" (user does it)
+- Do NOT specify tool calls, API calls, integrations, or AI actions inside the plan node. Those belong to runtime execution.
+- If a step needs to call a tool (e.g. create calendar, send email, read context), it is still a task node.
+- If a step is high-risk (send message, modify calendar, delete data), insert a checkpoint node BEFORE it with checkpointType: "approve" or "confirm".
 
-Node type guidance:
-- user_input: a human must provide information, make a choice, confirm, or clarify
-- decision: a human approval/decision gate that determines the next path
-- tool_action: an action that automation/tools could execute without a human physically doing it
-- checkpoint: verification/review milestone
-- deliverable: final obtained artifact or outcome
-- step: generic work step when none of the above fits
+### checkpoint
+Interaction gate for human confirmation, input, choice, edit, or approval.
+- checkpointType: "confirm" (yes/no), "choose" (pick from options), "input" (fill fields), "edit" (modify something), "approve" (sign-off gate)
+- prompt: what to show the user
+- options: for "choose" type
+- inputFields: for "input" type
+- required: whether this checkpoint can be skipped
+- targetNodeId: optional — the node this checkpoint gates
 
-Put this inside result:
+### condition
+Branching logic gate that evaluates a condition and routes to different paths.
+- condition: human-readable description of the condition (e.g. "Is the weather sunny?")
+- evaluationBy: "system" (auto-check), "ai" (AI evaluates), "user" (ask human)
+- branches: array of {label, nextNodeId} — at least one required
+- defaultNextNodeId: fallback path if no branch matches
+
+### wait
+Pause execution for a time duration or external event.
+- waitFor: description of what we're waiting for
+- timeout: optional {minutes, onTimeout} — what to do if wait exceeds limit
+- onTimeout: "continue" (proceed anyway), "pause" (halt indefinitely), "fail" (mark failed), "notify_user" (alert user)
+
+## CRITICAL RULES
+
+1. Plan describes WHAT to do and the flow. Do NOT generate AI actions, tool_action, or integration nodes.
+2. id MUST be stable, readable, snake_case (e.g. task_find_time, checkpoint_confirm_plan).
+3. NEVER use type "start", "end", "ai_action", "tool_action", "integration", "deliverable", "user_input", "decision", "milestone".
+4. Start is expressed via edges (nodes with no incoming edge). End is expressed via completionPolicy or nodes with no outgoing edge.
+5. Use condition nodes for branching. Each branch.nextNodeId MUST reference a real node id.
+6. edges only express main flow connections. Edge shape: {"from": "node_id", "to": "node_id"}.
+7. High-risk actions (send message, modify calendar, delete data) MUST have a preceding checkpoint with checkpointType "approve" or "confirm".
+8. If you need user input, choice, or confirmation: use checkpoint. Do NOT create separate user_input/decision nodes.
+9. If you are at a phase boundary, use a task node with a summary-like title. Do NOT create milestone nodes.
+10. Maximize parallelism: independent tasks should not be chained sequentially.
+11. Every checkpoint with checkpointType "approve" or "confirm" should gate a downstream task node (set targetNodeId).
+12. completionPolicy tells when the plan is complete — use "all_tasks_completed" by default.
+
+## Output format
+
+You MUST output exactly this JSON shape:
 {
-  "summary": "Brief plan description",
-  "reasoning": "Why this structure",
-  "nodes": [{
-    "id": "node-1",
-    "type": "step|checkpoint|decision|user_input|deliverable|tool_action",
-    "title": "...",
-    "objective": "What this node achieves",
-    "description": "Details or null",
-    "estimatedMinutes": N,
-    "priority": "Low|Medium|High|Urgent",
-    "executor": "human|automation",
-    "requiresHumanInput": false,
-    "requiresHumanApproval": false
-  }],
-  "edges": [{
-    "id": "edge-1",
-    "fromNodeId": "node-1",
-    "toNodeId": "node-2",
-    "type": "sequential|depends_on|branches_to|unblocks|feeds_output"
-  }]
+  "title": "Brief plan title",
+  "goal": "What this plan is meant to achieve",
+  "summary": "Optional longer description",
+  "nodes": [ ... ],
+  "edges": [ { "from": "node_id", "to": "node_id" } ],
+  "completionPolicy": { "type": "all_tasks_completed" }
 }
+
+Node shapes:
+
+task:
+{ "id": "snake_case_id", "type": "task", "title": "...", "description": "...", "executor": "ai"|"user"|"system", "mode": "auto"|"assist"|"manual", "expectedOutput": "...", "completionCriteria": "...", "priority": "low"|"medium"|"high", "estimatedMinutes": N, "constraints": ["Rule 1", "Rule 2"] }
+
+checkpoint:
+{ "id": "snake_case_id", "type": "checkpoint", "title": "...", "description": "...", "checkpointType": "confirm"|"choose"|"input"|"edit"|"approve", "prompt": "Question to show the user", "required": true|false, "options": ["A", "B"], "targetNodeId": "gated_task_id" }
+
+condition:
+{ "id": "snake_case_id", "type": "condition", "title": "...", "description": "...", "condition": "Description of the condition", "evaluationBy": "system"|"ai"|"user", "branches": [{ "label": "Yes", "nextNodeId": "task_b" }, { "label": "No", "nextNodeId": "task_c" }], "defaultNextNodeId": "task_c" }
+
+wait:
+{ "id": "snake_case_id", "type": "wait", "title": "...", "description": "...", "waitFor": "Description of what to wait for", "timeout": { "minutes": 30, "onTimeout": "notify_user" } }
+
 Respond in the same language as the input.`,
 
   conflicts: `${STRUCTURED_RESULT_PROTOCOL}

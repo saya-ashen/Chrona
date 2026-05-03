@@ -47,12 +47,12 @@ async function ensureApiKey() {
 // -- Helpers --
 
 function normalizeNodeType(value: unknown): TaskPlanNode["type"] {
-  const valid = ["step", "checkpoint", "decision", "user_input", "deliverable", "tool_action"];
-  return valid.includes(value as string) ? (value as TaskPlanNode["type"]) : "step";
+  const valid = ["task", "checkpoint", "condition", "wait"];
+  return valid.includes(value as string) ? (value as TaskPlanNode["type"]) : "task";
 }
 
 function normalizeEdgeType(value: unknown): TaskPlanEdge["type"] {
-  const valid = ["sequential", "depends_on", "branches_to", "unblocks", "feeds_output"];
+  const valid = ["sequential", "depends_on"];
   return valid.includes(value as string) ? (value as TaskPlanEdge["type"]) : "sequential";
 }
 
@@ -392,7 +392,7 @@ function makeNode(
 ): TaskPlanNode {
   return {
     id,
-    type: "step",
+    type: "task",
     title: `Node ${id}`,
     objective: `Objective for ${id}`,
     description: null,

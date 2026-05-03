@@ -291,6 +291,16 @@ function stringifyExecutionInput(
   return parts.join("\n\n");
 }
 
+function buildOpenResponsesInput(
+  text: string,
+  pendingToolOutputs: Array<{ type: "function_call_output"; call_id: string; output: string }>,
+): Array<{ type: "function_call_output"; call_id: string; output: string } | { type: "input_text"; text: string }> {
+  return [
+    ...pendingToolOutputs,
+    { type: "input_text", text },
+  ];
+}
+
 export function buildGatewayBody(
   route: RouteKind,
   request: BridgeRequest,
@@ -309,16 +319,12 @@ export function buildGatewayBody(
     const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
     const featureInstructions =
       featureRequest.instructions?.trim() || defaultFeatureInstructions(route.feature);
+    const featureInputText = stringifyFeatureInput(route.feature, featureRequest.input);
     const body: Record<string, unknown> = {
       model: "openclaw",
       user: sessionKey,
       instructions: `[Chrona Feature Request]\nFeature: ${route.feature}\n${featureInstructions}`,
-      input: pendingToolOutputs.length > 0
-        ? [
-            ...pendingToolOutputs,
-            { type: "input_text", text: stringifyFeatureInput(route.feature, featureRequest.input) },
-          ]
-        : stringifyFeatureInput(route.feature, featureRequest.input),
+      input: buildOpenResponsesInput(featureInputText, pendingToolOutputs),
       stream: route.stream,
     };
 
@@ -343,14 +349,10 @@ export function buildGatewayBody(
   }
 
   const execution = request as BridgeExecutionTaskRequest;
+  const executionInputText = stringifyExecutionInput(execution);
   const body: Record<string, unknown> = {
     model: "openclaw",
-    input: pendingToolOutputs.length > 0
-      ? [
-          ...pendingToolOutputs,
-          { type: "input_text", text: stringifyExecutionInput(execution) },
-        ]
-      : stringifyExecutionInput(execution),
+    input: buildOpenResponsesInput(executionInputText, pendingToolOutputs),
     stream: route.stream,
     max_output_tokens:
       typeof execution.runtimeInput?.maxTokens === "number"

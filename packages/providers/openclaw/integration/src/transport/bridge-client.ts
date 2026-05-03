@@ -33,6 +33,7 @@ import type { RuntimeInput } from "@chrona/runtime-core";
 
 export type OpenClawBridgeClientOptions = {
   baseUrl?: string;
+  authToken?: string;
   timeoutSeconds?: number;
   onEvent?: (event: NDJSONEvent) => void;
 };
@@ -56,6 +57,7 @@ export type SessionState = {
 
 export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   private baseUrl: string;
+  private authToken: string;
   private timeoutSeconds: number;
   private onEvent?: (event: NDJSONEvent) => void;
   private sessions = new Map<string, SessionState>();
@@ -66,12 +68,15 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       process.env.OPENCLAW_BRIDGE_URL ??
       "http://localhost:7677"
     ).replace(/\/$/, "");
+    this.authToken = options.authToken ?? process.env.OPENCLAW_BRIDGE_TOKEN ?? "";
     this.timeoutSeconds = options.timeoutSeconds ?? 300;
     this.onEvent = options.onEvent;
   }
 
   async connect(): Promise<OpenClawHello> {
-    const res = await fetch(`${this.baseUrl}/v1/health`);
+    const res = await fetch(`${this.baseUrl}/v1/health`, {
+      headers: this.buildHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Bridge health check failed: ${res.status}`);
     }
@@ -329,7 +334,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   ): Promise<TResponse> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -361,7 +366,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   ): Promise<BridgeResponse> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.buildHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -415,5 +420,12 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     }
 
     return finalResponse;
+  }
+
+  private buildHeaders(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}),
+    };
   }
 }

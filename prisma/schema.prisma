@@ -448,7 +448,7 @@ model AiClient {
   name      String
   type      AiClientType
   /// JSON config — shape depends on type:
-  ///   openclaw: { bridgeUrl, timeoutSeconds }
+  ///   openclaw: { bridgeUrl, bridgeToken, timeoutSeconds }
   ///   llm: { baseUrl, apiKey, model, temperature }
   config    Json
   isDefault Boolean            @default(false)

@@ -551,7 +551,7 @@ export type $AiClientPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     type: $Enums.AiClientType
     /**
      * JSON config — shape depends on type:
-     * openclaw: { bridgeUrl, timeoutSeconds }
+     * openclaw: { bridgeUrl, bridgeToken, timeoutSeconds }
      * llm: { baseUrl, apiKey, model, temperature }
      */
     config: runtime.JsonValue

@@ -17,16 +17,7 @@ export * from "./bridge/contracts";
 export * from "./runtime/client";
 export * from "./protocol/openclaw";
 export * from "./transport/bridge-client";
-export {
-  OpenClawEmbeddedClient,
-  type OpenClawEmbeddedClientOptions,
-} from "./transport/embedded-client";
 export * from "./transport/bridge-types";
-export * from "./provider-core/types";
-export * from "./provider-core/constants";
-export * from "./provider-core/feature-contracts";
-export * from "./provider-core/gateway-response";
-export * from "./provider-core/executor";
 export * from "./runtime/runtime-client";
 export * from "./runtime/adapter";
 export * from "./runtime/orchestrator";

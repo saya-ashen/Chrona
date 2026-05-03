@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@/modules/ai/types";
+import { normalizePlanNodeTypeForDisplay } from "./selected-block-sheet/plan-utils";
 import { useSmartDecomposition } from "@/hooks/use-ai";
 
 import { useI18n } from "@/i18n/client";
@@ -208,17 +209,23 @@ export function TaskDecompositionPanel({
         phase: node.phase ?? node.type,
         status: node.status === "skipped" ? "done" : node.status,
         requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
+        requiresHumanApproval: node.requiresHumanApproval ?? false,
         type: node.type,
+        displayType: normalizePlanNodeTypeForDisplay(node.type),
         linkedTaskId: node.linkedTaskId,
         executionMode: node.executionMode,
         estimatedMinutes: node.estimatedMinutes,
         priority: node.priority,
+        metadata: node.metadata as Record<string, unknown> | null,
       })),
       edges: graph.edges.map((edge) => ({
         id: edge.id,
         fromNodeId: edge.fromNodeId,
         toNodeId: edge.toNodeId,
         type: edge.type,
+        label: edge.metadata && typeof edge.metadata === "object" && !Array.isArray(edge.metadata)
+          ? (edge.metadata as Record<string, unknown>).label as string | undefined
+          : undefined,
       })),
     };
   }, [displayPlanGraph]);

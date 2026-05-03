@@ -3,57 +3,111 @@ import { describe, expect, it } from "bun:test";
 import { normalizeGeneratePlanResponse } from "./index";
 
 describe("normalizeGeneratePlanResponse", () => {
-  it("derives execution semantics from explicit executor and human flags", () => {
+  it("accepts bridge-style plan payloads without title and goal", () => {
     const result = normalizeGeneratePlanResponse({
       parsed: {
-        summary: "买咖啡计划",
+        summary: "Plan the API test rollout",
         nodes: [
           {
-            id: "node-1",
-            type: "user_input",
-            title: "确认咖啡偏好",
-            objective: "收集口味信息",
-            executor: "human",
-            requiresHumanInput: true,
-            requiresHumanApproval: false,
-          },
-          {
-            id: "node-2",
-            type: "tool_action",
-            title: "查询附近门店库存",
-            objective: "确认可购买门店",
+            id: "node_1",
+            type: "task",
+            title: "Draft failing regression test",
+            objective: "Reproduce the missing plan generation bug",
             executor: "automation",
-            requiresHumanInput: false,
-            requiresHumanApproval: false,
+            estimatedMinutes: 15,
           },
           {
-            id: "node-3",
-            type: "step",
-            title: "前往门店取货",
-            objective: "到店拿到饮品",
-            executor: "human",
-            requiresHumanInput: false,
-            requiresHumanApproval: false,
-          },
-          {
-            id: "node-4",
-            type: "decision",
-            title: "审批最终购买方案",
-            objective: "确认是否执行支付",
-            executor: "human",
-            requiresHumanInput: false,
-            requiresHumanApproval: true,
+            id: "node_2",
+            type: "checkpoint",
+            title: "Review the failing output",
+            checkpointType: "approve",
+            prompt: "Confirm the failure matches the production bug",
           },
         ],
         edges: [
-          { id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "depends_on" },
-          { id: "edge-2", fromNodeId: "node-2", toNodeId: "node-3", type: "unblocks" },
-          { id: "edge-3", fromNodeId: "node-3", toNodeId: "node-4", type: "invalid_edge" },
+          {
+            fromNodeId: "node_1",
+            toNodeId: "node_2",
+            type: "sequential",
+          },
         ],
       },
       source: "openclaw",
     });
 
+    expect(result.summary).toBe("Plan the API test rollout");
+    expect(result.nodes).toHaveLength(2);
+    expect(result.nodes[0]).toMatchObject({
+      id: "node_1",
+      title: "Draft failing regression test",
+      executionMode: "automatic",
+      autoRunnable: true,
+    });
+    expect(result.nodes[1]).toMatchObject({
+      id: "node_2",
+      title: "Review the failing output",
+      executionMode: "manual",
+      requiresHumanApproval: true,
+      autoRunnable: false,
+    });
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0]).toMatchObject({
+      fromNodeId: "node_1",
+      toNodeId: "node_2",
+      type: "sequential",
+    });
+  });
+
+  it("derives execution semantics from node types and fields", () => {
+    const result = normalizeGeneratePlanResponse({
+      parsed: {
+        title: "买咖啡计划",
+        goal: "高效购得咖啡",
+        summary: "买咖啡计划",
+        nodes: [
+          {
+            id: "node_1",
+            type: "checkpoint",
+            title: "确认咖啡偏好",
+            checkpointType: "input",
+            prompt: "你想喝什么咖啡？",
+          },
+          {
+            id: "node_2",
+            type: "task",
+            title: "查询附近门店库存",
+            description: "确认可购买门店",
+            executor: "ai",
+            mode: "auto",
+            expectedOutput: "可购买门店列表",
+          },
+          {
+            id: "node_3",
+            type: "task",
+            title: "前往门店取货",
+            description: "到店拿到饮品",
+            executor: "user",
+            mode: "manual",
+            expectedOutput: "拿到饮品",
+          },
+          {
+            id: "node_4",
+            type: "checkpoint",
+            title: "审批最终购买方案",
+            checkpointType: "approve",
+            prompt: "是否确认执行支付？",
+          },
+        ],
+        edges: [
+          { from: "node_1", to: "node_2" },
+          { from: "node_2", to: "node_3" },
+          { from: "node_3", to: "node_4" },
+        ],
+      },
+      source: "openclaw",
+    });
+
+    // node_1: checkpoint "input" → manual, needs_user_input
     expect(result.nodes[0]).toMatchObject({
       executionMode: "manual",
       requiresHumanInput: true,
@@ -62,6 +116,7 @@ describe("normalizeGeneratePlanResponse", () => {
       blockingReason: "needs_user_input",
     });
 
+    // node_2: task executor "ai", mode "auto" → automatic
     expect(result.nodes[1]).toMatchObject({
       executionMode: "automatic",
       requiresHumanInput: false,
@@ -70,14 +125,16 @@ describe("normalizeGeneratePlanResponse", () => {
       blockingReason: null,
     });
 
+    // node_3: task executor "user", mode "manual" → manual
     expect(result.nodes[2]).toMatchObject({
       executionMode: "manual",
-      requiresHumanInput: false,
+      requiresHumanInput: true,
       requiresHumanApproval: false,
       autoRunnable: false,
-      blockingReason: null,
+      blockingReason: "needs_user_input",
     });
 
+    // node_4: checkpoint "approve" → manual, needs_approval
     expect(result.nodes[3]).toMatchObject({
       executionMode: "manual",
       requiresHumanApproval: true,
@@ -85,9 +142,10 @@ describe("normalizeGeneratePlanResponse", () => {
       blockingReason: "needs_approval",
     });
 
+    // All main edges become "sequential" via buildTaskPlanEdgesFromAIPlanEdges
     expect(result.edges.map((edge) => edge.type)).toEqual([
-      "depends_on",
-      "unblocks",
+      "sequential",
+      "sequential",
       "sequential",
     ]);
   });

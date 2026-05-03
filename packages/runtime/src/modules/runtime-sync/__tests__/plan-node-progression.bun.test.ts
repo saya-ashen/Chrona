@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
@@ -42,11 +42,6 @@ describe("runtime sync triggers plan progression", () => {
   beforeEach(async () => {
     progressAcceptedTaskPlanMock.mockClear();
     await resetDb();
-  });
-
-  afterAll(async () => {
-    await resetDb();
-    await db.$disconnect();
   });
 
   it("calls plan progression after child completion and preserves updated accepted plan node state", async () => {
@@ -117,7 +112,7 @@ describe("runtime sync triggers plan progression", () => {
         nodes: [
           {
             id: "node-child",
-            type: "step",
+            type: "task",
             title: "Child node task",
             objective: "Do the child task",
             description: null,

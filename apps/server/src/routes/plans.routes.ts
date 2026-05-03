@@ -664,7 +664,7 @@ export function createPlansRoutes() {
               id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
               fromNodeId: e.fromNodeId as string,
               toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
+              type: (e.type === "depends_on" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
               metadata: null as Record<string, unknown> | null,
             }))] as typeof plan.edges;
           }
@@ -727,7 +727,7 @@ export function createPlansRoutes() {
               id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
               fromNodeId: e.fromNodeId as string,
               toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" || e.type === "branches_to" || e.type === "unblocks" || e.type === "feeds_output" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
+              type: (e.type === "depends_on" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
               metadata: null as Record<string, unknown> | null,
             })),
           ] as typeof plan.edges;

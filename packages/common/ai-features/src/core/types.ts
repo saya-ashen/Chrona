@@ -27,8 +27,8 @@ export interface AiClientRecord {
 }
 
 export interface OpenClawClientConfig {
-  gatewayUrl: string;
-  gatewayToken: string;
+  bridgeUrl: string;
+  bridgeToken: string;
   timeoutSeconds?: number;
 }
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
@@ -106,7 +106,7 @@ async function seedLinkedChildRun() {
       nodes: [
         {
           id: "node-child",
-          type: "step",
+          type: "task",
           title: "Child node task",
           objective: "Do the child task",
           description: null,
@@ -135,11 +135,6 @@ describe("parent task accepted-plan derived states", () => {
   beforeEach(async () => {
     progressAcceptedTaskPlanMock.mockClear();
     await resetDb();
-  });
-
-  afterAll(async () => {
-    await resetDb();
-    await db.$disconnect();
   });
 
   it("moves parent task to WaitingForApproval when a linked child run waits for approval", async () => {

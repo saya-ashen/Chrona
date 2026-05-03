@@ -52,7 +52,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
     nodes: [
       {
         id: "node-1",
-        type: "step",
+        type: "task",
         title: "Review existing documentation",
         objective: "Read through all current docs and note outdated sections",
         description: "Read through all current docs and note outdated sections",
@@ -71,7 +71,7 @@ const samplePlanResponse: TaskPlanGraphResponse = {
       },
       {
         id: "node-2",
-        type: "deliverable",
+        type: "task",
         title: "Update API reference",
         objective: "Refresh endpoint descriptions and examples",
         description: "Refresh endpoint descriptions and examples",

@@ -103,7 +103,7 @@ export async function applyPlanPatch(
           }
           updatedGraph.nodes.push({
             id: nodeId,
-            type: "step",
+            type: "task",
             title: newNode.title,
             objective: newNode.title,
             description: newNode.description ?? null,
@@ -207,7 +207,7 @@ export async function applyPlanPatch(
         );
         const newNodes = patch.nodes.map((n) => ({
           id: n.id ?? `node-${Math.random().toString(36).slice(2, 8)}`,
-          type: "step" as const,
+          type: "task" as const,
           title: n.title,
           objective: n.title,
           description: n.description ?? null,
@@ -231,7 +231,7 @@ export async function applyPlanPatch(
           id: `edge-${e.from}-${e.to}`,
           fromNodeId: e.from,
           toNodeId: e.to,
-          type: (e.type ?? "sequential") as "sequential" | "depends_on" | "branches_to" | "unblocks" | "feeds_output",
+          type: (e.type === "depends_on" ? e.type : "sequential") as "sequential" | "depends_on",
           metadata: null,
         }));
       }

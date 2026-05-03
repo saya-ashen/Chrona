@@ -44,28 +44,25 @@ export async function getOpenClawAdapter() {
     where: { type: "openclaw", isDefault: true, enabled: true },
   });
   const config = (client?.config as Record<string, unknown> | null) ?? {};
-  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
-  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
+  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
   return createRuntimeAdapter(
-    gatewayUrl ? { gatewayHttpUrl: gatewayUrl, gatewayToken } : undefined,
+    bridgeUrl ? { bridgeUrl, bridgeToken } : undefined,
   );
 }
 
 export async function testOpenClaw(config: Record<string, unknown>) {
-  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : "";
-  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
-  if (!gatewayUrl) {
-    return { available: false, reason: "Gateway URL is required" };
-  }
-  if (!gatewayToken) {
-    return { available: false, reason: "Gateway token is required" };
+  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
+  if (!bridgeUrl) {
+    return { available: false, reason: "Bridge URL is required" };
   }
 
   try {
-    const res = await fetch(`${gatewayUrl}/health`, {
+    const res = await fetch(`${bridgeUrl}/v1/health`, {
       headers: {
-        Authorization: `Bearer ${gatewayToken}`,
         Accept: "application/json",
+        ...(bridgeToken ? { Authorization: `Bearer ${bridgeToken}` } : {}),
       },
       signal: AbortSignal.timeout(3000),
     });
@@ -76,7 +73,7 @@ export async function testOpenClaw(config: Record<string, unknown>) {
     if (!res.ok) {
       return {
         available: false,
-        reason: `Gateway health endpoint returned ${res.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ""}`,
+        reason: `Bridge health endpoint returned ${res.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ""}`,
       };
     }
 
@@ -84,14 +81,14 @@ export async function testOpenClaw(config: Record<string, unknown>) {
     if (trimmedBody.startsWith("<!doctype") || trimmedBody.startsWith("<html")) {
       return {
         available: false,
-        reason: "Gateway URL returned an HTML page instead of the OpenClaw JSON health response. Check that the Gateway URL points to the actual API origin and is not a website/login page/reverse-proxy fallback.",
+        reason: "Bridge URL returned an HTML page instead of the OpenClaw JSON health response. Check that the Bridge URL points to the actual API origin and is not a website/login page/reverse-proxy fallback.",
       };
     }
 
     if (!contentType.toLowerCase().includes("application/json")) {
       return {
         available: false,
-        reason: `Gateway health endpoint returned non-JSON content-type: ${contentType || "unknown"}`,
+        reason: `Bridge health endpoint returned non-JSON content-type: ${contentType || "unknown"}`,
       };
     }
 
@@ -101,21 +98,21 @@ export async function testOpenClaw(config: Record<string, unknown>) {
     } catch {
       return {
         available: false,
-        reason: `Gateway health endpoint returned invalid JSON: ${bodyText.slice(0, 200) || "empty response"}`,
+        reason: `Bridge health endpoint returned invalid JSON: ${bodyText.slice(0, 200) || "empty response"}`,
       };
     }
 
-    if (!(body.ok === true && body.status === "live")) {
+    if (body.status !== "ok") {
       return {
         available: false,
-        reason: `Gateway health response was ok=${String(body.ok)} status=${body.status ?? "unknown"}`,
+        reason: `Bridge health response status=${body.status ?? "unknown"}`,
       };
     }
-    return { available: true, reason: "Gateway is reachable" };
+    return { available: true, reason: "Bridge is reachable" };
   } catch (errorValue) {
     return {
       available: false,
-      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach gateway",
+      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach bridge",
     };
   }
 }
@@ -386,5 +383,3 @@ export async function deleteTaskWithRelations(taskId: string) {
 
   return { success: true, taskId };
 }
-
-

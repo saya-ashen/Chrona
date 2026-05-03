@@ -341,14 +341,14 @@ describe("Plan lifecycle workflow", () => {
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId, {
       nodes: [
         {
-          id: "a", type: "step", title: "First", objective: "First step",
+          id: "a", type: "task", title: "First", objective: "First step",
           status: "pending", executionMode: "automatic",
           requiresHumanInput: false, requiresHumanApproval: false,
           autoRunnable: true, blockingReason: null, linkedTaskId: null,
           completionSummary: null, metadata: null, estimatedMinutes: 10, priority: "Medium",
         },
         {
-          id: "b", type: "step", title: "Second", objective: "Second step",
+          id: "b", type: "task", title: "Second", objective: "Second step",
           status: "pending", executionMode: "automatic",
           requiresHumanInput: false, requiresHumanApproval: false,
           autoRunnable: true, blockingReason: null, linkedTaskId: null,
@@ -386,7 +386,7 @@ describe("Plan lifecycle workflow", () => {
 
     const inlineNode: TaskPlanNode = {
       id: "inline-1",
-      type: "step",
+      type: "task",
       title: "Inline Node",
       objective: "Created via batch-apply",
       description: null,
@@ -482,7 +482,7 @@ describe("Plan lifecycle workflow", () => {
     const { planId: planId2 } = await seedDraftPlan(taskId, ws.workspaceId, {
       nodes: [
         {
-          id: "n1", type: "step", title: "Different", objective: "Diff node",
+          id: "n1", type: "task", title: "Different", objective: "Diff node",
           status: "pending", executionMode: "automatic",
           requiresHumanInput: false, requiresHumanApproval: false,
           autoRunnable: true, blockingReason: null, linkedTaskId: null,
@@ -577,7 +577,7 @@ describe("Plan lifecycle workflow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         taskId,
-        nodes: [{ id: "bad-node", type: "step", title: "", objective: "" }],
+        nodes: [{ id: "bad-node", type: "task", title: "", objective: "" }],
         edges: [],
       }),
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, ListTodo, CircleHelp, UserCheck, ShieldCheck, GitBranch, Clock } from "lucide-react";
 import dagre from "@dagrejs/dagre";
 import {
   Handle,
@@ -26,12 +26,15 @@ type PlanStep = {
   phase: string;
   status: "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked" | "skipped";
   requiresHumanInput: boolean;
+  requiresHumanApproval?: boolean;
   type?: string;
+  displayType?: string;
   linkedTaskId?: string | null;
   executionMode?: string | null;
   estimatedMinutes?: number | null;
   priority?: string | null;
   completionSummary?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 type PlanEdge = {
@@ -39,6 +42,7 @@ type PlanEdge = {
   fromNodeId: string;
   toNodeId: string;
   type: string;
+  label?: string;
 };
 
 type TaskPlanGraphMode = "full" | "compact" | "auto";
@@ -66,9 +70,6 @@ const DEFAULT_GRAPH_COPY = {
   statusSkipped: "已跳过",
   statusPending: "待处理",
   edgeDependsOn: "依赖于",
-  edgeBranchesTo: "分支到",
-  edgeUnblocks: "解除阻塞",
-  edgeFeedsOutput: "输出流向",
   edgeSequential: "顺序执行",
   requiresHumanInput: "需要用户输入",
   detailType: "类型",
@@ -78,6 +79,23 @@ const DEFAULT_GRAPH_COPY = {
   detailLinkedTask: "关联任务",
   detailDescription: "详细说明",
   detailCompletionSummary: "完成情况说明",
+  nodeTypeTask: "任务",
+  nodeTypeCheckpoint: "检查点",
+  nodeTypeCondition: "条件判断",
+  nodeTypeWait: "等待",
+  badgeAuto: "自动",
+  badgeManual: "手动",
+  badgeAssist: "辅助",
+  badgeAi: "AI",
+  badgeUser: "用户",
+  badgeSystem: "系统",
+  badgeConfirm: "确认",
+  badgeChoose: "选择",
+  badgeInput: "输入",
+  badgeEdit: "编辑",
+  badgeApprove: "审批",
+  badgeRequired: "必须",
+  badgeOptional: "可选",
 } as const;
 
 type GraphCopyType = Record<keyof typeof DEFAULT_GRAPH_COPY, string>;
@@ -86,9 +104,9 @@ type NodeTone =
   | "child-task"
   | "waiting"
   | "checkpoint"
-  | "decision"
-  | "deliverable"
-  | "tool-action"
+  | "checkpoint-approve"
+  | "condition"
+  | "wait"
   | "done"
   | "blocked"
   | "current"
@@ -168,7 +186,7 @@ type EdgeLegendItem = {
   width: number;
 };
 
-type NodeShape = "rounded" | "diamond" | "pill" | "hex" | "parallelogram";
+type NodeShape = "rounded" | "diamond" | "pill" | "parallelogram";
 
 type NodeLegendItem = {
   type: string;
@@ -182,21 +200,30 @@ function getNodeTone(step: PlanStep): NodeTone {
   if (step.status === "skipped") return "done";
   if (step.requiresHumanInput || step.status === "waiting_for_user")
     return "waiting";
-  if (step.status === "waiting_for_child" || step.status === "waiting_for_approval")
+  if (step.status === "waiting_for_approval")
+    return "checkpoint-approve";
+  if (step.status === "waiting_for_child")
     return "waiting";
   if (step.status === "in_progress") return "current";
   if (step.status === "done") return "done";
 
-  if (step.type === "checkpoint") return "checkpoint";
-  if (step.type === "decision") return "decision";
-  if (step.type === "deliverable") return "deliverable";
-  if (step.type === "tool_action") return "tool-action";
+  const dt = step.displayType ?? step.type;
+
+  if (dt === "condition") return "condition";
+  if (dt === "wait") return "wait";
+  if (dt === "checkpoint") {
+    const meta = step.metadata;
+    const checkpointType = meta && typeof meta === "object"
+      ? (meta as Record<string, unknown>).checkpointType
+      : undefined;
+    if (checkpointType === "approve" || checkpointType === "confirm")
+      return "checkpoint-approve";
+    return "checkpoint";
+  }
   if (step.executionMode === "automatic" || step.linkedTaskId)
     return "child-task";
 
-  return step.priority === "Urgent" || step.priority === "High"
-    ? "decision"
-    : "default";
+  return "default";
 }
 
 const TONE_STYLES: Record<
@@ -221,23 +248,23 @@ const TONE_STYLES: Record<
     ring: "ring-violet-400/30",
     dot: "bg-violet-500",
   },
-  decision: {
-    border: "border-fuchsia-400/60",
-    bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30",
-    ring: "ring-fuchsia-400/30",
-    dot: "bg-fuchsia-500",
+  "checkpoint-approve": {
+    border: "border-rose-400/60",
+    bg: "bg-rose-50 dark:bg-rose-950/30",
+    ring: "ring-rose-400/30",
+    dot: "bg-rose-500",
   },
-  deliverable: {
+  condition: {
+    border: "border-yellow-400/60",
+    bg: "bg-yellow-50 dark:bg-yellow-950/30",
+    ring: "ring-yellow-400/30",
+    dot: "bg-yellow-500",
+  },
+  wait: {
     border: "border-cyan-400/60",
     bg: "bg-cyan-50 dark:bg-cyan-950/30",
     ring: "ring-cyan-400/30",
     dot: "bg-cyan-500",
-  },
-  "tool-action": {
-    border: "border-primary/40",
-    bg: "bg-primary-soft dark:bg-primary/10",
-    ring: "ring-primary/30",
-    dot: "bg-primary",
   },
   done: {
     border: "border-slate-300/60",
@@ -269,12 +296,6 @@ function edgeStroke(type: string) {
   switch (type) {
     case "depends_on":
       return "rgba(168, 85, 247, 0.82)";
-    case "branches_to":
-      return "rgba(236, 72, 153, 0.82)";
-    case "unblocks":
-      return "rgba(34, 197, 94, 0.86)";
-    case "feeds_output":
-      return "rgba(14, 165, 233, 0.84)";
     default:
       return "rgba(100, 116, 139, 0.64)";
   }
@@ -283,11 +304,7 @@ function edgeStroke(type: string) {
 function edgeDash(type: string) {
   switch (type) {
     case "depends_on":
-      return "10 4";
-    case "branches_to":
-      return "3 6";
-    case "feeds_output":
-      return "14 5";
+      return "8 4";
     default:
       return undefined;
   }
@@ -295,14 +312,8 @@ function edgeDash(type: string) {
 
 function edgeWidth(type: string) {
   switch (type) {
-    case "unblocks":
-      return 2.4;
-    case "feeds_output":
-      return 2.2;
     case "depends_on":
       return 2;
-    case "branches_to":
-      return 1.9;
     default:
       return 1.7;
   }
@@ -332,38 +343,16 @@ function buildEdgeLegend(graphCopy: GraphCopyType): EdgeLegendItem[] {
       dash: edgeDash("depends_on"),
       width: edgeWidth("depends_on"),
     },
-    {
-      type: "branches_to",
-      label: graphCopy.edgeBranchesTo,
-      stroke: edgeStroke("branches_to"),
-      dash: edgeDash("branches_to"),
-      width: edgeWidth("branches_to"),
-    },
-    {
-      type: "unblocks",
-      label: graphCopy.edgeUnblocks,
-      stroke: edgeStroke("unblocks"),
-      dash: edgeDash("unblocks"),
-      width: edgeWidth("unblocks"),
-    },
-    {
-      type: "feeds_output",
-      label: graphCopy.edgeFeedsOutput,
-      stroke: edgeStroke("feeds_output"),
-      dash: edgeDash("feeds_output"),
-      width: edgeWidth("feeds_output"),
-    },
   ];
 }
 
 function nodeShapeForStep(step: PlanStep): NodeShape {
-  switch (step.type) {
-    case "decision":
+  const dt = step.displayType ?? step.type;
+  switch (dt) {
+    case "condition":
       return "diamond";
-    case "deliverable":
+    case "wait":
       return "pill";
-    case "tool_action":
-      return "hex";
     case "checkpoint":
       return "parallelogram";
     default:
@@ -371,36 +360,30 @@ function nodeShapeForStep(step: PlanStep): NodeShape {
   }
 }
 
-function nodeLegendLabel(type: string) {
+function nodeLegendLabel(type: string, graphCopy: GraphCopyType) {
   switch (type) {
-    case "decision":
-      return `${type} · 决策/审批`;
-    case "deliverable":
-      return `${type} · 交付结果`;
-    case "tool_action":
-      return `${type} · 自动执行`;
+    case "condition":
+      return graphCopy.nodeTypeCondition;
+    case "wait":
+      return graphCopy.nodeTypeWait;
     case "checkpoint":
-      return `${type} · 检查点`;
-    case "user_input":
-      return `${type} · 用户输入`;
+      return graphCopy.nodeTypeCheckpoint;
     default:
-      return `${type} · 普通步骤`;
+      return graphCopy.nodeTypeTask;
   }
 }
 
-function buildNodeLegend(): NodeLegendItem[] {
+function buildNodeLegend(graphCopy: GraphCopyType): NodeLegendItem[] {
   const steps: PlanStep[] = [
-    { id: "legend-step", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "step" },
-    { id: "legend-user", title: "", objective: "", phase: "", status: "waiting_for_user", requiresHumanInput: true, type: "user_input" },
-    { id: "legend-checkpoint", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "checkpoint" },
-    { id: "legend-decision", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "decision" },
-    { id: "legend-tool", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "tool_action", executionMode: "automatic" },
-    { id: "legend-deliverable", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, type: "deliverable" },
+    { id: "legend-task", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, displayType: "task" },
+    { id: "legend-checkpoint", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: true, displayType: "checkpoint" },
+    { id: "legend-condition", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, displayType: "condition" },
+    { id: "legend-wait", title: "", objective: "", phase: "", status: "pending", requiresHumanInput: false, displayType: "wait" },
   ];
 
   return steps.map((step) => ({
-    type: step.type ?? "step",
-    label: nodeLegendLabel(step.type ?? "step"),
+    type: step.displayType ?? "task",
+    label: nodeLegendLabel(step.displayType ?? "task", graphCopy),
     shape: nodeShapeForStep(step),
     tone: getNodeTone(step),
   }));
@@ -416,10 +399,6 @@ function ShapeChip({ shape, tone, className }: { shape: NodeShape; tone: NodeTon
 
   if (shape === "pill") {
     return <span aria-hidden="true" className={cn(base, "rounded-full")} />;
-  }
-
-  if (shape === "hex") {
-    return <span aria-hidden="true" className={cn(base, "rounded-[6px]")} style={{ clipPath: "polygon(18% 0%, 82% 0%, 100% 50%, 82% 100%, 18% 100%, 0% 50%)" }} />;
   }
 
   if (shape === "parallelogram") {
@@ -502,24 +481,52 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const { step, tone, isCurrent, isSelected, onToggle, graphCopy } = data;
   const s = TONE_STYLES[tone];
   const shape = nodeShapeForStep(step);
+  const dt = step.displayType ?? step.type ?? "task";
   const shapeClassName =
     shape === "pill"
       ? "rounded-[999px]"
       : shape === "diamond"
         ? "rounded-[10px]"
-        : shape === "hex"
+        : shape === "parallelogram"
           ? "rounded-[12px]"
-          : shape === "parallelogram"
-            ? "rounded-[10px]"
-            : "rounded-2xl";
+          : "rounded-2xl";
   const shapeStyle =
     shape === "diamond"
       ? { clipPath: "polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)" }
-      : shape === "hex"
-        ? { clipPath: "polygon(12% 0%, 88% 0%, 100% 28%, 100% 72%, 88% 100%, 12% 100%, 0% 72%, 0% 28%)" }
-        : shape === "parallelogram"
-          ? { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" }
-          : undefined;
+      : shape === "parallelogram"
+        ? { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" }
+        : undefined;
+
+  const meta = (
+    step.metadata && typeof step.metadata === "object" ? step.metadata : {}
+  ) as Record<string, unknown>;
+
+  const checkpointType = meta.checkpointType as string | undefined;
+  const checkpointOptions = meta.options as string[] | undefined;
+  const waitFor = meta.waitFor as string | undefined;
+  const waitTimeout = meta.timeout as { minutes?: number } | undefined;
+  const branches = meta.branches as Array<{ label?: string }> | undefined;
+  const conditionText = meta.condition as string | undefined;
+  const evaluationBy = meta.evaluationBy as string | undefined;
+  const executor = meta.executor as string | undefined;
+  const mode = meta.mode as string | undefined;
+  const isRequired = meta.required as boolean | undefined;
+
+  const Icon = dt === "checkpoint"
+    ? (checkpointType === "approve" ? ShieldCheck : checkpointType === "confirm" ? UserCheck : CircleHelp)
+    : dt === "condition"
+      ? GitBranch
+      : dt === "wait"
+        ? Clock
+        : ListTodo;
+
+  const typeLabel = dt === "condition"
+    ? graphCopy.nodeTypeCondition
+    : dt === "wait"
+      ? graphCopy.nodeTypeWait
+      : dt === "checkpoint"
+        ? graphCopy.nodeTypeCheckpoint
+        : graphCopy.nodeTypeTask;
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
@@ -534,6 +541,7 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         data-testid={`task-plan-node-${step.id}`}
         data-node-tone={tone}
         data-node-shape={shape}
+        data-node-display-type={dt}
         data-node-current={isCurrent ? "true" : "false"}
         data-node-selected={isSelected ? "true" : "false"}
         className={cn(
@@ -548,21 +556,19 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         )}
         style={shapeStyle}
       >
-        <div className="flex items-start gap-2.5">
-          <div className="mt-1 flex flex-col items-center gap-1">
+        <div className="flex items-start gap-2">
+          <div className="mt-0.5 flex flex-col items-center gap-1">
             <span className={cn("size-2 rounded-full shadow-sm", s.dot)} />
+            <Icon className="size-3.5 shrink-0 text-muted-foreground/60" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="min-w-0 text-[10px] leading-snug text-muted-foreground">
               <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
                 <span className="font-semibold uppercase tracking-[0.12em]">
-                  {step.phase}
+                  {typeLabel}
                 </span>
-                {step.type && step.type !== step.phase?.toLowerCase() ? (
-                  <span aria-hidden="true">·</span>
-                ) : null}
-                {step.type && step.type !== step.phase?.toLowerCase() ? (
-                  <span className="truncate">{step.type}</span>
+                {checkpointType ? (
+                  <span className="rounded-full bg-foreground/8 px-1.5 py-0.5 text-[9px]">{checkpointType}</span>
                 ) : null}
                 {!isSelected ? <span aria-hidden="true">·</span> : null}
                 {!isSelected ? (
@@ -579,23 +585,97 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
             <p className="mt-1 text-sm font-medium leading-snug text-foreground line-clamp-2">
               {step.title}
             </p>
+
+            {checkpointType && meta.prompt ? (
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-1">
+                {String(meta.prompt)}
+              </p>
+            ) : conditionText ? (
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-1">
+                {conditionText}
+              </p>
+            ) : waitFor ? (
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-1">
+                {waitFor}
+              </p>
+            ) : null}
+
             {isSelected ? (
               <div className="mt-1.5 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-1 text-[10px] leading-none text-muted-foreground">
                   <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">
                     {getStatusLabel(step.status, graphCopy)}
                   </span>
+                  {executor ? (
+                    <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{executor}</span>
+                  ) : null}
+                  {mode ? (
+                    <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{mode}</span>
+                  ) : null}
+                  {isRequired !== undefined ? (
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5",
+                      isRequired ? "bg-amber-100 text-amber-800" : "bg-foreground/5",
+                    )}>
+                      {isRequired ? graphCopy.badgeRequired : graphCopy.badgeOptional}
+                    </span>
+                  ) : null}
                   {typeof step.estimatedMinutes === "number" ? (
                     <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">
                       {step.estimatedMinutes}m
                     </span>
                   ) : null}
+                  {evaluationBy ? (
+                    <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{evaluationBy}</span>
+                  ) : null}
+                  {branches ? (
+                    <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">
+                      {branches.length} 分支
+                    </span>
+                  ) : null}
                 </div>
+
+                {dt === "condition" && branches && branches.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {branches.map((b, i) => (
+                      <span key={i} className="rounded-full border border-yellow-300 bg-yellow-100 px-1.5 py-0.5 text-[10px] text-yellow-800">
+                        {b.label ?? `分支 ${i + 1}`}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {dt === "checkpoint" && checkpointOptions && checkpointOptions.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {checkpointOptions.slice(0, 3).map((opt, i) => (
+                      <span key={i} className="rounded-full border border-violet-300 bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-800">
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {dt === "wait" && waitTimeout?.minutes ? (
+                  <p className="text-[10px] text-muted-foreground">
+                    超时: {waitTimeout.minutes} 分钟
+                  </p>
+                ) : null}
+
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {step.objective}
                 </p>
               </div>
-            ) : null}
+            ) : (
+              (checkpointOptions && checkpointOptions.length > 0) ? (
+                <div className="mt-1 flex flex-wrap gap-0.5">
+                  {checkpointOptions.slice(0, 2).map((opt, i) => (
+                    <span key={i} className="rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0 text-[9px] text-violet-700">
+                      {opt}
+                    </span>
+                  ))}
+                </div>
+              ) : null
+            )}
           </div>
         </div>
 
@@ -608,11 +688,11 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
             <div className="grid gap-1.5 sm:grid-cols-2">
               <DetailItem
                 label={graphCopy.detailType}
-                value={step.type ?? "step"}
+                value={typeLabel}
               />
               <DetailItem
                 label={graphCopy.detailExecutionMode}
-                value={step.executionMode ?? "none"}
+                value={mode ?? step.executionMode ?? "none"}
               />
               <DetailItem
                 label={graphCopy.detailPriority}
@@ -794,6 +874,7 @@ function buildFlowLayout(input: {
       color: edgeStroke(edge.type),
     },
     style: buildEdgeStyle(edge.type),
+    label: edge.label ?? undefined,
   }));
 
   return { nodes, edges, contentWidth, contentHeight, viewportHeight };
@@ -1091,7 +1172,7 @@ export function TaskPlanGraph({
   const [nodes, setNodes] = useNodesState<FlowGraphNode>(layout.nodes);
   const [edges, setEdges] = useEdgesState(layout.edges);
   const edgeLegend = useMemo(() => buildEdgeLegend(graphCopy), [graphCopy]);
-  const nodeLegend = useMemo(() => buildNodeLegend(), []);
+  const nodeLegend = useMemo(() => buildNodeLegend(graphCopy), [graphCopy]);
   const compactSections = useMemo(() => buildCompactSections(plan), [plan]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(

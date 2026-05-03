@@ -21,13 +21,9 @@ import {
 import type {
   BridgeFeature,
   BridgeFeatureRequest,
+  BridgeResponse,
+  NDJSONEvent,
 } from "@chrona/openclaw-integration/bridge/contracts";
-import {
-  checkGatewayAvailable,
-  DEFAULT_OPENCLAW_ENVIRONMENT,
-  executeGatewayRequest,
-  type RouteKind,
-} from "@chrona/openclaw-integration";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
@@ -89,6 +85,152 @@ export function buildFeatureInput(
   return input as unknown as Record<string, unknown>;
 }
 
+function getBridgePath(feature: BridgeFeature, stream: boolean): string {
+  switch (feature) {
+    case "suggest":
+      return stream ? "/v1/features/suggest/stream" : "/v1/features/suggest";
+    case "generate_plan":
+      return stream
+        ? "/v1/features/generate-plan/stream"
+        : "/v1/features/generate-plan";
+    case "conflicts":
+      return "/v1/features/analyze-conflicts";
+    case "timeslots":
+      return "/v1/features/suggest-timeslot";
+    case "chat":
+      return "/v1/features/chat";
+    case "dispatch_task":
+      return "/v1/features/dispatch-task";
+  }
+}
+
+function getBridgeHeaders(config: OpenClawClientConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config.bridgeToken.trim()) {
+    headers.Authorization = `Bearer ${config.bridgeToken}`;
+  }
+
+  return headers;
+}
+
+function getBridgeBaseUrl(config: OpenClawClientConfig): string {
+  return config.bridgeUrl.replace(/\/+$/, "");
+}
+
+async function postBridgeFeature(
+  config: OpenClawClientConfig,
+  feature: BridgeFeature,
+  body: BridgeFeatureRequest<Record<string, unknown>>,
+): Promise<BridgeResponse> {
+  const res = await fetch(`${getBridgeBaseUrl(config)}${getBridgePath(feature, false)}`, {
+    method: "POST",
+    headers: getBridgeHeaders(config),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(((body.timeout ?? 120) + 15) * 1000),
+  });
+
+  const text = await res.text().catch(() => "");
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    throw new AiClientError(
+      `Bridge call failed (${res.status}): ${text.slice(0, 200)}`,
+      "openclaw",
+      "internal",
+    );
+  }
+
+  if (!res.ok) {
+    const message =
+      parsed && typeof parsed === "object" && "error" in parsed
+        ? String((parsed as { error?: unknown }).error ?? text)
+        : text;
+    throw new AiClientError(
+      `Bridge call failed (${res.status}): ${message}`,
+      "openclaw",
+      "internal",
+    );
+  }
+
+  return parsed as BridgeResponse;
+}
+
+export async function postBridgeFeatureStream(
+  config: OpenClawClientConfig,
+  feature: BridgeFeature,
+  body: BridgeFeatureRequest<Record<string, unknown>>,
+): Promise<{ response: BridgeResponse; events: NDJSONEvent[] }> {
+  const res = await fetch(`${getBridgeBaseUrl(config)}${getBridgePath(feature, true)}`, {
+    method: "POST",
+    headers: getBridgeHeaders(config),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(((body.timeout ?? 120) + 15) * 1000),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new AiClientError(
+      `Bridge stream call failed (${res.status}): ${errBody.slice(0, 400)}`,
+      "openclaw",
+      "internal",
+    );
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new AiClientError("No response body for streaming", "openclaw", "internal");
+  }
+
+  const decoder = new TextDecoder();
+  const events: NDJSONEvent[] = [];
+  let buffer = "";
+  let finalResponse: BridgeResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    let eventType = "";
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        eventType = line.slice(7).trim();
+        continue;
+      }
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      try {
+        const data = JSON.parse(raw) as NDJSONEvent | BridgeResponse;
+        if (eventType === "done") {
+          finalResponse = data as BridgeResponse;
+        } else if (eventType === "event") {
+          events.push(data as NDJSONEvent);
+        }
+      } catch {
+        // ignore malformed SSE lines
+      }
+      eventType = "";
+    }
+  }
+
+  if (!finalResponse) {
+    throw new AiClientError(
+      "Stream ended without a final response",
+      "openclaw",
+      "internal",
+    );
+  }
+
+  return { response: finalResponse, events };
+}
+
 async function fetchOpenClawBridge(
   config: OpenClawClientConfig,
   feature: AiFeature,
@@ -113,21 +255,10 @@ async function fetchOpenClawBridge(
     timeout,
   };
 
-  const route: RouteKind = {
-    kind: "feature",
-    feature: toBridgeFeature(feature),
-    stream: false,
-  };
-
-  const { response: bridge } = await executeGatewayRequest(
-    route,
+  const bridge = await postBridgeFeature(
+    config,
+    toBridgeFeature(feature),
     requestBody,
-    logger,
-    {
-      ...DEFAULT_OPENCLAW_ENVIRONMENT,
-      gatewayHttpUrl: config.gatewayUrl,
-      gatewayToken: config.gatewayToken,
-    },
   );
 
   if (bridge.error) {
@@ -189,14 +320,20 @@ async function openclawHealthCheck(
   config: OpenClawClientConfig,
 ): Promise<boolean> {
   try {
-    if (!config.gatewayUrl.trim() || !config.gatewayToken.trim()) {
+    if (!config.bridgeUrl.trim()) {
       return false;
     }
-    return await checkGatewayAvailable({
-      ...DEFAULT_OPENCLAW_ENVIRONMENT,
-      gatewayHttpUrl: config.gatewayUrl,
-      gatewayToken: config.gatewayToken,
+    const res = await fetch(`${getBridgeBaseUrl(config)}/v1/health`, {
+      headers: getBridgeHeaders(config),
+      signal: AbortSignal.timeout(3000),
     });
+
+    if (!res.ok) {
+      return false;
+    }
+
+    const body = (await res.json().catch(() => null)) as { status?: string } | null;
+    return body?.status === "ok";
   } catch {
     return false;
   }
@@ -376,6 +513,4 @@ export async function checkClientHealth(
   }
   return llmHealthCheck(client.config as LLMClientConfig);
 }
-
-
 

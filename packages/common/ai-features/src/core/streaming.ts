@@ -19,19 +19,19 @@ import type {
 import { createLogger } from "@chrona/db/logger";
 import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type {
+  BridgeFeature,
   BridgeFeatureRequest,
   NDJSONEvent,
 } from "@chrona/openclaw-integration/bridge/contracts";
 import {
-  DEFAULT_OPENCLAW_ENVIRONMENT,
-  executeGatewayRequest,
-  type RouteKind,
-} from "@chrona/openclaw-integration";
-import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
 } from "../features";
-import { buildFeatureInput, openclawCall } from "./providers";
+import {
+  buildFeatureInput,
+  openclawCall,
+  postBridgeFeatureStream,
+} from "./providers";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
@@ -42,7 +42,7 @@ function summarizeText(value: string, maxLength: number) {
 
 const logger = createLogger("ai-features.openclaw.streaming");
 
-function getStreamPath(feature: AiFeature): string | null {
+function getStreamPath(feature: AiFeature): BridgeFeature | null {
   switch (feature) {
     case "suggest":
       return "suggest";
@@ -135,21 +135,11 @@ async function* openclawStream(
         instructions: SYSTEM_PROMPTS[feature],
         timeout,
       };
-      const route: RouteKind = {
-        kind: "feature",
-        feature: streamPath as RouteKind extends { kind: "feature"; feature: infer F } ? F : never,
-        stream: true,
-      };
 
-      const { response, events } = await executeGatewayRequest(
-        route,
+      const { response, events } = await postBridgeFeatureStream(
+        config,
+        streamPath,
         requestBody,
-        logger,
-        {
-          ...DEFAULT_OPENCLAW_ENVIRONMENT,
-          gatewayHttpUrl: config.gatewayUrl,
-          gatewayToken: config.gatewayToken,
-        },
       );
 
       logger.info("openclaw.stream.response", {
@@ -664,4 +654,3 @@ export async function* generatePlanStream(
     yield event;
   }
 }
-

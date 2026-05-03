@@ -50,8 +50,8 @@ const samplePlanGraphResponse: TaskPlanGraphResponse = {
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     nodes: [
-      { id: "node-1", type: "step", title: "Research", objective: "Research the topic", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 30, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
-      { id: "node-2", type: "step", title: "Implementation", objective: "Implement the solution", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 120, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
+      { id: "node-1", type: "task", title: "Research", objective: "Research the topic", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 30, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
+      { id: "node-2", type: "task", title: "Implementation", objective: "Implement the solution", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 120, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
     ],
     edges: [{ id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "sequential", metadata: null }],
   },

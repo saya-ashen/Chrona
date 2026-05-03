@@ -2,7 +2,7 @@
  * Integration tests for executePlanNode: verifies that the runtime output is
  * persisted as conversationEntry records after createRun() succeeds.
  *
- * This test reproduces the root cause: the OpenClawEmbeddedClient stores
+ * This test reproduces the root cause: the OpenClaw runtime client stores
  * output in an in-memory sessions Map, and if those conversation entries
  * are not persisted before the adapter instance is garbage-collected, the
  * output is lost.  We simulate a real adapter by storing messages in a
@@ -18,7 +18,7 @@ import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 // ---------------------------------------------------------------------------
 // Smart mock adapter: stores messages in an in-memory Map and returns them
-// via readHistory, exactly like OpenClawEmbeddedClient does.
+// via readHistory, exactly like the real OpenClaw bridge client does.
 // ---------------------------------------------------------------------------
 function createMockAdapter(outputContent: string) {
   const messages: Array<{ role: string; content: string }> = [];

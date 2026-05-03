@@ -67,7 +67,7 @@ describe("update-task-plan-node-summary", () => {
         nodes: [
           {
             id: "node-1",
-            type: "step",
+            type: "task",
             title: "Step 1",
             objective: "Do step 1",
             description: null,
