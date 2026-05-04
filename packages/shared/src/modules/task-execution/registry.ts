@@ -78,6 +78,6 @@ export function validateRuntimeTaskConfig(key: string, input: unknown): RuntimeI
   return getRuntimeAdapterDefinition(key).validateTaskConfig(input);
 }
 
-export function listRuntimeAdapterKeys() {
+function listRuntimeAdapterKeys() {
   return [...runtimeRegistry.keys()];
 }

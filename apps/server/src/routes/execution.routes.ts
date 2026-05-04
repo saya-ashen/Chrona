@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 
-import { db } from "@chrona/db";
 import {
   acceptTaskResult,
+  applyAssistantMessage,
   applySchedule,
   clearSchedule,
   continuePlanExecution,
   createFollowUpTask,
   decideScheduleProposal,
+  ensureProposalInWorkspace,
+  ensureTaskInWorkspace,
   getAcceptedTaskPlanGraph,
+  getActiveMessageableRun,
+  getAssistantMessages,
+  getTaskOrThrow,
+  getWaitingInputRun,
   invalidateMemory,
   markTaskDone,
   proposeSchedule,
@@ -16,14 +22,12 @@ import {
   reopenTask,
   resolveApproval,
   retryRun,
+  saveAssistantMessage,
   sendOperatorMessage,
   startPlanExecution,
 } from "@chrona/engine";
 
 import {
-  getOpenClawAdapter,
-  ensureTaskInWorkspace,
-  ensureProposalInWorkspace,
   toDateOrNull,
   ensureValidDateFields,
 } from "./helpers";
@@ -41,11 +45,7 @@ export function createExecutionRoutes() {
       const taskId = c.req.param("taskId");
       const body = await c.req.json().catch(() => ({}));
 
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, title: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
       if (!acceptedPlan) {
@@ -77,11 +77,7 @@ export function createExecutionRoutes() {
       const taskId = c.req.param("taskId");
       const body = await c.req.json().catch(() => ({}));
 
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, title: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
       if (acceptedPlan) {
@@ -93,8 +89,7 @@ export function createExecutionRoutes() {
         return json(c, { workspaceId: task.workspaceId, ...result });
       }
 
-      const adapter = await getOpenClawAdapter();
-      return json(c, await retryRun({ taskId, prompt: body.prompt, adapter }));
+      return json(c, await retryRun({ taskId, prompt: body.prompt }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to retry run";
       return error(c, message, message.includes("not found") ? 404 : 500);
@@ -109,11 +104,7 @@ export function createExecutionRoutes() {
         return error(c, "inputText is required", 400);
       }
 
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, status: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
       if (acceptedPlan && task.status === "WaitingForInput") {
@@ -127,18 +118,13 @@ export function createExecutionRoutes() {
 
       let runId = body.runId as string | undefined;
       if (!runId) {
-        const latestRun = await db.run.findFirst({
-          where: { taskId, status: "WaitingForInput" },
-          orderBy: { startedAt: "desc" },
-          select: { id: true },
-        });
+        const latestRun = await getWaitingInputRun(taskId);
         if (!latestRun) {
           return error(c, "No run waiting for input found for this task.", 400);
         }
         runId = latestRun.id;
       }
-      const adapter = await getOpenClawAdapter();
-      return json(c, await provideInput({ runId, inputText: body.inputText, adapter }));
+      return json(c, await provideInput({ runId, inputText: body.inputText }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to provide input";
       return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);
@@ -153,11 +139,7 @@ export function createExecutionRoutes() {
         return error(c, "message is required", 400);
       }
 
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, status: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
       if (acceptedPlan) {
@@ -172,18 +154,13 @@ export function createExecutionRoutes() {
 
       let runId = body.runId as string | undefined;
       if (!runId) {
-        const latestRun = await db.run.findFirst({
-          where: { taskId, status: { in: ["Running", "WaitingForApproval"] } },
-          orderBy: { startedAt: "desc" },
-          select: { id: true },
-        });
+        const latestRun = await getActiveMessageableRun(taskId);
         if (!latestRun) {
           return error(c, "No active run found for this task. The agent must be running to receive messages.", 400);
         }
         runId = latestRun.id;
       }
-      const adapter = await getOpenClawAdapter();
-      return json(c, await sendOperatorMessage({ runId, message: body.message, adapter }));
+      return json(c, await sendOperatorMessage({ runId, message: body.message }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to send message";
       return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);
@@ -404,25 +381,11 @@ export function createExecutionRoutes() {
         return error(c, "role must be 'user' or 'assistant'", 400);
       }
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const lastMsg = await db.taskAssistantMessage.findFirst({
-        where: { taskId },
-        orderBy: { sequence: "desc" },
-        select: { sequence: true },
-      });
-      const sequence = (lastMsg?.sequence ?? -1) + 1;
-
-      const message = await db.taskAssistantMessage.create({
-        data: {
-          taskId,
-          role,
-          content,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          proposal: (proposal ?? null) as any,
-          sequence,
-        },
+      const message = await saveAssistantMessage({
+        taskId,
+        role,
+        content,
+        proposal,
       });
 
       return json(c, {
@@ -437,6 +400,10 @@ export function createExecutionRoutes() {
         createdAt: message.createdAt,
       }, 201);
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to save message";
+      if (message.includes("Task not found")) {
+        return error(c, "Task not found", 404);
+      }
       return internalServerError(c, "POST /api/tasks/:taskId/assistant/messages", cause, "Failed to save message");
     }
   });
@@ -445,13 +412,7 @@ export function createExecutionRoutes() {
     try {
       const taskId = c.req.param("taskId");
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const messages = await db.taskAssistantMessage.findMany({
-        where: { taskId },
-        orderBy: { sequence: "asc" },
-      });
+      const messages = await getAssistantMessages(taskId);
 
       return json(c, {
         messages: messages.map((m) => ({
@@ -467,6 +428,10 @@ export function createExecutionRoutes() {
         })),
       });
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to fetch messages";
+      if (message.includes("Task not found")) {
+        return error(c, "Task not found", 404);
+      }
       return internalServerError(c, "GET /api/tasks/:taskId/assistant/messages", cause, "Failed to fetch messages");
     }
   });
@@ -476,18 +441,7 @@ export function createExecutionRoutes() {
       const taskId = c.req.param("taskId");
       const messageId = c.req.param("messageId");
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const existing = await db.taskAssistantMessage.findFirst({
-        where: { id: messageId, taskId },
-      });
-      if (!existing) return error(c, "Message not found", 404);
-
-      const message = await db.taskAssistantMessage.update({
-        where: { id: messageId },
-        data: { applied: true, appliedAt: new Date() },
-      });
+      const message = await applyAssistantMessage(messageId, taskId);
 
       return json(c, {
         id: message.id,
@@ -501,6 +455,13 @@ export function createExecutionRoutes() {
         createdAt: message.createdAt,
       });
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to mark applied";
+      if (message.includes("Task not found")) {
+        return error(c, "Task not found", 404);
+      }
+      if (message.includes("Message not found")) {
+        return error(c, "Message not found", 404);
+      }
       return internalServerError(c, "PATCH /api/tasks/:taskId/assistant/messages/:messageId/apply", cause, "Failed to mark applied");
     }
   });

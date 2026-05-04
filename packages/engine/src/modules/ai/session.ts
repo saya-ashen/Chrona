@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { AiFeature } from "./types";
+import type { AiFeature } from "@chrona/contracts";
 
 function sanitizeSessionPart(value: string, maxLength: number): string {
   const normalized = value

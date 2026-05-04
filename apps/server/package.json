@@ -10,7 +10,6 @@
     "@chrona/i18n": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
-    "@chrona/engine": "workspace:*",
-    "@chrona/openclaw": "workspace:*"
+    "@chrona/engine": "workspace:*"
   }
 }

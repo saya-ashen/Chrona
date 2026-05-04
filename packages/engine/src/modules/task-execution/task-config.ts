@@ -7,7 +7,7 @@ import {
 } from "./registry";
 import type { RuntimeInput } from "@chrona/runtime-core";
 
-export function isRuntimeInput(value: unknown): value is RuntimeInput {
+function isRuntimeInput(value: unknown): value is RuntimeInput {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -23,7 +23,7 @@ function readRuntimeText(input: RuntimeInput, key: string) {
     : null;
 }
 
-export function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
+function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
   // Backward-compat mapping for legacy task columns (`runtimeModel`/`prompt`/`runtimeConfig`).
   // TODO(chrona-runtime): remove once all reads/writes use `runtimeInput` only.
   const runtimeModel = readRuntimeText(runtimeInput, "model");
@@ -40,7 +40,7 @@ export function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
   };
 }
 
-export function buildCompatRuntimeInput(input: {
+function buildCompatRuntimeInput(input: {
   runtimeModel?: string | null;
   prompt?: string | null;
   runtimeConfig?: unknown;

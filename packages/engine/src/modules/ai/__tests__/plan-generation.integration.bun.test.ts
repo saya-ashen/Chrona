@@ -12,7 +12,8 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { extractJSON, llmCall, SYSTEM_PROMPTS } from "@chrona/ai-features";
+import { extractJSON, llmCall } from "@/modules/ai/providers";
+import { SYSTEM_PROMPTS } from "@/modules/ai/prompts";
 import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
 import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 
@@ -71,14 +72,14 @@ function parseGraphResponse(raw: string) {
     /```(?:json|tool)?\s*\n?(?:generate_task_plan_graph\s*\n)?([\s\S]*?)```/,
   );
   const candidate = toolJsonMatch?.[1]?.trim() || raw;
-  const parsed = extractJSON<{
+  const parsed = extractJSON(candidate) as {
     summary?: string;
     reasoning?: string;
     nodes?: Array<Record<string, unknown>>;
     edges?: Array<Record<string, unknown>>;
-  }>(candidate, "llm");
+  } | null;
 
-  const nodes: TaskPlanNode[] = (parsed.nodes ?? []).map((n, i) => {
+  const nodes: TaskPlanNode[] = (parsed?.nodes ?? []).map((n: Record<string, unknown>, i: number) => {
     const execMode =
       n.executionMode === "manual" || n.executionMode === "hybrid"
         ? (n.executionMode as "manual" | "hybrid")
@@ -112,7 +113,7 @@ function parseGraphResponse(raw: string) {
     };
   });
 
-  const edges: TaskPlanEdge[] = (parsed.edges ?? []).map((e, i) => ({
+  const edges: TaskPlanEdge[] = (parsed?.edges ?? []).map((e: Record<string, unknown>, i: number) => ({
     id: (e.id as string) ?? `edge-${i + 1}`,
     fromNodeId: ((e.fromNodeId ?? e.from ?? "") as string),
     toNodeId: ((e.toNodeId ?? e.to ?? "") as string),
@@ -121,8 +122,8 @@ function parseGraphResponse(raw: string) {
   }));
 
   return {
-    summary: (parsed.summary as string) ?? "",
-    reasoning: parsed.reasoning as string | undefined,
+    summary: (parsed?.summary as string) ?? "",
+    reasoning: parsed?.reasoning as string | undefined,
     nodes,
     edges,
   };

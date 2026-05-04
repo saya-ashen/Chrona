@@ -36,7 +36,7 @@ export {
   type OpenClawAdapterConfig,
 } from "./runtime/adapter";
 
-export { createMockOpenClawAdapter } from "./runtime/mock-adapter";
+
 
 export type {
   OpenClawApprovalDecision,

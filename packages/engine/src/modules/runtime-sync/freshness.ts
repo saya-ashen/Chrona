@@ -42,7 +42,7 @@ async function markSyncDegraded(run: { id: string; runtimeName: string | null },
   });
 }
 
-export async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
+async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
   const run = await db.run.findUniqueOrThrow({
     where: { id: runId },
     select: { id: true, runtimeName: true },

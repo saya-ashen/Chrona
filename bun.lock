@@ -55,9 +55,8 @@
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
+        "@chrona/engine": "workspace:*",
         "@chrona/i18n": "workspace:*",
-        "@chrona/openclaw": "workspace:*",
-        "@chrona/runtime": "workspace:*",
       },
     },
     "apps/web": {
@@ -66,8 +65,8 @@
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
         "@chrona/i18n": "workspace:*",
-        "@chrona/runtime": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
+        "@chrona/shared": "workspace:*",
       },
     },
     "packages/ai-features": {
@@ -107,6 +106,18 @@
       "name": "@chrona/domain",
       "version": "0.1.0",
     },
+    "packages/engine": {
+      "name": "@chrona/engine",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/ai-features": "workspace:*",
+        "@chrona/contracts": "workspace:*",
+        "@chrona/domain": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
+        "@chrona/runtime-core": "workspace:*",
+        "@chrona/shared": "workspace:*",
+      },
+    },
     "packages/i18n": {
       "name": "@chrona/i18n",
       "version": "0.1.0",
@@ -127,20 +138,18 @@
         "@chrona/runtime-core": "workspace:*",
       },
     },
-    "packages/runtime": {
-      "name": "@chrona/runtime",
-      "version": "0.1.0",
-      "dependencies": {
-        "@chrona/ai-features": "workspace:*",
-        "@chrona/contracts": "workspace:*",
-        "@chrona/domain": "workspace:*",
-        "@chrona/openclaw": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
-      },
-    },
     "packages/runtime-core": {
       "name": "@chrona/runtime-core",
       "version": "0.1.0",
+    },
+    "packages/shared": {
+      "name": "@chrona/shared",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/contracts": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
+        "@chrona/runtime-core": "workspace:*",
+      },
     },
   },
   "trustedDependencies": [
@@ -237,17 +246,19 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
+    "@chrona/engine": ["@chrona/engine@workspace:packages/engine"],
+
     "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
 
     "@chrona/openclaw": ["@chrona/openclaw@workspace:packages/providers/openclaw"],
 
     "@chrona/providers-core": ["@chrona/providers-core@workspace:packages/providers/core"],
 
-    "@chrona/runtime": ["@chrona/runtime@workspace:packages/runtime"],
-
     "@chrona/runtime-core": ["@chrona/runtime-core@workspace:packages/runtime-core"],
 
     "@chrona/server": ["@chrona/server@workspace:apps/server"],
+
+    "@chrona/shared": ["@chrona/shared@workspace:packages/shared"],
 
     "@chrona/web": ["@chrona/web@workspace:apps/web"],
 

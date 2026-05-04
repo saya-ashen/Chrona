@@ -20,7 +20,7 @@ async function parseResponse(response: Response) {
   return text ? { message: text } : null;
 }
 
-export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
     headers: {

@@ -1,6 +1,5 @@
 import type { OpenClawRuntimeClient } from "./runtime-client";
 import { OpenClawBridgeClient } from "../transport/bridge-client";
-import { createMockOpenClawAdapter } from "./mock-adapter";
 import {
   getOpenClawTaskConfigSpec,
   OPENCLAW_RUNTIME_ADAPTER_KEY,
@@ -80,6 +79,7 @@ export type OpenClawAdapterConfig = {
 
 export async function createRuntimeAdapter(config?: OpenClawAdapterConfig): Promise<OpenClawAdapter> {
   if (config?.mode === "mock") {
+    const { createMockOpenClawAdapter } = await import("./mock-adapter");
     return createMockOpenClawAdapter();
   }
   if (!config?.bridgeUrl?.trim()) {

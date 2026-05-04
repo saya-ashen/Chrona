@@ -1,4 +1,4 @@
-import { AiClientError } from "./types";
+import { AiClientError } from "@chrona/contracts";
 
 export function parseTextJsonWithFallback<T>(
   raw: string,

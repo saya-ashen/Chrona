@@ -24,11 +24,11 @@ import type {
   StructuredDebugInfo,
   DispatchTaskInput,
   DispatchTaskOutput,
-} from "../core/types";
-import { parseTaskDispatchDecision } from "../core/dispatch-types";
-import { AiClientError } from "../core/types";
-import { dispatch, dispatchFeaturePayload, extractJSON } from "../core/providers";
-import { buildGeneratePlanScope } from "../core/streaming";
+} from "@chrona/contracts";
+import { parseTaskDispatchDecision } from "@chrona/contracts";
+import { AiClientError } from "@chrona/contracts";
+import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
+import { buildGeneratePlanScope } from "./streaming";
 import type { AIPlanOutput } from "@chrona/contracts/ai";
 import {
   validateAIPlanOutput,
@@ -206,7 +206,7 @@ export async function chat(
       const content = await dispatch(client, "chat", request, "chat");
       return {
         content,
-        parsed: extractJSON<unknown>(content, client.type),
+        parsed: extractJSON(content) as unknown,
         source: client.type,
       };
     }
@@ -285,7 +285,7 @@ export async function chat(
 
   const content = contentChunks.join("");
   if (request.jsonMode) {
-    const parsed = extractJSON<unknown>(content, client.type);
+    const parsed = extractJSON(content) as unknown;
     return { content, parsed, source: client.type };
   }
   return { content, source: client.type };

@@ -54,7 +54,7 @@ export async function ensurePlanMainSession(input: {
   };
 }
 
-export async function findPlanMainSession(input: {
+async function findPlanMainSession(input: {
   taskId: string;
   planId: string;
 }) {

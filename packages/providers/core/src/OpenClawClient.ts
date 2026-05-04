@@ -205,6 +205,82 @@ async function parseStreamingGatewayResponse(
   return { output, toolCalls, events };
 }
 
+async function* parseStreamingGatewayGenerator(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): AsyncGenerator<StreamEvent> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEventType = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith("event:")) {
+        currentEventType = trimmed.slice(6).trim();
+        continue;
+      }
+      if (!trimmed.startsWith("data:")) continue;
+
+      const rawData = trimmed.slice(5).trim();
+      if (!rawData || rawData === "[DONE]") continue;
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(rawData) as Record<string, unknown>;
+      } catch {
+        currentEventType = "";
+        continue;
+      }
+
+      if (currentEventType === "response.output_text.delta") {
+        const delta =
+          typeof parsed.delta === "string"
+            ? parsed.delta
+            : typeof parsed.text === "string"
+              ? parsed.text
+              : "";
+        if (delta) {
+          yield { type: "text", data: delta };
+        }
+        currentEventType = "";
+        continue;
+      }
+
+      if (
+        currentEventType === "response.output_item.added" ||
+        currentEventType === "response.output_item.done"
+      ) {
+        const item = parsed.item;
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          const toolCall = item as Record<string, unknown>;
+          if (toolCall.type === "function_call") {
+            yield {
+              type: "tool_call",
+              data: JSON.stringify(toolCall),
+              toolCall: {
+                tool: (toolCall.name as string) ?? "unknown",
+                callId: (toolCall.call_id as string) ?? `${Date.now()}`,
+                input: parseToolArguments(toolCall.arguments),
+                status: "completed" as const,
+              },
+            };
+          }
+        }
+      }
+
+      currentEventType = "";
+    }
+  }
+}
+
 async function parseJsonGatewayResponse(
   res: Response,
 ): Promise<ParsedGatewayResponse> {
@@ -276,13 +352,41 @@ export class OpenClawClient extends ProviderClient {
       [key: string]: unknown;
     },
   ): AsyncGenerator<StreamEvent> {
-    const { events } = await this.executeGatewayRaw(
-      "feature",
-      feature,
-      true,
-      input,
+    const route = buildRoute("feature", feature, true);
+    const request = normalizeGatewayRequestInput(input);
+    const sessionId = `${request.sessionKey}-${Date.now()}`;
+    const body = buildGatewayBody(
+      route,
+      request as unknown as Parameters<typeof buildGatewayBody>[1],
+      sessionId,
+      this.env,
     );
-    yield* this.yieldEvents(events);
+    const headers = gatewayHeaders(
+      this.env,
+      request as unknown as Parameters<typeof gatewayHeaders>[1],
+    );
+    const timeoutMs = (request.timeout + 15) * 1000;
+
+    const res = await fetch(`${this.env.gatewayHttpUrl}/v1/responses`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(
+        `[openclaw] Gateway call failed (${res.status}): ${errText.slice(0, 500)}`,
+      );
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      throw new Error("[openclaw] Stream response missing body");
+    }
+
+    yield* parseStreamingGatewayGenerator(reader);
   }
 
   async executeTask(input: {
@@ -366,33 +470,5 @@ export class OpenClawClient extends ProviderClient {
       }),
       events: parsed.events,
     };
-  }
-
-  private async *yieldEvents(
-    events: Array<Record<string, unknown>>,
-  ): AsyncGenerator<StreamEvent> {
-    for (const event of events) {
-      const delta = (event as Record<string, unknown>).delta as
-        | string
-        | undefined;
-      if (delta) {
-        yield { type: "text", data: delta };
-      }
-      const toolCall = (event as Record<string, unknown>).function_call as
-        | Record<string, unknown>
-        | undefined;
-      if (toolCall) {
-        yield {
-          type: "tool_call",
-          data: JSON.stringify(toolCall),
-          toolCall: {
-            tool: (toolCall.name as string) ?? "unknown",
-            callId: (toolCall.call_id as string) ?? `${Date.now()}`,
-            input: parseToolArguments(toolCall.arguments),
-            status: "completed" as const,
-          },
-        };
-      }
-    }
   }
 }

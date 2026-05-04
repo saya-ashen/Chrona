@@ -86,7 +86,7 @@ type GlobalWithScheduler = typeof globalThis & {
   [globalKey]?: AutoStartScheduler;
 };
 
-export function getAutoStartScheduler() {
+function getAutoStartScheduler() {
   const scopedGlobal = globalThis as GlobalWithScheduler;
   if (!scopedGlobal[globalKey]) {
     scopedGlobal[globalKey] = createAutoStartScheduler();

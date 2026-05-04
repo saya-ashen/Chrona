@@ -93,7 +93,6 @@ export type {
 
 // AI feature request/response contracts
 export type {
-  GenerateTaskPlanRequest,
   TaskWorkspaceChatRequest,
   TaskWorkspaceChatResponse,
   TaskWorkspaceUpdateProposal,
@@ -137,3 +136,55 @@ export {
   validateAIPlanOutput,
   validatePreparedFeaturePayload,
 } from "./ai";
+
+export type {
+  AiClientRecord,
+  AiClientType,
+  AiFeature,
+  LLMClientConfig,
+  OpenClawClientConfig,
+  SmartSuggestRequest,
+  SmartSuggestion,
+  SmartSuggestResponse,
+  ScheduleHealthSnapshot,
+  TaskSnapshot,
+  GenerateTaskPlanRequest,
+  GenerateTaskPlanResponse,
+  AnalyzeConflictsRequest,
+  AnalyzeConflictsResponse,
+  ConflictInfo,
+  ResolutionSuggestion,
+  SuggestTimeslotRequest,
+  SuggestTimeslotResponse,
+  TimeslotOption,
+  ChatRequest,
+  ChatResponse,
+  ChatMessage,
+  DispatchTaskInput,
+  DispatchTaskOutput,
+  ExecutionContextStats,
+  LinkedPlanTaskSummary,
+  RuntimeRunSummary,
+  TaskEventSummary,
+  ApprovalSummary,
+  BlockerSummary,
+  StreamEvent,
+  StructuredDebugInfo,
+  StructuredResponseMeta,
+} from "./ai-feature-types";
+
+export { AiClientError } from "./ai-feature-types";
+
+export type {
+  TaskDispatchAction,
+  TaskDispatchDecision,
+  DispatchDecisionParseIssue,
+  ParseResult,
+  TaskDispatchPolicy,
+  TaskPlanPatch,
+} from "./ai-dispatch-types";
+
+export {
+  isAutoExecutableDispatchDecision,
+  parseTaskDispatchDecision,
+} from "./ai-dispatch-types";

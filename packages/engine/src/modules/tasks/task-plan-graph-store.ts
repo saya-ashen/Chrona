@@ -330,7 +330,7 @@ export async function getAcceptedTaskPlanGraph(taskId: string) {
   return null;
 }
 
-export async function supersedeOlderTaskPlanGraphs(input: { taskId: string; excludePlanId?: string | null }) {
+async function supersedeOlderTaskPlanGraphs(input: { taskId: string; excludePlanId?: string | null }) {
   const memories = await findTaskPlanMemories(input.taskId);
   const toSupersede = memories
     .filter((memory) => memory.id !== input.excludePlanId)

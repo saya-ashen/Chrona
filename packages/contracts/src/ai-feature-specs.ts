@@ -9,14 +9,6 @@ import {
   validateAIPlanOutput,
 } from "./ai-plan-blueprint";
 
-const STRUCTURED_RESULT_PROTOCOL = `
-CRITICAL OUTPUT PROTOCOL:
-- Business tools are the primary machine-readable channel.
-- Put the real structured payload directly into the matching business tool input.
-- Do NOT rely on free-form assistant text as the only structured result channel.
-- If information is missing, prefer returning an incomplete business tool payload plus notes/questions in tool output rather than silently inventing fields.
-`.trim();
-
 export type AiFeatureToolSpec = {
   type: "function";
   name: string;
@@ -41,7 +33,8 @@ export type PreparedAiFeatureSpec = {
 };
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_NAME = "suggest_task_completions";
-export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME = "analyze_schedule_conflicts";
+export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME =
+  "analyze_schedule_conflicts";
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_TASK_PLAN_GRAPH_TOOL_NAME = "generate_task_plan_graph";
@@ -65,7 +58,7 @@ export const GENERATE_TASK_PLAN_GRAPH_TOOL_DESCRIPTION =
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
 
-export const SUGGEST_SYSTEM_PROMPT = `${STRUCTURED_RESULT_PROTOCOL}
+export const SUGGEST_SYSTEM_PROMPT = `
 
 You are a smart scheduling assistant for a task planning application.
 When given a partial task title and context, generate 2-4 task suggestions.
@@ -75,7 +68,7 @@ Tool payload shape:
 {"suggestions":[{"title":"...","description":"...","priority":"Low|Medium|High|Urgent","estimatedMinutes":N,"tags":[],"suggestedSlot":{"startAt":"ISO","endAt":"ISO"}}]}
 Respond in the same language as the input.`;
 
-export const CONFLICTS_SYSTEM_PROMPT = `${STRUCTURED_RESULT_PROTOCOL}
+export const CONFLICTS_SYSTEM_PROMPT = `
 
 You are a schedule conflict analyzer. Find conflicts and suggest resolutions.
 You MUST call the business tool analyze_schedule_conflicts.
@@ -83,7 +76,7 @@ Put the final conflict analysis directly into that tool input.
 Tool payload shape:
 {"conflicts":[{"id":"...","type":"time_overlap|overload|fragmentation|dependency","severity":"low|medium|high","taskIds":[],"description":"..."}],"resolutions":[{"conflictId":"...","type":"reschedule|split|merge|defer|reorder","description":"...","reason":"...","changes":[{"taskId":"...","scheduledStartAt":"...","scheduledEndAt":"..."}]}],"summary":"..."}`;
 
-export const TIMESLOTS_SYSTEM_PROMPT = `${STRUCTURED_RESULT_PROTOCOL}
+export const TIMESLOTS_SYSTEM_PROMPT = `
 
 You are a scheduling optimizer. Suggest optimal time slots for a task.
 You MUST call the business tool suggest_task_timeslots.
@@ -91,7 +84,7 @@ Put the final timeslot suggestions directly into that tool input.
 Tool payload shape:
 {"slots":[{"startAt":"ISO","endAt":"ISO","score":0.0-1.0,"reason":"..."}],"reasoning":"..."}`;
 
-export const DISPATCH_TASK_SYSTEM_PROMPT = `${STRUCTURED_RESULT_PROTOCOL}
+export const DISPATCH_TASK_SYSTEM_PROMPT = `
 
 You are Chrona's conservative task dispatcher.
 Choose exactly one next action and return it via the business tool dispatch_next_task_action.
@@ -108,8 +101,6 @@ Rules:
 `;
 
 export const GENERATE_PLAN_SYSTEM_PROMPT = `
-${STRUCTURED_RESULT_PROTOCOL}
-
 You are a task planning assistant that generates concise execution blueprints as directed acyclic graphs (DAGs).
 Given a task, produce a structured plan using ONLY these 4 node types: task, checkpoint, condition, wait.
 You MUST call the business tool generate_task_plan_graph.
@@ -150,7 +141,7 @@ Pause execution for a time duration or external event.
 
 1. Plan describes WHAT to do and the flow. Do NOT generate AI actions, tool_action, or integration nodes.
 2. id MUST be stable, readable, snake_case (e.g. task_find_time, checkpoint_confirm_plan).
-3. NEVER use type "start", "end", "ai_action", "tool_action", "integration", "deliverable", "user_input", "decision", "milestone".
+3. Every checkpoint with checkpointType "approve" or "confirm" should directly precede the risky task it gates.
 4. Start is expressed via edges (nodes with no incoming edge). End is expressed by nodes with no outgoing edge.
 5. Use condition nodes for branching. Each branch.nextNodeId MUST reference a real node id.
 6. edges only express main flow connections. Edge shape: {"from": "node_id", "to": "node_id"}.
@@ -158,38 +149,10 @@ Pause execution for a time duration or external event.
 8. If you need user input, choice, or confirmation: use checkpoint. Do NOT create separate user_input/decision nodes.
 9. If you are at a phase boundary, use a task node with a summary-like title. Do NOT create milestone nodes.
 10. Maximize parallelism: independent tasks should not be chained sequentially.
-11. Every checkpoint with checkpointType "approve" or "confirm" should directly precede the risky task it gates.
-
-## Tool payload shape
-
-The generate_task_plan_graph tool arguments MUST match this JSON shape:
-{
-  "title": "Brief plan title",
-  "goal": "What this plan is meant to achieve",
-  "assumptions": ["Optional assumption"],
-  "nodes": [ ... ],
-  "edges": [ { "from": "node_id", "to": "node_id" } ]
-}
-
-Node shapes:
-
-task:
-{ "id": "snake_case_id", "type": "task", "title": "...", "executor": "ai"|"user"|"system", "mode": "auto"|"assist"|"manual", "expectedOutput": "...", "completionCriteria": "...", "estimatedMinutes": N }
-
-checkpoint:
-{ "id": "snake_case_id", "type": "checkpoint", "title": "...", "checkpointType": "confirm"|"choose"|"input"|"edit"|"approve", "prompt": "Question to show the user", "required": true|false, "options": ["A", "B"] }
-
-condition:
-{ "id": "snake_case_id", "type": "condition", "title": "...", "condition": "Description of the condition", "evaluationBy": "system"|"ai"|"user", "branches": [{ "label": "Yes", "nextNodeId": "task_b" }, { "label": "No", "nextNodeId": "task_c" }], "defaultNextNodeId": "task_c" }
-
-wait:
-{ "id": "snake_case_id", "type": "wait", "title": "...", "waitFor": "Description of what to wait for", "estimatedMinutes": 30, "timeout": { "minutes": 30, "onTimeout": "notify_user" } }
 
 Respond in the same language as the input.`.trim();
 
 export const EDIT_PLAN_PATCH_SYSTEM_PROMPT = `
-${STRUCTURED_RESULT_PROTOCOL}
-
 You are a plan editor. Given an existing plan and a user instruction, propose ONLY a PlanPatch.
 Do NOT return a full plan graph — return patch operations using the edit_plan_patch tool.
 
@@ -210,17 +173,6 @@ Do NOT return a full plan graph — return patch operations using the edit_plan_
 5. New node IDs must be snake_case.
 6. Only use node types: task, checkpoint, condition, wait.
 7. Provide a rationale for the change.
-
-## Tool payload shape
-{
-  "basePlanId": "string",
-  "baseVersion": N,
-  "rationale": "Why this change",
-  "operations": [
-    { "op": "add_node", "node": { "id": "...", "type": "task", ... } },
-    { "op": "add_edge", "edge": { "from": "...", "to": "..." } }
-  ]
-}
 `.trim();
 
 export const suggestTaskCompletionsToolSpec: AiFeatureToolSpec = {
@@ -384,7 +336,7 @@ export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
   description: GENERATE_TASK_PLAN_GRAPH_TOOL_DESCRIPTION,
   parameters: {
     type: "object",
-    additionalProperties: true,
+    additionalProperties: false,
     properties: {
       title: {
         type: "string",
@@ -401,27 +353,38 @@ export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
       },
       nodes: {
         type: "array",
-        description: "Execution nodes in dependency order. Provide at least one node.",
+        description:
+          "Execution nodes in dependency order. Provide at least one node.",
         minItems: 1,
         items: {
           type: "object",
           additionalProperties: true,
           properties: {
-            id: { type: "string", description: "Stable local id, e.g. node-1." },
+            id: {
+              type: "string",
+              description: "Stable local id, e.g. node-1.",
+            },
             type: {
               type: "string",
               enum: [...AI_PLAN_NODE_TYPES],
             },
-            title: { type: "string", description: "Short node label shown to the user." },
+            title: {
+              type: "string",
+              description: "Short node label shown to the user.",
+            },
             expectedOutput: {
               type: "string",
-              description: "What successful completion of this node should produce.",
+              description:
+                "What successful completion of this node should produce.",
             },
             completionCriteria: {
               type: "string",
               description: "How to determine the node is done.",
             },
-            estimatedMinutes: { type: "number", description: "Best-effort duration estimate for just this node." },
+            estimatedMinutes: {
+              type: "number",
+              description: "Best-effort duration estimate for just this node.",
+            },
             executor: {
               type: "string",
               enum: [...AI_TASK_EXECUTORS],
@@ -437,7 +400,8 @@ export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
             checkpointType: {
               type: "string",
               enum: [...AI_CHECKPOINT_TYPES],
-              description: "Checkpoint subtype for human confirmation, choice, input, edit, or approval.",
+              description:
+                "Checkpoint subtype for human confirmation, choice, input, edit, or approval.",
             },
             prompt: {
               type: "string",
@@ -480,7 +444,8 @@ export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
             },
             waitFor: {
               type: "string",
-              description: "What external event or duration this wait node depends on.",
+              description:
+                "What external event or duration this wait node depends on.",
             },
             timeout: {
               type: "object",
@@ -524,8 +489,14 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
     type: "object",
     additionalProperties: true,
     properties: {
-      basePlanId: { type: "string", description: "ID of the plan being edited" },
-      baseVersion: { type: "number", description: "Current version for optimistic locking" },
+      basePlanId: {
+        type: "string",
+        description: "ID of the plan being edited",
+      },
+      baseVersion: {
+        type: "number",
+        description: "Current version for optimistic locking",
+      },
       rationale: { type: "string", description: "Why this change is needed" },
       operations: {
         type: "array",
@@ -536,7 +507,15 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
           properties: {
             op: {
               type: "string",
-              enum: ["update_plan", "add_node", "update_node", "delete_node", "add_edge", "delete_edge", "replace_subgraph"],
+              enum: [
+                "update_plan",
+                "add_node",
+                "update_node",
+                "delete_node",
+                "add_edge",
+                "delete_edge",
+                "replace_subgraph",
+              ],
             },
           },
           required: ["op"],
@@ -547,10 +526,12 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
   },
 };
 
-export function buildGeneratePlanFeatureInputText(input: GenerateTaskPlanRequest): string {
+export function buildGeneratePlanFeatureInputText(
+  input: GenerateTaskPlanRequest,
+): string {
   const parts: string[] = [
     "Create a concise plan blueprint for the task below.",
-    "Use only the information provided in this message. Do not ask follow-up questions.",
+    "Do not ask follow-up questions.",
     "Make reasonable assumptions if the task is underspecified.",
     "The plan should be concise but actionable: 3-7 nodes for normal tasks, with clear dependencies.",
     "Prefer automatic execution nodes when no human approval/input is truly required.",
@@ -568,31 +549,12 @@ export function buildGeneratePlanFeatureInputText(input: GenerateTaskPlanRequest
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
   }
 
-  parts.push(
-    "",
-    "Tool call requirements",
-    "- Call generate_task_plan_graph exactly once.",
-    "- Put the full plan graph into the function call arguments.",
-    "- Include only title, goal, optional assumptions, nodes, and edges in the tool arguments.",
-    "- Each node should include id, type, title, and estimatedMinutes when possible.",
-    "- For task nodes, use expectedOutput and completionCriteria when they are clear.",
-    "- For each task node, explicitly set executor to 'user', 'ai', or 'system' when possible.",
-    "- Use executor='ai' when Chrona/runtime can complete the node primarily through model-driven software work.",
-    "- Use executor='system' for deterministic software automation or integrations that do not require a person to act.",
-    "- Use executor='user' for approvals, choices, clarification, communication, payment, pickup, travel, waiting, receiving items, and any physical/manual action.",
-    "- Set mode to 'auto', 'assist', or 'manual' when the execution style is clear.",
-    "- Do NOT emit runtime fields such as executionMode, autoRunnable, blockingReason, status, linkedTaskId, completionSummary, node state, attempts, artifacts, or logs; Chrona derives them.",
-    "- Use type=checkpoint for approvals, choices, confirmations, and explicit user input gates.",
-    "- Use type=condition only for branching logic, and type=wait only for explicit waiting steps.",
-    "- Use type=task for executable work steps; do not invent additional node types.",
-    "- Each edge should use { from, to, label? }; use edges: [] only if there is a single independent node.",
-    "- Do not rely on assistant free text as the machine-readable result channel.",
-  );
-
   return parts.join("\n");
 }
 
-export function buildGeneratePlanFeatureSpec(input: GenerateTaskPlanRequest): PreparedAiFeatureSpec {
+export function buildGeneratePlanFeatureSpec(
+  input: GenerateTaskPlanRequest,
+): PreparedAiFeatureSpec {
   return {
     feature: "generate_plan",
     instructions: GENERATE_PLAN_SYSTEM_PROMPT,
@@ -612,7 +574,9 @@ export interface EditPlanFeatureInput {
   userInstruction: string;
 }
 
-export function buildEditPlanPatchFeatureInputText(input: EditPlanFeatureInput): string {
+export function buildEditPlanPatchFeatureInputText(
+  input: EditPlanFeatureInput,
+): string {
   const lines: string[] = [
     "Edit the existing plan according to the user instruction below.",
     "",
@@ -634,7 +598,9 @@ export function buildEditPlanPatchFeatureInputText(input: EditPlanFeatureInput):
   return lines.join("\n");
 }
 
-export function buildEditPlanPatchFeatureSpec(input: EditPlanFeatureInput): PreparedAiFeatureSpec {
+export function buildEditPlanPatchFeatureSpec(
+  input: EditPlanFeatureInput,
+): PreparedAiFeatureSpec {
   return {
     feature: "edit_plan",
     instructions: EDIT_PLAN_PATCH_SYSTEM_PROMPT,
@@ -692,7 +658,11 @@ function validateSuggestPayload(payload: Record<string, unknown>) {
     };
   }
   for (const suggestion of payload.suggestions) {
-    if (!isRecord(suggestion) || typeof suggestion.title !== "string" || !suggestion.title.trim()) {
+    if (
+      !isRecord(suggestion) ||
+      typeof suggestion.title !== "string" ||
+      !suggestion.title.trim()
+    ) {
       return {
         ok: false as const,
         error: "Feature 'suggest' suggestions must include a non-empty title",
@@ -731,10 +701,14 @@ function validateTimeslotsPayload(payload: Record<string, unknown>) {
       error: "Feature 'timeslots' payload.slots must be an array",
     };
   }
-  if (payload.reasoning !== undefined && typeof payload.reasoning !== "string") {
+  if (
+    payload.reasoning !== undefined &&
+    typeof payload.reasoning !== "string"
+  ) {
     return {
       ok: false as const,
-      error: "Feature 'timeslots' payload.reasoning must be a string when provided",
+      error:
+        "Feature 'timeslots' payload.reasoning must be a string when provided",
     };
   }
   return { ok: true as const };
@@ -744,7 +718,8 @@ function validateDispatchTaskPayload(payload: Record<string, unknown>) {
   if (payload.schemaName !== "task_dispatch_decision") {
     return {
       ok: false as const,
-      error: "Feature 'dispatch_task' schemaName must be task_dispatch_decision",
+      error:
+        "Feature 'dispatch_task' schemaName must be task_dispatch_decision",
     };
   }
   if (payload.schemaVersion !== "1.0.0") {
@@ -769,23 +744,26 @@ function validateDispatchTaskPayload(payload: Record<string, unknown>) {
   if (typeof safety.requiresHumanApproval !== "boolean") {
     return {
       ok: false as const,
-      error: "Feature 'dispatch_task' safety.requiresHumanApproval must be boolean",
+      error:
+        "Feature 'dispatch_task' safety.requiresHumanApproval must be boolean",
     };
   }
   if (!["low", "medium", "high"].includes(String(safety.riskLevel))) {
     return {
       ok: false as const,
-      error: "Feature 'dispatch_task' safety.riskLevel must be low, medium, or high",
+      error:
+        "Feature 'dispatch_task' safety.riskLevel must be low, medium, or high",
     };
   }
   if (
-    typeof payload.confidence !== "number"
-    || payload.confidence < 0
-    || payload.confidence > 1
+    typeof payload.confidence !== "number" ||
+    payload.confidence < 0 ||
+    payload.confidence > 1
   ) {
     return {
       ok: false as const,
-      error: "Feature 'dispatch_task' confidence must be a number between 0 and 1",
+      error:
+        "Feature 'dispatch_task' confidence must be a number between 0 and 1",
     };
   }
   if (typeof payload.reason !== "string" || !payload.reason.trim()) {
@@ -812,15 +790,15 @@ export function validatePreparedFeaturePayload(
     case "generate_plan": {
       const validation = validateAIPlanOutput(payload);
       if (
-        !validation.valid.title
-        || !validation.valid.goal
-        || validation.valid.nodes.length === 0
+        !validation.valid.title ||
+        !validation.valid.goal ||
+        validation.valid.nodes.length === 0
       ) {
         return {
           ok: false,
           error:
-            validation.warnings[0]
-            ?? "Feature 'generate_plan' payload does not match AIPlanOutput",
+            validation.warnings[0] ??
+            "Feature 'generate_plan' payload does not match AIPlanOutput",
         };
       }
       return { ok: true };
