@@ -8,7 +8,14 @@ import { decideNodeExecutionSession } from "./session-policy";
 import { executePlanNode } from "./node-executor";
 import { detectPlanDrift } from "./replan-detector";
 import { applyPlanPatch } from "./apply-plan-patch";
-import type { TaskPlanNode, TaskPlanGraph } from "@chrona/contracts/ai";
+import { savePlanRun, getPlanRun } from "./plan-run-store";
+import {
+  createPlanRunFromGraph,
+  syncGraphStateToRun,
+} from "./plan-run-bridge";
+import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
+import { compileEditablePlan } from "@chrona/domain";
+import type { TaskPlanNode, TaskPlanGraph, PlanRun, CompiledPlan } from "@chrona/contracts/ai";
 import type { PlanExecutablePath } from "./executable-path";
 
 async function activateWorkBlock(taskId: string) {
@@ -118,6 +125,21 @@ export async function advancePlanExecution(input: {
   }
 
   const planId = acceptedPlan.id;
+
+  // Load or create PlanRun for layered tracking
+  let planRun = await getPlanRun(input.taskId, planId);
+  let compiled: CompiledPlan | null = null;
+  if (!planRun) {
+    const result = createPlanRunFromGraph(acceptedPlan.plan);
+    if (result) {
+      planRun = result.run;
+      compiled = result.compiled;
+    }
+  } else if (acceptedPlan.plan.blueprint) {
+    const editable = upgradeBlueprintToEditable(acceptedPlan.plan.blueprint, planId);
+    compiled = compileEditablePlan(editable);
+  }
+
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
     planId,
@@ -319,7 +341,7 @@ export async function advancePlanExecution(input: {
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -416,7 +438,7 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, prompt: result.prompt },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -458,7 +480,7 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, prompt: result.prompt },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -499,7 +521,7 @@ export async function advancePlanExecution(input: {
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -545,7 +567,7 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, reason: blockMessage },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -586,7 +608,7 @@ export async function advancePlanExecution(input: {
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan);
+        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -603,11 +625,11 @@ export async function advancePlanExecution(input: {
       }
     }
 
-    await savePlanState(currentPlan, acceptedPlan);
+    await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
     await rebuildTaskProjection(input.taskId);
   }
 
-  await savePlanState(currentPlan, acceptedPlan);
+  await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
   await rebuildTaskProjection(input.taskId);
 
   return {
@@ -698,6 +720,13 @@ export async function continuePlanExecution(input: {
     planId: acceptedPlan.id,
   });
 
+  const planRun = await getPlanRun(input.taskId, acceptedPlan.id);
+  let compiled: CompiledPlan | null = null;
+  if (planRun && acceptedPlan.plan.blueprint) {
+    const editable = upgradeBlueprintToEditable(acceptedPlan.plan.blueprint, acceptedPlan.id);
+    compiled = compileEditablePlan(editable);
+  }
+
   if (input.userInput) {
     await appendMainSessionEvent({
       taskId: input.taskId,
@@ -740,6 +769,16 @@ export async function continuePlanExecution(input: {
         changeSummary: acceptedPlan.changeSummary,
       });
 
+      if (planRun && compiled) {
+        syncGraphStateToRun(updatedPlan, compiled, planRun);
+        await savePlanRun({
+          workspaceId: task.workspaceId,
+          taskId: input.taskId,
+          planId: acceptedPlan.id,
+          run: planRun,
+        });
+      }
+
       await db.task.update({
         where: { id: input.taskId },
         data: {
@@ -761,6 +800,7 @@ export async function continuePlanExecution(input: {
 async function savePlanState(
   currentPlan: TaskPlanGraph,
   savedPlan: { workspaceId: string; status: string; source: "ai" | "user" | "mixed"; generatedBy: string | null; summary: string | null; changeSummary: string | null },
+  planRunContext?: { run: PlanRun; compiled: CompiledPlan; planId: string } | null,
 ) {
   await saveTaskPlanGraph({
     workspaceId: savedPlan.workspaceId,
@@ -772,4 +812,14 @@ async function savePlanState(
     summary: savedPlan.summary,
     changeSummary: savedPlan.changeSummary,
   });
+
+  if (planRunContext) {
+    syncGraphStateToRun(currentPlan, planRunContext.compiled, planRunContext.run);
+    await savePlanRun({
+      workspaceId: savedPlan.workspaceId,
+      taskId: currentPlan.taskId,
+      planId: planRunContext.planId,
+      run: planRunContext.run,
+    });
+  }
 }

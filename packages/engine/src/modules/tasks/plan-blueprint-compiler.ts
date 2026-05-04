@@ -9,8 +9,10 @@ import type {
   TaskPlanEdgeType,
   TaskPlanGraph,
   TaskPlanNode,
+  CompiledPlan,
 } from "@chrona/contracts/ai";
-import { PlanCompileError } from "@chrona/contracts/ai";
+import { PlanCompileError, upgradeBlueprintToEditable } from "@chrona/contracts/ai";
+import { compileEditablePlan } from "@chrona/domain";
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
 const HIGH_RISK_PATTERN = /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update)\b/i;
@@ -349,4 +351,14 @@ export function compilePlanBlueprint(input: {
     nodes,
     edges,
   };
+}
+
+/**
+ * Compiles a loose AI blueprint (AIPlanOutput) into a new-architecture CompiledPlan.
+ * Uses the domain-layer compileEditablePlan underneath.
+ */
+export function compileBlueprintToCompiledPlan(blueprint: AIPlanOutput): CompiledPlan {
+  const planId = `plan_${randomUUID().slice(0, 8)}`;
+  const editable = upgradeBlueprintToEditable(blueprint, planId, 1);
+  return compileEditablePlan(editable);
 }

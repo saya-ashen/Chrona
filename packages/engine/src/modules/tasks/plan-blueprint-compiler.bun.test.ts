@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { PlanCompileError } from "@chrona/contracts/ai";
 
-import { compilePlanBlueprint } from "./plan-blueprint-compiler";
+import { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "./plan-blueprint-compiler";
 
 describe("compilePlanBlueprint", () => {
   it("compiles a blueprint, derives graph metadata, and preserves local ids", () => {
@@ -134,6 +134,49 @@ describe("compilePlanBlueprint", () => {
         ],
         edges: [],
       },
+    })).toThrow(PlanCompileError);
+  });
+});
+
+describe("compileBlueprintToCompiledPlan", () => {
+  it("compiles a blueprint into a CompiledPlan with localId mapping", () => {
+    const compiled = compileBlueprintToCompiledPlan({
+      title: "Test",
+      goal: "Achieve goal",
+      nodes: [
+        { id: "approve_step", type: "checkpoint", title: "Approve", checkpointType: "approve", prompt: "OK?" },
+        { id: "do_work", type: "task", title: "Work", executor: "ai", mode: "auto" },
+      ],
+      edges: [{ from: "approve_step", to: "do_work" }],
+    });
+
+    expect(compiled.editablePlanId).toBeDefined();
+    expect(compiled.sourceVersion).toBe(1);
+    expect(compiled.completionPolicy).toEqual({ type: "all_tasks_completed" });
+    expect(compiled.nodes).toHaveLength(2);
+    expect(compiled.entryNodeIds).toHaveLength(1);
+    expect(compiled.terminalNodeIds).toHaveLength(1);
+
+    const entry = compiled.nodes.find((n) => n.localId === "approve_step");
+    const terminal = compiled.nodes.find((n) => n.localId === "do_work");
+    expect(entry).toBeDefined();
+    expect(terminal).toBeDefined();
+    expect(compiled.entryNodeIds).toEqual([entry!.id]);
+    expect(compiled.terminalNodeIds).toEqual([terminal!.id]);
+  });
+
+  it("throws on invalid blueprints", () => {
+    expect(() => compileBlueprintToCompiledPlan({
+      title: "Bad",
+      goal: "Bad",
+      nodes: [
+        { id: "a", type: "task", title: "A", executor: "ai", mode: "auto" },
+        { id: "b", type: "task", title: "B", executor: "ai", mode: "auto" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "a" },
+      ],
     })).toThrow(PlanCompileError);
   });
 });

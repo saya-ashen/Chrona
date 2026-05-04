@@ -4,6 +4,10 @@ import { randomUUID } from "node:crypto";
 import { db } from "@chrona/db";
 import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import type { PlanBlueprint } from "@chrona/contracts/ai";
+import type {
+  RuntimeCommand,
+  CompiledPlan,
+} from "@chrona/contracts/ai";
 import {
   acceptTaskPlanGraph,
   aiGeneratePlan,
@@ -14,6 +18,9 @@ import {
   getLatestTaskPlanGraph,
   materializeTaskPlan,
   saveTaskPlanGraph,
+  savePlanRun,
+  getPlanRun,
+  getLatestPlanRun,
 } from "@chrona/engine";
 import { compilePlanBlueprint } from "@chrona/engine";
 import {
@@ -21,6 +28,12 @@ import {
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
 } from "@chrona/engine";
+import {
+  createPlanRunFromGraph,
+  applyCommandAndSyncGraph,
+} from "@chrona/engine";
+import { compileEditablePlan } from "@chrona/domain";
+import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 
 import {
   ensureTaskInWorkspace,
@@ -738,6 +751,118 @@ export function createPlansRoutes() {
       }, 200);
     } catch (cause) {
       return internalServerError(c, "POST /api/tasks/:taskId/plan", cause, "Failed to apply plan patch");
+    }
+  });
+
+  api.post("/plan-runs/from-accepted", async (c) => {
+    try {
+      const body = await c.req.json();
+      const taskId = typeof body.taskId === "string" ? body.taskId : "";
+
+      if (!taskId) {
+        return error(c, "taskId is required", 400);
+      }
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const accepted = await getAcceptedTaskPlanGraph(taskId);
+      if (!accepted) return error(c, "No accepted plan found for this task", 404);
+
+      const result = createPlanRunFromGraph(accepted.plan);
+      if (!result) return error(c, "Failed to create PlanRun — plan may lack a blueprint", 400);
+
+      await savePlanRun({
+        workspaceId: task.workspaceId,
+        taskId,
+        planId: accepted.plan.id,
+        run: result.run,
+      });
+
+      return json(c, { planRun: result.run }, 201);
+    } catch (cause) {
+      return internalServerError(c, "POST /api/plan-runs/from-accepted", cause, "Failed to create PlanRun");
+    }
+  });
+
+  api.post("/plan-runs/command", async (c) => {
+    try {
+      const body = await c.req.json();
+      const taskId = typeof body.taskId === "string" ? body.taskId : "";
+      const command = body.command as RuntimeCommand | undefined;
+
+      if (!taskId) {
+        return error(c, "taskId is required", 400);
+      }
+
+      if (!command || typeof command.type !== "string") {
+        return error(c, "command is required with a valid 'type' field", 400);
+      }
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const accepted = await getAcceptedTaskPlanGraph(taskId);
+      if (!accepted) return error(c, "No accepted plan found for this task", 404);
+
+      const planRun = await getPlanRun(taskId, accepted.plan.id);
+      if (!planRun) return error(c, "No PlanRun found. Create one first via POST /api/plan-runs/from-accepted", 404);
+
+      // Compile the accepted plan's blueprint
+      if (!accepted.plan.blueprint) {
+        return error(c, "Plan lacks a blueprint — cannot compile", 400);
+      }
+
+      let compiled: CompiledPlan;
+      try {
+        const editable = upgradeBlueprintToEditable(accepted.plan.blueprint, accepted.plan.id);
+        compiled = compileEditablePlan(editable);
+      } catch {
+        return error(c, "Failed to compile plan blueprint", 400);
+      }
+
+      const result = applyCommandAndSyncGraph(planRun, compiled, command, accepted.plan);
+
+      if (!result.ok || !result.run) {
+        return json(c, { ok: false, error: result.error }, 400);
+      }
+
+      await savePlanRun({
+        workspaceId: task.workspaceId,
+        taskId,
+        planId: accepted.plan.id,
+        run: result.run,
+      });
+
+      if (result.graph) {
+        await saveTaskPlanGraph({
+          workspaceId: task.workspaceId,
+          taskId,
+          plan: result.graph,
+          status: accepted.status,
+          source: accepted.source,
+          generatedBy: accepted.generatedBy,
+          summary: accepted.summary,
+          changeSummary: `Runtime command: ${command.type}`,
+        });
+      }
+
+      return json(c, { ok: true, planRun: result.run });
+    } catch (cause) {
+      return internalServerError(c, "POST /api/plan-runs/command", cause, "Failed to apply runtime command");
+    }
+  });
+
+  api.get("/tasks/:taskId/plan-run", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+
+      const planRun = await getLatestPlanRun(taskId);
+      if (!planRun) return error(c, "No PlanRun found for this task", 404);
+
+      return json(c, { planRun });
+    } catch (cause) {
+      return internalServerError(c, "GET /api/tasks/:taskId/plan-run", cause, "Failed to get PlanRun");
     }
   });
 

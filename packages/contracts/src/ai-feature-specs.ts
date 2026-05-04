@@ -27,6 +27,7 @@ export type AiFeatureToolSpec = {
 export type StructuredAiFeature =
   | "suggest"
   | "generate_plan"
+  | "edit_plan"
   | "conflicts"
   | "timeslots"
   | "dispatch_task";
@@ -44,6 +45,7 @@ export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME = "analyze_schedule_conflicts"
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_TASK_PLAN_GRAPH_TOOL_NAME = "generate_task_plan_graph";
+export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION =
   "Return Chrona task suggestions as structured tool arguments.";
@@ -59,6 +61,9 @@ export const DISPATCH_NEXT_TASK_ACTION_TOOL_DESCRIPTION =
 
 export const GENERATE_TASK_PLAN_GRAPH_TOOL_DESCRIPTION =
   "Create and persist the Chrona task plan graph as structured tool arguments.";
+
+export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
+  "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
 
 export const SUGGEST_SYSTEM_PROMPT = `${STRUCTURED_RESULT_PROTOCOL}
 
@@ -181,6 +186,42 @@ wait:
 { "id": "snake_case_id", "type": "wait", "title": "...", "waitFor": "Description of what to wait for", "estimatedMinutes": 30, "timeout": { "minutes": 30, "onTimeout": "notify_user" } }
 
 Respond in the same language as the input.`.trim();
+
+export const EDIT_PLAN_PATCH_SYSTEM_PROMPT = `
+${STRUCTURED_RESULT_PROTOCOL}
+
+You are a plan editor. Given an existing plan and a user instruction, propose ONLY a PlanPatch.
+Do NOT return a full plan graph — return patch operations using the edit_plan_patch tool.
+
+## Patch operations available
+- update_plan: change title, goal, or assumptions
+- add_node: add a new task/checkpoint/condition/wait node
+- update_node: modify an existing node's fields (NOT its type)
+- delete_node: remove a node (associated edges removed automatically)
+- add_edge: add a dependency edge (must keep graph a DAG)
+- delete_edge: remove an edge
+- replace_subgraph: remove nodes and replace with new ones
+
+## Critical rules
+1. basePlanId and baseVersion must match the current plan.
+2. DO NOT modify runtime fields (status, attempts, toolCalls, artifacts, logs).
+3. DO NOT change node.type on existing nodes.
+4. Keep existing node IDs stable.
+5. New node IDs must be snake_case.
+6. Only use node types: task, checkpoint, condition, wait.
+7. Provide a rationale for the change.
+
+## Tool payload shape
+{
+  "basePlanId": "string",
+  "baseVersion": N,
+  "rationale": "Why this change",
+  "operations": [
+    { "op": "add_node", "node": { "id": "...", "type": "task", ... } },
+    { "op": "add_edge", "edge": { "from": "...", "to": "..." } }
+  ]
+}
+`.trim();
 
 export const suggestTaskCompletionsToolSpec: AiFeatureToolSpec = {
   type: "function",
@@ -475,6 +516,37 @@ export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
   },
 };
 
+export const editPlanPatchToolSpec: AiFeatureToolSpec = {
+  type: "function",
+  name: EDIT_PLAN_PATCH_TOOL_NAME,
+  description: EDIT_PLAN_PATCH_TOOL_DESCRIPTION,
+  parameters: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      basePlanId: { type: "string", description: "ID of the plan being edited" },
+      baseVersion: { type: "number", description: "Current version for optimistic locking" },
+      rationale: { type: "string", description: "Why this change is needed" },
+      operations: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            op: {
+              type: "string",
+              enum: ["update_plan", "add_node", "update_node", "delete_node", "add_edge", "delete_edge", "replace_subgraph"],
+            },
+          },
+          required: ["op"],
+        },
+      },
+    },
+    required: ["basePlanId", "baseVersion", "operations"],
+  },
+};
+
 export function buildGeneratePlanFeatureInputText(input: GenerateTaskPlanRequest): string {
   const parts: string[] = [
     "Create a concise plan blueprint for the task below.",
@@ -526,6 +598,48 @@ export function buildGeneratePlanFeatureSpec(input: GenerateTaskPlanRequest): Pr
     instructions: GENERATE_PLAN_SYSTEM_PROMPT,
     inputText: buildGeneratePlanFeatureInputText(input),
     requiredTool: generateTaskPlanGraphToolSpec,
+    toolChoice: "required",
+  };
+}
+
+export interface EditPlanFeatureInput {
+  planId: string;
+  version: number;
+  title: string;
+  goal: string;
+  nodes: Array<{ id: string; type: string; title: string }>;
+  edges: Array<{ from: string; to: string }>;
+  userInstruction: string;
+}
+
+export function buildEditPlanPatchFeatureInputText(input: EditPlanFeatureInput): string {
+  const lines: string[] = [
+    "Edit the existing plan according to the user instruction below.",
+    "",
+    "Current plan:",
+    `ID: ${input.planId}`,
+    `Version: ${input.version}`,
+    `Title: ${input.title}`,
+    `Goal: ${input.goal}`,
+    "",
+    "Nodes:",
+    ...input.nodes.map((n) => `  - ${n.id} [${n.type}] ${n.title}`),
+    "",
+    "Edges:",
+    ...input.edges.map((e) => `  ${e.from} -> ${e.to}`),
+    "",
+    "User instruction:",
+    input.userInstruction,
+  ];
+  return lines.join("\n");
+}
+
+export function buildEditPlanPatchFeatureSpec(input: EditPlanFeatureInput): PreparedAiFeatureSpec {
+  return {
+    feature: "edit_plan",
+    instructions: EDIT_PLAN_PATCH_SYSTEM_PROMPT,
+    inputText: buildEditPlanPatchFeatureInputText(input),
+    requiredTool: editPlanPatchToolSpec,
     toolChoice: "required",
   };
 }
