@@ -3,8 +3,13 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { acceptTaskPlanGraph, getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, saveTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
-import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
+import {
+  acceptTaskPlanGraph,
+  getAcceptedTaskPlanGraph,
+  getLatestTaskPlanGraph,
+  materializeTaskPlan,
+  saveTaskPlanGraph,
+} from "@chrona/engine";
 import type {
   TaskPlanNodeType,
   TaskPlanNodeStatus,

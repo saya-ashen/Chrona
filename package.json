@@ -53,7 +53,7 @@
     "test:web": "vitest run --coverage",
     "test:watch": "vitest",
     "test:api": "bun run scripts/run-api-tests.ts",
-    "test:bridge": "bun test apps/server/src/__tests__/bridge/ packages/providers/openclaw/bridge/src/ packages/providers/openclaw/integration/src/transport/",
+    "test:bridge": "bun test packages/providers/openclaw/src/transport/",
     "test:bun": "bun run scripts/run-bun-tests.ts",
     "test:e2e": "playwright test",
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",

@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
-import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analyzer";
+import { analyzeConflictsSmart } from "@chrona/engine";
 import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 import {
   resetTestDb,

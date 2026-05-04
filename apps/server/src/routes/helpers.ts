@@ -2,12 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
+import { createRuntimeAdapter } from "@chrona/openclaw";
 import type { StructuredSuggestion } from "@chrona/contracts";
 import { createLogger, summarizeText } from "@chrona/db/logger";
 import type { TaskPlanStatus } from "@chrona/contracts/ai";
-import { appendCanonicalEvent } from "@chrona/runtime/modules/events/append-canonical-event";
-import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
+import { appendCanonicalEvent, TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/engine";
 import { OpenClawClient } from "@chrona/providers-core";
 
 import { HttpError } from "../lib/http";

@@ -7,11 +7,13 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { ApprovalStatus, RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { markTaskDone } from "@chrona/runtime/modules/commands/mark-task-done";
-import { reopenTask } from "@chrona/runtime/modules/commands/reopen-task";
-import { acceptTaskResult } from "@chrona/runtime/modules/commands/accept-task-result";
-import { createFollowUpTask } from "@chrona/runtime/modules/commands/create-follow-up-task";
-import { resolveApproval } from "@chrona/runtime/modules/commands/resolve-approval";
+import {
+  acceptTaskResult,
+  createFollowUpTask,
+  markTaskDone,
+  reopenTask,
+  resolveApproval,
+} from "@chrona/engine";
 import { resetTestDb, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 // ---------------------------------------------------------------------------

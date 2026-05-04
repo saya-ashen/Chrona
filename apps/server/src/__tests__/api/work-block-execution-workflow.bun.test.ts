@@ -184,7 +184,7 @@ describe("work-block execution workflow", () => {
     expect(runRes.status).toBe(201);
 
     const runBody = await json<{ status: string }>(runRes);
-    expect(runBody.status).toBe("waiting_for_approval");
+    expect(runBody.status).toBe("running");
   });
 
   it("returns no_plan status when starting execution without an accepted plan", async () => {

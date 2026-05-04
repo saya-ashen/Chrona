@@ -1,0 +1,17 @@
+{
+  "name": "@chrona/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/ai-features": "workspace:*",
+    "@chrona/contracts": "workspace:*",
+    "@chrona/domain": "workspace:*",
+    "@chrona/openclaw": "workspace:*",
+    "@chrona/shared": "workspace:*",
+    "@chrona/runtime-core": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import { buildGeneratePlanFeatureSpec } from "@chrona/contracts";
 
 import { checkClientHealth, openclawCall } from "./providers";
 import type { AiClientRecord, OpenClawClientConfig } from "./types";
@@ -31,6 +32,12 @@ afterEach(() => {
 describe("openclaw feature transport", () => {
   it("posts generate_plan requests to the OpenResponses gateway with function tool constraints", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const featureSpec = buildGeneratePlanFeatureSpec({
+      taskId: "task-1",
+      title: "制作一个汉堡",
+      description: "准备食材并完成烹饪",
+      estimatedMinutes: 60,
+    });
 
     globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -80,7 +87,7 @@ describe("openclaw feature transport", () => {
 
     expect(text).toBe("bridge ok");
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.url).toBe("https://bridge.example.com//v1/responses");
+    expect(requests[0]?.url).toBe("https://bridge.example.com/v1/responses");
     expect(requests[0]?.init?.headers).toEqual({
       "Content-Type": "application/json",
       Authorization: "Bearer secret-token",
@@ -94,14 +101,15 @@ describe("openclaw feature transport", () => {
       input?: Array<Record<string, unknown>>;
     };
     expect(body.tool_choice).toBe("required");
-    expect(body.tools?.[0]).toMatchObject({
-      type: "function",
-      name: "generate_task_plan_graph",
-    });
-    expect(body.input).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: "input_text" }),
-      ]),
+    expect(body.tools).toEqual([featureSpec.requiredTool]);
+    expect(body.input).toEqual([
+      {
+        type: "input_text",
+        text: featureSpec.inputText,
+      },
+    ]);
+    expect(String((body as { instructions?: string }).instructions)).toContain(
+      featureSpec.instructions,
     );
   });
 
@@ -117,6 +125,6 @@ describe("openclaw feature transport", () => {
     const healthy = await checkClientHealth(makeOpenClawClient());
 
     expect(healthy).toBe(true);
-    expect(requests).toEqual(["https://bridge.example.com//v1/health"]);
+    expect(requests).toEqual(["https://bridge.example.com/v1/health"]);
   });
 });

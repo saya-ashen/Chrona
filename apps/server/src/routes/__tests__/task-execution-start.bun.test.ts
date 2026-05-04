@@ -7,9 +7,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { startRun } from "@chrona/runtime/modules/commands/start-run";
-import { retryRun } from "@chrona/runtime/modules/commands/retry-run";
-import { provideInput } from "@chrona/runtime/modules/commands/provide-input";
+import { provideInput, retryRun, startRun } from "@chrona/engine";
 import { resetTestDb, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 // ---------------------------------------------------------------------------

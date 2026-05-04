@@ -6,12 +6,12 @@
   },
   "include": [
     "packages/ai-features/src/index.ts",
-    "packages/runtime/src/modules/tasks/task-dispatch-types.ts",
-    "packages/runtime/src/modules/ai/__tests__/plan-generation.integration.test.ts",
+    "packages/engine/src/modules/tasks/task-dispatch-types.ts",
+    "packages/engine/src/modules/ai/__tests__/plan-generation.integration.test.ts",
     "packages/ai-features/src/**/*.ts",
-    "packages/runtime/src/modules/ai/types.ts",
-    "packages/runtime/src/modules/tasks/task-plan-graph-store.ts",
+    "packages/engine/src/modules/ai/types.ts",
+    "packages/engine/src/modules/tasks/task-plan-graph-store.ts",
     "packages/db/src/**/*.ts",
-    "packages/runtime/src/modules/task-execution/**/*.ts"
+    "packages/engine/src/modules/task-execution/**/*.ts"
   ]
 }

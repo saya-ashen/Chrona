@@ -11,7 +11,7 @@
     "@chrona/i18n": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
-    "@chrona/runtime": "workspace:*",
+    "@chrona/shared": "workspace:*",
     "@chrona/runtime-core": "workspace:*"
   }
 }

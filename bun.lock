@@ -53,33 +53,33 @@
     "apps/server": {
       "name": "@chrona/server",
       "dependencies": {
-        "@chrona/common-i18n": "workspace:*",
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
-        "@chrona/openclaw-bridge": "workspace:*",
-        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/i18n": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
         "@chrona/runtime": "workspace:*",
       },
     },
     "apps/web": {
       "name": "@chrona/web",
       "dependencies": {
-        "@chrona/common-i18n": "workspace:*",
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
+        "@chrona/i18n": "workspace:*",
         "@chrona/runtime": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
       },
     },
-    "packages/common/ai-features": {
+    "packages/ai-features": {
       "name": "@chrona/ai-features",
       "version": "0.1.0",
       "dependencies": {
+        "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
-        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
       },
     },
-    "packages/common/cli": {
+    "packages/cli": {
       "name": "@chrona/cli",
       "version": "0.2.0",
       "bin": {
@@ -91,14 +91,6 @@
         "cli-table3": "^0.6.5",
         "commander": "^14.0.3",
       },
-    },
-    "packages/common/i18n": {
-      "name": "@chrona/common-i18n",
-      "version": "0.1.0",
-    },
-    "packages/common/runtime-core": {
-      "name": "@chrona/runtime-core",
-      "version": "0.1.0",
     },
     "packages/contracts": {
       "name": "@chrona/contracts",
@@ -115,26 +107,23 @@
       "name": "@chrona/domain",
       "version": "0.1.0",
     },
+    "packages/i18n": {
+      "name": "@chrona/i18n",
+      "version": "0.1.0",
+    },
     "packages/providers/core": {
       "name": "@chrona/providers-core",
       "version": "0.1.0",
       "dependencies": {
-        "@chrona/openclaw-bridge": "workspace:*",
-        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/contracts": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
       },
     },
-    "packages/providers/openclaw/bridge": {
-      "name": "@chrona/openclaw-bridge",
+    "packages/providers/openclaw": {
+      "name": "@chrona/openclaw",
       "version": "0.1.0",
       "dependencies": {
-        "@chrona/openclaw-integration": "workspace:*",
-        "hono": "^4.9.6",
-      },
-    },
-    "packages/providers/openclaw/integration": {
-      "name": "@chrona/openclaw-integration",
-      "version": "0.1.0",
-      "dependencies": {
+        "@chrona/contracts": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
       },
     },
@@ -145,9 +134,13 @@
         "@chrona/ai-features": "workspace:*",
         "@chrona/contracts": "workspace:*",
         "@chrona/domain": "workspace:*",
-        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
       },
+    },
+    "packages/runtime-core": {
+      "name": "@chrona/runtime-core",
+      "version": "0.1.0",
     },
   },
   "trustedDependencies": [
@@ -234,11 +227,9 @@
 
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
 
-    "@chrona/ai-features": ["@chrona/ai-features@workspace:packages/common/ai-features"],
+    "@chrona/ai-features": ["@chrona/ai-features@workspace:packages/ai-features"],
 
-    "@chrona/cli": ["@chrona/cli@workspace:packages/common/cli"],
-
-    "@chrona/common-i18n": ["@chrona/common-i18n@workspace:packages/common/i18n"],
+    "@chrona/cli": ["@chrona/cli@workspace:packages/cli"],
 
     "@chrona/contracts": ["@chrona/contracts@workspace:packages/contracts"],
 
@@ -246,15 +237,15 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
-    "@chrona/openclaw-bridge": ["@chrona/openclaw-bridge@workspace:packages/providers/openclaw/bridge"],
+    "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
 
-    "@chrona/openclaw-integration": ["@chrona/openclaw-integration@workspace:packages/providers/openclaw/integration"],
+    "@chrona/openclaw": ["@chrona/openclaw@workspace:packages/providers/openclaw"],
 
     "@chrona/providers-core": ["@chrona/providers-core@workspace:packages/providers/core"],
 
     "@chrona/runtime": ["@chrona/runtime@workspace:packages/runtime"],
 
-    "@chrona/runtime-core": ["@chrona/runtime-core@workspace:packages/common/runtime-core"],
+    "@chrona/runtime-core": ["@chrona/runtime-core@workspace:packages/runtime-core"],
 
     "@chrona/server": ["@chrona/server@workspace:apps/server"],
 

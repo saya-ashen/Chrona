@@ -3,16 +3,22 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@chrona/db";
 import type { TaskPlanGraph, TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
-import { acceptTaskPlanGraph, getLatestTaskPlanGraph, saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
-import { generateTaskPlanForTask } from "@chrona/runtime/modules/commands/generate-task-plan-for-task";
-import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
-import { ensureDefaultTaskSession } from "@chrona/runtime/modules/task-execution/task-sessions";
-import { aiGeneratePlan, aiGeneratePlanStream } from "@chrona/runtime/modules/ai/ai-service";
+import {
+  acceptTaskPlanGraph,
+  aiGeneratePlan,
+  aiGeneratePlanStream,
+  ensureDefaultTaskSession,
+  generateTaskPlanForTask,
+  getAcceptedTaskPlanGraph,
+  getLatestTaskPlanGraph,
+  materializeTaskPlan,
+  saveTaskPlanGraph,
+} from "@chrona/engine";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
-} from "@chrona/runtime/modules/commands/task-plan-generation-registry";
+} from "@chrona/engine";
 
 import {
   ensureTaskInWorkspace,

@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { ApprovalStatus, RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { resolveApproval } from "@chrona/runtime/modules/commands/resolve-approval";
+import { resolveApproval } from "@chrona/engine";
 import { resetTestDb, seedWorkspace, seedTask, expectApiError } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------

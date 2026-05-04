@@ -167,12 +167,12 @@ Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun r
 4. 调用业务命令函数（`createTask`、`updateTask` 等），不直接操作 Prisma
 5. 通过 `app.request()` 发请求，做状态断言
 
-### 桥接合约测试
+### OpenClaw Provider 测试
 
-1. 在 `apps/server/src/__tests__/bridge/` 创建 `*.bun.test.ts` 文件
-2. 导入 `createBridgeApp` 从 `@chrona/openclaw-bridge`
-3. 注入 mock `executeRequest` / `checkGatewayAvailable`
-4. 验证 HTTP 状态码、请求体构造、响应解析、错误传播
+1. 在 `packages/providers/openclaw/src/` 下靠近实现放置 `*.bun.test.ts`
+2. 优先测试 `transport/`、`execution/`、`features/` 这些 provider 内部子层
+3. 对外部 gateway 调用使用 mock `fetch`
+4. 验证请求体构造、响应解析、错误传播与会话语义
 
 ### 前端组件测试
 

@@ -2,7 +2,7 @@
  * API workflow tests: Task CRUD
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import
- * (which triggers @chrona/runtime → frontend module resolution errors).
+ * (which triggers shared frontend module resolution errors).
  * Tests the full create → list → get → update → verify → delete → verify-404
  * workflow, plus negative cases.
  */
@@ -12,9 +12,7 @@ import { Hono } from "hono";
 
 import { db } from "@chrona/db";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
-import { createTask } from "@chrona/runtime/modules/commands/create-task";
-import { updateTask } from "@chrona/runtime/modules/commands/update-task";
-import { appendCanonicalEvent } from "@chrona/runtime/modules/events/append-canonical-event";
+import { appendCanonicalEvent, createTask, updateTask } from "@chrona/engine";
 import { resetTestDb, seedWorkspace, seedTask, expectTaskExists, expectTaskNotFound } from "../bun-test-helpers";
 import { json, error, internalServerError, parseLimit, toHttpError, HttpError } from "../../lib/http";
 

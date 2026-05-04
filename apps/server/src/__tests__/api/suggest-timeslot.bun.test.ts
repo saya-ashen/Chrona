@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
-import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
+import { suggestTimeslots } from "@chrona/engine";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
 import {
   resetTestDb,
