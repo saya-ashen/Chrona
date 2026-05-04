@@ -1,4 +1,188 @@
-import type { CompiledPlanCompletionPolicy, PlanBlueprint } from "./ai-plan-blueprint";
+import type {
+  PlanBlueprint,
+  ValidationWarning,
+  TaskExecutor,
+  TaskMode,
+  CompiledPlanCompletionPolicy,
+} from "./ai-plan-blueprint";
+
+// ═══════════════════════════════════════════════════════════════
+// Layer 3: CompiledPlan (backend-compiled execution graph)
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Node configs ───
+
+export interface TaskConfig {
+  expectedOutput?: string;
+  completionCriteria?: string;
+}
+
+export interface CheckpointConfig {
+  checkpointType: string;
+  prompt: string;
+  required: boolean;
+  options?: string[];
+  inputFields?: Array<{
+    name: string;
+    label: string;
+    type?: string;
+    required?: boolean;
+    options?: string[];
+  }>;
+}
+
+export interface ConditionConfig {
+  condition: string;
+  evaluationBy: string;
+  branches: Array<{
+    label: string;
+    nextNodeId: string;
+  }>;
+  defaultNextNodeId?: string;
+}
+
+export interface WaitConfig {
+  waitFor: string;
+  timeout?: {
+    minutes: number;
+    onTimeout: string;
+  };
+}
+
+export type NodeConfig = TaskConfig | CheckpointConfig | ConditionConfig | WaitConfig;
+
+// ─── Compiled types ───
+
+export interface CompiledNode {
+  id: string;
+  localId: string;
+  type: "task" | "checkpoint" | "condition" | "wait";
+  title: string;
+  config: NodeConfig;
+  dependencies: string[];
+  dependents: string[];
+  executor?: TaskExecutor;
+  mode?: TaskMode;
+  estimatedMinutes?: number;
+}
+
+export interface CompiledEdge {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;
+}
+
+export interface CompiledPlan {
+  id: string;
+  editablePlanId: string;
+  sourceVersion: number;
+  title: string;
+  goal: string;
+  assumptions: string[];
+  nodes: CompiledNode[];
+  edges: CompiledEdge[];
+  entryNodeIds: string[];
+  terminalNodeIds: string[];
+  completionPolicy: CompiledPlanCompletionPolicy;
+  validationWarnings: ValidationWarning[];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Layer 4: PlanRun (execution runtime state)
+// ═══════════════════════════════════════════════════════════════
+
+export type PlanRunStatus = "pending" | "running" | "paused" | "completed" | "failed" | "cancelled";
+
+export type NodeRuntimeStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "skipped";
+
+export interface NodeRuntimeState {
+  nodeId: string;
+  status: NodeRuntimeStatus;
+  attempts: number;
+  lastError?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface CheckpointResponse {
+  id: string;
+  planRunId: string;
+  nodeId: string;
+  response: unknown;
+  submittedAt: string;
+}
+
+export interface ArtifactRef {
+  id: string;
+  planRunId: string;
+  nodeId: string;
+  artifactType: string;
+  artifactId: string;
+  metadata?: unknown;
+}
+
+export interface NodeExecutionAttempt {
+  id: string;
+  planRunId: string;
+  nodeId: string;
+  attemptNumber: number;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  inputSnapshot?: unknown;
+  outputSnapshot?: unknown;
+  toolCalls?: unknown[];
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+  startedAt: string;
+  finishedAt?: string;
+}
+
+export interface PlanRun {
+  id: string;
+  compiledPlanId: string;
+  editablePlanId: string;
+  sourceVersion: number;
+  status: PlanRunStatus;
+  nodeStates: Record<string, NodeRuntimeState>;
+  checkpointResponses: CheckpointResponse[];
+  artifactRefs: ArtifactRef[];
+  attempts: NodeExecutionAttempt[];
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Runtime commands
+// ═══════════════════════════════════════════════════════════════
+
+export type RuntimeCommand =
+  | { type: "start_plan" }
+  | { type: "pause_plan" }
+  | { type: "resume_plan" }
+  | { type: "cancel_plan" }
+  | { type: "mark_user_task_completed"; nodeId: string }
+  | { type: "approve_checkpoint"; nodeId: string; response?: unknown }
+  | { type: "reject_checkpoint"; nodeId: string; reason?: string }
+  | { type: "retry_node"; nodeId: string };
+
+// ═══════════════════════════════════════════════════════════════
+// Legacy types retained for backward compatibility
+// These are the types used by the engine execution layer,
+// API routes, AI features, and existing tests.
+// TODO: migrate all consumers to CompiledPlan / PlanRun
+// ═══════════════════════════════════════════════════════════════
 
 export interface GenerateTaskPlanRequest {
   taskId?: string;
@@ -23,8 +207,21 @@ export type TaskPlanNodeStatus =
   | "skipped";
 export type TaskPlanEdgeType = "sequential" | "depends_on";
 export type TaskPlanNodeExecutionMode = "automatic" | "manual" | "hybrid";
-export type TaskPlanNodeBlockingReason = "needs_user_input" | "needs_approval" | "external_dependency" | null;
+export type TaskPlanNodeBlockingReason =
+  | "needs_user_input"
+  | "needs_approval"
+  | "external_dependency"
+  | null;
 
+export type TaskPlanNodeExecutionClassification =
+  | "automatic_chainable"
+  | "automatic_standalone"
+  | "human_dependent"
+  | "review_gate";
+
+export type TaskPlanNodeReadiness = "ready" | "blocked" | "waiting";
+
+/** @deprecated Use CompiledNode instead */
 export type TaskPlanNode = {
   id: string;
   localId?: string;
@@ -51,14 +248,7 @@ export type TaskPlanNode = {
   readiness?: TaskPlanNodeReadiness;
 };
 
-export type TaskPlanNodeExecutionClassification =
-  | "automatic_chainable"
-  | "automatic_standalone"
-  | "human_dependent"
-  | "review_gate";
-
-export type TaskPlanNodeReadiness = "ready" | "blocked" | "waiting";
-
+/** @deprecated Use CompiledEdge instead */
 export type TaskPlanEdge = {
   id: string;
   fromNodeId: string;
@@ -67,6 +257,7 @@ export type TaskPlanEdge = {
   metadata: Record<string, unknown> | null;
 };
 
+/** @deprecated Use CompiledPlan instead */
 export type TaskPlanGraph = {
   id: string;
   taskId: string;
@@ -131,6 +322,7 @@ export type TaskUpdatePatch = {
   runtimeInput?: unknown;
 };
 
+/** @deprecated Use PlanPatch + PlanPatchOperation from ai-plan-blueprint instead */
 export type PlanUpdatePatch = {
   summary?: string;
   operation:

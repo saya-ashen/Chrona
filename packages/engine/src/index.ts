@@ -61,6 +61,17 @@ export {
   startPlanExecution,
 } from "./modules/plan-execution";
 
+export {
+  savePlanRun,
+  getPlanRun,
+  getLatestPlanRun,
+} from "./modules/plan-execution";
+
+export {
+  createPlanRunFromGraph,
+  applyCommandAndSyncGraph,
+} from "./modules/plan-execution";
+
 export { getInbox } from "./modules/queries/get-inbox";
 export { getMemoryConsole } from "./modules/queries/get-memory-console";
 export { getSchedulePage } from "./modules/queries/get-schedule-page";

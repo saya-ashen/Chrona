@@ -42,5 +42,9 @@ export { settlePlanNodeFromRun } from "./settle-node-run";
 export { applyPlanPatch } from "./apply-plan-patch";
 export type { ApplyPlanPatchInput, ApplyPlanPatchResult } from "./apply-plan-patch";
 
+export { savePlanRun, getPlanRun, getLatestPlanRun } from "./plan-run-store";
+
+export { createPlanRunFromGraph, applyCommandAndSyncGraph } from "./plan-run-bridge";
+
 export { recomputePlanExecutionProjection } from "./plan-execution-projection";
 export type { PlanExecutionProjection } from "./plan-execution-projection";

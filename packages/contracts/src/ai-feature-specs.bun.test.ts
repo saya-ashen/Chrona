@@ -39,7 +39,6 @@ describe("generate_plan feature spec", () => {
       validatePreparedFeaturePayload(spec, {
         title: "汉堡制作计划",
         goal: "完成汉堡制作",
-        summary: "按顺序完成准备、烹饪和装配",
         nodes: [{ id: "prepare", type: "task", title: "准备食材" }],
         edges: [],
       }),

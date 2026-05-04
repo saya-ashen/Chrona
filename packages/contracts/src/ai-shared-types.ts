@@ -1,5 +1,3 @@
-import type { TaskPlanNode } from "./ai-plan-runtime";
-
 export interface StructuredSuggestion {
   id: string;
   summary: string;
