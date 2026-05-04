@@ -29,210 +29,13 @@ import { parseTaskDispatchDecision } from "../core/dispatch-types";
 import { AiClientError } from "../core/types";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "../core/providers";
 import { buildGeneratePlanScope } from "../core/streaming";
-import type {
-  TaskPlanNode,
-  TaskPlanEdge,
-  TaskPlanEdgeType,
-  AIPlanOutput,
-  AIPlanEdge,
-  AITaskNode,
-  AICheckpointNode,
-  AIConditionNode,
-  AIWaitNode,
-} from "@chrona/contracts/ai";
+import type { AIPlanOutput } from "@chrona/contracts/ai";
 import {
   validateAIPlanOutput,
 } from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/db/logger";
 
 const logger = createLogger("ai-features.features");
-
-function normalizeAIPriority(
-  value: unknown,
-): "Low" | "Medium" | "High" | "Urgent" | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "low") return "Low";
-  if (normalized === "medium") return "Medium";
-  if (normalized === "high") return "High";
-  if (normalized === "urgent") return "Urgent";
-  return null;
-}
-
-function deriveExecutionFromAIPlanNode(
-  node: AITaskNode | AICheckpointNode | AIConditionNode | AIWaitNode,
-): {
-  requiresHumanInput: boolean;
-  requiresHumanApproval: boolean;
-  autoRunnable: boolean;
-  blockingReason: TaskPlanNode["blockingReason"];
-} {
-  switch (node.type) {
-    case "task":
-      return {
-        requiresHumanInput: node.executor === "user" || node.mode === "manual",
-        requiresHumanApproval: false,
-        autoRunnable: node.executor !== "user" && node.mode !== "manual",
-        blockingReason:
-          node.executor === "user" || node.mode === "manual" ? "needs_user_input" : null,
-      };
-    case "checkpoint":
-      return {
-        requiresHumanInput: true,
-        requiresHumanApproval:
-          node.checkpointType === "approve" || node.checkpointType === "confirm",
-        autoRunnable: false,
-        blockingReason:
-          node.checkpointType === "approve" || node.checkpointType === "confirm"
-            ? "needs_approval"
-            : "needs_user_input",
-      };
-    case "condition":
-      return {
-        requiresHumanInput: node.evaluationBy === "user",
-        requiresHumanApproval: false,
-        autoRunnable: node.evaluationBy !== "user",
-        blockingReason: node.evaluationBy === "user" ? "needs_user_input" : null,
-      };
-    case "wait":
-      return {
-        requiresHumanInput: false,
-        requiresHumanApproval: false,
-        autoRunnable: true,
-        blockingReason: null,
-      };
-  }
-}
-
-function buildTaskPlanNodeFromAIPlanNode(
-  node: AITaskNode | AICheckpointNode | AIConditionNode | AIWaitNode,
-  index: number,
-): TaskPlanNode {
-  const execution = deriveExecutionFromAIPlanNode(node);
-  const executionMode: TaskPlanNode["executionMode"] =
-    execution.requiresHumanInput || execution.requiresHumanApproval
-      ? "manual"
-      : "automatic";
-
-  let objective: string;
-  let description: string | null;
-  let estimatedMinutes: number | null;
-
-  switch (node.type) {
-    case "task":
-      objective = node.expectedOutput ?? node.description ?? node.title;
-      description = node.description ?? null;
-      estimatedMinutes = typeof node.estimatedMinutes === "number" ? node.estimatedMinutes : 30;
-      break;
-    case "checkpoint":
-      objective = node.prompt;
-      description = node.description ?? null;
-      estimatedMinutes = 5;
-      break;
-    case "condition":
-      objective = node.condition;
-      description = node.description ?? null;
-      estimatedMinutes = 5;
-      break;
-    case "wait":
-      objective = `Wait for: ${node.waitFor}`;
-      description = node.description ?? null;
-      estimatedMinutes = node.timeout?.minutes ?? 30;
-      break;
-  }
-
-  return {
-    id: node.id ?? `node-${index + 1}`,
-    type: node.type,
-    title: node.title,
-    objective,
-    description,
-    status: "pending",
-    phase: null,
-    estimatedMinutes,
-    priority: "type" in node && node.type === "task"
-      ? normalizeAIPriority(node.priority)
-      : null,
-    executionMode,
-    requiresHumanInput: execution.requiresHumanInput,
-    requiresHumanApproval: execution.requiresHumanApproval,
-    autoRunnable: execution.autoRunnable,
-    blockingReason: execution.blockingReason,
-    linkedTaskId: null,
-    completionSummary: null,
-    metadata: {
-      ...(node.type === "checkpoint"
-        ? {
-            checkpointType: node.checkpointType,
-            options: node.options,
-            inputFields: node.inputFields,
-            prompt: node.prompt,
-            required: node.required,
-            targetNodeId: node.targetNodeId,
-          }
-        : {}),
-      ...(node.type === "condition"
-        ? {
-            condition: node.condition,
-            evaluationBy: node.evaluationBy,
-            branches: node.branches,
-            defaultNextNodeId: node.defaultNextNodeId,
-          }
-        : {}),
-      ...(node.type === "wait"
-        ? { waitFor: node.waitFor, timeout: node.timeout }
-        : {}),
-      ...(node.type === "task" && node.executor
-        ? { executor: node.executor, mode: node.mode }
-        : {}),
-    },
-  };
-}
-
-function buildTaskPlanEdgesFromAIPlanEdges(
-  aiEdges: AIPlanEdge[],
-): TaskPlanEdge[] {
-  return aiEdges.map((edge, index) => ({
-    id: `edge-${index + 1}`,
-    fromNodeId: edge.from,
-    toNodeId: edge.to,
-    type: "sequential" as TaskPlanEdgeType,
-    metadata: edge.label ? { label: edge.label } : null,
-  }));
-}
-
-function buildConditionEdges(
-  nodes: AIPlanOutput["nodes"],
-): TaskPlanEdge[] {
-  const edges: TaskPlanEdge[] = [];
-  let edgeIndex = 0;
-
-  for (const node of nodes) {
-    if (node.type !== "condition") continue;
-
-    for (const branch of node.branches) {
-      edges.push({
-        id: `edge-condition-${++edgeIndex}`,
-        fromNodeId: node.id,
-        toNodeId: branch.nextNodeId,
-        type: "depends_on",
-        metadata: { branchLabel: branch.label },
-      });
-    }
-
-    if (node.defaultNextNodeId) {
-      edges.push({
-        id: `edge-condition-${++edgeIndex}`,
-        fromNodeId: node.id,
-        toNodeId: node.defaultNextNodeId,
-        type: "depends_on",
-        metadata: { branchLabel: "default" },
-      });
-    }
-  }
-
-  return edges;
-}
 
 function ensureObject(value: unknown, context: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -308,9 +111,7 @@ export function normalizeGeneratePlanResponse(input: {
   structured?: StructuredDebugInfo | null;
 }): GenerateTaskPlanResponse {
   const defaultResult = {
-    nodes: [] as TaskPlanNode[],
-    edges: [] as TaskPlanEdge[],
-    summary: "",
+    blueprint: { title: "", goal: "", nodes: [], edges: [] },
     source: input.source,
     structured: input.structured ?? undefined,
   };
@@ -334,19 +135,8 @@ export function normalizeGeneratePlanResponse(input: {
     logger.warn("plan.validation_warnings", { warnings, source: input.source });
   }
 
-  const nodes: TaskPlanNode[] = aiPlan.nodes.map((node, index) =>
-    buildTaskPlanNodeFromAIPlanNode(node, index),
-  );
-
-  const mainEdges = buildTaskPlanEdgesFromAIPlanEdges(aiPlan.edges);
-  const conditionEdges = buildConditionEdges(aiPlan.nodes);
-  const edges = [...mainEdges, ...conditionEdges];
-
   return {
-    nodes,
-    edges,
-    summary: aiPlan.summary ?? aiPlan.title ?? `${nodes.length} planned step${nodes.length === 1 ? "" : "s"}`,
-    reasoning: aiPlan.title ? `Goal: ${aiPlan.goal}` : undefined,
+    blueprint: aiPlan,
     source: input.source,
     structured: input.structured ?? undefined,
   };
@@ -359,10 +149,9 @@ export async function generatePlan(
   const result = await parseStructuredFeatureResult<{
     title?: string;
     goal?: string;
-    summary?: string;
+    assumptions?: string[];
     nodes?: Array<Record<string, unknown>>;
     edges?: Array<Record<string, unknown>>;
-    completionPolicy?: Record<string, unknown>;
   }>(client, "generate_plan", request, buildGeneratePlanScope(request));
 
   return normalizeGeneratePlanResponse({

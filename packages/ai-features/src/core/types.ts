@@ -115,7 +115,7 @@ export interface SmartSuggestResponse extends StructuredResponseMeta {
   requestId: string;
 }
 
-import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
+import type { PlanBlueprint } from "@chrona/contracts/ai";
 
 export interface GenerateTaskPlanRequest {
   taskId: string;
@@ -126,10 +126,7 @@ export interface GenerateTaskPlanRequest {
 }
 
 export interface GenerateTaskPlanResponse extends StructuredResponseMeta {
-  nodes: TaskPlanNode[];
-  edges: TaskPlanEdge[];
-  summary: string;
-  reasoning?: string;
+  blueprint: PlanBlueprint;
   source: string;
 }
 

@@ -347,18 +347,6 @@ export class OpenClawClient extends ProviderClient {
     });
 
     if (!res.ok) {
-      console.log(
-        "Gateway error,request:",
-        JSON.stringify(body),
-        "response status:",
-        res.status,
-      );
-      // 把请求的body写入到一个json文件中
-      await Bun.write(
-        `gateway_error_${Date.now()}.json`,
-        JSON.stringify(body, null, 2),
-      );
-
       const errText = await res.text().catch(() => "");
       throw new Error(
         `[openclaw] Gateway call failed (${res.status}): ${errText.slice(0, 500)}`,
