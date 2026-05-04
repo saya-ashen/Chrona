@@ -1,6 +1,8 @@
 import { MemoryScope, MemorySourceType, MemoryStatus, type Memory } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type {
+  PlanBlueprint,
+  CompiledPlanCompletionPolicy,
   SavedTaskPlanGraph,
   TaskPlanEdge,
   TaskPlanGraph,
@@ -20,6 +22,10 @@ type StoredTaskPlanGraphPayload = {
   prompt: string | null;
   summary: string | null;
   changeSummary: string | null;
+  blueprint?: PlanBlueprint;
+  completionPolicy?: CompiledPlanCompletionPolicy;
+  entryNodeIds?: string[];
+  terminalNodeIds?: string[];
   nodes: TaskPlanNode[];
   edges: TaskPlanEdge[];
 };
@@ -135,11 +141,32 @@ function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGrap
       typeof payload.changeSummary === "string" && payload.changeSummary.trim().length > 0
         ? payload.changeSummary.trim()
         : null,
+    blueprint:
+      payload.blueprint && typeof payload.blueprint === "object" && Array.isArray(payload.blueprint.nodes)
+        ? payload.blueprint
+        : { title: memory.id, goal: payload.summary ?? "", nodes: [], edges: [] },
+    completionPolicy:
+      payload.completionPolicy && typeof payload.completionPolicy === "object" && typeof payload.completionPolicy.type === "string"
+        ? payload.completionPolicy
+        : { type: "all_tasks_completed" },
+    entryNodeIds: Array.isArray(payload.entryNodeIds)
+      ? payload.entryNodeIds.filter((value): value is string => typeof value === "string")
+      : [],
+    terminalNodeIds: Array.isArray(payload.terminalNodeIds)
+      ? payload.terminalNodeIds.filter((value): value is string => typeof value === "string")
+      : [],
     createdAt: memory.createdAt.toISOString(),
     updatedAt: memory.updatedAt.toISOString(),
     nodes: Array.isArray(payload.nodes)
       ? payload.nodes.map((node, index) => ({
           id: typeof node.id === "string" && node.id.trim().length > 0 ? node.id : `node-${index + 1}`,
+          localId:
+            typeof (node as Record<string, unknown>).localId === "string"
+            && ((node as Record<string, unknown>).localId as string).trim().length > 0
+              ? ((node as Record<string, unknown>).localId as string).trim()
+              : typeof node.id === "string" && node.id.trim().length > 0
+                ? node.id
+                : `node-${index + 1}`,
           type: normalizeNodeType(node.type),
           title: typeof node.title === "string" && node.title.trim().length > 0 ? node.title.trim() : `Step ${index + 1}`,
           objective:
@@ -258,6 +285,10 @@ function serializeTaskPlanGraph(input: {
     summary: input.summary?.trim() ? input.summary.trim() : input.plan.summary ?? null,
     changeSummary:
       input.changeSummary?.trim() ? input.changeSummary.trim() : input.plan.changeSummary ?? null,
+    blueprint: input.plan.blueprint,
+    completionPolicy: input.plan.completionPolicy,
+    entryNodeIds: input.plan.entryNodeIds,
+    terminalNodeIds: input.plan.terminalNodeIds,
     nodes: input.plan.nodes,
     edges: input.plan.edges,
   };

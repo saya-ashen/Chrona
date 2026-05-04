@@ -626,7 +626,7 @@ export async function* generatePlanStream(
         source: client.type,
         structured: event.structured,
       });
-      if (plan.nodes.length === 0) {
+      if (plan.blueprint.nodes.length === 0) {
         const diagnostics = buildGeneratePlanDiagnostics({
           text,
           structured: event.structured ?? null,
@@ -640,7 +640,7 @@ export async function* generatePlanStream(
             structured: event.structured ?? null,
             latestToolInput,
             structuredToolGraph,
-          })} Normalized plan contained zero nodes.`,
+          })} Normalized plan blueprint contained zero nodes.`,
           rawText: text,
           structured: event.structured ?? null,
           diagnostics,

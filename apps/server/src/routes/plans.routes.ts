@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { db } from "@chrona/db";
-import type { TaskPlanGraph, TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { PlanBlueprint } from "@chrona/contracts/ai";
 import {
   acceptTaskPlanGraph,
   aiGeneratePlan,
@@ -14,6 +15,7 @@ import {
   materializeTaskPlan,
   saveTaskPlanGraph,
 } from "@chrona/engine";
+import { compilePlanBlueprint } from "@chrona/engine";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
@@ -282,7 +284,7 @@ export function createPlansRoutes() {
                 } else if (event.type === "partial") {
                   if (!safeEnqueue("partial", { text: event.text })) break;
                 } else if (event.type === "result" && "plan" in event) {
-                  if (event.plan.nodes.length === 0) {
+                  if (event.plan.blueprint.nodes.length === 0) {
                     const message =
                       event.plan.structured?.error?.trim() ||
                       "AI returned an empty task plan with zero nodes.";
@@ -290,7 +292,7 @@ export function createPlansRoutes() {
                       requestId,
                       feature: "generate_plan",
                       taskId: taskId ?? null,
-                      planSummary: event.plan.summary,
+                        planSummary: event.plan.blueprint.title,
                       structured: summarizeStructuredPlanDebug(
                         event.plan.structured,
                       ),
@@ -299,21 +301,16 @@ export function createPlansRoutes() {
                     requestFinished = true;
                     break;
                   }
-                  const draftPlan: TaskPlanGraph = {
-                    id: `graph-${taskId || "adhoc"}-${Date.now()}`,
+                  const draftPlan: TaskPlanGraph = compilePlanBlueprint({
+                    graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
                     taskId: taskId ?? "",
+                    blueprint: event.plan.blueprint,
+                    prompt: planningPrompt ?? null,
+                    generatedBy: event.plan.source ?? "ai",
+                    source: "ai",
                     status: "draft",
                     revision: 1,
-                    source: "ai",
-                    generatedBy: event.plan.source ?? "ai",
-                    prompt: planningPrompt ?? null,
-                    summary: event.plan.summary,
-                    changeSummary: null,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    nodes: event.plan.nodes,
-                    edges: event.plan.edges,
-                  };
+                  });
 
                   if (taskId && resolvedWorkspaceId) {
                     const savedPlan = await saveTaskPlanGraph({
@@ -324,21 +321,19 @@ export function createPlansRoutes() {
                       status: "draft",
                       source: "ai",
                       generatedBy: event.plan.source ?? "ai",
-                      summary: event.plan.summary,
+                      summary: draftPlan.summary,
                     });
                     finalResponse = {
                       source: event.plan.source,
                       planGraph: savedPlan.plan,
                       taskSessionKey: sharedTaskSessionKey,
                       savedPlan: buildSavedPlanSummary(savedPlan),
-                      reasoning: event.plan.reasoning,
                     };
                   } else {
                     finalResponse = {
                       source: event.plan.source,
                       planGraph: draftPlan,
                       taskSessionKey: sharedTaskSessionKey,
-                      reasoning: event.plan.reasoning,
                     };
                   }
                   if (!safeEnqueue("result", finalResponse)) break;
@@ -433,21 +428,16 @@ export function createPlansRoutes() {
         return error(c, "AI planning unavailable", 503);
       }
 
-      const plan: TaskPlanGraph = {
-        id: `graph-${taskId || "adhoc"}-${Date.now()}`,
+      const plan: TaskPlanGraph = compilePlanBlueprint({
+        graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
         taskId: taskId ?? "",
+        blueprint: planResult.blueprint,
+        prompt: planningPrompt ?? null,
+        generatedBy: planResult.source ?? "ai",
+        source: "ai",
         status: "draft",
         revision: 1,
-        source: "ai",
-        generatedBy: planResult.source ?? "ai",
-        prompt: planningPrompt ?? null,
-        summary: planResult.summary,
-        changeSummary: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        nodes: planResult.nodes,
-        edges: planResult.edges,
-      };
+      });
 
       if (taskId && resolvedWorkspaceId) {
         const savedPlan = await saveTaskPlanGraph({
@@ -458,7 +448,7 @@ export function createPlansRoutes() {
           status: "draft",
           source: "ai",
           generatedBy: planResult.source ?? "ai",
-          summary: planResult.summary,
+          summary: plan.summary,
         });
 
         return json(c, {
@@ -466,7 +456,6 @@ export function createPlansRoutes() {
           planGraph: savedPlan.plan,
           taskSessionKey: sharedTaskSessionKey,
           savedPlan: buildSavedPlanSummary(savedPlan),
-          reasoning: planResult.reasoning,
         });
       }
 
@@ -474,7 +463,6 @@ export function createPlansRoutes() {
         source: planResult.source,
         planGraph: plan,
         taskSessionKey: sharedTaskSessionKey,
-        reasoning: planResult.reasoning,
       });
     } catch (cause) {
       if (cause instanceof TaskPlanGenerationInFlightError) {
@@ -488,10 +476,9 @@ export function createPlansRoutes() {
   api.post("/ai/batch-apply-plan", async (c) => {
     try {
       const body = await c.req.json();
-      const { taskId, nodes: providedNodes, edges: providedEdges } = body as {
+      const { taskId, blueprint: providedBlueprint } = body as {
         taskId?: string;
-        nodes?: TaskPlanNode[];
-        edges?: TaskPlanEdge[];
+        blueprint?: PlanBlueprint;
       };
 
       if (!taskId) {
@@ -507,66 +494,23 @@ export function createPlansRoutes() {
         return error(c, "Task not found", 404);
       }
 
-      if (providedNodes !== undefined && !Array.isArray(providedNodes)) {
-        return error(c, "nodes must be an array", 400);
-      }
-
-      if (providedEdges !== undefined && !Array.isArray(providedEdges)) {
-        return error(c, "edges must be an array", 400);
-      }
-
-      if (providedNodes && providedNodes.length > 0) {
-        const hasInvalidNode = providedNodes.some((node) => {
-          if (!node || typeof node !== "object") return true;
-          const record = node as Record<string, unknown>;
-          return (
-            typeof record.id !== "string" ||
-            !record.id.trim() ||
-            typeof record.title !== "string" ||
-            !record.title.trim() ||
-            typeof record.objective !== "string" ||
-            !record.objective.trim()
-          );
-        });
-        if (hasInvalidNode) {
-          return error(c, "plan nodes must include id, title, and objective", 400);
-        }
-      }
-
-      if (providedEdges && providedEdges.length > 0) {
-        const validNodeIds = new Set((providedNodes ?? []).map((node) => node.id));
-        const hasInvalidEdge = providedEdges.some((edge) => {
-          if (!edge || typeof edge !== "object") return true;
-          const record = edge as Record<string, unknown>;
-          return (
-            typeof record.fromNodeId !== "string" ||
-            typeof record.toNodeId !== "string" ||
-            (validNodeIds.size > 0 && (!validNodeIds.has(record.fromNodeId) || !validNodeIds.has(record.toNodeId)))
-          );
-        });
-        if (hasInvalidEdge) {
-          return error(c, "plan edges must reference valid node ids", 400);
+      if (providedBlueprint !== undefined) {
+        if (!providedBlueprint || typeof providedBlueprint !== "object" || !Array.isArray(providedBlueprint.nodes)) {
+          return error(c, "blueprint must be a valid plan blueprint", 400);
         }
       }
 
       let graphPlan = null;
-      if (providedNodes && Array.isArray(providedNodes) && providedNodes.length > 0) {
-        const now = new Date().toISOString();
-        const plan: TaskPlanGraph = {
-          id: `graph-${taskId}-${Date.now()}`,
+      if (providedBlueprint && Array.isArray(providedBlueprint.nodes) && providedBlueprint.nodes.length > 0) {
+        const plan: TaskPlanGraph = compilePlanBlueprint({
+          graphId: `graph-${taskId}-${Date.now()}`,
           taskId,
+          blueprint: providedBlueprint,
+          generatedBy: "batch-apply",
+          source: "ai",
           status: "draft",
           revision: 1,
-          source: "ai",
-          generatedBy: "batch-apply",
-          prompt: null,
-          summary: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
-          changeSummary: null,
-          createdAt: now,
-          updatedAt: now,
-          nodes: providedNodes,
-          edges: providedEdges ?? [],
-        };
+        });
         graphPlan = await saveTaskPlanGraph({
           workspaceId: task.workspaceId,
           taskId: task.id,

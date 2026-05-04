@@ -84,5 +84,6 @@ export {
   getLatestTaskPlanGraph,
   saveTaskPlanGraph,
 } from "./modules/tasks/task-plan-graph-store";
+export { compilePlanBlueprint } from "./modules/tasks/plan-blueprint-compiler";
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";

@@ -5,6 +5,7 @@ import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@chro
 import { getLatestTaskPlanGraph, saveTaskPlanGraph, enrichPlanGraphNodes } from "@/modules/tasks/task-plan-graph-store";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
+import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 
 const logger = createLogger("command.generate-task-plan-for-task");
 
@@ -36,22 +37,16 @@ function buildDraftPlanGraph(input: {
   generatedBy: string;
   planResult: GenerateTaskPlanResponse;
 }) {
-  const now = new Date().toISOString();
-  const graph: TaskPlanGraph = {
-    id: `graph-${input.taskId || "adhoc"}-${Date.now()}`,
+  const graph = compilePlanBlueprint({
+    graphId: `graph-${input.taskId || "adhoc"}-${Date.now()}`,
     taskId: input.taskId,
+    blueprint: input.planResult.blueprint,
+    prompt: input.prompt,
+    generatedBy: input.generatedBy,
+    source: "ai",
     status: "draft",
     revision: 1,
-    source: "ai",
-    generatedBy: input.generatedBy,
-    prompt: input.prompt,
-    summary: input.planResult.summary,
-    changeSummary: null,
-    createdAt: now,
-    updatedAt: now,
-    nodes: input.planResult.nodes,
-    edges: input.planResult.edges,
-  };
+  });
   return enrichPlanGraphNodes(graph);
 }
 
@@ -153,14 +148,14 @@ export async function generateTaskPlanForTask(input: {
     return null;
   }
 
-   if (planResult.nodes.length === 0) {
-     logger.warn("request.empty_plan", {
-       taskId: task.id,
-       source: planResult.source,
-       summary: summarizeText(planResult.summary),
-     });
-     return null;
-   }
+  if (planResult.blueprint.nodes.length === 0) {
+      logger.warn("request.empty_plan", {
+        taskId: task.id,
+        source: planResult.source,
+        summary: summarizeText(planResult.blueprint.title),
+      });
+      return null;
+    }
 
   const draftPlan = buildDraftPlanGraph({
     taskId: task.id,
@@ -176,7 +171,7 @@ export async function generateTaskPlanForTask(input: {
     status: "draft",
     source: "ai",
     generatedBy: planResult.source ?? "ai",
-    summary: planResult.summary,
+    summary: draftPlan.summary,
   });
 
   logger.info("request.saved", {
@@ -190,7 +185,6 @@ export async function generateTaskPlanForTask(input: {
     planGraph: savedPlan.plan,
     taskSessionKey: sharedTaskSessionKey,
     savedPlan: buildSavedPlanSummary(savedPlan),
-    reasoning: planResult.reasoning,
   });
 }
 
