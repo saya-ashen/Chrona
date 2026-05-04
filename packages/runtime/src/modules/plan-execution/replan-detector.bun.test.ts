@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { detectPlanDrift } from "./replan-detector";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executor";
 
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {

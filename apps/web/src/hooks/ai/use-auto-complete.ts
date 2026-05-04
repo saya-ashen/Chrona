@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { createLogger, summarizeText } from "../logger";
+import { createLogger, summarizeText } from "./logger";
 
 const logger = createLogger("hook.use-auto-complete");
 import type {

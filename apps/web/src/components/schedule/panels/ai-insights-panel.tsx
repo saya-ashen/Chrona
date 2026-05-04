@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { SurfaceCard } from "@/components/ui/surface-card";

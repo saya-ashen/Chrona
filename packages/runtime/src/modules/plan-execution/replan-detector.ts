@@ -1,4 +1,4 @@
-import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@/modules/ai/types";
+import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executor";
 
 export type PlanDriftDecision =

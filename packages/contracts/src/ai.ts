@@ -115,6 +115,21 @@ export interface AIPlanOutput {
   completionPolicy?: AIPlanCompletionPolicy;
 }
 
+export interface StructuredSuggestion {
+  id: string;
+  summary: string;
+  action: {
+    type: "create_task";
+    title: string;
+    description: string;
+    priority: "Low" | "Medium" | "High" | "Urgent";
+    estimatedMinutes: number;
+    tags: string[];
+    scheduledStartAt?: string;
+    scheduledEndAt?: string;
+  };
+}
+
 // ────────────────────────────────────────────────────
 // Zod schemas for AI plan output validation
 // ────────────────────────────────────────────────────

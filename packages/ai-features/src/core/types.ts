@@ -115,7 +115,7 @@ export interface SmartSuggestResponse extends StructuredResponseMeta {
   requestId: string;
 }
 
-import type { TaskPlanNode, TaskPlanEdge } from "@/modules/ai/types";
+import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
 
 export interface GenerateTaskPlanRequest {
   taskId: string;
@@ -260,7 +260,7 @@ export interface ExecutionContextStats {
   summaryMemoryId?: string;
 }
 
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import type { TaskDispatchDecision, TaskDispatchPolicy } from "./dispatch-types";
 
 export interface DispatchTaskInput {

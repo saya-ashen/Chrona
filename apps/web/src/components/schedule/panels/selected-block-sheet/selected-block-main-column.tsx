@@ -14,7 +14,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import { cn } from "@/lib/utils";
 import { toPlanGraphPlan } from "./plan-utils";
 

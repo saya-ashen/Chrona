@@ -35,7 +35,7 @@ The npm package is built with esbuild (not tsup/bun build) to handle monorepo wo
 
 ```bash
 bun run build         # Build the SPA (Vite)
-bun run build:npm     # Build the npm entry point (esbuild)
+bun run build:npm     # Build the npm launcher bundle
 ```
 
 Test locally:
@@ -52,8 +52,7 @@ Chrona is a Vite + Hono monorepo:
 |---------|---------|
 | `apps/web/` | Vite React SPA (React Router) |
 | `apps/server/` | Hono API server + static SPA host |
-| `packages/cli/` | npm entry point (embeds Bun) |
-| `packages/common/cli/` | CLI commands (task, run, schedule, ai) |
+| `packages/cli/` | CLI package: npm entry point, launcher, and commands |
 | `packages/contracts/` | Shared DTOs, Zod schemas |
 | `packages/db/` | Prisma bootstrap and repositories |
 | `packages/domain/` | Pure business rules |

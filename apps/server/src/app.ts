@@ -4,7 +4,7 @@ import {
   defaultLocale,
   getPreferredLocale,
   hasLocale,
-} from "@chrona/common-i18n";
+} from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
 import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";

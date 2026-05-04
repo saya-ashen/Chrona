@@ -3,7 +3,7 @@ import type {
   ScheduledTaskInfo,
   Suggestion,
   TaskChange,
-} from "./types";
+} from "@chrona/contracts/ai";
 
 /**
  * 为时间重叠冲突生成建议

@@ -5,7 +5,7 @@ import { db } from "@chrona/db";
 import { createRuntimeAdapter } from "@chrona/openclaw-integration/runtime/adapter";
 import type { StructuredSuggestion } from "@chrona/contracts";
 import { createLogger, summarizeText } from "@chrona/db/logger";
-import type { TaskPlanStatus } from "@chrona/runtime/modules/ai/types";
+import type { TaskPlanStatus } from "@chrona/contracts/ai";
 import { appendCanonicalEvent } from "@chrona/runtime/modules/events/append-canonical-event";
 import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
 import { OpenClawClient } from "@chrona/providers-core";

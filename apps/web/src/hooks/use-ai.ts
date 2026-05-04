@@ -1,8 +1,9 @@
 export type {
   StructuredSuggestion,
-} from "@chrona/contracts/hooks/use-ai";
+  AutoCompleteSuggestion,
+} from "./ai/types";
 
-export {
-  useAutoComplete,
-  useSmartDecomposition,
-} from "@chrona/contracts/hooks/use-ai";
+export type { SmartDecompositionTaskInput } from "./ai/use-smart-decomposition";
+
+export { useAutoComplete } from "./ai/use-auto-complete";
+export { useSmartDecomposition, useBatchApplyPlan } from "./ai/use-smart-decomposition";

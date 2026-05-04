@@ -1,7 +1,6 @@
-export type { StructuredSuggestion } from "./hooks/ai/types";
-
 // AI plan contracts
 export type {
+  StructuredSuggestion,
   AIPlanNode,
   AIPlanNodeType,
   AITaskNode,

@@ -4,7 +4,7 @@ import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-re
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import { TaskContextLinks } from "@/components/ui/task-context-links";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
 export function SelectedBlockAiSidebar({

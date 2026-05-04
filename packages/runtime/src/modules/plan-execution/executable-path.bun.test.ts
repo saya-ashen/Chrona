@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { computeExecutablePath, type PlanExecutablePath } from "./executable-path";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
   const { id, ...rest } = overrides;

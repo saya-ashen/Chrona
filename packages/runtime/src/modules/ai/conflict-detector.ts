@@ -2,7 +2,7 @@ import type {
   Conflict,
   ConflictSeverity,
   ScheduledTaskInfo,
-} from "./types";
+} from "@chrona/contracts/ai";
 
 /**
  * 检测时间重叠冲突
