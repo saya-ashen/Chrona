@@ -72,22 +72,29 @@ function defaultFeatureInstructions(feature: BridgeFeature): string {
     case "dispatch_task":
       return "Return dispatch decision only via function call dispatch_next_task_action.";
     case "conflicts":
-      return "Analyze conflicts and return structured JSON.";
+      return "Call analyze_schedule_conflicts exactly once with the final conflict analysis payload.";
     case "timeslots":
-      return "Suggest timeslots and return structured JSON.";
+      return "Call suggest_task_timeslots exactly once with the final timeslot suggestion payload.";
     case "chat":
       return "Answer user request normally.";
   }
 }
 
 function toolDescription(toolName: string): string {
-  if (toolName === "generate_task_plan_graph") {
-    return [
-      "Create and persist the Chrona task plan graph for the provided task snapshot.",
-      "Return a complete graph with summary, nodes, and edges; do not ask follow-up questions.",
-    ].join(" ");
+  switch (toolName) {
+    case "suggest_task_completions":
+      return "Return Chrona task suggestions as structured tool arguments.";
+    case "generate_task_plan_graph":
+      return "Create and persist the Chrona task plan graph as structured tool arguments.";
+    case "dispatch_next_task_action":
+      return "Return Chrona's next task dispatch decision as structured tool arguments.";
+    case "analyze_schedule_conflicts":
+      return "Return Chrona's schedule conflict analysis as structured tool arguments.";
+    case "suggest_task_timeslots":
+      return "Return Chrona's timeslot suggestions as structured tool arguments.";
+    default:
+      return "Return the structured result through tool arguments.";
   }
-  return `Chrona structured feature tool: ${toolName}`;
 }
 
 function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unknown>): string {
@@ -102,7 +109,7 @@ function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unk
   const parts: string[] = [
     "Create an execution-ready plan graph for the task below.",
     "Use only the information provided in this message. Do not ask follow-up questions.",
-    "Make reasonable assumptions if the task is underspecified, and directly call generate_task_plan_graph.",
+    "Make reasonable assumptions if the task is underspecified.",
     "The plan should be concise but actionable: 3-7 nodes for normal tasks, with clear dependencies.",
     "Prefer automatic execution nodes when no human approval/input is truly required.",
     "",
@@ -127,17 +134,24 @@ function stringifyFeatureInput(feature: BridgeFeature, input: Record<string, unk
 
     parts.push(
       "",
-      "Output requirements",
+      "Tool call requirements",
       "- Call generate_task_plan_graph exactly once.",
-      "- Include summary, nodes, and edges as top-level fields.",
-      "- Each node should include id, type, title, objective, and estimatedMinutes when possible.",
-      "- For each node, explicitly set executor to either 'human' or 'automation'.",
-      "- Use executor='automation' ONLY when the node can be completed entirely in software without human input, approval, payment, travel, pickup, waiting, or other manual action.",
-      "- Use executor='human' for approvals, choices, clarification, communication, payment, pickup, travel, waiting, receiving items, and any physical/manual action.",
+      "- Put the full plan graph into the function call arguments.",
+      "- Include summary, nodes, and edges as top-level fields in the tool arguments.",
+      "- Each node should include id, type, title, and estimatedMinutes when possible.",
+      "- For task nodes, use expectedOutput and completionCriteria when they are clear.",
+      "- For each task node, explicitly set executor to 'user', 'ai', or 'system' when possible.",
+      "- Use executor='ai' when Chrona/runtime can complete the node primarily through model-driven software work.",
+      "- Use executor='system' for deterministic software automation or integrations that do not require a person to act.",
+      "- Use executor='user' for approvals, choices, clarification, communication, payment, pickup, travel, waiting, receiving items, and any physical/manual action.",
+      "- Set mode to 'auto', 'assist', or 'manual' when the execution style is clear.",
       "- Do NOT emit executionMode, autoRunnable, blockingReason, status, linkedTaskId, or completionSummary; Chrona derives them.",
-      "- Use type=user_input for human clarification/input, decision for approval/choice gates, and tool_action only for truly automatable actions.",
-      "- Each edge should include id, fromNodeId, toNodeId, and type; use edges: [] only if there is a single independent node.",
-      "- Do not return prose instead of the tool call.",
+      "- Use type=checkpoint for approvals, choices, confirmations, and explicit user input gates.",
+      "- Use type=condition only for branching logic, and type=wait only for explicit waiting steps.",
+      "- Use type=task for executable work steps; do not invent additional node types.",
+      "- Each edge should use { from, to, label? }; use edges: [] only if there is a single independent node.",
+      "- Use completionPolicy.type='all_tasks_completed' by default when no stronger completion rule is needed.",
+      "- Do not rely on assistant free text as the machine-readable result channel.",
     );
 
   return parts.join("\n");
@@ -316,7 +330,6 @@ export function buildGatewayBody(
     const featureRequest = request as BridgeFeatureRequest<
       Record<string, unknown>
     >;
-    const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
     const featureInstructions =
       featureRequest.instructions?.trim() || defaultFeatureInstructions(route.feature);
     const featureInputText = stringifyFeatureInput(route.feature, featureRequest.input);
@@ -328,21 +341,24 @@ export function buildGatewayBody(
       stream: route.stream,
     };
 
-    if (previousResponseId) {
-      body.previous_response_id = previousResponseId;
-    }
-
+    const requiredTool = FEATURE_FUNCTION_TOOL[route.feature];
     if (requiredTool) {
       body.tools = [
         {
           type: "function",
           name: requiredTool,
           description: toolDescription(requiredTool),
-          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool],
+          parameters: FUNCTION_TOOL_SCHEMAS[requiredTool] ?? {
+            type: "object",
+            additionalProperties: true,
+          },
         },
       ];
-
       body.tool_choice = "required";
+    }
+
+    if (previousResponseId) {
+      body.previous_response_id = previousResponseId;
     }
 
     return body;

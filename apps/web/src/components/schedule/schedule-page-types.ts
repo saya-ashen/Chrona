@@ -112,6 +112,18 @@ export type ScheduleProposal = {
   scheduledEndAt: Date | null;
 };
 
+export type WorkBlockInfo = {
+  id: string;
+  taskId: string;
+  planId: string | null;
+  title: string;
+  status: "Scheduled" | "Active" | "Completed" | "Cancelled";
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+  startedAt: Date | null;
+  trigger: "scheduled" | "manual";
+};
+
 export type SchedulePageData = {
   defaultRuntimeAdapterKey: string;
   runtimeAdapters: TaskConfigRuntimeAdapter[];
@@ -126,6 +138,7 @@ export type SchedulePageData = {
   listItems: ScheduleTaskListItem[];
   conflicts: ScheduleConflict[];
   suggestions: ScheduleSuggestion[];
+  workBlocks: WorkBlockInfo[];
 };
 
 export type SchedulePageProps = {

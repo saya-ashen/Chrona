@@ -15,9 +15,9 @@ import type {
   AnalyzeConflictsRequest,
   SuggestTimeslotRequest,
   ChatRequest,
+  StructuredDebugInfo,
 } from "./types";
 import { createLogger } from "@chrona/db/logger";
-import type { StructuredAgentResult } from "@chrona/openclaw-integration/protocol/structured-result";
 import type {
   BridgeFeature,
   BridgeFeatureRequest,
@@ -152,7 +152,7 @@ async function* openclawStream(
 
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
-      const finalStructured: StructuredAgentResult | null = response.structured ?? null;
+      const finalStructured: StructuredDebugInfo | null = null;
 
       for (const rawEvent of events) {
         const event = parseBridgeEvent(rawEvent as NDJSONEvent);

@@ -52,14 +52,30 @@
     },
     "apps/server": {
       "name": "@chrona/server",
+      "dependencies": {
+        "@chrona/common-i18n": "workspace:*",
+        "@chrona/contracts": "workspace:*",
+        "@chrona/db": "workspace:*",
+        "@chrona/openclaw-bridge": "workspace:*",
+        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/runtime": "workspace:*",
+      },
     },
     "apps/web": {
       "name": "@chrona/web",
+      "dependencies": {
+        "@chrona/common-i18n": "workspace:*",
+        "@chrona/contracts": "workspace:*",
+        "@chrona/db": "workspace:*",
+        "@chrona/runtime": "workspace:*",
+        "@chrona/runtime-core": "workspace:*",
+      },
     },
     "packages/common/ai-features": {
       "name": "@chrona/ai-features",
       "version": "0.1.0",
       "dependencies": {
+        "@chrona/db": "workspace:*",
         "@chrona/openclaw-integration": "workspace:*",
       },
     },
@@ -87,6 +103,9 @@
     "packages/contracts": {
       "name": "@chrona/contracts",
       "version": "0.1.0",
+      "dependencies": {
+        "zod": "^4.3.6",
+      },
     },
     "packages/db": {
       "name": "@chrona/db",
@@ -95,6 +114,14 @@
     "packages/domain": {
       "name": "@chrona/domain",
       "version": "0.1.0",
+    },
+    "packages/providers/core": {
+      "name": "@chrona/providers-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/openclaw-bridge": "workspace:*",
+        "@chrona/openclaw-integration": "workspace:*",
+      },
     },
     "packages/providers/openclaw/bridge": {
       "name": "@chrona/openclaw-bridge",
@@ -114,6 +141,13 @@
     "packages/runtime": {
       "name": "@chrona/runtime",
       "version": "0.1.0",
+      "dependencies": {
+        "@chrona/ai-features": "workspace:*",
+        "@chrona/contracts": "workspace:*",
+        "@chrona/domain": "workspace:*",
+        "@chrona/openclaw-integration": "workspace:*",
+        "@chrona/runtime-core": "workspace:*",
+      },
     },
   },
   "trustedDependencies": [
@@ -215,6 +249,8 @@
     "@chrona/openclaw-bridge": ["@chrona/openclaw-bridge@workspace:packages/providers/openclaw/bridge"],
 
     "@chrona/openclaw-integration": ["@chrona/openclaw-integration@workspace:packages/providers/openclaw/integration"],
+
+    "@chrona/providers-core": ["@chrona/providers-core@workspace:packages/providers/core"],
 
     "@chrona/runtime": ["@chrona/runtime@workspace:packages/runtime"],
 

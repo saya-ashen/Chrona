@@ -35,6 +35,11 @@ type PlanStep = {
   priority?: string | null;
   completionSummary?: string | null;
   metadata?: Record<string, unknown> | null;
+  readiness?: "ready" | "blocked" | "waiting";
+  dependencies?: string[];
+  executionClassification?: "automatic_chainable" | "automatic_standalone" | "human_dependent" | "review_gate";
+  nextAction?: string | null;
+  requiredInfo?: string[];
 };
 
 type PlanEdge = {
@@ -79,6 +84,11 @@ const DEFAULT_GRAPH_COPY = {
   detailLinkedTask: "关联任务",
   detailDescription: "详细说明",
   detailCompletionSummary: "完成情况说明",
+  detailExecutionClassification: "执行分类",
+  detailReadiness: "就绪状态",
+  detailNextAction: "建议下一步",
+  detailDependencies: "前置依赖",
+  detailRequiredInfo: "所需信息",
   nodeTypeTask: "任务",
   nodeTypeCheckpoint: "检查点",
   nodeTypeCondition: "条件判断",
@@ -707,6 +717,36 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
               <DetailItem
                 label={graphCopy.detailLinkedTask}
                 value={step.linkedTaskId}
+              />
+            ) : null}
+            {step.executionClassification ? (
+              <DetailItem
+                label={graphCopy.detailExecutionClassification}
+                value={step.executionClassification}
+              />
+            ) : null}
+            {step.readiness ? (
+              <DetailItem
+                label={graphCopy.detailReadiness}
+                value={step.readiness}
+              />
+            ) : null}
+            {step.nextAction ? (
+              <DetailItem
+                label={graphCopy.detailNextAction}
+                value={step.nextAction}
+              />
+            ) : null}
+            {step.dependencies && step.dependencies.length > 0 ? (
+              <DetailItem
+                label={graphCopy.detailDependencies}
+                value={step.dependencies.join(", ")}
+              />
+            ) : null}
+            {step.requiredInfo && step.requiredInfo.length > 0 ? (
+              <DetailItem
+                label={graphCopy.detailRequiredInfo}
+                value={step.requiredInfo.join(", ")}
               />
             ) : null}
             {step.completionSummary ? (

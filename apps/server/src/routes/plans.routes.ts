@@ -657,6 +657,11 @@ export function createPlansRoutes() {
             linkedTaskId: null as string | null,
             completionSummary: null as string | null,
             metadata: null as Record<string, unknown> | null,
+            requiredInfo: Array.isArray(n.requiredInfo) ? n.requiredInfo as string[] : [] as string[],
+            dependencies: Array.isArray(n.dependencies) ? n.dependencies as string[] : undefined,
+            executionClassification: typeof n.executionClassification === "string" ? n.executionClassification as import("@chrona/contracts/ai").TaskPlanNodeExecutionClassification : undefined,
+            nextAction: typeof n.nextAction === "string" ? n.nextAction as string | null : null,
+            readiness: typeof n.readiness === "string" ? n.readiness as import("@chrona/contracts/ai").TaskPlanNodeReadiness : undefined,
           }));
           plan.nodes = [...plan.nodes, ...newNodes] as typeof plan.nodes;
           if (edges && edges.length > 0) {
@@ -692,6 +697,13 @@ export function createPlansRoutes() {
               ...(typeof patch.status === "string" ? { status: patch.status as import("@chrona/contracts/ai").TaskPlanNodeStatus } : {}),
               ...(typeof patch.priority === "string" ? { priority: patch.priority as import("@chrona/contracts/ai").TaskPlanNode["priority"] } : {}),
               ...(typeof patch.executionMode === "string" ? { executionMode: patch.executionMode as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode } : {}),
+              ...(patch.requiresHumanInput !== undefined ? { requiresHumanInput: patch.requiresHumanInput as boolean, autoRunnable: !(patch.requiresHumanInput as boolean) && !(node.requiresHumanApproval ?? false) } : {}),
+              ...(patch.requiresHumanApproval !== undefined ? { requiresHumanApproval: patch.requiresHumanApproval as boolean, autoRunnable: !(node.requiresHumanInput ?? false) && !(patch.requiresHumanApproval as boolean) } : {}),
+              ...(Array.isArray(patch.requiredInfo) ? { requiredInfo: patch.requiredInfo as string[] } : {}),
+              ...(Array.isArray(patch.dependencies) ? { dependencies: patch.dependencies as string[] } : {}),
+              ...(typeof patch.executionClassification === "string" ? { executionClassification: patch.executionClassification as import("@chrona/contracts/ai").TaskPlanNodeExecutionClassification } : {}),
+              ...(typeof patch.nextAction === "string" ? { nextAction: patch.nextAction as string | null } : {}),
+              ...(typeof patch.readiness === "string" ? { readiness: patch.readiness as import("@chrona/contracts/ai").TaskPlanNodeReadiness } : {}),
             };
           });
           break;

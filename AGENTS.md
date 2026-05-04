@@ -68,3 +68,8 @@ packages/
 - Preserve existing route behavior and public API behavior unless explicitly requested.
 - After each change batch, run: `bun run typecheck`, `bun run lint`, `bun run test`.
 - If a check fails, first determine whether the failure is caused by import/path breakage, environment/tooling drift, or an actual behavior change.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read `specs/001-plan-execution-orchestration/plan.md`
+<!-- SPECKIT END -->

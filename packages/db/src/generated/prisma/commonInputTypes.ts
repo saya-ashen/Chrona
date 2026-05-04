@@ -579,6 +579,57 @@ export type EnumAiClientTypeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
 }
 
+export type EnumWorkBlockStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockStatus | Prisma.EnumWorkBlockStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockStatus[]
+  notIn?: $Enums.WorkBlockStatus[]
+  not?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel> | $Enums.WorkBlockStatus
+}
+
+export type EnumWorkBlockTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockTrigger | Prisma.EnumWorkBlockTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockTrigger[]
+  notIn?: $Enums.WorkBlockTrigger[]
+  not?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel> | $Enums.WorkBlockTrigger
+}
+
+export type EnumWorkBlockStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockStatus | Prisma.EnumWorkBlockStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockStatus[]
+  notIn?: $Enums.WorkBlockStatus[]
+  not?: Prisma.NestedEnumWorkBlockStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkBlockStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel>
+}
+
+export type EnumWorkBlockTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockTrigger | Prisma.EnumWorkBlockTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockTrigger[]
+  notIn?: $Enums.WorkBlockTrigger[]
+  not?: Prisma.NestedEnumWorkBlockTriggerWithAggregatesFilter<$PrismaModel> | $Enums.WorkBlockTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel>
+}
+
+export type EnumExecutionSessionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExecutionSessionStatus | Prisma.EnumExecutionSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExecutionSessionStatus[]
+  notIn?: $Enums.ExecutionSessionStatus[]
+  not?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel> | $Enums.ExecutionSessionStatus
+}
+
+export type EnumExecutionSessionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExecutionSessionStatus | Prisma.EnumExecutionSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExecutionSessionStatus[]
+  notIn?: $Enums.ExecutionSessionStatus[]
+  not?: Prisma.NestedEnumExecutionSessionStatusWithAggregatesFilter<$PrismaModel> | $Enums.ExecutionSessionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[]
@@ -1104,6 +1155,57 @@ export type NestedEnumAiClientTypeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumAiClientTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumWorkBlockStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockStatus | Prisma.EnumWorkBlockStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockStatus[]
+  notIn?: $Enums.WorkBlockStatus[]
+  not?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel> | $Enums.WorkBlockStatus
+}
+
+export type NestedEnumWorkBlockTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockTrigger | Prisma.EnumWorkBlockTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockTrigger[]
+  notIn?: $Enums.WorkBlockTrigger[]
+  not?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel> | $Enums.WorkBlockTrigger
+}
+
+export type NestedEnumWorkBlockStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockStatus | Prisma.EnumWorkBlockStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockStatus[]
+  notIn?: $Enums.WorkBlockStatus[]
+  not?: Prisma.NestedEnumWorkBlockStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkBlockStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkBlockStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumWorkBlockTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkBlockTrigger | Prisma.EnumWorkBlockTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkBlockTrigger[]
+  notIn?: $Enums.WorkBlockTrigger[]
+  not?: Prisma.NestedEnumWorkBlockTriggerWithAggregatesFilter<$PrismaModel> | $Enums.WorkBlockTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkBlockTriggerFilter<$PrismaModel>
+}
+
+export type NestedEnumExecutionSessionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExecutionSessionStatus | Prisma.EnumExecutionSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExecutionSessionStatus[]
+  notIn?: $Enums.ExecutionSessionStatus[]
+  not?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel> | $Enums.ExecutionSessionStatus
+}
+
+export type NestedEnumExecutionSessionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExecutionSessionStatus | Prisma.EnumExecutionSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExecutionSessionStatus[]
+  notIn?: $Enums.ExecutionSessionStatus[]
+  not?: Prisma.NestedEnumExecutionSessionStatusWithAggregatesFilter<$PrismaModel> | $Enums.ExecutionSessionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumExecutionSessionStatusFilter<$PrismaModel>
 }
 
 

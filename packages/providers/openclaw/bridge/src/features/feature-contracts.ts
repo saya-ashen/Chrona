@@ -5,15 +5,7 @@ import type {
   ToolCallInfo,
 } from "../shared/types";
 import { FEATURE_FUNCTION_TOOL } from "../shared/constants";
-import { parseJsonObject } from "../shared/json";
-
-function isPlanNodeArray(value: unknown) {
-  return Array.isArray(value) && value.every((item) => item && typeof item === "object");
-}
-
-function isPlanEdgeArray(value: unknown) {
-  return Array.isArray(value) && value.every((item) => item && typeof item === "object");
-}
+import { validateAIPlanOutput } from "@chrona/contracts/ai";
 
 function validateFeaturePayload(
   feature: BridgeFeature,
@@ -24,15 +16,35 @@ function validateFeaturePayload(
   }
 
   if (feature === "generate_plan") {
+    const validation = validateAIPlanOutput(payload);
+    if (!validation.valid.title || !validation.valid.goal || validation.valid.nodes.length === 0) {
+      return {
+        ok: false,
+        error: validation.warnings[0] ?? "Feature 'generate_plan' payload does not match AIPlanOutput",
+      };
+    }
+  }
+
+  if (feature === "conflicts") {
     const record = payload as Record<string, unknown>;
+    if (!Array.isArray(record.conflicts)) {
+      return { ok: false, error: "Feature 'conflicts' payload.conflicts must be an array" };
+    }
+    if (!Array.isArray(record.resolutions)) {
+      return { ok: false, error: "Feature 'conflicts' payload.resolutions must be an array" };
+    }
     if (typeof record.summary !== "string") {
-      return { ok: false, error: "Feature 'generate_plan' payload.summary must be a string" };
+      return { ok: false, error: "Feature 'conflicts' payload.summary must be a string" };
     }
-    if (!isPlanNodeArray(record.nodes)) {
-      return { ok: false, error: "Feature 'generate_plan' payload.nodes must be an array" };
+  }
+
+  if (feature === "timeslots") {
+    const record = payload as Record<string, unknown>;
+    if (!Array.isArray(record.slots)) {
+      return { ok: false, error: "Feature 'timeslots' payload.slots must be an array" };
     }
-    if (!isPlanEdgeArray(record.edges)) {
-      return { ok: false, error: "Feature 'generate_plan' payload.edges must be an array" };
+    if (record.reasoning !== undefined && typeof record.reasoning !== "string") {
+      return { ok: false, error: "Feature 'timeslots' payload.reasoning must be a string when provided" };
     }
   }
 
@@ -81,29 +93,29 @@ export function buildFeatureResultFromResponse(
   const requiredTool = FEATURE_FUNCTION_TOOL[feature];
   if (requiredTool) {
     const matching = [...toolCalls].reverse().find((call) => call.tool === requiredTool);
-    if (!matching) {
-      return {
-        featureResult: null,
-        error: `Feature '${feature}' requires function_call '${requiredTool}' in response.output`,
-      };
-    }
+    if (matching) {
+      const payloadValidation = validateFeaturePayload(feature, matching.input);
+      if (!payloadValidation.ok) {
+        return {
+          featureResult: null,
+          error: payloadValidation.error,
+        };
+      }
 
-    const payloadValidation = validateFeaturePayload(feature, matching.input);
-    if (!payloadValidation.ok) {
       return {
-        featureResult: null,
-        error: payloadValidation.error,
+        featureResult: {
+          feature,
+          source: "business_tool",
+          toolName: requiredTool,
+          payload: matching.input,
+        },
+        error: null,
       };
     }
 
     return {
-      featureResult: {
-        feature,
-        source: "business_tool",
-        toolName: requiredTool,
-        payload: matching.input,
-      },
-      error: null,
+      featureResult: null,
+      error: `Feature '${feature}' requires business tool call '${requiredTool}' but none was found in the response`,
     };
   }
 
@@ -118,21 +130,9 @@ export function buildFeatureResultFromResponse(
     };
   }
 
-  const parsedJson = parseJsonObject(outputText);
-  if (!parsedJson) {
-    return {
-      featureResult: null,
-      error: `Feature '${feature}' did not yield structured output`,
-    };
-  }
-
   return {
-    featureResult: {
-      feature,
-      source: "output_json",
-      payload: parsedJson,
-    },
-    error: null,
+    featureResult: null,
+    error: `Feature '${feature}' requires a business tool result but none was found in the response`,
   };
 }
 
@@ -172,7 +172,6 @@ export function buildStructuredResult(params: {
   return {
     ok: false,
     parsed: null,
-    source: "fallback_text",
     feature: params.feature ?? null,
     toolName: params.featureToolName ?? null,
     rawOutput: params.output,

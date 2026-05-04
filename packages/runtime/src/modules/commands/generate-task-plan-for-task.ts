@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { createLogger, summarizeText } from "@/lib/logger";
 import { aiGeneratePlan } from "@/modules/ai/ai-service";
 import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@/modules/ai/types";
-import { getLatestTaskPlanGraph, saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getLatestTaskPlanGraph, saveTaskPlanGraph, enrichPlanGraphNodes } from "@/modules/tasks/task-plan-graph-store";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
 
@@ -37,7 +37,7 @@ function buildDraftPlanGraph(input: {
   planResult: GenerateTaskPlanResponse;
 }) {
   const now = new Date().toISOString();
-  return {
+  const graph: TaskPlanGraph = {
     id: `graph-${input.taskId || "adhoc"}-${Date.now()}`,
     taskId: input.taskId,
     status: "draft",
@@ -51,7 +51,8 @@ function buildDraftPlanGraph(input: {
     updatedAt: now,
     nodes: input.planResult.nodes,
     edges: input.planResult.edges,
-  } satisfies TaskPlanGraph;
+  };
+  return enrichPlanGraphNodes(graph);
 }
 
 function buildPlanResponse(input: {

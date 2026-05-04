@@ -17,6 +17,8 @@ async function resetDb() {
   await db.event.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
+  await db.executionSession.deleteMany();
+  await db.workBlock.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
   await db.taskSession.deleteMany();
@@ -37,7 +39,7 @@ async function createWorkspace() {
 }
 
 async function createDueTask(workspaceId: string, overrides: Record<string, unknown> = {}) {
-  return db.task.create({
+  const task = await db.task.create({
     data: {
       workspaceId,
       title: "Due scheduled task",
@@ -57,6 +59,20 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
       ...overrides,
     },
   });
+
+  await db.workBlock.create({
+    data: {
+      workspaceId,
+      taskId: task.id,
+      title: task.title,
+      status: "Scheduled",
+      scheduledStartAt: (overrides.scheduledStartAt as Date) ?? new Date(Date.now() - 5 * 60_000),
+      scheduledEndAt: (overrides.scheduledEndAt as Date) ?? new Date(Date.now() + 55 * 60_000),
+      trigger: "scheduled",
+    },
+  });
+
+  return task;
 }
 
 describe("auto-start-scheduled-plan", () => {
@@ -356,6 +372,101 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started).toEqual([]);
     expect(result.skipped).toEqual([]);
     expect(result.failed).toEqual([]);
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
+  });
+
+  it("activates work block on auto-start", async () => {
+    const workspace = await createWorkspace();
+    const task = await createDueTask(workspace.id);
+
+    startPlanExecutionMock.mockResolvedValue({
+      taskId: task.id,
+      planId: "plan-1",
+      mainSessionId: "session-1",
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started",
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started.length).toBe(1);
+    expect(result.started[0].taskId).toBe(task.id);
+    expect(result.started[0].workBlockId).toBeString();
+
+    const updatedBlock = await db.workBlock.findFirst({ where: { taskId: task.id } });
+    expect(updatedBlock?.status).toBe("Active");
+    expect(updatedBlock?.startedAt).not.toBeNull();
+  });
+
+  it("skips tasks without active work blocks", async () => {
+    const workspace = await createWorkspace();
+    await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "No work block task",
+        status: "Ready",
+        priority: "Medium",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: { model: "gpt-5.4", prompt: "Run" },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Run",
+        runtimeConfig: { sessionStrategy: "per_subtask" },
+        scheduleStatus: "Scheduled",
+        scheduleSource: "human",
+        scheduledStartAt: new Date(Date.now() - 5 * 60_000),
+        scheduledEndAt: new Date(Date.now() + 55 * 60_000),
+      },
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toEqual([]);
+    expect(startPlanExecutionMock).not.toHaveBeenCalled();
+  });
+
+  it("skips work blocks whose task status is not eligible", async () => {
+    const workspace = await createWorkspace();
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Running task",
+        status: "Running",
+        priority: "High",
+        ownerType: "human",
+        runtimeAdapterKey: "openclaw",
+        runtimeInput: { model: "gpt-5.4", prompt: "Run" },
+        runtimeInputVersion: "openclaw-legacy-v1",
+        runtimeModel: "gpt-5.4",
+        prompt: "Run",
+        runtimeConfig: { sessionStrategy: "per_subtask" },
+        scheduleStatus: "Scheduled",
+        scheduleSource: "human",
+        scheduledStartAt: new Date(Date.now() - 5 * 60_000),
+        scheduledEndAt: new Date(Date.now() + 55 * 60_000),
+      },
+    });
+
+    await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date(Date.now() - 5 * 60_000),
+        scheduledEndAt: new Date(Date.now() + 55 * 60_000),
+        trigger: "scheduled",
+      },
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toEqual([]);
     expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,7 @@ import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
 import { createTask } from "@chrona/runtime/modules/commands/create-task";
 import { updateTask } from "@chrona/runtime/modules/commands/update-task";
-import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
+import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, enrichPlanGraphNodes } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
 import { isTaskPlanGenerationRunning } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
 import { getTaskPage } from "@chrona/runtime/modules/queries/get-task-page";
 
@@ -223,6 +223,7 @@ export function createTasksRoutes() {
     try {
       const taskId = c.req.param("taskId");
       const savedAiPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? (await getLatestTaskPlanGraph(taskId));
+      const enrichedPlan = savedAiPlan ? enrichPlanGraphNodes(savedAiPlan.plan) : null;
       const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
         ? "generating"
         : savedAiPlan?.status === "accepted"
@@ -241,7 +242,7 @@ export function createTasksRoutes() {
               revision: savedAiPlan.revision,
               summary: savedAiPlan.summary,
               updatedAt: savedAiPlan.updatedAt,
-              plan: savedAiPlan.plan,
+              plan: enrichedPlan,
             }
           : null,
       });

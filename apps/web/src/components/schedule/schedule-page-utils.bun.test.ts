@@ -935,14 +935,14 @@ describe("buildTodayFocusItems", () => {
   }
 
   it("returns empty for no risks and no group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items).toEqual([]);
   });
 
   it("includes overdue risks", () => {
     const risk = makeRisk({ taskId: "t1", scheduleStatus: "Overdue" });
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(1);
     expect(items[0].reason).toBe("Overdue");
@@ -950,7 +950,7 @@ describe("buildTodayFocusItems", () => {
   });
 
   it("includes high-priority unstarted items from active group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const group = {
       key: "2026-04-15",
       date: new Date(2026, 3, 15),
@@ -968,7 +968,7 @@ describe("buildTodayFocusItems", () => {
     const risks = Array.from({ length: 8 }, (_, i) =>
       makeRisk({ taskId: `risk-${i}`, scheduleStatus: "Overdue" }),
     );
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(5);
   });

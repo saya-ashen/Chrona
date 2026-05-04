@@ -25,14 +25,9 @@ import type {
   DispatchTaskInput,
   DispatchTaskOutput,
 } from "../core/types";
-import type { StructuredAgentResult } from "../core/structured";
 import { parseTaskDispatchDecision } from "../core/dispatch-types";
 import { AiClientError } from "../core/types";
-import { dispatch, dispatchStructured, extractJSON } from "../core/providers";
-import {
-  parseDirectStructuredEnvelope,
-  requireStructuredResult,
-} from "../core/structured";
+import { dispatch, dispatchFeaturePayload, extractJSON } from "../core/providers";
 import { buildGeneratePlanScope } from "../core/streaming";
 import type {
   TaskPlanNode,
@@ -51,22 +46,6 @@ import {
 import { createLogger } from "@chrona/db/logger";
 
 const logger = createLogger("ai-features.features");
-
-function toStructuredDebugInfo(
-  result: ReturnType<typeof requireStructuredResult>,
-): StructuredDebugInfo {
-  return {
-    rawOutput: result.rawOutput,
-    error: result.error,
-    source: result.source,
-    feature: result.feature,
-    toolName: result.toolName,
-    sessionId: result.sessionId,
-    runId: result.runId,
-    validationIssues: result.validationIssues,
-    bridgeToolCalls: result.bridgeToolCalls,
-  };
-}
 
 function normalizeAIPriority(
   value: unknown,
@@ -268,36 +247,17 @@ function ensureObject(value: unknown, context: string): Record<string, unknown> 
 
 async function parseStructuredFeatureResult<T>(
   client: AiClientRecord,
-  feature: Parameters<typeof dispatchStructured>[1],
-  input: Parameters<typeof dispatchStructured>[2],
+  feature: Parameters<typeof dispatchFeaturePayload>[1],
+  input: Parameters<typeof dispatchFeaturePayload>[2],
   scope = "default",
 ): Promise<{ parsed: T; debug?: StructuredDebugInfo; rawText?: string }> {
-  if (client.type === "openclaw") {
-    const structuredCall = await dispatchStructured<T>(
-      client,
-      feature,
-      input,
-      scope,
-    );
-    const structured = requireStructuredResult<T>(structuredCall, client.type);
-    return {
-      parsed: structured.parsed as T,
-      debug: toStructuredDebugInfo(structured),
-      rawText: structured.rawOutput ?? structuredCall.text,
-    };
-  }
-
-  const raw = await dispatch(client, feature, input, scope);
-  return {
-    parsed: extractJSON<T>(raw, client.type),
-    rawText: raw,
-  };
+  return dispatchFeaturePayload<T>(client, feature, input, scope);
 }
 
 export function normalizeSuggestResponse(input: {
   parsed: unknown;
   source: string;
-  structured?: StructuredDebugInfo | StructuredAgentResult | null;
+  structured?: StructuredDebugInfo | null;
 }): SmartSuggestResponse {
   const parsed = ensureObject(input.parsed, "suggest result");
   return {
@@ -345,7 +305,7 @@ export async function suggest(
 export function normalizeGeneratePlanResponse(input: {
   parsed: unknown;
   source: string;
-  structured?: StructuredDebugInfo | StructuredAgentResult | null;
+  structured?: StructuredDebugInfo | null;
 }): GenerateTaskPlanResponse {
   const defaultResult = {
     nodes: [] as TaskPlanNode[],
@@ -454,30 +414,11 @@ export async function chat(
 ): Promise<ChatResponse> {
   if (client.type === "openclaw") {
     if (request.jsonMode) {
-      const structuredCall = await dispatchStructured<unknown>(
-        client,
-        "chat",
-        request,
-        "chat",
-      );
-      if (structuredCall.structured?.ok) {
-        return {
-          content: structuredCall.text,
-          parsed: structuredCall.structured.parsed,
-          source: client.type,
-          structured: toStructuredDebugInfo(structuredCall.structured),
-        };
-      }
-
-      const fallback = parseDirectStructuredEnvelope<unknown>(
-        extractJSON<unknown>(structuredCall.text, client.type),
-        client.type,
-      );
+      const content = await dispatch(client, "chat", request, "chat");
       return {
-        content: structuredCall.text,
-        parsed: fallback.parsed,
+        content,
+        parsed: extractJSON<unknown>(content, client.type),
         source: client.type,
-        structured: toStructuredDebugInfo(fallback),
       };
     }
 
@@ -583,7 +524,7 @@ export async function dispatchTask(
 
   return {
     decision: parsed.value,
-    reliability: result.debug?.source === "assistant_text" ? "fallback_text" : "structured_tool_call",
+    reliability: "structured_tool_call",
     rawProviderResult: result.rawText,
     structured: result.debug,
   };

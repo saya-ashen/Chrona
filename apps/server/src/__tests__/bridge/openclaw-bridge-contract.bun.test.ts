@@ -137,8 +137,10 @@ describe("OpenClaw bridge contract", () => {
     mockedExecuteRequest = async (route) => {
       capturedRoute = route;
       const planJson = JSON.stringify({
+        title: "Test plan",
+        goal: "Plan the requested task",
         summary: "A test plan",
-        nodes: [{ id: "n1", type: "step", title: "Step 1", objective: "Do it", executor: "human", requiresHumanInput: false, requiresHumanApproval: false }],
+        nodes: [{ id: "n1", type: "task", title: "Step 1", expectedOutput: "Do it", executor: "user", mode: "manual" }],
         edges: [],
       });
       return {
@@ -180,16 +182,17 @@ describe("OpenClaw bridge contract", () => {
 
   it("extracts function_call arguments as plan payload", async () => {
     const planData = {
+      title: "Extracted plan",
+      goal: "Study the domain safely",
       summary: "Extracted plan",
       nodes: [
         {
           id: "n1",
-          type: "step",
+          type: "task",
           title: "Research",
-          objective: "Study domain",
-          executor: "automation",
-          requiresHumanInput: false,
-          requiresHumanApproval: false,
+          expectedOutput: "Study domain",
+          executor: "ai",
+          mode: "auto",
         },
       ],
       edges: [],
@@ -251,7 +254,7 @@ describe("OpenClaw bridge contract", () => {
           {
             tool: "wrong_tool",
             callId: "call-wrong-tool",
-            input: { summary: "Wrong tool", nodes: [], edges: [] },
+            input: { title: "Wrong tool", goal: "Wrong tool", summary: "Wrong tool", nodes: [{ id: "n1", type: "task", title: "Wrong" }], edges: [] },
             status: "completed",
           },
         ],

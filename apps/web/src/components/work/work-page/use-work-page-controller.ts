@@ -273,6 +273,14 @@ export function useWorkPageController(
   );
 
   const actions = {
+    async startExecution() {
+      return runScopedAction(async () => {
+        await startRun({
+          taskId: data.taskShell.id,
+        });
+      }, "hero");
+    },
+
     async approveApproval(approvalId: string) {
       return runScopedAction(async () => {
         await approveApproval(approvalId);

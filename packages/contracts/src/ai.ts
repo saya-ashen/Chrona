@@ -5,10 +5,28 @@
 import { z } from "zod";
 
 // ────────────────────────────────────────────────────
-// AI Plan Output Schema (what AI models generate)
+// AI Plan Output Schema (canonical AI/tool payload)
 // ────────────────────────────────────────────────────
 
-export type AIPlanNodeType = "task" | "checkpoint" | "condition" | "wait";
+/**
+ * Canonical payload contract for AI-generated planning output.
+ *
+ * This is the authoritative shape for the `generate_task_plan_graph` business
+ * tool payload and other provider-facing plan-generation results.
+ *
+ * Downstream runtime/storage types such as `TaskPlanGraph` are derived from
+ * this contract and may use a different internal shape.
+ */
+export const AI_PLAN_NODE_TYPES = ["task", "checkpoint", "condition", "wait"] as const;
+export const AI_TASK_EXECUTORS = ["user", "ai", "system"] as const;
+export const AI_TASK_MODES = ["manual", "assist", "auto"] as const;
+export const AI_CHECKPOINT_TYPES = ["confirm", "choose", "input", "edit", "approve"] as const;
+export const AI_INPUT_FIELD_TYPES = ["text", "number", "date", "time", "select", "multi_select"] as const;
+export const AI_CONDITION_EVALUATORS = ["system", "ai", "user"] as const;
+export const AI_WAIT_TIMEOUT_ACTIONS = ["continue", "pause", "fail", "notify_user"] as const;
+export const AI_PLAN_COMPLETION_POLICY_TYPES = ["all_tasks_completed", "specific_nodes_completed", "custom"] as const;
+
+export type AIPlanNodeType = (typeof AI_PLAN_NODE_TYPES)[number];
 
 export type AIPlanNode =
   | AITaskNode
@@ -21,8 +39,8 @@ export interface AITaskNode {
   type: "task";
   title: string;
   description?: string;
-  executor?: "user" | "ai" | "system";
-  mode?: "manual" | "assist" | "auto";
+  executor?: (typeof AI_TASK_EXECUTORS)[number];
+  mode?: (typeof AI_TASK_MODES)[number];
   expectedOutput?: string;
   completionCriteria?: string;
   priority?: "low" | "medium" | "high";
@@ -36,14 +54,14 @@ export interface AICheckpointNode {
   type: "checkpoint";
   title: string;
   description?: string;
-  checkpointType: "confirm" | "choose" | "input" | "edit" | "approve";
+  checkpointType: (typeof AI_CHECKPOINT_TYPES)[number];
   prompt: string;
   required?: boolean;
   options?: string[];
   inputFields?: Array<{
     key: string;
     label: string;
-    inputType: "text" | "number" | "date" | "time" | "select" | "multi_select";
+    inputType: (typeof AI_INPUT_FIELD_TYPES)[number];
     required?: boolean;
     options?: string[];
   }>;
@@ -56,7 +74,7 @@ export interface AIConditionNode {
   title: string;
   description?: string;
   condition: string;
-  evaluationBy?: "system" | "ai" | "user";
+  evaluationBy?: (typeof AI_CONDITION_EVALUATORS)[number];
   branches: Array<{
     label: string;
     nextNodeId: string;
@@ -72,7 +90,7 @@ export interface AIWaitNode {
   waitFor: string;
   timeout?: {
     minutes: number;
-    onTimeout: "continue" | "pause" | "fail" | "notify_user";
+    onTimeout: (typeof AI_WAIT_TIMEOUT_ACTIONS)[number];
   };
 }
 
@@ -83,7 +101,7 @@ export interface AIPlanEdge {
 }
 
 export interface AIPlanCompletionPolicy {
-  type: "all_tasks_completed" | "specific_nodes_completed" | "custom";
+  type: (typeof AI_PLAN_COMPLETION_POLICY_TYPES)[number];
   nodeIds?: string[];
   description?: string;
 }
@@ -104,7 +122,7 @@ export interface AIPlanOutput {
 const aiPlanInputFieldSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
-  inputType: z.enum(["text", "number", "date", "time", "select", "multi_select"]),
+  inputType: z.enum(AI_INPUT_FIELD_TYPES),
   required: z.boolean().optional(),
   options: z.array(z.string()).optional(),
 });
@@ -114,17 +132,14 @@ const aiTaskNodeSchema = z.object({
   type: z.literal("task"),
   title: z.string().min(1),
   description: z.string().optional(),
-  executor: z.enum(["user", "ai", "system"]).optional(),
-  mode: z.enum(["manual", "assist", "auto"]).optional(),
+  executor: z.enum(AI_TASK_EXECUTORS).optional(),
+  mode: z.enum(AI_TASK_MODES).optional(),
   expectedOutput: z.string().optional(),
   completionCriteria: z.string().optional(),
-  objective: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
   estimatedMinutes: z.number().positive().optional(),
   dueAt: z.string().optional(),
   constraints: z.array(z.string()).optional(),
-  requiresHumanInput: z.boolean().optional(),
-  requiresHumanApproval: z.boolean().optional(),
 });
 
 const aiCheckpointNodeSchema = z.object({
@@ -132,14 +147,12 @@ const aiCheckpointNodeSchema = z.object({
   type: z.literal("checkpoint"),
   title: z.string().min(1),
   description: z.string().optional(),
-  checkpointType: z.enum(["confirm", "choose", "input", "edit", "approve"]),
+  checkpointType: z.enum(AI_CHECKPOINT_TYPES),
   prompt: z.string().min(1),
   required: z.boolean().optional(),
   options: z.array(z.string()).optional(),
   inputFields: z.array(aiPlanInputFieldSchema).optional(),
   targetNodeId: z.string().optional(),
-  requiresHumanInput: z.boolean().optional(),
-  requiresHumanApproval: z.boolean().optional(),
 });
 
 const aiConditionNodeSchema = z.object({
@@ -148,7 +161,7 @@ const aiConditionNodeSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   condition: z.string().min(1),
-  evaluationBy: z.enum(["system", "ai", "user"]).optional(),
+  evaluationBy: z.enum(AI_CONDITION_EVALUATORS).optional(),
   branches: z
     .array(
       z.object({
@@ -158,8 +171,6 @@ const aiConditionNodeSchema = z.object({
     )
     .min(1, "condition must have at least one branch"),
   defaultNextNodeId: z.string().optional(),
-  requiresHumanInput: z.boolean().optional(),
-  requiresHumanApproval: z.boolean().optional(),
 });
 
 const aiWaitNodeSchema = z.object({
@@ -171,11 +182,9 @@ const aiWaitNodeSchema = z.object({
   timeout: z
     .object({
       minutes: z.number().positive(),
-      onTimeout: z.enum(["continue", "pause", "fail", "notify_user"]),
+      onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
     })
     .optional(),
-  requiresHumanInput: z.boolean().optional(),
-  requiresHumanApproval: z.boolean().optional(),
 });
 
 const aiPlanEdgeSchema = z.object({
@@ -185,7 +194,7 @@ const aiPlanEdgeSchema = z.object({
 });
 
 const aiPlanCompletionPolicySchema = z.object({
-  type: z.enum(["all_tasks_completed", "specific_nodes_completed", "custom"]),
+  type: z.enum(AI_PLAN_COMPLETION_POLICY_TYPES),
   nodeIds: z.array(z.string()).optional(),
   description: z.string().optional(),
 });
@@ -206,6 +215,9 @@ export const aiPlanOutputSchema = z.object({
   completionPolicy: aiPlanCompletionPolicySchema.optional(),
 });
 
+export type GenerateTaskPlanGraphToolPayload = AIPlanOutput;
+export const generateTaskPlanGraphToolPayloadSchema = aiPlanOutputSchema;
+
 /**
  * Validates that an AIPlanOutput has valid edge references and condition branches.
  * Returns an object with the validated plan and any warnings (discarded edges, invalid branch refs).
@@ -216,9 +228,7 @@ export interface AIPlanValidationResult {
 }
 
 export function validateAIPlanOutput(raw: unknown): AIPlanValidationResult {
-  // Pre-normalize: map bridge-issued fields to Zod-expected fields
-  const normalized = normalizeAIPlanInput(raw);
-  const parsed = aiPlanOutputSchema.safeParse(normalized);
+  const parsed = aiPlanOutputSchema.safeParse(raw);
 
   if (!parsed.success) {
     // Log validation errors and return empty valid result so upstream can decide
@@ -269,66 +279,6 @@ export function validateAIPlanOutput(raw: unknown): AIPlanValidationResult {
   }
 
   return { valid: { ...aiPlan, edges: validEdges }, warnings };
-}
-
-/**
- * Normalizes AI-generated raw input from various bridge formats into
- * the Zod-expected shape before validation.
- */
-function normalizeAIPlanInput(raw: unknown): unknown {
-  if (!raw || typeof raw !== "object") return raw;
-  const obj = raw as Record<string, unknown>;
-
-  // Map bridge edge format: { fromNodeId, toNodeId } -> { from, to }
-  if (Array.isArray(obj.edges)) {
-    obj.edges = (obj.edges as Array<Record<string, unknown>>).map((e) => ({
-      from: e.from ?? e.fromNodeId,
-      to: e.to ?? e.toNodeId,
-      label: e.label,
-    }));
-  }
-
-  // Map node fields from bridge format
-  if (Array.isArray(obj.nodes)) {
-    obj.nodes = (obj.nodes as Array<Record<string, unknown>>).map((n) => {
-      // Normalize old type names -> new
-      if (n.type === "step" || n.type === "deliverable" || n.type === "tool_action") n.type = "task";
-      if (n.type === "decision") n.type = "condition";
-      if (n.type === "user_input") n.type = "checkpoint";
-      // Coerce executor "human" -> "user", "automation" -> "ai"
-      if (n.executor === "human" && n.type === "task") n.executor = "user";
-      if (n.executor === "automation" && n.type === "task") n.executor = "ai";
-      // If bridge sent objective but not expectedOutput, use objective
-      if (!n.expectedOutput && n.objective && typeof n.objective === "string") {
-        n.expectedOutput = n.objective;
-      }
-      return n;
-    });
-  }
-
-  // Remove reasoning from top-level (not in AIPlanOutput schema)
-  delete obj.reasoning;
-
-  const normalizedSummary = typeof obj.summary === "string" ? obj.summary.trim() : "";
-  const firstNodeWithTitle = Array.isArray(obj.nodes)
-    ? obj.nodes.find((node): node is Record<string, unknown> => {
-        if (!node || typeof node !== "object") return false;
-        const title = node.title;
-        return typeof title === "string" && title.trim().length > 0;
-      })
-    : undefined;
-  const normalizedFirstNodeTitle =
-    typeof firstNodeWithTitle?.title === "string" ? firstNodeWithTitle.title.trim() : "";
-
-  if (typeof obj.title !== "string" || obj.title.trim().length === 0) {
-    obj.title = normalizedSummary || normalizedFirstNodeTitle || "Generated task plan";
-  }
-
-  if (typeof obj.goal !== "string" || obj.goal.trim().length === 0) {
-    obj.goal = normalizedSummary || String(obj.title);
-  }
-
-  return obj;
 }
 
 // ────────────────────────────────────────────────────
@@ -486,7 +436,20 @@ export type TaskPlanNode = {
   linkedTaskId: string | null;
   completionSummary: string | null;
   metadata: Record<string, unknown> | null;
+  requiredInfo?: string[];
+  dependencies?: string[];
+  executionClassification?: TaskPlanNodeExecutionClassification;
+  nextAction?: string | null;
+  readiness?: TaskPlanNodeReadiness;
 };
+
+export type TaskPlanNodeExecutionClassification =
+  | "automatic_chainable"
+  | "automatic_standalone"
+  | "human_dependent"
+  | "review_gate";
+
+export type TaskPlanNodeReadiness = "ready" | "blocked" | "waiting";
 
 export type TaskPlanEdge = {
   id: string;
@@ -687,4 +650,99 @@ export interface TaskWorkspaceChatRequest {
 export interface TaskWorkspaceChatResponse {
   assistantMessage: string;
   proposal?: TaskWorkspaceUpdateProposal;
+}
+
+// ────────────────────────────────────────────────────
+// Work Block contracts
+// ────────────────────────────────────────────────────
+
+export type WorkBlockStatus = "Scheduled" | "Active" | "Completed" | "Cancelled";
+export type WorkBlockTrigger = "scheduled" | "manual";
+
+export interface WorkBlock {
+  id: string;
+  workspaceId: string;
+  taskId: string;
+  planId: string | null;
+  title: string;
+  status: WorkBlockStatus;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  trigger: WorkBlockTrigger;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkBlockInput {
+  taskId: string;
+  planId?: string | null;
+  title: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  trigger?: WorkBlockTrigger;
+}
+
+export interface WorkBlockResponse {
+  workBlock: WorkBlock;
+  canStart: boolean;
+  blockingReason: string | null;
+  nextStepId: string | null;
+}
+
+// ────────────────────────────────────────────────────
+// Execution Session contracts
+// ────────────────────────────────────────────────────
+
+export type ExecutionSessionStatus = "Active" | "Paused" | "Completed" | "Abandoned";
+export type ExecutionSessionPauseReason =
+  | "needs_user_input"
+  | "needs_approval"
+  | "external_dependency"
+  | "provider_unavailable"
+  | null;
+
+export interface ExecutionSession {
+  id: string;
+  workspaceId: string;
+  taskId: string;
+  workBlockId: string | null;
+  planId: string;
+  status: ExecutionSessionStatus;
+  currentNodeId: string | null;
+  pauseReason: ExecutionSessionPauseReason;
+  completedNodeIds: string[];
+  startedAt: string;
+  pausedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExecutionSessionResponse {
+  session: ExecutionSession;
+  currentStep: TaskPlanNode | null;
+  nextEligibleSteps: TaskPlanNode[];
+  reviewPending: boolean;
+}
+
+// ────────────────────────────────────────────────────
+// Step Review contracts
+// ────────────────────────────────────────────────────
+
+export type ReviewOutcome = "accept" | "reject" | "request_changes";
+
+export interface StepReviewInput {
+  taskId: string;
+  nodeId: string;
+  outcome: ReviewOutcome;
+  feedback?: string;
+}
+
+export interface StepReviewResponse {
+  nodeId: string;
+  outcome: ReviewOutcome;
+  feedback: string | null;
+  nextAction: string | null;
 }

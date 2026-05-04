@@ -16,6 +16,7 @@ import {
   getAcceptedTaskPlanGraph,
   acceptTaskPlanGraph,
   saveTaskPlanGraph,
+  enrichPlanGraphNodes,
 } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
 import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
 import { isTaskPlanGenerationRunning } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
@@ -66,7 +67,7 @@ function createPlanLifecycleRouter() {
               revision: savedAiPlan.revision,
               summary: savedAiPlan.summary,
               updatedAt: savedAiPlan.updatedAt,
-              plan: savedAiPlan.plan,
+              plan: enrichPlanGraphNodes(savedAiPlan.plan),
             }
           : null,
       });
@@ -618,5 +619,78 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(404);
     const body = await res.json() as any;
     expect(body.error).toBe("No plan found for task");
+  });
+
+  it("plan-state endpoint returns enriched node metadata (executionClassification, readiness, nextAction)", async () => {
+    const ws = await seedWorkspace();
+    const { taskId } = await seedTask(ws.workspaceId);
+
+    await seedAcceptedPlan(taskId, ws.workspaceId, {
+      nodes: [
+        {
+          id: "enr-node-1",
+          type: "task",
+          title: "Auto chainable step",
+          objective: "Runs automatically",
+          description: undefined,
+          status: "pending",
+          phase: undefined,
+          estimatedMinutes: undefined,
+          priority: "Medium",
+          executionMode: "automatic",
+          requiresHumanInput: false,
+          requiresHumanApproval: false,
+          autoRunnable: true,
+          blockingReason: null,
+          linkedTaskId: null,
+          completionSummary: null,
+          metadata: null,
+        },
+        {
+          id: "enr-node-2",
+          type: "task",
+          title: "Review gate step",
+          objective: "Needs approval",
+          description: undefined,
+          status: "pending",
+          phase: undefined,
+          estimatedMinutes: undefined,
+          priority: "High",
+          executionMode: "manual",
+          requiresHumanInput: false,
+          requiresHumanApproval: true,
+          autoRunnable: false,
+          blockingReason: null,
+          linkedTaskId: null,
+          completionSummary: null,
+          metadata: null,
+        },
+      ],
+      edges: [
+        { id: "enr-edge-1", fromNodeId: "enr-node-1", toNodeId: "enr-node-2", type: "sequential" },
+      ],
+    });
+
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan-state`, {
+      method: "GET",
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.savedAiPlan).not.toBeNull();
+    expect(body.savedAiPlan.plan).not.toBeNull();
+    expect(body.savedAiPlan.plan.nodes).toHaveLength(2);
+
+    const node1 = body.savedAiPlan.plan.nodes.find((n: any) => n.id === "enr-node-1");
+    expect(node1).not.toBeUndefined();
+    expect(node1.executionClassification).toBe("automatic_standalone");
+    expect(node1.readiness).toBe("ready");
+    expect(node1.nextAction).toBe("Ready to auto-start");
+
+    const node2 = body.savedAiPlan.plan.nodes.find((n: any) => n.id === "enr-node-2");
+    expect(node2).not.toBeUndefined();
+    expect(node2.executionClassification).toBe("review_gate");
+    expect(node2.dependencies).toEqual(["enr-node-1"]);
+    expect(node2.nextAction).toContain("Review and approve");
   });
 });

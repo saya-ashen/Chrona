@@ -21,6 +21,8 @@ export async function resetTestDb() {
   await db.event.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
+  await db.executionSession.deleteMany();
+  await db.workBlock.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
   await db.taskSession.deleteMany();

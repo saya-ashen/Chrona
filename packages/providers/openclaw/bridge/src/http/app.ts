@@ -38,10 +38,6 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
   const environment = options.environment ?? DEFAULT_BRIDGE_ENVIRONMENT;
   const gatewayAvailability =
     options.checkGatewayAvailable ?? (() => checkGatewayAvailable(environment));
-  const executeRequest =
-    options.executeRequest ??
-    ((route: RouteKind, request: BridgeRequest) =>
-      executeGatewayRequest(route, request, logger, environment));
 
   const app = new Hono();
 
@@ -67,6 +63,16 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
     if (!route || c.req.method !== "POST") {
       return c.json({ error: "Not found" }, 404);
     }
+
+    const gatewayUrlOverride = c.req.header("X-Bridge-Gateway-Url");
+    const gatewayTokenOverride = c.req.header("X-Bridge-Gateway-Token");
+    const requestEnvironment: BridgeEnvironment = gatewayUrlOverride
+      ? {
+          ...environment,
+          gatewayHttpUrl: gatewayUrlOverride,
+          gatewayToken: gatewayTokenOverride ?? environment.gatewayToken,
+        }
+      : environment;
 
     let payload: unknown;
     try {
@@ -98,7 +104,12 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): Hono {
     }
 
     try {
-      const { response, events } = await executeRequest(route, normalized);
+      const resolvedEnv = requestEnvironment;
+      const resolvedExecute = options.executeRequest ??
+        ((route: RouteKind, request: BridgeRequest) =>
+          executeGatewayRequest(route, request, logger, resolvedEnv));
+
+      const { response, events } = await resolvedExecute(route, normalized);
       const normalizedResponse =
         route.kind === "feature" && !response.error
           ? (() => {

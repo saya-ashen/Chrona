@@ -45,6 +45,8 @@
       "@chrona/runtime/*": ["./packages/runtime/src/*"],
     "@chrona/openclaw-bridge": ["./packages/providers/openclaw/bridge/src/server.ts"],
       "@chrona/openclaw-bridge/*": ["./packages/providers/openclaw/bridge/src/*"],
+      "@chrona/providers-core": ["./packages/providers/core/src/index.ts"],
+      "@chrona/providers-core/*": ["./packages/providers/core/src/*"],
       "@chrona/web/*": ["./apps/web/src/*"]
     }
   },

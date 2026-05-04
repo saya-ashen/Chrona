@@ -126,6 +126,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     heroErrorMessage,
     composerResetKey,
     submitWorkbenchInput,
+    actions,
   } = useWorkPageController(initialData, copy);
 
   const currentRun = data.currentRun;
@@ -473,7 +474,38 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
 
       {executionStatus === "no_plan" ? (
         <section className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-          No plan yet. Create or accept a plan before execution.
+          <div className="flex items-center justify-between gap-3">
+            <span>No plan yet. Create or accept a plan before execution.</span>
+            {data.taskPlan.steps.length > 0 ? (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => void actions.startExecution()}
+                className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shrink-0" })}
+              >
+                <Activity className="mr-1.5 size-3.5" />
+                Start Execution
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : executionStatus !== "completed" && executionStatus !== "running" ? (
+        <section className="rounded-2xl border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              Execution is {executionStatus}.{" "}
+              {executionStatus === "waiting_for_user" ? "Provide input to continue." : executionStatus === "waiting_for_approval" ? "Review and approve pending actions." : executionStatus === "blocked" ? "Resolve the blocking issue to resume." : "Start or resume execution."}
+            </span>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => void actions.startExecution()}
+              className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shrink-0" })}
+            >
+              <Activity className="mr-1.5 size-3.5" />
+              Resume
+            </button>
+          </div>
         </section>
       ) : null}
     </div>

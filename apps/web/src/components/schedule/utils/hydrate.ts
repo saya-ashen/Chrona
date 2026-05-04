@@ -39,5 +39,11 @@ export function hydrateSchedulePageData(data: SchedulePageData): SchedulePageDat
           }
         : conflict.timeRange,
     })),
+    workBlocks: (data.workBlocks ?? []).map((block) => ({
+      ...block,
+      scheduledStartAt: toDate(block.scheduledStartAt) ?? block.scheduledStartAt,
+      scheduledEndAt: toDate(block.scheduledEndAt) ?? block.scheduledEndAt,
+      startedAt: toDate(block.startedAt),
+    })),
   };
 }

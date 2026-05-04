@@ -206,6 +206,8 @@ export type WorkspaceWhereInput = {
   taskDependencies?: Prisma.TaskDependencyListRelationFilter
   taskProjections?: Prisma.TaskProjectionListRelationFilter
   scheduleProposals?: Prisma.ScheduleProposalListRelationFilter
+  workBlocks?: Prisma.WorkBlockListRelationFilter
+  executionSessions?: Prisma.ExecutionSessionListRelationFilter
 }
 
 export type WorkspaceOrderByWithRelationInput = {
@@ -224,6 +226,8 @@ export type WorkspaceOrderByWithRelationInput = {
   taskDependencies?: Prisma.TaskDependencyOrderByRelationAggregateInput
   taskProjections?: Prisma.TaskProjectionOrderByRelationAggregateInput
   scheduleProposals?: Prisma.ScheduleProposalOrderByRelationAggregateInput
+  workBlocks?: Prisma.WorkBlockOrderByRelationAggregateInput
+  executionSessions?: Prisma.ExecutionSessionOrderByRelationAggregateInput
 }
 
 export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
@@ -245,6 +249,8 @@ export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
   taskDependencies?: Prisma.TaskDependencyListRelationFilter
   taskProjections?: Prisma.TaskProjectionListRelationFilter
   scheduleProposals?: Prisma.ScheduleProposalListRelationFilter
+  workBlocks?: Prisma.WorkBlockListRelationFilter
+  executionSessions?: Prisma.ExecutionSessionListRelationFilter
 }, "id">
 
 export type WorkspaceOrderByWithAggregationInput = {
@@ -289,6 +295,8 @@ export type WorkspaceCreateInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateInput = {
@@ -307,6 +315,8 @@ export type WorkspaceUncheckedCreateInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUpdateInput = {
@@ -325,6 +335,8 @@ export type WorkspaceUpdateInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateInput = {
@@ -343,6 +355,8 @@ export type WorkspaceUncheckedUpdateInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateManyInput = {
@@ -538,6 +552,34 @@ export type WorkspaceUpdateOneRequiredWithoutScheduleProposalsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutScheduleProposalsInput, Prisma.WorkspaceUpdateWithoutScheduleProposalsInput>, Prisma.WorkspaceUncheckedUpdateWithoutScheduleProposalsInput>
 }
 
+export type WorkspaceCreateNestedOneWithoutWorkBlocksInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedCreateWithoutWorkBlocksInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutWorkBlocksInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutWorkBlocksNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedCreateWithoutWorkBlocksInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutWorkBlocksInput
+  upsert?: Prisma.WorkspaceUpsertWithoutWorkBlocksInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutWorkBlocksInput, Prisma.WorkspaceUpdateWithoutWorkBlocksInput>, Prisma.WorkspaceUncheckedUpdateWithoutWorkBlocksInput>
+}
+
+export type WorkspaceCreateNestedOneWithoutExecutionSessionsInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedCreateWithoutExecutionSessionsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutExecutionSessionsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutExecutionSessionsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedCreateWithoutExecutionSessionsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutExecutionSessionsInput
+  upsert?: Prisma.WorkspaceUpsertWithoutExecutionSessionsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutExecutionSessionsInput, Prisma.WorkspaceUpdateWithoutExecutionSessionsInput>, Prisma.WorkspaceUncheckedUpdateWithoutExecutionSessionsInput>
+}
+
 export type WorkspaceCreateWithoutTasksInput = {
   id?: string
   name: string
@@ -553,6 +595,8 @@ export type WorkspaceCreateWithoutTasksInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTasksInput = {
@@ -570,6 +614,8 @@ export type WorkspaceUncheckedCreateWithoutTasksInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTasksInput = {
@@ -603,6 +649,8 @@ export type WorkspaceUpdateWithoutTasksInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTasksInput = {
@@ -620,6 +668,8 @@ export type WorkspaceUncheckedUpdateWithoutTasksInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskDependenciesInput = {
@@ -637,6 +687,8 @@ export type WorkspaceCreateWithoutTaskDependenciesInput = {
   events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskDependenciesInput = {
@@ -654,6 +706,8 @@ export type WorkspaceUncheckedCreateWithoutTaskDependenciesInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskDependenciesInput = {
@@ -687,6 +741,8 @@ export type WorkspaceUpdateWithoutTaskDependenciesInput = {
   events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskDependenciesInput = {
@@ -704,6 +760,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskDependenciesInput = {
   events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutApprovalsInput = {
@@ -721,6 +779,8 @@ export type WorkspaceCreateWithoutApprovalsInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutApprovalsInput = {
@@ -738,6 +798,8 @@ export type WorkspaceUncheckedCreateWithoutApprovalsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutApprovalsInput = {
@@ -771,6 +833,8 @@ export type WorkspaceUpdateWithoutApprovalsInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutApprovalsInput = {
@@ -788,6 +852,8 @@ export type WorkspaceUncheckedUpdateWithoutApprovalsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutArtifactsInput = {
@@ -805,6 +871,8 @@ export type WorkspaceCreateWithoutArtifactsInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutArtifactsInput = {
@@ -822,6 +890,8 @@ export type WorkspaceUncheckedCreateWithoutArtifactsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutArtifactsInput = {
@@ -855,6 +925,8 @@ export type WorkspaceUpdateWithoutArtifactsInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutArtifactsInput = {
@@ -872,6 +944,8 @@ export type WorkspaceUncheckedUpdateWithoutArtifactsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutMemoriesInput = {
@@ -889,6 +963,8 @@ export type WorkspaceCreateWithoutMemoriesInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
@@ -906,6 +982,8 @@ export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutMemoriesInput = {
@@ -939,6 +1017,8 @@ export type WorkspaceUpdateWithoutMemoriesInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
@@ -956,6 +1036,8 @@ export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutEventsInput = {
@@ -973,6 +1055,8 @@ export type WorkspaceCreateWithoutEventsInput = {
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutEventsInput = {
@@ -990,6 +1074,8 @@ export type WorkspaceUncheckedCreateWithoutEventsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutEventsInput = {
@@ -1023,6 +1109,8 @@ export type WorkspaceUpdateWithoutEventsInput = {
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutEventsInput = {
@@ -1040,6 +1128,8 @@ export type WorkspaceUncheckedUpdateWithoutEventsInput = {
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskProjectionsInput = {
@@ -1057,6 +1147,8 @@ export type WorkspaceCreateWithoutTaskProjectionsInput = {
   events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskProjectionsInput = {
@@ -1074,6 +1166,8 @@ export type WorkspaceUncheckedCreateWithoutTaskProjectionsInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskProjectionsInput = {
@@ -1107,6 +1201,8 @@ export type WorkspaceUpdateWithoutTaskProjectionsInput = {
   events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskProjectionsInput = {
@@ -1124,6 +1220,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskProjectionsInput = {
   events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutScheduleProposalsInput = {
@@ -1141,6 +1239,8 @@ export type WorkspaceCreateWithoutScheduleProposalsInput = {
   events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
   taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutScheduleProposalsInput = {
@@ -1158,6 +1258,8 @@ export type WorkspaceUncheckedCreateWithoutScheduleProposalsInput = {
   events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
   taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
   taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutScheduleProposalsInput = {
@@ -1191,6 +1293,8 @@ export type WorkspaceUpdateWithoutScheduleProposalsInput = {
   events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
   taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutScheduleProposalsInput = {
@@ -1208,6 +1312,192 @@ export type WorkspaceUncheckedUpdateWithoutScheduleProposalsInput = {
   events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
   taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutWorkBlocksInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutWorkBlocksInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutWorkBlocksInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedCreateWithoutWorkBlocksInput>
+}
+
+export type WorkspaceUpsertWithoutWorkBlocksInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedUpdateWithoutWorkBlocksInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedCreateWithoutWorkBlocksInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutWorkBlocksInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutWorkBlocksInput, Prisma.WorkspaceUncheckedUpdateWithoutWorkBlocksInput>
+}
+
+export type WorkspaceUpdateWithoutWorkBlocksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutWorkBlocksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutExecutionSessionsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutExecutionSessionsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutExecutionSessionsInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedCreateWithoutExecutionSessionsInput>
+}
+
+export type WorkspaceUpsertWithoutExecutionSessionsInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedUpdateWithoutExecutionSessionsInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedCreateWithoutExecutionSessionsInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutExecutionSessionsInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutExecutionSessionsInput, Prisma.WorkspaceUncheckedUpdateWithoutExecutionSessionsInput>
+}
+
+export type WorkspaceUpdateWithoutExecutionSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutExecutionSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 
@@ -1224,6 +1514,8 @@ export type WorkspaceCountOutputType = {
   taskDependencies: number
   taskProjections: number
   scheduleProposals: number
+  workBlocks: number
+  executionSessions: number
 }
 
 export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1235,6 +1527,8 @@ export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   taskDependencies?: boolean | WorkspaceCountOutputTypeCountTaskDependenciesArgs
   taskProjections?: boolean | WorkspaceCountOutputTypeCountTaskProjectionsArgs
   scheduleProposals?: boolean | WorkspaceCountOutputTypeCountScheduleProposalsArgs
+  workBlocks?: boolean | WorkspaceCountOutputTypeCountWorkBlocksArgs
+  executionSessions?: boolean | WorkspaceCountOutputTypeCountExecutionSessionsArgs
 }
 
 /**
@@ -1303,6 +1597,20 @@ export type WorkspaceCountOutputTypeCountScheduleProposalsArgs<ExtArgs extends r
   where?: Prisma.ScheduleProposalWhereInput
 }
 
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountWorkBlocksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WorkBlockWhereInput
+}
+
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountExecutionSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ExecutionSessionWhereInput
+}
+
 
 export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1320,6 +1628,8 @@ export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   taskDependencies?: boolean | Prisma.Workspace$taskDependenciesArgs<ExtArgs>
   taskProjections?: boolean | Prisma.Workspace$taskProjectionsArgs<ExtArgs>
   scheduleProposals?: boolean | Prisma.Workspace$scheduleProposalsArgs<ExtArgs>
+  workBlocks?: boolean | Prisma.Workspace$workBlocksArgs<ExtArgs>
+  executionSessions?: boolean | Prisma.Workspace$executionSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workspace"]>
 
@@ -1363,6 +1673,8 @@ export type WorkspaceInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   taskDependencies?: boolean | Prisma.Workspace$taskDependenciesArgs<ExtArgs>
   taskProjections?: boolean | Prisma.Workspace$taskProjectionsArgs<ExtArgs>
   scheduleProposals?: boolean | Prisma.Workspace$scheduleProposalsArgs<ExtArgs>
+  workBlocks?: boolean | Prisma.Workspace$workBlocksArgs<ExtArgs>
+  executionSessions?: boolean | Prisma.Workspace$executionSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WorkspaceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1379,6 +1691,8 @@ export type $WorkspacePayload<ExtArgs extends runtime.Types.Extensions.InternalA
     taskDependencies: Prisma.$TaskDependencyPayload<ExtArgs>[]
     taskProjections: Prisma.$TaskProjectionPayload<ExtArgs>[]
     scheduleProposals: Prisma.$ScheduleProposalPayload<ExtArgs>[]
+    workBlocks: Prisma.$WorkBlockPayload<ExtArgs>[]
+    executionSessions: Prisma.$ExecutionSessionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1790,6 +2104,8 @@ export interface Prisma__WorkspaceClient<T, Null = never, ExtArgs extends runtim
   taskDependencies<T extends Prisma.Workspace$taskDependenciesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$taskDependenciesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskDependencyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskProjections<T extends Prisma.Workspace$taskProjectionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$taskProjectionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskProjectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   scheduleProposals<T extends Prisma.Workspace$scheduleProposalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$scheduleProposalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ScheduleProposalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  workBlocks<T extends Prisma.Workspace$workBlocksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$workBlocksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  executionSessions<T extends Prisma.Workspace$executionSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$executionSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExecutionSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2406,6 +2722,54 @@ export type Workspace$scheduleProposalsArgs<ExtArgs extends runtime.Types.Extens
   take?: number
   skip?: number
   distinct?: Prisma.ScheduleProposalScalarFieldEnum | Prisma.ScheduleProposalScalarFieldEnum[]
+}
+
+/**
+ * Workspace.workBlocks
+ */
+export type Workspace$workBlocksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkBlock
+   */
+  select?: Prisma.WorkBlockSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkBlock
+   */
+  omit?: Prisma.WorkBlockOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkBlockInclude<ExtArgs> | null
+  where?: Prisma.WorkBlockWhereInput
+  orderBy?: Prisma.WorkBlockOrderByWithRelationInput | Prisma.WorkBlockOrderByWithRelationInput[]
+  cursor?: Prisma.WorkBlockWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WorkBlockScalarFieldEnum | Prisma.WorkBlockScalarFieldEnum[]
+}
+
+/**
+ * Workspace.executionSessions
+ */
+export type Workspace$executionSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ExecutionSession
+   */
+  select?: Prisma.ExecutionSessionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ExecutionSession
+   */
+  omit?: Prisma.ExecutionSessionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ExecutionSessionInclude<ExtArgs> | null
+  where?: Prisma.ExecutionSessionWhereInput
+  orderBy?: Prisma.ExecutionSessionOrderByWithRelationInput | Prisma.ExecutionSessionOrderByWithRelationInput[]
+  cursor?: Prisma.ExecutionSessionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ExecutionSessionScalarFieldEnum | Prisma.ExecutionSessionScalarFieldEnum[]
 }
 
 /**
