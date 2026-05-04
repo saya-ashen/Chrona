@@ -1,8 +1,6 @@
 export type StructuredResultReliability =
   | "business_tool"
-  | "output_json"
-  | "assistant_text"
-  | "fallback_text";
+  | "assistant_text";
 
 export interface StructuredValidationIssue {
   path: string;

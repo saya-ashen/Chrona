@@ -1,4 +1,13 @@
 import type { BridgeEnvironment, BridgeFeature } from "./types";
+import {
+  AI_CHECKPOINT_TYPES,
+  AI_CONDITION_EVALUATORS,
+  AI_PLAN_COMPLETION_POLICY_TYPES,
+  AI_PLAN_NODE_TYPES,
+  AI_TASK_EXECUTORS,
+  AI_TASK_MODES,
+  AI_WAIT_TIMEOUT_ACTIONS,
+} from "@chrona/contracts/ai";
 
 export const LOG_LEVEL_ORDER = {
   debug: 10,
@@ -103,6 +112,65 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     },
     required: ["suggestions"],
   },
+  analyze_schedule_conflicts: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      conflicts: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            id: { type: "string" },
+            type: {
+              type: "string",
+              enum: ["time_overlap", "overload", "fragmentation", "dependency"],
+            },
+            severity: {
+              type: "string",
+              enum: ["low", "medium", "high"],
+            },
+            taskIds: { type: "array", items: { type: "string" } },
+            description: { type: "string" },
+          },
+          required: ["id", "type", "severity", "taskIds", "description"],
+        },
+      },
+      resolutions: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            conflictId: { type: "string" },
+            type: {
+              type: "string",
+              enum: ["reschedule", "split", "merge", "defer", "reorder"],
+            },
+            description: { type: "string" },
+            reason: { type: "string" },
+            changes: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: true,
+                properties: {
+                  taskId: { type: "string" },
+                  scheduledStartAt: { type: "string" },
+                  scheduledEndAt: { type: "string" },
+                },
+                required: ["taskId"],
+              },
+            },
+          },
+          required: ["conflictId", "type", "description", "reason", "changes"],
+        },
+      },
+      summary: { type: "string" },
+    },
+    required: ["conflicts", "resolutions", "summary"],
+  },
   generate_task_plan_graph: {
     type: "object",
     additionalProperties: true,
@@ -134,33 +202,99 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
             id: { type: "string", description: "Stable local id, e.g. node-1." },
             type: {
               type: "string",
-              enum: ["task", "checkpoint", "condition", "wait"],
+              enum: [...AI_PLAN_NODE_TYPES],
             },
             title: { type: "string", description: "Short node label shown to the user." },
-            objective: { type: "string", description: "What this node achieves when completed." },
             description: { type: "string", description: "Optional implementation detail for the node." },
-            phase: { type: "string", description: "Optional coarse stage label." },
+            expectedOutput: {
+              type: "string",
+              description: "What successful completion of this node should produce.",
+            },
+            completionCriteria: {
+              type: "string",
+              description: "How to determine the node is done.",
+            },
             estimatedMinutes: { type: "number", description: "Best-effort duration estimate for just this node." },
             priority: {
               type: "string",
-              enum: ["Low", "Medium", "High", "Urgent"],
+              enum: ["low", "medium", "high"],
               description: "Relative urgency of this node.",
             },
             executor: {
               type: "string",
-              enum: ["human", "automation"],
+              enum: [...AI_TASK_EXECUTORS],
               description:
-                "Who must perform the node. Use 'automation' ONLY when Chrona/runtime could complete it entirely in software without a person acting in the physical world or supplying new information. Use 'human' for approvals, choices, clarifications, payment, pickup, travel, waiting, receiving items, and any in-person/manual action.",
+                "Who must perform the node. Use 'ai' when model-driven software work can complete it, 'system' for deterministic software automation/integrations, and 'user' for approvals, choices, clarifications, payment, pickup, travel, waiting, receiving items, or any in-person/manual action.",
             },
-            requiresHumanInput: {
-              type: "boolean",
+            mode: {
+              type: "string",
+              enum: [...AI_TASK_MODES],
               description:
-                "Set true when this node cannot proceed until a person provides missing information, makes a choice, or confirms details.",
+                "manual = user performs it, assist = AI helps while user remains active, auto = fully software-executable.",
             },
-            requiresHumanApproval: {
+            checkpointType: {
+              type: "string",
+              enum: [...AI_CHECKPOINT_TYPES],
+              description: "Checkpoint subtype for human confirmation, choice, input, edit, or approval.",
+            },
+            prompt: {
+              type: "string",
+              description: "Prompt shown to the user for checkpoint nodes.",
+            },
+            required: {
               type: "boolean",
-              description:
-                "Set true when this node is an approval/review/sign-off gate that must be explicitly approved by a person.",
+              description: "Whether the checkpoint can be skipped.",
+            },
+            options: {
+              type: "array",
+              items: { type: "string" },
+              description: "Available options for choose-style checkpoints.",
+            },
+            targetNodeId: {
+              type: "string",
+              description: "Optional downstream node gated by this checkpoint.",
+            },
+            condition: {
+              type: "string",
+              description: "Human-readable branching condition.",
+            },
+            evaluationBy: {
+              type: "string",
+              enum: [...AI_CONDITION_EVALUATORS],
+              description: "Who evaluates the condition.",
+            },
+            branches: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: true,
+                properties: {
+                  label: { type: "string" },
+                  nextNodeId: { type: "string" },
+                },
+                required: ["label", "nextNodeId"],
+              },
+              description: "Branches for condition nodes.",
+            },
+            defaultNextNodeId: {
+              type: "string",
+              description: "Fallback target when no branch matches.",
+            },
+            waitFor: {
+              type: "string",
+              description: "External event or condition to wait for.",
+            },
+            timeout: {
+              type: "object",
+              additionalProperties: true,
+              properties: {
+                minutes: { type: "number" },
+                onTimeout: {
+                  type: "string",
+                  enum: [...AI_WAIT_TIMEOUT_ACTIONS],
+                },
+              },
+              required: ["minutes", "onTimeout"],
             },
           },
           required: ["id", "type", "title"],
@@ -173,21 +307,53 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
           type: "object",
           additionalProperties: true,
           properties: {
-            id: { type: "string", description: "Stable local id, e.g. edge-1." },
-            fromNodeId: { type: "string", description: "Upstream/source node id." },
-            toNodeId: { type: "string", description: "Downstream/target node id." },
-            type: {
-              type: "string",
-              enum: ["sequential", "depends_on"],
-              description:
-                "sequential = ordinary next step; depends_on = target cannot start until source completes.",
-            },
+            from: { type: "string", description: "Upstream/source node id." },
+            to: { type: "string", description: "Downstream/target node id." },
+            label: { type: "string", description: "Optional edge label." },
           },
-          required: ["id", "fromNodeId", "toNodeId", "type"],
+          required: ["from", "to"],
         },
+      },
+      completionPolicy: {
+        type: "object",
+        additionalProperties: true,
+        properties: {
+          type: {
+            type: "string",
+            enum: [...AI_PLAN_COMPLETION_POLICY_TYPES],
+          },
+          nodeIds: {
+            type: "array",
+            items: { type: "string" },
+          },
+          description: { type: "string" },
+        },
+        required: ["type"],
       },
     },
     required: ["title", "goal", "nodes", "edges"],
+  },
+  suggest_task_timeslots: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      slots: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            startAt: { type: "string" },
+            endAt: { type: "string" },
+            score: { type: "number" },
+            reason: { type: "string" },
+          },
+          required: ["startAt", "endAt", "score", "reason"],
+        },
+      },
+      reasoning: { type: "string" },
+    },
+    required: ["slots"],
   },
   dispatch_next_task_action: {
     type: "object",
@@ -214,5 +380,7 @@ export const FUNCTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
 export const FEATURE_FUNCTION_TOOL: Partial<Record<BridgeFeature, string>> = {
   suggest: "suggest_task_completions",
   generate_plan: "generate_task_plan_graph",
+  conflicts: "analyze_schedule_conflicts",
+  timeslots: "suggest_task_timeslots",
   dispatch_task: "dispatch_next_task_action",
 };

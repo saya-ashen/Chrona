@@ -196,6 +196,7 @@ describe("WorkPageClient", () => {
       resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
+        startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
@@ -212,7 +213,7 @@ describe("WorkPageClient", () => {
     expect(screen.getByText("起草任务驱动 Agent 面板")).toBeInTheDocument();
     expect(screen.getByText("Add Input")).toBeInTheDocument();
     expect(screen.getAllByText("Latest Output").length).toBeGreaterThan(0);
-    expect(screen.getByText("Task Plan")).toBeInTheDocument();
+    expect(screen.getAllByText("Task Plan").length).toBeGreaterThan(0);
     expect(screen.getByText("Execution Record")).toBeInTheDocument();
   });
 
@@ -230,6 +231,7 @@ describe("WorkPageClient", () => {
       resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
+        startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
@@ -243,7 +245,7 @@ describe("WorkPageClient", () => {
 
     render(<WorkPageClient initialData={baseData} />);
 
-    expect(screen.getByText("Task Plan")).toBeInTheDocument();
+    expect(screen.getAllByText("Task Plan").length).toBeGreaterThan(0);
   });
 
   it("keeps the collaboration tab focused on conversation messages while the composer stays docked at the bottom", () => {
@@ -306,6 +308,7 @@ describe("WorkPageClient", () => {
       resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
+        startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
@@ -470,6 +473,7 @@ describe("WorkPageClient", () => {
       resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
+        startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
@@ -541,6 +545,7 @@ describe("WorkPageClient", () => {
       resetComposer: vi.fn(),
       submitWorkbenchInput: vi.fn(),
       actions: {
+        startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),

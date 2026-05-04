@@ -49,7 +49,7 @@ export interface ToolCallOutputInfo {
 
 export interface BridgeFeatureResult {
   feature: BridgeFeature;
-  source: "business_tool" | "output_json" | "assistant_text";
+  source: "business_tool" | "assistant_text";
   toolName?: string;
   payload: unknown;
 }

@@ -165,3 +165,31 @@ export const AiClientType = {
 } as const
 
 export type AiClientType = (typeof AiClientType)[keyof typeof AiClientType]
+
+
+export const WorkBlockStatus = {
+  Scheduled: 'Scheduled',
+  Active: 'Active',
+  Completed: 'Completed',
+  Cancelled: 'Cancelled'
+} as const
+
+export type WorkBlockStatus = (typeof WorkBlockStatus)[keyof typeof WorkBlockStatus]
+
+
+export const WorkBlockTrigger = {
+  scheduled: 'scheduled',
+  manual: 'manual'
+} as const
+
+export type WorkBlockTrigger = (typeof WorkBlockTrigger)[keyof typeof WorkBlockTrigger]
+
+
+export const ExecutionSessionStatus = {
+  Active: 'Active',
+  Paused: 'Paused',
+  Completed: 'Completed',
+  Abandoned: 'Abandoned'
+} as const
+
+export type ExecutionSessionStatus = (typeof ExecutionSessionStatus)[keyof typeof ExecutionSessionStatus]

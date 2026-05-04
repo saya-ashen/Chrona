@@ -11,6 +11,20 @@ import { applyPlanPatch } from "./apply-plan-patch";
 import type { TaskPlanNode, TaskPlanGraph } from "@/modules/ai/types";
 import type { PlanExecutablePath } from "./executable-path";
 
+async function activateWorkBlock(taskId: string) {
+  await db.workBlock.updateMany({
+    where: { taskId, status: "Scheduled" },
+    data: { status: "Active", startedAt: new Date() },
+  });
+}
+
+async function completeWorkBlock(taskId: string) {
+  await db.workBlock.updateMany({
+    where: { taskId, status: "Active" },
+    data: { status: "Completed", completedAt: new Date() },
+  });
+}
+
 export type PlanExecutionStatus =
   | "started"
   | "running"
@@ -182,6 +196,7 @@ export async function advancePlanExecution(input: {
           eventType: "execution_completed",
           payload: { totalSteps: executedNodeIds.length },
         });
+        await completeWorkBlock(input.taskId);
       }
 
       return {
@@ -632,6 +647,8 @@ export async function startPlanExecution(input: {
     taskId: input.taskId,
     planId: acceptedPlan.id,
   });
+
+  await activateWorkBlock(input.taskId);
 
   await appendMainSessionEvent({
     taskId: input.taskId,

@@ -400,7 +400,9 @@ export const ModelName = {
   RuntimeCursor: 'RuntimeCursor',
   AiClient: 'AiClient',
   AiFeatureBinding: 'AiFeatureBinding',
-  TaskAssistantMessage: 'TaskAssistantMessage'
+  TaskAssistantMessage: 'TaskAssistantMessage',
+  WorkBlock: 'WorkBlock',
+  ExecutionSession: 'ExecutionSession'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +418,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage"
+    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1678,6 +1680,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WorkBlock: {
+      payload: Prisma.$WorkBlockPayload<ExtArgs>
+      fields: Prisma.WorkBlockFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WorkBlockFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WorkBlockFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        findFirst: {
+          args: Prisma.WorkBlockFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WorkBlockFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        findMany: {
+          args: Prisma.WorkBlockFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>[]
+        }
+        create: {
+          args: Prisma.WorkBlockCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        createMany: {
+          args: Prisma.WorkBlockCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WorkBlockCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>[]
+        }
+        delete: {
+          args: Prisma.WorkBlockDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        update: {
+          args: Prisma.WorkBlockUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        deleteMany: {
+          args: Prisma.WorkBlockDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WorkBlockUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WorkBlockUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>[]
+        }
+        upsert: {
+          args: Prisma.WorkBlockUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkBlockPayload>
+        }
+        aggregate: {
+          args: Prisma.WorkBlockAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWorkBlock>
+        }
+        groupBy: {
+          args: Prisma.WorkBlockGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkBlockGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WorkBlockCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkBlockCountAggregateOutputType> | number
+        }
+      }
+    }
+    ExecutionSession: {
+      payload: Prisma.$ExecutionSessionPayload<ExtArgs>
+      fields: Prisma.ExecutionSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ExecutionSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ExecutionSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.ExecutionSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ExecutionSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        findMany: {
+          args: Prisma.ExecutionSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>[]
+        }
+        create: {
+          args: Prisma.ExecutionSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        createMany: {
+          args: Prisma.ExecutionSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ExecutionSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.ExecutionSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        update: {
+          args: Prisma.ExecutionSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.ExecutionSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ExecutionSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ExecutionSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.ExecutionSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExecutionSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.ExecutionSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateExecutionSession>
+        }
+        groupBy: {
+          args: Prisma.ExecutionSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExecutionSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ExecutionSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExecutionSessionCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2020,6 +2170,45 @@ export const TaskAssistantMessageScalarFieldEnum = {
 export type TaskAssistantMessageScalarFieldEnum = (typeof TaskAssistantMessageScalarFieldEnum)[keyof typeof TaskAssistantMessageScalarFieldEnum]
 
 
+export const WorkBlockScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  title: 'title',
+  status: 'status',
+  scheduledStartAt: 'scheduledStartAt',
+  scheduledEndAt: 'scheduledEndAt',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  trigger: 'trigger',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WorkBlockScalarFieldEnum = (typeof WorkBlockScalarFieldEnum)[keyof typeof WorkBlockScalarFieldEnum]
+
+
+export const ExecutionSessionScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  workBlockId: 'workBlockId',
+  planId: 'planId',
+  status: 'status',
+  currentNodeId: 'currentNodeId',
+  pauseReason: 'pauseReason',
+  completedNodeIds: 'completedNodeIds',
+  startedAt: 'startedAt',
+  pausedAt: 'pausedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExecutionSessionScalarFieldEnum = (typeof ExecutionSessionScalarFieldEnum)[keyof typeof ExecutionSessionScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2227,6 +2416,27 @@ export type EnumScheduleProposalStatusFieldRefInput<$PrismaModel> = FieldRefInpu
 export type EnumAiClientTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AiClientType'>
     
 
+
+/**
+ * Reference to a field of type 'WorkBlockStatus'
+ */
+export type EnumWorkBlockStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkBlockStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'WorkBlockTrigger'
+ */
+export type EnumWorkBlockTriggerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkBlockTrigger'>
+    
+
+
+/**
+ * Reference to a field of type 'ExecutionSessionStatus'
+ */
+export type EnumExecutionSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExecutionSessionStatus'>
+    
+
 /**
  * Batch Payload for updateMany & deleteMany & createMany
  */
@@ -2354,6 +2564,8 @@ export type GlobalOmitConfig = {
   aiClient?: Prisma.AiClientOmit
   aiFeatureBinding?: Prisma.AiFeatureBindingOmit
   taskAssistantMessage?: Prisma.TaskAssistantMessageOmit
+  workBlock?: Prisma.WorkBlockOmit
+  executionSession?: Prisma.ExecutionSessionOmit
 }
 
 /* Types for Logging */

@@ -73,6 +73,11 @@ type TaskPageProps = {
             requiresHumanApproval: boolean;
             autoRunnable: boolean;
             blockingReason: string | null;
+            executionClassification?: "automatic_chainable" | "automatic_standalone" | "human_dependent" | "review_gate";
+            readiness?: "ready" | "blocked" | "waiting";
+            nextAction?: string | null;
+            dependencies?: string[];
+            requiredInfo?: string[];
           }>;
           edges: Array<{
             id: string;
@@ -426,6 +431,30 @@ export function TaskPage({ data, copy: copyProp }: TaskPageProps) {
                   {copy.planningContextDescription}
                 </SurfaceCardDescription>
               </SurfaceCardHeader>
+
+              {data.task.savedAiPlan?.plan?.nodes && data.task.savedAiPlan.plan.nodes.length > 0 ? (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  {data.task.savedAiPlan.plan.nodes
+                    .filter((n) => n.readiness || n.executionClassification || n.nextAction || (n.dependencies?.length))
+                    .slice(0, 5)
+                    .map((node) => (
+                      <SurfaceCard key={node.id} as="div" variant="default" padding="sm" className="rounded-2xl">
+                        <p className="font-medium text-foreground">{node.title}</p>
+                        <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
+                          {node.executionClassification ? (
+                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-emerald-800">{node.executionClassification}</span>
+                          ) : null}
+                          {node.readiness ? (
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-800">{node.readiness}</span>
+                          ) : null}
+                        </div>
+                        {node.nextAction ? (
+                          <p className="mt-1 text-[11px]">{node.nextAction}</p>
+                        ) : null}
+                      </SurfaceCard>
+                    ))}
+                </div>
+              ) : null}
 
               <dl className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between gap-4">

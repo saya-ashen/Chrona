@@ -289,6 +289,7 @@ function createData(): SchedulePageData {
     listItems: [],
     conflicts: [],
     suggestions: [],
+    workBlocks: [],
   };
 }
 

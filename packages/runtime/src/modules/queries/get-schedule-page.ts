@@ -392,6 +392,23 @@ export async function getSchedulePage(workspaceId: string) {
 
   const conflictAnalysis = analyzeConflicts(scheduledTasks);
 
+  const workBlocks = await db.workBlock.findMany({
+    where: { workspaceId, status: { in: ["Scheduled", "Active"] } },
+    orderBy: { scheduledStartAt: "asc" },
+  });
+
+  const actionableWorkBlocks = workBlocks.map((block) => ({
+    id: block.id,
+    taskId: block.taskId,
+    planId: block.planId,
+    title: block.title,
+    status: block.status,
+    scheduledStartAt: block.scheduledStartAt,
+    scheduledEndAt: block.scheduledEndAt,
+    startedAt: block.startedAt,
+    trigger: block.trigger,
+  }));
+
   return {
     defaultRuntimeAdapterKey: workspace.defaultRuntime,
     runtimeAdapters,
@@ -411,5 +428,6 @@ export async function getSchedulePage(workspaceId: string) {
     proposals: mappedProposals,
     conflicts: conflictAnalysis.conflicts as unknown as ScheduleConflict[],
     suggestions: conflictAnalysis.suggestions as unknown as ScheduleSuggestion[],
+    workBlocks: actionableWorkBlocks,
   };
 }

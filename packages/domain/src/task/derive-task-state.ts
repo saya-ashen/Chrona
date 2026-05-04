@@ -3,6 +3,11 @@ type DeriveTaskStateInput = {
   runs: Array<{ id: string; status: string; updatedAt: Date }>;
   approvals: Array<{ status: string; requestedAt: Date }>;
   sync: { stale: boolean };
+  executionSession?: {
+    status: string;
+    currentNodeId: string | null;
+    pauseReason: string | null;
+  } | null;
 };
 
 type BlockReason = {
@@ -125,6 +130,65 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
         actionRequired: "Open Work Page",
       },
       blockSince: latestPendingApproval.requestedAt,
+    };
+  }
+
+  if (input.executionSession?.status === "Paused") {
+    const pauseReason = input.executionSession.pauseReason;
+    if (pauseReason === "needs_user_input") {
+      return {
+        persistedStatus: "Blocked",
+        displayState: "WaitingForInput",
+        blockReason: {
+          blockType: "execution_paused_input",
+          scope: "execution_session",
+          actionRequired: "Provide Input",
+        },
+        blockSince: activeRun?.updatedAt ?? null,
+      };
+    }
+    if (pauseReason === "needs_approval") {
+      return {
+        persistedStatus: "Blocked",
+        displayState: "WaitingForApproval",
+        blockReason: {
+          blockType: "execution_paused_approval",
+          scope: "execution_session",
+          actionRequired: "Review Step Output",
+        },
+        blockSince: activeRun?.updatedAt ?? null,
+      };
+    }
+    if (pauseReason === "provider_unavailable") {
+      return {
+        persistedStatus: "Blocked",
+        displayState: "Attention Needed",
+        blockReason: {
+          blockType: "provider_unavailable",
+          scope: "runtime",
+          actionRequired: "Check provider availability",
+        },
+        blockSince: activeRun?.updatedAt ?? null,
+      };
+    }
+    return {
+      persistedStatus: "Blocked",
+      displayState: "Attention Needed",
+      blockReason: {
+        blockType: "execution_paused",
+        scope: "execution_session",
+        actionRequired: "Check execution status",
+      },
+      blockSince: activeRun?.updatedAt ?? null,
+    };
+  }
+
+  if (input.executionSession?.status === "Active") {
+    return {
+      persistedStatus: "Running",
+      displayState: "ExecutionActive",
+      blockReason: null,
+      blockSince: null,
     };
   }
 

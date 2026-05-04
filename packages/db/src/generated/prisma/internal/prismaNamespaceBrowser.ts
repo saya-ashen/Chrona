@@ -67,7 +67,9 @@ export const ModelName = {
   RuntimeCursor: 'RuntimeCursor',
   AiClient: 'AiClient',
   AiFeatureBinding: 'AiFeatureBinding',
-  TaskAssistantMessage: 'TaskAssistantMessage'
+  TaskAssistantMessage: 'TaskAssistantMessage',
+  WorkBlock: 'WorkBlock',
+  ExecutionSession: 'ExecutionSession'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -387,6 +389,45 @@ export const TaskAssistantMessageScalarFieldEnum = {
 } as const
 
 export type TaskAssistantMessageScalarFieldEnum = (typeof TaskAssistantMessageScalarFieldEnum)[keyof typeof TaskAssistantMessageScalarFieldEnum]
+
+
+export const WorkBlockScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  title: 'title',
+  status: 'status',
+  scheduledStartAt: 'scheduledStartAt',
+  scheduledEndAt: 'scheduledEndAt',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  trigger: 'trigger',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WorkBlockScalarFieldEnum = (typeof WorkBlockScalarFieldEnum)[keyof typeof WorkBlockScalarFieldEnum]
+
+
+export const ExecutionSessionScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  workBlockId: 'workBlockId',
+  planId: 'planId',
+  status: 'status',
+  currentNodeId: 'currentNodeId',
+  pauseReason: 'pauseReason',
+  completedNodeIds: 'completedNodeIds',
+  startedAt: 'startedAt',
+  pausedAt: 'pausedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExecutionSessionScalarFieldEnum = (typeof ExecutionSessionScalarFieldEnum)[keyof typeof ExecutionSessionScalarFieldEnum]
 
 
 export const SortOrder = {

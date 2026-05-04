@@ -1,0 +1,14 @@
+{
+  "name": "@chrona/providers-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/openclaw-bridge": "workspace:*",
+    "@chrona/openclaw-integration": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

@@ -9,15 +9,11 @@ import type {
   SuggestTimeslotRequest,
   ChatRequest,
   DispatchTaskInput,
+  StructuredDebugInfo,
 } from "./types";
 import { AiClientError } from "./types";
 import { createLogger } from "@chrona/db/logger";
-import {
-  coerceStructuredResult,
-  parseTextJsonWithFallback,
-  type OpenClawCallResult,
-  type OpenClawStructuredMode,
-} from "./structured";
+import { parseTextJsonWithFallback } from "./structured";
 import type {
   BridgeFeature,
   BridgeFeatureRequest,
@@ -26,8 +22,26 @@ import type {
 } from "@chrona/openclaw-integration/bridge/contracts";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
+import { OpenClawClient } from "@chrona/providers-core";
 
-const logger = createLogger("ai-features.openclaw.providers");
+const _logger = createLogger("ai-features.openclaw.providers");
+
+const clientCache = new Map<string, OpenClawClient>();
+
+function getOrCreateClient(config: OpenClawClientConfig): OpenClawClient {
+  const gatewayUrl = config.gatewayUrl || config.bridgeUrl;
+  const key = `${gatewayUrl}|${config.gatewayToken ?? config.bridgeToken ?? ""}`;
+  let client = clientCache.get(key);
+  if (!client) {
+    client = new OpenClawClient({
+      gatewayUrl,
+      gatewayToken: config.gatewayToken || config.bridgeToken,
+      timeoutSeconds: config.timeoutSeconds,
+    });
+    clientCache.set(key, client);
+  }
+  return client;
+}
 
 function toBridgeFeature(feature: AiFeature): BridgeFeature {
   switch (feature) {
@@ -49,6 +63,12 @@ function toBridgeFeature(feature: AiFeature): BridgeFeature {
 export function extractJSON<T>(raw: string, clientType: string): T {
   return parseTextJsonWithFallback<T>(raw, clientType);
 }
+
+export type FeaturePayloadResult<T> = {
+  parsed: T;
+  rawText: string;
+  debug?: StructuredDebugInfo;
+};
 
 function buildGeneratePlanInput(input: GenerateTaskPlanRequest): Record<string, unknown> {
   const task: Record<string, unknown> = {
@@ -85,78 +105,23 @@ export function buildFeatureInput(
   return input as unknown as Record<string, unknown>;
 }
 
-function getBridgePath(feature: BridgeFeature, stream: boolean): string {
-  switch (feature) {
-    case "suggest":
-      return stream ? "/v1/features/suggest/stream" : "/v1/features/suggest";
-    case "generate_plan":
-      return stream
-        ? "/v1/features/generate-plan/stream"
-        : "/v1/features/generate-plan";
-    case "conflicts":
-      return "/v1/features/analyze-conflicts";
-    case "timeslots":
-      return "/v1/features/suggest-timeslot";
-    case "chat":
-      return "/v1/features/chat";
-    case "dispatch_task":
-      return "/v1/features/dispatch-task";
-  }
-}
-
-function getBridgeHeaders(config: OpenClawClientConfig): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (config.bridgeToken.trim()) {
-    headers.Authorization = `Bearer ${config.bridgeToken}`;
-  }
-
-  return headers;
-}
-
-function getBridgeBaseUrl(config: OpenClawClientConfig): string {
-  return config.bridgeUrl.replace(/\/+$/, "");
-}
-
 async function postBridgeFeature(
   config: OpenClawClientConfig,
   feature: BridgeFeature,
   body: BridgeFeatureRequest<Record<string, unknown>>,
 ): Promise<BridgeResponse> {
-  const res = await fetch(`${getBridgeBaseUrl(config)}${getBridgePath(feature, false)}`, {
-    method: "POST",
-    headers: getBridgeHeaders(config),
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(((body.timeout ?? 120) + 15) * 1000),
-  });
-
-  const text = await res.text().catch(() => "");
-  let parsed: unknown;
   try {
-    parsed = text ? JSON.parse(text) : {};
-  } catch {
-    throw new AiClientError(
-      `Bridge call failed (${res.status}): ${text.slice(0, 200)}`,
-      "openclaw",
-      "internal",
-    );
+    const client = getOrCreateClient(config);
+    return await client.executeFeature(feature, {
+      sessionKey: body.sessionKey,
+      instructions: body.instructions,
+      timeout: body.timeout,
+      ...(body.input as Record<string, unknown> ?? {}),
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "Bridge call failed";
+    throw new AiClientError(message, "openclaw", "internal");
   }
-
-  if (!res.ok) {
-    const message =
-      parsed && typeof parsed === "object" && "error" in parsed
-        ? String((parsed as { error?: unknown }).error ?? text)
-        : text;
-    throw new AiClientError(
-      `Bridge call failed (${res.status}): ${message}`,
-      "openclaw",
-      "internal",
-    );
-  }
-
-  return parsed as BridgeResponse;
 }
 
 export async function postBridgeFeatureStream(
@@ -164,71 +129,33 @@ export async function postBridgeFeatureStream(
   feature: BridgeFeature,
   body: BridgeFeatureRequest<Record<string, unknown>>,
 ): Promise<{ response: BridgeResponse; events: NDJSONEvent[] }> {
-  const res = await fetch(`${getBridgeBaseUrl(config)}${getBridgePath(feature, true)}`, {
-    method: "POST",
-    headers: getBridgeHeaders(config),
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(((body.timeout ?? 120) + 15) * 1000),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    throw new AiClientError(
-      `Bridge stream call failed (${res.status}): ${errBody.slice(0, 400)}`,
-      "openclaw",
-      "internal",
-    );
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) {
-    throw new AiClientError("No response body for streaming", "openclaw", "internal");
-  }
-
-  const decoder = new TextDecoder();
+  const client = getOrCreateClient(config);
   const events: NDJSONEvent[] = [];
-  let buffer = "";
-  let finalResponse: BridgeResponse | null = null;
+  let output = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    let eventType = "";
-    for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        eventType = line.slice(7).trim();
-        continue;
-      }
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      try {
-        const data = JSON.parse(raw) as NDJSONEvent | BridgeResponse;
-        if (eventType === "done") {
-          finalResponse = data as BridgeResponse;
-        } else if (eventType === "event") {
-          events.push(data as NDJSONEvent);
-        }
-      } catch {
-        // ignore malformed SSE lines
-      }
-      eventType = "";
-    }
+  for await (const event of client.executeFeatureStream(feature, {
+    sessionKey: body.sessionKey,
+    instructions: body.instructions,
+    timeout: body.timeout,
+    ...(body.input as Record<string, unknown> ?? {}),
+  })) {
+    events.push({ type: event.type, data: event.data } as unknown as NDJSONEvent);
+    if (event.type === "text") output += event.data;
   }
 
-  if (!finalResponse) {
-    throw new AiClientError(
-      "Stream ended without a final response",
-      "openclaw",
-      "internal",
-    );
-  }
-
-  return { response: finalResponse, events };
+  return {
+    response: {
+      sessionId: body.sessionKey ?? "",
+      output,
+      toolCalls: [],
+      usage: null,
+      error: null,
+      durationMs: 0,
+      structured: null,
+      feature: null,
+    },
+    events,
+  };
 }
 
 async function fetchOpenClawBridge(
@@ -243,8 +170,7 @@ async function fetchOpenClawBridge(
     | SuggestTimeslotRequest
     | ChatRequest
     | DispatchTaskInput,
-  mode: OpenClawStructuredMode,
-): Promise<OpenClawCallResult> {
+): Promise<BridgeResponse> {
   const timeout = config.timeoutSeconds ?? 120;
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(feature, scope);
   const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
@@ -265,7 +191,33 @@ async function fetchOpenClawBridge(
     throw new AiClientError(bridge.error, "openclaw", "internal");
   }
 
-  return coerceStructuredResult(bridge, mode);
+  return bridge;
+}
+
+function toStructuredDebugInfo(bridge: BridgeResponse): StructuredDebugInfo | undefined {
+  const feature = bridge.feature;
+  const structured = bridge.structured;
+  if (!feature && !structured) {
+    return undefined;
+  }
+
+  return {
+    rawOutput: structured?.rawOutput ?? bridge.output,
+    error: structured?.error ?? bridge.error,
+    source: structured?.source ?? feature?.source,
+    feature: structured?.feature ?? feature?.feature ?? null,
+    toolName: structured?.toolName ?? feature?.toolName ?? null,
+    sessionId: structured?.sessionId ?? bridge.sessionId,
+    runId: structured?.runId ?? bridge.runId,
+    validationIssues: structured?.validationIssues,
+    bridgeToolCalls: structured?.bridgeToolCalls ?? bridge.toolCalls.map((toolCall) => ({
+      tool: toolCall.tool,
+      callId: toolCall.callId,
+      input: toolCall.input,
+      result: toolCall.result,
+      status: toolCall.status,
+    })),
+  };
 }
 
 export async function openclawCall(
@@ -281,11 +233,11 @@ export async function openclawCall(
     | ChatRequest
     | DispatchTaskInput,
 ): Promise<string> {
-  const result = await fetchOpenClawBridge(config, feature, scope, input, "text");
-  return result.text;
+  const bridge = await fetchOpenClawBridge(config, feature, scope, input);
+  return bridge.output;
 }
 
-async function openclawStructuredCall<T = unknown>(
+async function openclawFeaturePayload<T>(
   config: OpenClawClientConfig,
   feature: AiFeature,
   scope: string,
@@ -297,22 +249,22 @@ async function openclawStructuredCall<T = unknown>(
     | SuggestTimeslotRequest
     | ChatRequest
     | DispatchTaskInput,
-): Promise<OpenClawCallResult<T>> {
-  const result = await fetchOpenClawBridge(
-    config,
-    feature,
-    scope,
-    input,
-    "structured",
-  );
+): Promise<FeaturePayloadResult<T>> {
+  const bridge = await fetchOpenClawBridge(config, feature, scope, input);
+  const payload = bridge.feature?.payload;
+
+  if (payload == null) {
+    throw new AiClientError(
+      bridge.structured?.error ?? `Feature '${feature}' did not return a parsed payload`,
+      "openclaw",
+      "invalid_response",
+    );
+  }
+
   return {
-    ...result,
-    structured: result.structured
-      ? {
-          ...result.structured,
-          parsed: (result.structured.parsed ?? null) as T | null,
-        }
-      : null,
+    parsed: payload as T,
+    rawText: bridge.output,
+    debug: toStructuredDebugInfo(bridge),
   };
 }
 
@@ -320,20 +272,12 @@ async function openclawHealthCheck(
   config: OpenClawClientConfig,
 ): Promise<boolean> {
   try {
-    if (!config.bridgeUrl.trim()) {
+    const gatewayUrl = config.gatewayUrl ?? config.bridgeUrl;
+    if (!gatewayUrl?.trim()) {
       return false;
     }
-    const res = await fetch(`${getBridgeBaseUrl(config)}/v1/health`, {
-      headers: getBridgeHeaders(config),
-      signal: AbortSignal.timeout(3000),
-    });
-
-    if (!res.ok) {
-      return false;
-    }
-
-    const body = (await res.json().catch(() => null)) as { status?: string } | null;
-    return body?.status === "ok";
+    const client = getOrCreateClient(config);
+    return await client.checkHealth();
   } catch {
     return false;
   }
@@ -456,7 +400,7 @@ export async function dispatch(
   );
 }
 
-export async function dispatchStructured<T = unknown>(
+export async function dispatchFeaturePayload<T = unknown>(
   client: AiClientRecord,
   feature: AiFeature,
   input:
@@ -468,9 +412,9 @@ export async function dispatchStructured<T = unknown>(
     | ChatRequest
     | DispatchTaskInput,
   scope = "default",
-): Promise<OpenClawCallResult<T>> {
+): Promise<FeaturePayloadResult<T>> {
   if (client.type === "openclaw") {
-    return openclawStructuredCall<T>(
+    return openclawFeaturePayload<T>(
       client.config as OpenClawClientConfig,
       feature,
       scope,
@@ -487,20 +431,8 @@ export async function dispatchStructured<T = unknown>(
   );
 
   return {
-    mode: "structured",
-    text,
-    structured: null,
-    bridge: {
-      sessionId: buildOpenClawSessionIdentity(feature, scope).sessionId,
-      runId: undefined,
-      output: text,
-      toolCalls: [],
-      usage: null,
-      error: null,
-      durationMs: 0,
-      structured: null,
-      feature: null,
-    },
+    parsed: extractJSON<T>(text, client.type),
+    rawText: text,
   };
 }
 
@@ -513,4 +445,3 @@ export async function checkClientHealth(
   }
   return llmHealthCheck(client.config as LLMClientConfig);
 }
-

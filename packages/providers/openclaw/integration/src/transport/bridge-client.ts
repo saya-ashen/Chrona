@@ -74,14 +74,14 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   }
 
   async connect(): Promise<OpenClawHello> {
-    const res = await fetch(`${this.baseUrl}/v1/health`, {
+    const res = await fetch(`${this.baseUrl}/health`, {
       headers: this.buildHeaders(),
     });
     if (!res.ok) {
       throw new Error(`Bridge health check failed: ${res.status}`);
     }
-    const health = (await res.json()) as { status: string };
-    if (health.status !== "ok") {
+    const health = (await res.json()) as { ok?: boolean; status: string };
+    if (health.ok !== true && health.status !== "ok") {
       throw new Error("OpenClaw CLI not available on bridge");
     }
     return {
@@ -130,7 +130,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       timeout: this.timeoutSeconds,
     };
     const response = await this.postJson<BridgeResponse>(
-      "/v1/execution/task",
+      "/execution/task",
       requestBody,
     );
     this.recordBridgeResponse(sessionKey, input.prompt, response);
@@ -234,7 +234,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       timeout: this.timeoutSeconds,
     };
     const response = await this.postJson<BridgeResponse>(
-      "/v1/execution/task",
+      "/execution/task",
       requestBody,
     );
     this.recordBridgeResponse(input.runtimeSessionKey, input.message, response);
@@ -312,19 +312,19 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   private getFeaturePath(feature: BridgeFeature, stream: boolean): string {
     switch (feature) {
       case "suggest":
-        return stream ? "/v1/features/suggest/stream" : "/v1/features/suggest";
+        return stream ? "/features/suggest/stream" : "/features/suggest";
       case "generate_plan":
         return stream
-          ? "/v1/features/generate-plan/stream"
-          : "/v1/features/generate-plan";
+          ? "/features/generate-plan/stream"
+          : "/features/generate-plan";
       case "conflicts":
-        return "/v1/features/analyze-conflicts";
+        return "/features/analyze-conflicts";
       case "timeslots":
-        return "/v1/features/suggest-timeslot";
+        return "/features/suggest-timeslot";
       case "chat":
-        return "/v1/features/chat";
+        return "/features/chat";
       case "dispatch_task":
-        return "/v1/features/dispatch-task";
+        return "/features/dispatch-task";
     }
   }
 

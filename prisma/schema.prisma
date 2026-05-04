@@ -133,6 +133,8 @@ model Workspace {
   taskDependencies  TaskDependency[]
   taskProjections   TaskProjection[]
   scheduleProposals ScheduleProposal[]
+  workBlocks        WorkBlock[]
+  executionSessions ExecutionSession[]
 }
 
 model Task {
@@ -176,6 +178,8 @@ model Task {
   dependentTasks      TaskDependency[]       @relation("TaskDependents")
   scheduleProposals   ScheduleProposal[]
   assistantMessages   TaskAssistantMessage[]
+  workBlocks          WorkBlock[]
+  executionSessions   ExecutionSession[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -443,6 +447,29 @@ enum AiClientType {
   llm
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Execution Layer Enums
+// ────────────────────────────────────────────────────────────────────
+
+enum WorkBlockStatus {
+  Scheduled
+  Active
+  Completed
+  Cancelled
+}
+
+enum WorkBlockTrigger {
+  scheduled
+  manual
+}
+
+enum ExecutionSessionStatus {
+  Active
+  Paused
+  Completed
+  Abandoned
+}
+
 model AiClient {
   id        String             @id @default(cuid())
   name      String
@@ -485,4 +512,55 @@ model TaskAssistantMessage {
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, sequence])
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Execution Layer Models
+// ────────────────────────────────────────────────────────────────────
+
+model WorkBlock {
+  id               String           @id @default(cuid())
+  workspaceId      String
+  taskId           String
+  planId           String?
+  title            String
+  status           WorkBlockStatus  @default(Scheduled)
+  scheduledStartAt DateTime
+  scheduledEndAt   DateTime
+  startedAt        DateTime?
+  completedAt      DateTime?
+  trigger          WorkBlockTrigger @default(scheduled)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id])
+  task             Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  executionSessions ExecutionSession[]
+
+  @@index([workspaceId, status])
+  @@index([taskId, status])
+  @@index([workspaceId, scheduledStartAt])
+}
+
+model ExecutionSession {
+  id               String                  @id @default(cuid())
+  workspaceId      String
+  taskId           String
+  workBlockId      String?
+  planId           String?
+  status           ExecutionSessionStatus  @default(Active)
+  currentNodeId    String?
+  pauseReason      String?
+  completedNodeIds String                  @default("[]") /// JSON array of completed node IDs
+  startedAt        DateTime                @default(now())
+  pausedAt         DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  workspace        Workspace               @relation(fields: [workspaceId], references: [id])
+  task             Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock        WorkBlock?              @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status])
+  @@index([taskId, status])
+  @@index([workBlockId])
 }

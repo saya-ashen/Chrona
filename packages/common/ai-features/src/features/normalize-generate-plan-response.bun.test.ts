@@ -3,17 +3,20 @@ import { describe, expect, it } from "bun:test";
 import { normalizeGeneratePlanResponse } from "./index";
 
 describe("normalizeGeneratePlanResponse", () => {
-  it("accepts bridge-style plan payloads without title and goal", () => {
+  it("normalizes canonical AI plan payloads", () => {
     const result = normalizeGeneratePlanResponse({
       parsed: {
+        title: "API test rollout",
+        goal: "Roll out the API regression tests safely",
         summary: "Plan the API test rollout",
         nodes: [
           {
             id: "node_1",
             type: "task",
             title: "Draft failing regression test",
-            objective: "Reproduce the missing plan generation bug",
-            executor: "automation",
+            expectedOutput: "A failing regression test that reproduces the bug",
+            executor: "ai",
+            mode: "auto",
             estimatedMinutes: 15,
           },
           {
@@ -26,9 +29,8 @@ describe("normalizeGeneratePlanResponse", () => {
         ],
         edges: [
           {
-            fromNodeId: "node_1",
-            toNodeId: "node_2",
-            type: "sequential",
+            from: "node_1",
+            to: "node_2",
           },
         ],
       },
@@ -56,6 +58,29 @@ describe("normalizeGeneratePlanResponse", () => {
       toNodeId: "node_2",
       type: "sequential",
     });
+  });
+
+  it("rejects legacy bridge payloads that no longer match the canonical contract", () => {
+    const result = normalizeGeneratePlanResponse({
+      parsed: {
+        summary: "Legacy shape",
+        nodes: [
+          {
+            id: "node_1",
+            type: "step",
+            title: "Old style node",
+            objective: "Legacy field",
+            executor: "automation",
+          },
+        ],
+        edges: [{ fromNodeId: "node_1", toNodeId: "node_2" }],
+      },
+      source: "openclaw",
+    });
+
+    expect(result.summary).toBe("");
+    expect(result.nodes).toEqual([]);
+    expect(result.edges).toEqual([]);
   });
 
   it("derives execution semantics from node types and fields", () => {

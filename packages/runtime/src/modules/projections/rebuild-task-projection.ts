@@ -11,6 +11,16 @@ export async function rebuildTaskProjection(taskId: string) {
       approvals: { where: { status: "Pending" }, orderBy: { requestedAt: "desc" } },
       artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
       scheduleProposals: { where: { status: "Pending" } },
+      executionSessions: {
+        where: { status: { in: ["Active", "Paused"] } },
+        orderBy: { startedAt: "desc" },
+        take: 1,
+      },
+      workBlocks: {
+        where: { status: { in: ["Scheduled", "Active"] } },
+        orderBy: { scheduledStartAt: "asc" },
+        take: 1,
+      },
     },
   });
 
@@ -18,11 +28,20 @@ export async function rebuildTaskProjection(taskId: string) {
     (run) => run.lastSyncedAt && Date.now() - run.lastSyncedAt.getTime() > SYNC_STALE_MS,
   );
 
+  const activeSession = task.executionSessions[0] ?? null;
+
   const derived = deriveTaskState({
     task: { status: task.status, latestRunId: task.latestRunId },
     runs: task.runs,
     approvals: task.approvals,
     sync: { stale: syncStale },
+    executionSession: activeSession
+      ? {
+          status: activeSession.status,
+          currentNodeId: activeSession.currentNodeId,
+          pauseReason: activeSession.pauseReason,
+        }
+      : null,
   });
 
   const latestRun = task.runs[0] ?? null;

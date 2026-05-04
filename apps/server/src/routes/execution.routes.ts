@@ -607,5 +607,59 @@ export function createExecutionRoutes() {
     }
   });
 
+  // ────────────────────────────────────────────────────────────────────
+  // Work-block endpoints
+  // ────────────────────────────────────────────────────────────────────
+
+  api.get("/tasks/:taskId/work-blocks", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const blocks = await db.workBlock.findMany({
+        where: { taskId },
+        orderBy: { scheduledStartAt: "desc" },
+      });
+
+      return json(c, { workBlocks: blocks });
+    } catch (cause) {
+      return internalServerError(c, "GET /api/tasks/:taskId/work-blocks", cause, "Failed to fetch work blocks");
+    }
+  });
+
+  api.post("/tasks/:taskId/work-blocks", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json().catch(() => ({}));
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) return error(c, "Task not found", 404);
+
+      const now = new Date();
+      const scheduledStartAt = body.scheduledStartAt ? new Date(body.scheduledStartAt) : now;
+      const scheduledEndAt = body.scheduledEndAt
+        ? new Date(body.scheduledEndAt)
+        : new Date(scheduledStartAt.getTime() + 60 * 60 * 1000);
+
+      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+
+      const block = await db.workBlock.create({
+        data: {
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          planId: acceptedPlan?.id ?? null,
+          title: body.title ?? task.title,
+          scheduledStartAt,
+          scheduledEndAt,
+          trigger: "manual",
+        },
+      });
+
+      return json(c, block, 201);
+    } catch (cause) {
+      return internalServerError(c, "POST /api/tasks/:taskId/work-blocks", cause, "Failed to create work block");
+    }
+  });
+
   return api;
 }

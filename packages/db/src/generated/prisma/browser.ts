@@ -102,3 +102,13 @@ export type AiFeatureBinding = Prisma.AiFeatureBindingModel
  * 
  */
 export type TaskAssistantMessage = Prisma.TaskAssistantMessageModel
+/**
+ * Model WorkBlock
+ * 
+ */
+export type WorkBlock = Prisma.WorkBlockModel
+/**
+ * Model ExecutionSession
+ * 
+ */
+export type ExecutionSession = Prisma.ExecutionSessionModel

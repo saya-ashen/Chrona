@@ -83,6 +83,29 @@ function normalizePlanStatus(value: unknown): TaskPlanStatus {
   }
 }
 
+function normalizeExecutionClassification(value: unknown): TaskPlanNode["executionClassification"] {
+  switch (value) {
+    case "automatic_chainable":
+    case "automatic_standalone":
+    case "human_dependent":
+    case "review_gate":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizeReadiness(value: unknown): TaskPlanNode["readiness"] {
+  switch (value) {
+    case "ready":
+    case "blocked":
+    case "waiting":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
 function normalizeBlockingReason(value: unknown): TaskPlanNodeBlockingReason {
   switch (value) {
     case "needs_user_input":
@@ -150,6 +173,22 @@ function buildSavedTaskPlanGraph(memory: PlanRecord, payload: StoredTaskPlanGrap
           metadata: node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
             ? (node.metadata as Record<string, unknown>)
             : null,
+          requiredInfo:
+            Array.isArray((node as Record<string, unknown>).requiredInfo)
+              ? ((node as Record<string, unknown>).requiredInfo as string[]).filter((v: unknown) => typeof v === "string")
+              : undefined,
+          dependencies:
+            Array.isArray((node as Record<string, unknown>).dependencies)
+              ? ((node as Record<string, unknown>).dependencies as string[]).filter((v: unknown) => typeof v === "string")
+              : undefined,
+          executionClassification: normalizeExecutionClassification(
+            (node as Record<string, unknown>).executionClassification,
+          ),
+          nextAction:
+            typeof (node as Record<string, unknown>).nextAction === "string"
+              ? (node as Record<string, unknown>).nextAction as string
+              : undefined,
+          readiness: normalizeReadiness((node as Record<string, unknown>).readiness),
         }))
       : [],
     edges: Array.isArray(payload.edges)
@@ -400,4 +439,60 @@ export function getReadyAutoRunnableNodes(graph: TaskPlanGraph): TaskPlanNode[] 
     const deps = incomingEdges.get(node.id) ?? [];
     return deps.every(depId => completedNodeIds.has(depId));
   });
+}
+
+export function enrichPlanGraphNodes(graph: TaskPlanGraph): TaskPlanGraph {
+  const incomingMap = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    if (!incomingMap.has(edge.toNodeId)) {
+      incomingMap.set(edge.toNodeId, []);
+    }
+    incomingMap.get(edge.toNodeId)!.push(edge.fromNodeId);
+  }
+
+  const enrichedNodes = graph.nodes.map((node) => {
+    const deps = incomingMap.get(node.id) ?? [];
+    const hasDeps = deps.length > 0;
+
+    let executionClassification: TaskPlanNode["executionClassification"] = "automatic_standalone";
+    if (node.requiresHumanInput) {
+      executionClassification = "human_dependent";
+    } else if (node.requiresHumanApproval) {
+      executionClassification = "review_gate";
+    } else if (hasDeps) {
+      executionClassification = "automatic_chainable";
+    }
+
+    let nextAction: string | null = null;
+    if (node.requiresHumanInput) {
+      nextAction = "Provide required information to proceed";
+    } else if (node.requiresHumanApproval) {
+      nextAction = "Review and approve this step's output before continuing";
+    } else if (node.blockingReason === "external_dependency") {
+      nextAction = "Resolve external dependency before this step can start";
+    } else if (!node.autoRunnable) {
+      nextAction = "This step requires manual start";
+    } else if (!hasDeps) {
+      nextAction = "Ready to auto-start";
+    } else {
+      nextAction = "Will auto-start after dependencies complete";
+    }
+
+    let readiness: TaskPlanNode["readiness"] = "ready";
+    if (node.blockingReason || node.status === "blocked") {
+      readiness = "blocked";
+    } else if (hasDeps && node.status === "pending") {
+      readiness = "waiting";
+    }
+
+    return {
+      ...node,
+      dependencies: deps.length > 0 ? deps : undefined,
+      executionClassification,
+      nextAction,
+      readiness,
+    };
+  });
+
+  return { ...graph, nodes: enrichedNodes };
 }

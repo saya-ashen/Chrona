@@ -36,7 +36,7 @@ describe("OpenClawBridgeClient", () => {
 
     globalThis.fetch = (async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/v1/execution/task")) {
+      if (url.endsWith("/execution/task")) {
         calls.push({
           url,
           body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
@@ -87,7 +87,7 @@ describe("OpenClawBridgeClient", () => {
 
     globalThis.fetch = (async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/v1/execution/task")) {
+      if (url.endsWith("/execution/task")) {
         calls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
         return Response.json(
           makeBridgeResponse({
@@ -137,7 +137,7 @@ describe("OpenClawBridgeClient", () => {
 
     globalThis.fetch = (async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/v1/features/generate-plan")) {
+      if (url.endsWith("/features/generate-plan")) {
         calls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
         return Response.json(
           makeBridgeResponse({

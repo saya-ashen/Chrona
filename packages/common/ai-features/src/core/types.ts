@@ -2,12 +2,6 @@
  * AI Features — Shared feature-layer type definitions.
  */
 
-import type {
-  StructuredAgentResult,
-  StructuredValidationIssue,
-  StructuredResultReliability,
-} from "@chrona/openclaw-integration/protocol/structured-result";
-
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
   | "suggest"
@@ -29,6 +23,8 @@ export interface AiClientRecord {
 export interface OpenClawClientConfig {
   bridgeUrl: string;
   bridgeToken: string;
+  gatewayUrl?: string;
+  gatewayToken?: string;
   timeoutSeconds?: number;
 }
 
@@ -37,6 +33,13 @@ export interface LLMClientConfig {
   apiKey: string;
   model?: string;
   temperature?: number;
+}
+
+export type StructuredResultReliability = "business_tool" | "assistant_text";
+
+export interface StructuredValidationIssue {
+  path: string;
+  message: string;
 }
 
 export interface StructuredDebugInfo {
@@ -275,7 +278,7 @@ export interface DispatchTaskInput {
 
 export interface DispatchTaskOutput extends StructuredResponseMeta {
   decision: TaskDispatchDecision;
-  reliability: "structured_tool_call" | "fallback_text" | "mock";
+  reliability: "structured_tool_call" | "mock";
   rawProviderResult?: unknown;
 }
 
@@ -302,11 +305,11 @@ export type StreamEvent =
   | { type: "partial"; text: string }
   | { type: "result"; suggestions: SmartSuggestResponse }
   | { type: "result"; plan: GenerateTaskPlanResponse }
-  | { type: "done"; text: string; structured?: StructuredAgentResult | null }
+  | { type: "done"; text: string; structured?: StructuredDebugInfo | null }
   | {
       type: "error";
       message: string;
       rawText?: string;
-      structured?: StructuredAgentResult | null;
+      structured?: StructuredDebugInfo | null;
       diagnostics?: Record<string, unknown>;
     };

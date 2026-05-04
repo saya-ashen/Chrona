@@ -8,6 +8,7 @@ import { createLogger, summarizeText } from "@chrona/db/logger";
 import type { TaskPlanStatus } from "@chrona/runtime/modules/ai/types";
 import { appendCanonicalEvent } from "@chrona/runtime/modules/events/append-canonical-event";
 import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
+import { OpenClawClient } from "@chrona/providers-core";
 
 import { HttpError } from "../lib/http";
 
@@ -52,67 +53,22 @@ export async function getOpenClawAdapter() {
 }
 
 export async function testOpenClaw(config: Record<string, unknown>) {
-  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
-  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
-  if (!bridgeUrl) {
-    return { available: false, reason: "Bridge URL is required" };
+  const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const gatewayToken = typeof config.gatewayToken === "string" ? config.gatewayToken : "";
+  if (!gatewayUrl) {
+    return { available: false, reason: "Gateway URL is required" };
   }
 
   try {
-    const res = await fetch(`${bridgeUrl}/v1/health`, {
-      headers: {
-        Accept: "application/json",
-        ...(bridgeToken ? { Authorization: `Bearer ${bridgeToken}` } : {}),
-      },
-      signal: AbortSignal.timeout(3000),
-    });
-
-    const contentType = res.headers.get("content-type") ?? "";
-    const bodyText = await res.text();
-
-    if (!res.ok) {
-      return {
-        available: false,
-        reason: `Bridge health endpoint returned ${res.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ""}`,
-      };
-    }
-
-    const trimmedBody = bodyText.trim();
-    if (trimmedBody.startsWith("<!doctype") || trimmedBody.startsWith("<html")) {
-      return {
-        available: false,
-        reason: "Bridge URL returned an HTML page instead of the OpenClaw JSON health response. Check that the Bridge URL points to the actual API origin and is not a website/login page/reverse-proxy fallback.",
-      };
-    }
-
-    if (!contentType.toLowerCase().includes("application/json")) {
-      return {
-        available: false,
-        reason: `Bridge health endpoint returned non-JSON content-type: ${contentType || "unknown"}`,
-      };
-    }
-
-    let body: { ok?: boolean; status?: string };
-    try {
-      body = JSON.parse(bodyText) as { ok?: boolean; status?: string };
-    } catch {
-      return {
-        available: false,
-        reason: `Bridge health endpoint returned invalid JSON: ${bodyText.slice(0, 200) || "empty response"}`,
-      };
-    }
-
-    if (body.status !== "ok") {
-      return {
-        available: false,
-        reason: `Bridge health response status=${body.status ?? "unknown"}`,
-      };
-    }
-    return { available: true, reason: "Bridge is reachable" };
+    const client = new OpenClawClient({ gatewayUrl, gatewayToken: gatewayToken || undefined });
+    const healthy = await client.checkHealth();
+    return healthy
+      ? { available: true, reason: "Gateway is reachable" }
+      : { available: false, reason: "Gateway health check failed" };
   } catch (errorValue) {
     return {
       available: false,
-      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach bridge",
+      reason: errorValue instanceof Error ? errorValue.message : "Failed to reach gateway",
     };
   }
 }
