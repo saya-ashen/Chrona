@@ -9,7 +9,7 @@ import { Hono } from "hono";
 
 import { db } from "@chrona/db";
 import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
-import type { ScheduleSlot } from "@chrona/runtime/modules/ai/types";
+import type { ScheduleSlot } from "@chrona/contracts/ai";
 import {
   resetTestDb,
   seedWorkspace,

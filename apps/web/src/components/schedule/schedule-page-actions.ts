@@ -15,7 +15,7 @@ import type {
   TimelineDragItem,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import {
   applyScheduleToListItem,
   applyTaskConfigToItem,
@@ -561,7 +561,6 @@ export async function handleApplyDecompositionFromDialogAction({
     setIsPending(false);
   }
 }
-
 
 
 

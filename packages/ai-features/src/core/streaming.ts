@@ -22,7 +22,7 @@ import type {
   BridgeFeature,
   BridgeFeatureRequest,
   NDJSONEvent,
-} from "@chrona/openclaw-integration/bridge/contracts";
+} from "@chrona/openclaw-integration";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,

@@ -4,7 +4,7 @@ import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy"
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
 import { buttonVariants } from "@/components/ui/button";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import { CompactMetaPill, ItemMeta } from "../schedule-panel-primitives";
 
 export function SelectedBlockSheetHeader({

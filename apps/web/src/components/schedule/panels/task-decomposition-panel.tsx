@@ -15,7 +15,7 @@ import {
   Square,
 } from "lucide-react";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
-import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import { normalizePlanNodeTypeForDisplay } from "./selected-block-sheet/plan-utils";
 import { useSmartDecomposition } from "@/hooks/use-ai";
 
@@ -525,4 +525,3 @@ export function TaskDecompositionPanel({
     </div>
   );
 }
-

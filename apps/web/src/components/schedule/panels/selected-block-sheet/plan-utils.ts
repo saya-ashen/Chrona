@@ -1,4 +1,4 @@
-import type { TaskPlanGraphResponse, TaskPlanNode } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse, TaskPlanNode } from "@chrona/contracts/ai";
 
 export type PlanDisplayType = "task" | "checkpoint" | "condition" | "wait";
 

@@ -7,7 +7,7 @@ import { appendMainSessionEvent, ensurePlanMainSession } from "./plan-state-stor
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { db } from "@/lib/db";
 import { TaskStatus, Prisma } from "@/generated/prisma/client";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 export async function settlePlanNodeFromRun(input: {
   taskId: string;

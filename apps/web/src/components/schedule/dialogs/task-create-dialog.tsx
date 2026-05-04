@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n } from "@/i18n/client";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 /* ------------------------------------------------------------------ */
 /*  Priority badge color map                                          */

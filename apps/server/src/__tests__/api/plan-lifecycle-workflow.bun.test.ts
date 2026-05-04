@@ -20,7 +20,7 @@ import {
 } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
 import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
 import { isTaskPlanGenerationRunning } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
-import type { TaskPlanNode, TaskPlanEdge, TaskPlanGraph } from "@chrona/runtime/modules/ai/types";
+import type { TaskPlanNode, TaskPlanEdge, TaskPlanGraph } from "@chrona/contracts/ai";
 import { resetTestDb, seedWorkspace, seedTask, seedDraftPlan, seedAcceptedPlan } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------

@@ -228,11 +228,3 @@ export class ApiClient {
     return this.request<unknown>("GET", "/api/ai/status");
   }
 }
-
-
-
-
-
-
-
-

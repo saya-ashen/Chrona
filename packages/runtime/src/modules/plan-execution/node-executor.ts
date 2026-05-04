@@ -1,4 +1,4 @@
-import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@/modules/ai/types";
+import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@chrona/contracts/ai";
 import type { NodeSessionDecision } from "./session-policy";
 import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session";
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";

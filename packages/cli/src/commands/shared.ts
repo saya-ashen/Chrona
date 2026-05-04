@@ -65,4 +65,3 @@ export function parseJsonOption<T>(value: string, label: string): T {
     printErrorAndExit(invalidJson(label));
   }
 }
-

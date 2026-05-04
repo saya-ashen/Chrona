@@ -1,4 +1,4 @@
-import type { SavedTaskPlanGraph, TaskPlanGraph, TaskPlanNode } from "@/modules/ai/types";
+import type { SavedTaskPlanGraph, TaskPlanGraph, TaskPlanNode } from "@chrona/contracts/ai";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
 type SyncPlanNodeFromTaskInput = {

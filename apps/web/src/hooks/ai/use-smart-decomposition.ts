@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchJSON } from "./types";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import type { StreamToolCall, StreamToolResult, StreamPhase } from "./types";
-import { createLogger, summarizeText } from "../logger";
+import { createLogger, summarizeText } from "./logger";
 
 const logger = createLogger("hook.use-smart-decomposition");
 
@@ -256,5 +256,3 @@ export function useBatchApplyPlan() {
 
   return { applyPlan, isLoading, error };
 }
-
-
