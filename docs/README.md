@@ -10,6 +10,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework, orga
 |-------------|-----------|
 | **Get started** — install and run Chrona in 2 minutes | [Quick Start (EN)](./en/quick-start.md) \| [快速开始（中文）](./zh/quick-start.md) |
 | **Understand the design** — why CQRS, how layers connect | [Architecture](./architecture.md) |
+| **Understand package responsibilities** — what belongs in each package and why | [Package Boundaries](./package-boundaries.md) |
 | **Explore the database** — schema, relationships, enums | [Data Model](./data-model.md) |
 | **Integrate via API** — full REST endpoint reference | [API Reference](./api-reference.md) |
 | **See product direction** — what's shipped, what's next | [Roadmap (EN)](./en/roadmap.md) \| [路线图（中文）](./zh/roadmap.md) |
@@ -59,6 +60,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework, orga
 | [Quick Start (EN)](./en/quick-start.md) | Tutorial | Install, configure, and run your first task |
 | [快速开始（中文）](./zh/quick-start.md) | Tutorial | 安装、配置和运行第一个任务 |
 | [Architecture](./architecture.md) | Explanation | CQRS + Event Sourcing design, data flow, modules |
+| [Package Boundaries](./package-boundaries.md) | Explanation | Package-by-package responsibilities, dependency direction, placement rules |
 | [Data Model](./data-model.md) | Reference | Full database schema, ERD, enums, indexes |
 | [API Reference](./api-reference.md) | Reference | All REST endpoints with curl examples |
 | [Roadmap (EN)](./en/roadmap.md) | Explanation | Product direction, phases, principles |

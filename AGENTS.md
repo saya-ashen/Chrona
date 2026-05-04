@@ -40,7 +40,13 @@ Before any code change, state:
 - Put shared request/response types and Zod schemas in `packages/contracts`.
 - Put command/query/projection handlers in `packages/runtime/src/modules/`.
 - Put Prisma bootstrap and database access in `packages/db`.
+- Keep `apps/server` focused on route wiring, validation glue, auth/context, and startup; do not collapse runtime/domain/provider layers back into it.
+- Keep CLI as a separate package-level entrypoint rather than treating it as a generic shared helper.
 - Keep provider-specific OpenClaw logic in `packages/providers/openclaw/`.
+- Chrona should interact with AI providers through a middle layer, not by depending on provider wire protocols directly.
+- Upper layers (`apps/*`, `packages/runtime`, `packages/ai-features`) must not parse provider-specific SSE/function-call/OpenResponses wire formats directly.
+- `packages/providers/core` is the provider-facing middle layer Chrona should call; `packages/providers/<provider>/...` owns provider-specific protocol details.
+- Provider packages must consume canonical business contracts from `packages/contracts`; they must not invent competing business schema definitions.
 - API routes in `apps/server/src/routes/` should validate input, call server-layer functions, and return responses — no direct DB access.
 - Client components must not import server-only handlers or database helpers.
 
@@ -51,14 +57,16 @@ apps/
   web/          — Vite React SPA
   server/       — Local Hono API server + static SPA host
 packages/
-  common/
-    ai-features/        — AI feature surface (generate plan, suggest, etc.)
-    cli/                — Chrona CLI
+  ai-features/          — AI feature surface (generate plan, suggest, etc.)
+  cli/                  — Chrona CLI client entrypoint
   contracts/            — Shared DTOs, Zod schemas, API contracts
   db/                   — Prisma bootstrap, repositories, generated client
   domain/               — Pure business rules, state derivations
   runtime/              — Provider-agnostic runtime (commands, queries, projections)
+  runtime-core/         — Backend-agnostic runtime adapter contracts/config
+  i18n/                 — Shared locale utilities
   providers/
+    core/               — Provider-facing middle layer Chrona calls
     openclaw/           — OpenClaw bridge & integration
     hermes/             — Hermes provider (future)
 ```
