@@ -1,0 +1,14 @@
+{
+  "name": "@chrona/openclaw",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*",
+    "@chrona/runtime-core": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

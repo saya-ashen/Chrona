@@ -22,17 +22,16 @@ import type {
   BridgeFeature,
   BridgeFeatureRequest,
   NDJSONEvent,
-} from "@chrona/openclaw-integration";
+} from "@chrona/openclaw";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
 } from "../features";
 import {
-  buildFeatureInput,
+  buildPreparedFeatureRequest,
   openclawCall,
   postBridgeFeatureStream,
 } from "./providers";
-import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
@@ -62,8 +61,11 @@ function buildStreamingInput(
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
     | ChatRequest,
-): Record<string, unknown> {
-  return buildFeatureInput(feature, input);
+): Pick<
+  BridgeFeatureRequest<Record<string, unknown>>,
+  "input" | "instructions" | "inputText" | "featureSpec"
+> {
+  return buildPreparedFeatureRequest(feature, input);
 }
 
 function parseBridgeEvent(evt: NDJSONEvent): StreamEvent | null {
@@ -131,8 +133,7 @@ async function* openclawStream(
       const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
         sessionId,
         sessionKey,
-        input: buildStreamingInput(feature, input),
-        instructions: SYSTEM_PROMPTS[feature],
+        ...buildStreamingInput(feature, input),
         timeout,
       };
 

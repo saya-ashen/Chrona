@@ -8,8 +8,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { sendOperatorMessage } from "@chrona/runtime/modules/commands/send-operator-message";
-import { resumeRun } from "@chrona/runtime/modules/commands/resume-run";
+import { resumeRun, sendOperatorMessage } from "@chrona/engine";
 import { resetTestDb, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 // ---------------------------------------------------------------------------

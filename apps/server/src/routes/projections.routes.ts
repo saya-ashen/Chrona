@@ -1,12 +1,15 @@
 import { Hono } from "hono";
 
-import { getSchedulePage } from "@chrona/runtime/modules/queries/get-schedule-page";
-import { getInbox } from "@chrona/runtime/modules/queries/get-inbox";
-import { getMemoryConsole } from "@chrona/runtime/modules/queries/get-memory-console";
-import { getWorkPage, WorkPageTaskNotFoundError } from "@chrona/runtime/modules/queries/get-work-page";
-import { getDefaultWorkspace } from "@chrona/runtime/modules/workspaces/get-default-workspace";
-import { getWorkspaces } from "@chrona/runtime/modules/queries/get-workspaces";
-import { getWorkspaceOverview } from "@chrona/runtime/modules/queries/get-workspace-overview";
+import {
+  getDefaultWorkspace,
+  getInbox,
+  getMemoryConsole,
+  getSchedulePage,
+  getWorkPage,
+  getWorkspaceOverview,
+  getWorkspaces,
+  WorkPageTaskNotFoundError,
+} from "@chrona/engine";
 
 import {
   error,

@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 
-mock.module("@chrona/runtime/modules/tasks/derive-task-runnability", () => ({
+mock.module("@chrona/shared", () => ({
   deriveTaskRunnability: () => ({ isRunnable: false, state: "not_configured", summary: "Not configured" }),
 }));
 

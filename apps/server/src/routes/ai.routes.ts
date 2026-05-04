@@ -3,21 +3,21 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@chrona/db";
 import { summarizeText } from "@chrona/db/logger";
-import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/runtime/modules/ai/ai-service";
+import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/engine";
 import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput } from "@chrona/contracts/ai";
 import {
   aiAnalyzeConflicts,
   aiChat,
   aiSuggestStream,
   aiSuggestTimeslots,
+  analyzeConflictsSmart,
+  buildTaskWorkspaceSystemPrompt,
+  ensureDefaultTaskSession,
   getAIClientInfo,
   isAIAvailable,
-} from "@chrona/runtime/modules/ai/ai-service";
-import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analyzer";
-import { suggestAutomationSmart } from "@chrona/runtime/modules/ai/automation-suggester";
-import { suggestTimeslots } from "@chrona/runtime/modules/ai/timeslot-suggester";
-import { ensureDefaultTaskSession } from "@chrona/runtime/modules/task-execution/task-sessions";
-import { buildTaskWorkspaceSystemPrompt } from "@chrona/runtime/modules/ai/prompts/task-workspace-prompt";
+  suggestAutomationSmart,
+  suggestTimeslots,
+} from "@chrona/engine";
 
 import {
   testOpenClaw,
@@ -466,7 +466,7 @@ export function createAiRoutes() {
         return error(c, "taskId and workspaceId are required", 400);
       }
 
-      const { dispatchNextTaskAction } = await import("@chrona/runtime/modules/commands/dispatch-next-task-action");
+      const { dispatchNextTaskAction } = await import("@chrona/engine");
       return json(c, await dispatchNextTaskAction({
         taskId,
         workspaceId,

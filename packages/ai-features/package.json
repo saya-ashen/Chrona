@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
-    "@chrona/openclaw-integration": "workspace:*"
+    "@chrona/openclaw": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"

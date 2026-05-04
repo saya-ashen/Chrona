@@ -1,4 +1,4 @@
-import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw-integration";
+import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw";
 
 export type ProviderResponse = BridgeResponse;
 export type ProviderToolCall = ToolCallInfo;

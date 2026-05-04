@@ -513,41 +513,27 @@ Current drift to watch:
 Rule of thumb:
 - this package should describe how Chrona talks to a provider client, not the entire OpenClaw protocol model
 
-### `packages/providers/openclaw/integration`
+### `packages/providers/openclaw`
 
 Responsible for:
 - OpenClaw-specific protocol types
 - transport clients
 - runtime adapter/orchestration integration
-- bridge-facing transport contracts
+- gateway request/response mapping helpers
 
 Not responsible for:
 - generic app orchestration
 - canonical domain/business rules
 
 Why it feels heavy:
-- it is intentionally a full provider integration package, not just a small adapter shim
-- it contains several sublayers: `protocol`, `transport`, `runtime`, `config`, and bridge contracts
-
-Rule of thumb:
-- if the concept only exists because OpenClaw exists, it likely belongs here or in `openclaw/bridge`
-
-### `packages/providers/openclaw/bridge`
-
-Responsible for:
-- Bun/Hono bridge server
-- mapping Chrona feature/execution requests to OpenResponses/OpenClaw gateway semantics
-- HTTP and SSE wrapper behavior
-
-Not responsible for:
-- owning canonical AI plan schemas
-- runtime business decisions
+- it is intentionally a full provider package, not just a small adapter shim
+- it contains several sublayers: `protocol`, `transport`, `runtime`, `config`, `execution`, `features`, `parse`, and `shared`
 
 Current drift to watch:
-- `execution/gateway.ts` is a known complexity hotspot and currently carries too many responsibilities
+- `execution/gateway.ts` remains a complexity hotspot and still carries too many responsibilities
 
 Rule of thumb:
-- if the code is about HTTP/SSE request/response handling for the OpenClaw bridge, it belongs here
+- if the concept only exists because OpenClaw exists, it belongs here
 
 ### `packages/providers/hermes`
 

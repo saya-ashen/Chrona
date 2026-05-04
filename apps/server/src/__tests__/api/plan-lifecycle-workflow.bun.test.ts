@@ -17,9 +17,9 @@ import {
   acceptTaskPlanGraph,
   saveTaskPlanGraph,
   enrichPlanGraphNodes,
-} from "@chrona/runtime/modules/tasks/task-plan-graph-store";
-import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";
-import { isTaskPlanGenerationRunning } from "@chrona/runtime/modules/commands/task-plan-generation-registry";
+  isTaskPlanGenerationRunning,
+  materializeTaskPlan,
+} from "@chrona/engine";
 import type { TaskPlanNode, TaskPlanEdge, TaskPlanGraph } from "@chrona/contracts/ai";
 import { resetTestDb, seedWorkspace, seedTask, seedDraftPlan, seedAcceptedPlan } from "../bun-test-helpers";
 

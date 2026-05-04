@@ -19,10 +19,17 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
   NDJSONEvent,
-} from "@chrona/openclaw-integration";
+} from "@chrona/openclaw";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 import { OpenClawClient } from "@chrona/providers-core";
+import {
+  buildAnalyzeConflictsFeatureSpec,
+  buildDispatchTaskFeatureSpec,
+  buildGeneratePlanFeatureSpec,
+  buildSuggestFeatureSpec,
+  buildSuggestTimeslotsFeatureSpec,
+} from "@chrona/contracts";
 
 const _logger = createLogger("ai-features.openclaw.providers");
 
@@ -85,6 +92,90 @@ function buildGeneratePlanInput(input: GenerateTaskPlanRequest): Record<string, 
   return { task };
 }
 
+function stringifyStructuredFeatureInput(input: Record<string, unknown>): string {
+  return JSON.stringify(input);
+}
+
+export function buildPreparedFeatureRequest(
+  feature: AiFeature,
+  input:
+    | string
+    | SmartSuggestRequest
+    | GenerateTaskPlanRequest
+    | AnalyzeConflictsRequest
+    | SuggestTimeslotRequest
+    | ChatRequest
+    | DispatchTaskInput,
+): Pick<
+  BridgeFeatureRequest<Record<string, unknown>>,
+  "input" | "instructions" | "inputText" | "featureSpec"
+> {
+  if (feature === "generate_plan") {
+    const request = input as GenerateTaskPlanRequest;
+    const featureSpec = buildGeneratePlanFeatureSpec({
+      taskId: request.taskId,
+      title: request.title,
+      description: request.description,
+      estimatedMinutes: request.estimatedMinutes,
+    });
+    return {
+      input: buildGeneratePlanInput(request),
+      instructions: featureSpec.instructions,
+      inputText: featureSpec.inputText,
+      featureSpec,
+    };
+  }
+
+  if (feature === "suggest") {
+    const featureInput = buildFeatureInput(feature, input);
+    const featureSpec = buildSuggestFeatureSpec();
+    return {
+      input: featureInput,
+      instructions: featureSpec.instructions,
+      inputText: stringifyStructuredFeatureInput(featureInput),
+      featureSpec,
+    };
+  }
+
+  if (feature === "conflicts") {
+    const featureInput = buildFeatureInput(feature, input);
+    const featureSpec = buildAnalyzeConflictsFeatureSpec();
+    return {
+      input: featureInput,
+      instructions: featureSpec.instructions,
+      inputText: stringifyStructuredFeatureInput(featureInput),
+      featureSpec,
+    };
+  }
+
+  if (feature === "timeslots") {
+    const featureInput = buildFeatureInput(feature, input);
+    const featureSpec = buildSuggestTimeslotsFeatureSpec();
+    return {
+      input: featureInput,
+      instructions: featureSpec.instructions,
+      inputText: stringifyStructuredFeatureInput(featureInput),
+      featureSpec,
+    };
+  }
+
+  if (feature === "dispatch_task") {
+    const featureInput = buildFeatureInput(feature, input);
+    const featureSpec = buildDispatchTaskFeatureSpec();
+    return {
+      input: featureInput,
+      instructions: featureSpec.instructions,
+      inputText: stringifyStructuredFeatureInput(featureInput),
+      featureSpec,
+    };
+  }
+
+  return {
+    input: buildFeatureInput(feature, input),
+    instructions: SYSTEM_PROMPTS[feature],
+  };
+}
+
 export function buildFeatureInput(
   feature: AiFeature,
   input:
@@ -115,6 +206,8 @@ async function postBridgeFeature(
     return await client.executeFeature(feature, {
       sessionKey: body.sessionKey,
       instructions: body.instructions,
+      inputText: body.inputText,
+      featureSpec: body.featureSpec,
       timeout: body.timeout,
       ...(body.input as Record<string, unknown> ?? {}),
     });
@@ -136,6 +229,8 @@ export async function postBridgeFeatureStream(
   for await (const event of client.executeFeatureStream(feature, {
     sessionKey: body.sessionKey,
     instructions: body.instructions,
+    inputText: body.inputText,
+    featureSpec: body.featureSpec,
     timeout: body.timeout,
     ...(body.input as Record<string, unknown> ?? {}),
   })) {
@@ -173,11 +268,11 @@ async function fetchOpenClawBridge(
 ): Promise<BridgeResponse> {
   const timeout = config.timeoutSeconds ?? 120;
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(feature, scope);
+  const prepared = buildPreparedFeatureRequest(feature, input);
   const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
     sessionId,
     sessionKey,
-    input: buildFeatureInput(feature, input),
-    instructions: SYSTEM_PROMPTS[feature],
+    ...prepared,
     timeout,
   };
 
