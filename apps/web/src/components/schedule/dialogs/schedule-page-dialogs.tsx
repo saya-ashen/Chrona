@@ -5,7 +5,7 @@ import type {
   TimelineCreateInput,
 } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 export function SchedulePageDialogs({
   showQuickAddDialog,

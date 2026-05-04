@@ -9,7 +9,7 @@ import type {
   TaskPlanNodeStatus,
   TaskPlanNodeType,
   TaskPlanStatus,
-} from "@/modules/ai/types";
+} from "@chrona/contracts/ai";
 
 type StoredTaskPlanGraphPayload = {
   type: "task_plan_graph_v1";

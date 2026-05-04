@@ -19,7 +19,7 @@ import type {
   BridgeFeatureRequest,
   BridgeResponse,
   NDJSONEvent,
-} from "@chrona/openclaw-integration/bridge/contracts";
+} from "@chrona/openclaw-integration";
 import { SYSTEM_PROMPTS } from "./prompts";
 import { buildOpenClawSessionIdentity } from "./session";
 import { OpenClawClient } from "@chrona/providers-core";

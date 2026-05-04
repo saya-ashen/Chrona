@@ -3,7 +3,7 @@ import { resolve, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { Database } from "bun:sqlite";
 
-import { createProgram } from "../../common/cli/src/program";
+import { createProgram } from "./program.js";
 import { startBunServer } from "@server/index.bun";
 
 // ──────────────────────────────────────────────────────────────

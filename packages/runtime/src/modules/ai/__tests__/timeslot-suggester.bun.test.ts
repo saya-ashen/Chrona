@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { suggestTimeslots } from "../timeslot-suggester";
 import type {
   TimeslotSuggestionInput,
-} from "../types";
+} from "@chrona/contracts/ai";
 
 /**
  * Helper: create a Date for 2026-04-15 at the given hour:minute (UTC).

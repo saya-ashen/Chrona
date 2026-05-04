@@ -1,5 +1,7 @@
 "use client";
 
+export type { StructuredSuggestion } from "@chrona/contracts";
+
 // ---------- Shared helpers ----------
 
 /**
@@ -29,24 +31,6 @@ export async function fetchJSON<T>(
 }
 
 // ---------- Types ----------
-
-/** Structured suggestion from the AI API */
-export interface StructuredSuggestion {
-  id: string;
-  /** One-line human-readable summary */
-  summary: string;
-  /** Structured actionable data — can be sent to apply-suggestion */
-  action: {
-    type: "create_task";
-    title: string;
-    description: string;
-    priority: "Low" | "Medium" | "High" | "Urgent";
-    estimatedMinutes: number;
-    tags: string[];
-    scheduledStartAt?: string;
-    scheduledEndAt?: string;
-  };
-}
 
 /** Legacy flat shape — kept for backward compat in components */
 export interface AutoCompleteSuggestion {

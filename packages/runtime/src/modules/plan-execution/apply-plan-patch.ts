@@ -1,6 +1,6 @@
-import type { TaskPlanGraph, PlanUpdatePatch } from "@/modules/ai/types";
+import type { TaskPlanGraph, PlanUpdatePatch } from "@chrona/contracts/ai";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import type { SavedTaskPlanGraph } from "@/modules/ai/types";
+import type { SavedTaskPlanGraph } from "@chrona/contracts/ai";
 
 export type ApplyPlanPatchInput = {
   taskId: string;

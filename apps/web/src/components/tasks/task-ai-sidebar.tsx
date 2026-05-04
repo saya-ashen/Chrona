@@ -13,7 +13,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import { useI18n } from "@/i18n/client";
 
 function getAiSidebarCopy(raw: Record<string, string> | undefined) {

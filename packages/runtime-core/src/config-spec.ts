@@ -253,4 +253,3 @@ export function readMissingRequiredPaths(spec: RuntimeTaskConfigSpec, input: unk
 export function readRequiredFieldLabel(spec: RuntimeTaskConfigSpec, path: string) {
   return spec.fields.find((field) => field.path === path)?.label ?? path;
 }
-

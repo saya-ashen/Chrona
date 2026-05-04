@@ -5,7 +5,7 @@ import {
   detectFragmentation,
   detectDependencyConflicts,
 } from "../conflict-detector";
-import type { ScheduledTaskInfo } from "../types";
+import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 
 describe("conflict-detector", () => {
   describe("detectTimeOverlaps", () => {

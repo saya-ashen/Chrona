@@ -3,7 +3,7 @@ import type {
   ScheduledTaskInfo,
   Suggestion,
   Conflict,
-} from "./types";
+} from "@chrona/contracts/ai";
 import { detectAllConflicts } from "./conflict-detector";
 import { generateSuggestions } from "./suggestion-generator";
 import { aiChat } from "./ai-service";

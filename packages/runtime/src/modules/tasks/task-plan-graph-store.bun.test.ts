@@ -7,7 +7,7 @@ import {
   getLatestTaskPlanGraph,
   getReadyAutoRunnableNodes,
 } from "@/modules/tasks/task-plan-graph-store";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();

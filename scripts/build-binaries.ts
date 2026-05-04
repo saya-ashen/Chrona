@@ -76,7 +76,7 @@ async function buildBinary(target: string) {
   const releaseDir = resolve(ROOT, "dist", "releases", releaseName);
   const binaryPath = resolve(releaseDir, binaryName);
   const resourcesDir = resolve(releaseDir, "resources");
-  const entryFile = resolve(ROOT, "packages/cli/src/binary-entry.ts");
+  const entryFile = resolve(ROOT, "packages/cli/src/bun-entry.ts");
 
   console.log("");
   console.log(`Building Chrona binary for ${target} (${bunTarget})`);

@@ -1,4 +1,4 @@
-import type { TaskPlanEdge, TaskPlanNode } from "@/modules/ai/types";
+import type { TaskPlanEdge, TaskPlanNode } from "@chrona/contracts/ai";
 
 export type TaskDispatchAction =
   | "run_node"
@@ -198,4 +198,3 @@ export function isAutoExecutableDispatchDecision(
   }
   return true;
 }
-
