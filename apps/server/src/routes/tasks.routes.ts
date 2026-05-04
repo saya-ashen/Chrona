@@ -14,7 +14,6 @@ import {
 
 import {
   VALID_TASK_STATUSES,
-  mapSubtask,
   toDateOrNull,
   ensureValidDateFields,
   ensureTaskInWorkspace,
@@ -113,35 +112,6 @@ export function createTasksRoutes() {
         return error(c, message, 400);
       }
       return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
-    }
-  });
-
-  api.get("/tasks/:taskId", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const workspaceId = c.req.query("workspaceId");
-      if (workspaceId) {
-        await ensureTaskInWorkspace(taskId, workspaceId);
-      }
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        include: {
-          projection: true,
-          runs: { orderBy: { startedAt: "desc" }, take: 5 },
-        },
-      });
-
-      if (!task) {
-        return error(c, "Task not found", 404);
-      }
-
-      return json(c, { task });
-    } catch (cause) {
-      const httpError = toHttpError(cause);
-      if (httpError) {
-        return error(c, httpError.message, httpError.status);
-      }
-      return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
     }
   });
 
@@ -253,68 +223,6 @@ export function createTasksRoutes() {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to get task plan state";
       return error(c, message, 500);
-    }
-  });
-
-  api.get("/tasks/:taskId/subtasks", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const parentTask = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true },
-      });
-
-      if (!parentTask) {
-        return error(c, "Task not found", 404);
-      }
-
-      const subtasks = await db.task.findMany({
-        where: { parentTaskId: taskId },
-        include: { projection: true },
-        orderBy: { createdAt: "asc" },
-      });
-
-      const normalizedSubtasks = subtasks.map(mapSubtask);
-      return json(c, { subtasks: normalizedSubtasks, count: normalizedSubtasks.length });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/tasks/:taskId/subtasks", cause, "Failed to list subtasks");
-    }
-  });
-
-  api.post("/tasks/:taskId/subtasks", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json();
-      const parentTask = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true },
-      });
-
-      if (!parentTask) {
-        return error(c, "Parent task not found", 404);
-      }
-
-      if (!body.title || (typeof body.title === "string" && !body.title.trim())) {
-        return error(c, "title is required", 400);
-      }
-
-      const result = await createTask({
-        workspaceId: parentTask.workspaceId,
-        title: body.title,
-        description: body.description,
-        priority: body.priority,
-        parentTaskId: taskId,
-        dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
-      });
-
-      const subtask = await db.task.findUnique({
-        where: { id: result.taskId },
-        include: { projection: true },
-      });
-
-      return json(c, { subtask: subtask ? mapSubtask(subtask) : null }, 201);
-    } catch (cause) {
-      return internalServerError(c, "POST /api/tasks/:taskId/subtasks", cause, "Failed to create subtask");
     }
   });
 

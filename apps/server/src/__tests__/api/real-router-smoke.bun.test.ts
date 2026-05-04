@@ -44,7 +44,7 @@ describe("Real router smoke", () => {
     expect(created.workspaceId).toBe(workspaceId);
 
     const getRes = await app().request(
-      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
     );
     expect(getRes.status).toBe(200);
     const getBody = await json<{ task: { title: string; description: string | null } }>(getRes);
@@ -65,7 +65,7 @@ describe("Real router smoke", () => {
     expect(patchRes.status).toBe(200);
 
     const verifyRes = await app().request(
-      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
     );
     const verifyBody = await json<{ task: { title: string; status: string } }>(verifyRes);
     expect(verifyBody.task.title).toBe("Router-updated task");
@@ -78,7 +78,7 @@ describe("Real router smoke", () => {
     expect(deleteRes.status).toBe(200);
 
     const missingRes = await app().request(
-      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
     );
     await expectApiError(missingRes, 404);
   });

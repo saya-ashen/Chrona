@@ -1,8 +1,7 @@
 /**
  * API route tests for approval resolution workflow.
  *
- * Covers POST /api/approvals/:approvalId/resolve and
- * POST /api/tasks/:taskId/approvals/:approvalId/resolve (task-scoped).
+ * Covers POST /api/approvals/:approvalId/resolve.
  *
  * Uses fake adapters (same pattern as task-execution-closure) so tests
  * don't need a live OpenClaw backend.
@@ -157,40 +156,6 @@ function createApprovalRouter() {
     }
   });
 
-  // Task-scoped resolution
-  api.post("/tasks/:taskId/approvals/:approvalId/resolve", async (c) => {
-    try {
-      const approvalId = c.req.param("approvalId");
-      const body = await c.req.json();
-      const { decision, resolutionNote, editedContent } = body as {
-        decision: "Approved" | "Rejected" | "EditedAndApproved";
-        resolutionNote?: string;
-        editedContent?: string;
-      };
-
-      if (!decision || !["Approved", "Rejected", "EditedAndApproved"].includes(decision)) {
-        return c.json({ error: "decision is required" }, 400);
-      }
-
-      const adapter = decision === "Rejected"
-        ? fakeAdapterForReject()
-        : fakeAdapterForApprove("session-approve") as any;
-
-      const result = await resolveApproval({
-        approvalId,
-        decision,
-        resolutionNote,
-        editedContent,
-        adapter,
-      });
-      return c.json(result, 200);
-    } catch (err: any) {
-      const msg = err?.message ?? String(err);
-      if (/no longer exists/i.test(msg)) return c.json({ error: msg }, 404);
-      return c.json({ error: msg }, 400);
-    }
-  });
-
   return api;
 }
 
@@ -258,47 +223,11 @@ describe("Approval workflow", () => {
     expect(storedTask.status).toBe(TaskStatus.Blocked);
   });
 
-  // ── Happy path: task-scoped route ─────────────────────────────────────
-
-  it("resolves approval via task-scoped route", async () => {
-    const ws = await seedWorkspace();
-    const { taskId, approvalId } = await seedApprovalFixture(ws.workspaceId, { decision: "Approved" });
-
-    const res = await app().request(
-      `http://local/api/tasks/${taskId}/approvals/${approvalId}/resolve`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: "Approved" }),
-      },
-    );
-
-    expect(res.status).toBe(200);
-
-    const storedApproval = await db.approval.findUniqueOrThrow({ where: { id: approvalId } });
-    expect(storedApproval.status).toBe(ApprovalStatus.Approved);
-  });
-
   // ── Negative cases ────────────────────────────────────────────────────
 
   it("returns 404 for non-existent approval (direct route)", async () => {
     const res = await app().request(
       "http://local/api/approvals/nonexistent-id/resolve",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: "Approved" }),
-      },
-    );
-    await expectApiError(res, 404);
-  });
-
-  it("returns 404 for non-existent approval (task-scoped route)", async () => {
-    const ws = await seedWorkspace();
-    const { taskId } = await seedTask(ws.workspaceId);
-
-    const res = await app().request(
-      `http://local/api/tasks/${taskId}/approvals/nonexistent-id/resolve`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

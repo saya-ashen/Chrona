@@ -3,7 +3,7 @@
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import
  * (which triggers shared frontend module resolution errors).
- * Tests the full create → list → get → update → verify → delete → verify-404
+ * Tests the full create → list → detail → update → verify → delete → verify-404
  * workflow, plus negative cases.
  */
 
@@ -143,7 +143,7 @@ function createTaskRouter() {
     }
   });
 
-  api.get("/tasks/:taskId", async (c) => {
+  api.get("/tasks/:taskId/detail", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const task = await db.task.findUnique({
@@ -153,7 +153,7 @@ function createTaskRouter() {
       if (!task) return error(c, "Task not found", 404);
       return json(c, { task });
     } catch (cause) {
-      return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
+      return internalServerError(c, "GET /api/tasks/:taskId/detail", cause, "Failed to get task");
     }
   });
 
@@ -224,7 +224,7 @@ describe("Task CRUD workflow", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Happy path: create → list → get → update → get → delete → 404
+  // Happy path: create → list → detail → update → detail → delete → 404
   // -----------------------------------------------------------------------
 
   it("creates a task and returns 201 with task data", async () => {
@@ -277,10 +277,10 @@ describe("Task CRUD workflow", () => {
     expect(body.tasks[0].title).toBe("Draft Task");
   });
 
-  it("gets a single task by ID", async () => {
+  it("gets task detail by ID", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Single Task" });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
@@ -329,7 +329,7 @@ describe("Task CRUD workflow", () => {
     expect(new Date(String(task.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
   });
 
-  it("get-after-update reflects changes", async () => {
+  it("detail-after-update reflects changes", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Before Update" });
 
     await app().request(`http://local/api/tasks/${taskId}`, {
@@ -338,7 +338,7 @@ describe("Task CRUD workflow", () => {
       body: JSON.stringify({ title: "After Update", priority: "High" }),
     });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.task.title).toBe("After Update");
@@ -358,12 +358,12 @@ describe("Task CRUD workflow", () => {
     expect(body.taskId).toBe(taskId);
   });
 
-  it("returns 404 when getting a deleted task", async () => {
+  it("returns 404 when getting detail for a deleted task", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Delete Me" });
 
     await app().request(`http://local/api/tasks/${taskId}`, { method: "DELETE" });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
     expect(res.status).toBe(404);
   });
 
@@ -457,12 +457,12 @@ describe("Task CRUD workflow", () => {
     expect(res.status).toBe(200);
   });
 
-  it("gets a task even when workspace isolation query does not match in the inline router", async () => {
+  it("gets task detail even when workspace isolation query does not match in the inline router", async () => {
     const other = await seedWorkspace("Other Workspace");
     const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
 
     const res = await app().request(
-      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
+      `http://local/api/tasks/${taskId}/detail?workspaceId=${other.workspaceId}`,
     );
 
     expect(res.status).toBe(200);
@@ -480,8 +480,8 @@ describe("Task CRUD workflow", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns 404 when getting a nonexistent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent-task-id");
+  it("returns 404 when getting detail for a nonexistent task", async () => {
+    const res = await app().request("http://local/api/tasks/nonexistent-task-id/detail");
 
     expect(res.status).toBe(404);
     const body = await res.json() as any;

@@ -37,7 +37,7 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       .description("Get task details")
       .requiredOption("-t, --task-id <id>", "Task ID")
       .action(async (options: CommonCommandOptions & { taskId: string }) => {
-        await runCommand(() => getClient().getTask(options.taskId), options, formatTaskDetail);
+        await runCommand(() => getClient().getTaskDetail(options.taskId), options, formatTaskDetail);
       }),
   );
 
@@ -150,43 +150,4 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       }),
   );
 
-  createOutputOption(
-    task
-      .command("subtasks")
-      .description("List task subtasks")
-      .requiredOption("-t, --task-id <id>", "Parent task ID")
-      .action(async (options: CommonCommandOptions & { taskId: string }) => {
-        await runCommand(() => getClient().listSubtasks(options.taskId), options, formatTaskList);
-      }),
-  );
-
-  createOutputOption(
-    task
-      .command("add-subtask")
-      .description("Create a subtask")
-      .requiredOption("-t, --task-id <id>", "Parent task ID")
-      .requiredOption("--title <title>", "Subtask title")
-      .option("--description <text>", "Subtask description")
-      .option("--priority <priority>", "Subtask priority")
-      .option("--due <datetime>", "Due date as ISO-8601")
-      .action(async (options: CommonCommandOptions & {
-        taskId: string;
-        title: string;
-        description?: string;
-        priority?: string;
-        due?: string;
-      }) => {
-        await runCommand(
-          () =>
-            getClient().createSubtask(options.taskId, {
-              title: options.title,
-              description: options.description,
-              priority: options.priority,
-              dueAt: options.due,
-            }),
-          options,
-          formatTaskDetail,
-        );
-      }),
-  );
 }

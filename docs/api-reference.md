@@ -150,14 +150,6 @@ curl -s http://localhost:3101/api/tasks \
 
 **Response `201`** — Created task object.
 
-### Get Task
-
-```bash
-GET /api/tasks/:taskId
-```
-
-Returns the task with its latest 5 runs and projection data.
-
 ### Get Task Detail (full page data)
 
 ```bash
@@ -215,21 +207,6 @@ Content-Type: application/json
 ```
 
 Retries the most recent failed or completed run.
-
-### Resume Run
-
-```bash
-POST /api/tasks/:taskId/resume
-Content-Type: application/json
-
-{
-  "runId": "cm_run123",
-  "inputText": "Here is the data you asked for",
-  "approvalId": "appr_456"
-}
-```
-
-Resumes a paused run (WaitingForInput or WaitingForApproval).
 
 ### Provide Mid-Run Input
 
@@ -428,11 +405,8 @@ Content-Type: application/json
 
 ### Resolve Approval
 
-Two equivalent paths:
-
 ```bash
 POST /api/approvals/:approvalId/resolve
-POST /api/tasks/:taskId/approvals/:approvalId/resolve
 ```
 
 ```json
@@ -514,7 +488,6 @@ GET /api/work/:taskId/projection                               # WorkPageData
 ```bash
 GET    /api/ai/clients                           # List all clients
 POST   /api/ai/clients                           # Create client
-GET    /api/ai/clients/:clientId                 # Get client with bindings
 PATCH  /api/ai/clients/:clientId                 # Update client
 DELETE /api/ai/clients/:clientId                 # Delete client
 ```
@@ -566,7 +539,6 @@ Content-Type: application/json
 ### Feature Bindings
 
 ```bash
-GET /api/ai/clients/:clientId/bindings         # List bound features
 PUT /api/ai/clients/:clientId/bindings         # Set bindings
 ```
 
@@ -642,59 +614,6 @@ Content-Type: application/json
 { "taskId": "cm_abc123" }
 ```
 
-### ⚡ AI Suggest Timeslot
-
-```bash
-POST /api/ai/suggest-timeslot
-Content-Type: application/json
-
-{ "workspaceId": "default", "taskId": "cm_abc123", "date": "2025-01-15" }
-```
-
-Returns suggested time windows for the task on the given date.
-
-### ⚡ Suggest Automation
-
-```bash
-POST /api/ai/suggest-automation
-Content-Type: application/json
-
-{ "taskId": "cm_abc123" }
-```
-
-```bash
-# Adhoc mode
-curl -s http://localhost:3101/api/ai/suggest-automation \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Fix login bug", "description": "Users report 500 error on login", "priority": "Urgent"}'
-```
-
-### Analyze Schedule Conflicts
-
-```bash
-POST /api/ai/analyze-conflicts
-Content-Type: application/json
-
-{ "workspaceId": "default", "date": "2025-01-15" }
-```
-
-```json
-// Response 200
-{
-  "conflicts": [
-    {
-      "type": "time_overlap",
-      "severity": "high",
-      "description": "Task A and Task B overlap at 14:00-15:00",
-      "involvedTaskIds": ["cm_a", "cm_b"]
-    }
-  ],
-  "suggestions": [
-    { "type": "reschedule", "taskId": "cm_b", "suggestedStartAt": "..." }
-  ]
-}
-```
-
 ### ⚡ Auto-Complete
 
 ```bash
@@ -706,43 +625,6 @@ Accept: text/event-stream
 ```
 
 Streams task completion suggestions from partial input. Falls back to keyword rule engine when AI is unavailable.
-
-### Apply Suggestion
-
-```bash
-POST /api/ai/apply-suggestion
-Content-Type: application/json
-
-{
-  "workspaceId": "default",
-  "suggestion": {
-    "id": "sug_xyz",
-    "summary": "Create a new analysis task",
-    "action": {
-      "type": "create_task",
-      "title": "Analyze user behavior data",
-      "description": "30-day analysis using Python",
-      "priority": "Medium",
-      "estimatedMinutes": 60,
-      "scheduledStartAt": "2025-01-15T14:00:00Z",
-      "scheduledEndAt": "2025-01-15T15:00:00Z"
-    }
-  }
-}
-```
-
-Also supports batch mode with `changes[]` array.
-
-### Dispatch Task (dry-run)
-
-```bash
-POST /api/ai/dispatch-task
-Content-Type: application/json
-
-{ "taskId": "cm_abc123", "workspaceId": "default" }
-```
-
-Returns a preview of the next action that would be taken for the task without executing it.
 
 ### ⚡ Task Workspace Chat
 
@@ -829,21 +711,17 @@ curl -s -X PATCH http://localhost:3101/api/tasks/cm_abc123/assistant/messages/ms
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/tasks` | List tasks |
 | `POST` | `/api/tasks` | Create task |
-| `GET` | `/api/tasks/:taskId` | Get task |
 | `GET` | `/api/tasks/:taskId/detail` | Get task detail (full page) |
 | `PATCH` | `/api/tasks/:taskId` | Update task |
 | `DELETE` | `/api/tasks/:taskId` | Delete task (cascade) |
 | `POST` | `/api/tasks/:taskId/run` | Start run |
 | `POST` | `/api/tasks/:taskId/retry` | Retry run |
-| `POST` | `/api/tasks/:taskId/resume` | Resume run |
 | `POST` | `/api/tasks/:taskId/input` | Provide mid-run input |
 | `POST` | `/api/tasks/:taskId/message` | Send message during run |
 | `POST` | `/api/tasks/:taskId/done` | Mark task done |
 | `POST` | `/api/tasks/:taskId/reopen` | Reopen task |
 | `POST` | `/api/tasks/:taskId/result/accept` | Accept result |
 | `POST` | `/api/tasks/:taskId/follow-up` | Create follow-up |
-| `GET` | `/api/tasks/:taskId/subtasks` | List subtasks |
-| `POST` | `/api/tasks/:taskId/subtasks` | Create subtask |
 | `GET` | `/api/tasks/:taskId/plan-state` | Get plan state |
 | `POST` | `/api/tasks/:taskId/plan` | Edit plan (patch ops) |
 | `POST` | `/api/tasks/:taskId/schedule` | Apply schedule |
@@ -861,22 +739,15 @@ curl -s -X PATCH http://localhost:3101/api/tasks/cm_abc123/assistant/messages/ms
 | `GET` | `/api/work/:taskId/projection` | Work page data |
 | `GET` | `/api/ai/clients` | List AI clients |
 | `POST` | `/api/ai/clients` | Create AI client |
-| `GET` | `/api/ai/clients/:id` | Get AI client |
 | `PATCH` | `/api/ai/clients/:id` | Update AI client |
 | `DELETE` | `/api/ai/clients/:id` | Delete AI client |
 | `POST` | `/api/ai/clients/test` | Test AI client |
-| `GET` | `/api/ai/clients/:id/bindings` | Get feature bindings |
 | `PUT` | `/api/ai/clients/:id/bindings` | Set feature bindings |
 | `POST` | `/api/ai/generate-task-plan` | Generate plan ⚡ |
 | `POST` | `/api/ai/generate-task-plan/stop` | Stop plan generation |
 | `POST` | `/api/ai/task-plan/accept` | Accept plan |
 | `POST` | `/api/ai/batch-apply-plan` | Materialize plan |
-| `POST` | `/api/ai/suggest-timeslot` | Suggest timeslot |
-| `POST` | `/api/ai/suggest-automation` | Suggest automation |
-| `POST` | `/api/ai/analyze-conflicts` | Analyze conflicts |
 | `POST` | `/api/ai/auto-complete` | Auto-complete task |
-| `POST` | `/api/ai/apply-suggestion` | Apply AI suggestion |
-| `POST` | `/api/ai/dispatch-task` | Dispatch task (dry-run) |
 | `POST` | `/api/ai/task-workspace/chat` | Task workspace chat ⚡ |
 | `GET` | `/api/tasks/:taskId/assistant/messages` | List assistant messages |
 | `POST` | `/api/tasks/:taskId/assistant/messages` | Save assistant message |

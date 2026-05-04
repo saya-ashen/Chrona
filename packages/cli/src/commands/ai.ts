@@ -1,5 +1,4 @@
 import { Command } from "commander";
-import type { TaskChange } from "../client.js";
 import type { ClientResolver } from "./shared.js";
 import {
   createOutputOption,
@@ -8,11 +7,8 @@ import {
   type CommonCommandOptions,
 } from "./shared.js";
 import {
-  formatAiStatus,
   formatAutoComplete,
-  formatAutomation,
   formatPlanResult,
-  formatSuggestionApplyResult,
 } from "../output/ai.js";
 
 export function registerAiCommands(program: Command, getClient: ClientResolver): void {
@@ -77,37 +73,6 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
 
   createOutputOption(
     ai
-      .command("suggest-automation")
-      .description("Get automation suggestions for a task")
-      .requiredOption("-t, --task-id <id>", "Task ID")
-      .action(async (options: CommonCommandOptions & { taskId: string }) => {
-        await runCommand(() => getClient().suggestAutomation(options.taskId), options, formatAutomation);
-      }),
-  );
-
-  createOutputOption(
-    ai
-      .command("apply-suggestion")
-      .description("Apply a legacy scheduling suggestion change-set")
-      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-      .requiredOption("-s, --suggestion-id <id>", "Suggestion ID")
-      .requiredOption("-c, --changes <json>", "TaskChange JSON array")
-      .action(async (options: CommonCommandOptions & { workspaceId: string; suggestionId: string; changes: string }) => {
-        await runCommand(
-          () =>
-            getClient().applySuggestion(
-              options.workspaceId,
-              options.suggestionId,
-              parseJsonOption<TaskChange[]>(options.changes, "--changes"),
-            ),
-          options,
-          formatSuggestionApplyResult,
-        );
-      }),
-  );
-
-  createOutputOption(
-    ai
       .command("auto-complete")
       .description("Request task creation auto-complete suggestions")
       .requiredOption("--title <title>", "Partial title")
@@ -118,15 +83,6 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
           options,
           formatAutoComplete,
         );
-      }),
-  );
-
-  createOutputOption(
-    ai
-      .command("status")
-      .description("Get current AI client availability")
-      .action(async (options: CommonCommandOptions) => {
-        await runCommand(() => getClient().getAiStatus(), options, formatAiStatus);
       }),
   );
 
