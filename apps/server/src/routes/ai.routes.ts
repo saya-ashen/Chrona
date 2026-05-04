@@ -4,19 +4,11 @@ import { randomUUID } from "node:crypto";
 import { db } from "@chrona/db";
 import { summarizeText } from "@chrona/db/logger";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/engine";
-import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput } from "@chrona/contracts/ai";
 import {
-  aiAnalyzeConflicts,
   aiChat,
   aiSuggestStream,
-  aiSuggestTimeslots,
-  analyzeConflictsSmart,
   buildTaskWorkspaceSystemPrompt,
   ensureDefaultTaskSession,
-  getAIClientInfo,
-  isAIAvailable,
-  suggestAutomationSmart,
-  suggestTimeslots,
 } from "@chrona/engine";
 
 import {
@@ -36,8 +28,6 @@ import {
 import {
   createAiClientSchema,
   taskWorkspaceChatSchema,
-  applySuggestionChangesSchema,
-  applySuggestionSingleSchema,
 } from "./schemas";
 
 export function createAiRoutes() {
@@ -124,31 +114,6 @@ export function createAiRoutes() {
     }
   });
 
-  ai.get("/ai/clients/:clientId", async (c) => {
-    try {
-      const client = await db.aiClient.findUnique({
-        where: { id: c.req.param("clientId") },
-        include: { bindings: true },
-      });
-
-      if (!client) {
-        return error(c, "Client not found", 404);
-      }
-
-      return json(c, {
-        id: client.id,
-        name: client.name,
-        type: client.type,
-        config: client.config,
-        isDefault: client.isDefault,
-        enabled: client.enabled,
-        bindings: client.bindings.map((binding) => binding.feature),
-      });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/ai/clients/:clientId", cause, "Failed to get AI client");
-    }
-  });
-
   ai.patch("/ai/clients/:clientId", async (c) => {
     try {
       const clientId = c.req.param("clientId");
@@ -185,15 +150,6 @@ export function createAiRoutes() {
       return json(c, { success: true });
     } catch {
       return error(c, "Client not found", 404);
-    }
-  });
-
-  ai.get("/ai/clients/:clientId/bindings", async (c) => {
-    try {
-      const bindings = await db.aiFeatureBinding.findMany({ where: { clientId: c.req.param("clientId") } });
-      return json(c, { features: bindings.map((binding) => binding.feature) });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/ai/clients/:clientId/bindings", cause, "Failed to get feature bindings");
     }
   });
 
@@ -247,235 +203,8 @@ export function createAiRoutes() {
   });
 
   // ──────────────────────────────────────────────
-  // Scheduling AI Intelligence
-  // ──────────────────────────────────────────────
-
-  ai.post("/ai/suggest-timeslot", async (c) => {
-    try {
-      const body = await c.req.json();
-      const { workspaceId, taskId, date } = body;
-
-      if (!workspaceId || !taskId) {
-        return error(c, "workspaceId and taskId are required", 400);
-      }
-
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) {
-        return error(c, "Task not found", 404);
-      }
-
-      const targetDate = date ? new Date(date) : new Date();
-      targetDate.setHours(0, 0, 0, 0);
-      const nextDay = new Date(targetDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-
-      const projections = await db.taskProjection.findMany({
-        where: {
-          workspaceId,
-          scheduledStartAt: { gte: targetDate, lt: nextDay },
-          NOT: { taskId },
-        },
-        include: { task: { select: { title: true, priority: true, status: true } } },
-      });
-
-      let estimatedMinutes = 60;
-      if (task.scheduledStartAt && task.scheduledEndAt) {
-        estimatedMinutes = Math.round((new Date(task.scheduledEndAt).getTime() - new Date(task.scheduledStartAt).getTime()) / 60000);
-      }
-
-      const taskSnapshots: TaskSnapshot[] = projections
-        .filter((projection) => projection.scheduledStartAt && projection.scheduledEndAt)
-        .map((projection) => ({
-          id: projection.taskId,
-          title: projection.task?.title ?? "",
-          status: projection.task?.status ?? "open",
-          priority: projection.task?.priority ?? undefined,
-          scheduledStartAt: projection.scheduledStartAt!.toISOString(),
-          scheduledEndAt: projection.scheduledEndAt!.toISOString(),
-        }));
-
-      const adapterResult = await aiSuggestTimeslots({
-        taskTitle: task.title,
-        estimatedMinutes,
-        priority: task.priority as "Low" | "Medium" | "High" | "Urgent" | undefined,
-        deadline: task.dueAt?.toISOString(),
-        currentSchedule: taskSnapshots,
-      });
-
-      if (adapterResult) {
-        return json(c, adapterResult);
-      }
-
-      const currentSchedule: ScheduleSlot[] = projections
-        .filter((projection) => projection.scheduledStartAt !== null && projection.scheduledEndAt !== null)
-        .map((projection) => ({
-          taskId: projection.taskId,
-          title: projection.task?.title ?? "Untitled",
-          startAt: projection.scheduledStartAt!,
-          endAt: projection.scheduledEndAt!,
-        }));
-
-      return json(c, suggestTimeslots({
-        taskId: task.id,
-        title: task.title,
-        priority: task.priority,
-        estimatedMinutes,
-        dueAt: task.dueAt,
-        currentSchedule,
-      }));
-    } catch (cause) {
-      return internalServerError(c, "POST /api/ai/suggest-timeslot", cause, "Failed to suggest timeslot");
-    }
-  });
-
-  ai.post("/ai/suggest-automation", async (c) => {
-    try {
-      const body = await c.req.json();
-      const { taskId, title, description, priority, dueAt, scheduledStartAt, scheduledEndAt, isRunnable, runnabilityState, ownerType } = body;
-
-      if (!taskId && !title) {
-        return error(c, "Either taskId or title is required", 400);
-      }
-
-      if (taskId && !title) {
-        const task = await db.task.findUnique({ where: { id: taskId } });
-        if (!task) {
-          return error(c, "Task not found", 404);
-        }
-        return json(c, await suggestAutomationSmart({
-          taskId: task.id,
-          title: task.title,
-          description: task.description ?? "",
-          priority: task.priority,
-          dueAt: task.dueAt,
-          scheduledStartAt: task.scheduledStartAt,
-          scheduledEndAt: task.scheduledEndAt,
-          isRunnable: !!task.runtimeAdapterKey,
-          runnabilityState: task.status ?? "",
-          ownerType: task.ownerType ?? "",
-        }));
-      }
-
-      const input: TaskAutomationInput = {
-        taskId: taskId ?? "",
-        title,
-        description: description ?? "",
-        priority: priority ?? "Medium",
-        dueAt: dueAt ? new Date(dueAt) : null,
-        scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : null,
-        scheduledEndAt: scheduledEndAt ? new Date(scheduledEndAt) : null,
-        isRunnable: isRunnable ?? false,
-        runnabilityState: runnabilityState ?? "",
-        ownerType: ownerType ?? "",
-      };
-
-      return json(c, await suggestAutomationSmart(input));
-    } catch (cause) {
-      return internalServerError(c, "POST /api/ai/suggest-automation", cause, "Failed to suggest automation");
-    }
-  });
-
-  ai.post("/ai/analyze-conflicts", async (c) => {
-    try {
-      const body = await c.req.json();
-      const { workspaceId, date } = body;
-
-      if (!workspaceId) {
-        return error(c, "workspaceId is required", 400);
-      }
-
-      let startDate: Date;
-      let endDate: Date;
-      if (date) {
-        startDate = new Date(date);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 1);
-      } else {
-        startDate = new Date();
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 7);
-      }
-
-      const projections = await db.taskProjection.findMany({
-        where: {
-          workspaceId,
-          scheduledStartAt: { gte: startDate, lt: endDate },
-        },
-        include: {
-          task: {
-            include: {
-              dependencies: { select: { dependsOnTaskId: true } },
-            },
-          },
-        },
-      });
-
-      const validProjections = projections.filter(
-        (projection) => projection.scheduledStartAt !== null && projection.scheduledEndAt !== null && projection.task !== null,
-      );
-
-      const taskSnapshots: TaskSnapshot[] = validProjections.map((projection) => ({
-        id: projection.taskId,
-        title: projection.task.title,
-        status: projection.task.status,
-        priority: projection.task.priority ?? undefined,
-        scheduledStartAt: projection.scheduledStartAt!.toISOString(),
-        scheduledEndAt: projection.scheduledEndAt!.toISOString(),
-      }));
-
-      const adapterResult = await aiAnalyzeConflicts({
-        tasks: taskSnapshots,
-        workspaceId,
-        focusDate: date,
-      });
-
-      if (adapterResult) {
-        return json(c, adapterResult);
-      }
-
-      const tasks: ScheduledTaskInfo[] = validProjections.map((projection) => ({
-        taskId: projection.taskId,
-        title: projection.task.title,
-        priority: projection.task.priority,
-        scheduledStartAt: projection.scheduledStartAt!,
-        scheduledEndAt: projection.scheduledEndAt!,
-        dueAt: projection.task.dueAt,
-        estimatedMinutes: Math.round((projection.scheduledEndAt!.getTime() - projection.scheduledStartAt!.getTime()) / 60000),
-        dependencies: projection.task.dependencies.map((dependency) => dependency.dependsOnTaskId),
-      }));
-
-      return json(c, await analyzeConflictsSmart(tasks));
-    } catch (cause) {
-      return internalServerError(c, "POST /api/ai/analyze-conflicts", cause, "Failed to analyze conflicts");
-    }
-  });
-
-  // ──────────────────────────────────────────────
   // AI Task Dispatching & Auto-Complete
   // ──────────────────────────────────────────────
-
-  ai.post("/ai/dispatch-task", async (c) => {
-    try {
-      const body = await c.req.json();
-      const taskId = typeof body.taskId === "string" ? body.taskId : "";
-      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
-
-      if (!taskId || !workspaceId) {
-        return error(c, "taskId and workspaceId are required", 400);
-      }
-
-      const { dispatchNextTaskAction } = await import("@chrona/engine");
-      return json(c, await dispatchNextTaskAction({
-        taskId,
-        workspaceId,
-        mode: "preview",
-      }));
-    } catch (cause) {
-      return internalServerError(c, "POST /api/ai/dispatch-task", cause, "Failed to dispatch task");
-    }
-  });
 
   ai.post("/ai/auto-complete", async (c) => {
     try {
@@ -661,100 +390,6 @@ export function createAiRoutes() {
   });
 
   // ──────────────────────────────────────────────
-  // Suggestion Application
-  // ──────────────────────────────────────────────
-
-  ai.post("/ai/apply-suggestion", async (c) => {
-    try {
-      const body = await c.req.json();
-
-      // Try changes-array format first
-      const changesResult = applySuggestionChangesSchema.safeParse(body);
-      if (changesResult.success) {
-        const { workspaceId, suggestionId, changes } = changesResult.data;
-
-        const taskIds = changes.map((change) => change.taskId);
-        const tasks = await db.task.findMany({
-          where: { id: { in: taskIds }, workspaceId },
-        });
-
-        if (tasks.length !== taskIds.length) {
-          return error(c, "Some tasks do not belong to this workspace", 403);
-        }
-
-        await db.$transaction(async (tx) => {
-          await Promise.all(changes.map((change) => tx.taskProjection.update({
-            where: { taskId: change.taskId },
-            data: {
-              ...(change.scheduledStartAt && { scheduledStartAt: new Date(change.scheduledStartAt) }),
-              ...(change.scheduledEndAt && { scheduledEndAt: new Date(change.scheduledEndAt) }),
-              updatedAt: new Date(),
-            },
-          })));
-        });
-
-        return json(c, { success: true, appliedChanges: changes.length, suggestionId });
-      }
-
-      // Try single-suggestion format
-      const singleResult = applySuggestionSingleSchema.safeParse(body);
-      if (!singleResult.success) {
-        return error(c, singleResult.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), 400);
-      }
-
-      const { workspaceId, suggestion } = singleResult.data;
-      const taskId = randomUUID();
-      const now = new Date();
-      await db.$transaction(async (tx) => {
-        await tx.task.create({
-          data: {
-            id: taskId,
-            workspaceId,
-            title: suggestion.action.title,
-            description: suggestion.action.description || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            priority: (suggestion.action.priority ?? "Medium") as any,
-            status: "Draft",
-            scheduleStatus: suggestion.action.scheduledStartAt ? "Scheduled" : "Unscheduled",
-            scheduleSource: "ai",
-            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-            ownerType: "human",
-            createdAt: now,
-            updatedAt: now,
-          },
-        });
-        await tx.taskProjection.upsert({
-          where: { taskId },
-          create: {
-            taskId,
-            workspaceId,
-            persistedStatus: "Draft",
-            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-            updatedAt: now,
-          },
-          update: {
-            scheduledStartAt: suggestion.action.scheduledStartAt ? new Date(suggestion.action.scheduledStartAt) : null,
-            scheduledEndAt: suggestion.action.scheduledEndAt ? new Date(suggestion.action.scheduledEndAt) : null,
-            updatedAt: now,
-          },
-        });
-      });
-
-      return json(c, {
-        success: true,
-        taskId,
-        suggestionId: suggestion.id,
-        action: suggestion.action.type,
-        summary: suggestion.summary,
-      });
-    } catch (cause) {
-      return internalServerError(c, "POST /api/ai/apply-suggestion", cause, "Failed to apply suggestion");
-    }
-  });
-
-  // ──────────────────────────────────────────────
   // Task Workspace AI Chat
   // ──────────────────────────────────────────────
 
@@ -883,19 +518,6 @@ export function createAiRoutes() {
         return json(c, { assistantMessage: "AI service is not configured. Please set up an AI client in Settings.", error: message }, 503);
       }
       return internalServerError(c, "POST /api/ai/task-workspace/chat", cause, "Failed to process AI workspace chat");
-    }
-  });
-
-  // ──────────────────────────────────────────────
-  // AI Service Status
-  // ──────────────────────────────────────────────
-
-  ai.get("/ai/status", async (c) => {
-    try {
-      return json(c, { available: await isAIAvailable(), clients: await getAIClientInfo() });
-    } catch (cause) {
-      console.error("GET /api/ai/status error:", cause);
-      return json(c, { available: false, clients: [], error: "Failed to check AI status" }, 500);
     }
   });
 

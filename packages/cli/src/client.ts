@@ -1,11 +1,3 @@
-export interface TaskChange {
-  taskId: string;
-  scheduledStartAt?: string;
-  scheduledEndAt?: string;
-  priority?: string;
-  dueAt?: string;
-}
-
 interface CreateTaskInput {
   workspaceId: string;
   title: string;
@@ -16,13 +8,6 @@ interface CreateTaskInput {
   runtimeModel?: string;
   prompt?: string;
   runtimeConfig?: Record<string, unknown>;
-}
-
-interface CreateSubtaskInput {
-  title: string;
-  description?: string;
-  priority?: string;
-  dueAt?: string;
 }
 
 interface UpdateTaskInput {
@@ -124,8 +109,8 @@ export class ApiClient {
     );
   }
 
-  getTask(taskId: string) {
-    return this.request<unknown>("GET", `/api/tasks/${encodeURIComponent(taskId)}`);
+  getTaskDetail(taskId: string) {
+    return this.request<unknown>("GET", `/api/tasks/${encodeURIComponent(taskId)}/detail`);
   }
 
   createTask(input: CreateTaskInput) {
@@ -146,14 +131,6 @@ export class ApiClient {
 
   reopenTask(taskId: string) {
     return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/reopen`);
-  }
-
-  listSubtasks(taskId: string) {
-    return this.request<unknown>("GET", `/api/tasks/${encodeURIComponent(taskId)}/subtasks`);
-  }
-
-  createSubtask(taskId: string, input: CreateSubtaskInput) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/subtasks`, input);
   }
 
   startRun(taskId: string, prompt?: string) {
@@ -192,26 +169,6 @@ export class ApiClient {
     );
   }
 
-  analyzeConflicts(workspaceId: string, date?: string) {
-    return this.request<unknown>("POST", "/api/ai/analyze-conflicts", { workspaceId, date });
-  }
-
-  suggestTimeslot(workspaceId: string, taskId: string, date?: string) {
-    return this.request<unknown>("POST", "/api/ai/suggest-timeslot", { workspaceId, taskId, date });
-  }
-
-  suggestAutomation(taskId?: string, input?: Record<string, unknown>) {
-    return this.request<unknown>("POST", "/api/ai/suggest-automation", taskId ? { taskId } : input ?? {});
-  }
-
-  applySuggestion(workspaceId: string, suggestionId: string, changes: TaskChange[]) {
-    return this.request<unknown>("POST", "/api/ai/apply-suggestion", {
-      workspaceId,
-      suggestionId,
-      changes,
-    });
-  }
-
   autoComplete(input: AutoCompleteInput) {
     return this.request<unknown>("POST", "/api/ai/auto-complete", input);
   }
@@ -224,7 +181,4 @@ export class ApiClient {
     return this.request<unknown>("POST", "/api/ai/batch-apply-plan", input);
   }
 
-  getAiStatus() {
-    return this.request<unknown>("GET", "/api/ai/status");
-  }
 }

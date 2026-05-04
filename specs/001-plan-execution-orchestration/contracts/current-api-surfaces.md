@@ -24,10 +24,6 @@ This contract inventory documents the current external API surfaces Chrona expos
 - Creates a task.
 - Brownfield role: start of the `Task -> Plan` flow.
 
-### `GET /tasks/:taskId`
-
-- Returns basic task detail.
-
 ### `GET /tasks/:taskId/detail`
 
 - Returns richer task detail used by task workspace surfaces.
@@ -37,15 +33,6 @@ This contract inventory documents the current external API surfaces Chrona expos
 - Returns the current saved plan state for a task.
 - Response includes `aiPlanGenerationStatus` and `savedAiPlan` when present.
 - Brownfield note: this is the clearest read contract for current plan lifecycle state.
-
-### `GET /tasks/:taskId/subtasks`
-
-- Lists child tasks created under a task.
-
-### `POST /tasks/:taskId/subtasks`
-
-- Creates a child task.
-- Brownfield note: plan materialization can create task trees through related flows.
 
 ## Plan Contracts
 
@@ -127,14 +114,6 @@ Request shape used today:
 - Requires an accepted plan to exist.
 - Brownfield note: despite the route name, this can start plan execution rather than only raw provider runs.
 
-### `POST /tasks/:taskId/execution/advance`
-
-- Advances plan execution manually or settles a child run when `runId` is supplied.
-
-### `POST /tasks/:taskId/execution/settle-run`
-
-- Settles a child run back into the accepted plan.
-
 ### `POST /tasks/:taskId/retry`
 
 - Retries execution.
@@ -149,17 +128,12 @@ Request shape used today:
 
 - Sends an operator message into the current execution context.
 
-### `POST /tasks/:taskId/resume`
-
-- Resumes a runtime run through the adapter surface.
-
 ### `POST /tasks/:taskId/result/accept`
 
 - Accepts the current task result.
 - Brownfield note: this is task-level result acceptance, not yet a formal plan-step review contract.
 
 ### `POST /approvals/:approvalId/resolve`
-### `POST /tasks/:taskId/approvals/:approvalId/resolve`
 
 - Resolves runtime approval records.
 

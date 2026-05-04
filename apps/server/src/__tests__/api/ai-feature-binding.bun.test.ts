@@ -15,17 +15,6 @@ const VALID_AI_FEATURES = ["suggest", "generate_plan", "conflicts", "timeslots",
 function createBindingRouter() {
   const api = new Hono();
 
-  api.get("/ai/clients/:clientId/bindings", async (c) => {
-    try {
-      const bindings = await db.aiFeatureBinding.findMany({
-        where: { clientId: c.req.param("clientId") },
-      });
-      return httpJson(c, { features: bindings.map((binding) => binding.feature) });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/ai/clients/:clientId/bindings", cause, "Failed to get feature bindings");
-    }
-  });
-
   api.put("/ai/clients/:clientId/bindings", async (c) => {
     try {
       const clientId = c.req.param("clientId");
@@ -101,10 +90,6 @@ async function putBindings(clientId: string, features: string[]) {
   });
 }
 
-async function getBindings(clientId: string) {
-  return await app().request(`http://local/api/ai/clients/${clientId}/bindings`);
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -139,14 +124,11 @@ describe("AI Feature Binding", () => {
     // Transfer "suggest" to client B
     await putBindings(clientB.id, ["suggest"]);
 
-    const getARes = await getBindings(clientA.id);
-    const getABody = await json<{ features: string[] }>(getARes);
-    expect(getABody.features).not.toContain("suggest");
-    expect(getABody.features).toContain("chat");
-
-    const getBRes = await getBindings(clientB.id);
-    const getBBody = await json<{ features: string[] }>(getBRes);
-    expect(getBBody.features).toContain("suggest");
+    const bindingsA = await db.aiFeatureBinding.findMany({ where: { clientId: clientA.id } });
+    const bindingsB = await db.aiFeatureBinding.findMany({ where: { clientId: clientB.id } });
+    expect(bindingsA.map((binding) => binding.feature)).not.toContain("suggest");
+    expect(bindingsA.map((binding) => binding.feature)).toContain("chat");
+    expect(bindingsB.map((binding) => binding.feature)).toContain("suggest");
   });
 
   it("PUT bindings with empty array clears all bindings", async () => {
@@ -158,20 +140,8 @@ describe("AI Feature Binding", () => {
     const body = await json<{ bindings: string[] }>(res);
     expect(body.bindings).toEqual([]);
 
-    const getRes = await getBindings(client.id);
-    const getBody = await json<{ features: string[] }>(getRes);
-    expect(getBody.features).toEqual([]);
-  });
-
-  it("GET bindings returns client's bound features", async () => {
-    const client = await createClient("Client A");
-
-    await putBindings(client.id, ["suggest", "timeslots"]);
-
-    const res = await getBindings(client.id);
-    expect(res.status).toBe(200);
-    const body = await json<{ features: string[] }>(res);
-    expect(body.features).toEqual(["suggest", "timeslots"]);
+    const bindings = await db.aiFeatureBinding.findMany({ where: { clientId: client.id } });
+    expect(bindings).toEqual([]);
   });
 
   // ──────────────────────────────────────────────

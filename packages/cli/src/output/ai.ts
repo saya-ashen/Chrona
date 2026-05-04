@@ -1,49 +1,5 @@
 import { createTable, formatKeyValue, getArray, getObject, type TableCell } from "./index.js";
 
-export function formatAutomation(value: unknown): string {
-  const data = getObject(value);
-  const reminder = getObject(data.reminderStrategy);
-  const steps = Array.isArray(data.preparationSteps) ? data.preparationSteps : [];
-  const contextSources = getArray(data.contextSources);
-
-  const blocks = [
-    formatKeyValue("Automation suggestion", [
-      ["Execution mode", data.executionMode],
-      ["Confidence", data.confidence],
-      ["Reminder advance minutes", reminder.advanceMinutes],
-      ["Reminder frequency", reminder.frequency],
-      ["Reminder channels", Array.isArray(reminder.channels) ? reminder.channels.join(", ") : reminder.channels],
-    ]),
-  ];
-
-  if (steps.length > 0) {
-    blocks.push(steps.map((step, index) => `${index + 1}. ${String(step)}`).join("\n"));
-  }
-
-  if (contextSources.length > 0) {
-    blocks.push(
-      createTable(
-        ["Type", "Description"],
-        contextSources.map((source) => [String(source.type ?? ""), String(source.description ?? "")] satisfies TableCell[]),
-      ),
-    );
-  }
-
-  return blocks.join("\n\n");
-}
-
-export function formatSuggestionApplyResult(value: unknown): string {
-  const data = getObject(value);
-  return formatKeyValue("Suggestion apply result", [
-    ["Success", data.success],
-    ["Applied changes", data.appliedChanges],
-    ["Suggestion ID", data.suggestionId],
-    ["Task ID", data.taskId],
-    ["Action", data.action],
-    ["Summary", data.summary],
-  ]);
-}
-
 export function formatAutoComplete(value: unknown): string {
   const data = getObject(value);
   const suggestions = getArray(data.suggestions);
@@ -98,30 +54,6 @@ export function formatPlanResult(value: unknown): string {
           String(node.title ?? ""),
           String(node.kind ?? ""),
           String(node.status ?? ""),
-        ] satisfies TableCell[]),
-      ),
-    );
-  }
-
-  return blocks.join("\n\n");
-}
-
-export function formatAiStatus(value: unknown): string {
-  const data = getObject(value);
-  const clients = getArray(data.clients);
-
-  const blocks = [
-    formatKeyValue("AI status", [["Available", data.available]]),
-  ];
-
-  if (clients.length > 0) {
-    blocks.push(
-      createTable(
-        ["Client", "Provider", "Features"],
-        clients.map((client) => [
-          String(client.id ?? client.clientId ?? ""),
-          String(client.provider ?? client.name ?? ""),
-          Array.isArray(client.features) ? client.features.join(", ") : String(client.features ?? ""),
         ] satisfies TableCell[]),
       ),
     );

@@ -95,36 +95,6 @@ function createAiClientRouter() {
     }
   });
 
-  api.get("/ai/clients/:clientId", async (c) => {
-    try {
-      const client = await db.aiClient.findUnique({
-        where: { id: c.req.param("clientId") },
-        include: { bindings: true },
-      });
-
-      if (!client) {
-        return error(c, "Client not found", 404);
-      }
-
-      return httpJson(c, {
-        id: client.id,
-        name: client.name,
-        type: client.type,
-        config: client.config,
-        isDefault: client.isDefault,
-        enabled: client.enabled,
-        bindings: client.bindings.map((binding) => binding.feature),
-      });
-    } catch (cause) {
-      return internalServerError(
-        c,
-        "GET /api/ai/clients/:clientId",
-        cause,
-        "Failed to get AI client",
-      );
-    }
-  });
-
   api.patch("/ai/clients/:clientId", async (c) => {
     try {
       const clientId = c.req.param("clientId");
@@ -266,25 +236,6 @@ describe("AI Client CRUD", () => {
     expect(body.clients[0].bindings).toEqual([]);
   });
 
-  it("GET /ai/clients/:id returns single client", async () => {
-    const createRes = await createClient({ name: "Single", type: "openclaw" });
-    const created = await json<{ client: { id: string } }>(createRes);
-
-    const res = await app().request(
-      `http://local/api/ai/clients/${created.client.id}`,
-    );
-    expect(res.status).toBe(200);
-    const body = await json<{
-      id: string;
-      name: string;
-      type: string;
-      bindings: string[];
-    }>(res);
-    expect(body.id).toBe(created.client.id);
-    expect(body.name).toBe("Single");
-    expect(body.type).toBe("openclaw");
-  });
-
   it("PATCH /ai/clients/:id updates name and config", async () => {
     const createRes = await createClient({ name: "Old", type: "openclaw" });
     const created = await json<{ client: { id: string } }>(createRes);
@@ -351,7 +302,7 @@ describe("AI Client CRUD", () => {
     expect(listBody.clients.find((c) => c.name === "B")?.isDefault).toBe(true);
   });
 
-  it("DELETE /ai/clients/:id removes client, subsequent GET returns 404", async () => {
+  it("DELETE /ai/clients/:id removes client", async () => {
     const createRes = await createClient({
       name: "Delete Me",
       type: "openclaw",
@@ -364,10 +315,8 @@ describe("AI Client CRUD", () => {
     );
     expect(delRes.status).toBe(200);
 
-    const getRes = await app().request(
-      `http://local/api/ai/clients/${created.client.id}`,
-    );
-    await expectApiError(getRes, 404);
+    const deleted = await db.aiClient.findUnique({ where: { id: created.client.id } });
+    expect(deleted).toBeNull();
   });
 
   // ──────────────────────────────────────────────
@@ -387,11 +336,6 @@ describe("AI Client CRUD", () => {
   it("POST /ai/clients invalid type returns 400", async () => {
     const res = await createClient({ name: "Bad Type", type: "gpt" });
     await expectApiError(res, 400);
-  });
-
-  it("GET /ai/clients/:id nonexistent returns 404", async () => {
-    const res = await app().request("http://local/api/ai/clients/nonexistent");
-    await expectApiError(res, 404);
   });
 
   it("PATCH /ai/clients/:id nonexistent returns 404", async () => {

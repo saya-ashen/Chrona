@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { db } from "@chrona/db";
 import {
   acceptTaskResult,
-  advancePlanExecution,
   applySchedule,
   clearSchedule,
   continuePlanExecution,
@@ -16,10 +15,8 @@ import {
   provideInput,
   reopenTask,
   resolveApproval,
-  resumeRun,
   retryRun,
   sendOperatorMessage,
-  settlePlanNodeFromRun,
   startPlanExecution,
 } from "@chrona/engine";
 
@@ -72,64 +69,6 @@ export function createExecutionRoutes() {
         return error(c, "Task not found", 404);
       }
       return error(c, message, 500);
-    }
-  });
-
-  api.post("/tasks/:taskId/execution/advance", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json().catch(() => ({}));
-
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, title: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
-
-      if (typeof body.runId === "string" && body.runId.trim()) {
-        const result = await settlePlanNodeFromRun({
-          taskId,
-          runId: body.runId,
-          reason: typeof body.reason === "string" ? body.reason : "child_run_completed",
-        });
-        return json(c, { workspaceId: task.workspaceId, ...result });
-      }
-
-      const result = await advancePlanExecution({
-        taskId,
-        trigger: "manual",
-      });
-      return json(c, { workspaceId: task.workspaceId, ...result });
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to advance execution";
-      return error(c, message, message.includes("not found") ? 404 : 500);
-    }
-  });
-
-  api.post("/tasks/:taskId/execution/settle-run", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json();
-
-      if (!body.runId || typeof body.runId !== "string" || !body.runId.trim()) {
-        return error(c, "runId is required", 400);
-      }
-
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true, workspaceId: true, title: true },
-      });
-      if (!task) return error(c, "Task not found", 404);
-
-      const result = await settlePlanNodeFromRun({
-        taskId,
-        runId: body.runId,
-        reason: typeof body.reason === "string" ? body.reason : undefined,
-      });
-      return json(c, { workspaceId: task.workspaceId, ...result });
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to settle run";
-      return error(c, message, message.includes("not found") ? 404 : 500);
     }
   });
 
@@ -247,28 +186,6 @@ export function createExecutionRoutes() {
       return json(c, await sendOperatorMessage({ runId, message: body.message, adapter }));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to send message";
-      return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);
-    }
-  });
-
-  api.post("/tasks/:taskId/resume", async (c) => {
-    try {
-      const body = await c.req.json();
-      if (!body.runId) {
-        return error(c, "runId is required", 400);
-      }
-      const adapter = await getOpenClawAdapter();
-      return json(
-        c,
-        await resumeRun({
-          runId: body.runId,
-          inputText: body.inputText,
-          approvalId: body.approvalId,
-          adapter,
-        }),
-      );
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to resume run";
       return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);
     }
   });
@@ -461,25 +378,6 @@ export function createExecutionRoutes() {
     }
   });
 
-  api.post("/tasks/:taskId/approvals/:approvalId/resolve", async (c) => {
-    try {
-      const approvalId = c.req.param("approvalId");
-      const body = await c.req.json();
-      return json(
-        c,
-        await resolveApproval({
-          approvalId,
-          decision: body.decision,
-          resolutionNote: body.resolutionNote,
-          editedContent: body.editedContent,
-        }),
-      );
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to resolve approval";
-      return error(c, message, message.includes("no longer exists") || message.includes("not found") ? 404 : 400);
-    }
-  });
-
   api.post("/memories/:memoryId/invalidate", async (c) => {
     try {
       return json(c, await invalidateMemory({ memoryId: c.req.param("memoryId") }));
@@ -604,60 +502,6 @@ export function createExecutionRoutes() {
       });
     } catch (cause) {
       return internalServerError(c, "PATCH /api/tasks/:taskId/assistant/messages/:messageId/apply", cause, "Failed to mark applied");
-    }
-  });
-
-  // ────────────────────────────────────────────────────────────────────
-  // Work-block endpoints
-  // ────────────────────────────────────────────────────────────────────
-
-  api.get("/tasks/:taskId/work-blocks", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const blocks = await db.workBlock.findMany({
-        where: { taskId },
-        orderBy: { scheduledStartAt: "desc" },
-      });
-
-      return json(c, { workBlocks: blocks });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/tasks/:taskId/work-blocks", cause, "Failed to fetch work blocks");
-    }
-  });
-
-  api.post("/tasks/:taskId/work-blocks", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json().catch(() => ({}));
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const now = new Date();
-      const scheduledStartAt = body.scheduledStartAt ? new Date(body.scheduledStartAt) : now;
-      const scheduledEndAt = body.scheduledEndAt
-        ? new Date(body.scheduledEndAt)
-        : new Date(scheduledStartAt.getTime() + 60 * 60 * 1000);
-
-      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
-
-      const block = await db.workBlock.create({
-        data: {
-          workspaceId: task.workspaceId,
-          taskId: task.id,
-          planId: acceptedPlan?.id ?? null,
-          title: body.title ?? task.title,
-          scheduledStartAt,
-          scheduledEndAt,
-          trigger: "manual",
-        },
-      });
-
-      return json(c, block, 201);
-    } catch (cause) {
-      return internalServerError(c, "POST /api/tasks/:taskId/work-blocks", cause, "Failed to create work block");
     }
   });
 

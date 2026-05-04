@@ -2,7 +2,7 @@ import { Command } from "commander";
 import type { ClientResolver } from "./shared.js";
 import { createOutputOption, runCommand, type CommonCommandOptions } from "./shared.js";
 import { formatRunResult } from "../output/run.js";
-import { formatConflicts, formatWorkspace } from "../output/schedule.js";
+import { formatWorkspace } from "../output/schedule.js";
 
 export function registerScheduleCommands(program: Command, getClient: ClientResolver): void {
   const schedule = program.command("schedule").description("Schedule management");
@@ -43,33 +43,4 @@ export function registerScheduleCommands(program: Command, getClient: ClientReso
       }),
   );
 
-  createOutputOption(
-    schedule
-      .command("conflicts")
-      .description("Analyze scheduling conflicts")
-      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-      .option("-d, --date <date>", "Optional focus date")
-      .action(async (options: CommonCommandOptions & { workspaceId: string; date?: string }) => {
-        await runCommand(
-          () => getClient().analyzeConflicts(options.workspaceId, options.date),
-          options,
-          formatConflicts,
-        );
-      }),
-  );
-
-  createOutputOption(
-    schedule
-      .command("suggest-time")
-      .description("Suggest an available timeslot for a task")
-      .requiredOption("-w, --workspace-id <id>", "Workspace ID")
-      .requiredOption("-t, --task-id <id>", "Task ID")
-      .option("-d, --date <date>", "Optional focus date")
-      .action(async (options: CommonCommandOptions & { workspaceId: string; taskId: string; date?: string }) => {
-        await runCommand(
-          () => getClient().suggestTimeslot(options.workspaceId, options.taskId, options.date),
-          options,
-        );
-      }),
-  );
 }
