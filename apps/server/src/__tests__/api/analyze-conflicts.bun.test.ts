@@ -10,7 +10,7 @@ import { Hono } from "hono";
 
 import { db } from "@chrona/db";
 import { analyzeConflictsSmart } from "@chrona/runtime/modules/ai/conflict-analyzer";
-import type { ScheduledTaskInfo } from "@chrona/runtime/modules/ai/types";
+import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 import {
   resetTestDb,
   seedWorkspace,

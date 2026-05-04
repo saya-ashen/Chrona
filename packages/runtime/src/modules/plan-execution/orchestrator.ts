@@ -8,7 +8,7 @@ import { decideNodeExecutionSession } from "./session-policy";
 import { executePlanNode } from "./node-executor";
 import { detectPlanDrift } from "./replan-detector";
 import { applyPlanPatch } from "./apply-plan-patch";
-import type { TaskPlanNode, TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanNode, TaskPlanGraph } from "@chrona/contracts/ai";
 import type { PlanExecutablePath } from "./executable-path";
 
 async function activateWorkBlock(taskId: string) {

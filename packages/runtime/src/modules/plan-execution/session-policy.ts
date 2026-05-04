@@ -1,4 +1,4 @@
-import type { TaskPlanNode, TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanNode, TaskPlanGraph } from "@chrona/contracts/ai";
 
 export type NodeSessionDecision =
   | { kind: "main_session"; reason: string }

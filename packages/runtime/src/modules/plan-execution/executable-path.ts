@@ -1,4 +1,4 @@
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 export type PlanExecutablePath = {
   readyNodeIds: string[];

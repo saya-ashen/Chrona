@@ -6,7 +6,7 @@ mock.module("../ai-service", () => ({
 
 import { aiChat } from "../ai-service";
 import { analyzeConflictsSmart, analyzeConflicts } from "../conflict-analyzer";
-import type { ScheduledTaskInfo } from "../types";
+import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 
 function d(hour: number, minute = 0): Date {
   return new Date(

@@ -5,16 +5,18 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@chrona/common-i18n/*": ["../../packages/common/i18n/src/*"],
-      "@chrona/common-i18n": ["../../packages/common/i18n/src/locale.ts"],
+      "@chrona/runtime-core/*": ["../../packages/runtime-core/src/*"],
+      "@chrona/runtime-core": ["../../packages/runtime-core/src/index.ts"],
+      "@chrona/i18n/*": ["../../packages/i18n/src/*"],
+      "@chrona/i18n": ["../../packages/i18n/src/locale.ts"],
       "@chrona/runtime/*": ["../../packages/runtime/src/*"],
       "@chrona/runtime": ["../../packages/runtime/src/index.ts"],
       "@chrona/db/*": ["../../packages/db/src/*"],
       "@chrona/db": ["../../packages/db/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],
       "@chrona/contracts": ["../../packages/contracts/src/index.ts"],
-      "@chrona/ai-features/*": ["../../packages/common/ai-features/src/*"],
-      "@chrona/ai-features": ["../../packages/common/ai-features/src/index.ts"],
+      "@chrona/ai-features/*": ["../../packages/ai-features/src/*"],
+      "@chrona/ai-features": ["../../packages/ai-features/src/index.ts"],
       "@chrona/domain/*": ["../../packages/domain/src/*"],
       "@chrona/domain": ["../../packages/domain/src/index.ts"]
     }

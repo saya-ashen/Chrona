@@ -13,7 +13,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { extractJSON, llmCall, SYSTEM_PROMPTS } from "@chrona/ai-features";
-import type { TaskPlanNode, TaskPlanEdge } from "../types";
+import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
 import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 
 // -- Config --

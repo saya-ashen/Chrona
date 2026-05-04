@@ -6,7 +6,7 @@ mock.module("../ai-service", () => ({
 
 import { aiChat } from "../ai-service";
 import { suggestAutomationSmart, suggestAutomation } from "../automation-suggester";
-import type { TaskAutomationInput } from "../types";
+import type { TaskAutomationInput } from "@chrona/contracts/ai";
 
 function makeTask(
   overrides: Partial<TaskAutomationInput> = {},

@@ -10,7 +10,7 @@ import { Hono } from "hono";
 
 import { db } from "@chrona/db";
 import { suggestAutomationSmart } from "@chrona/runtime/modules/ai/automation-suggester";
-import type { TaskAutomationInput } from "@chrona/runtime/modules/ai/types";
+import type { TaskAutomationInput } from "@chrona/contracts/ai";
 import {
   resetTestDb,
   seedWorkspace,

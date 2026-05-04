@@ -3,7 +3,7 @@ import type {
   ExecutionMode,
   ReminderStrategy,
   AutomationSuggestion,
-} from "./types";
+} from "@chrona/contracts/ai";
 import { aiChat } from "./ai-service";
 
 function isAutomationSuggestion(

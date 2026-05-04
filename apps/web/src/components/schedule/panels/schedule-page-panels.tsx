@@ -31,7 +31,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard, SurfaceCardHeader, SurfaceCardTitle } from "@/components/ui/surface-card";
 import { TaskContextLinks } from "@/components/ui/task-context-links";
-import type { ScheduleSlot } from "@/modules/ai/types";
+import type { ScheduleSlot } from "@chrona/contracts/ai";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import { DetailGrid, EmptyState, ItemMeta, TodayFocusLink } from "./schedule-panel-primitives";

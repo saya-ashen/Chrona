@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { createLogger, summarizeText } from "@/lib/logger";
 import { aiGeneratePlan } from "@/modules/ai/ai-service";
-import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@/modules/ai/types";
+import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@chrona/contracts/ai";
 import { getLatestTaskPlanGraph, saveTaskPlanGraph, enrichPlanGraphNodes } from "@/modules/tasks/task-plan-graph-store";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { GenerateTaskPlanResponse } from "@chrona/ai-features";

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { db } from "@chrona/db";
-import type { TaskPlanGraph, TaskPlanNode, TaskPlanEdge } from "@chrona/runtime/modules/ai/types";
+import type { TaskPlanGraph, TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
 import { acceptTaskPlanGraph, getLatestTaskPlanGraph, saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@chrona/runtime/modules/tasks/task-plan-graph-store";
 import { generateTaskPlanForTask } from "@chrona/runtime/modules/commands/generate-task-plan-for-task";
 import { materializeTaskPlan } from "@chrona/runtime/modules/commands/materialize-task-plan";

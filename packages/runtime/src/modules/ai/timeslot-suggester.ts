@@ -4,7 +4,7 @@ import type {
   TimeslotSuggestion,
   TimeslotOptions,
   ScheduleSlot,
-} from "./types";
+} from "@chrona/contracts/ai";
 
 const DEFAULT_OPTIONS: Required<TimeslotOptions> = {
   workdayStartHour: 9,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScheduledItem, ScheduleAiPlanGenerationStatus } from "@/components/schedule/schedule-page-types";
-import type { TaskPlanGraph, TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraph, TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 export type SavedTaskPlan = {
   id: string;

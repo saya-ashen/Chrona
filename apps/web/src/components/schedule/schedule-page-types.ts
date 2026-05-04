@@ -1,7 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
-import type { TaskPlanGraph } from "@/modules/ai/types";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
 
 type SchedulePageSummary = {
   scheduledCount: number;
@@ -329,7 +329,6 @@ export type QuickCreateDraft = {
   scheduledEndAt: Date | null;
   priority: "Low" | "Medium" | "High" | "Urgent";
 };
-
 
 
 

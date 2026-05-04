@@ -22,7 +22,7 @@ vi.mock("@/hooks/use-ai", () => ({
 }));
 
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
-import type { TaskPlanGraphResponse } from "@/modules/ai/types";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 const defaultProps = {
   taskId: "task_1",

@@ -8,7 +8,7 @@ import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@/modules/tasks/derive-task-runnability";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
-import type { ScheduledTaskInfo } from "@/modules/ai/types";
+import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";

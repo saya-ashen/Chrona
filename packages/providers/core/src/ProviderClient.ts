@@ -1,4 +1,7 @@
-import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw-integration/bridge/contracts";
+import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw-integration";
+
+export type ProviderResponse = BridgeResponse;
+export type ProviderToolCall = ToolCallInfo;
 
 export interface ProviderConfig {
   gatewayUrl: string;
@@ -10,7 +13,7 @@ export interface ProviderConfig {
 export interface StreamEvent {
   type: "text" | "tool_call" | "tool_result" | "done" | "error";
   data: string;
-  toolCall?: ToolCallInfo;
+  toolCall?: ProviderToolCall;
 }
 
 export type ProviderFeature =
@@ -32,7 +35,7 @@ export abstract class ProviderClient {
       timeout?: number;
       [key: string]: unknown;
     },
-  ): Promise<BridgeResponse>;
+  ): Promise<ProviderResponse>;
 
   abstract executeFeatureStream(
     feature: ProviderFeature,
@@ -53,7 +56,7 @@ export abstract class ProviderClient {
       timeout?: number;
       [key: string]: unknown;
     },
-  ): Promise<BridgeResponse>;
+  ): Promise<ProviderResponse>;
 
   abstract checkHealth(): Promise<boolean>;
 }

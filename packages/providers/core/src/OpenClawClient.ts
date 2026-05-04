@@ -2,11 +2,17 @@ import {
   buildGatewayBody,
   checkGatewayAvailable as checkGateway,
   gatewayHeaders,
-} from "@chrona/openclaw-bridge/execution/gateway";
-import { buildFeatureResultFromResponse } from "@chrona/openclaw-bridge/features/feature-contracts";
-import type { BridgeEnvironment } from "@chrona/openclaw-bridge/shared/types";
-import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw-integration/bridge/contracts";
-import { ProviderClient, type ProviderConfig, type ProviderFeature, type StreamEvent } from "./ProviderClient";
+} from "@chrona/openclaw-bridge/provider-client";
+import { buildFeatureResultFromResponse } from "@chrona/openclaw-bridge/provider-client";
+import type { BridgeEnvironment } from "@chrona/openclaw-bridge/provider-client";
+import type { ToolCallInfo } from "@chrona/openclaw-integration";
+import {
+  ProviderClient,
+  type ProviderConfig,
+  type ProviderFeature,
+  type ProviderResponse,
+  type StreamEvent,
+} from "./ProviderClient";
 
 type GatewayRoute =
   | { kind: "feature"; feature: ProviderFeature; stream: boolean }
@@ -74,7 +80,7 @@ function buildBridgeResponse(params: {
   sessionId: string;
   feature: ProviderFeature | undefined;
   parsed: ParsedGatewayResponse;
-}): BridgeResponse {
+}): ProviderResponse {
   const built = buildFeatureResultFromResponse(
     params.feature ?? "generate_plan",
     params.parsed.output,
@@ -215,7 +221,7 @@ export class OpenClawClient extends ProviderClient {
   async executeFeature(
     feature: ProviderFeature,
     input: { sessionKey?: string; instructions?: string; timeout?: number; [key: string]: unknown },
-  ): Promise<BridgeResponse> {
+  ): Promise<ProviderResponse> {
     return this.executeGateway("feature", feature, false, input);
   }
 
@@ -229,7 +235,7 @@ export class OpenClawClient extends ProviderClient {
 
   async executeTask(
     input: { sessionKey?: string; instructions: string; prompt?: string; timeout?: number; [key: string]: unknown },
-  ): Promise<BridgeResponse> {
+  ): Promise<ProviderResponse> {
     return this.executeGateway("execution", undefined as unknown as ProviderFeature, false, input);
   }
 
@@ -238,7 +244,7 @@ export class OpenClawClient extends ProviderClient {
     feature: ProviderFeature | undefined,
     stream: boolean,
     input: Record<string, unknown>,
-  ): Promise<BridgeResponse> {
+  ): Promise<ProviderResponse> {
     const { response } = await this.executeGatewayRaw(kind, feature, stream, input);
     return response;
   }
@@ -248,7 +254,7 @@ export class OpenClawClient extends ProviderClient {
     feature: ProviderFeature | undefined,
     stream: boolean,
     input: Record<string, unknown>,
-  ): Promise<{ response: BridgeResponse; events: Array<Record<string, unknown>> }> {
+  ): Promise<{ response: ProviderResponse; events: Array<Record<string, unknown>> }> {
     const route = buildRoute(kind, feature, stream);
     const request = normalizeGatewayRequestInput(input);
     const sessionId = `${request.sessionKey}-${Date.now()}`;

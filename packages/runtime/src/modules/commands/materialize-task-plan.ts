@@ -1,6 +1,6 @@
 import { TaskPriority, TaskStatus, type Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import type { TaskPlanEdge, TaskPlanNode } from "@/modules/ai/types";
+import type { TaskPlanEdge, TaskPlanNode } from "@chrona/contracts/ai";
 import {
   getAcceptedTaskPlanGraph,
   getLatestTaskPlanGraph,

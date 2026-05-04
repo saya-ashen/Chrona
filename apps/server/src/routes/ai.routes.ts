@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@chrona/db";
 import { summarizeText } from "@chrona/db/logger";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/runtime/modules/ai/ai-service";
-import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput } from "@chrona/runtime/modules/ai/types";
+import type { ScheduleSlot, ScheduledTaskInfo, TaskAutomationInput } from "@chrona/contracts/ai";
 import {
   aiAnalyzeConflicts,
   aiChat,
