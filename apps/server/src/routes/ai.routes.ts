@@ -1,14 +1,19 @@
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import { db } from "@chrona/db";
 import { summarizeText } from "@chrona/db/logger";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/engine";
 import {
   aiChat,
   aiSuggestStream,
   buildTaskWorkspaceSystemPrompt,
+  createAiClient,
+  deleteAiClient,
   ensureDefaultTaskSession,
+  getRecentTasksForAutoComplete,
+  listAiClients,
+  updateAiClient,
+  updateAiClientBindings,
 } from "@chrona/engine";
 
 import {
@@ -39,10 +44,7 @@ export function createAiRoutes() {
 
   ai.get("/ai/clients", async (c) => {
     try {
-      const clients = await db.aiClient.findMany({
-        include: { bindings: true },
-        orderBy: { createdAt: "asc" },
-      });
+      const clients = await listAiClients();
 
       return json(c, {
         clients: clients.map((client) => ({
@@ -72,20 +74,11 @@ export function createAiRoutes() {
 
       const { name, type, config, isDefault } = parsed.data;
 
-      if (isDefault) {
-        await db.aiClient.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
-      }
-
-      const client = await db.aiClient.create({
-        data: {
-          id: randomUUID().replace(/-/g, "").slice(0, 25),
-          name,
-          type,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          config: (config ?? {}) as any,
-          isDefault: isDefault ?? false,
-          enabled: true,
-        },
+      const client = await createAiClient({
+        name,
+        type,
+        config: config as Record<string, unknown> | undefined,
+        isDefault,
       });
 
       return json(c, { client }, 201);
@@ -118,35 +111,27 @@ export function createAiRoutes() {
     try {
       const clientId = c.req.param("clientId");
       const body = await c.req.json();
-      const existing = await db.aiClient.findUnique({ where: { id: clientId } });
 
-      if (!existing) {
-        return error(c, "Client not found", 404);
-      }
-
-      if (body.isDefault === true) {
-        await db.aiClient.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
-      }
-
-      const updated = await db.aiClient.update({
-        where: { id: clientId },
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.config !== undefined && { config: body.config }),
-          ...(body.isDefault !== undefined && { isDefault: body.isDefault }),
-          ...(body.enabled !== undefined && { enabled: body.enabled }),
-        },
+      const updated = await updateAiClient(clientId, {
+        name: body.name,
+        config: body.config,
+        isDefault: body.isDefault,
+        enabled: body.enabled,
       });
 
       return json(c, { client: updated });
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to update AI client";
+      if (message === "Client not found") {
+        return error(c, message, 404);
+      }
       return internalServerError(c, "PATCH /api/ai/clients/:clientId", cause, "Failed to update AI client");
     }
   });
 
   ai.delete("/ai/clients/:clientId", async (c) => {
     try {
-      await db.aiClient.delete({ where: { id: c.req.param("clientId") } });
+      await deleteAiClient(c.req.param("clientId"));
       return json(c, { success: true });
     } catch {
       return error(c, "Client not found", 404);
@@ -163,41 +148,18 @@ export function createAiRoutes() {
         return error(c, "features must be an array", 400);
       }
 
-      const client = await db.aiClient.findUnique({ where: { id: clientId } });
-      if (!client) {
-        return error(c, "Client not found", 404);
-      }
-
-      const validFeatures = [...new Set(features.filter((feature: string) => (VALID_AI_FEATURES as readonly string[]).includes(feature)))];
-
-      // Feature bindings are globally unique: each feature can only be bound to one client at a time.
-      // We must atomically remove existing bindings for the selected features (from any client)
-      // and remove any stale bindings for this client, then create new bindings.
-      await db.$transaction(async (tx) => {
-        if (validFeatures.length > 0) {
-          await tx.aiFeatureBinding.deleteMany({ where: { feature: { in: validFeatures } } });
-        }
-
-        await tx.aiFeatureBinding.deleteMany({
-          where: {
-            clientId,
-            feature: { notIn: validFeatures },
-          },
-        });
-
-        for (const feature of validFeatures) {
-          await tx.aiFeatureBinding.create({
-            data: {
-              id: randomUUID().replace(/-/g, "").slice(0, 25),
-              feature,
-              clientId,
-            },
-          });
-        }
+      const bindings = await updateAiClientBindings({
+        clientId,
+        features,
+        validFeatureSet: new Set(VALID_AI_FEATURES as readonly string[]),
       });
 
-      return json(c, { bindings: validFeatures });
+      return json(c, { bindings });
     } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to update feature bindings";
+      if (message === "Client not found") {
+        return error(c, message, 404);
+      }
       return internalServerError(c, "PUT /api/ai/clients/:clientId/bindings", cause, "Failed to update feature bindings");
     }
   });
@@ -231,31 +193,17 @@ export function createAiRoutes() {
       let sharedTaskSessionKey: string | null = null;
       if (workspaceId) {
         try {
-          const recentTasks = await db.taskProjection.findMany({
-            where: { workspaceId },
-            take: 10,
-            orderBy: { updatedAt: "desc" },
-            include: { task: { select: { title: true, status: true, priority: true, defaultSessionId: true, runtimeAdapterKey: true } } },
-          });
-          context = {
-            existingTasks: recentTasks.map((projection) => ({
-              id: projection.taskId,
-              title: projection.task?.title ?? "",
-              status: projection.task?.status ?? "open",
-              priority: projection.task?.priority ?? undefined,
-              scheduledStartAt: projection.scheduledStartAt?.toISOString(),
-              scheduledEndAt: projection.scheduledEndAt?.toISOString(),
-            })),
-          };
+          const existingTasks = await getRecentTasksForAutoComplete(workspaceId);
+          context = { existingTasks };
 
-          const exactTask = recentTasks.find((projection) => projection.task?.title?.trim() === trimmedTitle);
-          if (exactTask?.task) {
+          const exactTask = existingTasks.find((t) => t.title?.trim() === trimmedTitle);
+          if (exactTask) {
             sharedTaskSessionKey = (
               await ensureDefaultTaskSession({
-                taskId: exactTask.taskId,
-                taskTitle: exactTask.task.title ?? trimmedTitle,
-                runtimeName: exactTask.task.runtimeAdapterKey ?? "openclaw",
-                defaultSessionId: exactTask.task.defaultSessionId,
+                taskId: exactTask.id,
+                taskTitle: exactTask.title ?? trimmedTitle,
+                runtimeName: "openclaw",
+                defaultSessionId: undefined,
               })
             ).sessionKey;
           }

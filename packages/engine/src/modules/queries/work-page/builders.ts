@@ -56,7 +56,7 @@ export function readBlockReason(
   );
 }
 
-export function deriveTaskPlanStepStatus(
+function deriveTaskPlanStepStatus(
   stepId: string,
   currentRun: { status: string } | null,
   closure: { isDone: boolean },

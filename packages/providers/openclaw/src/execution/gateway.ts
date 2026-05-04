@@ -28,7 +28,9 @@ function previewText(value: string, maxLength = 1200): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-function summarizeHeaders(headers: Record<string, string>): Record<string, unknown> {
+function summarizeHeaders(
+  headers: Record<string, string>,
+): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [
       key,
@@ -46,7 +48,11 @@ const sessionPendingToolOutputMap = new Map<
 type OpenResponsesTurnState = {
   sessionKey: string;
   previousResponseId?: string;
-  pendingToolOutputs: Array<{ type: "function_call_output"; call_id: string; output: string }>;
+  pendingToolOutputs: Array<{
+    type: "function_call_output";
+    call_id: string;
+    output: string;
+  }>;
 };
 
 function defaultFeatureInstructions(feature: BridgeFeature): string {
@@ -81,12 +87,14 @@ function resolveFeatureInputText(
   request: BridgeFeatureRequest<Record<string, unknown>>,
   featureSpec?: PreparedAiFeatureSpec,
 ): string {
-  return featureSpec?.inputText ?? request.inputText ?? stringifyFeatureInput(request.input);
+  return (
+    featureSpec?.inputText ??
+    request.inputText ??
+    stringifyFeatureInput(request.input)
+  );
 }
 
-function resolveRequiredTool(
-  featureSpec?: PreparedAiFeatureSpec,
-): {
+function resolveRequiredTool(featureSpec?: PreparedAiFeatureSpec): {
   type: "function";
   name: string;
   description: string;
@@ -95,7 +103,10 @@ function resolveRequiredTool(
   return featureSpec?.requiredTool ?? null;
 }
 
-function normalizeSessionSegment(value: string | undefined, fallback: string): string {
+function normalizeSessionSegment(
+  value: string | undefined,
+  fallback: string,
+): string {
   const normalized = value
     ?.trim()
     .toLowerCase()
@@ -119,9 +130,14 @@ function timestampSessionSegment(date = new Date()): string {
   ].join("");
 }
 
-function buildReadableSessionId(route: RouteKind, request: BridgeRequest): string {
+function buildReadableSessionId(
+  route: RouteKind,
+  request: BridgeRequest,
+): string {
   if (route.kind === "feature") {
-    const featureRequest = request as BridgeFeatureRequest<Record<string, unknown>>;
+    const featureRequest = request as BridgeFeatureRequest<
+      Record<string, unknown>
+    >;
     const input = featureRequest.input ?? {};
     const task =
       input.task && typeof input.task === "object" && !Array.isArray(input.task)
@@ -168,9 +184,10 @@ function resolveOpenResponsesTurnState(
   };
 }
 
-function buildToolAcknowledgementOutput(
-  toolCall: { tool: string; input: Record<string, unknown> },
-): string {
+function buildToolAcknowledgementOutput(toolCall: {
+  tool: string;
+  input: Record<string, unknown>;
+}): string {
   return JSON.stringify({
     ok: true,
     message: "Structured tool result accepted.",
@@ -179,7 +196,11 @@ function buildToolAcknowledgementOutput(
 }
 
 function buildToolOutputItems(
-  toolCalls: Array<{ callId: string; tool: string; input: Record<string, unknown> }>,
+  toolCalls: Array<{
+    callId: string;
+    tool: string;
+    input: Record<string, unknown>;
+  }>,
 ): Array<{ type: "function_call_output"; call_id: string; output: string }> {
   return toolCalls.map((toolCall) => ({
     type: "function_call_output" as const,
@@ -198,7 +219,8 @@ function shouldAcknowledgeFeatureToolCalls(
   const requiredTool = featureSpec?.requiredTool.name;
   if (!requiredTool) return false;
   if (toolCalls.length === 0) return false;
-  if (!toolCalls.some((toolCall) => toolCall.tool === requiredTool)) return false;
+  if (!toolCalls.some((toolCall) => toolCall.tool === requiredTool))
+    return false;
   const acknowledged = new Set(toolCallOutputs.map((output) => output.callId));
   return toolCalls.some((toolCall) => !acknowledged.has(toolCall.callId));
 }
@@ -232,11 +254,18 @@ function stringifyExecutionInput(
 
 function buildOpenResponsesInput(
   text: string,
-  pendingToolOutputs: Array<{ type: "function_call_output"; call_id: string; output: string }>,
-): Array<{ type: "function_call_output"; call_id: string; output: string } | { type: "input_text"; text: string }> {
+  pendingToolOutputs: Array<{
+    type: "function_call_output";
+    call_id: string;
+    output: string;
+  }>,
+): Array<
+  | { type: "function_call_output"; call_id: string; output: string }
+  | { type: "message"; role: "user"; content: string }
+> {
   return [
     ...pendingToolOutputs,
-    { type: "input_text", text },
+    { type: "message", role: "user", content: text },
   ];
 }
 
@@ -246,10 +275,8 @@ export function buildGatewayBody(
   sessionId: string,
   environment: BridgeEnvironment,
 ): Record<string, unknown> {
-  const { sessionKey, previousResponseId, pendingToolOutputs } = resolveOpenResponsesTurnState(
-    request,
-    sessionId,
-  );
+  const { sessionKey, previousResponseId, pendingToolOutputs } =
+    resolveOpenResponsesTurnState(request, sessionId);
 
   if (route.kind === "feature") {
     const featureRequest = request as BridgeFeatureRequest<
@@ -276,7 +303,7 @@ export function buildGatewayBody(
     const requiredTool = resolveRequiredTool(featureSpec);
     if (requiredTool) {
       body.tools = [requiredTool];
-      body.tool_choice = featureSpec?.toolChoice ?? "required";
+      body.tool_choice = "required";
     }
 
     if (previousResponseId) {
@@ -367,7 +394,10 @@ export async function executeGatewayRequest(
   environment: BridgeEnvironment,
 ): Promise<ExecutionResult> {
   const sessionId = resolveSessionId(route, request);
-  const { sessionKey, pendingToolOutputs } = resolveOpenResponsesTurnState(request, sessionId);
+  const { sessionKey, pendingToolOutputs } = resolveOpenResponsesTurnState(
+    request,
+    sessionId,
+  );
   const startedAt = Date.now();
   const body = buildGatewayBody(route, request, sessionId, environment);
 
@@ -456,16 +486,26 @@ export async function executeGatewayRequest(
     const { toolCalls, toolCallOutputs } = parseFunctionItems(gateway);
     const featureSpec =
       route.kind === "feature"
-        ? resolveFeatureSpec(request as BridgeFeatureRequest<Record<string, unknown>>)
+        ? resolveFeatureSpec(
+            request as BridgeFeatureRequest<Record<string, unknown>>,
+          )
         : undefined;
     if (pendingToolOutputs.length > 0) {
       sessionPendingToolOutputMap.delete(sessionKey);
     }
     if (
       responseId &&
-      shouldAcknowledgeFeatureToolCalls(route, toolCalls, toolCallOutputs, featureSpec)
+      shouldAcknowledgeFeatureToolCalls(
+        route,
+        toolCalls,
+        toolCallOutputs,
+        featureSpec,
+      )
     ) {
-      sessionPendingToolOutputMap.set(sessionKey, buildToolOutputItems(toolCalls));
+      sessionPendingToolOutputMap.set(
+        sessionKey,
+        buildToolOutputItems(toolCalls),
+      );
     }
     const outputText = extractOutputText(gateway);
 
@@ -590,16 +630,26 @@ export async function executeGatewayRequest(
     parseFunctionItems(finalGatewayResponse);
   const featureSpec =
     route.kind === "feature"
-      ? resolveFeatureSpec(request as BridgeFeatureRequest<Record<string, unknown>>)
+      ? resolveFeatureSpec(
+          request as BridgeFeatureRequest<Record<string, unknown>>,
+        )
       : undefined;
   if (pendingToolOutputs.length > 0) {
     sessionPendingToolOutputMap.delete(sessionKey);
   }
   if (
     responseId &&
-    shouldAcknowledgeFeatureToolCalls(route, toolCalls, toolCallOutputs, featureSpec)
+    shouldAcknowledgeFeatureToolCalls(
+      route,
+      toolCalls,
+      toolCallOutputs,
+      featureSpec,
+    )
   ) {
-    sessionPendingToolOutputMap.set(sessionKey, buildToolOutputItems(toolCalls));
+    sessionPendingToolOutputMap.set(
+      sessionKey,
+      buildToolOutputItems(toolCalls),
+    );
   }
   const outputText = extractOutputText(finalGatewayResponse);
 

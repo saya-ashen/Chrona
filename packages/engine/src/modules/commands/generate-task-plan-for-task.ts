@@ -4,7 +4,7 @@ import { aiGeneratePlan } from "@/modules/ai/ai-service";
 import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@chrona/contracts/ai";
 import { getLatestTaskPlanGraph, saveTaskPlanGraph, enrichPlanGraphNodes } from "@/modules/tasks/task-plan-graph-store";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
+import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 
 const logger = createLogger("command.generate-task-plan-for-task");
@@ -186,39 +186,4 @@ export async function generateTaskPlanForTask(input: {
     taskSessionKey: sharedTaskSessionKey,
     savedPlan: buildSavedPlanSummary(savedPlan),
   });
-}
-
-export function buildAdhocDraftTaskPlan(input: {
-  taskId?: string | null;
-  planningPrompt?: string | null;
-  generatedBy: string;
-  planResult: GenerateTaskPlanResponse;
-}) {
-  return buildDraftPlanGraph({
-    taskId: input.taskId ?? "",
-    prompt: input.planningPrompt ?? null,
-    generatedBy: input.generatedBy,
-    planResult: input.planResult,
-  });
-}
-
-export function buildGenerateTaskPlanResponse(input: {
-  source: string;
-  planGraph: TaskPlanGraph;
-  taskSessionKey?: string | null;
-  savedPlan?: {
-    id: string;
-    status: TaskPlanStatus;
-    prompt: string | null;
-    revision: number;
-    summary: string | null;
-    updatedAt: string;
-  };
-  reasoning?: string;
-}) {
-  return buildPlanResponse(input);
-}
-
-export function buildSavedTaskPlanSummary(input: Parameters<typeof buildSavedPlanSummary>[0]) {
-  return buildSavedPlanSummary(input);
 }

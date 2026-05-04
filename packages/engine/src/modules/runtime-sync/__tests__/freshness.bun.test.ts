@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus, WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createMockOpenClawAdapter } from "@chrona/openclaw";
+import { createMockOpenClawAdapter } from "@chrona/openclaw/runtime/mock-adapter";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 
 async function resetDb() {

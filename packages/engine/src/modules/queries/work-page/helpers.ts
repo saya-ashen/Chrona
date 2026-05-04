@@ -12,7 +12,7 @@ export function toIsoString(value: Date | null | undefined) {
   return value?.toISOString() ?? null;
 }
 
-export function summarizeValue(value: unknown) {
+function summarizeValue(value: unknown) {
   if (typeof value === "string") {
     return value;
   }

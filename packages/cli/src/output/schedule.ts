@@ -47,7 +47,7 @@ export function formatWorkspace(value: unknown): string {
   return blocks.join("\n\n");
 }
 
-export function formatConflicts(value: unknown): string {
+function formatConflicts(value: unknown): string {
   const data = getObject(value);
   const summary = getObject(data.summary);
   const conflicts = getArray(data.conflicts);

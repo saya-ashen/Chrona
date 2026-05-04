@@ -15,22 +15,19 @@ import type {
   AnalyzeConflictsRequest,
   SuggestTimeslotRequest,
   ChatRequest,
-  StructuredDebugInfo,
-} from "./types";
+} from "@chrona/contracts";
 import { createLogger } from "@chrona/db/logger";
 import type {
-  BridgeFeature,
-  BridgeFeatureRequest,
-  NDJSONEvent,
-} from "@chrona/openclaw";
+  StreamEvent as ProviderStreamEvent,
+} from "@chrona/providers-core";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
-} from "../features";
+} from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
   openclawCall,
-  postBridgeFeatureStream,
+  getOrCreateClient,
 } from "./providers";
 import { buildOpenClawSessionIdentity } from "./session";
 
@@ -41,18 +38,7 @@ function summarizeText(value: string, maxLength: number) {
 
 const logger = createLogger("ai-features.openclaw.streaming");
 
-function getStreamPath(feature: AiFeature): BridgeFeature | null {
-  switch (feature) {
-    case "suggest":
-      return "suggest";
-    case "generate_plan":
-      return "generate_plan";
-    default:
-      return null;
-  }
-}
-
-function buildStreamingInput(
+function toFeatureInput(
   feature: AiFeature,
   input:
     | string
@@ -61,45 +47,42 @@ function buildStreamingInput(
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
     | ChatRequest,
-): Pick<
-  BridgeFeatureRequest<Record<string, unknown>>,
-  "input" | "instructions" | "inputText" | "featureSpec"
-> {
-  return buildPreparedFeatureRequest(feature, input);
+): Record<string, unknown> {
+  const prepared = buildPreparedFeatureRequest(feature, input);
+  return {
+    instructions: prepared.instructions,
+    inputText: prepared.inputText,
+    featureSpec: prepared.featureSpec,
+    input: prepared.input,
+  };
 }
 
-function parseBridgeEvent(evt: NDJSONEvent): StreamEvent | null {
-  if (evt.type === "tool_call" && evt.tool) {
-    return {
-      type: "tool_call",
-      tool: evt.tool,
-      input: evt.input ?? {},
-    };
+function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
+  switch (evt.type) {
+    case "text":
+      return { type: "partial", text: evt.data };
+    case "tool_call":
+      return evt.toolCall
+        ? {
+            type: "tool_call",
+            tool: evt.toolCall.tool,
+            input: evt.toolCall.input,
+          }
+        : {
+            type: "status",
+            message: `Tool call: ${evt.data.slice(0, 80)}`,
+          };
+    case "tool_result":
+      return {
+        type: "tool_result",
+        tool: evt.toolCall?.tool ?? "unknown",
+        result: evt.data,
+      };
+    case "error":
+      return { type: "error", message: evt.data };
+    default:
+      return null;
   }
-  if (evt.type === "tool_result") {
-    return {
-      type: "tool_result",
-      tool: evt.tool ?? "function_call_output",
-      result:
-        typeof evt.output === "string"
-          ? evt.output
-          : evt.text ?? JSON.stringify(evt.output ?? {}),
-    };
-  }
-  if (evt.type === "status") {
-    return {
-      type: "status",
-      message: evt.message ?? evt.status ?? "Processing",
-    };
-  }
-  if (evt.type === "failed") {
-    const message = evt.error ?? evt.message ?? "Unknown error";
-    return { type: "error", message };
-  }
-  if (evt.type === "text_delta" && evt.text) {
-    return { type: "partial", text: evt.text };
-  }
-  return null;
 }
 
 async function* openclawStream(
@@ -115,8 +98,10 @@ async function* openclawStream(
     | ChatRequest,
 ): AsyncGenerator<StreamEvent> {
   const timeout = config.timeoutSeconds ?? 120;
-  const { sessionId, sessionKey } = buildOpenClawSessionIdentity(feature, scope);
-  const streamPath = getStreamPath(feature);
+  const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
+    feature,
+    scope,
+  );
 
   logger.info("openclaw.stream.start", {
     feature,
@@ -128,51 +113,42 @@ async function* openclawStream(
 
   yield { type: "status", message: "正在连接 AI 服务..." };
 
-  if (streamPath) {
+  const streamableFeatures: AiFeature[] = ["suggest", "generate_plan"];
+  if (streamableFeatures.includes(feature)) {
     try {
-      const requestBody: BridgeFeatureRequest<Record<string, unknown>> = {
-        sessionId,
-        sessionKey,
-        ...buildStreamingInput(feature, input),
-        timeout,
-      };
-
-      const { response, events } = await postBridgeFeatureStream(
-        config,
-        streamPath,
-        requestBody,
-      );
-
-      logger.info("openclaw.stream.response", {
-        feature,
-        scope,
-        sessionId,
-        ok: !response.error,
-        status: response.responseStatus,
-      });
+      const client = getOrCreateClient(config);
 
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
-      const finalStructured: StructuredDebugInfo | null = null;
 
-      for (const rawEvent of events) {
-        const event = parseBridgeEvent(rawEvent as NDJSONEvent);
-        if (!event) continue;
-        if (event.type === "partial") {
-          fullText += event.text;
+      for await (const event of client.executeFeatureStream(
+        feature as "suggest" | "generate_plan",
+        {
+          sessionKey,
+          ...toFeatureInput(feature, input),
+          timeout,
+        },
+      )) {
+        const parsed = convertProviderEvent(event);
+        if (!parsed) continue;
+        if (parsed.type === "partial") {
+          fullText += parsed.text;
         }
-        yield event;
-        if (event.type === "error") {
+        yield parsed;
+        if (parsed.type === "error") {
           return;
         }
       }
 
-      fullText = response.output ?? fullText;
-      yield {
-        type: "done",
-        text: fullText,
-        structured: finalStructured,
-      };
+      logger.info("openclaw.stream.done", {
+        feature,
+        scope,
+        sessionId,
+        ok: true,
+        textLength: fullText.length,
+      });
+
+      yield { type: "done", text: fullText, structured: null };
       return;
     } catch (error) {
       logger.warn("openclaw.stream.fallback_to_blocking", {
@@ -186,7 +162,10 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(config, feature, scope, input);
+    const text = await openclawCall(config, feature, {
+      ...buildPreparedFeatureRequest(feature, input),
+      sessionKey: scope,
+    });
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -334,7 +313,10 @@ export function buildSuggestScope(request: SmartSuggestRequest): string {
   const workspace = asciiSlug(request.workspaceId ?? "default", 24);
   const normalizedInput = request.input.trim();
   const inputSlug = asciiSlug(normalizedInput, 24);
-  const inputHash = createHash("sha1").update(normalizedInput).digest("hex").slice(0, 8);
+  const inputHash = createHash("sha1")
+    .update(normalizedInput)
+    .digest("hex")
+    .slice(0, 8);
   const nonce = Math.random().toString(36).slice(2, 10);
   return `${workspace}-${request.kind}-${inputSlug}-${inputHash}-${nonce}`;
 }
@@ -375,7 +357,8 @@ export async function* suggestStream(
     if (event.type === "done") {
       const text = event.text ?? finalText;
       latestStructured = event.structured ?? null;
-      const parsed = latestToolInput ??
+      const parsed =
+        latestToolInput ??
         (() => {
           try {
             return text ? JSON.parse(text) : { suggestions: [] };
@@ -440,11 +423,17 @@ function describeGeneratePlanFailure(params: {
   ];
 
   if (params.latestToolInput) {
-    parts.push("A live tool_call was seen, but its payload could not be normalized into a valid plan.");
+    parts.push(
+      "A live tool_call was seen, but its payload could not be normalized into a valid plan.",
+    );
   } else if (params.structuredToolGraph) {
-    parts.push("A structured bridge tool payload existed, but no live tool_call event was emitted.");
+    parts.push(
+      "A structured bridge tool payload existed, but no live tool_call event was emitted.",
+    );
   } else {
-    parts.push("No generate_task_plan_graph tool payload was found in either streamed tool_call events or the final structured result.");
+    parts.push(
+      "No generate_task_plan_graph tool payload was found in either streamed tool_call events or the final structured result.",
+    );
   }
 
   const structuredRecord = params.structured as
@@ -458,18 +447,33 @@ function describeGeneratePlanFailure(params: {
     | null
     | undefined;
 
-  if (typeof structuredRecord?.error === "string" && structuredRecord.error.trim()) {
+  if (
+    typeof structuredRecord?.error === "string" &&
+    structuredRecord.error.trim()
+  ) {
     parts.push(`Structured error: ${structuredRecord.error.trim()}`);
   }
-  if (typeof structuredRecord?.toolName === "string" && structuredRecord.toolName.trim()) {
+  if (
+    typeof structuredRecord?.toolName === "string" &&
+    structuredRecord.toolName.trim()
+  ) {
     parts.push(`Structured toolName: ${structuredRecord.toolName.trim()}`);
   }
-  if (typeof structuredRecord?.source === "string" && structuredRecord.source.trim()) {
+  if (
+    typeof structuredRecord?.source === "string" &&
+    structuredRecord.source.trim()
+  ) {
     parts.push(`Structured source: ${structuredRecord.source.trim()}`);
   }
-  if (Array.isArray(structuredRecord?.bridgeToolCalls) && structuredRecord!.bridgeToolCalls.length > 0) {
+  if (
+    Array.isArray(structuredRecord?.bridgeToolCalls) &&
+    structuredRecord!.bridgeToolCalls.length > 0
+  ) {
     const toolSummary = structuredRecord!.bridgeToolCalls
-      .map((toolCall) => `${toolCall.tool ?? "unknown"}${toolCall.status ? `(${toolCall.status})` : ""}`)
+      .map(
+        (toolCall) =>
+          `${toolCall.tool ?? "unknown"}${toolCall.status ? `(${toolCall.status})` : ""}`,
+      )
       .join(", ");
     parts.push(`Bridge tool calls seen: ${toolSummary}`);
   }
@@ -539,7 +543,9 @@ function buildGeneratePlanDiagnostics(params: {
   };
 }
 
-export function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
+export function buildGeneratePlanScope(
+  request: GenerateTaskPlanRequest,
+): string {
   if (request.sessionKey?.trim()) {
     return request.sessionKey.trim();
   }

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import { db } from "@chrona/db";
 import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import type { PlanBlueprint } from "@chrona/contracts/ai";
 import type {
@@ -21,6 +20,11 @@ import {
   savePlanRun,
   getPlanRun,
   getLatestPlanRun,
+  ensureTaskInWorkspace,
+  ensurePlanInWorkspace,
+  getTaskOrThrow,
+  getTasksWithProjections,
+  applyPlanPatchCommand,
 } from "@chrona/engine";
 import { compilePlanBlueprint } from "@chrona/engine";
 import {
@@ -36,10 +40,7 @@ import { compileEditablePlan } from "@chrona/domain";
 import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 
 import {
-  ensureTaskInWorkspace,
-  ensurePlanInWorkspace,
   buildSavedPlanSummary,
-  summarizeStructuredPlanDebug,
   planGenerationConflictBody,
   sseEncode,
   logger,
@@ -161,10 +162,7 @@ export function createPlansRoutes() {
       let sharedTaskSessionKey: string | null = null;
 
       if (taskId) {
-        const task = await db.task.findUnique({ where: { id: taskId } });
-        if (!task) {
-          return error(c, "Task not found", 404);
-        }
+        const task = await getTaskOrThrow(taskId);
         resolvedWorkspaceId = task.workspaceId;
         resolvedTitle = task.title;
         resolvedDescription = task.description ?? undefined;
@@ -277,6 +275,8 @@ export function createPlansRoutes() {
                 description: generatedContext.description,
                 estimatedMinutes: generatedContext.estimatedMinutes,
                 sessionKey: sharedTaskSessionKey ?? undefined,
+                workspaceId: resolvedWorkspaceId ?? undefined,
+                planningPrompt,
               })) {
                 if (streamClosed || requestFinished) {
                   break;
@@ -297,58 +297,12 @@ export function createPlansRoutes() {
                 } else if (event.type === "partial") {
                   if (!safeEnqueue("partial", { text: event.text })) break;
                 } else if (event.type === "result" && "plan" in event) {
-                  if (event.plan.blueprint.nodes.length === 0) {
-                    const message =
-                      event.plan.structured?.error?.trim() ||
-                      "AI returned an empty task plan with zero nodes.";
-                    logger.warn("request.empty_plan", {
-                      requestId,
-                      feature: "generate_plan",
-                      taskId: taskId ?? null,
-                        planSummary: event.plan.blueprint.title,
-                      structured: summarizeStructuredPlanDebug(
-                        event.plan.structured,
-                      ),
-                    });
-                    if (!safeEnqueue("error", { message })) break;
-                    requestFinished = true;
-                    break;
-                  }
-                  const draftPlan: TaskPlanGraph = compilePlanBlueprint({
-                    graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
-                    taskId: taskId ?? "",
-                    blueprint: event.plan.blueprint,
-                    prompt: planningPrompt ?? null,
-                    generatedBy: event.plan.source ?? "ai",
-                    source: "ai",
-                    status: "draft",
-                    revision: 1,
-                  });
-
-                  if (taskId && resolvedWorkspaceId) {
-                    const savedPlan = await saveTaskPlanGraph({
-                      workspaceId: resolvedWorkspaceId,
-                      taskId,
-                      plan: draftPlan,
-                      prompt: planningPrompt ?? null,
-                      status: "draft",
-                      source: "ai",
-                      generatedBy: event.plan.source ?? "ai",
-                      summary: draftPlan.summary,
-                    });
-                    finalResponse = {
-                      source: event.plan.source,
-                      planGraph: savedPlan.plan,
-                      taskSessionKey: sharedTaskSessionKey,
-                      savedPlan: buildSavedPlanSummary(savedPlan),
-                    };
-                  } else {
-                    finalResponse = {
-                      source: event.plan.source,
-                      planGraph: draftPlan,
-                      taskSessionKey: sharedTaskSessionKey,
-                    };
-                  }
+                  finalResponse = {
+                    source: event.source ?? event.plan.source,
+                    planGraph: event.planGraph,
+                    taskSessionKey: sharedTaskSessionKey,
+                    savedPlan: event.savedPlan,
+                  };
                   if (!safeEnqueue("result", finalResponse)) break;
                 } else if (event.type === "error") {
                   logger.error("request.plan_generation_error", {
@@ -356,17 +310,8 @@ export function createPlansRoutes() {
                     feature: "generate_plan",
                     taskId: taskId ?? null,
                     error: event.message,
-                    rawTextPreview:
-                      typeof event.rawText === "string"
-                        ? event.rawText.slice(0, 400)
-                        : null,
-                    structured: summarizeStructuredPlanDebug(
-                      event.structured,
-                    ),
-                    diagnostics:
-                      event.diagnostics && typeof event.diagnostics === "object"
-                        ? event.diagnostics
-                        : null,
+                    rawText: event.rawText,
+                    diagnostics: event.diagnostics,
                   });
                   if (!safeEnqueue("error", { message: event.message })) break;
                   requestFinished = true;
@@ -502,10 +447,7 @@ export function createPlansRoutes() {
         await ensureTaskInWorkspace(taskId, body.workspaceId);
       }
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) {
-        return error(c, "Task not found", 404);
-      }
+      const task = await getTaskOrThrow(taskId);
 
       if (providedBlueprint !== undefined) {
         if (!providedBlueprint || typeof providedBlueprint !== "object" || !Array.isArray(providedBlueprint.nodes)) {
@@ -541,11 +483,7 @@ export function createPlansRoutes() {
       }
 
       const materialized = await materializeTaskPlan({ taskId: task.id });
-      const createdTasks = await db.task.findMany({
-        where: { id: { in: materialized.createdTaskIds } },
-        include: { projection: true },
-        orderBy: { createdAt: "asc" },
-      });
+      const createdTasks = await getTasksWithProjections(materialized.createdTaskIds);
       const acceptedPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? graphPlan;
       const materializedNodeIds = new Set(
         acceptedPlan?.plan.nodes
@@ -585,172 +523,22 @@ export function createPlansRoutes() {
           summary?: string;
         };
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
-
-      const currentPlanGraph = await getLatestTaskPlanGraph(taskId);
-      if (!currentPlanGraph) return error(c, "No plan found for this task", 404);
-
-      // Deep-clone to avoid mutating the fetched plan reference
-      const plan = {
-        ...currentPlanGraph.plan,
-        nodes: currentPlanGraph.plan.nodes.map((n: Record<string, unknown>) => ({ ...n })),
-        edges: currentPlanGraph.plan.edges.map((e: Record<string, unknown>) => ({ ...e })),
-      } as typeof currentPlanGraph.plan;
-      switch (operation) {
-        case "add_node": {
-          if (!nodes || nodes.length === 0) {
-            return error(c, "add_node requires nodes[]", 400);
-          }
-          const newNodes = nodes.map((n, i) => ({
-            id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${i}`,
-            type: (typeof n.type === "string" ? n.type : "step") as import("@chrona/contracts/ai").TaskPlanNodeType,
-            title: typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`,
-            objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`),
-            description: typeof n.description === "string" && n.description.trim() ? n.description : null,
-            status: "pending" as import("@chrona/contracts/ai").TaskPlanNodeStatus,
-            phase: null as string | null,
-            estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : null,
-            priority: typeof n.priority === "string" ? n.priority as "Low" | "Medium" | "High" | "Urgent" | null : null,
-            executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode,
-            requiresHumanInput: Boolean(n.requiresHumanInput),
-            requiresHumanApproval: Boolean(n.requiresHumanApproval),
-            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
-            blockingReason: null as import("@chrona/contracts/ai").TaskPlanNodeBlockingReason,
-            linkedTaskId: null as string | null,
-            completionSummary: null as string | null,
-            metadata: null as Record<string, unknown> | null,
-            requiredInfo: Array.isArray(n.requiredInfo) ? n.requiredInfo as string[] : [] as string[],
-            dependencies: Array.isArray(n.dependencies) ? n.dependencies as string[] : undefined,
-            executionClassification: typeof n.executionClassification === "string" ? n.executionClassification as import("@chrona/contracts/ai").TaskPlanNodeExecutionClassification : undefined,
-            nextAction: typeof n.nextAction === "string" ? n.nextAction as string | null : null,
-            readiness: typeof n.readiness === "string" ? n.readiness as import("@chrona/contracts/ai").TaskPlanNodeReadiness : undefined,
-          }));
-          plan.nodes = [...plan.nodes, ...newNodes] as typeof plan.nodes;
-          if (edges && edges.length > 0) {
-            plan.edges = [...plan.edges, ...edges.map((e, i) => ({
-              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
-              fromNodeId: e.fromNodeId as string,
-              toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
-              metadata: null as Record<string, unknown> | null,
-            }))] as typeof plan.edges;
-          }
-          break;
-        }
-        case "update_node": {
-          if (!nodePatches || nodePatches.length === 0) {
-            return error(c, "update_node requires nodePatches[]", 400);
-          }
-          const existingIds = new Set(plan.nodes.map((n) => n.id));
-          const unknownIds = nodePatches.map((p) => p.id).filter((id) => !existingIds.has(id));
-          if (unknownIds.length > 0) {
-            return error(c, `Unknown node id(s): ${unknownIds.join(", ")}`, 400);
-          }
-          const patchMap = new Map(nodePatches.map((p) => [p.id, p]));
-          plan.nodes = plan.nodes.map((node) => {
-            const patch = patchMap.get(node.id);
-            if (!patch) return node;
-            return {
-              ...node,
-              ...(typeof patch.title === "string" ? { title: patch.title } : {}),
-              ...(typeof patch.objective === "string" ? { objective: patch.objective } : {}),
-              ...(typeof patch.description === "string" ? { description: patch.description } : {}),
-              ...(typeof patch.estimatedMinutes === "number" ? { estimatedMinutes: patch.estimatedMinutes } : {}),
-              ...(typeof patch.status === "string" ? { status: patch.status as import("@chrona/contracts/ai").TaskPlanNodeStatus } : {}),
-              ...(typeof patch.priority === "string" ? { priority: patch.priority as import("@chrona/contracts/ai").TaskPlanNode["priority"] } : {}),
-              ...(typeof patch.executionMode === "string" ? { executionMode: patch.executionMode as import("@chrona/contracts/ai").TaskPlanNodeExecutionMode } : {}),
-              ...(patch.requiresHumanInput !== undefined ? { requiresHumanInput: patch.requiresHumanInput as boolean, autoRunnable: !(patch.requiresHumanInput as boolean) && !(node.requiresHumanApproval ?? false) } : {}),
-              ...(patch.requiresHumanApproval !== undefined ? { requiresHumanApproval: patch.requiresHumanApproval as boolean, autoRunnable: !(node.requiresHumanInput ?? false) && !(patch.requiresHumanApproval as boolean) } : {}),
-              ...(Array.isArray(patch.requiredInfo) ? { requiredInfo: patch.requiredInfo as string[] } : {}),
-              ...(Array.isArray(patch.dependencies) ? { dependencies: patch.dependencies as string[] } : {}),
-              ...(typeof patch.executionClassification === "string" ? { executionClassification: patch.executionClassification as import("@chrona/contracts/ai").TaskPlanNodeExecutionClassification } : {}),
-              ...(typeof patch.nextAction === "string" ? { nextAction: patch.nextAction as string | null } : {}),
-              ...(typeof patch.readiness === "string" ? { readiness: patch.readiness as import("@chrona/contracts/ai").TaskPlanNodeReadiness } : {}),
-            };
-          });
-          break;
-        }
-        case "delete_node": {
-          if (!deletedNodeIds || deletedNodeIds.length === 0) {
-            return error(c, "delete_node requires deletedNodeIds[]", 400);
-          }
-          const deleteSet = new Set(deletedNodeIds);
-          plan.nodes = plan.nodes.filter((n) => !deleteSet.has(n.id));
-          plan.edges = plan.edges.filter(
-            (e) => !deleteSet.has(e.fromNodeId) && !deleteSet.has(e.toNodeId),
-          );
-          break;
-        }
-        case "update_dependencies": {
-          if (!edges || edges.length === 0) {
-            return error(c, "update_dependencies requires edges[]", 400);
-          }
-          const existingIds = new Set(plan.nodes.map((n) => n.id));
-          const missingFrom = edges.filter((e) => !existingIds.has(e.fromNodeId as string));
-          const missingTo = edges.filter((e) => !existingIds.has(e.toNodeId as string));
-          if (missingFrom.length > 0) {
-            return error(c, `Unknown fromNodeId(s): ${missingFrom.map((e) => e.fromNodeId).join(", ")}`, 400);
-          }
-          if (missingTo.length > 0) {
-            return error(c, `Unknown toNodeId(s): ${missingTo.map((e) => e.toNodeId).join(", ")}`, 400);
-          }
-          const newEdgeIds = new Set(edges.map((e) => `${e.fromNodeId}->${e.toNodeId}`));
-          plan.edges = [
-            ...plan.edges.filter((e) => !newEdgeIds.has(`${e.fromNodeId}->${e.toNodeId}`)),
-            ...edges.map((e, i) => ({
-              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
-              fromNodeId: e.fromNodeId as string,
-              toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" ? e.type : "sequential") as import("@chrona/contracts/ai").TaskPlanEdgeType,
-              metadata: null as Record<string, unknown> | null,
-            })),
-          ] as typeof plan.edges;
-          break;
-        }
-        case "reorder_nodes": {
-          if (!reorder || reorder.length === 0) {
-            return error(c, "reorder_nodes requires reorder[]", 400);
-          }
-          const orderMap = new Map(reorder.map((id, i) => [id, i]));
-          const reordered = plan.nodes
-            .filter((n) => orderMap.has(n.id))
-            .sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-          const firstIndex = plan.nodes.findIndex((n) => orderMap.has(n.id));
-          const insertAt = firstIndex >= 0 ? firstIndex : plan.nodes.length;
-          const kept = plan.nodes.filter((n) => !orderMap.has(n.id));
-          plan.nodes = [...kept.slice(0, insertAt), ...reordered, ...kept.slice(insertAt)];
-          break;
-        }
-        case "update_plan_summary": {
-          if (summary !== undefined) {
-            plan.summary = summary;
-          }
-          break;
-        }
-        default:
-          return error(c, `Unsupported plan operation: ${operation}`, 400);
-      }
-
-      const savedPlan = await saveTaskPlanGraph({
-        workspaceId: task.workspaceId,
-        taskId,
-        plan,
-        prompt: currentPlanGraph.prompt,
-        status: currentPlanGraph.status,
-        source: "mixed",
-        generatedBy: currentPlanGraph.generatedBy,
-        summary: plan.summary ?? currentPlanGraph.summary,
-        changeSummary: `Applied plan patch: ${operation}`,
-      });
-
-      return json(c, {
+      const result = await applyPlanPatchCommand({
         taskId,
         operation,
-        planGraph: savedPlan.plan,
-      }, 200);
+        nodes,
+        edges,
+        nodePatches,
+        deletedNodeIds,
+        reorder,
+        summary,
+      });
+
+      return json(c, result, 200);
     } catch (cause) {
-      return internalServerError(c, "POST /api/tasks/:taskId/plan", cause, "Failed to apply plan patch");
+      const message = cause instanceof Error ? cause.message : "Failed to apply plan patch";
+      const status = message.includes("not found") ? 404 : message.includes("requires") ? 400 : 500;
+      return error(c, message, status);
     }
   });
 
@@ -763,8 +551,7 @@ export function createPlansRoutes() {
         return error(c, "taskId is required", 400);
       }
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const accepted = await getAcceptedTaskPlanGraph(taskId);
       if (!accepted) return error(c, "No accepted plan found for this task", 404);
@@ -799,8 +586,7 @@ export function createPlansRoutes() {
         return error(c, "command is required with a valid 'type' field", 400);
       }
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return error(c, "Task not found", 404);
+      const task = await getTaskOrThrow(taskId);
 
       const accepted = await getAcceptedTaskPlanGraph(taskId);
       if (!accepted) return error(c, "No accepted plan found for this task", 404);
@@ -808,7 +594,6 @@ export function createPlansRoutes() {
       const planRun = await getPlanRun(taskId, accepted.plan.id);
       if (!planRun) return error(c, "No PlanRun found. Create one first via POST /api/plan-runs/from-accepted", 404);
 
-      // Compile the accepted plan's blueprint
       if (!accepted.plan.blueprint) {
         return error(c, "Plan lacks a blueprint — cannot compile", 400);
       }

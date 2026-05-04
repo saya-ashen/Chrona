@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import { createMockOpenClawAdapter } from "@chrona/openclaw";
+import { createMockOpenClawAdapter } from "@chrona/openclaw/runtime/mock-adapter";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 
 async function resetDb() {

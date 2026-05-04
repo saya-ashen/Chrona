@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 
 import { db } from "@/lib/db";
-import type { GenerateTaskPlanResponse } from "@chrona/ai-features";
+import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 
 import { generateTaskPlanForTask } from "@/modules/commands/generate-task-plan-for-task";
 import { getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";

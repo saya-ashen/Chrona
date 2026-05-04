@@ -7,6 +7,7 @@
  */
 
 import { db } from "@/lib/db";
+
 import {
   type AiClientRecord,
   type AiClientType,
@@ -23,15 +24,22 @@ import {
   type DispatchTaskInput,
   type DispatchTaskOutput,
   type StreamEvent,
+} from "@chrona/contracts";
+import {
   generatePlan,
   analyzeConflicts,
   suggestTimeslots,
   chat,
   dispatchTask,
-  checkClientHealth,
+} from "@/modules/ai/feature-normalizers";
+import { checkClientHealth } from "@/modules/ai/providers";
+import {
   suggestStream,
   generatePlanStream,
-} from "@chrona/ai-features";
+} from "@/modules/ai/streaming";
+import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
+import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution
@@ -122,13 +130,92 @@ export async function* aiSuggestStream(request: SmartSuggestRequest): AsyncGener
   yield* suggestStream(client, request);
 }
 
-export async function* aiGeneratePlanStream(request: GenerateTaskPlanRequest): AsyncGenerator<StreamEvent> {
+export async function* aiGeneratePlanStream(
+  request: GenerateTaskPlanRequest & {
+    taskId?: string;
+    workspaceId?: string;
+    planningPrompt?: string | null;
+  },
+): AsyncGenerator<StreamEvent> {
   const client = await getClientForFeature("generate_plan");
   if (!client) {
     yield { type: "error", message: "No AI client configured for task planning" };
     return;
   }
-  yield* generatePlanStream(client, request);
+
+  // Stream raw AI events through generatePlanStream which normalizes the plan
+  for await (const event of generatePlanStream(client, request)) {
+    // Pass through status, partial, tool_call events while plan is being generated
+    if (event.type === "status" || event.type === "partial" || event.type === "tool_call" || event.type === "tool_result") {
+      yield event;
+      continue;
+    }
+
+    if (event.type === "result" && "plan" in event) {
+      const { plan } = event;
+
+      if (plan.blueprint.nodes.length === 0) {
+        const message = plan.structured?.error?.trim() ?? "AI returned an empty task plan with zero nodes.";
+        yield { type: "error", message };
+        return;
+      }
+
+      const { taskId, workspaceId, planningPrompt } = request;
+
+      const draftPlan: TaskPlanGraph = compilePlanBlueprint({
+        graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
+        taskId: taskId ?? "",
+        blueprint: plan.blueprint,
+        prompt: planningPrompt ?? null,
+        generatedBy: plan.source ?? "ai",
+        source: "ai",
+        status: "draft",
+        revision: 1,
+      });
+
+      let savedPlan: { id: string; plan: TaskPlanGraph } | null = null;
+      if (taskId && workspaceId) {
+        savedPlan = await saveTaskPlanGraph({
+          workspaceId,
+          taskId,
+          plan: draftPlan,
+          prompt: planningPrompt ?? null,
+          status: "draft",
+          source: "ai",
+          generatedBy: plan.source ?? "ai",
+          summary: draftPlan.summary,
+        });
+      }
+
+      yield {
+        type: "result",
+        plan,
+        source: plan.source,
+        planGraph: savedPlan?.plan ?? draftPlan,
+        savedPlan: savedPlan
+          ? {
+              id: savedPlan.id,
+              status: "draft",
+              prompt: planningPrompt ?? null,
+              revision: 1,
+              summary: draftPlan.summary,
+              updatedAt: new Date().toISOString(),
+            }
+          : undefined,
+        taskSessionKey: request.sessionKey,
+      };
+      continue;
+    }
+
+    if (event.type === "done") {
+      yield { type: "done", text: event.text, structured: event.structured };
+      return;
+    }
+
+    // Error and other events
+    yield event;
+    if (event.type === "error") return;
+  }
 }
 
 export async function isAIAvailable(): Promise<boolean> {
@@ -175,6 +262,4 @@ export async function getAIClientInfo(): Promise<Array<{
 export type {
   TaskSnapshot,
   ScheduleHealthSnapshot,
-} from "@chrona/ai-features";
-
-
+} from "@chrona/contracts";

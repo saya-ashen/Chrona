@@ -2,7 +2,7 @@
  * AI Client — System prompts for each feature.
  */
 
-import type { AiFeature } from "./types";
+import type { AiFeature } from "@chrona/contracts";
 import {
   CONFLICTS_SYSTEM_PROMPT,
   DISPATCH_TASK_SYSTEM_PROMPT,

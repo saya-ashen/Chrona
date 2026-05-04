@@ -2,6 +2,9 @@
  * AI Features — Shared feature-layer type definitions.
  */
 
+import type { PlanBlueprint } from "./ai-plan-blueprint";
+import type { TaskPlanGraph } from "./ai-plan-runtime";
+
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
   | "suggest"
@@ -25,6 +28,7 @@ export interface OpenClawClientConfig {
   bridgeToken: string;
   gatewayUrl?: string;
   gatewayToken?: string;
+  model?: string;
   timeoutSeconds?: number;
 }
 
@@ -114,8 +118,6 @@ export interface SmartSuggestResponse extends StructuredResponseMeta {
   source: string;
   requestId: string;
 }
-
-import type { PlanBlueprint } from "@chrona/contracts/ai";
 
 export interface GenerateTaskPlanRequest {
   taskId: string;
@@ -245,6 +247,8 @@ export interface BlockerSummary {
   reason: string;
 }
 
+import type { TaskDispatchDecision, TaskDispatchPolicy } from "./ai-dispatch-types";
+
 export interface ExecutionContextStats {
   messageCount: number;
   transcriptChars: number;
@@ -256,9 +260,6 @@ export interface ExecutionContextStats {
   compacted: boolean;
   summaryMemoryId?: string;
 }
-
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
-import type { TaskDispatchDecision, TaskDispatchPolicy } from "./dispatch-types";
 
 export interface DispatchTaskInput {
   taskId: string;
@@ -301,7 +302,7 @@ export type StreamEvent =
   | { type: "tool_result"; tool: string; result: string }
   | { type: "partial"; text: string }
   | { type: "result"; suggestions: SmartSuggestResponse }
-  | { type: "result"; plan: GenerateTaskPlanResponse }
+  | { type: "result"; plan: GenerateTaskPlanResponse; planGraph?: unknown; savedPlan?: unknown; source?: string; taskSessionKey?: string }
   | { type: "done"; text: string; structured?: StructuredDebugInfo | null }
   | {
       type: "error";

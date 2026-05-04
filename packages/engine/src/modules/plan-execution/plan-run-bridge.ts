@@ -132,7 +132,7 @@ export function applyCommandAndSyncGraph(
  * Sync PlanRun node states → TaskPlanGraph node statuses.
  * Mutates graph in place. Returns the mutated graph.
  */
-export function syncRunStateToGraph(
+function syncRunStateToGraph(
   run: PlanRun,
   compiled: CompiledPlan,
   graph: TaskPlanGraph,
@@ -177,8 +177,6 @@ export function syncGraphStateToRun(
 
   return run;
 }
-
-export { buildLocalToCompiledMap, buildCompiledNodeMap };
 
 function mapGraphStatusToRunStatus(status: TaskPlanNodeStatus): PlanRun["nodeStates"][string]["status"] | null {
   switch (status) {

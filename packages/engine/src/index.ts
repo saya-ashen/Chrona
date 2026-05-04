@@ -17,7 +17,6 @@ export { analyzeConflictsSmart } from "./modules/ai/conflict-analyzer";
 export { suggestAutomationSmart } from "./modules/ai/automation-suggester";
 export {
   buildTaskWorkspaceSystemPrompt,
-  suggestTimeslots,
   deriveTaskRunnability,
 } from "@chrona/shared";
 
@@ -98,3 +97,40 @@ export {
 export { compilePlanBlueprint } from "./modules/tasks/plan-blueprint-compiler";
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
+
+export { getTaskOrThrow, ensureTaskInWorkspace } from "./modules/queries/task-by-id";
+export { getTasksWithProjections } from "./modules/queries/tasks-with-projections";
+export { listTasksByWorkspace } from "./modules/queries/list-tasks";
+export { listAiClients } from "./modules/queries/list-ai-clients";
+export { getRecentTasksForAutoComplete } from "./modules/queries/recent-tasks-for-auto-complete";
+export { ensurePlanInWorkspace } from "./modules/queries/plan-in-workspace";
+export { applyPlanPatchCommand } from "./modules/commands/apply-plan-patch-command";
+export { deleteTask } from "./modules/commands/delete-task";
+export { createAiClient } from "./modules/commands/create-ai-client";
+export { updateAiClient } from "./modules/commands/update-ai-client";
+export { deleteAiClient } from "./modules/commands/delete-ai-client";
+export { updateAiClientBindings } from "./modules/commands/update-ai-client-bindings";
+export { ensureProposalInWorkspace } from "./modules/queries/proposal-in-workspace";
+export { getWaitingInputRun, getActiveMessageableRun } from "./modules/queries/run-lookup";
+export { saveAssistantMessage, getAssistantMessages, applyAssistantMessage } from "./modules/commands/assistant-message";
+
+export {
+  suggestStream,
+  generatePlanStream,
+} from "./modules/ai/streaming";
+
+export {
+  normalizeGeneratePlanResponse,
+  normalizeSuggestResponse,
+  generatePlan,
+  suggest,
+  analyzeConflicts,
+  suggestTimeslots,
+  chat,
+} from "./modules/ai/feature-normalizers";
+
+export { SYSTEM_PROMPTS } from "./modules/ai/prompts";
+
+export { extractJSON } from "./modules/ai/providers";
+
+export { llmCall, checkClientHealth, dispatch } from "./modules/ai/providers";

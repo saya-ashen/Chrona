@@ -5,10 +5,10 @@ export type {
   TaskDispatchDecision,
   TaskDispatchPolicy,
   TaskPlanPatch,
-} from "@chrona/ai-features";
+} from "@chrona/contracts";
 
 export {
   isAutoExecutableDispatchDecision,
   parseTaskDispatchDecision,
-} from "@chrona/ai-features";
+} from "@chrona/contracts";
 

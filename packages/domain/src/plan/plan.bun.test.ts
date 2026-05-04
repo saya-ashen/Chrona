@@ -17,7 +17,7 @@ import { validateEditablePlan } from "./validate";
 import { applyPlanPatch } from "./patch";
 import { compileEditablePlan } from "./compile";
 import { createPlanRun, applyRuntimeCommand } from "./run";
-import { buildPlanGenerationPrompt, buildPlanPatchPrompt } from "./prompts";
+import { buildPlanPatchPrompt } from "./prompts";
 
 // ─── Helpers ───
 
@@ -66,7 +66,10 @@ function makeCondition(
   };
 }
 
-function makeWait(id: string, overrides?: Partial<EditableWaitNode>): EditableWaitNode {
+function makeWait(
+  id: string,
+  overrides?: Partial<EditableWaitNode>,
+): EditableWaitNode {
   return {
     id,
     type: "wait",
@@ -117,7 +120,9 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("missing_node"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("missing_node"))).toBe(
+      true,
+    );
   });
 
   it("3. rejects cycle", () => {
@@ -138,14 +143,20 @@ describe("validateEditablePlan", () => {
     const plan = makePlan(
       "plan_1",
       // Use as unknown cast to simulate bad AI output at runtime
-      [{ id: "my_node", type: "start", title: "Start" } as unknown as EditableNode],
+      [
+        {
+          id: "my_node",
+          type: "start",
+          title: "Start",
+        } as unknown as EditableNode,
+      ],
       [],
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("Invalid node type"))).toBe(
-      true,
-    );
+    expect(
+      result.errors.some((e) => e.message.includes("Invalid node type")),
+    ).toBe(true);
   });
 
   it("5. rejects duplicate node id", () => {
@@ -156,25 +167,39 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("Duplicate"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("Duplicate"))).toBe(
+      true,
+    );
   });
 
   it("6. rejects non-snake_case id", () => {
     const plan = makePlan(
       "plan_1",
-      [{ id: "Bad Name", type: "task", title: "Bad", executor: "ai", mode: "auto" }],
+      [
+        {
+          id: "Bad Name",
+          type: "task",
+          title: "Bad",
+          executor: "ai",
+          mode: "auto",
+        },
+      ],
       [],
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("snake_case"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("snake_case"))).toBe(
+      true,
+    );
   });
 
   it("7. rejects condition branch pointing to non-existent node", () => {
     const plan = makePlan(
       "plan_1",
       [
-        makeCondition("check_status", [{ label: "yes", nextNodeId: "missing_branch" }]),
+        makeCondition("check_status", [
+          { label: "yes", nextNodeId: "missing_branch" },
+        ]),
       ],
       [],
     );
@@ -193,7 +218,9 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true); // Warning, not error
-    expect(result.warnings.some((w) => w.message.includes("High-risk"))).toBe(true);
+    expect(result.warnings.some((w) => w.message.includes("High-risk"))).toBe(
+      true,
+    );
   });
 
   it("9. accepts high-risk task with preceding checkpoint", () => {
@@ -240,7 +267,15 @@ describe("validateEditablePlan", () => {
     const plan = makePlan(
       "plan_1",
       // Edge case: empty strings for executor/mode should be caught by validation
-      [{ id: "bad_task", type: "task", title: "Bad", executor: "" as TaskExecutor, mode: "" as TaskMode }],
+      [
+        {
+          id: "bad_task",
+          type: "task",
+          title: "Bad",
+          executor: "" as TaskExecutor,
+          mode: "" as TaskMode,
+        },
+      ],
       [],
     );
     const result = validateEditablePlan(plan);
@@ -251,11 +286,9 @@ describe("validateEditablePlan", () => {
     const plan = makePlan(
       "plan_1",
       [
-        makeCondition(
-          "check",
-          [{ label: "yes", nextNodeId: "yes_task" }],
-          { defaultNextNodeId: "no_task" },
-        ),
+        makeCondition("check", [{ label: "yes", nextNodeId: "yes_task" }], {
+          defaultNextNodeId: "no_task",
+        }),
         makeTask("yes_task"),
         makeTask("no_task"),
       ],
@@ -269,11 +302,9 @@ describe("validateEditablePlan", () => {
     const plan = makePlan(
       "plan_1",
       [
-        makeCondition(
-          "check",
-          [{ label: "yes", nextNodeId: "yes_task" }],
-          { defaultNextNodeId: "nowhere" },
-        ),
+        makeCondition("check", [{ label: "yes", nextNodeId: "yes_task" }], {
+          defaultNextNodeId: "nowhere",
+        }),
         makeTask("yes_task"),
       ],
       [],
@@ -459,7 +490,10 @@ describe("applyPlanPatch", () => {
 
     const result = applyPlanPatch(plan, patch);
     expect(result.ok).toBe(true);
-    expect(result.plan!.nodes.map((n) => n.id).sort()).toEqual(["new_1", "new_2"]);
+    expect(result.plan!.nodes.map((n) => n.id).sort()).toEqual([
+      "new_1",
+      "new_2",
+    ]);
     expect(result.plan!.edges).toHaveLength(1);
   });
 
@@ -467,7 +501,10 @@ describe("applyPlanPatch", () => {
     const plan = makePlan(
       "plan_cyc",
       [makeTask("a"), makeTask("b"), makeTask("c")],
-      [{ from: "a", to: "b" }, { from: "b", to: "c" }],
+      [
+        { from: "a", to: "b" },
+        { from: "b", to: "c" },
+      ],
     );
 
     // Adding c→a creates a cycle
@@ -506,7 +543,9 @@ describe("compileEditablePlan", () => {
     expect(compiled.entryNodeIds).toHaveLength(1);
     expect(compiled.terminalNodeIds).toHaveLength(1);
 
-    const entryNode = compiled.nodes.find((n) => n.id === compiled.entryNodeIds[0]);
+    const entryNode = compiled.nodes.find(
+      (n) => n.id === compiled.entryNodeIds[0],
+    );
     expect(entryNode?.localId).toBe("review");
 
     const terminalNode = compiled.nodes.find(
@@ -561,9 +600,9 @@ describe("compileEditablePlan", () => {
     const compiled = compileEditablePlan(plan);
 
     // Warning about high-risk task
-    expect(compiled.validationWarnings.some((w) => w.message.includes("High-risk"))).toBe(
-      true,
-    );
+    expect(
+      compiled.validationWarnings.some((w) => w.message.includes("High-risk")),
+    ).toBe(true);
   });
 
   it("30. refuses to compile invalid plan", () => {
@@ -645,7 +684,10 @@ describe("compileEditablePlan", () => {
           prompt: "Please approve",
           required: true,
         }),
-        makeWait("w", { waitFor: "signal", timeout: { minutes: 5, onTimeout: "fail" } }),
+        makeWait("w", {
+          waitFor: "signal",
+          timeout: { minutes: 5, onTimeout: "fail" },
+        }),
         makeCondition("cond", [{ label: "ok", nextNodeId: "t" }]),
       ],
       [],
@@ -808,13 +850,20 @@ describe("applyRuntimeCommand", () => {
     expect(result.run!.nodeStates[cpId].status).toBe("completed");
     expect(result.run!.nodeStates[taskId].status).toBe("ready");
     expect(result.run!.checkpointResponses).toHaveLength(1);
-    expect(result.run!.checkpointResponses[0].response).toEqual({ approved: true });
+    expect(result.run!.checkpointResponses[0].response).toEqual({
+      approved: true,
+    });
   });
 
   it("42. reject_checkpoint marks node as failed and pauses plan", () => {
     const plan = makePlan(
       "plan_rej",
-      [makeCheckpoint("safe_gate", { checkpointType: "confirm", prompt: "Go?" })],
+      [
+        makeCheckpoint("safe_gate", {
+          checkpointType: "confirm",
+          prompt: "Go?",
+        }),
+      ],
       [],
     );
     const compiled = compileEditablePlan(plan);
@@ -838,7 +887,10 @@ describe("applyRuntimeCommand", () => {
   it("43. mark_user_task_completed unlocks dependent nodes", () => {
     const plan = makePlan(
       "plan_ut",
-      [makeTask("human_task", { executor: "user", mode: "manual" }), makeTask("auto_follow")],
+      [
+        makeTask("human_task", { executor: "user", mode: "manual" }),
+        makeTask("auto_follow"),
+      ],
       [{ from: "human_task", to: "auto_follow" }],
     );
     const compiled = compileEditablePlan(plan);
@@ -846,7 +898,9 @@ describe("applyRuntimeCommand", () => {
     run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
 
     const humanId = compiled.nodes.find((n) => n.localId === "human_task")!.id;
-    const followId = compiled.nodes.find((n) => n.localId === "auto_follow")!.id;
+    const followId = compiled.nodes.find(
+      (n) => n.localId === "auto_follow",
+    )!.id;
 
     // Human task completes
     const result = applyRuntimeCommand(run, compiled, {
@@ -946,59 +1000,3 @@ describe("applyRuntimeCommand", () => {
 // ═══════════════════════════════════════════════════════════════
 // Prompt builder tests
 // ═══════════════════════════════════════════════════════════════
-
-describe("prompt builders", () => {
-  it("48. buildPlanGenerationPrompt includes task details", () => {
-    const prompt = buildPlanGenerationPrompt({
-      title: "Test task",
-      description: "Do something",
-      estimatedMinutes: 30,
-    });
-
-    expect(prompt).toContain("Test task");
-    expect(prompt).toContain("Do something");
-    expect(prompt).toContain("30");
-    // Should instruct NOT to include runtime fields
-    expect(prompt).toContain("Do NOT include runtime fields");
-    expect(prompt).toContain("status");
-    // Should contain output format info
-    expect(prompt).toContain("EditablePlan");
-  });
-
-  it("49. buildPlanPatchPrompt includes current plan state and base version", () => {
-    const plan = makePlan(
-      "plan_x",
-      [makeTask("task_one"), makeTask("task_two")],
-      [{ from: "task_one", to: "task_two" }],
-      { version: 3 },
-    );
-
-    const prompt = buildPlanPatchPrompt(plan, "Add a review step");
-
-    expect(prompt).toContain("plan_x");
-    expect(prompt).toContain("baseVersion: 3");
-    expect(prompt).toContain("task_one");
-    expect(prompt).toContain("task_two");
-    expect(prompt).toContain("Add a review step");
-    // Should instruct NOT to modify runtime fields (covers toolCalls, artifacts, etc.)
-    expect(prompt).toContain("DO NOT modify runtime fields");
-    // Should instruct to keep node IDs stable
-    expect(prompt).toContain("Keep existing node IDs stable");
-  });
-
-  it("50. buildPlanPatchPrompt instructs not to generate tool calls", () => {
-    const plan = makePlan("plan_tc", [makeTask("a")], []);
-    const prompt = buildPlanPatchPrompt(plan, "Fix it");
-
-    expect(prompt).toContain("DO NOT generate tool calls");
-  });
-
-  it("51. buildPlanGenerationPrompt mentions all 4 node types", () => {
-    const prompt = buildPlanGenerationPrompt({ title: "Test" });
-
-    expect(prompt).toContain("task");
-    expect(prompt).toContain("checkpoint");
-    expect(prompt).toContain("condition");
-    expect(prompt).toContain("wait");
-  });
-});

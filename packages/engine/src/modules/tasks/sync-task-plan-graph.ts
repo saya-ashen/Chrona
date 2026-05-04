@@ -25,7 +25,7 @@ function mapTaskStatusToPlanNodeStatus(taskStatus: string): TaskPlanNode["status
   }
 }
 
-export function syncTaskPlanNodeFromTask(input: SyncPlanNodeFromTaskInput): TaskPlanGraph {
+function syncTaskPlanNodeFromTask(input: SyncPlanNodeFromTaskInput): TaskPlanGraph {
   const nextStatus = mapTaskStatusToPlanNodeStatus(input.taskStatus);
   if (!nextStatus) {
     return input.plan;

@@ -1,12 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
-import { db } from "@chrona/db";
-import { createRuntimeAdapter } from "@chrona/openclaw";
 import type { StructuredSuggestion } from "@chrona/contracts";
 import { createLogger, summarizeText } from "@chrona/db/logger";
 import type { TaskPlanStatus } from "@chrona/contracts/ai";
-import { appendCanonicalEvent, TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/engine";
+import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/engine";
 import { OpenClawClient } from "@chrona/providers-core";
 
 import { HttpError } from "../lib/http";
@@ -14,42 +12,6 @@ import { HttpError } from "../lib/http";
 export const VALID_TASK_STATUSES = new Set(Object.values(TaskStatus));
 export const VALID_AI_FEATURES = ["suggest", "generate_plan", "conflicts", "timeslots", "chat"] as const;
 export const logger = createLogger("apps.server.api");
-
-export function mapSubtask(
-  task: Awaited<ReturnType<typeof db.task.findMany>>[number] & {
-    projection: { persistedStatus: string; scheduleStatus: string | null } | null;
-  },
-) {
-  return {
-    id: task.id,
-    parentTaskId: task.parentTaskId,
-    title: task.title,
-    description: task.description,
-    priority: task.priority,
-    status: task.status,
-    persistedStatus: task.projection?.persistedStatus ?? task.status,
-    scheduleStatus: task.projection?.scheduleStatus ?? task.scheduleStatus,
-    dueAt: task.dueAt,
-    scheduledStartAt: task.scheduledStartAt,
-    scheduledEndAt: task.scheduledEndAt,
-    completedAt: task.completedAt,
-    isCompleted: task.status === "Done" || task.status === "Completed",
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
-}
-
-export async function getOpenClawAdapter() {
-  const client = await db.aiClient.findFirst({
-    where: { type: "openclaw", isDefault: true, enabled: true },
-  });
-  const config = (client?.config as Record<string, unknown> | null) ?? {};
-  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
-  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
-  return createRuntimeAdapter(
-    bridgeUrl ? { bridgeUrl, bridgeToken } : undefined,
-  );
-}
 
 export async function testOpenClaw(config: Record<string, unknown>) {
   const gatewayUrl = typeof config.gatewayUrl === "string" ? config.gatewayUrl : typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
@@ -226,115 +188,4 @@ export function ensureValidDateFields(fields: Record<string, Date | null | undef
       throw new HttpError(400, `${field} must be a valid date string`);
     }
   }
-}
-
-export async function ensureTaskInWorkspace(taskId: string, workspaceId: string) {
-  const task = await db.task.findUnique({
-    where: { id: taskId },
-    select: { id: true, workspaceId: true },
-  });
-
-  if (!task) {
-    throw new HttpError(404, "Task not found");
-  }
-
-  if (task.workspaceId !== workspaceId) {
-    throw new HttpError(404, "Task not found");
-  }
-
-  return task;
-}
-
-export async function ensureProposalInWorkspace(proposalId: string, workspaceId: string) {
-  const proposal = await db.scheduleProposal.findUnique({
-    where: { id: proposalId },
-    select: { id: true, workspaceId: true },
-  });
-
-  if (!proposal) {
-    throw new HttpError(404, "Schedule proposal not found");
-  }
-
-  if (proposal.workspaceId !== workspaceId) {
-    throw new HttpError(404, "Schedule proposal not found");
-  }
-
-  return proposal;
-}
-
-export async function ensurePlanInWorkspace(planId: string, taskId: string, workspaceId: string) {
-  const plan = await db.memory.findUnique({
-    where: { id: planId },
-    select: { id: true, taskId: true, workspaceId: true },
-  });
-
-  if (!plan || plan.taskId !== taskId) {
-    throw new HttpError(404, "Task plan graph not found");
-  }
-
-  if (plan.workspaceId !== workspaceId) {
-    throw new HttpError(404, "Task plan graph not found");
-  }
-
-  return plan;
-}
-
-export async function deleteTaskWithRelations(taskId: string) {
-  const task = await db.task.findUnique({
-    where: { id: taskId },
-    select: { id: true, workspaceId: true, title: true },
-  });
-
-  if (!task) {
-    throw new HttpError(404, "Task not found");
-  }
-
-  await appendCanonicalEvent({
-    eventType: "task.deleted",
-    workspaceId: task.workspaceId,
-    taskId: task.id,
-    actorType: "user",
-    actorId: "server-action",
-    source: "ui",
-    payload: { title: task.title },
-    dedupeKey: `task.deleted:${task.id}`,
-  });
-
-  await db.$transaction(async (tx) => {
-    await tx.taskProjection.deleteMany({ where: { taskId } });
-    await tx.run.deleteMany({ where: { taskId } });
-    await tx.taskSession.deleteMany({ where: { taskId } });
-    await tx.approval.deleteMany({ where: { taskId } });
-    await tx.artifact.deleteMany({ where: { taskId } });
-    await tx.memory.deleteMany({ where: { taskId } });
-    await tx.event.deleteMany({ where: { taskId } });
-    await tx.taskDependency.deleteMany({
-      where: { OR: [{ taskId }, { dependsOnTaskId: taskId }] },
-    });
-    await tx.scheduleProposal.deleteMany({ where: { taskId } });
-
-    const childTasks = await tx.task.findMany({
-      where: { parentTaskId: taskId },
-      select: { id: true },
-    });
-
-    for (const child of childTasks) {
-      await tx.taskProjection.deleteMany({ where: { taskId: child.id } });
-      await tx.run.deleteMany({ where: { taskId: child.id } });
-      await tx.taskSession.deleteMany({ where: { taskId: child.id } });
-      await tx.approval.deleteMany({ where: { taskId: child.id } });
-      await tx.artifact.deleteMany({ where: { taskId: child.id } });
-      await tx.memory.deleteMany({ where: { taskId: child.id } });
-      await tx.event.deleteMany({ where: { taskId: child.id } });
-      await tx.taskDependency.deleteMany({
-        where: { OR: [{ taskId: child.id }, { dependsOnTaskId: child.id }] },
-      });
-      await tx.scheduleProposal.deleteMany({ where: { taskId: child.id } });
-      await tx.task.delete({ where: { id: child.id } });
-    }
-
-    await tx.task.delete({ where: { id: taskId } });
-  });
-
-  return { success: true, taskId };
 }

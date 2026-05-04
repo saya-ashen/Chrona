@@ -1,4 +1,4 @@
-import type { TaskPlanGraph, PlanUpdatePatch, PlanPatch, EditablePlan } from "@chrona/contracts/ai";
+import type { TaskPlanGraph, PlanUpdatePatch, EditablePlan } from "@chrona/contracts/ai";
 import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import type { SavedTaskPlanGraph } from "@chrona/contracts/ai";
@@ -263,84 +263,5 @@ export async function applyPlanPatch(
     success: true,
     updatedPlan: updatedGraph,
     warnings: combinedWarnings,
-  };
-}
-
-/**
- * Applies a PlanPatch (EditablePlan-level patch) to the blueprint stored
- * in a TaskPlanGraph. Uses the domain-layer applyPlanPatch underneath.
- *
- * This is the new-architecture patching path. The old applyPlanPatch above
- * works on TaskPlanGraph (runtime-level) nodes directly and is deprecated.
- */
-export async function applyBlueprintPatch(input: {
-  taskId: string;
-  currentPlan: {
-    saved: SavedTaskPlanGraph;
-    graph: TaskPlanGraph;
-  };
-  patch: PlanPatch;
-}): Promise<{
-  success: boolean;
-  updatedEditablePlan?: EditablePlan;
-  error?: string;
-  warnings: string[];
-}> {
-  const { currentPlan, patch } = input;
-  const blueprint = currentPlan.graph.blueprint;
-
-  if (!blueprint || blueprint.nodes.length === 0) {
-    return {
-      success: false,
-      error: "No editable blueprint found in current plan graph",
-      warnings: [],
-    };
-  }
-
-  const editable = upgradeBlueprintToEditable(
-    blueprint,
-    patch.basePlanId,
-    currentPlan.graph.revision,
-  );
-
-  const result = applyDomainPlanPatch(editable, patch);
-
-  if (!result.ok) {
-    return {
-      success: false,
-      error: result.error ?? "Patch application failed",
-      warnings: result.validation?.warnings?.map((w) => w.message) ?? [],
-    };
-  }
-
-  // Store the updated blueprint back into the graph
-  const updatedGraph = structuredClone(currentPlan.graph);
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  updatedGraph.blueprint = {
-    title: result.plan!.title,
-    goal: result.plan!.goal,
-    assumptions: result.plan!.assumptions,
-    nodes: result.plan!.nodes as unknown as NonNullable<typeof updatedGraph.blueprint>["nodes"],
-    edges: result.plan!.edges as unknown as NonNullable<typeof updatedGraph.blueprint>["edges"],
-  };
-  updatedGraph.revision = result.plan!.version;
-  updatedGraph.summary = result.plan!.title;
-  updatedGraph.updatedAt = new Date().toISOString();
-
-  await saveTaskPlanGraph({
-    workspaceId: currentPlan.saved.workspaceId,
-    taskId: input.taskId,
-    plan: updatedGraph,
-    status: currentPlan.saved.status,
-    source: currentPlan.saved.source,
-    generatedBy: currentPlan.saved.generatedBy,
-    summary: updatedGraph.summary,
-    changeSummary: `Blueprint patch: ${patch.rationale ?? "no rationale provided"}`,
-  });
-
-  return {
-    success: true,
-    updatedEditablePlan: result.plan,
-    warnings: [],
   };
 }

@@ -55,7 +55,3 @@ export function isTaskPlanGenerationRunning(taskId: string) {
   const existing = inFlightGenerations.get(taskId);
   return Boolean(existing && !existing.controller.signal.aborted);
 }
-
-export function resetTaskPlanGenerationRegistryForTests() {
-  inFlightGenerations.clear();
-}

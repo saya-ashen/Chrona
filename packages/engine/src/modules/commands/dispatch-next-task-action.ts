@@ -2,8 +2,7 @@ import { aiDispatchTask } from "@/modules/ai/ai-service";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { db } from "@/lib/db";
 import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import type { DispatchTaskOutput } from "@chrona/ai-features";
-import type { TaskDispatchPolicy } from "@chrona/ai-features";
+import type { DispatchTaskOutput, TaskDispatchPolicy } from "@chrona/contracts";
 
 const DEFAULT_DISPATCH_POLICY = {
   minConfidenceForAutoExecute: 0.9,

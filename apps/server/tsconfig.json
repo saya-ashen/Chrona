@@ -25,8 +25,6 @@
       "@chrona/openclaw": ["../../packages/providers/openclaw/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],
       "@chrona/contracts": ["../../packages/contracts/src/index.ts"],
-      "@chrona/ai-features/*": ["../../packages/ai-features/src/*"],
-      "@chrona/ai-features": ["../../packages/ai-features/src/index.ts"]
     }
   },
   "include": [

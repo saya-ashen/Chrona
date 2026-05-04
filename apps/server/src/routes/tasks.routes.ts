@@ -1,14 +1,16 @@
 import { Hono } from "hono";
 
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
-import { db } from "@chrona/db";
 import {
   createTask,
+  deleteTask,
+  ensureTaskInWorkspace,
   enrichPlanGraphNodes,
   getAcceptedTaskPlanGraph,
   getLatestTaskPlanGraph,
   getTaskPage,
   isTaskPlanGenerationRunning,
+  listTasksByWorkspace,
   updateTask,
 } from "@chrona/engine";
 
@@ -16,8 +18,6 @@ import {
   VALID_TASK_STATUSES,
   toDateOrNull,
   ensureValidDateFields,
-  ensureTaskInWorkspace,
-  deleteTaskWithRelations,
 } from "./helpers";
 import {
   error,
@@ -44,14 +44,13 @@ export function createTasksRoutes() {
         return error(c, `Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`, 400);
       }
 
-      const tasks = await db.task.findMany({
-        where: { workspaceId, ...(status ? { status: status as TaskStatus } : {}) },
-        include: { projection: true },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
+      const result = await listTasksByWorkspace({
+        workspaceId,
+        status: status ?? undefined,
+        limit,
       });
 
-      return json(c, { tasks, count: tasks.length });
+      return json(c, result);
     } catch (cause) {
       const httpError = toHttpError(cause);
       if (httpError) {
@@ -183,7 +182,7 @@ export function createTasksRoutes() {
       if (workspaceId) {
         await ensureTaskInWorkspace(c.req.param("taskId"), workspaceId);
       }
-      return json(c, await deleteTaskWithRelations(c.req.param("taskId")));
+      return json(c, await deleteTask(c.req.param("taskId")));
     } catch (cause) {
       const httpError = toHttpError(cause);
       if (httpError) {
