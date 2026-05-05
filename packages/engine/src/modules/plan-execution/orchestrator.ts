@@ -1,22 +1,31 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getAcceptedTaskPlanGraph, saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-store";
-import { computeExecutablePath } from "./executable-path";
 import { decideNodeExecutionSession } from "./session-policy";
 import { executePlanNode } from "./node-executor";
 import { detectPlanDrift } from "./replan-detector";
 import { applyPlanPatch } from "./apply-plan-patch";
-import { savePlanRun, getPlanRun } from "./plan-run-store";
 import {
-  createPlanRunFromGraph,
-  syncGraphStateToRun,
+  savePlanRun,
+  getPlanRun,
+  appendLayer,
+  getLayers,
+} from "./plan-run-store";
+import { getAcceptedCompiledPlan } from "./compiled-plan-store";
+import {
+  createPlanRunFromCompiledPlan,
+  applyCommandAndProduceLayer,
 } from "./plan-run-bridge";
-import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
-import { compileEditablePlan } from "@chrona/domain";
-import type { TaskPlanNode, TaskPlanGraph, PlanRun, CompiledPlan } from "@chrona/contracts/ai";
-import type { PlanExecutablePath } from "./executable-path";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
+import type {
+  PlanRun,
+  CompiledPlan,
+  EffectivePlanGraph,
+  EffectivePlanNode,
+  PlanOverlayLayer,
+  RuntimeLayer,
+} from "@chrona/contracts/ai";
 
 async function activateWorkBlock(taskId: string) {
   await db.workBlock.updateMany({
@@ -57,45 +66,26 @@ type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
 
 const DEFAULT_MAX_STEPS = 10;
 
-function mapTerminalReasonToStatus(
-  reason: PlanExecutablePath["terminalReason"],
-): PlanExecutionStatus {
-  switch (reason) {
-    case "has_ready_nodes":
-      return "running";
-    case "waiting_for_child":
-      return "running";
-    case "waiting_for_dependencies":
-      return "blocked";
-    case "waiting_for_user":
-      return "waiting_for_user";
-    case "waiting_for_approval":
-      return "waiting_for_approval";
-    case "blocked":
-      return "blocked";
-    case "all_done":
-      return "completed";
-    case "empty_plan":
-      return "no_plan";
-  }
+function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecutionStatus {
+  if (effective.readyNodeIds.length > 0) return "running";
+  if (effective.runningNodeIds.length > 0) return "running";
+  if (effective.blockedNodeIds.length > 0) return "blocked";
+  if (effective.failedNodeIds.length > 0) return "blocked";
+  if (effective.pendingNodeIds.length > 0) return "blocked";
+  if (effective.completedNodeIds.length === effective.nodes.length) return "completed";
+  return "blocked";
 }
 
-function updateNodeStatus(
-  plan: TaskPlanGraph,
-  nodeId: string,
-  updates: Partial<TaskPlanNode>,
-): TaskPlanGraph {
-  return {
-    ...plan,
-    nodes: plan.nodes.map((node) => {
-      if (node.id !== nodeId) return node;
-      return { ...node, ...updates };
-    }),
-  };
+function pickNextNodeId(effective: EffectivePlanGraph): string | null {
+  return effective.readyNodeIds.length > 0 ? effective.readyNodeIds[0] : null;
 }
 
-function pickNextNodeId(path: PlanExecutablePath): string | null {
-  return path.readyNodeIds.length > 0 ? path.readyNodeIds[0] : null;
+async function getRuntimeName(taskId: string): Promise<string> {
+  const task = await db.task.findUniqueOrThrow({
+    where: { id: taskId },
+    select: { runtimeAdapterKey: true },
+  });
+  return task.runtimeAdapterKey ?? "openclaw";
 }
 
 export async function advancePlanExecution(input: {
@@ -104,13 +94,15 @@ export async function advancePlanExecution(input: {
   maxSteps?: number;
 }): Promise<PlanExecutionResult> {
   const maxSteps = input.maxSteps ?? DEFAULT_MAX_STEPS;
-  await db.task.findUniqueOrThrow({
+
+  const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     select: { id: true, title: true, workspaceId: true, status: true },
   });
 
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
+  // Load compiled plan
+  const savedCompiled = await getAcceptedCompiledPlan(input.taskId);
+  if (!savedCompiled) {
     return {
       taskId: input.taskId,
       planId: null,
@@ -124,20 +116,24 @@ export async function advancePlanExecution(input: {
     };
   }
 
-  const planId = acceptedPlan.id;
+  const { compiledPlan, planId, workspaceId } = savedCompiled;
+  let layers = await getLayers(input.taskId, planId);
 
-  // Load or create PlanRun for layered tracking
-  let planRun = await getPlanRun(input.taskId, planId);
-  let compiled: CompiledPlan | null = null;
-  if (!planRun) {
-    const result = createPlanRunFromGraph(acceptedPlan.plan);
-    if (result) {
-      planRun = result.run;
-      compiled = result.compiled;
-    }
-  } else if (acceptedPlan.plan.blueprint) {
-    const editable = upgradeBlueprintToEditable(acceptedPlan.plan.blueprint, planId);
-    compiled = compileEditablePlan(editable);
+  // Load or create PlanRun
+  const planRunData = await getPlanRun(input.taskId, planId);
+  let planRun: PlanRun;
+
+  if (!planRunData) {
+    planRun = createPlanRunFromCompiledPlan(compiledPlan, layers);
+    await savePlanRun({
+      workspaceId,
+      taskId: input.taskId,
+      planId,
+      run: planRun,
+      layers,
+    });
+  } else {
+    planRun = planRunData.planRun;
   }
 
   const mainSession = await ensurePlanMainSession({
@@ -145,11 +141,11 @@ export async function advancePlanExecution(input: {
     planId,
   });
 
+  const runtimeName = await getRuntimeName(input.taskId);
   const executedNodeIds: string[] = [];
-  let currentPlan = acceptedPlan.plan;
 
   for (let step = 0; step < maxSteps; step++) {
-    const path = computeExecutablePath(currentPlan);
+    const effective = resolveEffectivePlanGraph(compiledPlan, layers);
 
     await appendMainSessionEvent({
       taskId: input.taskId,
@@ -157,52 +153,38 @@ export async function advancePlanExecution(input: {
       sessionId: mainSession.id,
       eventType: "executable_path_computed",
       payload: {
-        terminalReason: path.terminalReason,
-        readyCount: path.readyNodeIds.length,
-        waitingForChildCount: path.waitingForChildNodeIds.length,
-        waitingForDependencyCount: path.waitingForDependencyNodeIds.length,
-        waitingForUserCount: path.waitingForUserNodeIds.length,
-        waitingForApprovalCount: path.waitingForApprovalNodeIds.length,
-        blockedCount: path.blockedNodeIds.length,
-        doneCount: path.doneNodeIds.length,
-        inProgressCount: path.inProgressNodeIds.length,
+        readyCount: effective.readyNodeIds.length,
+        blockedCount: effective.blockedNodeIds.length,
+        completedCount: effective.completedNodeIds.length,
+        runningCount: effective.runningNodeIds.length,
+        failedCount: effective.failedNodeIds.length,
+        pendingCount: effective.pendingNodeIds.length,
       },
     });
 
-    if (path.terminalReason !== "has_ready_nodes" && path.terminalReason !== "waiting_for_child") {
-      const execStatus = mapTerminalReasonToStatus(path.terminalReason);
-      const taskStatus = (() => {
-        switch (execStatus) {
-          case "completed":
-            return TaskStatus.Completed;
-          case "waiting_for_user":
-            return TaskStatus.WaitingForInput;
-          case "waiting_for_approval":
-            return TaskStatus.WaitingForApproval;
-          case "blocked":
-          case "no_plan":
-            return TaskStatus.Blocked;
-          default:
-            return TaskStatus.Running;
-        }
-      })();
+    // Check terminal conditions
+    if (
+      effective.readyNodeIds.length === 0 &&
+      effective.runningNodeIds.length === 0
+    ) {
+      const execStatus = mapTerminalReasonToStatus(effective);
 
       await db.task.update({
         where: { id: input.taskId },
         data: {
-          status: taskStatus,
-          completedAt: ["Completed", "Done"].includes(taskStatus)
-            ? new Date()
-            : undefined,
+          status:
+            execStatus === "completed"
+              ? TaskStatus.Completed
+              : execStatus === "blocked"
+                ? TaskStatus.Blocked
+                : TaskStatus.Running,
+          completedAt: execStatus === "completed" ? new Date() : undefined,
           blockReason:
-            execStatus === "blocked" || execStatus === "no_plan"
+            execStatus === "blocked"
               ? {
-                  blockType: execStatus === "no_plan" ? "no_plan" : "node_blocked",
-                  scope: "plan_execution",
-                  actionRequired:
-                    execStatus === "no_plan"
-                      ? "Create or accept a plan"
-                      : "Review blocked nodes",
+                  blockType: "node_blocked" as const,
+                  scope: "plan_execution" as const,
+                  actionRequired: "Review blocked nodes",
                 }
               : Prisma.DbNull,
         },
@@ -226,40 +208,44 @@ export async function advancePlanExecution(input: {
         planId,
         mainSessionId: mainSession.id,
         status: execStatus,
-        currentNodeId: path.currentNodeId,
-        executedNodeIds,
-        waitingNodeIds: path.waitingForUserNodeIds,
-        blockedNodeIds: path.blockedNodeIds,
-        message: `Execution ${execStatus}: ${path.terminalReason}`,
-      };
-    }
-
-    const nextNodeId = pickNextNodeId(path);
-    if (!nextNodeId) break;
-
-    const node = currentPlan.nodes.find((n) => n.id === nextNodeId);
-    if (!node) {
-      return {
-        taskId: input.taskId,
-        planId,
-        mainSessionId: mainSession.id,
-        status: "blocked",
         currentNodeId: null,
         executedNodeIds,
         waitingNodeIds: [],
-        blockedNodeIds: [],
-        message: `Node ${nextNodeId} not found in plan`,
+        blockedNodeIds: effective.blockedNodeIds,
+        message: `Execution ${execStatus}: no ready nodes`,
       };
     }
 
+    const nextNodeId = pickNextNodeId(effective);
+    if (!nextNodeId) break;
+
+    const effectiveNode = effective.nodes.find((n) => n.id === nextNodeId);
+    if (!effectiveNode) break;
+
     const sessionDecision = decideNodeExecutionSession({
-      node,
-      plan: currentPlan,
+      node: effectiveNode,
+      plan: effective,
       parentTaskId: input.taskId,
     });
 
-    currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-      status: "in_progress",
+    // Mark node as running via a new RuntimeLayer
+    const startingLayer: RuntimeLayer = {
+      type: "runtime",
+      planId,
+      timestamp: new Date().toISOString(),
+      layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      version: layers.length + 1,
+      active: true,
+      source: "system",
+      nodeStates: {
+        [nextNodeId]: { status: "running" },
+      },
+    };
+    layers = await appendLayer({
+      workspaceId,
+      taskId: input.taskId,
+      planId,
+      layer: startingLayer,
     });
 
     await db.task.update({
@@ -274,45 +260,48 @@ export async function advancePlanExecution(input: {
       eventType: "node_started",
       payload: {
         nodeId: nextNodeId,
-        nodeTitle: node.title,
-        nodeType: node.type,
+        nodeTitle: effectiveNode.title,
+        nodeType: effectiveNode.type,
       },
     });
-
-    const executingNode = {
-      ...node,
-      status: "in_progress" as const,
-    };
 
     const result = await executePlanNode({
       taskId: input.taskId,
       planId,
       mainSession,
-      node: executingNode,
-      plan: currentPlan,
+      node: effectiveNode,
+      plan: effective,
       sessionDecision,
       trigger: input.trigger,
+      runtimeName,
     });
 
+    // Replan detection
     const drift = detectPlanDrift({
-      node: executingNode,
+      node: effectiveNode,
       nodeResult: result,
-      plan: currentPlan,
-      mainSessionSummary: null,
+      plan: effective,
     });
 
     if (drift.needsReplan) {
       if (drift.requiresUserConfirmation || drift.risk !== "low") {
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "blocked",
-          metadata: {
-            ...((node.metadata as Record<string, unknown>) ?? {}),
-            replan: {
-              risk: drift.risk,
-              reason: drift.reason,
-              proposedPatch: drift.proposedPatch,
-            },
+        const blockedLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "blocked", lastError: drift.reason },
           },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: blockedLayer,
         });
 
         await appendMainSessionEvent({
@@ -333,15 +322,14 @@ export async function advancePlanExecution(input: {
           data: {
             status: TaskStatus.WaitingForApproval,
             blockReason: {
-              blockType: "replan_required",
-              scope: "plan",
+              blockType: "replan_required" as const,
+              scope: "plan" as const,
               actionRequired: drift.reason,
               nodeId: nextNodeId,
             },
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -357,36 +345,39 @@ export async function advancePlanExecution(input: {
         };
       }
 
-      const patchResult = await applyPlanPatch({
-        taskId: input.taskId,
-        patch: drift.proposedPatch,
-        currentPlan: {
-          saved: {
-            ...acceptedPlan,
-            plan: currentPlan,
-          },
-          graph: currentPlan,
-        },
-      });
+      // Auto-apply low-risk replan
+      if (drift.proposedPatch) {
+        const patchResult = await applyPlanPatch({
+          taskId: input.taskId,
+          patch: drift.proposedPatch,
+          compiledPlanId: compiledPlan.id,
+          effectiveGraph: effective,
+          source: "system" as const,
+        });
 
-      if (patchResult.success) {
-        const refreshed = await getAcceptedTaskPlanGraph(input.taskId);
-        if (refreshed) {
-          currentPlan = refreshed.plan;
-          await appendMainSessionEvent({
+        if (patchResult.newLayers.length > 0) {
+          for (const newLayer of patchResult.newLayers) {
+          layers = await appendLayer({
+            workspaceId,
             taskId: input.taskId,
             planId,
-            sessionId: mainSession.id,
-            eventType: "replan_proposed",
-            payload: {
-              nodeId: nextNodeId,
-              reason: drift.reason,
-              risk: drift.risk,
-              autoApplied: true,
-            },
-          });
-          continue;
+            layer: newLayer,
+          }          );
         }
+        }
+
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId,
+          sessionId: mainSession.id,
+          eventType: "replan_proposed",
+          payload: {
+            nodeId: nextNodeId,
+            reason: drift.reason,
+            autoApplied: true,
+          },
+        });
+        continue;
       }
     }
 
@@ -394,9 +385,23 @@ export async function advancePlanExecution(input: {
 
     switch (result.status) {
       case "done": {
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "done",
-          completionSummary: result.summary,
+        const doneLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "completed" },
+          },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: doneLayer,
         });
 
         await appendMainSessionEvent({
@@ -404,17 +409,29 @@ export async function advancePlanExecution(input: {
           planId,
           sessionId: mainSession.id,
           eventType: "node_completed",
-          payload: {
-            nodeId: nextNodeId,
-            summary: result.summary,
-          },
+          payload: { nodeId: nextNodeId, summary: result.summary },
         });
         break;
       }
 
       case "waiting_for_user": {
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "waiting_for_user",
+        const waitLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "blocked" },
+          },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: waitLayer,
         });
 
         await db.task.update({
@@ -422,8 +439,8 @@ export async function advancePlanExecution(input: {
           data: {
             status: TaskStatus.WaitingForInput,
             blockReason: {
-              blockType: "human_input_required",
-              scope: "plan_node",
+              blockType: "human_input_required" as const,
+              scope: "plan_node" as const,
               actionRequired: result.prompt,
               nodeId: nextNodeId,
             },
@@ -438,7 +455,6 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, prompt: result.prompt },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -455,8 +471,23 @@ export async function advancePlanExecution(input: {
       }
 
       case "waiting_for_approval": {
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "waiting_for_approval",
+        const approvalLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "blocked" },
+          },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: approvalLayer,
         });
 
         await db.task.update({
@@ -464,8 +495,8 @@ export async function advancePlanExecution(input: {
           data: {
             status: TaskStatus.WaitingForApproval,
             blockReason: {
-              blockType: "approval_required",
-              scope: "plan_node",
+              blockType: "approval_required" as const,
+              scope: "plan_node" as const,
               actionRequired: result.prompt,
               nodeId: nextNodeId,
             },
@@ -480,7 +511,6 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, prompt: result.prompt },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -497,15 +527,23 @@ export async function advancePlanExecution(input: {
       }
 
       case "child_running": {
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "waiting_for_child",
-          metadata: {
-            ...((node.metadata as Record<string, unknown>) ?? {}),
-            childSessionId: result.evidence.childSessionId,
-            childRunId: result.evidence.runId,
-            childTaskId: result.evidence.childTaskId,
-            dispatchedAt: new Date().toISOString(),
+        const childLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "running" },
           },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: childLayer,
         });
 
         await appendMainSessionEvent({
@@ -521,7 +559,6 @@ export async function advancePlanExecution(input: {
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -541,9 +578,23 @@ export async function advancePlanExecution(input: {
       case "failed": {
         const blockMessage = result.status === "blocked" ? result.reason : result.error;
 
-        currentPlan = updateNodeStatus(currentPlan, nextNodeId, {
-          status: "blocked",
-          completionSummary: null,
+        const blockedLayer: RuntimeLayer = {
+          type: "runtime",
+          layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          version: layers.length + 1,
+          active: true,
+          planId,
+          timestamp: new Date().toISOString(),
+          source: "system",
+          nodeStates: {
+            [nextNodeId]: { status: "blocked", lastError: blockMessage },
+          },
+        };
+        layers = await appendLayer({
+          workspaceId,
+          taskId: input.taskId,
+          planId,
+          layer: blockedLayer,
         });
 
         await db.task.update({
@@ -551,8 +602,8 @@ export async function advancePlanExecution(input: {
           data: {
             status: TaskStatus.Blocked,
             blockReason: {
-              blockType: "node_blocked",
-              scope: "plan_node",
+              blockType: "node_blocked" as const,
+              scope: "plan_node" as const,
               actionRequired: blockMessage,
               nodeId: nextNodeId,
             },
@@ -567,7 +618,6 @@ export async function advancePlanExecution(input: {
           payload: { nodeId: nextNodeId, reason: blockMessage },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -589,10 +639,7 @@ export async function advancePlanExecution(input: {
           planId,
           sessionId: mainSession.id,
           eventType: "replan_proposed",
-          payload: {
-            nodeId: nextNodeId,
-            reason: result.reason,
-          },
+          payload: { nodeId: nextNodeId, reason: result.reason },
         });
 
         await db.task.update({
@@ -600,15 +647,14 @@ export async function advancePlanExecution(input: {
           data: {
             status: TaskStatus.WaitingForApproval,
             blockReason: {
-              blockType: "replan_required",
-              scope: "plan",
+              blockType: "replan_required" as const,
+              scope: "plan" as const,
               actionRequired: result.reason,
               nodeId: nextNodeId,
             },
           },
         });
 
-        await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
         await rebuildTaskProjection(input.taskId);
 
         return {
@@ -624,12 +670,8 @@ export async function advancePlanExecution(input: {
         };
       }
     }
-
-    await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
-    await rebuildTaskProjection(input.taskId);
   }
 
-  await savePlanState(currentPlan, acceptedPlan, planRun && compiled ? { run: planRun, compiled, planId } : null);
   await rebuildTaskProjection(input.taskId);
 
   return {
@@ -650,8 +692,8 @@ export async function startPlanExecution(input: {
   trigger: OrchestratorTrigger;
   prompt?: string;
 }): Promise<PlanExecutionResult> {
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
+  const savedCompiled = await getAcceptedCompiledPlan(input.taskId);
+  if (!savedCompiled) {
     return {
       taskId: input.taskId,
       planId: null,
@@ -667,20 +709,19 @@ export async function startPlanExecution(input: {
 
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
-    planId: acceptedPlan.id,
+    planId: savedCompiled.planId,
   });
 
   await activateWorkBlock(input.taskId);
 
   await appendMainSessionEvent({
     taskId: input.taskId,
-    planId: acceptedPlan.id,
+    planId: savedCompiled.planId,
     sessionId: mainSession.id,
     eventType: "execution_started",
     payload: {
       trigger: input.trigger,
       prompt: input.prompt,
-      planRevision: acceptedPlan.revision,
     },
   });
 
@@ -700,8 +741,8 @@ export async function continuePlanExecution(input: {
     select: { id: true, title: true, workspaceId: true },
   });
 
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
+  const savedCompiled = await getAcceptedCompiledPlan(input.taskId);
+  if (!savedCompiled) {
     return {
       taskId: input.taskId,
       planId: null,
@@ -715,69 +756,52 @@ export async function continuePlanExecution(input: {
     };
   }
 
+  const { compiledPlan, planId, workspaceId } = savedCompiled;
+  let layers = await getLayers(input.taskId, planId);
+
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
-    planId: acceptedPlan.id,
+    planId,
   });
-
-  const planRun = await getPlanRun(input.taskId, acceptedPlan.id);
-  let compiled: CompiledPlan | null = null;
-  if (planRun && acceptedPlan.plan.blueprint) {
-    const editable = upgradeBlueprintToEditable(acceptedPlan.plan.blueprint, acceptedPlan.id);
-    compiled = compileEditablePlan(editable);
-  }
 
   if (input.userInput) {
     await appendMainSessionEvent({
       taskId: input.taskId,
-      planId: acceptedPlan.id,
+      planId,
       sessionId: mainSession.id,
       eventType: "user_input_received",
-      payload: {
-        input: input.userInput,
-        reason: input.reason,
-      },
+      payload: { input: input.userInput, reason: input.reason },
     });
 
-    const path = computeExecutablePath(acceptedPlan.plan);
-    if (path.waitingForUserNodeIds.length > 0) {
-      const waitingNodeId = path.waitingForUserNodeIds[0];
-      const updatedPlan = {
-        ...acceptedPlan.plan,
-        nodes: acceptedPlan.plan.nodes.map((node) => {
-          if (node.id !== waitingNodeId) return node;
-          return {
-            ...node,
-            status: "pending" as const,
-            completionSummary: input.userInput ?? node.completionSummary,
-            metadata: {
-              ...((node.metadata as Record<string, unknown>) ?? {}),
-              userProvidedInput: input.userInput,
-            },
-          };
-        }),
+    // Find the waiting nodes and mark them ready via a RuntimeLayer
+    const effective = resolveEffectivePlanGraph(compiledPlan, layers);
+    const waitingNodes = effective.nodes.filter(
+      (n) => n.status === "blocked" || n.status === "failed"
+    );
+
+    if (waitingNodes.length > 0) {
+      const nodeStates: Record<string, { status: "ready" }> = {};
+      for (const n of waitingNodes) {
+        nodeStates[n.id] = { status: "ready" };
+      }
+
+      const resumeLayer: RuntimeLayer = {
+        type: "runtime",
+        planId,
+        timestamp: new Date().toISOString(),
+        layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        version: layers.length + 1,
+        active: true,
+        source: "system",
+        nodeStates,
       };
 
-      await saveTaskPlanGraph({
-        workspaceId: task.workspaceId,
+      layers = await appendLayer({
+        workspaceId,
         taskId: input.taskId,
-        plan: updatedPlan,
-        status: acceptedPlan.status,
-        source: acceptedPlan.source,
-        generatedBy: acceptedPlan.generatedBy,
-        summary: acceptedPlan.summary,
-        changeSummary: acceptedPlan.changeSummary,
+        planId,
+        layer: resumeLayer,
       });
-
-      if (planRun && compiled) {
-        syncGraphStateToRun(updatedPlan, compiled, planRun);
-        await savePlanRun({
-          workspaceId: task.workspaceId,
-          taskId: input.taskId,
-          planId: acceptedPlan.id,
-          run: planRun,
-        });
-      }
 
       await db.task.update({
         where: { id: input.taskId },
@@ -795,31 +819,4 @@ export async function continuePlanExecution(input: {
     taskId: input.taskId,
     trigger: "manual",
   });
-}
-
-async function savePlanState(
-  currentPlan: TaskPlanGraph,
-  savedPlan: { workspaceId: string; status: string; source: "ai" | "user" | "mixed"; generatedBy: string | null; summary: string | null; changeSummary: string | null },
-  planRunContext?: { run: PlanRun; compiled: CompiledPlan; planId: string } | null,
-) {
-  await saveTaskPlanGraph({
-    workspaceId: savedPlan.workspaceId,
-    taskId: currentPlan.taskId,
-    plan: currentPlan,
-    status: savedPlan.status as "accepted" | "draft" | "superseded" | "archived",
-    source: savedPlan.source,
-    generatedBy: savedPlan.generatedBy,
-    summary: savedPlan.summary,
-    changeSummary: savedPlan.changeSummary,
-  });
-
-  if (planRunContext) {
-    syncGraphStateToRun(currentPlan, planRunContext.compiled, planRunContext.run);
-    await savePlanRun({
-      workspaceId: savedPlan.workspaceId,
-      taskId: currentPlan.taskId,
-      planId: planRunContext.planId,
-      run: planRunContext.run,
-    });
-  }
 }

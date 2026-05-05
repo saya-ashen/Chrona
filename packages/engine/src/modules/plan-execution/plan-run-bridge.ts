@@ -1,221 +1,142 @@
+import { randomUUID } from "node:crypto";
 import type {
   PlanRun,
   CompiledPlan,
-  CompiledNode,
   RuntimeCommand,
-  TaskPlanGraph,
-  TaskPlanNode,
-  TaskPlanNodeStatus,
+  PlanOverlayLayer,
+  RuntimeLayer,
+  ResultLayer,
+  NodeRuntimeStatus,
 } from "@chrona/contracts/ai";
-import {
-  createPlanRun,
-  applyRuntimeCommand,
-  compileEditablePlan,
-} from "@chrona/domain";
-import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
+import { createPlanRun, applyRuntimeCommand } from "@chrona/domain";
 
 /**
- * Build a mapping from localId (original node ID) → compiled node ID.
+ * Creates a PlanRun from a CompiledPlan and initial layers.
+ * Entry nodes in the initial RuntimeLayer will already be marked "ready".
  */
-function buildLocalToCompiledMap(compiled: CompiledPlan): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const node of compiled.nodes) {
-    map.set(node.localId, node.id);
-  }
-  return map;
-}
+export function createPlanRunFromCompiledPlan(
+  compiled: CompiledPlan,
+  initialLayers: PlanOverlayLayer[],
+): PlanRun {
+  const run = createPlanRun(compiled);
 
-/**
- * Build a mapping from compiled node ID → CompiledNode.
- */
-function buildCompiledNodeMap(compiled: CompiledPlan): Map<string, CompiledNode> {
-  const map = new Map<string, CompiledNode>();
-  for (const node of compiled.nodes) {
-    map.set(node.id, node);
-  }
-  return map;
-}
-
-/**
- * Create a PlanRun from an accepted TaskPlanGraph.
- * Upgrades blueprint → EditablePlan → CompiledPlan → PlanRun.
- * Syncs current node states from TaskPlanGraph nodes to PlanRun states.
- * Returns { run, compiled } or null if the plan has no blueprint or compilation fails.
- */
-export function createPlanRunFromGraph(graph: TaskPlanGraph): {
-  run: PlanRun;
-  compiled: CompiledPlan;
-} | null {
-  if (!graph.blueprint) return null;
-
-  try {
-    const editable = upgradeBlueprintToEditable(graph.blueprint, graph.id);
-    const compiled = compileEditablePlan(editable);
-    const run = createPlanRun(compiled);
-
-    // Build compiledId → localId reverse lookup
-    const compiledToLocal = new Map<string, string>();
-    for (const node of compiled.nodes) {
-      compiledToLocal.set(node.id, node.localId);
-    }
-
-    // Sync current node states from TaskPlanGraph
-    for (const graphNode of graph.nodes) {
-      // Find the compiled node with matching localId
-      const compiledNode = compiled.nodes.find((cn) => cn.localId === graphNode.id);
-      if (!compiledNode) continue;
-
-      const runState = run.nodeStates[compiledNode.id];
-      if (!runState) continue;
-
-      const mapped = mapGraphStatusToRunStatus(graphNode.status);
-      if (mapped) {
-        runState.status = mapped;
+  for (const layer of initialLayers) {
+    if (layer.type === "runtime" && layer.active) {
+      for (const [nodeId, state] of Object.entries(layer.nodeStates)) {
+        if (run.nodeStates[nodeId]) {
+          run.nodeStates[nodeId].status = state.status as NodeRuntimeStatus;
+        }
       }
     }
-
-    return { run, compiled };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Apply a RuntimeCommand to a PlanRun and sync the resulting state
- * back to the TaskPlanGraph nodes.
- */
-export function applyCommandAndSyncGraph(
-  run: PlanRun,
-  compiled: CompiledPlan,
-  command: RuntimeCommand,
-  graph: TaskPlanGraph,
-): { ok: boolean; run?: PlanRun; graph?: TaskPlanGraph; error?: string } {
-  const result = applyRuntimeCommand(run, compiled, command);
-
-  if (!result.ok || !result.run) {
-    return result;
-  }
-
-  // Build compiledId → localId map
-  const compiledToLocal = new Map<string, string>();
-  for (const node of compiled.nodes) {
-    compiledToLocal.set(node.id, node.localId);
-  }
-
-  // Sync run status → graph node statuses
-  const updatedNodes = graph.nodes.map((node): TaskPlanNode => {
-    // Find compiled ID for this graph node
-    const compiledNode = compiled.nodes.find((cn) => cn.localId === node.id);
-    if (!compiledNode) return node;
-
-    const runState = result.run!.nodeStates[compiledNode.id];
-    if (!runState) return node;
-
-    const mapped = mapRunStatusToGraphStatus(runState.status);
-    if (mapped === node.status) return node;
-
-    return {
-      ...node,
-      status: mapped,
-      ...(runState.completedAt ? { completionSummary: node.completionSummary ?? `Completed at ${runState.completedAt}` } : {}),
-    };
-  });
-
-  return {
-    ok: true,
-    run: result.run,
-    graph: { ...graph, nodes: updatedNodes },
-  };
-}
-
-/**
- * Sync PlanRun node states → TaskPlanGraph node statuses.
- * Mutates graph in place. Returns the mutated graph.
- */
-function syncRunStateToGraph(
-  run: PlanRun,
-  compiled: CompiledPlan,
-  graph: TaskPlanGraph,
-): TaskPlanGraph {
-  const updatedNodes = graph.nodes.map((node): TaskPlanNode => {
-    const compiledNode = compiled.nodes.find((cn) => cn.localId === node.id);
-    if (!compiledNode) return node;
-
-    const runState = run.nodeStates[compiledNode.id];
-    if (!runState) return node;
-
-    const mapped = mapRunStatusToGraphStatus(runState.status);
-    if (mapped === node.status) return node;
-
-    return { ...node, status: mapped };
-  });
-
-  return { ...graph, nodes: updatedNodes };
-}
-
-/**
- * Sync TaskPlanGraph node statuses → PlanRun node states.
- * Mutates run in place. Returns the mutated run.
- */
-export function syncGraphStateToRun(
-  graph: TaskPlanGraph,
-  compiled: CompiledPlan,
-  run: PlanRun,
-): PlanRun {
-  for (const graphNode of graph.nodes) {
-    const compiledNode = compiled.nodes.find((cn) => cn.localId === graphNode.id);
-    if (!compiledNode) continue;
-
-    const runState = run.nodeStates[compiledNode.id];
-    if (!runState) continue;
-
-    const mapped = mapGraphStatusToRunStatus(graphNode.status);
-    if (mapped && mapped !== runState.status) {
-      runState.status = mapped;
+    if (layer.type === "result" && layer.active) {
+      for (const [nodeId, result] of Object.entries(layer.nodeResults)) {
+        if (result.artifactRefs && run.nodeStates[nodeId]) {
+          for (const ref of result.artifactRefs) {
+            if (!run.artifactRefs.some((r) => r.artifactType === ref.artifactType && r.nodeId === nodeId)) {
+              run.artifactRefs.push({
+                id: randomUUID(),
+                planRunId: run.id,
+                nodeId,
+                artifactType: ref.artifactType,
+                artifactId: ref.artifactId,
+              });
+            }
+          }
+        }
+        if (result.checkpointResponse && run.nodeStates[nodeId]) {
+          run.checkpointResponses.push({
+            id: randomUUID(),
+            planRunId: run.id,
+            nodeId,
+            response: result.checkpointResponse,
+            submittedAt: new Date().toISOString(),
+          });
+        }
+      }
     }
   }
 
   return run;
 }
 
-function mapGraphStatusToRunStatus(status: TaskPlanNodeStatus): PlanRun["nodeStates"][string]["status"] | null {
-  switch (status) {
-    case "pending":
-      return "pending";
-    case "in_progress":
-      return "running";
-    case "done":
-      return "completed";
-    case "blocked":
-      return "failed";
-    case "skipped":
-      return "skipped";
-    case "waiting_for_user":
-    case "waiting_for_approval":
-      return "ready";
-    case "waiting_for_child":
-      return "running";
-    default:
-      return null;
+/**
+ * Applies a RuntimeCommand and produces the resulting RuntimeLayer delta.
+ * DOES NOT mutate the PlanRun — returns a new layer to append.
+ */
+export function applyCommandAndProduceLayer(
+  run: PlanRun,
+  compiled: CompiledPlan,
+  command: RuntimeCommand,
+  layerVersion: number,
+): { ok: boolean; run?: PlanRun; layer?: RuntimeLayer; error?: string } {
+  const result = applyRuntimeCommand(run, compiled, command);
+
+  if (!result.ok || !result.run) {
+    return result;
   }
+
+  const nodeStates: Record<string, { status: NodeRuntimeStatus; attempts?: number; lastError?: string }> = {};
+
+  for (const [nodeId, state] of Object.entries(result.run.nodeStates)) {
+    const prev = run.nodeStates[nodeId];
+    if (!prev || prev.status !== state.status) {
+      nodeStates[nodeId] = {
+        status: state.status,
+        attempts: state.attempts,
+        lastError: state.lastError,
+      };
+    }
+  }
+
+  if (Object.keys(nodeStates).length === 0) {
+    return { ok: true, run: result.run };
+  }
+
+  const layer: RuntimeLayer = {
+    type: "runtime",
+    layerId: `layer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: layerVersion,
+    active: true,
+    planId: compiled.editablePlanId,
+    timestamp: new Date().toISOString(),
+    nodeStates,
+  };
+
+  return { ok: true, run: result.run, layer };
 }
 
-function mapRunStatusToGraphStatus(status: PlanRun["nodeStates"][string]["status"]): TaskPlanNodeStatus {
-  switch (status) {
-    case "ready":
-    case "pending":
-      return "pending";
-    case "running":
-      return "in_progress";
-    case "completed":
-      return "done";
-    case "failed":
-      return "blocked";
-    case "skipped":
-      return "skipped";
-    case "cancelled":
-      return "skipped";
-    case "blocked":
-      return "blocked";
-  }
+/**
+ * Builds a ResultLayer from a node execution's output.
+ */
+export function buildResultLayer(
+  nodeId: string,
+  planId: string,
+  result: {
+    outputSummary?: string;
+    artifactRefs?: Array<{ artifactType: string; artifactId: string }>;
+    checkpointResponse?: Record<string, unknown>;
+  },
+  layerVersion: number,
+): ResultLayer {
+  return {
+    type: "result",
+    layerId: `result_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: layerVersion,
+    active: true,
+    planId,
+    timestamp: new Date().toISOString(),
+    nodeResults: {
+      [nodeId]: {
+        outputSummary: result.outputSummary ?? undefined,
+        artifactRefs: (result.artifactRefs ?? []).map((ref) => ({
+          id: randomUUID(),
+          planRunId: "",
+          nodeId,
+          artifactType: ref.artifactType,
+          artifactId: ref.artifactId,
+        })),
+        checkpointResponse: result.checkpointResponse ?? null,
+      },
+    },
+  };
 }

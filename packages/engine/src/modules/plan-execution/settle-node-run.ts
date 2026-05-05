@@ -2,20 +2,22 @@ import type {
   PlanExecutionResult,
 } from "./orchestrator";
 import { advancePlanExecution } from "./orchestrator";
-import { getAcceptedTaskPlanGraph, saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan } from "./compiled-plan-store";
+import { appendLayer, getLayers, getPlanRun } from "./plan-run-store";
 import { appendMainSessionEvent, ensurePlanMainSession } from "./plan-state-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { db } from "@/lib/db";
 import { TaskStatus, Prisma } from "@/generated/prisma/client";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { RuntimeLayer } from "@chrona/contracts/ai";
 
 export async function settlePlanNodeFromRun(input: {
   taskId: string;
   runId: string;
   reason?: string;
 }): Promise<PlanExecutionResult> {
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
+  const savedCompiled = await getAcceptedCompiledPlan(input.taskId);
+  if (!savedCompiled) {
     return {
       taskId: input.taskId,
       planId: null,
@@ -29,28 +31,13 @@ export async function settlePlanNodeFromRun(input: {
     };
   }
 
-  const planId = acceptedPlan.id;
+  const { compiledPlan, planId, workspaceId } = savedCompiled;
+  let layers = await getLayers(input.taskId, planId);
+
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
     planId,
   });
-
-  const currentPlan = acceptedPlan.plan;
-
-  const nodeIndex = currentPlan.nodes.findIndex((n) => {
-    const meta = (n.metadata as Record<string, unknown> | null) ?? {};
-    return meta.childRunId === input.runId;
-  });
-
-  if (nodeIndex === -1) {
-    return advancePlanExecution({
-      taskId: input.taskId,
-      trigger: "system",
-    });
-  }
-
-  const node = currentPlan.nodes[nodeIndex]!;
-  const nodeMeta = ((node.metadata as Record<string, unknown>) ?? {}) as Record<string, unknown>;
 
   const run = await db.run.findUnique({
     where: { id: input.runId },
@@ -63,17 +50,10 @@ export async function settlePlanNodeFromRun(input: {
   });
 
   if (!run) {
-    return {
+    return advancePlanExecution({
       taskId: input.taskId,
-      planId,
-      mainSessionId: mainSession.id,
-      status: "blocked",
-      currentNodeId: node.id,
-      executedNodeIds: [],
-      waitingNodeIds: [],
-      blockedNodeIds: [node.id],
-      message: `Run ${input.runId} not found for node ${node.id}`,
-    };
+      trigger: "system",
+    });
   }
 
   const runArtifacts = await db.artifact.findMany({
@@ -82,80 +62,81 @@ export async function settlePlanNodeFromRun(input: {
     select: { id: true, title: true, type: true },
   });
 
-  const runStatusStr = run.status as string;
-  let newNodeStatus: string;
-  let completionSummary: string | null = null;
-  let eventType:
-    | "node_completed"
-    | "node_waiting_for_user"
-    | "node_waiting_for_approval"
-    | "node_blocked";
-  let eventPayload: Record<string, unknown>;
+  const effective = resolveEffectivePlanGraph(compiledPlan, layers);
 
-  const settledMeta: Record<string, unknown> = {
-    ...nodeMeta,
-    childRunId: input.runId,
-    settledAt: new Date().toISOString(),
-    settledFrom: runStatusStr,
-  };
+  // Find the node that corresponds to this child run
+  const nodeToSettle = effective.nodes.find((n) => {
+    const config = n.config as Record<string, unknown>;
+    return config.childRunId === input.runId;
+  });
+
+  if (!nodeToSettle) {
+    return advancePlanExecution({
+      taskId: input.taskId,
+      trigger: "system",
+    });
+  }
+
+  const runStatusStr = run.status as string;
+  let newNodeStatus: "completed" | "blocked" | "running";
+  let eventType: "node_completed" | "node_waiting_for_user" | "node_waiting_for_approval" | "node_blocked";
+  let eventPayload: Record<string, unknown>;
+  let completionSummary: string | null = null;
 
   if (runStatusStr === "Completed" || runStatusStr === "Succeeded") {
-    newNodeStatus = "done";
+    newNodeStatus = "completed";
     completionSummary = run.errorSummary ?? `Child run ${input.runId} completed`;
     eventType = "node_completed";
     eventPayload = {
-      nodeId: node.id,
+      nodeId: nodeToSettle.id,
       runId: input.runId,
       summary: completionSummary,
       artifactIds: runArtifacts.map((a) => a.id),
     };
-    settledMeta.evidence = run.errorSummary;
   } else if (runStatusStr === "WaitingForInput") {
-    newNodeStatus = "waiting_for_user";
+    newNodeStatus = "blocked";
     eventType = "node_waiting_for_user";
     eventPayload = {
-      nodeId: node.id,
+      nodeId: nodeToSettle.id,
       runId: input.runId,
       prompt: run.pendingInputPrompt,
     };
-    settledMeta.pendingInputPrompt = run.pendingInputPrompt;
   } else if (runStatusStr === "WaitingForApproval") {
-    newNodeStatus = "waiting_for_approval";
+    newNodeStatus = "blocked";
     eventType = "node_waiting_for_approval";
-    eventPayload = { nodeId: node.id, runId: input.runId };
+    eventPayload = { nodeId: nodeToSettle.id, runId: input.runId };
   } else {
     newNodeStatus = "blocked";
     eventType = "node_blocked";
     eventPayload = {
-      nodeId: node.id,
+      nodeId: nodeToSettle.id,
       runId: input.runId,
       reason: run.errorSummary ?? `Child run ${input.runId} failed`,
     };
-    settledMeta.errorSummary = run.errorSummary;
   }
 
-  const updatedPlan: TaskPlanGraph = {
-    ...currentPlan,
-    nodes: currentPlan.nodes.map((n, i) => {
-      if (i !== nodeIndex) return n;
-      return {
-        ...n,
-        status: newNodeStatus as TaskPlanGraph["nodes"][number]["status"],
-        completionSummary: completionSummary ?? n.completionSummary,
-        metadata: settledMeta,
-      };
-    }),
+  // Append RuntimeLayer with the settled status
+  const settleLayer: RuntimeLayer = {
+    type: "runtime",
+    planId: planId,
+    timestamp: new Date().toISOString(),
+    layerId: `settle_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: layers.length + 1,
+    active: true,
+    source: "system",
+    nodeStates: {
+      [nodeToSettle.id]: {
+        status: newNodeStatus,
+        ...(completionSummary ? { lastError: undefined } : {}),
+      },
+    },
   };
 
-  await saveTaskPlanGraph({
-    workspaceId: acceptedPlan.workspaceId,
+  layers = await appendLayer({
+    workspaceId,
     taskId: input.taskId,
-    plan: updatedPlan,
-    status: acceptedPlan.status,
-    source: acceptedPlan.source,
-    generatedBy: acceptedPlan.generatedBy,
-    summary: acceptedPlan.summary,
-    changeSummary: acceptedPlan.changeSummary,
+    planId,
+    layer: settleLayer,
   });
 
   await appendMainSessionEvent({
@@ -182,26 +163,26 @@ export async function settlePlanNodeFromRun(input: {
   const blockReason = (() => {
     if (eventType === "node_waiting_for_user") {
       return {
-        blockType: "human_input_required",
-        scope: "plan_node",
+        blockType: "human_input_required" as const,
+        scope: "plan_node" as const,
         actionRequired: eventPayload.prompt ?? "User input required",
-        nodeId: node.id,
+        nodeId: nodeToSettle.id,
       };
     }
     if (eventType === "node_waiting_for_approval") {
       return {
-        blockType: "approval_required",
-        scope: "plan_node",
+        blockType: "approval_required" as const,
+        scope: "plan_node" as const,
         actionRequired: "Child run approval required",
-        nodeId: node.id,
+        nodeId: nodeToSettle.id,
       };
     }
     if (eventType === "node_blocked") {
       return {
-        blockType: "node_blocked",
-        scope: "plan_node",
+        blockType: "node_blocked" as const,
+        scope: "plan_node" as const,
         actionRequired: eventPayload.reason ?? "Node blocked by child run failure",
-        nodeId: node.id,
+        nodeId: nodeToSettle.id,
       };
     }
     return undefined;
@@ -217,7 +198,7 @@ export async function settlePlanNodeFromRun(input: {
 
   await rebuildTaskProjection(input.taskId);
 
-  if (newNodeStatus === "done") {
+  if (newNodeStatus === "completed") {
     return advancePlanExecution({
       taskId: input.taskId,
       trigger: "system",
@@ -228,11 +209,11 @@ export async function settlePlanNodeFromRun(input: {
     taskId: input.taskId,
     planId,
     mainSessionId: mainSession.id,
-    status: newNodeStatus as PlanExecutionResult["status"],
-    currentNodeId: node.id,
+    status: newNodeStatus === "blocked" ? "blocked" : "running",
+    currentNodeId: nodeToSettle.id,
     executedNodeIds: [],
-    waitingNodeIds: eventType === "node_waiting_for_user" ? [node.id] : [],
-    blockedNodeIds: eventType === "node_blocked" ? [node.id] : [],
-    message: `Node ${node.id} settled from child run ${input.runId} with status ${newNodeStatus}`,
+    waitingNodeIds: eventType === "node_waiting_for_user" ? [nodeToSettle.id] : [],
+    blockedNodeIds: eventType === "node_blocked" ? [nodeToSettle.id] : [],
+    message: `Node ${nodeToSettle.id} settled from child run ${input.runId} with status ${newNodeStatus}`,
   };
 }

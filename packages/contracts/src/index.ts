@@ -61,6 +61,17 @@ export type {
   CheckpointResponse,
   ArtifactRef,
   RuntimeCommand,
+  // Overlay model (Phase 0)
+  PlanOverlayLayer,
+  StructuralLayer,
+  StructuralOperation,
+  RuntimeLayer,
+  ResultLayer,
+  NodeResult,
+  LayerSource,
+  EffectivePlanGraph,
+  EffectivePlanNode,
+  EffectivePlanEdge,
   // Legacy (deprecated)
   TaskPlanGraph,
   TaskPlanNode,

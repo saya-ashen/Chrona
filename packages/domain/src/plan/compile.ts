@@ -190,6 +190,12 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
     .filter((n) => (outdegree.get(n.id)?.length ?? 0) === 0)
     .map((n) => n.id);
 
+  // 5b. Topological order (Kahn's algorithm)
+  const topologicalOrder = computeTopologicalOrder(
+    compiledNodes.map((n) => n.id),
+    compiledEdges,
+  );
+
   // 6. Completion policy
   const completionPolicy = { type: "all_tasks_completed" as const };
 
@@ -207,7 +213,42 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
     edges: compiledEdges,
     entryNodeIds,
     terminalNodeIds,
+    topologicalOrder,
     completionPolicy,
     validationWarnings,
   };
+}
+
+function computeTopologicalOrder(
+  nodeIds: string[],
+  edges: Array<{ from: string; to: string }>,
+): string[] {
+  const indegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+  for (const id of nodeIds) {
+    indegree.set(id, 0);
+    adjacency.set(id, []);
+  }
+  for (const e of edges) {
+    adjacency.get(e.from)?.push(e.to);
+    indegree.set(e.to, (indegree.get(e.to) ?? 0) + 1);
+  }
+
+  const queue: string[] = [];
+  for (const [id, deg] of indegree) {
+    if (deg === 0) queue.push(id);
+  }
+
+  const order: string[] = [];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    order.push(current);
+    for (const neighbor of adjacency.get(current) ?? []) {
+      const newDeg = (indegree.get(neighbor) ?? 1) - 1;
+      indegree.set(neighbor, newDeg);
+      if (newDeg === 0) queue.push(neighbor);
+    }
+  }
+
+  return order;
 }

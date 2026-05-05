@@ -1,77 +1,78 @@
-import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executor";
 
-export type PlanDriftDecision =
-  | { needsReplan: false }
-  | {
-      needsReplan: true;
-      risk: "low" | "medium" | "high";
-      reason: string;
-      proposedPatch: PlanUpdatePatch;
-      requiresUserConfirmation: boolean;
-    };
-
-export type ReplanDetectorInput = {
-  node: TaskPlanNode;
-  nodeResult: NodeExecutionResult;
-  plan: TaskPlanGraph;
-  mainSessionSummary: string | null;
+export type PlanDriftDecision = {
+  needsReplan: boolean;
+  reason: string;
+  risk: "low" | "medium" | "high";
+  requiresUserConfirmation: boolean;
+  proposedPatch?: PlanPatch;
 };
 
-export function detectPlanDrift(input: ReplanDetectorInput): PlanDriftDecision {
+export function detectPlanDrift(input: {
+  node: EffectivePlanNode;
+  nodeResult: NodeExecutionResult;
+  plan: EffectivePlanGraph;
+}): PlanDriftDecision {
   const { node, nodeResult, plan } = input;
 
-  if (nodeResult.status === "replan_required") {
-    return {
-      needsReplan: true,
-      risk: "medium",
-      reason: nodeResult.reason,
-      proposedPatch: nodeResult.proposedPatch ?? {
-        operation: "update_node",
-        nodePatches: [
-          { nodeId: node.id, patch: { requiresUserConfirmation: true } },
-        ],
-      },
-      requiresUserConfirmation: true,
-    };
+  switch (nodeResult.status) {
+    case "replan_required":
+      return {
+        needsReplan: true,
+        reason: nodeResult.reason,
+        risk: "medium",
+        requiresUserConfirmation: true,
+        proposedPatch: nodeResult.proposedPatch,
+      };
+
+    case "failed": {
+      // Check if the failed node has dependents that would be stranded
+      const hasDependents = node.dependents.length > 0;
+      if (hasDependents) {
+        return {
+          needsReplan: true,
+          reason: `Node ${node.id} (${node.title}) failed and has downstream dependents. Blocking or replan required.`,
+          risk: "medium",
+          requiresUserConfirmation: true,
+        };
+      }
+      return {
+        needsReplan: false,
+        reason: `Node ${node.id} failed but has no dependents — terminal failure.`,
+        risk: "low",
+        requiresUserConfirmation: false,
+      };
+    }
+
+    case "blocked": {
+      const completedCount = plan.nodes.filter(
+        (n) => n.status === "completed" || n.status === "skipped",
+      ).length;
+
+      if (completedCount === 0) {
+        return {
+          needsReplan: true,
+          reason: `First node ${node.id} (${node.title}) is blocked — plan cannot start. Replan required.`,
+          risk: "high",
+          requiresUserConfirmation: true,
+        };
+      }
+
+      return {
+        needsReplan: false,
+        reason: `Node ${node.id} (${node.title}) blocked: ${nodeResult.reason}`,
+        risk: "low",
+        requiresUserConfirmation: false,
+      };
+    }
+
+    default:
+      return {
+        needsReplan: false,
+        reason: "No drift detected",
+        risk: "low",
+        requiresUserConfirmation: false,
+      };
   }
-
-  const doneNodes = plan.nodes.filter(
-    (n) => n.status === "done" || n.status === "skipped",
-  ).length;
-
-  if (
-    doneNodes > 0 &&
-    nodeResult.status === "done" &&
-    plan.nodes.every((n) => n.status === "done" || n.status === "skipped")
-  ) {
-    return { needsReplan: false };
-  }
-
-  if (nodeResult.status === "blocked" || nodeResult.status === "failed") {
-    return {
-      needsReplan: true,
-      risk: "high",
-      reason: nodeResult.status === "failed" ? nodeResult.error : nodeResult.reason,
-      proposedPatch: {
-        operation: "update_node",
-        nodePatches: [
-          {
-            nodeId: node.id,
-            patch: {
-              requiresHumanInput: true,
-              status: "waiting_for_user",
-            },
-          },
-        ],
-      },
-      requiresUserConfirmation: true,
-    };
-  }
-
-  if (nodeResult.status === "waiting_for_user") {
-    return { needsReplan: false };
-  }
-
-  return { needsReplan: false };
 }

@@ -36,7 +36,7 @@ async function runQueuedTaskPlanGeneration(input: {
     logger.info("job.done", {
       taskId: input.taskId,
       reason: input.reason,
-      savedPlanId: result?.savedPlan?.id ?? null,
+      savedPlanId: result?.planId ?? null,
     });
     return result;
   } catch (error) {

@@ -5,14 +5,15 @@ import {
   createTask,
   deleteTask,
   ensureTaskInWorkspace,
-  enrichPlanGraphNodes,
-  getAcceptedTaskPlanGraph,
-  getLatestTaskPlanGraph,
+  getAcceptedCompiledPlan,
+  getLatestCompiledPlan,
+  getLayers,
   getTaskPage,
   isTaskPlanGenerationRunning,
   listTasksByWorkspace,
   updateTask,
 } from "@chrona/engine";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 
 import {
   VALID_TASK_STATUSES,
@@ -195,27 +196,34 @@ export function createTasksRoutes() {
   api.get("/tasks/:taskId/plan-state", async (c) => {
     try {
       const taskId = c.req.param("taskId");
-      const savedAiPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? (await getLatestTaskPlanGraph(taskId));
-      const enrichedPlan = savedAiPlan ? enrichPlanGraphNodes(savedAiPlan.plan) : null;
+      const plan = await getAcceptedCompiledPlan(taskId);
+      const layers = plan ? await getLayers(taskId, plan.planId) : [];
+      const effective = plan ? resolveEffectivePlanGraph(plan.compiledPlan, layers) : null;
+      const planStatus = plan?.compiledPlan?.editablePlanId ? "accepted" : 
+        (await getLatestCompiledPlan(taskId)) ? "waiting_acceptance" : "no_plan";
       const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
         ? "generating"
-        : savedAiPlan?.status === "accepted"
+        : planStatus === "accepted"
           ? "accepted"
-          : savedAiPlan
+          : planStatus === "waiting_acceptance"
             ? "waiting_acceptance"
             : "idle";
       return json(c, {
         taskId,
         aiPlanGenerationStatus,
-        savedAiPlan: savedAiPlan
+        plan: effective
           ? {
-              id: savedAiPlan.id,
-              status: savedAiPlan.status,
-              prompt: savedAiPlan.prompt,
-              revision: savedAiPlan.revision,
-              summary: savedAiPlan.summary,
-              updatedAt: savedAiPlan.updatedAt,
-              plan: enrichedPlan,
+              id: plan?.planId,
+              status: planStatus,
+              nodes: effective.nodes.map((n) => ({
+                id: n.id,
+                localId: n.localId,
+                title: n.title,
+                type: n.type,
+                status: n.status,
+                ready: n.ready,
+                blockedReason: n.blockedReason,
+              })),
             }
           : null,
       });

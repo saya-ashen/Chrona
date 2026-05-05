@@ -1,77 +1,25 @@
 import { db } from "@/lib/db";
 import { createLogger, summarizeText } from "@/lib/logger";
 import { aiGeneratePlan } from "@/modules/ai/ai-service";
-import type { TaskPlanGraph, TaskPlanGraphResponse, TaskPlanStatus } from "@chrona/contracts/ai";
-import { getLatestTaskPlanGraph, saveTaskPlanGraph, enrichPlanGraphNodes } from "@/modules/tasks/task-plan-graph-store";
+import type { PlanOverlayLayer, RuntimeLayer } from "@chrona/contracts/ai";
+import { saveCompiledPlan, getLatestCompiledPlan, getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { savePlanRun, appendLayer, getLayers } from "@/modules/plan-execution/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-run-bridge";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 
 const logger = createLogger("command.generate-task-plan-for-task");
 
-export type GenerateTaskPlanForTaskResult = TaskPlanGraphResponse & {
-  reasoning?: string;
-};
-
-function buildSavedPlanSummary(savedPlan: {
-  id: string;
-  status: TaskPlanStatus;
-  prompt: string | null;
-  revision: number;
+export type GenerateTaskPlanForTaskResult = {
+  planId: string;
+  compiledPlanId: string;
+  title: string;
+  goal: string;
+  layers: PlanOverlayLayer[];
   summary: string | null;
-  updatedAt: string;
-}) {
-  return {
-    id: savedPlan.id,
-    status: savedPlan.status,
-    prompt: savedPlan.prompt,
-    revision: savedPlan.revision,
-    summary: savedPlan.summary,
-    updatedAt: savedPlan.updatedAt,
-  };
-}
-
-function buildDraftPlanGraph(input: {
-  taskId: string;
-  prompt: string | null;
-  generatedBy: string;
-  planResult: GenerateTaskPlanResponse;
-}) {
-  const graph = compilePlanBlueprint({
-    graphId: `graph-${input.taskId || "adhoc"}-${Date.now()}`,
-    taskId: input.taskId,
-    blueprint: input.planResult.blueprint,
-    prompt: input.prompt,
-    generatedBy: input.generatedBy,
-    source: "ai",
-    status: "draft",
-    revision: 1,
-  });
-  return enrichPlanGraphNodes(graph);
-}
-
-function buildPlanResponse(input: {
-  source: string;
-  planGraph: TaskPlanGraph;
-  taskSessionKey?: string | null;
-  savedPlan?: {
-    id: string;
-    status: TaskPlanStatus;
-    prompt: string | null;
-    revision: number;
-    summary: string | null;
-    updatedAt: string;
-  };
-  reasoning?: string;
-}): GenerateTaskPlanForTaskResult {
-  return {
-    source: input.source,
-    planGraph: input.planGraph,
-    taskSessionKey: input.taskSessionKey ?? null,
-    savedPlan: input.savedPlan,
-    reasoning: input.reasoning,
-  };
-}
+};
 
 export async function generateTaskPlanForTask(input: {
   taskId: string;
@@ -101,14 +49,18 @@ export async function generateTaskPlanForTask(input: {
   ).sessionKey;
 
   if (!input.forceRefresh) {
-    const savedPlan = await getLatestTaskPlanGraph(task.id);
-    if (savedPlan) {
-      return buildPlanResponse({
-        source: "saved",
-        planGraph: savedPlan.plan,
-        taskSessionKey: sharedTaskSessionKey,
-        savedPlan: buildSavedPlanSummary(savedPlan),
-      });
+    const savedCompiled = await getLatestCompiledPlan(task.id);
+    if (savedCompiled) {
+      const layers = await getLayers(task.id, savedCompiled.compiledPlan.editablePlanId);
+      const effective = resolveEffectivePlanGraph(savedCompiled.compiledPlan, layers);
+      return {
+        planId: savedCompiled.compiledPlan.editablePlanId,
+        compiledPlanId: savedCompiled.compiledPlan.id,
+        title: effective.nodes.length > 0 ? effective.nodes[0].title : "Plan",
+        goal: "",
+        layers,
+        summary: savedCompiled.summary,
+      };
     }
   }
 
@@ -149,41 +101,56 @@ export async function generateTaskPlanForTask(input: {
   }
 
   if (planResult.blueprint.nodes.length === 0) {
-      logger.warn("request.empty_plan", {
-        taskId: task.id,
-        source: planResult.source,
-        summary: summarizeText(planResult.blueprint.title),
-      });
-      return null;
-    }
+    logger.warn("request.empty_plan", {
+      taskId: task.id,
+      source: planResult.source,
+      summary: summarizeText(planResult.blueprint.title),
+    });
+    return null;
+  }
 
-  const draftPlan = buildDraftPlanGraph({
+  const { compiledPlan, initialLayer, planId } = compilePlanBlueprint({
     taskId: task.id,
+    blueprint: planResult.blueprint,
     prompt: input.planningPrompt ?? null,
     generatedBy: planResult.source ?? "ai",
-    planResult,
+    source: "ai",
   });
-  const savedPlan = await saveTaskPlanGraph({
+
+  // Store compiled plan
+  await saveCompiledPlan({
     workspaceId: task.workspaceId,
     taskId: task.id,
-    plan: draftPlan,
-    prompt: input.planningPrompt ?? null,
+    compiledPlan,
     status: "draft",
-    source: "ai",
+    prompt: input.planningPrompt ?? null,
+    summary: planResult.blueprint.title ?? null,
     generatedBy: planResult.source ?? "ai",
-    summary: draftPlan.summary,
+  });
+
+  // Create initial PlanRun with the initial layer
+  const initialLayers: PlanOverlayLayer[] = [initialLayer];
+  const run = createPlanRunFromCompiledPlan(compiledPlan, initialLayers);
+  await savePlanRun({
+    workspaceId: task.workspaceId,
+    taskId: task.id,
+    planId,
+    run,
+    layers: initialLayers,
   });
 
   logger.info("request.saved", {
     taskId: task.id,
-    savedPlanId: savedPlan.id,
-    revision: savedPlan.revision,
+    planId,
+    compiledPlanId: compiledPlan.id,
   });
 
-  return buildPlanResponse({
-    source: planResult.source,
-    planGraph: savedPlan.plan,
-    taskSessionKey: sharedTaskSessionKey,
-    savedPlan: buildSavedPlanSummary(savedPlan),
-  });
+  return {
+    planId,
+    compiledPlanId: compiledPlan.id,
+    title: compiledPlan.nodes[0]?.title ?? "Plan",
+    goal: "",
+    layers: initialLayers,
+    summary: planResult.blueprint.title ?? null,
+  };
 }

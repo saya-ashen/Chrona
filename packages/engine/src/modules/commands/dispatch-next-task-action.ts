@@ -1,7 +1,9 @@
 import { aiDispatchTask } from "@/modules/ai/ai-service";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { db } from "@/lib/db";
-import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers } from "@/modules/plan-execution/plan-run-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 import type { DispatchTaskOutput, TaskDispatchPolicy } from "@chrona/contracts";
 
 const DEFAULT_DISPATCH_POLICY = {
@@ -22,18 +24,21 @@ export async function dispatchNextTaskAction(input: {
     throw new Error(`Task ${input.taskId} not found in workspace ${input.workspaceId}`);
   }
 
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
-    throw new Error(`No accepted plan graph found for task ${input.taskId}`);
+  const accepted = await getAcceptedCompiledPlan(input.taskId);
+  if (!accepted) {
+    throw new Error(`No accepted plan found for task ${input.taskId}`);
   }
 
-  const linkedTasks = acceptedPlan.plan.nodes
-    .filter((node) => node.linkedTaskId)
-    .map((node) => ({
-      taskId: node.linkedTaskId as string,
-      nodeId: node.id,
-      status: node.status,
-      title: node.title,
+  const layers = await getLayers(input.taskId, accepted.planId);
+  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
+
+  const linkedTasks = effective.nodes
+    .filter((n) => n.linkedTaskId)
+    .map((n) => ({
+      taskId: n.linkedTaskId!,
+      nodeId: n.localId ?? n.id,
+      status: n.status,
+      title: n.title,
     }));
 
   const latestRuns = (
@@ -81,18 +86,30 @@ export async function dispatchNextTaskAction(input: {
     title: approval.title,
   }));
 
-  const blockers = acceptedPlan.plan.nodes
-    .filter((node) => node.status === "blocked" || node.status === "waiting_for_user")
-    .map((node) => ({
-      id: node.id,
-      type: node.status,
-      reason: node.blockingReason ?? "unknown",
+  const blockers = effective.nodes
+    .filter((n) => n.status === "blocked" || n.status === "waiting_for_user")
+    .map((n) => ({
+      id: n.localId ?? n.id,
+      type: n.status,
+      reason: n.blockedReason ?? "unknown",
     }));
+
+  // Build a summary of the plan for AI dispatch
+  const planSummary = {
+    planId: accepted.planId,
+    nodes: effective.nodes.map((n) => ({
+      id: n.localId ?? n.id,
+      title: n.title,
+      type: n.type,
+      status: n.status,
+    })),
+    readyNodeIds: effective.readyNodeIds,
+  };
 
   const result = await aiDispatchTask({
     taskId: input.taskId,
     workspaceId: input.workspaceId,
-    acceptedPlan: acceptedPlan.plan,
+    acceptedPlan: planSummary as unknown as import("@chrona/contracts/ai").TaskPlanGraph,
     linkedTasks,
     latestRuns,
     recentEvents,

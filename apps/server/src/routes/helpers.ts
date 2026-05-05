@@ -45,18 +45,28 @@ export function testLlm(config: Record<string, unknown>) {
 }
 
 export function buildSavedPlanSummary(savedPlan: {
-  id: string;
-  status: TaskPlanStatus;
+  memoryId?: string;
+  id?: string;
+  status: string;
   prompt: string | null;
-  revision: number;
+  revision?: number;
   summary: string | null;
-  updatedAt: string;
+  updatedAt?: string;
+  createdAt?: string;
 }) {
+  let planId = "id" in savedPlan && typeof savedPlan.id === "string" ? savedPlan.id : "";
+  if ("compiledPlan" in savedPlan && savedPlan.compiledPlan && typeof savedPlan.compiledPlan === "object") {
+    const cp = savedPlan.compiledPlan as { editablePlanId?: string };
+    planId = cp.editablePlanId ?? planId;
+  }
+  if (!planId && "memoryId" in savedPlan && typeof savedPlan.memoryId === "string") {
+    planId = savedPlan.memoryId;
+  }
   return {
-    id: savedPlan.id,
+    id: planId,
     status: savedPlan.status,
     prompt: savedPlan.prompt,
-    revision: savedPlan.revision,
+    revision: savedPlan.revision ?? 1,
     summary: savedPlan.summary,
     updatedAt: savedPlan.updatedAt,
   };

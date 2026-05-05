@@ -1,22 +1,17 @@
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
 import type { PlanBlueprint } from "@chrona/contracts/ai";
 import type {
   RuntimeCommand,
   CompiledPlan,
 } from "@chrona/contracts/ai";
 import {
-  acceptTaskPlanGraph,
   aiGeneratePlan,
   aiGeneratePlanStream,
   ensureDefaultTaskSession,
   generateTaskPlanForTask,
-  getAcceptedTaskPlanGraph,
-  getLatestTaskPlanGraph,
   materializeTaskPlan,
-  saveTaskPlanGraph,
   savePlanRun,
   getPlanRun,
   getLatestPlanRun,
@@ -25,18 +20,22 @@ import {
   getTaskOrThrow,
   getTasksWithProjections,
   applyPlanPatchCommand,
+  saveCompiledPlan,
+  getLatestCompiledPlan,
+  getAcceptedCompiledPlan,
+  getEditablePlan,
+  appendLayer,
+  getLayers,
+  createPlanRunFromCompiledPlan,
+  applyCommandAndProduceLayer,
 } from "@chrona/engine";
-import { compilePlanBlueprint } from "@chrona/engine";
+import { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "@chrona/engine";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
 } from "@chrona/engine";
-import {
-  createPlanRunFromGraph,
-  applyCommandAndSyncGraph,
-} from "@chrona/engine";
-import { compileEditablePlan } from "@chrona/domain";
+import { compileEditablePlan, resolveEffectivePlanGraph } from "@chrona/domain";
 import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 
 import {
@@ -70,16 +69,26 @@ export function createPlansRoutes() {
         await ensurePlanInWorkspace(planId, taskId, workspaceId);
       }
 
-      const savedPlan = await acceptTaskPlanGraph({ taskId, planId });
+      const latest = await getLatestCompiledPlan(taskId);
+      if (!latest || latest.compiledPlan.editablePlanId !== planId) {
+        return error(c, "Plan not found", 404);
+      }
+      await saveCompiledPlan({
+        workspaceId: latest.workspaceId,
+        taskId,
+        compiledPlan: latest.compiledPlan,
+        status: "accepted",
+        prompt: latest.prompt,
+        summary: latest.summary,
+        generatedBy: latest.generatedBy,
+      });
       return json(c, {
         savedPlan: {
-          id: savedPlan.id,
-          status: savedPlan.status,
-          prompt: savedPlan.prompt,
-          revision: savedPlan.revision,
-          summary: savedPlan.summary,
-          updatedAt: savedPlan.updatedAt,
-          plan: savedPlan.plan,
+          id: planId,
+          status: "accepted",
+          prompt: latest.prompt,
+          plan: latest.compiledPlan,
+          summary: latest.summary,
         },
       });
     } catch (cause) {
@@ -180,37 +189,41 @@ export function createPlansRoutes() {
       }
 
       if (taskId && !forceRefresh) {
-        const savedPlan = await getLatestTaskPlanGraph(taskId);
-        if (savedPlan) {
-          if (wantsStream) {
-            const encoder = new TextEncoder();
-            const stream = new ReadableStream({
-              start(controller) {
-                controller.enqueue(encoder.encode(sseEncode("result", {
-                  source: "saved",
-                  planGraph: savedPlan.plan,
-                  taskSessionKey: sharedTaskSessionKey,
-                  savedPlan: buildSavedPlanSummary(savedPlan),
-                })));
-                controller.enqueue(encoder.encode(sseEncode("done", {})));
-                controller.close();
-              },
-            });
-            return new Response(stream, {
-              headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                Connection: "keep-alive",
-              },
-            });
-          }
+          const savedCompiled = await getLatestCompiledPlan(taskId);
+          if (savedCompiled) {
+            const layers = await getLayers(taskId, savedCompiled.compiledPlan.editablePlanId);
+            const effective = resolveEffectivePlanGraph(savedCompiled.compiledPlan, layers);
+            if (wantsStream) {
+              const encoder = new TextEncoder();
+              const stream = new ReadableStream({
+                start(controller) {
+                  controller.enqueue(encoder.encode(sseEncode("result", {
+                    source: "saved",
+                    compiledPlan: savedCompiled.compiledPlan,
+                    effectivePlanGraph: effective,
+                    taskSessionKey: sharedTaskSessionKey,
+                    savedPlan: buildSavedPlanSummary(savedCompiled),
+                  })));
+                  controller.enqueue(encoder.encode(sseEncode("done", {})));
+                  controller.close();
+                },
+              });
+              return new Response(stream, {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  Connection: "keep-alive",
+                },
+              });
+            }
 
-          return json(c, {
-            source: "saved",
-            planGraph: savedPlan.plan,
-            taskSessionKey: sharedTaskSessionKey,
-            savedPlan: buildSavedPlanSummary(savedPlan),
-          });
+            return json(c, {
+              source: "saved",
+              compiledPlan: savedCompiled.compiledPlan,
+              effectivePlanGraph: effective,
+              taskSessionKey: sharedTaskSessionKey,
+              savedPlan: buildSavedPlanSummary(savedCompiled),
+            });
         }
       }
 
@@ -386,40 +399,46 @@ export function createPlansRoutes() {
         return error(c, "AI planning unavailable", 503);
       }
 
-      const plan: TaskPlanGraph = compilePlanBlueprint({
-        graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
+      const compResult = compilePlanBlueprint({
         taskId: taskId ?? "",
         blueprint: planResult.blueprint,
         prompt: planningPrompt ?? null,
         generatedBy: planResult.source ?? "ai",
         source: "ai",
-        status: "draft",
-        revision: 1,
       });
 
       if (taskId && resolvedWorkspaceId) {
-        const savedPlan = await saveTaskPlanGraph({
+        await saveCompiledPlan({
           workspaceId: resolvedWorkspaceId,
           taskId,
-          plan,
-          prompt: planningPrompt ?? null,
+          compiledPlan: compResult.compiledPlan,
           status: "draft",
-          source: "ai",
+          prompt: planningPrompt ?? null,
+          summary: planResult.blueprint.title ?? null,
           generatedBy: planResult.source ?? "ai",
-          summary: plan.summary,
+        });
+
+        const run = createPlanRunFromCompiledPlan(compResult.compiledPlan, [compResult.initialLayer]);
+        await savePlanRun({
+          workspaceId: resolvedWorkspaceId,
+          taskId,
+          planId: compResult.planId,
+          run,
+          layers: [compResult.initialLayer],
         });
 
         return json(c, {
           source: planResult.source,
-          planGraph: savedPlan.plan,
+          compiledPlan: compResult.compiledPlan,
+          planId: compResult.planId,
           taskSessionKey: sharedTaskSessionKey,
-          savedPlan: buildSavedPlanSummary(savedPlan),
         });
       }
 
       return json(c, {
         source: planResult.source,
-        planGraph: plan,
+        compiledPlan: compResult.compiledPlan,
+        planId: compResult.planId,
         taskSessionKey: sharedTaskSessionKey,
       });
     } catch (cause) {
@@ -455,48 +474,65 @@ export function createPlansRoutes() {
         }
       }
 
-      let graphPlan = null;
+      let compiledPlan: CompiledPlan | null = null;
+      let planId: string | null = null;
+      let graphPlan: { compiledPlan: CompiledPlan; planId: string } | null = null;
       if (providedBlueprint && Array.isArray(providedBlueprint.nodes) && providedBlueprint.nodes.length > 0) {
-        const plan: TaskPlanGraph = compilePlanBlueprint({
-          graphId: `graph-${taskId}-${Date.now()}`,
+        const compResult = compilePlanBlueprint({
           taskId,
           blueprint: providedBlueprint,
           generatedBy: "batch-apply",
           source: "ai",
-          status: "draft",
-          revision: 1,
         });
-        graphPlan = await saveTaskPlanGraph({
+        compiledPlan = compResult.compiledPlan;
+        planId = compResult.planId;
+        graphPlan = { compiledPlan: compResult.compiledPlan, planId: compResult.planId };
+
+        await saveCompiledPlan({
           workspaceId: task.workspaceId,
           taskId: task.id,
-          plan,
+          compiledPlan: compResult.compiledPlan,
           status: "draft",
-          source: "ai",
           generatedBy: "batch-apply",
-          summary: plan.summary,
+          summary: providedBlueprint.title ?? null,
+        });
+
+        const run = createPlanRunFromCompiledPlan(compResult.compiledPlan, [compResult.initialLayer]);
+        await savePlanRun({
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          planId: compResult.planId,
+          run,
+          layers: [compResult.initialLayer],
         });
       } else {
-        graphPlan = await getLatestTaskPlanGraph(taskId);
-        if (!graphPlan) {
+        const savedCompiled = await getLatestCompiledPlan(taskId);
+        if (!savedCompiled) {
           return error(c, "No plan found for task", 404);
         }
+        compiledPlan = savedCompiled.compiledPlan;
+        planId = savedCompiled.compiledPlan.editablePlanId;
+        graphPlan = { compiledPlan: savedCompiled.compiledPlan, planId: savedCompiled.compiledPlan.editablePlanId };
       }
 
       const materialized = await materializeTaskPlan({ taskId: task.id });
       const createdTasks = await getTasksWithProjections(materialized.createdTaskIds);
-      const acceptedPlan = (await getAcceptedTaskPlanGraph(taskId)) ?? graphPlan;
+      const accepted = await getAcceptedCompiledPlan(taskId);
+      const layers = accepted ? await getLayers(taskId, accepted.planId) : [];
+      const effective = accepted ? resolveEffectivePlanGraph(accepted.compiledPlan, layers) : null;
       const materializedNodeIds = new Set(
-        acceptedPlan?.plan.nodes
+        (effective?.nodes ?? [])
           .filter((node) => typeof node.linkedTaskId === "string" && node.linkedTaskId.length > 0)
-          .map((node) => node.id) ?? [],
+          .map((node) => node.id),
       );
-      const requestedNodeIds = new Set((acceptedPlan?.plan.nodes ?? []).map((node) => node.id));
+      const requestedNodeIds = new Set((effective?.nodes ?? []).map((node) => node.id));
       const skippedNodeIds = [...requestedNodeIds].filter((nodeId) => !materializedNodeIds.has(nodeId));
 
       return json(c, {
         parentTaskId: taskId,
         childTasks: createdTasks,
-        planGraph: graphPlan.plan,
+        compiledPlan,
+        planId,
         materialization: {
           createdTaskIds: materialized.createdTaskIds,
           updatedNodeIds: materialized.updatedNodeIds,
@@ -553,20 +589,20 @@ export function createPlansRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const accepted = await getAcceptedTaskPlanGraph(taskId);
+      const accepted = await getAcceptedCompiledPlan(taskId);
       if (!accepted) return error(c, "No accepted plan found for this task", 404);
 
-      const result = createPlanRunFromGraph(accepted.plan);
-      if (!result) return error(c, "Failed to create PlanRun — plan may lack a blueprint", 400);
+      const result = createPlanRunFromCompiledPlan(accepted.compiledPlan, []);
+      if (!result) return error(c, "Failed to create PlanRun", 400);
 
       await savePlanRun({
         workspaceId: task.workspaceId,
         taskId,
-        planId: accepted.plan.id,
-        run: result.run,
+        planId: accepted.planId,
+        run: result,
       });
 
-      return json(c, { planRun: result.run }, 201);
+      return json(c, { planRun: result }, 201);
     } catch (cause) {
       return internalServerError(c, "POST /api/plan-runs/from-accepted", cause, "Failed to create PlanRun");
     }
@@ -588,49 +624,30 @@ export function createPlansRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const accepted = await getAcceptedTaskPlanGraph(taskId);
+      const accepted = await getAcceptedCompiledPlan(taskId);
       if (!accepted) return error(c, "No accepted plan found for this task", 404);
 
-      const planRun = await getPlanRun(taskId, accepted.plan.id);
-      if (!planRun) return error(c, "No PlanRun found. Create one first via POST /api/plan-runs/from-accepted", 404);
+      const runAndLayers = await getPlanRun(taskId, accepted.planId);
+      if (!runAndLayers) return error(c, "No PlanRun found. Create one first via POST /api/plan-runs/from-accepted", 404);
 
-      if (!accepted.plan.blueprint) {
-        return error(c, "Plan lacks a blueprint — cannot compile", 400);
-      }
-
-      let compiled: CompiledPlan;
-      try {
-        const editable = upgradeBlueprintToEditable(accepted.plan.blueprint, accepted.plan.id);
-        compiled = compileEditablePlan(editable);
-      } catch {
-        return error(c, "Failed to compile plan blueprint", 400);
-      }
-
-      const result = applyCommandAndSyncGraph(planRun, compiled, command, accepted.plan);
+      const result = applyCommandAndProduceLayer(runAndLayers.planRun, accepted.compiledPlan, command, 1);
 
       if (!result.ok || !result.run) {
         return json(c, { ok: false, error: result.error }, 400);
       }
 
+      const layers = [...runAndLayers.layers];
+      if (result.layer) {
+        layers.push(result.layer);
+      }
+
       await savePlanRun({
         workspaceId: task.workspaceId,
         taskId,
-        planId: accepted.plan.id,
+        planId: accepted.planId,
         run: result.run,
+        layers,
       });
-
-      if (result.graph) {
-        await saveTaskPlanGraph({
-          workspaceId: task.workspaceId,
-          taskId,
-          plan: result.graph,
-          status: accepted.status,
-          source: accepted.source,
-          generatedBy: accepted.generatedBy,
-          summary: accepted.summary,
-          changeSummary: `Runtime command: ${command.type}`,
-        });
-      }
 
       return json(c, { ok: true, planRun: result.run });
     } catch (cause) {

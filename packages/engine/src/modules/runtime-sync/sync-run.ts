@@ -11,7 +11,6 @@ import {
   progressAcceptedTaskPlan,
   syncParentTaskStateFromAcceptedPlan,
 } from "@/modules/commands/progress-accepted-task-plan";
-import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
 import { syncAcceptedTaskPlanForTask } from "@/modules/tasks/sync-task-plan-graph";
 import {
   decodeSyncCursor,
@@ -287,27 +286,21 @@ export async function syncRunFromRuntime(input: {
   });
 
   if (run.task.parentTaskId) {
-    const acceptedPlan = await getAcceptedTaskPlanGraph(run.task.parentTaskId);
-    const acceptedPlanWithTaskId = acceptedPlan?.taskId
-      ? { ...acceptedPlan, taskId: acceptedPlan.taskId }
-      : null;
-    if (acceptedPlanWithTaskId) {
-      await syncAcceptedTaskPlanForTask({
-        savedPlan: acceptedPlanWithTaskId,
-        linkedTaskId: run.taskId,
-        taskStatus: snapshot.status,
+    await syncAcceptedTaskPlanForTask({
+      taskId: run.task.parentTaskId,
+      linkedTaskId: run.taskId,
+      taskStatus: snapshot.status,
+    });
+    if (snapshot.status === "Completed") {
+      await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });
+    } else if (snapshot.status === "WaitingForApproval") {
+      await db.task.update({
+        where: { id: run.task.parentTaskId },
+        data: { status: "WaitingForApproval", completedAt: null },
       });
-      if (snapshot.status === "Completed") {
-        await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });
-      } else if (snapshot.status === "WaitingForApproval") {
-        await db.task.update({
-          where: { id: run.task.parentTaskId },
-          data: { status: "WaitingForApproval", completedAt: null },
-        });
-        await rebuildTaskProjection(run.task.parentTaskId);
-      } else {
-        await syncParentTaskStateFromAcceptedPlan(run.task.parentTaskId);
-      }
+      await rebuildTaskProjection(run.task.parentTaskId);
+    } else {
+      await syncParentTaskStateFromAcceptedPlan(run.task.parentTaskId);
     }
   }
 

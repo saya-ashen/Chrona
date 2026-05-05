@@ -1,17 +1,12 @@
-import type { SavedTaskPlanGraph, TaskPlanGraph, TaskPlanNode } from "@chrona/contracts/ai";
-import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers, appendLayer } from "@/modules/plan-execution/plan-run-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
+import type { RuntimeLayer, EffectivePlanNode } from "@chrona/contracts/ai";
 
-type SyncPlanNodeFromTaskInput = {
-  plan: TaskPlanGraph;
-  linkedTaskId: string;
-  taskStatus: string;
-  completionSummary?: string | null;
-};
-
-function mapTaskStatusToPlanNodeStatus(taskStatus: string): TaskPlanNode["status"] | null {
+function mapTaskStatusToNodeStatus(taskStatus: string): EffectivePlanNode["status"] | null {
   switch (taskStatus) {
     case "Running":
-      return "in_progress";
+      return "running";
     case "WaitingForInput":
       return "waiting_for_user";
     case "Blocked":
@@ -19,60 +14,62 @@ function mapTaskStatusToPlanNodeStatus(taskStatus: string): TaskPlanNode["status
       return "blocked";
     case "Completed":
     case "Done":
-      return "done";
+      return "completed";
     default:
       return null;
   }
 }
 
-function syncTaskPlanNodeFromTask(input: SyncPlanNodeFromTaskInput): TaskPlanGraph {
-  const nextStatus = mapTaskStatusToPlanNodeStatus(input.taskStatus);
-  if (!nextStatus) {
-    return input.plan;
-  }
-
-  return {
-    ...input.plan,
-    nodes: input.plan.nodes.map((node) => {
-      if (node.linkedTaskId !== input.linkedTaskId) {
-        return node;
-      }
-      return {
-        ...node,
-        status: nextStatus,
-        completionSummary:
-          nextStatus === "done"
-            ? input.completionSummary?.trim() || "Awaiting agent-authored completion summary."
-            : node.completionSummary,
-      };
-    }),
-  };
-}
-
 export async function syncAcceptedTaskPlanForTask(input: {
-  savedPlan: SavedTaskPlanGraph & { taskId: string };
+  taskId: string;
   linkedTaskId: string;
   taskStatus: string;
   completionSummary?: string | null;
 }) {
-  const nextPlan = syncTaskPlanNodeFromTask({
-    plan: input.savedPlan.plan,
-    linkedTaskId: input.linkedTaskId,
-    taskStatus: input.taskStatus,
-    completionSummary: input.completionSummary,
-  });
+  const accepted = await getAcceptedCompiledPlan(input.taskId);
+  if (!accepted) {
+    throw new Error("Accepted compiled plan not found");
+  }
 
-  await saveTaskPlanGraph({
-    workspaceId: input.savedPlan.workspaceId,
-    taskId: input.savedPlan.taskId,
-    plan: nextPlan,
-    prompt: input.savedPlan.prompt ?? undefined,
-    status: input.savedPlan.status,
-    source: input.savedPlan.source,
-    generatedBy: input.savedPlan.generatedBy ?? undefined,
-    summary: input.savedPlan.summary ?? undefined,
-    changeSummary: input.savedPlan.changeSummary ?? undefined,
-  });
+  const layers = await getLayers(input.taskId, accepted.planId);
+  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
 
-  return nextPlan;
+  // Find the node linked to this child task
+  const linkedNode = effective.nodes.find(
+    (n) => n.linkedTaskId === input.linkedTaskId,
+  );
+
+  if (!linkedNode) {
+    return; // Node not found in plan — nothing to sync
+  }
+
+  const nextStatus = mapTaskStatusToNodeStatus(input.taskStatus);
+  if (!nextStatus) {
+    return; // No status change needed
+  }
+
+  const layer: RuntimeLayer = {
+    type: "runtime",
+    planId: accepted.planId,
+    timestamp: new Date().toISOString(),
+    layerId: `sync_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: 1,
+    active: true,
+    source: "system",
+    nodeStates: {
+      [linkedNode.id]: {
+        status: nextStatus,
+        ...(nextStatus === "completed" && input.completionSummary
+          ? { output: { completionSummary: input.completionSummary } }
+          : {}),
+      },
+    },
+  };
+
+  await appendLayer({
+    workspaceId: accepted.workspaceId,
+    taskId: input.taskId,
+    planId: accepted.planId,
+    layer,
+  });
 }
