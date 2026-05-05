@@ -324,9 +324,16 @@ describe("Task CRUD workflow", () => {
 
     expect(res.status).toBe(200);
     const task = await expectTaskExists(taskId);
+    const workBlock = await db.workBlock.findFirst({
+      where: { taskId, status: { in: ["Scheduled", "Active"] } },
+      orderBy: { scheduledStartAt: "asc" },
+    });
+    const projection = await db.taskProjection.findUnique({ where: { taskId } });
     expect(task.status).toBe("Blocked");
-    expect(new Date(String(task.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
-    expect(new Date(String(task.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
+    expect(new Date(String(workBlock?.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
+    expect(new Date(String(workBlock?.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
+    expect(new Date(String(projection?.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
+    expect(new Date(String(projection?.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
   });
 
   it("detail-after-update reflects changes", async () => {

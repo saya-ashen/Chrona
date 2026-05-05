@@ -1,7 +1,7 @@
 import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executor";
 
-export type PlanDriftDecision = {
+type PlanDriftDecision = {
   needsReplan: boolean;
   reason: string;
   risk: "low" | "medium" | "high";

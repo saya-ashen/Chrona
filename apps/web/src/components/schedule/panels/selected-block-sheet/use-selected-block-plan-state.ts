@@ -131,7 +131,7 @@ export function useSelectedBlockPlanState({
   }, []);
 
   const fetchPlanState = useCallback(async () => {
-    const response = await fetch(`/api/tasks/${item.taskId}/plan-state`, {
+    const response = await fetch(`/api/tasks/${item.taskId}/plan/state`, {
       cache: "no-store",
     });
 
@@ -235,11 +235,10 @@ export function useSelectedBlockPlanState({
     if (!savedPlan?.id) return;
     setIsApplying(true);
     try {
-      const res = await fetch("/api/ai/task-plan/accept", {
+      const res = await fetch(`/api/tasks/${item.taskId}/plan/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          taskId: item.taskId,
           planId: savedPlan.id,
         }),
       });

@@ -14,12 +14,9 @@ vi.mock("@/i18n/client", () => ({
 const mockUseAutoComplete = vi.fn();
 const mockUseSmartAutomation = vi.fn();
 
-const mockUseSmartDecomposition = vi.fn(() => ({ result: null, isLoading: false, error: null }));
-
 vi.mock("@/hooks/use-ai", () => ({
   useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
   useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
-  useSmartDecomposition: (...args: unknown[]) => (mockUseSmartDecomposition as (...a: unknown[]) => unknown)(...args),
 }));
 
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
@@ -160,40 +157,7 @@ describe("TaskCreateDialog – AI integration", () => {
     expect(urgentButton.className).toContain("bg-primary");
   });
 
-  it("merged AI plan panel shows when decomposition handler is provided", () => {
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-    });
-    mockUseSmartAutomation.mockReturnValue({
-      suggestion: {
-        executionMode: "scheduled",
-        reminderStrategy: {
-          advanceMinutes: 15,
-          frequency: "once",
-          channels: ["push"],
-        },
-        preparationSteps: ["Review last week notes", "Gather metrics"],
-        contextSources: [],
-        confidence: "high",
-      },
-      isLoading: false,
-      error: null,
-    });
-
-    render(
-      <TaskCreateDialog
-        {...defaultProps}
-        initialTitle="Write weekly report"
-        onApplyDecomposition={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
-
-    expect(screen.getAllByText("AI Task Planning").length).toBeGreaterThan(0);
-  });
-
-  it("does not show merged AI plan panel when decomposition handler is absent", () => {
+  it("does not show task planning UI inside the create dialog", () => {
     mockUseAutoComplete.mockReturnValue({
       suggestions: [],
       isLoading: false,

@@ -10,7 +10,7 @@ export type NodeSessionDecision =
   | { kind: "wait_for_user"; reason: string }
   | { kind: "manual_only"; reason: string };
 
-export type SessionPolicyInput = {
+type SessionPolicyInput = {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
   parentTaskId: string;

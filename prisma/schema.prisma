@@ -156,10 +156,6 @@ model Task {
   sourceSessionId     String?
   parentTaskId        String?
   dueAt               DateTime?
-  scheduledStartAt    DateTime?
-  scheduledEndAt      DateTime?
-  scheduleStatus      ScheduleStatus         @default(Unscheduled)
-  scheduleSource      ScheduleSource?
   budgetLimit         Int?
   blockReason         Json?
   defaultSessionId    String?
@@ -184,7 +180,6 @@ model Task {
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
-  @@index([workspaceId, scheduleStatus])
   @@index([defaultSessionId])
 }
 

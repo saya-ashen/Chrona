@@ -5,6 +5,7 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { validateScheduleWindow } from "@chrona/domain";
 
@@ -131,10 +132,23 @@ export async function createTask(input: {
       ownerType: OwnerType.human,
       parentTaskId: input.parentTaskId ?? null,
       dueAt: input.dueAt ?? null,
-      scheduledStartAt: input.scheduledStartAt ?? null,
-      scheduledEndAt: input.scheduledEndAt ?? null,
     },
   });
+
+  if (input.scheduledStartAt && input.scheduledEndAt) {
+    const acceptedPlan = await getAcceptedCompiledPlan(task.id);
+    await db.workBlock.create({
+      data: {
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        planId: acceptedPlan?.compiledPlan.editablePlanId ?? null,
+        title: task.title,
+        scheduledStartAt: input.scheduledStartAt,
+        scheduledEndAt: input.scheduledEndAt,
+        trigger: "manual",
+      },
+    });
+  }
 
   if (input.parentTaskId) {
     await db.taskDependency.upsert({

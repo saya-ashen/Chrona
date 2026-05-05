@@ -6,7 +6,7 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
 
 const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
 

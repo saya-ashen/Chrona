@@ -67,8 +67,17 @@ describe("generateTaskPlanForTask", () => {
         status: "Ready",
         priority: "High",
         ownerType: "human",
+      },
+    });
+    await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
         scheduledStartAt: new Date("2026-04-12T09:00:00.000Z"),
         scheduledEndAt: new Date("2026-04-12T10:30:00.000Z"),
+        trigger: "manual",
       },
     });
 

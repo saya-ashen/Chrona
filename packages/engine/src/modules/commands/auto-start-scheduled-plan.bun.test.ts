@@ -39,6 +39,17 @@ async function createWorkspace() {
 }
 
 async function createDueTask(workspaceId: string, overrides: Record<string, unknown> = {}) {
+  const {
+    scheduledStartAt,
+    scheduledEndAt,
+    workBlockStatus,
+    ...taskOverrides
+  } = overrides as {
+    scheduledStartAt?: Date;
+    scheduledEndAt?: Date;
+    workBlockStatus?: "Scheduled" | "Active" | "Completed" | "Cancelled";
+  } & Record<string, unknown>;
+
   const task = await db.task.create({
     data: {
       workspaceId,
@@ -52,27 +63,23 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
       runtimeModel: "gpt-5.4",
       prompt: "Run task",
       runtimeConfig: { sessionStrategy: "per_subtask" },
-      scheduleStatus: "Scheduled",
-      scheduleSource: "human",
-      scheduledStartAt: new Date(Date.now() - 5 * 60_000),
-      scheduledEndAt: new Date(Date.now() + 55 * 60_000),
-      ...overrides,
+      ...taskOverrides,
     },
   });
 
-  await db.workBlock.create({
+  const workBlock = await db.workBlock.create({
     data: {
       workspaceId,
       taskId: task.id,
       title: task.title,
-      status: "Scheduled",
-      scheduledStartAt: (overrides.scheduledStartAt as Date) ?? new Date(Date.now() - 5 * 60_000),
-      scheduledEndAt: (overrides.scheduledEndAt as Date) ?? new Date(Date.now() + 55 * 60_000),
+      status: workBlockStatus ?? "Scheduled",
+      scheduledStartAt: scheduledStartAt ?? new Date(Date.now() - 5 * 60_000),
+      scheduledEndAt: scheduledEndAt ?? new Date(Date.now() + 55 * 60_000),
       trigger: "scheduled",
     },
   });
 
-  return task;
+  return { task, workBlock };
 }
 
 describe("auto-start-scheduled-plan", () => {
@@ -89,7 +96,7 @@ describe("auto-start-scheduled-plan", () => {
   it("starts due scheduled parent task and materializes automatic child-task nodes into separate sessions", async () => {
     const workspace = await createWorkspace();
 
-    const parentTask = await createDueTask(workspace.id, { title: "Ship weekly plan" });
+    const { task: parentTask, workBlock } = await createDueTask(workspace.id, { title: "Ship weekly plan" });
 
     await db.taskProjection.create({
       data: {
@@ -99,8 +106,8 @@ describe("auto-start-scheduled-plan", () => {
         displayState: "Ready",
         scheduleStatus: "Scheduled",
         scheduleSource: "human",
-        scheduledStartAt: parentTask.scheduledStartAt,
-        scheduledEndAt: parentTask.scheduledEndAt,
+        scheduledStartAt: workBlock.scheduledStartAt,
+        scheduledEndAt: workBlock.scheduledEndAt,
       },
     });
 
@@ -220,7 +227,7 @@ describe("auto-start-scheduled-plan", () => {
 
   it("skips tasks that already have an active run", async () => {
     const workspace = await createWorkspace();
-    const task = await createDueTask(workspace.id);
+    const { task } = await createDueTask(workspace.id);
 
     await db.run.create({
       data: {
@@ -240,9 +247,9 @@ describe("auto-start-scheduled-plan", () => {
     expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
-  it("skips tasks with non-Scheduled scheduleStatus", async () => {
+  it("ignores work blocks that are not scheduled", async () => {
     const workspace = await createWorkspace();
-    await createDueTask(workspace.id, { scheduleStatus: "Unscheduled" });
+    await createDueTask(workspace.id, { workBlockStatus: "Completed" });
 
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
@@ -252,7 +259,7 @@ describe("auto-start-scheduled-plan", () => {
 
   it("skips tasks without a runtime adapter key", async () => {
     const workspace = await createWorkspace();
-    const task = await createDueTask(workspace.id, {
+    const { task } = await createDueTask(workspace.id, {
       runtimeAdapterKey: null,
     });
 
@@ -267,7 +274,7 @@ describe("auto-start-scheduled-plan", () => {
 
   it("writes task.auto_start.skipped events for skipped tasks", async () => {
     const workspace = await createWorkspace();
-    const task = await createDueTask(workspace.id);
+    const { task } = await createDueTask(workspace.id);
 
     await db.run.create({
       data: {
@@ -297,8 +304,8 @@ describe("auto-start-scheduled-plan", () => {
 
   it("does not let one task failure block other due tasks", async () => {
     const workspace = await createWorkspace();
-    const task1 = await createDueTask(workspace.id, { title: "Task 1" });
-    const task2 = await createDueTask(workspace.id, { title: "Task 2" });
+    const { task: task1 } = await createDueTask(workspace.id, { title: "Task 1" });
+    const { task: task2 } = await createDueTask(workspace.id, { title: "Task 2" });
 
     let callCount = 0;
     startPlanExecutionMock.mockImplementation(async (input: { taskId: string }) => {
@@ -367,7 +374,7 @@ describe("auto-start-scheduled-plan", () => {
 
   it("activates work block on auto-start", async () => {
     const workspace = await createWorkspace();
-    const task = await createDueTask(workspace.id);
+    const { task } = await createDueTask(workspace.id);
 
     startPlanExecutionMock.mockResolvedValue({
       taskId: task.id,
@@ -392,7 +399,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(updatedBlock?.startedAt).not.toBeNull();
   });
 
-  it("skips tasks without active work blocks", async () => {
+  it("ignores tasks without work blocks", async () => {
     const workspace = await createWorkspace();
     await db.task.create({
       data: {
@@ -407,10 +414,6 @@ describe("auto-start-scheduled-plan", () => {
         runtimeModel: "gpt-5.4",
         prompt: "Run",
         runtimeConfig: { sessionStrategy: "per_subtask" },
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
-        scheduledStartAt: new Date(Date.now() - 5 * 60_000),
-        scheduledEndAt: new Date(Date.now() + 55 * 60_000),
       },
     });
 
@@ -435,10 +438,6 @@ describe("auto-start-scheduled-plan", () => {
         runtimeModel: "gpt-5.4",
         prompt: "Run",
         runtimeConfig: { sessionStrategy: "per_subtask" },
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
-        scheduledStartAt: new Date(Date.now() - 5 * 60_000),
-        scheduledEndAt: new Date(Date.now() + 55 * 60_000),
       },
     });
 

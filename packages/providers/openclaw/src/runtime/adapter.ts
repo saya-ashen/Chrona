@@ -1,11 +1,7 @@
 import type { OpenClawRuntimeClient } from "./runtime-client";
 import { OpenClawBridgeClient } from "../transport/bridge-client";
-import {
-  getOpenClawTaskConfigSpec,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
-  OPENCLAW_RUNTIME_INPUT_VERSION,
-  validateOpenClawTaskConfig,
-} from "../config/config";
+
+
 import type { RuntimeInput } from "@chrona/runtime-core";
 import type {
   OpenClawApprovalDecision,
@@ -18,13 +14,6 @@ import type {
   OpenClawSessionStatus,
 } from "../protocol/types";
 import { OpenClawOrchestrator } from "./orchestrator";
-
-export {
-  getOpenClawTaskConfigSpec,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
-  OPENCLAW_RUNTIME_INPUT_VERSION,
-  validateOpenClawTaskConfig,
-};
 
 export type OpenClawAdapter = {
   createRun(input: {

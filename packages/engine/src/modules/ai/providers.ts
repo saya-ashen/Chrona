@@ -1,8 +1,5 @@
 import { OpenClawClient } from "@chrona/providers-core";
-import type {
-  ProviderFeature,
-  ProviderResponse,
-} from "@chrona/providers-core";
+import type { ProviderFeature, ProviderResponse } from "@chrona/providers-core";
 import type {
   AiClientRecord,
   AiFeature,
@@ -34,40 +31,6 @@ export function getOrCreateClient(
   });
   clientCache.set(key, client);
   return client;
-}
-
-export function invalidateClientCache() {
-  clientCache.clear();
-}
-
-export async function* postBridgeFeatureStream(
-  config: OpenClawClientConfig,
-  feature: AiFeature,
-  body: {
-    sessionId?: string;
-    sessionKey?: string;
-    instructions?: string;
-    inputText?: string;
-    featureSpec?: PreparedAiFeatureSpec;
-    timeout?: number;
-    input?: Record<string, unknown>;
-  },
-): AsyncGenerator<{ type: string; data: string }> {
-  const client = getOrCreateClient(config);
-
-  for await (const event of client.executeFeatureStream(feature, {
-    sessionKey: body.sessionKey,
-    instructions: body.instructions,
-    inputText: body.inputText,
-    featureSpec: body.featureSpec,
-    timeout: body.timeout,
-    ...((body.input as Record<string, unknown>) ?? {}),
-  })) {
-    yield {
-      type: event.type,
-      data: event.data,
-    };
-  }
 }
 
 export async function checkClientHealth(
@@ -106,7 +69,8 @@ export async function checkClientHealth(
       } catch (error) {
         return {
           available: false,
-          reason: error instanceof Error ? error.message : "Failed to reach LLM",
+          reason:
+            error instanceof Error ? error.message : "Failed to reach LLM",
         };
       }
     }
@@ -115,7 +79,8 @@ export async function checkClientHealth(
   } catch (error) {
     return {
       available: false,
-      reason: error instanceof Error ? error.message : "Client health check failed",
+      reason:
+        error instanceof Error ? error.message : "Client health check failed",
     };
   }
 }
@@ -261,42 +226,7 @@ export async function llmCall(
   );
 }
 
-function buildBestPrompt(
-  feature: AiFeature,
-  systemPrompts: Record<string, string>,
-): { systemPrompt: string; userMessage: string } {
-  const systemPrompt = systemPrompts[feature] ?? systemPrompts["default"] ?? "";
-
-  return { systemPrompt, userMessage: systemPrompt };
-}
-
-export async function dispatchCall(
-  client: AiClientRecord,
-  feature: AiFeature,
-  input: unknown,
-  systemPrompts: Record<string, string>,
-): Promise<string> {
-  const inputText = typeof input === "string" ? input : JSON.stringify(input);
-  const userMessage =
-    typeof input === "string"
-      ? input
-      : (input as Record<string, unknown>).title as string | undefined ?? inputText;
-  const { systemPrompt } = buildBestPrompt(feature, systemPrompts);
-
-  if (client.type === "openclaw") {
-    return openclawFeaturePayload(client, feature, {
-      instructions: systemPrompt,
-      inputText: userMessage,
-    });
-  }
-
-  return llmFeaturePayload(client, systemPrompt, userMessage);
-}
-
-export function buildPreparedFeatureRequest(
-  feature: AiFeature,
-  input: unknown,
-): {
+export function buildPreparedFeatureRequest(input: unknown): {
   input: Record<string, unknown>;
   instructions: string;
   inputText: string;
@@ -322,7 +252,7 @@ export function buildPreparedFeatureRequest(
 // Dispatch helpers (used by feature-normalizers)
 // ────────────────────────────────────────────────────────────────────
 
-export type FeaturePayloadResult<T> = {
+type FeaturePayloadResult<T> = {
   parsed: T;
   rawText: string;
   debug?: StructuredDebugInfo;
@@ -342,13 +272,16 @@ async function openclawFeaturePayloadFull<T>(
 ): Promise<FeaturePayloadResult<T>> {
   const config = client.config as OpenClawClientConfig;
   const openClawClient = getOrCreateClient(config);
-  const result = await openClawClient.executeFeature(feature as ProviderFeature, {
-    sessionKey: body.sessionKey,
-    instructions: body.instructions,
-    inputText: body.inputText,
-    timeout: body.timeout,
-    ...(body.input as Record<string, unknown> ?? {}),
-  }) as ProviderResponse;
+  const result = (await openClawClient.executeFeature(
+    feature as ProviderFeature,
+    {
+      sessionKey: body.sessionKey,
+      instructions: body.instructions,
+      inputText: body.inputText,
+      timeout: body.timeout,
+      ...((body.input as Record<string, unknown>) ?? {}),
+    },
+  )) as ProviderResponse;
 
   if (result.error) {
     throw new AiClientError(result.error, client.type, "internal");
@@ -368,19 +301,22 @@ async function openclawFeaturePayloadFull<T>(
     debug: {
       rawOutput: result.structured?.rawOutput ?? result.output,
       error: result.structured?.error ?? result.error,
-      source: (result.structured?.source ?? result.feature?.source) as StructuredDebugInfo["source"],
+      source: (result.structured?.source ??
+        result.feature?.source) as StructuredDebugInfo["source"],
       feature: result.structured?.feature ?? result.feature?.feature ?? null,
       toolName: result.structured?.toolName ?? result.feature?.toolName ?? null,
       sessionId: result.structured?.sessionId ?? result.sessionId,
       runId: result.structured?.runId ?? result.runId,
       validationIssues: result.structured?.validationIssues,
-      bridgeToolCalls: result.structured?.bridgeToolCalls ?? result.toolCalls.map((tc) => ({
-        tool: tc.tool,
-        callId: tc.callId,
-        input: tc.input as Record<string, unknown>,
-        result: tc.result,
-        status: tc.status as "pending" | "completed" | "error",
-      })),
+      bridgeToolCalls:
+        result.structured?.bridgeToolCalls ??
+        result.toolCalls.map((tc) => ({
+          tool: tc.tool,
+          callId: tc.callId,
+          input: tc.input as Record<string, unknown>,
+          result: tc.result,
+          status: tc.status as "pending" | "completed" | "error",
+        })),
     },
   };
 }
@@ -393,7 +329,10 @@ export async function dispatch(
 ): Promise<string> {
   if (client.type === "openclaw") {
     const inputText = typeof input === "string" ? input : JSON.stringify(input);
-    const inputObj = typeof input === "string" ? { input } : input as Record<string, unknown>;
+    const inputObj =
+      typeof input === "string"
+        ? { input }
+        : (input as Record<string, unknown>);
     return openclawFeaturePayload(client, feature, {
       sessionKey: scope,
       inputText,
@@ -417,7 +356,10 @@ export async function dispatchFeaturePayload<T = unknown>(
 ): Promise<FeaturePayloadResult<T>> {
   if (client.type === "openclaw") {
     const inputText = typeof input === "string" ? input : JSON.stringify(input);
-    const inputObj = typeof input === "string" ? { input } : input as Record<string, unknown>;
+    const inputObj =
+      typeof input === "string"
+        ? { input }
+        : (input as Record<string, unknown>);
     return openclawFeaturePayloadFull<T>(client, feature, {
       sessionKey: scope,
       inputText,

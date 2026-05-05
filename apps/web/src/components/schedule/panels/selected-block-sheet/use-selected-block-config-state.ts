@@ -20,7 +20,7 @@ function normalizePriority(value: string): TaskConfigFormDraft["priority"] {
   }
 }
 
-export function toPlanningTaskDraft(item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt">): TaskConfigFormDraft {
+function toPlanningTaskDraft(item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt">): TaskConfigFormDraft {
   return {
     title: item.title,
     description: item.description ?? "",

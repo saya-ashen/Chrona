@@ -1,9 +1,9 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import type { ScheduledItem, LegacyPlanGraph } from "@/components/schedule/schedule-page-types";
-import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { SurfaceCard } from "@/components/ui/surface-card";
 
 function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
@@ -68,7 +68,7 @@ export function AiInsightsPanel({
         </div>
       </SurfaceCard>
 
-      <TaskDecompositionPanel
+      <TaskPlanGenerationPanel
         taskId={item.taskId}
         title={item.title}
         description={item.description}

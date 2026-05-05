@@ -64,7 +64,7 @@ function buildCompatRuntimeInput(input: {
   return compatInput;
 }
 
-export function resolveTaskRuntimeConfig(input: {
+function resolveTaskRuntimeConfig(input: {
   runtimeAdapterKey?: string | null;
   workspaceDefaultRuntime?: string | null;
   runtimeInput?: unknown;

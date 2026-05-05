@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/client";
 
-type PlanStep = {
+export type PlanStep = {
   id: string;
   title: string;
   objective: string;
@@ -53,15 +53,23 @@ type PlanEdge = {
 type TaskPlanGraphMode = "full" | "compact" | "auto";
 const AUTO_FULL_MODE_MIN_WIDTH = 720;
 
+export type TaskPlanGraphPlan = {
+  state: "empty" | "ready";
+  currentStepId: string | null;
+  steps: PlanStep[];
+  edges?: PlanEdge[];
+  revision?: string | null;
+  generatedBy?: string | null;
+  isMock?: boolean;
+  summary?: string | null;
+  updatedAt?: string | null;
+  changeSummary?: string | null;
+};
+
 type TaskPlanGraphProps = {
   mode?: TaskPlanGraphMode;
   maxViewportHeight?: number;
-  plan: {
-    state: "empty" | "ready";
-    currentStepId: string | null;
-    steps: PlanStep[];
-    edges?: PlanEdge[];
-  };
+  plan: TaskPlanGraphPlan;
 };
 
 const DEFAULT_GRAPH_COPY = {

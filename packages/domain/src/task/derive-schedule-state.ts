@@ -1,10 +1,14 @@
 type DeriveScheduleStateInput = {
   task: {
     dueAt: Date | null;
-    scheduledStartAt: Date | null;
-    scheduledEndAt: Date | null;
-    scheduleSource: string | null;
   };
+  workBlock:
+    | {
+        status: string;
+        scheduledStartAt: Date | null;
+        scheduledEndAt: Date | null;
+      }
+    | null;
   latestRun:
     | {
         status: string;
@@ -30,7 +34,9 @@ type DeriveScheduleStateResult = {
 export function deriveScheduleState(
   input: DeriveScheduleStateInput,
 ): DeriveScheduleStateResult {
-  const { dueAt, scheduledStartAt, scheduledEndAt } = input.task;
+  const { dueAt } = input.task;
+  const scheduledStartAt = input.workBlock?.scheduledStartAt ?? null;
+  const scheduledEndAt = input.workBlock?.scheduledEndAt ?? null;
   const latestRun = input.latestRun;
   const hasPlannedWindow = Boolean(scheduledStartAt || scheduledEndAt);
 

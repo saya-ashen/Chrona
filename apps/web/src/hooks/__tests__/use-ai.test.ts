@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
-import {
-  useAutoComplete,
-  useSmartDecomposition,
-  useBatchApplyPlan,
-} from "../use-ai";
-import type { AutoCompleteSuggestion, SmartDecompositionTaskInput } from "../use-ai";
+import { renderHook, act } from "@testing-library/react";
+import { useAutoComplete } from "../use-ai";
+import type { AutoCompleteSuggestion } from "../use-ai";
 
 // ---------- Helpers ----------
 
@@ -32,38 +28,6 @@ const sampleSuggestions: AutoCompleteSuggestion[] = [
     tags: ["testing"],
   },
 ];
-
-const samplePlanGraphResponse = {
-  plan: { title: "Test Plan", goal: "Test goal", nodes: [], edges: [] },
-  source: "ai",
-  planGraph: {
-    id: "graph-1",
-    taskId: "task-1",
-    status: "draft",
-    revision: 1,
-    source: "ai",
-    generatedBy: "test",
-    prompt: null,
-    summary: "2 steps",
-    changeSummary: null,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    nodes: [
-      { id: "node-1", type: "task", title: "Research", objective: "Research the topic", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 30, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
-      { id: "node-2", type: "task", title: "Implementation", objective: "Implement the solution", description: null, executionMode: "automatic", autoRunnable: true, requiresHumanInput: false, requiresHumanApproval: false, blockingReason: null, status: "pending", phase: null, estimatedMinutes: 120, priority: "High", linkedTaskId: null, completionSummary: null, metadata: null },
-    ],
-    edges: [{ id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "sequential", metadata: null }],
-  },
-};
-
-const sampleBatchApplyPlanResponse = {
-  parentTaskId: "task-123",
-  childTasks: [
-    { id: "child-1", title: "Step 1" },
-    { id: "child-2", title: "Step 2" },
-  ],
-  planGraph: { id: "graph-1", nodes: [], edges: [] },
-};
 
 // ---------- useAutoComplete ----------
 
@@ -124,7 +88,10 @@ describe("useAutoComplete", () => {
   });
 
   it("should set isLoading=true immediately when title >= 3 chars, before debounce fires", () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ suggestions: [] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ suggestions: [] })),
+    );
 
     const { result } = renderHook(() => useAutoComplete("Write tests"));
 
@@ -133,7 +100,9 @@ describe("useAutoComplete", () => {
   });
 
   it("should debounce and fetch after delay when title >= 3 chars", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
     vi.stubGlobal("fetch", fetchSpy);
 
     renderHook(() => useAutoComplete("Write tests", 300));
@@ -161,7 +130,9 @@ describe("useAutoComplete", () => {
   });
 
   it("should return suggestions on successful response", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { result } = renderHook(() => useAutoComplete("Write tests", 100));
@@ -177,7 +148,11 @@ describe("useAutoComplete", () => {
   });
 
   it("should set error on failed request (HTTP error with error body)", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ error: "AI service unavailable" }, 503));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ error: "AI service unavailable" }, 503),
+      );
     vi.stubGlobal("fetch", fetchSpy);
 
     const { result } = renderHook(() => useAutoComplete("Write tests", 100));
@@ -193,7 +168,10 @@ describe("useAutoComplete", () => {
 
   it("should set generic error message on failed request without parseable error body", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      new Response("not json", { status: 500, headers: { "Content-Type": "text/plain" } }),
+      new Response("not json", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      }),
     );
     vi.stubGlobal("fetch", fetchSpy);
 
@@ -224,8 +202,7 @@ describe("useAutoComplete", () => {
   });
 
   it("should abort previous request when title changes", async () => {
-    const fetchSpy = vi.fn().mockImplementation(() => {
-    });
+    const fetchSpy = vi.fn().mockImplementation(() => {});
     vi.stubGlobal("fetch", fetchSpy);
 
     const { rerender } = renderHook(
@@ -256,7 +233,9 @@ describe("useAutoComplete", () => {
   });
 
   it("should reset state when title becomes null after having suggestions", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { result, rerender } = renderHook(
@@ -279,7 +258,9 @@ describe("useAutoComplete", () => {
   });
 
   it("should use custom debounce delay", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ suggestions: sampleSuggestions }));
     vi.stubGlobal("fetch", fetchSpy);
 
     renderHook(() => useAutoComplete("Write tests", 1000));
@@ -358,7 +339,8 @@ describe("useAutoComplete", () => {
   });
 
   it("should not get stuck in connecting when a newer request replaces an older one", async () => {
-    const fetchSpy = vi.fn()
+    const fetchSpy = vi
+      .fn()
       .mockImplementationOnce(
         () =>
           new Promise<Response>(() => {
@@ -419,7 +401,9 @@ describe("useAutoComplete", () => {
   });
 
   it("should use default 500ms debounce when not specified", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ suggestions: [] }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ suggestions: [] }));
     vi.stubGlobal("fetch", fetchSpy);
 
     renderHook(() => useAutoComplete("Write tests"));
@@ -433,449 +417,5 @@ describe("useAutoComplete", () => {
       await vi.advanceTimersByTimeAsync(100);
     });
     expect(fetchSpy).toHaveBeenCalledOnce();
-  });
-});
-
-// ---------- useSmartDecomposition ----------
-
-describe("useSmartDecomposition", () => {
-  const validInput: SmartDecompositionTaskInput = {
-    taskId: "task-abc",
-    title: "Build new feature",
-    description: "Build a new user dashboard feature",
-    priority: "High",
-    estimatedMinutes: 180,
-  };
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("should not fetch when input is null", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useSmartDecomposition(null));
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result.current.result).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBeNull();
-  });
-
-  it("should not fetch when input title is too short", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() =>
-      useSmartDecomposition({ ...validInput, title: "ab" }),
-    );
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result.current.result).toBeNull();
-  });
-
-  it("should fetch immediately (no debounce) when input provided", () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    renderHook(() => useSmartDecomposition(validInput));
-
-    // No debounce — fetch is called directly in the effect
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/ai/generate-task-plan",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          taskId: validInput.taskId,
-          title: validInput.title,
-          description: validInput.description,
-          priority: validInput.priority,
-          dueAt: validInput.dueAt,
-          estimatedMinutes: validInput.estimatedMinutes,
-        }),
-      }),
-    );
-  });
-
-  it("should return TaskPlanGraphResponse on success", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    await act(async () => {
-      // flush microtasks
-    });
-
-    expect(result.current.result).toEqual(samplePlanGraphResponse);
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBeNull();
-  });
-
-  it("should consume SSE plan-generation progress including tool calls before final result", async () => {
-    const encoder = new TextEncoder();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue(
-                encoder.encode(
-                  'event: status\ndata: {"message":"Planning graph"}\n\n' +
-                    'event: tool_call\ndata: {"tool":"generate_task_plan_graph","input":{"title":"Plan task"}}\n\n' +
-                    'event: result\ndata: ' +
-                    JSON.stringify(samplePlanGraphResponse) +
-                    '\n\n' +
-                    'event: done\ndata: {}\n\n',
-                ),
-              );
-              controller.close();
-            },
-          }),
-          { headers: { "Content-Type": "text/event-stream" } },
-        ),
-      ),
-    );
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    await waitFor(() => {
-      expect(result.current.result).toEqual(samplePlanGraphResponse);
-    });
-
-    expect(result.current.statusMessage).toBe("Planning graph");
-    expect(result.current.toolCalls).toEqual([
-      {
-        tool: "generate_task_plan_graph",
-        input: { title: "Plan task" },
-      },
-    ]);
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.result?.source).toBe("ai");
-  });
-
-  it("should preserve task session key from streamed plan responses", async () => {
-    const encoder = new TextEncoder();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue(
-                encoder.encode(
-                  'event: result\ndata: ' +
-                    JSON.stringify({
-                      ...samplePlanGraphResponse,
-                      taskSessionKey: "chrona:openclaw:task:task-abc:default",
-                    }) +
-                    '\n\n' +
-                    'event: done\ndata: {}\n\n',
-                ),
-              );
-              controller.close();
-            },
-          }),
-          { headers: { "Content-Type": "text/event-stream" } },
-        ),
-      ),
-    );
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    await waitFor(() => {
-      expect(result.current.result?.source).toBe("ai");
-    });
-  });
-
-  it("should handle error state", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ error: "Decomposition failed" }, 500));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    await act(async () => {
-      // flush microtasks
-    });
-
-    expect(result.current.error).toBe("Decomposition failed");
-    expect(result.current.result).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it("should set isLoading=true when fetching", () => {
-    // Use a fetch that never resolves to capture loading state
-    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    expect(result.current.isLoading).toBe(true);
-  });
-
-  it("should abort previous request when input changes", () => {
-    const abortSpy = vi.fn();
-    const originalAbortController = globalThis.AbortController;
-
-    vi.stubGlobal(
-      "AbortController",
-      class {
-        signal = { aborted: false };
-        abort() {
-          this.signal.aborted = true;
-          abortSpy();
-        }
-      },
-    );
-
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { rerender } = renderHook(
-      ({ input }: { input: SmartDecompositionTaskInput }) =>
-        useSmartDecomposition(input),
-      { initialProps: { input: validInput } },
-    );
-
-    // Change input — cleanup should abort previous controller
-    rerender({ input: { ...validInput, title: "Different task" } });
-
-    expect(abortSpy).toHaveBeenCalled();
-
-    vi.stubGlobal("AbortController", originalAbortController);
-  });
-
-  it("should reset state when input becomes null", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result, rerender } = renderHook(
-      ({ input }: { input: SmartDecompositionTaskInput | null }) =>
-        useSmartDecomposition(input),
-      { initialProps: { input: validInput as SmartDecompositionTaskInput | null } },
-    );
-
-    await act(async () => {
-      // flush
-    });
-
-    expect(result.current.result).toEqual(samplePlanGraphResponse);
-
-    rerender({ input: null });
-
-    expect(result.current.result).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBeNull();
-  });
-
-  it("should handle network errors", async () => {
-    const fetchSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useSmartDecomposition(validInput));
-
-    await act(async () => {
-      // flush
-    });
-
-    expect(result.current.error).toBe("fetch failed");
-    expect(result.current.result).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it("should send all task fields in the request body", () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(samplePlanGraphResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const input: SmartDecompositionTaskInput = {
-      taskId: "t-1",
-      title: "Test task with all fields",
-      description: "Detailed description",
-      priority: "Urgent",
-      dueAt: "2025-12-31",
-      estimatedMinutes: 240,
-    };
-
-    renderHook(() => useSmartDecomposition(input));
-
-    const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
-    expect(sentBody).toEqual({
-      taskId: "t-1",
-      title: "Test task with all fields",
-      description: "Detailed description",
-      priority: "Urgent",
-      dueAt: "2025-12-31",
-      estimatedMinutes: 240,
-    });
-  });
-});
-
-// ---------- useBatchApplyPlan ----------
-
-describe("useBatchApplyPlan", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("should call API when applyPlan() is called", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    await act(async () => {
-      await result.current.applyPlan("task-123");
-    });
-
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/ai/batch-apply-plan",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ taskId: "task-123" }),
-      }),
-    );
-  });
-
-  it("should return response data on success", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    let data: unknown;
-    await act(async () => {
-      data = await result.current.applyPlan("task-123");
-    });
-
-    expect(data).toEqual(sampleBatchApplyPlanResponse);
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBeNull();
-  });
-
-  it("should set error on failure", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ error: "Failed to apply task plan" }, 500));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    let data: unknown;
-    await act(async () => {
-      data = await result.current.applyPlan("task-123");
-    });
-
-    expect(data).toBeUndefined();
-    expect(result.current.error).toBe("Failed to apply task plan");
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it("should track isLoading", async () => {
-    let resolveFetch!: (value: Response) => void;
-    const fetchSpy = vi.fn().mockReturnValue(
-      new Promise<Response>((resolve) => {
-        resolveFetch = resolve;
-      }),
-    );
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    // Start applyPlan but don't await yet
-    let applyPromise: Promise<unknown>;
-    act(() => {
-      applyPromise = result.current.applyPlan("task-123");
-    });
-
-    // isLoading should be true while request is in-flight
-    expect(result.current.isLoading).toBe(true);
-    expect(result.current.error).toBeNull();
-
-    // Resolve the fetch
-    await act(async () => {
-      resolveFetch(jsonResponse(sampleBatchApplyPlanResponse));
-      await applyPromise!;
-    });
-
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it("should handle network errors", async () => {
-    const fetchSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    let data: unknown;
-    await act(async () => {
-      data = await result.current.applyPlan("task-123");
-    });
-
-    expect(data).toBeUndefined();
-    expect(result.current.error).toBe("fetch failed");
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it("should abort previous request when applyPlan() called again", async () => {
-    const abortSpy = vi.fn();
-    const originalAbortController = globalThis.AbortController;
-
-    let controllerCount = 0;
-    vi.stubGlobal(
-      "AbortController",
-      class {
-        signal = { aborted: false };
-        id = ++controllerCount;
-        abort() {
-          this.signal.aborted = true;
-          abortSpy(this.id);
-        }
-      },
-    );
-
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    await act(async () => {
-      const p1 = result.current.applyPlan("task-1");
-      const p2 = result.current.applyPlan("task-2");
-      await Promise.all([p1, p2]);
-    });
-
-    // First controller should be aborted
-    expect(abortSpy).toHaveBeenCalledWith(1);
-
-    vi.stubGlobal("AbortController", originalAbortController);
-  });
-
-  it("should maintain stable applyPlan function reference", () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(sampleBatchApplyPlanResponse)));
-
-    const { result, rerender } = renderHook(() => useBatchApplyPlan());
-
-    const firstApplyPlan = result.current.applyPlan;
-    rerender();
-    expect(result.current.applyPlan).toBe(firstApplyPlan);
-  });
-
-  it("should handle HTTP error without error field in body", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(
-      new Response("Server Error", { status: 502, headers: { "Content-Type": "text/plain" } }),
-    );
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const { result } = renderHook(() => useBatchApplyPlan());
-
-    let data: unknown;
-    await act(async () => {
-      data = await result.current.applyPlan("task-123");
-    });
-
-    expect(data).toBeUndefined();
-    expect(result.current.error).toBe("Request failed (502)");
-    expect(result.current.isLoading).toBe(false);
   });
 });

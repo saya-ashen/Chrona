@@ -2,13 +2,34 @@ import { z } from "zod";
 
 // ─── Node type constants ───
 
-export const AI_PLAN_NODE_TYPES = ["task", "checkpoint", "condition", "wait"] as const;
+export const AI_PLAN_NODE_TYPES = [
+  "task",
+  "checkpoint",
+  "condition",
+  "wait",
+] as const;
 export const AI_TASK_EXECUTORS = ["user", "ai", "system"] as const;
 export const AI_TASK_MODES = ["manual", "assist", "auto"] as const;
-export const AI_CHECKPOINT_TYPES = ["confirm", "choose", "input", "edit", "approve"] as const;
-export const AI_INPUT_FIELD_TYPES = ["text", "number", "boolean", "choice"] as const;
+export const AI_CHECKPOINT_TYPES = [
+  "confirm",
+  "choose",
+  "input",
+  "edit",
+  "approve",
+] as const;
+export const AI_INPUT_FIELD_TYPES = [
+  "text",
+  "number",
+  "boolean",
+  "choice",
+] as const;
 export const AI_CONDITION_EVALUATORS = ["system", "ai", "user"] as const;
-export const AI_WAIT_TIMEOUT_ACTIONS = ["continue", "pause", "fail", "notify_user"] as const;
+export const AI_WAIT_TIMEOUT_ACTIONS = [
+  "continue",
+  "pause",
+  "fail",
+  "notify_user",
+] as const;
 
 export type PlanNodeType = (typeof AI_PLAN_NODE_TYPES)[number];
 export type TaskExecutor = (typeof AI_TASK_EXECUTORS)[number];
@@ -205,7 +226,11 @@ export function upgradeBlueprintToEditable(
     goal: blueprint.goal,
     assumptions: blueprint.assumptions,
     nodes: blueprint.nodes.map(upgradeNode),
-    edges: blueprint.edges.map((e) => ({ from: e.from, to: e.to, label: e.label })),
+    edges: blueprint.edges.map((e) => ({
+      from: e.from,
+      to: e.to,
+      label: e.label,
+    })),
   };
 }
 
@@ -296,7 +321,10 @@ export class PlanCompileError extends Error {
 // ═══════════════════════════════════════════════════════════════
 
 export type PlanPatchOperation =
-  | { op: "update_plan"; patch: Partial<Pick<EditablePlan, "title" | "goal" | "assumptions">> }
+  | {
+      op: "update_plan";
+      patch: Partial<Pick<EditablePlan, "title" | "goal" | "assumptions">>;
+    }
   | { op: "add_node"; node: EditableNode }
   | { op: "update_node"; nodeId: string; patch: Partial<EditableNode> }
   | { op: "delete_node"; nodeId: string }
@@ -320,182 +348,217 @@ export interface PlanPatch {
 // Zod schemas — for AI output validation (PlanBlueprint, loose)
 // ═══════════════════════════════════════════════════════════════
 
-const aiPlanInputFieldSchema = z.object({
-  key: z.string().min(1),
-  label: z.string().min(1),
-  inputType: z.enum(AI_INPUT_FIELD_TYPES),
-  required: z.boolean().optional(),
-  options: z.array(z.string()).optional(),
-}).strict();
+const aiPlanInputFieldSchema = z
+  .object({
+    key: z.string().min(1),
+    label: z.string().min(1),
+    inputType: z.enum(AI_INPUT_FIELD_TYPES),
+    required: z.boolean().optional(),
+    options: z.array(z.string()).optional(),
+  })
+  .strict();
 
-const planBlueprintTaskNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("task"),
-  title: z.string().min(1),
-  executor: z.enum(AI_TASK_EXECUTORS).optional(),
-  mode: z.enum(AI_TASK_MODES).optional(),
-  expectedOutput: z.string().optional(),
-  completionCriteria: z.string().optional(),
-  estimatedMinutes: z.number().positive().optional(),
-}).strict();
+const planBlueprintTaskNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("task"),
+    title: z.string().min(1),
+    executor: z.enum(AI_TASK_EXECUTORS).optional(),
+    mode: z.enum(AI_TASK_MODES).optional(),
+    expectedOutput: z.string().optional(),
+    completionCriteria: z.string().optional(),
+    estimatedMinutes: z.number().positive().optional(),
+  })
+  .strict();
 
-const planBlueprintCheckpointNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("checkpoint"),
-  title: z.string().min(1),
-  checkpointType: z.enum(AI_CHECKPOINT_TYPES),
-  prompt: z.string().min(1),
-  required: z.boolean().optional(),
-  options: z.array(z.string()).optional(),
-  inputFields: z.array(aiPlanInputFieldSchema).optional(),
-}).strict();
+const planBlueprintCheckpointNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("checkpoint"),
+    title: z.string().min(1),
+    checkpointType: z.enum(AI_CHECKPOINT_TYPES),
+    prompt: z.string().min(1),
+    required: z.boolean().optional(),
+    options: z.array(z.string()).optional(),
+    inputFields: z.array(aiPlanInputFieldSchema).optional(),
+  })
+  .strict();
 
-const planBlueprintConditionNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("condition"),
-  title: z.string().min(1),
-  condition: z.string().min(1),
-  evaluationBy: z.enum(AI_CONDITION_EVALUATORS).optional(),
-  branches: z
-    .array(
-      z.object({
-        label: z.string().min(1),
-        nextNodeId: z.string().min(1),
-      }),
-    )
-    .min(1, "condition must have at least one branch"),
-  defaultNextNodeId: z.string().optional(),
-}).strict();
+const planBlueprintConditionNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("condition"),
+    title: z.string().min(1),
+    condition: z.string().min(1),
+    evaluationBy: z.enum(AI_CONDITION_EVALUATORS).optional(),
+    branches: z
+      .array(
+        z.object({
+          label: z.string().min(1),
+          nextNodeId: z.string().min(1),
+        }),
+      )
+      .min(1, "condition must have at least one branch"),
+    defaultNextNodeId: z.string().optional(),
+  })
+  .strict();
 
-const planBlueprintWaitNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("wait"),
-  title: z.string().min(1),
-  waitFor: z.string().min(1),
-  estimatedMinutes: z.number().positive().optional(),
-  timeout: z
-    .object({
-      minutes: z.number().positive(),
-      onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
-    })
-    .strict()
-    .optional(),
-}).strict();
+const planBlueprintWaitNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("wait"),
+    title: z.string().min(1),
+    waitFor: z.string().min(1),
+    estimatedMinutes: z.number().positive().optional(),
+    timeout: z
+      .object({
+        minutes: z.number().positive(),
+        onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
-export const planBlueprintNodeSchema: z.ZodType<PlanBlueprintNode> = z.discriminatedUnion("type", [
-  planBlueprintTaskNodeSchema,
-  planBlueprintCheckpointNodeSchema,
-  planBlueprintConditionNodeSchema,
-  planBlueprintWaitNodeSchema,
-]);
+export const planBlueprintNodeSchema: z.ZodType<PlanBlueprintNode> =
+  z.discriminatedUnion("type", [
+    planBlueprintTaskNodeSchema,
+    planBlueprintCheckpointNodeSchema,
+    planBlueprintConditionNodeSchema,
+    planBlueprintWaitNodeSchema,
+  ]);
 
-export const planBlueprintEdgeSchema = z.object({
-  from: z.string().min(1),
-  to: z.string().min(1),
-  label: z.string().optional(),
-}).strict();
+export const planBlueprintEdgeSchema = z
+  .object({
+    from: z.string().min(1),
+    to: z.string().min(1),
+    label: z.string().optional(),
+  })
+  .strict();
 
-export const planBlueprintSchema = z.object({
-  title: z.string().min(1),
-  goal: z.string().min(1),
-  assumptions: z.array(z.string().min(1)).optional(),
-  nodes: z.array(planBlueprintNodeSchema).min(1, "plan must have at least one node"),
-  edges: z.array(planBlueprintEdgeSchema).optional().default([]),
-}).strict();
+export const planBlueprintSchema = z
+  .object({
+    title: z.string().min(1),
+    goal: z.string().min(1),
+    assumptions: z.array(z.string().min(1)).optional(),
+    nodes: z
+      .array(planBlueprintNodeSchema)
+      .min(1, "plan must have at least one node"),
+    edges: z.array(planBlueprintEdgeSchema).optional().default([]),
+  })
+  .strict();
 
-export const aiPlanOutputSchema = planBlueprintSchema;
+const aiPlanOutputSchema = planBlueprintSchema;
 
 // ─── AI tool payload types ───
 
 export type GeneratePlanBlueprintToolPayload = PlanBlueprint;
-export const generatePlanBlueprintToolPayloadSchema = planBlueprintSchema;
 
 // ─── EditablePlan Zod schema (strict) ───
 
-const editableInputFieldSchema = z.object({
-  name: z.string().min(1),
-  label: z.string().min(1),
-  type: z.enum(AI_INPUT_FIELD_TYPES).optional(),
-  required: z.boolean().optional(),
-  options: z.array(z.string()).optional(),
-}).strict();
+const editableInputFieldSchema = z
+  .object({
+    name: z.string().min(1),
+    label: z.string().min(1),
+    type: z.enum(AI_INPUT_FIELD_TYPES).optional(),
+    required: z.boolean().optional(),
+    options: z.array(z.string()).optional(),
+  })
+  .strict();
 
-const editableTaskNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("task"),
-  title: z.string().min(1),
-  executor: z.enum(AI_TASK_EXECUTORS),
-  mode: z.enum(AI_TASK_MODES),
-  expectedOutput: z.string().optional(),
-  completionCriteria: z.string().optional(),
-  estimatedMinutes: z.number().positive().optional(),
-}).strict();
+const editableTaskNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("task"),
+    title: z.string().min(1),
+    executor: z.enum(AI_TASK_EXECUTORS),
+    mode: z.enum(AI_TASK_MODES),
+    expectedOutput: z.string().optional(),
+    completionCriteria: z.string().optional(),
+    estimatedMinutes: z.number().positive().optional(),
+  })
+  .strict();
 
-const editableCheckpointNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("checkpoint"),
-  title: z.string().min(1),
-  checkpointType: z.enum(AI_CHECKPOINT_TYPES),
-  prompt: z.string().min(1),
-  required: z.boolean(),
-  options: z.array(z.string()).optional(),
-  inputFields: z.array(editableInputFieldSchema).optional(),
-}).strict();
+const editableCheckpointNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("checkpoint"),
+    title: z.string().min(1),
+    checkpointType: z.enum(AI_CHECKPOINT_TYPES),
+    prompt: z.string().min(1),
+    required: z.boolean(),
+    options: z.array(z.string()).optional(),
+    inputFields: z.array(editableInputFieldSchema).optional(),
+  })
+  .strict();
 
-const editableConditionNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("condition"),
-  title: z.string().min(1),
-  condition: z.string().min(1),
-  evaluationBy: z.enum(AI_CONDITION_EVALUATORS),
-  branches: z
-    .array(
-      z.object({
-        label: z.string().min(1),
-        nextNodeId: z.string().min(1),
-      }),
-    )
-    .min(1, "condition must have at least one branch"),
-  defaultNextNodeId: z.string().optional(),
-}).strict();
+const editableConditionNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("condition"),
+    title: z.string().min(1),
+    condition: z.string().min(1),
+    evaluationBy: z.enum(AI_CONDITION_EVALUATORS),
+    branches: z
+      .array(
+        z.object({
+          label: z.string().min(1),
+          nextNodeId: z.string().min(1),
+        }),
+      )
+      .min(1, "condition must have at least one branch"),
+    defaultNextNodeId: z.string().optional(),
+  })
+  .strict();
 
-const editableWaitNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal("wait"),
-  title: z.string().min(1),
-  waitFor: z.string().min(1),
-  estimatedMinutes: z.number().positive().optional(),
-  timeout: z
-    .object({
-      minutes: z.number().positive(),
-      onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
-    })
-    .strict()
-    .optional(),
-}).strict();
+const editableWaitNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal("wait"),
+    title: z.string().min(1),
+    waitFor: z.string().min(1),
+    estimatedMinutes: z.number().positive().optional(),
+    timeout: z
+      .object({
+        minutes: z.number().positive(),
+        onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
-const editableNodeSchema: z.ZodType<EditableNode> = z.discriminatedUnion("type", [
-  editableTaskNodeSchema,
-  editableCheckpointNodeSchema,
-  editableConditionNodeSchema,
-  editableWaitNodeSchema,
-]);
+const editableNodeSchema: z.ZodType<EditableNode> = z.discriminatedUnion(
+  "type",
+  [
+    editableTaskNodeSchema,
+    editableCheckpointNodeSchema,
+    editableConditionNodeSchema,
+    editableWaitNodeSchema,
+  ],
+);
 
-export const editableEdgeSchema = z.object({
-  from: z.string().min(1),
-  to: z.string().min(1),
-  label: z.string().optional(),
-}).strict();
+export const editableEdgeSchema = z
+  .object({
+    from: z.string().min(1),
+    to: z.string().min(1),
+    label: z.string().optional(),
+  })
+  .strict();
 
-export const editablePlanSchema = z.object({
-  id: z.string().min(1),
-  version: z.number().int().positive(),
-  title: z.string().min(1),
-  goal: z.string().min(1),
-  assumptions: z.array(z.string().min(1)).optional(),
-  nodes: z.array(editableNodeSchema).min(1, "plan must have at least one node"),
-  edges: z.array(editableEdgeSchema).optional().default([]),
-}).strict();
+export const editablePlanSchema = z
+  .object({
+    id: z.string().min(1),
+    version: z.number().int().positive(),
+    title: z.string().min(1),
+    goal: z.string().min(1),
+    assumptions: z.array(z.string().min(1)).optional(),
+    nodes: z
+      .array(editableNodeSchema)
+      .min(1, "plan must have at least one node"),
+    edges: z.array(editableEdgeSchema).optional().default([]),
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // Legacy validateAIPlanOutput — uses loose PlanBlueprint schema
@@ -539,7 +602,9 @@ export function validateAIPlanOutput(raw: unknown): AIPlanValidationResult {
 
   for (const edge of aiPlan.edges) {
     if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-      warnings.push(`Edge ${edge.from} -> ${edge.to} references missing node ID(s)`);
+      warnings.push(
+        `Edge ${edge.from} -> ${edge.to} references missing node ID(s)`,
+      );
     }
   }
 

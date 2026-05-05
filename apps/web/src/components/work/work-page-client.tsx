@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { LatestResultPanel } from "@/components/work/latest-result-panel";
-import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
@@ -511,5 +511,4 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     </div>
   );
 }
-
 

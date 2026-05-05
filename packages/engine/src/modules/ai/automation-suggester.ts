@@ -327,10 +327,3 @@ Respond in the same language as the input.`;
 
   return isAutomationSuggestion(chatResult?.parsed) ? chatResult.parsed : null;
 }
-
-export type {
-  TaskAutomationInput,
-  ExecutionMode,
-  ReminderStrategy,
-  AutomationSuggestion,
-};

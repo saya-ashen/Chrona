@@ -26,7 +26,6 @@ import {
 } from "@/components/schedule/schedule-page-utils";
 import {
   getQuickCreateDefaults,
-  handleApplyDecompositionFromDialogAction,
   handleCreateTaskBlockAction,
   handleScheduleDropAction,
   handleTaskConfigSaveAction,
@@ -37,9 +36,9 @@ import {
 import { buildSchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
-import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/schedule-page-sidebar";
-import { SchedulePageDialogs } from "@/components/schedule/schedule-page-dialogs";
-import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
+import { SchedulePageDialogs } from "@/components/schedule/dialogs/schedule-page-dialogs";
+import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
+import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 import { useI18n, useLocale } from "@/i18n/client";
@@ -419,35 +418,6 @@ export function SchedulePage({
         actionFailedMessage={actionFailedMessage}
         onCloseQuickAdd={() => setShowNewTaskDialog(false)}
         handleCreateTaskBlock={handleCreateTaskBlock}
-        handleApplyDecompositionFromDialog={async ({
-          result,
-          title,
-          description,
-          priority,
-          dueAt,
-        }) => {
-          await handleApplyDecompositionFromDialogAction({
-            workspaceId,
-            title,
-            description,
-            priority,
-            dueAt,
-            defaultRuntimeAdapterKey: data.defaultRuntimeAdapterKey,
-            result,
-            activeDay: viewModel.activeDay,
-            activeView,
-            locale,
-            pushRoute: router.push,
-            localizeHref,
-            buildScheduleViewHref,
-            setShowNewTaskDialog,
-            setLocalSelectedTaskId,
-            setIsPending,
-            setErrorMessage,
-            refreshProjection,
-            actionFailedMessage,
-          });
-        }}
       />
     </div>
   );

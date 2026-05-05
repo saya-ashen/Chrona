@@ -2,12 +2,9 @@ import { ApprovalStatus, RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { resumeRun } from "@/modules/commands/resume-run";
-import { createRuntimeAdapter, type RuntimeAdapter } from "@chrona/providers-core";
-import {
-  resolveTaskSessionKey,
-  updateTaskSessionStateFromRun,
-} from "@/modules/task-execution/task-sessions";
+import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
+import type { RuntimeAdapter } from "@chrona/providers-core";
+import { Prisma } from "@/generated/prisma/client";
 
 async function markApprovalResolved(input: {
   approval: {
@@ -72,24 +69,6 @@ export async function resolveApproval(input: {
   }
 
   if (input.decision === "Rejected") {
-    const adapter: RuntimeAdapter = input.adapter ?? (await createRuntimeAdapter());
-
-    const runtimeSessionKey = resolveTaskSessionKey(approval.run);
-
-    if (!runtimeSessionKey) {
-      throw new Error("Cannot reject approval without a runtime session key.");
-    }
-
-    const resumed = await adapter.resumeRun({
-      runtimeSessionKey,
-      approvalId: approval.id,
-      decision: "reject",
-    });
-
-    if (!resumed.accepted) {
-      throw new Error("Runtime rejected the approval resolution.");
-    }
-
     await markApprovalResolved({
       approval,
       decision: input.decision,
@@ -133,18 +112,25 @@ export async function resolveApproval(input: {
     };
   }
 
-  const result = await resumeRun({
-    runId: approval.runId,
-    approvalId: approval.id,
-    inputText: input.decision === "EditedAndApproved" ? input.editedContent : undefined,
-    adapter: input.adapter,
-  });
-
   await markApprovalResolved({
     approval,
     decision: input.decision,
     resolutionNote: input.resolutionNote,
   });
 
-  return result;
+  await db.task.update({
+    where: { id: approval.taskId },
+    data: {
+      status: "Ready",
+      blockReason: Prisma.DbNull,
+    },
+  });
+
+  await rebuildTaskProjection(approval.taskId);
+
+  return {
+    taskId: approval.taskId,
+    workspaceId: approval.task.workspaceId,
+    runId: approval.runId,
+  };
 }

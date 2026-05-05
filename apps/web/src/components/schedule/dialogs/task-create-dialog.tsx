@@ -2,13 +2,11 @@
 
 import { Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n } from "@/i18n/client";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 /* ------------------------------------------------------------------ */
 /*  Priority badge color map                                          */
@@ -35,15 +33,7 @@ type TaskCreateDialogProps = {
     scheduledStartAt: Date;
     scheduledEndAt: Date;
   }) => Promise<void>;
-  onApplyDecomposition?: (payload: {
-    result: TaskPlanGraphResponse;
-    title: string;
-    description: string;
-    priority: "Low" | "Medium" | "High" | "Urgent";
-    dueAt: Date | null;
-  }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
-  autoPlanGenerationEnabled?: boolean;
 };
 
 export function TaskCreateDialog({
@@ -54,18 +44,14 @@ export function TaskCreateDialog({
   isPending,
   onClose,
   onSubmit,
-  onApplyDecomposition,
   autoSuggestionsEnabled,
-  autoPlanGenerationEnabled,
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
   const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
-  const resolvedAutoPlanGenerationEnabled = autoPlanGenerationEnabled ?? aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const { messages } = useI18n();
   const dialogCopy = {
     generatingSuggestions: "Generating suggestions...",
-    aiTaskPlanning: "AI Task Planning",
     ...((messages.components as unknown as Record<string, Record<string, string>> | undefined)?.taskCreateDialog ?? {}),
   };
   const [description, setDescription] = useState("");
@@ -73,7 +59,6 @@ export function TaskCreateDialog({
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [planSeedTitle, setDecompositionSeedTitle] = useState("");
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
@@ -130,7 +115,6 @@ export function TaskCreateDialog({
       setDescription("");
       setPriority("Medium");
       setShowAutoComplete(false);
-      setDecompositionSeedTitle(initialTitle);
       suppressRef.current = false;
     }
   }, [isOpen, initialStartAt, initialEndAt, initialTitle]);
@@ -289,7 +273,6 @@ export function TaskCreateDialog({
                       }
                       suppressRef.current = true;
                       setTitle(suggestion.title);
-                      setDecompositionSeedTitle(suggestion.title);
                       if (suggestion.description) {
                         setDescription(suggestion.description);
                       }
@@ -425,40 +408,6 @@ export function TaskCreateDialog({
             </div>
           </div>
 
-          {/* AI plan */}
-          {onApplyDecomposition ? (
-            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Sparkles className="size-4 text-primary" />
-                <span>{dialogCopy.aiTaskPlanning}</span>
-              </div>
-              <TaskDecompositionPanel
-                title={planSeedTitle || title || initialTitle}
-                description={description}
-                priority={priority}
-                dueAt={null}
-                estimatedMinutes={(() => {
-                  const durationMinutes =
-                    (new Date(`${startDate}T${endTime}`).getTime() -
-                      new Date(`${startDate}T${startTime}`).getTime()) /
-                    60000;
-                  return Number.isFinite(durationMinutes) && durationMinutes > 0
-                    ? Math.max(15, Math.round(durationMinutes))
-                    : 60;
-                })()}
-                autoRequest={resolvedAutoPlanGenerationEnabled && Boolean(planSeedTitle || title || initialTitle)}
-                onApply={async (result) => {
-                  await onApplyDecomposition?.({
-                    result,
-                    title: title.trim() || initialTitle,
-                    description: description.trim(),
-                    priority,
-                    dueAt: null,
-                  });
-                }}
-              />
-            </div>
-          ) : null}
         </div>
 
         {/* Footer */}

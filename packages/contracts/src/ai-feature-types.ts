@@ -38,9 +38,9 @@ export interface LLMClientConfig {
   temperature?: number;
 }
 
-export type StructuredResultReliability = "business_tool" | "assistant_text";
+type StructuredResultReliability = "business_tool" | "assistant_text";
 
-export interface StructuredValidationIssue {
+interface StructuredValidationIssue {
   path: string;
   message: string;
 }

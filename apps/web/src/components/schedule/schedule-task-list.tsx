@@ -15,7 +15,7 @@ import {
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 

@@ -17,9 +17,7 @@ import type {
   ChatRequest,
 } from "@chrona/contracts";
 import { createLogger } from "@chrona/db/logger";
-import type {
-  StreamEvent as ProviderStreamEvent,
-} from "@chrona/providers-core";
+import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-core";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
@@ -39,7 +37,6 @@ function summarizeText(value: string, maxLength: number) {
 const logger = createLogger("ai-features.openclaw.streaming");
 
 function toFeatureInput(
-  feature: AiFeature,
   input:
     | string
     | SmartSuggestRequest
@@ -48,7 +45,7 @@ function toFeatureInput(
     | SuggestTimeslotRequest
     | ChatRequest,
 ): Record<string, unknown> {
-  const prepared = buildPreparedFeatureRequest(feature, input);
+  const prepared = buildPreparedFeatureRequest(input);
   return {
     instructions: prepared.instructions,
     inputText: prepared.inputText,
@@ -125,7 +122,7 @@ async function* openclawStream(
         feature as "suggest" | "generate_plan",
         {
           sessionKey,
-          ...toFeatureInput(feature, input),
+          ...toFeatureInput(input),
           timeout,
         },
       )) {
@@ -162,10 +159,10 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(config, feature, {
-      ...buildPreparedFeatureRequest(feature, input),
-      sessionKey: scope,
-    });
+      const text = await openclawCall(config, feature, {
+        ...buildPreparedFeatureRequest(input),
+        sessionKey: scope,
+      });
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -303,7 +300,7 @@ function asciiSlug(value: string, maxLength: number): string {
   return normalized || "input";
 }
 
-export function buildSuggestScope(request: SmartSuggestRequest): string {
+function buildSuggestScope(request: SmartSuggestRequest): string {
   if (request.sessionKey?.trim()) {
     return request.sessionKey.trim();
   }

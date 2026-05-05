@@ -128,7 +128,6 @@ export {
   buildSuggestFeatureSpec,
   buildSuggestTimeslotsFeatureSpec,
   dispatchNextTaskActionToolSpec,
-  generatePlanBlueprintToolPayloadSchema,
   generatePlanBlueprintToolSpec,
   suggestTaskCompletionsToolSpec,
   suggestTaskTimeslotsToolSpec,

@@ -1,5 +1,5 @@
 import { ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
-import { QueueCard } from "@/components/schedule/schedule-page-panels";
+import { QueueCard } from "@/components/schedule/panels/schedule-page-panels";
 import type {
   SchedulePageData,
   UnscheduledItem,
@@ -155,9 +155,4 @@ export function ScheduleRightSidebar({
       </SurfaceCard>
     </aside>
   );
-}
-
-// Legacy export for backward compatibility
-export function SchedulePageSidebar(_props: Record<string, unknown>) {
-  return null;
 }

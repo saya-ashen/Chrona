@@ -3,7 +3,7 @@ import { startPlanExecution } from "@/modules/plan-execution";
 import { deriveAutoStartEligibility } from "@/modules/tasks/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 
-export type AutoStartScheduledPlanResult = {
+type AutoStartScheduledPlanResult = {
   started: Array<{ taskId: string; workBlockId: string; runId: string }>;
   skipped: Array<{ taskId: string; workBlockId: string; reason: string }>;
   failed: Array<{ taskId: string; workBlockId: string; error: string }>;
@@ -26,8 +26,6 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           id: true,
           workspaceId: true,
           status: true,
-          scheduleStatus: true,
-          scheduledStartAt: true,
           runtimeAdapterKey: true,
         },
       },
@@ -53,16 +51,15 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         orderBy: { createdAt: "desc" },
       });
 
-      const eligibility = deriveAutoStartEligibility({
-        task: {
-          status: task.status,
-          scheduleStatus: task.scheduleStatus ?? "Scheduled",
-          scheduledStartAt: task.scheduledStartAt,
-          runtimeAdapterKey: task.runtimeAdapterKey,
-        },
-        now,
-        activeRun: activeRun ? { status: activeRun.status } : null,
-      });
+        const eligibility = deriveAutoStartEligibility({
+          task: {
+            status: task.status,
+            runtimeAdapterKey: task.runtimeAdapterKey,
+          },
+          workBlock: { scheduledStartAt: block.scheduledStartAt },
+          now,
+          activeRun: activeRun ? { status: activeRun.status } : null,
+        });
 
       if (!eligibility.ok) {
         result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: eligibility.reason });
@@ -74,12 +71,11 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           actorType: "system",
           actorId: "auto-start-scheduler",
           source: "scheduler",
-          payload: {
-            reason: eligibility.reason,
-            workBlockId: block.id,
-            scheduleStatus: task.scheduleStatus,
-            scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
-          },
+            payload: {
+              reason: eligibility.reason,
+              workBlockId: block.id,
+              scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
+            },
           dedupeKey: `task.auto_start.skipped:${task.id}:${now.toISOString().slice(0, 13)}`,
         });
         continue;

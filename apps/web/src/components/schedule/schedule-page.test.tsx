@@ -10,6 +10,11 @@ const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", worksp
 const updateTaskConfigFromSchedule = vi.fn();
 
 vi.mock("@/lib/router", () => ({
+  AppLink: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={typeof href === "string" ? href : "#"} {...props}>
+      {children}
+    </a>
+  ),
   useAppRouter: () => ({ push, refresh }),
 }));
 
@@ -40,7 +45,7 @@ vi.mock("@/components/schedule/planning-header", () => ({
   ),
 }));
 
-vi.mock("@/components/schedule/schedule-page-panels", () => ({
+vi.mock("@/components/schedule/panels/schedule-page-panels", () => ({
   EmptyState: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ProposalCard: () => <div data-testid="proposal-card" />,
   QueueCard: () => <div data-testid="queue-card" />,
@@ -87,7 +92,7 @@ vi.mock("@/components/schedule/schedule-task-list", () => ({
   ScheduleTaskList: () => <div data-testid="schedule-task-list" />,
 }));
 
-vi.mock("@/components/schedule/schedule-page-timeline", () => ({
+vi.mock("@/components/schedule/timeline/schedule-page-timeline", () => ({
   DayTimeline: () => <div data-testid="day-timeline" />,
   WeekStrip: () => <div data-testid="week-strip" />,
 }));

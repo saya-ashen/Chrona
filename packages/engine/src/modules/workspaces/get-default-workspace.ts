@@ -4,7 +4,7 @@ import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
 
 export const DEFAULT_WORKSPACE_ID = "ws_default";
 
-export type DefaultWorkspace = {
+type DefaultWorkspace = {
   id: string;
   name: string;
   description: string | null;

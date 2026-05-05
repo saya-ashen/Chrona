@@ -86,8 +86,6 @@ export async function materializeTaskPlan(input: { taskId: string }) {
       runtimeAdapterKey: true,
       runtimeInputVersion: true,
       runtimeModel: true,
-      scheduledStartAt: true,
-      scheduledEndAt: true,
       dueAt: true,
       workspace: {
         select: {
@@ -131,8 +129,6 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           ownerType: "human",
           parentTaskId: parentTask.id,
           dueAt: parentTask.dueAt,
-          scheduledStartAt: parentTask.scheduledStartAt,
-          scheduledEndAt: parentTask.scheduledEndAt,
           runtimeAdapterKey,
           runtimeInput: {
             model: "gpt-5.4",
@@ -156,12 +152,12 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           taskId: createdTask.id,
           workspaceId: parentTask.workspaceId,
           persistedStatus: createdTask.status,
-          scheduleStatus: createdTask.scheduleStatus,
+          scheduleStatus: "Unscheduled",
         }),
         update: {
           persistedStatus: createdTask.status,
           displayState: createdTask.status,
-          scheduleStatus: createdTask.scheduleStatus,
+          scheduleStatus: "Unscheduled",
         },
       });
 

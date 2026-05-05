@@ -66,25 +66,3 @@ export async function loadLayers(
 
   return layers;
 }
-
-export async function deactivateLayer(memoryId: string): Promise<void> {
-  await db.memory.update({
-    where: { id: memoryId },
-    data: { status: MemoryStatus.Inactive },
-  });
-}
-
-export async function deactivateLayers(
-  taskId: string,
-  _planId: string,
-): Promise<void> {
-  await db.memory.updateMany({
-    where: {
-      taskId,
-      scope: MemoryScope.task,
-      sourceType: MemorySourceType.plan_layer,
-      status: MemoryStatus.Active,
-    },
-    data: { status: MemoryStatus.Inactive },
-  });
-}

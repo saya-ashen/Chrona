@@ -7,11 +7,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { type DragEvent, useState } from "react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
-import { getSchedulePageCopy, type SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
+import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type {
-  ScheduleProposal,
-  TodayFocusItem,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
 import {
@@ -27,47 +24,14 @@ import {
   type TaskConfigFormInput,
   type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
-import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { SurfaceCard, SurfaceCardHeader, SurfaceCardTitle } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
-import { DetailGrid, EmptyState, ItemMeta, TodayFocusLink } from "./schedule-panel-primitives";
 
 export { DayTimelineSummary } from "./schedule-panel-primitives";
 export { SelectedBlockSheet } from "./selected-block-sheet";
-
-export function TodayFocusCard({
-  items,
-  emptyMessage,
-  copy,
-}: {
-  items: TodayFocusItem[];
-  emptyMessage: string;
-  copy: SchedulePageCopy;
-}) {
-  return (
-    <SurfaceCard>
-      <SurfaceCardHeader>
-        <SurfaceCardTitle>{copy.todayFocus}</SurfaceCardTitle>
-      </SurfaceCardHeader>
-
-      {items.length === 0 ? (
-        <div className="px-6 pb-6">
-          <EmptyState>{emptyMessage}</EmptyState>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 px-6 pb-6 text-sm">
-          {items.map((item) => (
-            <TodayFocusLink key={item.taskId} item={item} />
-          ))}
-        </div>
-      )}
-    </SurfaceCard>
-  );
-}
 
 function QueueTaskConfigEditor({
   item,
@@ -305,75 +269,5 @@ export function QueueCard({
          </div>
       ) : null}
     </div>
-  );
-}
-
-export function ProposalCard({
-  proposal,
-  isPending,
-  onAccept,
-  onReject,
-}: {
-  proposal: ScheduleProposal;
-  isPending: boolean;
-  onAccept: (proposalId: string) => Promise<void>;
-  onReject: (proposalId: string) => Promise<void>;
-}) {
-  const locale = useLocale();
-  const { messages, t } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
-
-  return (
-    <SurfaceCard as="div" variant="inset" className="rounded-2xl">
-      <div className="space-y-3 text-sm text-muted-foreground">
-        <div className="space-y-2">
-          <LocalizedLink
-            href={`/workspaces/${proposal.workspaceId}/tasks/${proposal.taskId}`}
-            className="text-base font-medium text-foreground transition-colors hover:text-primary"
-          >
-            {proposal.title}
-          </LocalizedLink>
-          <ItemMeta item={proposal} />
-        </div>
-        <p>{proposal.summary}</p>
-        <DetailGrid
-          items={[
-            { label: copy.proposedBy, value: proposal.proposedBy },
-            {
-              label: copy.candidateBlock,
-              value: `${formatDateTime(proposal.scheduledStartAt, locale)} → ${formatDateTime(proposal.scheduledEndAt, locale)}`,
-            },
-            {
-              label: copy.dueImpact,
-              value: formatDateTime(proposal.dueAt, locale),
-            },
-            { label: copy.source, value: proposal.source },
-          ]}
-        />
-        <TaskContextLinks
-          workspaceId={proposal.workspaceId}
-          taskId={proposal.taskId}
-          workLabel={t("common.openWorkbench")}
-        />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => void onAccept(proposal.proposalId)}
-            className={buttonVariants({ variant: "default" })}
-          >
-            {copy.acceptProposal}
-          </button>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => void onReject(proposal.proposalId)}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            {copy.rejectProposal}
-          </button>
-        </div>
-      </div>
-    </SurfaceCard>
   );
 }

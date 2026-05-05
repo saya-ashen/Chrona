@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   isAutoExecutableDispatchDecision,
   parseTaskDispatchDecision,
-} from "@/modules/tasks/task-dispatch-types";
+} from "@chrona/contracts";
 
 const baseDecision = {
   schemaName: "task_dispatch_decision" as const,

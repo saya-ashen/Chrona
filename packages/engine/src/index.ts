@@ -22,9 +22,7 @@ export {
 
 export { appendCanonicalEvent } from "./modules/events/append-canonical-event";
 
-export {
-  acceptTaskResult,
-} from "./modules/commands/accept-task-result";
+export { acceptTaskResult } from "./modules/commands/accept-task-result";
 export { applySchedule } from "./modules/commands/apply-schedule";
 export { clearSchedule } from "./modules/commands/clear-schedule";
 export { createFollowUpTask } from "./modules/commands/create-follow-up-task";
@@ -36,13 +34,9 @@ export { invalidateMemory } from "./modules/commands/invalidate-memory";
 export { markTaskDone } from "./modules/commands/mark-task-done";
 export { materializeTaskPlan } from "./modules/commands/materialize-task-plan";
 export { proposeSchedule } from "./modules/commands/propose-schedule";
-export { provideInput } from "./modules/commands/provide-input";
 export { reopenTask } from "./modules/commands/reopen-task";
 export { resolveApproval } from "./modules/commands/resolve-approval";
-export { resumeRun } from "./modules/commands/resume-run";
-export { retryRun } from "./modules/commands/retry-run";
-export { sendOperatorMessage } from "./modules/commands/send-operator-message";
-export { startRun } from "./modules/commands/start-run";
+export { streamTaskPlanGeneration } from "./modules/commands/stream-task-plan-generation";
 export {
   isTaskPlanGenerationRunning,
   startTaskPlanGeneration,
@@ -53,10 +47,8 @@ export {
 export { updateTask } from "./modules/commands/update-task";
 
 export {
-  advancePlanExecution,
   continuePlanExecution,
   executePlanNode,
-  settlePlanNodeFromRun,
   startPlanExecution,
   createPlanRunFromCompiledPlan,
 } from "./modules/plan-execution";
@@ -80,10 +72,7 @@ export {
   getEditablePlan,
 } from "./modules/plan-execution/compiled-plan-store";
 
-export {
-  resolveEffectivePlanGraph,
-  compileEditablePlan,
-} from "@chrona/domain";
+export { resolveEffectivePlanGraph, compileEditablePlan } from "@chrona/domain";
 
 export { getInbox } from "./modules/queries/get-inbox";
 export { getMemoryConsole } from "./modules/queries/get-memory-console";
@@ -118,7 +107,10 @@ export { getLatestSavedAiPlanSnapshot } from "./modules/plan-execution/saved-pla
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
 
-export { getTaskOrThrow, ensureTaskInWorkspace } from "./modules/queries/task-by-id";
+export {
+  getTaskOrThrow,
+  ensureTaskInWorkspace,
+} from "./modules/queries/task-by-id";
 export { getTasksWithProjections } from "./modules/queries/tasks-with-projections";
 export { listTasksByWorkspace } from "./modules/queries/list-tasks";
 export { listAiClients } from "./modules/queries/list-ai-clients";
@@ -131,13 +123,13 @@ export { updateAiClient } from "./modules/commands/update-ai-client";
 export { deleteAiClient } from "./modules/commands/delete-ai-client";
 export { updateAiClientBindings } from "./modules/commands/update-ai-client-bindings";
 export { ensureProposalInWorkspace } from "./modules/queries/proposal-in-workspace";
-export { getWaitingInputRun, getActiveMessageableRun } from "./modules/queries/run-lookup";
-export { saveAssistantMessage, getAssistantMessages, applyAssistantMessage } from "./modules/commands/assistant-message";
-
 export {
-  suggestStream,
-  generatePlanStream,
-} from "./modules/ai/streaming";
+  saveAssistantMessage,
+  getAssistantMessages,
+  applyAssistantMessage,
+} from "./modules/commands/assistant-message";
+
+export { suggestStream, generatePlanStream } from "./modules/ai/streaming";
 
 export {
   normalizeGeneratePlanResponse,

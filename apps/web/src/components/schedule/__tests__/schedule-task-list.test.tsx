@@ -18,7 +18,7 @@ vi.mock("@/components/ui/surface-card", () => ({
   SurfaceCardHeader: ({ children }: any) => <div>{children}</div>,
   SurfaceCardTitle: ({ children }: any) => <h3>{children}</h3>,
 }));
-vi.mock("@/components/ui/task-context-links", () => ({ TaskContextLinks: () => null }));
+vi.mock("@/components/task/shared/task-context-links", () => ({ TaskContextLinks: () => null }));
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, ...props }: any) => <a {...props}>{children}</a>,
 }));

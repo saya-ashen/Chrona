@@ -8,28 +8,6 @@ export type { StructuredSuggestion } from "@chrona/contracts";
  * Generic POST fetch with AbortController support.
  * Returns parsed JSON on success, throws on error.
  */
-export async function fetchJSON<T>(
-  url: string,
-  body: Record<string, unknown>,
-  signal?: AbortSignal,
-): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(
-      (errorBody as { error?: string }).error ?? `Request failed (${res.status})`,
-    );
-  }
-
-  return res.json() as Promise<T>;
-}
-
 // ---------- Types ----------
 
 /** Legacy flat shape — kept for backward compat in components */

@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
 
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),

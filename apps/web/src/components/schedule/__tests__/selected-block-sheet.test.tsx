@@ -95,9 +95,9 @@ vi.mock("@/components/schedule/panels/selected-block-sheet/selected-block-sheet-
   ),
 }));
 
-// Mock the task decomposition panel
-vi.mock("@/components/schedule/task-planning-panel", () => ({
-  TaskDecompositionPanel: (props: {
+// Mock the task planning panel
+vi.mock("@/components/task/ai/task-plan-generation-panel", () => ({
+  TaskPlanGenerationPanel: (props: {
     activeAcceptedPlanId?: string | null;
     title?: string;
     description?: string | null;
@@ -120,7 +120,7 @@ vi.mock("@/components/schedule/task-planning-panel", () => ({
 }));
 
 // Mock the task context links
-vi.mock("@/components/ui/task-context-links", () => ({
+vi.mock("@/components/task/shared/task-context-links", () => ({
   TaskContextLinks: () => <div data-testid="task-context-links" />,
 }));
 
@@ -212,7 +212,7 @@ beforeEach(() => {
         ? input.toString()
         : input.url;
 
-    if (url.includes("/api/tasks/") && url.includes("/plan-state")) {
+    if (url.includes("/api/tasks/") && url.includes("/plan/state")) {
       return Promise.resolve(createJsonResponse({
         taskId: "task-1",
         aiPlanGenerationStatus: "idle",
@@ -220,7 +220,7 @@ beforeEach(() => {
       }));
     }
 
-    if (url.includes("/api/ai/task-plan/accept")) {
+    if (url.includes("/api/tasks/") && url.includes("/plan/accept")) {
       return Promise.resolve(createJsonResponse({ ok: true }));
     }
 
@@ -457,7 +457,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan-state")) {
+      if (url.includes("/api/tasks/task-1/plan/state")) {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "waiting_acceptance",
@@ -491,7 +491,7 @@ describe("SelectedBlockSheet – layout order", () => {
         throw new Error("schedule projection should not be fetched during plan polling");
       }
 
-      if (url.includes("/api/ai/task-plan/accept")) {
+      if (url.includes("/api/tasks/task-1/plan/accept")) {
         return Promise.resolve(createJsonResponse({ ok: true }));
       }
 
@@ -508,7 +508,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-polled");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -520,7 +520,7 @@ describe("SelectedBlockSheet – layout order", () => {
       await Promise.resolve();
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -532,7 +532,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan-state")) {
+      if (url.includes("/api/tasks/task-1/plan/state")) {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "idle",
@@ -540,7 +540,7 @@ describe("SelectedBlockSheet – layout order", () => {
         }));
       }
 
-      if (url.includes("/api/ai/task-plan/accept")) {
+      if (url.includes("/api/tasks/task-1/plan/accept")) {
         return Promise.resolve(createJsonResponse({ ok: true }));
       }
 
@@ -559,7 +559,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan-state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
   });
 
   it("keeps polling while generation remains unchanged across responses", async () => {
@@ -571,7 +571,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan-state")) {
+      if (url.includes("/api/tasks/task-1/plan/state")) {
         pollCount += 1;
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
@@ -580,7 +580,7 @@ describe("SelectedBlockSheet – layout order", () => {
         }));
       }
 
-      if (url.includes("/api/ai/task-plan/accept")) {
+      if (url.includes("/api/tasks/task-1/plan/accept")) {
         return Promise.resolve(createJsonResponse({ ok: true }));
       }
 
@@ -614,7 +614,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan-state")) {
+      if (url.includes("/api/tasks/task-1/plan/state")) {
         pollCount += 1;
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
@@ -623,7 +623,7 @@ describe("SelectedBlockSheet – layout order", () => {
         }));
       }
 
-      if (url.includes("/api/ai/task-plan/accept")) {
+      if (url.includes("/api/tasks/task-1/plan/accept")) {
         return Promise.resolve(createJsonResponse({ ok: true }));
       }
 

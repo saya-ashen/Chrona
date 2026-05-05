@@ -7,8 +7,8 @@ vi.mock("@/i18n/client", () => ({
 }));
 
 const taskDecompositionPanelProps = vi.fn();
-vi.mock("@/components/schedule/task-planning-panel", () => ({
-  TaskDecompositionPanel: (props: unknown) => {
+vi.mock("@/components/task/ai/task-plan-generation-panel", () => ({
+  TaskPlanGenerationPanel: (props: unknown) => {
     taskDecompositionPanelProps(props);
     return <div data-testid="task-decomposition-panel" />;
   },
