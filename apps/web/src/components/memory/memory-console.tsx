@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard, SurfaceCardHeader, SurfaceCardTitle } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
+import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 
 type MemoryConsoleProps = {
   items: Array<{

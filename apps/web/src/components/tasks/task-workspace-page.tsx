@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Ellipsis, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { TaskPlanPanel } from "@/components/task/plan/task-plan-panel";
 import { TaskEditForm } from "@/components/tasks/task-edit-form";
-import { TaskPlanPanel } from "@/components/tasks/task-plan-panel";
 import { TaskWorkspaceAssistant } from "@/components/tasks/task-workspace-assistant";
 import { TaskWorkspaceDiffPreview } from "@/components/tasks/task-workspace-diff-preview";
 import { buttonVariants } from "@/components/ui/button";
@@ -188,7 +188,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const fetchPlan = useCallback(async () => {
     setIsRefetchingPlan(true);
     try {
-      const res = await fetch(`/api/tasks/${task.id}/plan-state`);
+      const res = await fetch(`/api/tasks/${task.id}/plan/state`);
       if (res.ok) {
         const state = (await res.json()) as {
           aiPlanGenerationStatus?: string;

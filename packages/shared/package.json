@@ -5,7 +5,7 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
-    "@chrona/openclaw": "workspace:*",
+    "@chrona/providers-core": "workspace:*",
     "@chrona/runtime-core": "workspace:*"
   },
   "exports": {

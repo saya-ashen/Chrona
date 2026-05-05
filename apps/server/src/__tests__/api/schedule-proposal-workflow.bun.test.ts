@@ -2,7 +2,7 @@
  * API workflow tests: Schedule proposal lifecycle
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import.
- * Tests: create proposal → accept → task times applied, reject → task times unchanged,
+ * Tests: create proposal → accept → work block applied, reject → task times unchanged,
  * re-decide blocked, plus all negative cases.
  */
 
@@ -170,7 +170,7 @@ describe("Schedule proposal workflow", () => {
   // Accept proposal
   // -----------------------------------------------------------------------
 
-  it("accepting a proposal applies schedule times to the task", async () => {
+  it("accepting a proposal applies schedule times to the canonical work block", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -206,13 +206,19 @@ describe("Schedule proposal workflow", () => {
 
     expect(decisionRes.status).toBe(200);
 
-    // Verify task was updated
+    // Verify due date stays on task and schedule window moves to WorkBlock + projection.
     const task = await db.task.findUnique({ where: { id: taskId } });
-    expect(task!.scheduledStartAt).not.toBeNull();
-    expect(task!.scheduledEndAt).not.toBeNull();
+    const workBlock = await db.workBlock.findFirst({ where: { taskId } });
+    const projection = await db.taskProjection.findUnique({ where: { taskId } });
+
+    expect(workBlock).not.toBeNull();
+    expect(projection).not.toBeNull();
     expect(task!.dueAt).not.toBeNull();
-    expect(new Date(task!.scheduledStartAt!).getTime()).toBe(start.getTime());
-    expect(new Date(task!.scheduledEndAt!).getTime()).toBe(end.getTime());
+    expect(new Date(workBlock!.scheduledStartAt).getTime()).toBe(start.getTime());
+    expect(new Date(workBlock!.scheduledEndAt).getTime()).toBe(end.getTime());
+    expect(projection!.scheduleStatus).toBe("Scheduled");
+    expect(new Date(projection!.scheduledStartAt!).getTime()).toBe(start.getTime());
+    expect(new Date(projection!.scheduledEndAt!).getTime()).toBe(end.getTime());
     expect(new Date(task!.dueAt!).getTime()).toBe(due.getTime());
   });
 
@@ -277,10 +283,15 @@ describe("Schedule proposal workflow", () => {
       body: JSON.stringify({ proposalId, decision: "Rejected", resolutionNote: "Too early" }),
     });
 
-    // Task times should still be null
+    // Task due date and canonical work blocks should remain untouched.
     const task = await db.task.findUnique({ where: { id: taskId } });
-    expect(task!.scheduledStartAt).toBeNull();
-    expect(task!.scheduledEndAt).toBeNull();
+    const workBlocks = await db.workBlock.findMany({ where: { taskId } });
+    const projection = await db.taskProjection.findUnique({ where: { taskId } });
+
+    expect(workBlocks).toHaveLength(0);
+    expect(projection?.scheduledStartAt ?? null).toBeNull();
+    expect(projection?.scheduledEndAt ?? null).toBeNull();
+    expect(projection?.scheduleStatus ?? "Unscheduled").toBe("Unscheduled");
     expect(task!.dueAt).toBeNull();
   });
 

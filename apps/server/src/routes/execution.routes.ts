@@ -11,19 +11,14 @@ import {
   ensureProposalInWorkspace,
   ensureTaskInWorkspace,
   getAcceptedCompiledPlan,
-  getActiveMessageableRun,
   getAssistantMessages,
   getTaskOrThrow,
-  getWaitingInputRun,
   invalidateMemory,
   markTaskDone,
   proposeSchedule,
-  provideInput,
   reopenTask,
   resolveApproval,
-  retryRun,
   saveAssistantMessage,
-  sendOperatorMessage,
   startPlanExecution,
 } from "@chrona/engine";
 
@@ -80,16 +75,16 @@ export function createExecutionRoutes() {
       const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedCompiledPlan(taskId);
-      if (acceptedPlan) {
-        const result = await startPlanExecution({
-          taskId,
-          trigger: "manual",
-          prompt: body.prompt,
-        });
-        return json(c, { workspaceId: task.workspaceId, ...result });
+      if (!acceptedPlan) {
+        return error(c, "No accepted plan. Create or accept a plan before execution.", 400);
       }
 
-      return json(c, await retryRun({ taskId, prompt: body.prompt }));
+      const result = await startPlanExecution({
+        taskId,
+        trigger: "manual",
+        prompt: body.prompt,
+      });
+      return json(c, { workspaceId: task.workspaceId, ...result });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to retry run";
       return error(c, message, message.includes("not found") ? 404 : 500);
@@ -107,24 +102,19 @@ export function createExecutionRoutes() {
       const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedCompiledPlan(taskId);
-      if (acceptedPlan && task.status === "WaitingForInput") {
-        const result = await continuePlanExecution({
-          taskId,
-          reason: "user_provided_input",
-          userInput: body.inputText,
-        });
-        return json(c, { workspaceId: task.workspaceId, ...result });
+      if (!acceptedPlan) {
+        return error(c, "No accepted plan. Create or accept a plan before execution.", 400);
+      }
+      if (task.status !== "WaitingForInput") {
+        return error(c, "Task is not currently waiting for input.", 409);
       }
 
-      let runId = body.runId as string | undefined;
-      if (!runId) {
-        const latestRun = await getWaitingInputRun(taskId);
-        if (!latestRun) {
-          return error(c, "No run waiting for input found for this task.", 400);
-        }
-        runId = latestRun.id;
-      }
-      return json(c, await provideInput({ runId, inputText: body.inputText }));
+      const result = await continuePlanExecution({
+        taskId,
+        reason: "user_provided_input",
+        userInput: body.inputText,
+      });
+      return json(c, { workspaceId: task.workspaceId, ...result });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to provide input";
       return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);
@@ -142,25 +132,17 @@ export function createExecutionRoutes() {
       const task = await getTaskOrThrow(taskId);
 
       const acceptedPlan = await getAcceptedCompiledPlan(taskId);
-      if (acceptedPlan) {
-        const trigger = task.status === "WaitingForInput" ? "user_provided_input" : "user_message";
-        const result = await continuePlanExecution({
-          taskId,
-          reason: trigger,
-          userInput: body.message,
-        });
-        return json(c, { workspaceId: task.workspaceId, ...result });
+      if (!acceptedPlan) {
+        return error(c, "No accepted plan. Create or accept a plan before execution.", 400);
       }
 
-      let runId = body.runId as string | undefined;
-      if (!runId) {
-        const latestRun = await getActiveMessageableRun(taskId);
-        if (!latestRun) {
-          return error(c, "No active run found for this task. The agent must be running to receive messages.", 400);
-        }
-        runId = latestRun.id;
-      }
-      return json(c, await sendOperatorMessage({ runId, message: body.message }));
+      const trigger = task.status === "WaitingForInput" ? "user_provided_input" : "user_message";
+      const result = await continuePlanExecution({
+        taskId,
+        reason: trigger,
+        userInput: body.message,
+      });
+      return json(c, { workspaceId: task.workspaceId, ...result });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to send message";
       return error(c, message, message.includes("not found") || message.includes("no longer exists") ? 404 : 500);

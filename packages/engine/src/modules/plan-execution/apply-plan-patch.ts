@@ -14,7 +14,7 @@ import { applyPlanPatch as domainApplyPlanPatch } from "@chrona/domain/plan/patc
 import { compileEditablePlan } from "@chrona/domain";
 import { getEditablePlan } from "./compiled-plan-store";
 
-export type ApplyPlanPatchResult = {
+type ApplyPlanPatchResult = {
   newLayers: PlanOverlayLayer[];
 };
 

@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { ApprovalStatus, RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
 import { resolveApproval } from "@chrona/engine";
-import { resetTestDb, seedWorkspace, seedTask, expectApiError } from "../bun-test-helpers";
+import { resetTestDb, seedAcceptedPlan, seedWorkspace, seedTask, expectApiError } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------
 // Fake adapters
@@ -70,6 +70,7 @@ async function seedApprovalFixture(
     title: `Approval ${decision} Task`,
     status: TaskStatus.WaitingForApproval,
   });
+  await seedAcceptedPlan(taskId, workspaceId);
 
   const sessionKey = `session-${decision}-${Date.now()}`;
   const runRef = `run-${decision}-${Date.now()}`;

@@ -1,6 +1,6 @@
 import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 
-export type NodeExecutionEvidence = {
+type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
   childTaskId?: string;

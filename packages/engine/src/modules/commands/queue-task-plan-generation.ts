@@ -7,7 +7,7 @@ import {
 
 const logger = createLogger("command.queue-task-plan-generation");
 
-export type TaskPlanGenerationReason = "task_created" | "task_updated" | "manual_regenerate";
+type TaskPlanGenerationReason = "task_created" | "task_updated" | "manual_regenerate";
 
 async function runQueuedTaskPlanGeneration(input: {
   taskId: string;

@@ -6,7 +6,7 @@ import {
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
 
-export type MainSessionEventType =
+type MainSessionEventType =
   | "execution_started"
   | "executable_path_computed"
   | "node_started"
@@ -21,7 +21,7 @@ export type MainSessionEventType =
   | "user_input_received"
   | "plan_accepted";
 
-export type MainSessionEventPayload = Record<string, unknown>;
+type MainSessionEventPayload = Record<string, unknown>;
 
 export async function ensurePlanMainSession(input: {
   taskId: string;

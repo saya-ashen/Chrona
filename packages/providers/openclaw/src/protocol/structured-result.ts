@@ -1,8 +1,8 @@
-export type StructuredResultReliability =
+type StructuredResultReliability =
   | "business_tool"
   | "assistant_text";
 
-export interface StructuredValidationIssue {
+interface StructuredValidationIssue {
   path: string;
   message: string;
 }

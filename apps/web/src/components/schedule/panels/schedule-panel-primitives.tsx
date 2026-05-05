@@ -1,6 +1,5 @@
 "use client";
 
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { ScheduleCardItem, ScheduledItem } from "@/components/schedule/schedule-page-types";
 import {
@@ -50,28 +49,6 @@ export function ItemMeta({ item }: { item: ScheduleCardItem }) {
         </StatusBadge>
       ) : null}
     </div>
-  );
-}
-
-export function DetailGrid({
-  items,
-}: {
-  items: Array<{ label: string; value: string | null | undefined }>;
-}) {
-  return (
-    <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2"
-        >
-          <dt className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            {item.label}
-          </dt>
-          <dd className="mt-1 text-sm text-foreground">{item.value ?? "-"}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -139,17 +116,5 @@ export function DayTimelineSummary({
     <span>
       {formatTime(earliest, locale)} → {formatTime(latest, locale)}
     </span>
-  );
-}
-
-export function TodayFocusLink({ item }: { item: { taskId: string; workspaceId: string; tone: Parameters<typeof StatusBadge>[0]["tone"]; reason: string; title: string } }) {
-  return (
-    <LocalizedLink
-      href={`/workspaces/${item.workspaceId}/work/${item.taskId}`}
-      className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-    >
-      <StatusBadge tone={item.tone}>{item.reason}</StatusBadge>
-      <span className="max-w-[18rem] truncate">{item.title}</span>
-    </LocalizedLink>
   );
 }

@@ -13,12 +13,12 @@ import {
   createFollowUpTask,
   editAndApproveApproval,
   markTaskDone,
-  provideInput,
   rejectApproval,
   reopenTask,
-  retryRun,
-  sendOperatorMessage,
-  startRun,
+  retryExecution,
+  sendExecutionMessage,
+  startExecution,
+  submitExecutionInput,
 } from "@/lib/task-actions-client";
 import { useAppRouter } from "@/lib/router";
 import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
@@ -173,80 +173,42 @@ export function useWorkPageController(
       }
 
       const didSucceed = await runScopedAction(async () => {
-        const currentRun = data.currentRun;
         const planExecution = data.planExecution;
 
-        if (planExecution) {
-          if (planExecution.status === "no_plan") {
-            throw new Error("No accepted plan. Create or accept a plan before execution.");
-          }
-
-          if (planExecution.status === "completed") {
-            throw new Error("Plan execution is complete. Reopen or create a follow-up task.");
-          }
-
-          if (
-            planExecution.status === "waiting_for_user" ||
-            planExecution.status === "waiting_for_approval" ||
-            planExecution.status === "blocked"
-          ) {
-            await provideInput({
-              taskId: data.taskShell.id,
-              inputText,
-            });
-            return;
-          }
-
-          if (planExecution.status === "running") {
-            await sendOperatorMessage({
-              taskId: data.taskShell.id,
-              message: inputText,
-            });
-            return;
-          }
-
-          await startRun({
-            taskId: data.taskShell.id,
-            prompt: inputText,
-          });
-          return;
+        if (!planExecution) {
+          throw new Error("Execution state is unavailable. Refresh the work page and try again.");
         }
 
-        if (!currentRun) {
-          await startRun({
-            taskId: data.taskShell.id,
-            prompt: inputText,
-          });
-          return;
+        if (planExecution.status === "no_plan") {
+          throw new Error("No accepted plan. Create or accept a plan before execution.");
         }
 
-        if (currentRun.status === "WaitingForInput") {
-          await provideInput({
+        if (planExecution.status === "completed") {
+          throw new Error("Plan execution is complete. Reopen or create a follow-up task.");
+        }
+
+        if (
+          planExecution.status === "waiting_for_user" ||
+          planExecution.status === "waiting_for_approval" ||
+          planExecution.status === "blocked"
+        ) {
+          await submitExecutionInput({
             taskId: data.taskShell.id,
-            runId: currentRun.id,
             inputText,
           });
           return;
         }
 
-        if (
-          currentRun.status === "Running" ||
-          currentRun.status === "WaitingForApproval"
-        ) {
-          await sendOperatorMessage({
+        if (planExecution.status === "running") {
+          await sendExecutionMessage({
             taskId: data.taskShell.id,
-            runId: currentRun.id,
             message: inputText,
           });
           return;
         }
 
-        if (
-          currentRun.status === "Completed" ||
-          currentRun.status === "Failed" ||
-          currentRun.status === "Cancelled"
-        ) {
-          await retryRun({
+        if (planExecution.status === "started") {
+          await startExecution({
             taskId: data.taskShell.id,
             prompt: inputText,
           });
@@ -263,19 +225,19 @@ export function useWorkPageController(
       return didSucceed;
     },
     [
-      copy.composerRequired,
-      copy.currentRunCannotAcceptMessages,
-      data.currentRun,
-      data.taskShell.id,
-      resetComposer,
-      runScopedAction,
+        copy.composerRequired,
+        copy.currentRunCannotAcceptMessages,
+        data.planExecution,
+        data.taskShell.id,
+        resetComposer,
+        runScopedAction,
     ],
   );
 
   const actions = {
     async startExecution() {
       return runScopedAction(async () => {
-        await startRun({
+        await startExecution({
           taskId: data.taskShell.id,
         });
       }, "hero");
@@ -307,7 +269,7 @@ export function useWorkPageController(
 
     async retryResult(prompt?: string) {
       return runScopedAction(async () => {
-        await retryRun({
+        await retryExecution({
           taskId: data.taskShell.id,
           prompt:
             prompt?.trim() ||

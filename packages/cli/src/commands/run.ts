@@ -13,7 +13,7 @@ export function registerRunCommands(program: Command, getClient: ClientResolver)
       .requiredOption("-t, --task-id <id>", "Task ID")
       .option("--prompt <text>", "Run prompt override")
       .action(async (options: CommonCommandOptions & { taskId: string; prompt?: string }) => {
-        await runCommand(() => getClient().startRun(options.taskId, options.prompt), options, formatRunResult);
+        await runCommand(() => getClient().startExecution(options.taskId, options.prompt), options, formatRunResult);
       }),
   );
 
@@ -39,10 +39,9 @@ export function registerRunCommands(program: Command, getClient: ClientResolver)
       .description("Provide input to a waiting task run")
       .requiredOption("-t, --task-id <id>", "Task ID")
       .requiredOption("--text <text>", "Input text")
-      .option("-r, --run-id <id>", "Specific run ID")
-      .action(async (options: CommonCommandOptions & { taskId: string; text: string; runId?: string }) => {
+      .action(async (options: CommonCommandOptions & { taskId: string; text: string }) => {
         await runCommand(
-          () => getClient().provideInput(options.taskId, options.text, options.runId),
+          () => getClient().submitExecutionInput(options.taskId, options.text),
           options,
           formatRunResult,
         );

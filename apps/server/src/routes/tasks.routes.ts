@@ -5,9 +5,7 @@ import {
   createTask,
   deleteTask,
   ensureTaskInWorkspace,
-  getLatestSavedAiPlanSnapshot,
   getTaskPage,
-  isTaskPlanGenerationRunning,
   listTasksByWorkspace,
   updateTask,
 } from "@chrona/engine";
@@ -187,33 +185,6 @@ export function createTasksRoutes() {
         return error(c, httpError.message, httpError.status);
       }
       return internalServerError(c, "DELETE /api/tasks/:taskId", cause, "Failed to delete task");
-    }
-  });
-
-  api.get("/tasks/:taskId/plan-state", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const savedAiPlan = await getLatestSavedAiPlanSnapshot(taskId);
-      const planStatus = savedAiPlan?.status === "accepted"
-        ? "accepted"
-        : savedAiPlan
-          ? "waiting_acceptance"
-          : "no_plan";
-      const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
-        ? "generating"
-        : planStatus === "accepted"
-          ? "accepted"
-          : planStatus === "waiting_acceptance"
-            ? "waiting_acceptance"
-            : "idle";
-      return json(c, {
-        taskId,
-        aiPlanGenerationStatus,
-        savedAiPlan,
-      });
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to get task plan state";
-      return error(c, message, 500);
     }
   });
 

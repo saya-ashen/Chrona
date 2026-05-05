@@ -5,7 +5,6 @@ import type {
   TimelineCreateInput,
 } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 export function SchedulePageDialogs({
   showQuickAddDialog,
@@ -22,7 +21,6 @@ export function SchedulePageDialogs({
   actionFailedMessage,
   onCloseQuickAdd,
   handleCreateTaskBlock,
-  handleApplyDecompositionFromDialog,
 }: {
   showQuickAddDialog: boolean;
   isPending: boolean;
@@ -43,13 +41,6 @@ buildScheduleViewHref: (...args: any[]) => string;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
   handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
-  handleApplyDecompositionFromDialog: (payload: {
-    result: TaskPlanGraphResponse;
-    title: string;
-    description: string;
-    priority: "Low" | "Medium" | "High" | "Urgent";
-    dueAt: Date | null;
-  }) => Promise<void>;
 }) {
 
   void data;
@@ -86,7 +77,6 @@ buildScheduleViewHref: (...args: any[]) => string;
         });
         onCloseQuickAdd();
       }}
-      onApplyDecomposition={handleApplyDecompositionFromDialog}
     />
   );
 }

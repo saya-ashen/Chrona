@@ -27,7 +27,7 @@ import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
 import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
 
-export type PlanExecutionStatus =
+type PlanExecutionStatus =
   | "started"
   | "running"
   | "waiting_for_user"
@@ -36,7 +36,7 @@ export type PlanExecutionStatus =
   | "completed"
   | "no_plan";
 
-export type PlanExecutionResult = {
+type PlanExecutionResult = {
   taskId: string;
   planId: string | null;
   mainSessionId: string | null;
@@ -400,7 +400,7 @@ async function handleNodeResult(params: {
   }
 }
 
-export async function advancePlanExecution(input: {
+async function advancePlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   maxSteps?: number;

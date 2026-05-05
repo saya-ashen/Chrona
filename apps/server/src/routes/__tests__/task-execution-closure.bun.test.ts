@@ -14,7 +14,7 @@ import {
   reopenTask,
   resolveApproval,
 } from "@chrona/engine";
-import { resetTestDb, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
+import { resetTestDb, seedAcceptedPlan, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 // ---------------------------------------------------------------------------
 // Fake adapter for resolveApproval rejection path
@@ -659,6 +659,7 @@ describe("POST /api/approvals/:approvalId/resolve", () => {
       title: `Approval ${decision ?? "Test"} Task`,
       status: TaskStatus.WaitingForApproval,
     });
+    await seedAcceptedPlan(taskId, workspaceId);
 
     const run = await db.run.create({
       data: {
@@ -730,7 +731,7 @@ describe("POST /api/approvals/:approvalId/resolve", () => {
     expect(storedTask.status).toBe(TaskStatus.Blocked);
   });
 
-  it("records approval.resolved and run.started events on approve", async () => {
+  it("records approval.resolved on approve", async () => {
     const { workspaceId } = await seedWorkspace("Approve Event");
     const { taskId, approvalId } = await seedApproval(workspaceId, "Approved");
 

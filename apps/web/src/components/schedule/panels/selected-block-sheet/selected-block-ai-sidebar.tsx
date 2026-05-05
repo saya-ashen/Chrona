@@ -1,9 +1,9 @@
 "use client";
 
 import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-react";
-import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
+import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
+import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
-import { TaskContextLinks } from "@/components/ui/task-context-links";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
@@ -99,7 +99,7 @@ export function SelectedBlockAiSidebar({
             </div>
           </div>
           <div className="p-3">
-            <TaskDecompositionPanel
+            <TaskPlanGenerationPanel
               taskId={taskId}
               title={planningTaskDraft.title}
               description={planningTaskDraft.description}

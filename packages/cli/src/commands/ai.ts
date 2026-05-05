@@ -17,31 +17,17 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
   createOutputOption(
     ai
       .command("generate-plan")
-      .description("Generate a task plan graph")
-      .option("-t, --task-id <id>", "Task ID")
-      .option("--title <title>", "Ad-hoc task title")
-      .option("--description <text>", "Ad-hoc task description")
-      .option("--estimated-minutes <number>", "Estimated minutes")
-      .option("--planning-prompt <text>", "Planning prompt override")
+      .description("Generate a task plan graph for an existing task")
+      .requiredOption("-t, --task-id <id>", "Task ID")
       .option("--force-refresh", "Ignore cached plan", false)
       .action(async (options: CommonCommandOptions & {
-        taskId?: string;
-        title?: string;
-        description?: string;
-        estimatedMinutes?: string;
-        planningPrompt?: string;
+        taskId: string;
         forceRefresh: boolean;
       }) => {
         await runCommand(
           () =>
             getClient().generateTaskPlan({
               taskId: options.taskId,
-              title: options.title,
-              description: options.description,
-              estimatedMinutes: options.estimatedMinutes
-                ? Number.parseInt(options.estimatedMinutes, 10)
-                : undefined,
-              planningPrompt: options.planningPrompt,
               forceRefresh: options.forceRefresh,
             }),
           options,

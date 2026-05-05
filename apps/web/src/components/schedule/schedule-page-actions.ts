@@ -15,8 +15,6 @@ import type {
   TimelineDragItem,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-import type { LegacyPlanGraph } from "@/components/schedule/schedule-page-types";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import {
   applyScheduleToListItem,
   applyTaskConfigToItem,
@@ -469,100 +467,4 @@ export async function handleTaskConfigSaveAction({
     setIsPending(false);
   }
 }
-
-export async function handleApplyDecompositionFromDialogAction({
-  workspaceId,
-  title,
-  description,
-  priority,
-  dueAt,
-  defaultRuntimeAdapterKey,
-  result,
-  activeDay,
-  activeView,
-  locale,
-  pushRoute,
-  localizeHref,
-  buildScheduleViewHref,
-  setShowNewTaskDialog,
-  setLocalSelectedTaskId,
-  setIsPending,
-  setErrorMessage,
-  refreshProjection,
-  actionFailedMessage,
-}: {
-  workspaceId: string;
-  title: string;
-  description: string;
-  priority: "Low" | "Medium" | "High" | "Urgent";
-  dueAt: Date | null;
-  defaultRuntimeAdapterKey: string;
-  result: TaskPlanGraphResponse;
-  activeDay: string;
-  activeView: ScheduleViewMode;
-  locale: string;
-  pushRoute: (href: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  localizeHref: (locale: any, href: string) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  buildScheduleViewHref: (...args: any[]) => string;
-  setShowNewTaskDialog: (value: boolean) => void;
-  setLocalSelectedTaskId: (taskId: string) => void;
-  setIsPending: (value: boolean) => void;
-  setErrorMessage: (value: string | null) => void;
-  refreshProjection: () => Promise<void>;
-  actionFailedMessage: string;
-}) {
-  setIsPending(true);
-  setErrorMessage(null);
-
-  try {
-    const created = await createTaskFromSchedule({
-      workspaceId,
-      title,
-      description: description || null,
-      priority,
-      dueAt,
-      runtimeAdapterKey: defaultRuntimeAdapterKey,
-      runtimeInput: {},
-      runtimeInputVersion: `${defaultRuntimeAdapterKey}-v1`,
-      runtimeModel: null,
-      prompt: null,
-      runtimeConfig: null,
-    });
-
-    const response = await fetch("/api/ai/batch-apply-plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        taskId: created.taskId,
-        nodes: (result.planGraph as LegacyPlanGraph).nodes,
-        edges: (result.planGraph as LegacyPlanGraph).edges,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to apply task plan");
-    }
-
-    setShowNewTaskDialog(false);
-    setLocalSelectedTaskId(created.taskId);
-    pushRoute(
-      localizeHref(
-        locale,
-        buildScheduleViewHref(activeDay, activeView, created.taskId),
-      ),
-    );
-    await refreshProjection();
-  } catch (error) {
-    setErrorMessage(
-      error instanceof Error ? error.message : actionFailedMessage,
-    );
-  } finally {
-    setIsPending(false);
-  }
-}
-
-
-
 

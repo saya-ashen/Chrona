@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./task/*": "./src/task/*.ts"

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@chrona/shared";
@@ -127,13 +128,19 @@ export async function updateTask(input: {
       workspace: {
         select: { defaultRuntime: true },
       },
+      workBlocks: {
+        where: { status: { in: ["Scheduled", "Active"] } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
   });
+  const currentWorkBlock = currentTask.workBlocks[0] ?? null;
   validateScheduleWindow({
     scheduledStartAt:
-      input.scheduledStartAt === undefined ? currentTask.scheduledStartAt : input.scheduledStartAt,
+      input.scheduledStartAt === undefined ? currentWorkBlock?.scheduledStartAt ?? null : input.scheduledStartAt,
     scheduledEndAt:
-      input.scheduledEndAt === undefined ? currentTask.scheduledEndAt : input.scheduledEndAt,
+      input.scheduledEndAt === undefined ? currentWorkBlock?.scheduledEndAt ?? null : input.scheduledEndAt,
   });
   const nextRuntimeModel = runtimeModel === undefined ? currentTask.runtimeModel : runtimeModel;
   const nextPrompt = prompt === undefined ? currentTask.prompt : prompt;
@@ -243,8 +250,6 @@ export async function updateTask(input: {
       description,
       priority: input.priority ? TaskPriority[input.priority] : undefined,
       dueAt: input.dueAt,
-      scheduledStartAt: input.scheduledStartAt,
-      scheduledEndAt: input.scheduledEndAt,
       runtimeAdapterKey: shouldPersistResolvedRuntimeConfig
         ? validatedRuntimeConfig.runtimeAdapterKey
         : undefined,
@@ -265,6 +270,44 @@ export async function updateTask(input: {
       status: nextStatus,
     },
   });
+
+  if (input.scheduledStartAt !== undefined || input.scheduledEndAt !== undefined) {
+    const nextScheduledStartAt =
+      input.scheduledStartAt === undefined ? currentWorkBlock?.scheduledStartAt ?? null : input.scheduledStartAt;
+    const nextScheduledEndAt =
+      input.scheduledEndAt === undefined ? currentWorkBlock?.scheduledEndAt ?? null : input.scheduledEndAt;
+
+    if (!nextScheduledStartAt || !nextScheduledEndAt) {
+      if (currentWorkBlock?.status === "Active") {
+        throw new Error("Cannot clear schedule while a work block is active");
+      }
+      if (currentWorkBlock) {
+        await db.workBlock.delete({ where: { id: currentWorkBlock.id } });
+      }
+    } else if (currentWorkBlock) {
+      await db.workBlock.update({
+        where: { id: currentWorkBlock.id },
+        data: {
+          title: title ?? currentTask.title,
+          scheduledStartAt: nextScheduledStartAt,
+          scheduledEndAt: nextScheduledEndAt,
+        },
+      });
+    } else {
+      const acceptedPlan = await getAcceptedCompiledPlan(task.id);
+      await db.workBlock.create({
+        data: {
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          planId: acceptedPlan?.compiledPlan.editablePlanId ?? null,
+          title: title ?? currentTask.title,
+          scheduledStartAt: nextScheduledStartAt,
+          scheduledEndAt: nextScheduledEndAt,
+          trigger: "manual",
+        },
+      });
+    }
+  }
 
   await appendCanonicalEvent({
     eventType: "task.updated",

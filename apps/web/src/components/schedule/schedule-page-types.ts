@@ -148,7 +148,7 @@ export type ScheduleRecord = {
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 } & ScheduleRuntimeFields;
 
-export type ScheduleProposal = {
+type ScheduleProposal = {
   proposalId: string;
   taskId: string;
   workspaceId: string;
@@ -164,7 +164,7 @@ export type ScheduleProposal = {
   scheduledEndAt: Date | null;
 };
 
-export type WorkBlockInfo = {
+type WorkBlockInfo = {
   id: string;
   taskId: string;
   planId: string | null;
@@ -381,7 +381,6 @@ export type QuickCreateDraft = {
   scheduledEndAt: Date | null;
   priority: "Low" | "Medium" | "High" | "Urgent";
 };
-
 
 
 

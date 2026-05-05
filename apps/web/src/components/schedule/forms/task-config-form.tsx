@@ -37,7 +37,7 @@ export type TaskConfigRuntimeAdapter = {
   spec: RuntimeTaskConfigSpec;
 };
 
-export type TaskConfigPreset = {
+type TaskConfigPreset = {
   id: string;
   label: string;
   description: string;

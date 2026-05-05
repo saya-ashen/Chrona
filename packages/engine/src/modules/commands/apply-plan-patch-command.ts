@@ -18,7 +18,7 @@ import type {
   PlanOverlayLayer,
 } from "@chrona/contracts/ai";
 
-export type PlanPatchInput = {
+type PlanPatchInput = {
   taskId: string;
   operation: string;
   nodes?: Array<Record<string, unknown>>;

@@ -29,6 +29,7 @@ export async function rebuildTaskProjection(taskId: string) {
   );
 
   const activeSession = task.executionSessions[0] ?? null;
+  const currentWorkBlock = task.workBlocks[0] ?? null;
 
   const derived = deriveTaskState({
     task: { status: task.status, latestRunId: task.latestRunId },
@@ -48,10 +49,14 @@ export async function rebuildTaskProjection(taskId: string) {
   const schedule = deriveScheduleState({
     task: {
       dueAt: task.dueAt,
-      scheduledStartAt: task.scheduledStartAt,
-      scheduledEndAt: task.scheduledEndAt,
-      scheduleSource: task.scheduleSource,
     },
+    workBlock: currentWorkBlock
+      ? {
+          status: currentWorkBlock.status,
+          scheduledStartAt: currentWorkBlock.scheduledStartAt,
+          scheduledEndAt: currentWorkBlock.scheduledEndAt,
+        }
+      : null,
     latestRun: latestRun
       ? {
           status: latestRun.status,
@@ -69,7 +74,6 @@ export async function rebuildTaskProjection(taskId: string) {
   const shouldClearBlockReason = !derived.blockReason && task.blockReason !== null;
   const updateData: Record<string, unknown> = {
     status: derived.persistedStatus,
-    scheduleStatus: schedule.scheduleStatus,
   };
   if (derived.blockReason) {
     updateData.blockReason = derived.blockReason as Prisma.InputJsonValue;
@@ -96,10 +100,15 @@ export async function rebuildTaskProjection(taskId: string) {
       latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
-      scheduledStartAt: task.scheduledStartAt,
-      scheduledEndAt: task.scheduledEndAt,
+      scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
+      scheduledEndAt: currentWorkBlock?.scheduledEndAt ?? null,
       scheduleStatus: schedule.scheduleStatus,
-      scheduleSource: task.scheduleSource,
+      scheduleSource:
+        currentWorkBlock?.trigger === "scheduled"
+          ? "ai"
+          : currentWorkBlock?.trigger === "manual"
+            ? "human"
+            : null,
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
       lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
@@ -116,10 +125,15 @@ export async function rebuildTaskProjection(taskId: string) {
       latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
-      scheduledStartAt: task.scheduledStartAt,
-      scheduledEndAt: task.scheduledEndAt,
+      scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
+      scheduledEndAt: currentWorkBlock?.scheduledEndAt ?? null,
       scheduleStatus: schedule.scheduleStatus,
-      scheduleSource: task.scheduleSource,
+      scheduleSource:
+        currentWorkBlock?.trigger === "scheduled"
+          ? "ai"
+          : currentWorkBlock?.trigger === "manual"
+            ? "human"
+            : null,
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
       lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,

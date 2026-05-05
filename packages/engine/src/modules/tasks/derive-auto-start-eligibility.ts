@@ -1,4 +1,4 @@
-export type AutoStartEligibility =
+type AutoStartEligibility =
   | {
       ok: true;
       mode: "start_task";
@@ -19,9 +19,11 @@ export type AutoStartEligibility =
 
 export type TaskLike = {
   status: string;
-  scheduleStatus: string;
-  scheduledStartAt?: Date | string | null;
   runtimeAdapterKey?: string | null;
+};
+
+export type WorkBlockLike = {
+  scheduledStartAt?: Date | string | null;
 };
 
 export type RunLike = {
@@ -34,14 +36,15 @@ const ACTIVE_RUN_STATUSES = ["Pending", "Running", "WaitingForInput", "WaitingFo
 
 export function deriveAutoStartEligibility(input: {
   task: TaskLike;
+  workBlock: WorkBlockLike | null;
   now: Date;
   activeRun?: RunLike | null;
 }): AutoStartEligibility {
-  if (input.task.scheduleStatus !== "Scheduled" && input.task.scheduleStatus !== "Overdue") {
+  if (!input.workBlock) {
     return { ok: false, reason: "not_scheduled" };
   }
 
-  const scheduledStartAt = input.task.scheduledStartAt;
+  const scheduledStartAt = input.workBlock.scheduledStartAt;
   if (!scheduledStartAt) {
     return { ok: false, reason: "not_due" };
   }

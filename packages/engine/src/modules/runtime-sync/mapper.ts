@@ -5,7 +5,7 @@ import type {
   OpenClawRunSnapshot,
 } from "@chrona/providers-core";
 
-export type OpenClawSyncCursor = {
+type OpenClawSyncCursor = {
   sessionKey?: string;
   lastMessageSeq?: number;
   lastRunStatus?: string;

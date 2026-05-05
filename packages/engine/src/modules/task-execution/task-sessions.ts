@@ -10,7 +10,11 @@ type EnsureDefaultTaskSessionInput = {
   label?: string | null;
 };
 
-type TaskSessionStatus = "idle" | "running" | "waiting_for_input" | "waiting_for_approval";
+type TaskSessionStatus =
+  | "idle"
+  | "running"
+  | "waiting_for_input"
+  | "waiting_for_approval";
 
 export function buildDefaultTaskSessionKey(input: {
   taskId: string;
@@ -21,18 +25,16 @@ export function buildDefaultTaskSessionKey(input: {
   return `chrona:${input.runtimeName}:task:${input.taskId}:${suffix}`;
 }
 
-function buildLegacyTaskSessionKey(input: { taskId: string; runtimeName: string }) {
+function buildLegacyTaskSessionKey(input: {
+  taskId: string;
+  runtimeName: string;
+}) {
   return `agent-dashboard:${input.runtimeName}:task:${input.taskId}:default`;
 }
 
-export function resolveTaskSessionKey(input: {
-  taskSession?: { sessionKey: string } | null;
-  runtimeSessionRef: string | null;
-}) {
-  return input.taskSession?.sessionKey ?? input.runtimeSessionRef ?? undefined;
-}
-
-export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionInput) {
+export async function ensureDefaultTaskSession(
+  input: EnsureDefaultTaskSessionInput,
+) {
   const expectedSessionKey = buildDefaultTaskSessionKey({
     taskId: input.taskId,
     runtimeName: input.runtimeName,
@@ -55,7 +57,12 @@ export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionIn
       runtimeName: input.runtimeName,
       OR: [
         { sessionKey: expectedSessionKey },
-        { sessionKey: buildLegacyTaskSessionKey({ taskId: input.taskId, runtimeName: input.runtimeName }) },
+        {
+          sessionKey: buildLegacyTaskSessionKey({
+            taskId: input.taskId,
+            runtimeName: input.runtimeName,
+          }),
+        },
       ],
     },
     orderBy: { createdAt: "asc" },
@@ -84,7 +91,9 @@ export async function ensureDefaultTaskSession(input: EnsureDefaultTaskSessionIn
       taskId: input.taskId,
       runtimeName: input.runtimeName,
       sessionKey: expectedSessionKey,
-      label: input.label?.trim() || `${input.taskTitle.trim() || "Task"} · ${input.suffix?.trim() || "Default session"}`,
+      label:
+        input.label?.trim() ||
+        `${input.taskTitle.trim() || "Task"} · ${input.suffix?.trim() || "Default session"}`,
       createdByFramework: true,
     },
   });
@@ -115,7 +124,9 @@ export async function updateTaskSessionStateFromRun(input: {
       status,
       lastRunStatus: input.runStatus,
       activeRunId: status === "idle" ? null : input.runId,
-      ...(input.runtimeRunRef !== undefined ? { lastRunRef: input.runtimeRunRef } : {}),
+      ...(input.runtimeRunRef !== undefined
+        ? { lastRunRef: input.runtimeRunRef }
+        : {}),
     },
   });
 }

@@ -9,9 +9,10 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import { compiledPlanToGraphPlan } from "@/components/task/plan/task-plan-view-model";
 
-import type { CompiledPlan, CompiledNode, CompiledEdge } from "@chrona/contracts/ai";
+import type { CompiledPlan, CompiledNode } from "@chrona/contracts/ai";
 
 type PlanData = {
   id: string;
@@ -41,39 +42,6 @@ function planStatusTone(status: string) {
   if (status === "draft") return "warning" as const;
   if (status === "superseded") return "neutral" as const;
   return "neutral" as const;
-}
-
-function toGraphPlan(plan: NonNullable<PlanData>["plan"]) {
-  if (!plan?.nodes?.length) return null;
-
-  const steps = plan.nodes.map((node: CompiledNode) => ({
-    id: node.id,
-    title: node.title,
-    objective: node.description ?? "",
-    phase: node.type,
-    status: "pending" as "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked",
-    requiresHumanInput: node.mode === "manual",
-    type: node.type,
-    linkedTaskId: node.linkedTaskId,
-    executionMode: node.mode ?? null,
-    estimatedMinutes: node.estimatedMinutes ?? null,
-    priority: node.priority ?? null,
-  }));
-
-  const currentStepId =
-    steps.find((s) => ["in_progress", "waiting_for_user", "blocked"].includes(s.status))?.id ?? null;
-
-  return {
-    state: "ready" as const,
-    currentStepId,
-    steps,
-    edges: plan.edges.map((edge: CompiledEdge) => ({
-      id: edge.id,
-      fromNodeId: edge.from,
-      toNodeId: edge.to,
-      type: "sequential",
-    })),
-  };
 }
 
 function NoPlanCard({ status }: { status?: string }) {
@@ -153,10 +121,10 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
     setIsAccepting(true);
     setAcceptError(null);
     try {
-      const res = await fetch("/api/ai/task-plan/accept", {
+      const res = await fetch(`/api/tasks/${taskId}/plan/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, planId: plan.id }),
+        body: JSON.stringify({ planId: plan.id }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed to accept plan" }));
@@ -174,7 +142,7 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
     return <NoPlanCard status={aiPlanGenerationStatus} />;
   }
 
-  const graphPlan = toGraphPlan(plan.plan);
+  const graphPlan = compiledPlanToGraphPlan(plan.plan);
 
   return (
     <SurfaceCard className="space-y-4" padding="lg">

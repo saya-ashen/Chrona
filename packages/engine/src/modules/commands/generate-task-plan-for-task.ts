@@ -2,8 +2,14 @@ import { db } from "@/lib/db";
 import { createLogger, summarizeText } from "@/lib/logger";
 import { aiGeneratePlan } from "@/modules/ai/ai-service";
 import type { PlanOverlayLayer } from "@chrona/contracts/ai";
-import { saveCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { savePlanRun, getLayers } from "@/modules/plan-execution/plan-run-store";
+import {
+  saveCompiledPlan,
+  getLatestCompiledPlan,
+} from "@/modules/plan-execution/compiled-plan-store";
+import {
+  savePlanRun,
+  getLayers,
+} from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
@@ -11,15 +17,6 @@ import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 
 const logger = createLogger("command.generate-task-plan-for-task");
-
-export type GenerateTaskPlanForTaskResult = {
-  planId: string;
-  compiledPlanId: string;
-  title: string;
-  goal: string;
-  layers: PlanOverlayLayer[];
-  summary: string | null;
-};
 
 export async function generateTaskPlanForTask(input: {
   taskId: string;
@@ -34,7 +31,16 @@ export async function generateTaskPlanForTask(input: {
     throw new DOMException("Task plan generation aborted", "AbortError");
   }
 
-  const task = await db.task.findUnique({ where: { id: input.taskId } });
+  const task = await db.task.findUnique({
+    where: { id: input.taskId },
+    include: {
+      workBlocks: {
+        where: { status: { in: ["Scheduled", "Active"] } },
+        orderBy: { scheduledStartAt: "asc" },
+        take: 1,
+      },
+    },
+  });
   if (!task) {
     throw new Error("Task not found");
   }
@@ -53,8 +59,14 @@ export async function generateTaskPlanForTask(input: {
   if (!input.forceRefresh) {
     const savedCompiled = await getLatestCompiledPlan(task.id);
     if (savedCompiled) {
-      const layers = await getLayers(task.id, savedCompiled.compiledPlan.editablePlanId);
-      const effective = resolveEffectivePlanGraph(savedCompiled.compiledPlan, layers);
+      const layers = await getLayers(
+        task.id,
+        savedCompiled.compiledPlan.editablePlanId,
+      );
+      const effective = resolveEffectivePlanGraph(
+        savedCompiled.compiledPlan,
+        layers,
+      );
       return {
         planId: savedCompiled.compiledPlan.editablePlanId,
         compiledPlanId: savedCompiled.compiledPlan.id,
@@ -70,11 +82,17 @@ export async function generateTaskPlanForTask(input: {
     throw new DOMException("Task plan generation aborted", "AbortError");
   }
 
-  const estimatedMinutes = typeof input.estimatedMinutes === "number"
-    ? input.estimatedMinutes
-    : task.scheduledStartAt && task.scheduledEndAt
-      ? Math.round((task.scheduledEndAt.getTime() - task.scheduledStartAt.getTime()) / 60000)
-      : undefined;
+  const currentWorkBlock = task.workBlocks[0] ?? null;
+  const estimatedMinutes =
+    typeof input.estimatedMinutes === "number"
+      ? input.estimatedMinutes
+      : currentWorkBlock?.scheduledStartAt && currentWorkBlock.scheduledEndAt
+        ? Math.round(
+            (currentWorkBlock.scheduledEndAt.getTime() -
+              currentWorkBlock.scheduledStartAt.getTime()) /
+              60000,
+          )
+        : undefined;
   const title = input.title?.trim() || task.title;
   const description = input.description ?? task.description ?? undefined;
 

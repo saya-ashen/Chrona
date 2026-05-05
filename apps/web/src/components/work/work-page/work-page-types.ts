@@ -167,7 +167,14 @@ export type WorkPageClientProps = {
     }>;
     composerValue?: string;
     planExecution?: {
-      status: "no_plan" | "started" | "running" | "waiting_for_user" | "waiting_for_approval" | "blocked" | "completed";
+      status:
+        | "no_plan"
+        | "started"
+        | "running"
+        | "waiting_for_user"
+        | "waiting_for_approval"
+        | "blocked"
+        | "completed";
       currentNodeId: string | null;
       executedNodeIds: string[];
       waitingNodeIds: string[];
@@ -211,17 +218,7 @@ export type WorkbenchComposer = {
   submitVariant?: "default" | "outline" | "secondary";
 };
 
-export type CollaborationFeedItem = {
-  id: string;
-  kind: "decision" | "user" | "agent" | "event" | "result";
-  eyebrow: string;
-  title: string;
-  body: string;
-  meta?: string | null;
-};
-
 export type WorkbenchCopy = {
   [Key in keyof typeof DEFAULT_WORK_PAGE_COPY]: string;
 };
 export type WorkPageData = WorkPageClientProps["initialData"];
-

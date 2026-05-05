@@ -1,7 +1,4 @@
-import { Button as ButtonPrimitive } from "@base-ui/react/button";
-import { cva, type VariantProps } from "class-variance-authority";
-
-import { cn } from "@/lib/utils";
+import { cva } from "class-variance-authority";
 
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium select-none outline-none transition-all duration-150 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -12,12 +9,9 @@ const buttonVariants = cva(
           "bg-primary text-primary-foreground shadow-[0_1px_3px_var(--color-primary)/0.15,0_0_0_1px_var(--color-primary)/0.02] hover:bg-primary/90 hover:shadow-[0_4px_10px_-3px_var(--color-primary)/0.22]",
         outline:
           "border border-border/80 bg-background text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:border-primary/30 hover:bg-primary/[0.03] hover:text-primary dark:hover:bg-primary/[0.06]",
-        soft:
-          "bg-primary-soft text-primary border border-primary-border hover:bg-primary-soft-hover",
-        secondary:
-          "bg-primary/[0.07] text-primary hover:bg-primary/[0.11]",
-        ghost:
-          "text-foreground hover:bg-muted hover:text-foreground",
+        soft: "bg-primary-soft text-primary border border-primary-border hover:bg-primary-soft-hover",
+        secondary: "bg-primary/[0.07] text-primary hover:bg-primary/[0.11]",
+        ghost: "text-foreground hover:bg-muted hover:text-foreground",
         destructive:
           "bg-destructive/10 text-destructive border border-destructive/15 hover:bg-destructive/15 hover:border-destructive/25 active:bg-destructive/20",
         link: "text-primary underline-offset-4 hover:underline p-0 h-auto",
@@ -40,19 +34,4 @@ const buttonVariants = cva(
   },
 );
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  return (
-    <ButtonPrimitive
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
-}
-
-export { Button, buttonVariants };
+export { buttonVariants };

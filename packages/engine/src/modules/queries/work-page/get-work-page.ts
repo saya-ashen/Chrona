@@ -291,7 +291,12 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     })) ?? [],
     copy: mergedCopy,
   });
-  const scheduleImpact = buildScheduleImpact(task, mergedCopy);
+  const scheduleImpact = buildScheduleImpact({
+    scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
+    dueAt: task.dueAt,
+    scheduledStartAt: task.projection?.scheduledStartAt ?? null,
+    scheduledEndAt: task.projection?.scheduledEndAt ?? null,
+  }, mergedCopy);
   const reliability = buildReliability({
     currentRun: serializedRun,
     blockReason,
@@ -333,9 +338,9 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       status: task.projection?.displayState ?? task.status,
       priority: task.priority,
       dueAt: toIsoString(task.dueAt),
-      scheduledStartAt: toIsoString(task.scheduledStartAt),
-      scheduledEndAt: toIsoString(task.scheduledEndAt),
-      scheduleStatus: task.scheduleStatus,
+      scheduledStartAt: toIsoString(task.projection?.scheduledStartAt ?? null),
+      scheduledEndAt: toIsoString(task.projection?.scheduledEndAt ?? null),
+      scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
       blockReason,
     },
     currentRun: serializedRun,

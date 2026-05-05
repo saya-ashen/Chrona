@@ -29,11 +29,7 @@ interface AutoCompleteInput {
 }
 
 interface GenerateTaskPlanInput {
-  taskId?: string;
-  title?: string;
-  description?: string;
-  estimatedMinutes?: number;
-  planningPrompt?: string;
+  taskId: string;
   forceRefresh?: boolean;
 }
 
@@ -133,7 +129,7 @@ export class ApiClient {
     return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/reopen`);
   }
 
-  startRun(taskId: string, prompt?: string) {
+  startExecution(taskId: string, prompt?: string) {
     return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/run`, prompt ? { prompt } : {});
   }
 
@@ -144,10 +140,9 @@ export class ApiClient {
     });
   }
 
-  provideInput(taskId: string, inputText: string, runId?: string) {
+  submitExecutionInput(taskId: string, inputText: string) {
     return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/input`, {
       inputText,
-      runId,
     });
   }
 
@@ -173,12 +168,81 @@ export class ApiClient {
     return this.request<unknown>("POST", "/api/ai/auto-complete", input);
   }
 
-  generateTaskPlan(input: GenerateTaskPlanInput) {
-    return this.request<unknown>("POST", "/api/ai/generate-task-plan", input);
+  async generateTaskPlan(input: GenerateTaskPlanInput) {
+    const response = await fetch(`${this.baseUrl}/api/tasks/${encodeURIComponent(input.taskId)}/plan/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify({ forceRefresh: input.forceRefresh }),
+    });
+
+    if (!response.ok) {
+      let message = response.statusText;
+      try {
+        const errorBody = (await response.json()) as ApiErrorBody;
+        message = errorBody.error ?? errorBody.message ?? message;
+      } catch {
+        // ignore invalid/non-json error bodies
+      }
+
+      throw new Error(`POST /api/tasks/${encodeURIComponent(input.taskId)}/plan/generate failed (${response.status}): ${message}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Plan generation stream did not return a readable body");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let eventType = "";
+    let finalResult: unknown = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7).trim();
+          continue;
+        }
+
+        if (!line.startsWith("data: ")) {
+          continue;
+        }
+
+        const raw = line.slice(6).trim();
+        const payload = raw ? JSON.parse(raw) : {};
+
+        if (eventType === "result") {
+          finalResult = payload;
+        }
+
+        if (eventType === "error") {
+          throw new Error(
+            typeof payload?.message === "string" ? payload.message : "Failed to generate task plan",
+          );
+        }
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error("Plan generation stream completed without a result event");
+    }
+
+    return finalResult;
   }
 
   batchApplyPlan(input: BatchApplyPlanInput) {
-    return this.request<unknown>("POST", "/api/ai/batch-apply-plan", input);
+    const { taskId, ...body } = input;
+    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/plan/materialize`, body);
   }
 
 }

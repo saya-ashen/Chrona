@@ -1,7 +1,7 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { startRun } from "@/modules/commands/start-run";
 import { materializeTaskPlan } from "@/modules/commands/materialize-task-plan";
+import { startPlanExecution } from "@/modules/plan-execution";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
@@ -91,9 +91,9 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
   const layers = await getLayers(input.parentTaskId, planId);
   const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
 
-  // Find ready, auto-runnable, non-materialized nodes
+  // Find ready plan nodes, including nodes already linked to child tasks.
   const readyAutoNodes = effective.nodes.filter(
-    (n) => n.ready && !n.linkedTaskId,
+    (n) => n.ready,
   );
   const readyNodeIds = readyAutoNodes.map((n) => n.id);
 
@@ -115,7 +115,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
       );
 
       const childTasks = await db.task.findMany({
-        where: { id: { in: materialized.createdTaskIds } },
+        where: { id: { in: [...readyTaskIds] } },
         orderBy: { createdAt: "asc" },
       });
 
@@ -149,8 +149,15 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
           });
         }
 
-        await startRun({ taskId: childTask.id });
-        startedTaskIds.push(childTask.id);
+        const acceptedChildPlan = await getAcceptedCompiledPlan(childTask.id);
+        if (!acceptedChildPlan) {
+          continue;
+        }
+
+        const execution = await startPlanExecution({ taskId: childTask.id, trigger: "auto" });
+        if (execution.status !== "no_plan") {
+          startedTaskIds.push(childTask.id);
+        }
       }
     }
   }

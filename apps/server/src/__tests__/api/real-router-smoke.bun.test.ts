@@ -88,14 +88,14 @@ describe("Real router smoke", () => {
     const { taskId } = await seedTask(workspaceId, { title: "Plan parent" });
     const { planId } = await seedAcceptedPlan(taskId, workspaceId);
 
-    const acceptRes = await app().request("http://local/api/ai/task-plan/accept", {
+    const acceptRes = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId, workspaceId }),
+      body: JSON.stringify({ planId, workspaceId }),
     });
     expect(acceptRes.status).toBe(200);
 
-    const stateRes = await app().request(`http://local/api/tasks/${taskId}/plan-state`);
+    const stateRes = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
     expect(stateRes.status).toBe(200);
     const stateBody = await json<{
       aiPlanGenerationStatus: string;
@@ -105,10 +105,10 @@ describe("Real router smoke", () => {
     expect(stateBody.savedAiPlan?.id).toBe(planId);
     expect(stateBody.savedAiPlan?.plan.nodes.length).toBeGreaterThan(0);
 
-    const applyRes = await app().request("http://local/api/ai/batch-apply-plan", {
+    const applyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, workspaceId }),
+      body: JSON.stringify({ workspaceId }),
     });
     expect(applyRes.status).toBe(201);
     const applyBody = await json<{
@@ -121,10 +121,10 @@ describe("Real router smoke", () => {
     expect(applyBody.childTasks.every((task) => task.parentTaskId === taskId)).toBe(true);
     expect(applyBody.materialization.createdTaskIds.length).toBe(2);
 
-    const reapplyRes = await app().request("http://local/api/ai/batch-apply-plan", {
+    const reapplyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, workspaceId }),
+      body: JSON.stringify({ workspaceId }),
     });
     expect(reapplyRes.status).toBe(201);
     const reapplyBody = await json<{
@@ -165,9 +165,15 @@ describe("Real router smoke", () => {
     });
     expect(acceptRes.status).toBe(200);
 
-    const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: acceptedTaskId } });
-    expect(acceptedTask.scheduledStartAt?.toISOString()).toBe("2026-05-03T09:00:00.000Z");
-    expect(acceptedTask.scheduledEndAt?.toISOString()).toBe("2026-05-03T10:30:00.000Z");
+    const acceptedBlock = await db.workBlock.findFirstOrThrow({
+      where: { taskId: acceptedTaskId, status: { in: ["Scheduled", "Active"] } },
+      orderBy: { scheduledStartAt: "asc" },
+    });
+    const acceptedProjection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: acceptedTaskId } });
+    expect(acceptedBlock.scheduledStartAt?.toISOString()).toBe("2026-05-03T09:00:00.000Z");
+    expect(acceptedBlock.scheduledEndAt?.toISOString()).toBe("2026-05-03T10:30:00.000Z");
+    expect(acceptedProjection.scheduledStartAt?.toISOString()).toBe("2026-05-03T09:00:00.000Z");
+    expect(acceptedProjection.scheduledEndAt?.toISOString()).toBe("2026-05-03T10:30:00.000Z");
 
     const createRejectedRes = await app().request(
       `http://local/api/tasks/${rejectedTaskId}/schedule/proposals`,
@@ -194,8 +200,12 @@ describe("Real router smoke", () => {
     });
     expect(rejectRes.status).toBe(200);
 
-    const rejectedTask = await db.task.findUniqueOrThrow({ where: { id: rejectedTaskId } });
-    expect(rejectedTask.scheduledStartAt).toBeNull();
-    expect(rejectedTask.scheduledEndAt).toBeNull();
+    const rejectedBlock = await db.workBlock.findFirst({
+      where: { taskId: rejectedTaskId, status: { in: ["Scheduled", "Active"] } },
+    });
+    const rejectedProjection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: rejectedTaskId } });
+    expect(rejectedBlock).toBeNull();
+    expect(rejectedProjection.scheduledStartAt).toBeNull();
+    expect(rejectedProjection.scheduledEndAt).toBeNull();
   });
 });

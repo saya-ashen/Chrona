@@ -3,17 +3,12 @@
  * graph migration. Current engine code should prefer direct compiled-plan,
  * effective-graph, and saved-plan snapshot modules instead of importing here.
  */
-export { createPlanRunFromCompiledPlan } from "./plan-runner";
-
 export { savePlanRun as saveTaskPlanGraph } from "./plan-run-store";
 export { getCompiledPlan as acceptTaskPlanGraph } from "./compiled-plan-store";
 
 import type { CompiledPlan, PlanOverlayLayer } from "@chrona/contracts/ai";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan, type SavedCompiledPlan } from "./compiled-plan-store";
-export { type SavedAiPlanSnapshot, getLatestSavedAiPlanSnapshot } from "./saved-plan-snapshot";
-export { syncAcceptedTaskPlanForTask } from "./sync-accepted-plan";
-
 type CompatPlan = SavedCompiledPlan & {
   id: string;
   planId: string;

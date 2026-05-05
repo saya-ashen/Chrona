@@ -95,28 +95,26 @@ export function clearSchedule(input: { taskId: string }) {
   return deleteJson<TaskMutationResult>(`/api/tasks/${input.taskId}/schedule`);
 }
 
-export function startRun(input: { taskId: string; prompt?: string | null }) {
+export function startExecution(input: { taskId: string; prompt?: string | null }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/run`, {
     prompt: input.prompt,
   });
 }
 
-export function retryRun(input: { taskId: string; prompt?: string | null }) {
+export function retryExecution(input: { taskId: string; prompt?: string | null }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/retry`, {
     prompt: input.prompt,
   });
 }
 
-export function provideInput(input: { taskId: string; runId?: string; inputText: string }) {
+export function submitExecutionInput(input: { taskId: string; inputText: string }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/input`, {
-    runId: input.runId,
     inputText: input.inputText,
   });
 }
 
-export function sendOperatorMessage(input: { taskId: string; runId?: string; message: string }) {
+export function sendExecutionMessage(input: { taskId: string; message: string }) {
   return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/message`, {
-    runId: input.runId,
     message: input.message,
   });
 }

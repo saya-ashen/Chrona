@@ -15,10 +15,19 @@
   ],
   "ignore": [
     "postcss.config.mjs",
+    "packages/cli/src/bun-entry.ts",
+    "packages/cli/src/npm-launcher.ts",
     "packages/db/src/generated/**"
   ],
+  "ignoreBinaries": [
+    "scripts/demo/readme-gif.ts",
+    "scripts/openclaw/probe.ts"
+  ],
   "ignoreDependencies": [
-    "esbuild"
+    "esbuild",
+    "@tailwindcss/postcss",
+    "tailwindcss",
+    "tw-animate-css"
   ],
   "rules": {
     "classMembers": "off",

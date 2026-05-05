@@ -58,8 +58,6 @@ export async function seedTask(workspaceId: string, overrides?: {
   priority?: string;
   parentTaskId?: string;
   dueAt?: Date;
-  scheduledStartAt?: Date;
-  scheduledEndAt?: Date;
 }): Promise<SeedTaskResult> {
   const task = await db.task.create({
     data: {
@@ -70,8 +68,6 @@ export async function seedTask(workspaceId: string, overrides?: {
       ownerType: "human",
       parentTaskId: overrides?.parentTaskId ?? null,
       dueAt: overrides?.dueAt ?? null,
-      scheduledStartAt: overrides?.scheduledStartAt ?? null,
-      scheduledEndAt: overrides?.scheduledEndAt ?? null,
     },
   });
   return { workspaceId, taskId: task.id };

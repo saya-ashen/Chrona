@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { suggestAutomation } from "../automation-suggester";
-import type { TaskAutomationInput } from "../automation-suggester";
+import type { TaskAutomationInput } from "@chrona/contracts/ai";
 
 /**
  * Helper to create a full TaskAutomationInput with defaults

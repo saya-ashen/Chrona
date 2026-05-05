@@ -14,16 +14,22 @@ import {
   RotateCcw,
   Square,
 } from "lucide-react";
-import { TaskPlanGraph } from "@/components/work/task-plan-graph";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import {
+  legacyPlanGraphToGraphPlan,
+  summarizeLegacyPlanGraph,
+} from "@/components/task/plan/task-plan-view-model";
 import type { TaskPlanGraphResponse, CompiledPlan } from "@chrona/contracts/ai";
-import type { LegacyPlanGraph, LegacyPlanGraphNode, LegacyPlanGraphEdge, LegacySavedPlan } from "@/components/schedule/schedule-page-types";
-import { normalizePlanNodeTypeForDisplay } from "./selected-block-sheet/plan-utils";
-import { useSmartDecomposition } from "@/hooks/use-ai";
+import type {
+  LegacyPlanGraph,
+  LegacySavedPlan,
+} from "@/components/schedule/schedule-page-types";
 
 import { useI18n } from "@/i18n/client";
 import { buttonVariants } from "@/components/ui/button";
+import type { StreamPhase, StreamToolCall, StreamToolResult } from "@/hooks/ai/types";
 
-interface TaskDecompositionPanelProps {
+interface TaskPlanGenerationPanelProps {
   taskId?: string;
   title: string;
   description?: string | null;
@@ -44,45 +50,21 @@ interface TaskDecompositionPanelProps {
   } | null;
   generationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
   onApply?: (result: TaskPlanGraphResponse) => Promise<void> | void;
-  onPlanLoaded?: (savedPlan: {
-    id: string;
-    status: "draft" | "accepted" | "superseded" | "archived";
-    prompt: string | null;
-    revision?: number;
-    summary?: string | null;
-    updatedAt: string;
-    plan?: CompiledPlan;
-  } | null) => void;
+  onPlanLoaded?: (
+    savedPlan: {
+      id: string;
+      status: "draft" | "accepted" | "superseded" | "archived";
+      prompt: string | null;
+      revision?: number;
+      summary?: string | null;
+      updatedAt: string;
+      plan?: CompiledPlan;
+    } | null,
+  ) => void;
   activeAcceptedPlanId?: string | null;
   hasUnsavedConfigChanges?: boolean;
   unsavedConfigDraft?: TaskConfigFormDraft | null;
   onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
-}
-
-function summarizePlanGraph(graph: LegacyPlanGraph | null) {
-  if (!graph) {
-    return {
-      totalEstimatedMinutes: 0,
-      nodeCount: 0,
-      warnings: [] as string[],
-    };
-  }
-
-  const totalEstimatedMinutes = graph.nodes.reduce((sum: number, node: LegacyPlanGraphNode) => sum + (node.estimatedMinutes ?? 0), 0);
-  const metaWarnings = graph.nodes.find((node: LegacyPlanGraphNode) => {
-    const meta = node.metadata as Record<string, unknown> | null;
-    return Array.isArray(meta?.warnings);
-  })?.metadata as { warnings?: unknown } | null;
-  const firstWarnings = metaWarnings?.warnings;
-  const warnings = Array.isArray(firstWarnings)
-    ? firstWarnings.filter((warning: unknown): warning is string => typeof warning === "string")
-    : [];
-
-  return {
-    totalEstimatedMinutes,
-    nodeCount: graph.nodes.length,
-    warnings,
-  };
 }
 
 const DEFAULT_DECOMP_COPY = {
@@ -92,11 +74,19 @@ const DEFAULT_DECOMP_COPY = {
 };
 
 function getDecompCopy(messages: Record<string, unknown>) {
-  const raw = (messages.components as Record<string, Record<string, string>> | undefined)?.taskDecompositionPanel ?? {};
+  const raw =
+    (messages.components as Record<string, Record<string, string>> | undefined)
+      ?.taskDecompositionPanel ?? {};
   return { ...DEFAULT_DECOMP_COPY, ...raw };
 }
 
-export function TaskDecompositionPanel({
+type ActivePlanRequest = {
+  taskId: string;
+  forceRefresh: boolean;
+  requestKey: number;
+};
+
+export function TaskPlanGenerationPanel({
   taskId,
   title,
   description,
@@ -114,14 +104,20 @@ export function TaskDecompositionPanel({
   hasUnsavedConfigChanges = false,
   unsavedConfigDraft = null,
   onSaveConfigBeforeRegenerate,
-}: TaskDecompositionPanelProps) {
+}: TaskPlanGenerationPanelProps) {
   const [requested, setRequested] = useState(autoRequest);
   const [requestKey, setRequestKey] = useState(0);
-  const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] = useState(false);
-  const [isSavingBeforeRegenerate, setIsSavingBeforeRegenerate] = useState(false);
+  const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] =
+    useState(false);
+  const [isSavingBeforeRegenerate, setIsSavingBeforeRegenerate] =
+    useState(false);
   const [isStoppingGeneration, setIsStoppingGeneration] = useState(false);
-  const [stopGenerationError, setStopGenerationError] = useState<string | null>(null);
-  const [localForceRefresh, setLocalForceRefresh] = useState(Boolean(forceRefresh));
+  const [stopGenerationError, setStopGenerationError] = useState<string | null>(
+    null,
+  );
+  const [localForceRefresh, setLocalForceRefresh] = useState(
+    Boolean(forceRefresh),
+  );
   const [requestSnapshot, setRequestSnapshot] = useState(() => ({
     taskId,
     title,
@@ -138,31 +134,183 @@ export function TaskDecompositionPanel({
   const latestRequestSnapshot = (draft?: TaskConfigFormDraft | null) => ({
     taskId,
     title: draft?.title ?? title,
-    description: draft ? draft.description : description ?? undefined,
+    description: draft ? draft.description : (description ?? undefined),
     priority: draft?.priority ?? priority,
     dueAt: draft ? draft.dueAt : dueAt,
     estimatedMinutes,
     planningPrompt,
   });
 
-  const planInput = requested
-    ? {
-        ...requestSnapshot,
-        forceRefresh: localForceRefresh,
-        requestKey,
-      }
-    : null;
+  const planInput = useMemo<ActivePlanRequest | null>(() => {
+    if (!requested || !requestSnapshot.taskId) {
+      return null;
+    }
 
-  const {
-    result,
-    isLoading,
-    error,
-    phase,
-    statusMessage,
-    partialText,
-    toolCalls,
-    toolResults,
-  } = useSmartDecomposition(planInput);
+    return {
+      taskId: requestSnapshot.taskId,
+      forceRefresh: localForceRefresh,
+      requestKey,
+    };
+  }, [localForceRefresh, requestKey, requestSnapshot.taskId, requested]);
+
+  const [result, setResult] = useState<TaskPlanGraphResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<StreamPhase>("idle");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [partialText, setPartialText] = useState("");
+  const [toolCalls, setToolCalls] = useState<StreamToolCall[]>([]);
+  const [toolResults, setToolResults] = useState<StreamToolResult[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (!planInput?.taskId) {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      setResult(null);
+      setIsLoading(false);
+      setError(null);
+      setPhase("idle");
+      setStatusMessage(null);
+      setPartialText("");
+      setToolCalls([]);
+      setToolResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+    const requestId = ++requestSeqRef.current;
+    const isActive = () => requestId === requestSeqRef.current && !controller.signal.aborted;
+
+    setResult(null);
+    setIsLoading(true);
+    setError(null);
+    setPhase("connecting");
+    setStatusMessage(null);
+    setPartialText("");
+    setToolCalls([]);
+    setToolResults([]);
+
+    const readStream = async (activeRequest: ActivePlanRequest) => {
+      try {
+        const response = await fetch(`/api/tasks/${activeRequest.taskId}/plan/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({ forceRefresh: activeRequest.forceRefresh }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error((errorBody as { error?: string }).error ?? `Request failed (${response.status})`);
+        }
+
+        if (!response.body) {
+          throw new Error("Plan generation stream did not return a readable body");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let eventType = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || !isActive()) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+              continue;
+            }
+
+            if (!line.startsWith("data: ")) {
+              continue;
+            }
+
+            const raw = line.slice(6).trim();
+            const data = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+            if (!isActive()) return;
+
+            switch (eventType) {
+              case "status":
+                setPhase("thinking");
+                setStatusMessage(typeof data.message === "string" ? data.message : null);
+                break;
+              case "tool_call":
+                setPhase("thinking");
+                setToolCalls((current) => [...current, {
+                  tool: typeof data.tool === "string" ? data.tool : "unknown",
+                  input: (data.input as Record<string, unknown> | undefined) ?? {},
+                }]);
+                break;
+              case "tool_result":
+                setToolResults((current) => [...current, {
+                  tool: typeof data.tool === "string" ? data.tool : "unknown",
+                  result: typeof data.result === "string" ? data.result : JSON.stringify(data.result ?? ""),
+                }]);
+                break;
+              case "partial":
+                setPhase("streaming");
+                setPartialText((current) => current + (typeof data.text === "string" ? data.text : ""));
+                break;
+              case "result":
+                setResult(data as unknown as TaskPlanGraphResponse);
+                setPhase("done");
+                setIsLoading(false);
+                break;
+              case "error":
+                setError(typeof data.message === "string" ? data.message : "Failed to generate task plan");
+                setPhase("error");
+                setIsLoading(false);
+                break;
+            }
+
+            eventType = "";
+          }
+        }
+
+        if (isActive()) {
+          setIsLoading(false);
+          setPhase((current) => current === "error" ? current : "done");
+        }
+      } catch (streamError) {
+        if (streamError instanceof DOMException && streamError.name === "AbortError") {
+          return;
+        }
+        if (isActive()) {
+          setError(streamError instanceof Error ? streamError.message : "Failed to generate task plan");
+          setPhase("error");
+          setIsLoading(false);
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+      }
+    };
+
+    void readStream(planInput);
+
+    return () => {
+      controller.abort();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+    };
+  }, [planInput]);
 
   const hookSavedPlanMeta = useMemo(() => {
     if (!result?.savedPlan) {
@@ -176,72 +324,40 @@ export function TaskDecompositionPanel({
     };
   }, [result]);
   const savedPlanMeta = hookSavedPlanMeta ?? savedPlan;
-  const displayPlanGraph = (result?.planGraph as LegacyPlanGraph | undefined) ?? (savedPlanMeta?.plan as LegacyPlanGraph | undefined) ?? null;
-  const displayResult = result ?? (savedPlanMeta?.plan
-    ? {
-        plan: { title: "", goal: "", nodes: [], edges: [] },
-        source: "saved",
-        planGraph: savedPlanMeta.plan as unknown,
-        savedPlan: {
-          id: savedPlanMeta.id,
-          status: savedPlanMeta.status,
-          prompt: savedPlanMeta.prompt,
-          revision: savedPlanMeta.revision ?? 0,
-          summary: savedPlanMeta.summary ?? null,
-          updatedAt: savedPlanMeta.updatedAt,
-        } as unknown,
-      }
-    : null);
+  const displayPlanGraph =
+    (result?.planGraph as LegacyPlanGraph | undefined) ??
+    (savedPlanMeta?.plan as LegacyPlanGraph | undefined) ??
+    null;
+  const displayResult =
+    result ??
+    (savedPlanMeta?.plan
+      ? {
+          plan: { title: "", goal: "", nodes: [], edges: [] },
+          source: "saved",
+          planGraph: savedPlanMeta.plan as unknown,
+          savedPlan: {
+            id: savedPlanMeta.id,
+            status: savedPlanMeta.status,
+            prompt: savedPlanMeta.prompt,
+            revision: savedPlanMeta.revision ?? 0,
+            summary: savedPlanMeta.summary ?? null,
+            updatedAt: savedPlanMeta.updatedAt,
+          } as unknown,
+        }
+      : null);
 
   const planGraph = useMemo(() => {
-    const graph = displayPlanGraph;
-    if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
-      return null;
-    }
-
-    return {
-      state: "ready" as const,
-      revision: typeof graph.revision === "number" ? `r${graph.revision}` : null,
-      generatedBy: graph.generatedBy,
-      isMock: false,
-      summary: graph.summary,
-      updatedAt: graph.updatedAt,
-      changeSummary: graph.changeSummary,
-      currentStepId:
-        graph.nodes.find((node: LegacyPlanGraphNode) => ["in_progress", "waiting_for_user", "blocked"].includes(node.status))?.id ?? null,
-      steps: graph.nodes.map((node: LegacyPlanGraphNode) => ({
-        id: node.id,
-        title: node.title,
-        objective: node.objective,
-        phase: node.phase ?? node.type,
-        status: (node.status === "skipped" ? "done" : node.status) as "pending" | "in_progress" | "waiting_for_user" | "waiting_for_child" | "waiting_for_approval" | "done" | "blocked" | "skipped",
-        requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
-        requiresHumanApproval: node.requiresHumanApproval ?? false,
-        type: node.type,
-        displayType: normalizePlanNodeTypeForDisplay(node.type),
-        linkedTaskId: node.linkedTaskId,
-        executionMode: node.executionMode,
-        estimatedMinutes: node.estimatedMinutes,
-        priority: node.priority,
-        metadata: node.metadata as Record<string, unknown> | null,
-      })),
-      edges: graph.edges.map((edge: LegacyPlanGraphEdge) => ({
-        id: edge.id,
-        fromNodeId: edge.fromNodeId,
-        toNodeId: edge.toNodeId,
-        type: edge.type,
-        label: edge.metadata && typeof edge.metadata === "object" && !Array.isArray(edge.metadata)
-          ? (edge.metadata as Record<string, unknown>).label as string | undefined
-          : undefined,
-      })),
-    };
+    return legacyPlanGraphToGraphPlan(displayPlanGraph ?? null);
   }, [displayPlanGraph]);
 
-  const graphSummary = useMemo(() => summarizePlanGraph(displayPlanGraph ?? null), [displayPlanGraph]);
+  const graphSummary = useMemo(
+    () => summarizeLegacyPlanGraph(displayPlanGraph ?? null),
+    [displayPlanGraph],
+  );
   const isAppliedPlan = Boolean(
-    activeAcceptedPlanId
-      && savedPlanMeta?.id
-      && savedPlanMeta.id === activeAcceptedPlanId,
+    activeAcceptedPlanId &&
+      savedPlanMeta?.id &&
+      savedPlanMeta.id === activeAcceptedPlanId,
   );
 
   const requestFreshPlan = (draft?: TaskConfigFormDraft | null) => {
@@ -279,19 +395,22 @@ export function TaskDecompositionPanel({
     setIsStoppingGeneration(true);
     setStopGenerationError(null);
     try {
-      const response = await fetch("/api/ai/generate-task-plan/stop", {
+      const response = await fetch(`/api/tasks/${taskId}/plan/generate/stop`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
       });
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
         throw new Error(
-          (errorBody as { error?: string }).error ?? `Failed to stop generation (${response.status})`,
+          (errorBody as { error?: string }).error ??
+            `Failed to stop generation (${response.status})`,
         );
       }
     } catch (stopError) {
-      setStopGenerationError(stopError instanceof Error ? stopError.message : "Failed to stop generation");
+      setStopGenerationError(
+        stopError instanceof Error
+          ? stopError.message
+          : "Failed to stop generation",
+      );
     } finally {
       setIsStoppingGeneration(false);
     }
@@ -347,14 +466,20 @@ export function TaskDecompositionPanel({
         )}
         <div className="mt-3 flex items-center gap-2 text-sm text-primary">
           <Bot className="size-4 animate-pulse" />
-          <span className="font-medium">{statusMessage ?? decompCopy.aiPlanning}</span>
+          <span className="font-medium">
+            {statusMessage ?? decompCopy.aiPlanning}
+          </span>
         </div>
         {stopGenerationError ? (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {stopGenerationError}
           </div>
         ) : null}
-        {phase !== "thinking" || statusMessage || partialText || toolCalls.length || toolResults.length ? (
+        {phase !== "thinking" ||
+        statusMessage ||
+        partialText ||
+        toolCalls.length ||
+        toolResults.length ? (
           <div className="mt-3 space-y-3 text-xs text-primary/90">
             {statusMessage ? (
               <div className="rounded-lg border border-primary/20 bg-background/70 px-3 py-2">
@@ -370,7 +495,10 @@ export function TaskDecompositionPanel({
               <div className="space-y-1 rounded-lg border border-border/40 bg-background/70 px-3 py-2">
                 <p className="font-medium text-foreground">Tools in progress</p>
                 {toolCalls.map((call, index) => (
-                  <div key={`${call.tool}-${index}`} className="text-muted-foreground">
+                  <div
+                    key={`${call.tool}-${index}`}
+                    className="text-muted-foreground"
+                  >
                     {call.tool}
                   </div>
                 ))}
@@ -380,7 +508,10 @@ export function TaskDecompositionPanel({
               <div className="space-y-1 rounded-lg border border-border/40 bg-background/70 px-3 py-2">
                 <p className="font-medium text-foreground">Tool results</p>
                 {toolResults.map((toolResult, index) => (
-                  <div key={`${toolResult.tool}-${index}`} className="text-muted-foreground">
+                  <div
+                    key={`${toolResult.tool}-${index}`}
+                    className="text-muted-foreground"
+                  >
                     {toolResult.tool}: {toolResult.result}
                   </div>
                 ))}
@@ -415,7 +546,8 @@ export function TaskDecompositionPanel({
     >
       <p className="font-medium">Save changes before regenerating?</p>
       <p className="mt-1 text-xs text-amber-800">
-        You have unsaved task configuration changes. Save them and use the new configuration to regenerate the plan.
+        You have unsaved task configuration changes. Save them and use the new
+        configuration to regenerate the plan.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
@@ -445,7 +577,11 @@ export function TaskDecompositionPanel({
           <button
             type="button"
             onClick={handleRegenerate}
-            className={buttonVariants({ variant: "soft", size: "sm", className: "rounded-full" })}
+            className={buttonVariants({
+              variant: "soft",
+              size: "sm",
+              className: "rounded-full",
+            })}
           >
             <Sparkles className="size-3.5" />
             Generate plan
@@ -482,20 +618,27 @@ export function TaskDecompositionPanel({
           <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Clock className="size-3.5" />
           </span>
-          <span className="font-medium text-foreground">{graphSummary.totalEstimatedMinutes} min</span>
+          <span className="font-medium text-foreground">
+            {graphSummary.totalEstimatedMinutes} min
+          </span>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/70 px-3 py-2 shadow-sm">
           <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Scissors className="size-3.5" />
           </span>
-          <span className="font-medium text-foreground">{graphSummary.nodeCount} nodes</span>
+          <span className="font-medium text-foreground">
+            {graphSummary.nodeCount} nodes
+          </span>
         </div>
       </div>
 
       {graphSummary.warnings.length > 0 ? (
         <div className="space-y-1">
           {graphSummary.warnings.map((warning, index) => (
-            <div key={index} className="flex items-start gap-2 text-xs text-amber-700">
+            <div
+              key={index}
+              className="flex items-start gap-2 text-xs text-amber-700"
+            >
               <AlertTriangle className="mt-0.5 size-3 shrink-0" />
               <span>{warning}</span>
             </div>

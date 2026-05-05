@@ -46,7 +46,7 @@ function err500(c: Context, route: string, cause: unknown, fallback: string) {
 function createPlanLifecycleRouter() {
   const api = new Hono();
 
-  api.get("/tasks/:taskId/plan-state", async (c) => {
+  api.get("/tasks/:taskId/plan/state", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const savedAiPlan =
@@ -83,14 +83,14 @@ function createPlanLifecycleRouter() {
     }
   });
 
-  api.post("/ai/task-plan/accept", async (c) => {
+  api.post("/tasks/:taskId/plan/accept", async (c) => {
     try {
       const body = await c.req.json();
-      const taskId = typeof body.taskId === "string" ? body.taskId : "";
+      const taskId = c.req.param("taskId");
       const planId = typeof body.planId === "string" ? body.planId : "";
 
-      if (!taskId || !planId) {
-        return err(c, "taskId and planId are required", 400);
+      if (!planId) {
+        return err(c, "planId is required", 400);
       }
 
       const latest = await getLatestCompiledPlan(taskId);
@@ -123,18 +123,14 @@ function createPlanLifecycleRouter() {
     }
   });
 
-  api.post("/ai/batch-apply-plan", async (c) => {
+  api.post("/tasks/:taskId/plan/materialize", async (c) => {
     try {
+      const taskId = c.req.param("taskId");
       const body = await c.req.json();
-      const { taskId, nodes: providedNodes, edges: providedEdges } = body as {
-        taskId?: string;
+      const { nodes: providedNodes, edges: providedEdges } = body as {
         nodes?: Record<string, unknown>[];
         edges?: Record<string, unknown>[];
       };
-
-      if (!taskId) {
-        return err(c, "taskId is required", 400);
-      }
 
       const task = await db.task.findUnique({ where: { id: taskId } });
       if (!task) {
@@ -202,7 +198,7 @@ function createPlanLifecycleRouter() {
         planGraph: compiledPlan,
       }, 201);
     } catch (cause) {
-      return err500(c, "POST /api/ai/batch-apply-plan", cause, "Failed to apply task plan");
+      return err500(c, "POST /api/tasks/:taskId/plan/materialize", cause, "Failed to apply task plan");
     }
   });
 
@@ -232,7 +228,7 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan-state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
@@ -245,7 +241,7 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     await seedDraftPlan(taskId, ws.workspaceId);
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan-state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
@@ -261,13 +257,13 @@ describe("Plan lifecycle workflow", () => {
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
     // Accept the plan
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan-state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
@@ -284,10 +280,10 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
     expect(res.status).toBe(200);
@@ -301,10 +297,10 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
     const body = await res.json() as any;
@@ -321,17 +317,17 @@ describe("Plan lifecycle workflow", () => {
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
     // First accept
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
     // Then batch-apply
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(201);
@@ -348,16 +344,16 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
 
     const body = await res.json() as any;
@@ -393,16 +389,16 @@ describe("Plan lifecycle workflow", () => {
       ],
     });
 
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
-    await app().request("http://local/api/ai/batch-apply-plan", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
 
     // Verify dependency was created
@@ -437,11 +433,10 @@ describe("Plan lifecycle workflow", () => {
       metadata: null,
     };
 
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        taskId,
         nodes: [inlineNode],
         edges: [],
       }),
@@ -459,27 +454,27 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
     // First apply
-    const res1 = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res1 = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
     const body1 = await res1.json() as any;
     const firstCount = body1.childTasks.length;
     expect(firstCount).toBeGreaterThan(0);
 
     // Second apply — should NOT create new tasks (createdTaskIds is empty on re-apply)
-    const res2 = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res2 = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
     expect(res2.status).toBe(201);
 
@@ -493,17 +488,17 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     await seedAcceptedPlan(taskId, ws.workspaceId);
 
-    const firstRes = await app().request("http://local/api/ai/batch-apply-plan", {
+    const firstRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
     expect(firstRes.status).toBe(201);
 
-    const secondRes = await app().request("http://local/api/ai/batch-apply-plan", {
+    const secondRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
     expect(secondRes.status).toBe(201);
   });
@@ -526,17 +521,17 @@ describe("Plan lifecycle workflow", () => {
     });
 
     // Accept first plan
-    await app().request("http://local/api/ai/task-plan/accept", {
+    await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId }),
+      body: JSON.stringify({ planId }),
     });
 
     // Accept second plan (supersedes first)
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId: planId2 }),
+      body: JSON.stringify({ planId: planId2 }),
     });
 
     expect(res.status).toBe(200);
@@ -553,21 +548,11 @@ describe("Plan lifecycle workflow", () => {
   // Negative cases
   // -----------------------------------------------------------------------
 
-  it("returns 400 when accepting without taskId", async () => {
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "some-plan" }),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
   it("returns 400 when accepting without planId", async () => {
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request("http://local/api/tasks/some-task/plan/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: "some-task" }),
+      body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(400);
@@ -577,10 +562,10 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId: "nonexistent-plan-id" }),
+      body: JSON.stringify({ planId: "nonexistent-plan-id" }),
     });
 
     expect(res.status).toBe(404);
@@ -592,10 +577,10 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { planId } = await seedDraftPlan(taskId, ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/task-plan/accept", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, planId, workspaceId: other.workspaceId }),
+      body: JSON.stringify({ planId, workspaceId: other.workspaceId }),
     });
 
     expect(res.status).toBe(200);
@@ -605,11 +590,10 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        taskId,
         nodes: [{ id: "bad_node", type: "task", title: "", objective: "" }],
         edges: [],
       }),
@@ -618,21 +602,11 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(201);
   });
 
-  it("returns 404 when batch-applying without taskId", async () => {
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+  it("returns 404 when batch-applying for nonexistent task", async () => {
+    const res = await app().request("http://local/api/tasks/nonexistent/plan/materialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 404 when batch-applying for nonexistent task", async () => {
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: "nonexistent" }),
     });
 
     expect(res.status).toBe(404);
@@ -642,10 +616,10 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const res = await app().request("http://local/api/ai/batch-apply-plan", {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(404);
@@ -653,7 +627,7 @@ describe("Plan lifecycle workflow", () => {
     expect(body.error).toBe("No plan found for task");
   });
 
-  it("plan-state endpoint returns enriched node metadata (executionClassification, readiness, nextAction)", async () => {
+  it("plan state endpoint returns enriched node metadata (executionClassification, readiness, nextAction)", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -703,7 +677,7 @@ describe("Plan lifecycle workflow", () => {
       ],
     });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan-state`, {
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`, {
       method: "GET",
     });
 

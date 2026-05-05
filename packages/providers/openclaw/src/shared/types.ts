@@ -11,7 +11,6 @@ import type {
   ToolCallOutputInfo,
 } from "../transport/bridge-types";
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
 export type BridgeLogger = {
   debug: (event: string, data?: Record<string, unknown>) => void;
   info: (event: string, data?: Record<string, unknown>) => void;
@@ -26,13 +25,6 @@ export type RouteKind =
 export interface ExecutionResult {
   response: BridgeResponse;
   events: NDJSONEvent[];
-}
-
-export interface BridgeLogEntry {
-  ts: string;
-  level: LogLevel;
-  event: string;
-  data?: Record<string, unknown>;
 }
 
 export interface BridgeEnvironment {

@@ -4,7 +4,7 @@ import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session"
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 import { db } from "@/lib/db";
 
-export type NodeExecutionEvidence = {
+type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
   childTaskId?: string;
@@ -23,7 +23,7 @@ export type NodeExecutionResult =
   | { status: "child_running"; summary: string; evidence: NodeExecutionEvidence; output?: unknown }
   | { status: "failed"; error: string; evidence?: NodeExecutionEvidence };
 
-export type NodeExecutorInput = {
+type NodeExecutorInput = {
   taskId: string;
   planId: string;
   mainSession: {

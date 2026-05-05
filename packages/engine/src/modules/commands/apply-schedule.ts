@@ -25,10 +25,6 @@ export async function applySchedule(input: {
     where: { id: input.taskId },
     data: {
       dueAt: input.dueAt,
-      scheduledStartAt: input.scheduledStartAt,
-      scheduledEndAt: input.scheduledEndAt,
-      scheduleStatus: "Scheduled",
-      scheduleSource: input.scheduleSource,
     },
   });
 
@@ -41,6 +37,16 @@ export async function applySchedule(input: {
       orderBy: { createdAt: "desc" },
     });
 
+    if (!existingBlock) {
+      const activeBlock = await db.workBlock.findFirst({
+        where: { taskId: input.taskId, status: "Active" },
+        orderBy: { createdAt: "desc" },
+      });
+      if (activeBlock) {
+        throw new Error("Cannot reschedule while a work block is active");
+      }
+    }
+
     if (existingBlock) {
       await db.workBlock.update({
         where: { id: existingBlock.id },
@@ -49,6 +55,7 @@ export async function applySchedule(input: {
           title: input.title ?? task.title,
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,
+          trigger: input.scheduleSource === "ai" ? "scheduled" : "manual",
         },
       });
     } else {

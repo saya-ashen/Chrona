@@ -8,7 +8,6 @@ import {
   type DragEvent,
   type MouseEvent,
 } from "react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   getSchedulePageCopy,
@@ -17,13 +16,12 @@ import {
   TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
 import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
-import { DayTimelineSummary } from "@/components/schedule/schedule-page-panels";
+import { DayTimelineSummary } from "@/components/schedule/panels/schedule-page-panels";
 import {
   ScheduledTimelineBlock,
   TimelinePlacementCard,
 } from "@/components/schedule/schedule-timeline-primitives";
 import type {
-  ScheduledDayGroup,
   ScheduledItem,
   TimelineCreateInput,
   TimelineDragItem,
@@ -33,18 +31,15 @@ import type {
 } from "@/components/schedule/schedule-page-types";
 import {
   buildCompressedTimeline,
-  buildScheduleHref,
   buildTimelinePlacementPreview,
   clampScheduledEndMinute,
   clampScheduledStartMinute,
   formatDayHeading,
-  formatShortDay,
   formatTime,
   getTodayKey,
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
 import { type TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
@@ -90,69 +85,6 @@ function TimelineComposer({
         });
       }}
     />
-  );
-}
-
-export function WeekStrip({
-  groups,
-  selectedDay,
-}: {
-  groups: ScheduledDayGroup[];
-  selectedDay: string;
-}) {
-  const locale = useLocale();
-  const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
-
-  return (
-    <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
-        {groups.map((group) => {
-          const isActive = group.key === selectedDay;
-
-          return (
-            <LocalizedLink
-              key={group.key}
-              href={buildScheduleHref(group.key)}
-              className={cn(
-                "rounded-2xl border px-3 py-3 transition-colors hover:border-primary/40 hover:bg-background",
-                isActive
-                  ? "border-primary/60 bg-primary/5 shadow-sm"
-                  : "border-border/60 bg-background/70",
-              )}
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground">
-                    {formatShortDay(group.date, locale, copy)}
-                  </p>
-                  {group.riskCount > 0 ? (
-                    <StatusBadge tone="critical">{copy.riskDay}</StatusBadge>
-                  ) : null}
-                </div>
-                <p className="text-xs text-muted-foreground">{group.label}</p>
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge>
-                    {group.items.length}{" "}
-                    {group.items.length === 1
-                      ? copy.blockSingular
-                      : copy.blockPlural}
-                  </StatusBadge>
-                  {group.proposalCount > 0 ? (
-                    <StatusBadge tone="info">
-                      {group.proposalCount}{" "}
-                      {group.proposalCount === 1
-                        ? copy.proposalSingular
-                        : copy.proposalPlural}
-                    </StatusBadge>
-                  ) : null}
-                </div>
-              </div>
-            </LocalizedLink>
-          );
-        })}
-      </div>
-    </SurfaceCard>
   );
 }
 

@@ -218,10 +218,15 @@ test("full deterministic AI task flow persists plan updates", async ({
 
         await test.step("3. AI generates plan via mock LLM", async () => {
           console.log(`[e2e] generating plan for task ${createdTask.taskId}...`);
-          const genResp = await request.post("/api/ai/generate-task-plan", {
-            data: { taskId: createdTask.taskId },
+          const genResp = await request.post(`/api/tasks/${createdTask.taskId}/plan/generate`, {
+            data: {},
+            headers: { Accept: "text/event-stream" },
           });
-          const genJson = await genResp.json();
+          const genText = await genResp.text();
+          const resultLine = genText
+            .split("\n")
+            .find((line) => line.startsWith("data: ") && line.includes('"savedPlan"'));
+          const genJson = resultLine ? JSON.parse(resultLine.slice(6)) : null;
           console.log(`[e2e] plan generated: source=${genJson.source}, savedPlan.id=${genJson.savedPlan?.id}`);
           expect(genJson.savedPlan?.id).toBeTruthy();
 
@@ -266,7 +271,7 @@ test("full deterministic AI task flow persists plan updates", async ({
 
         await test.step("6. Verify plan persisted via API", async () => {
           const planStateResp = await request.get(
-            `/api/tasks/${createdTask.taskId}/plan-state`,
+            `/api/tasks/${createdTask.taskId}/plan/state`,
           );
           expect(planStateResp.ok()).toBeTruthy();
           const planState = (await planStateResp.json()) as {

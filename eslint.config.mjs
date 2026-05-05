@@ -1,10 +1,38 @@
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
+import unusedImports from "eslint-plugin-unused-imports";
 
 const eslintConfig = defineConfig([
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    plugins: {
+      "unused-imports": unusedImports,
+    },
+    languageOptions: {
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    rules: {
+      "unused-imports/no-unused-imports": "error",
+
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-vars": "off",
+      "unused-imports/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
+
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
@@ -16,26 +44,35 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", {
-        argsIgnorePattern: "^_",
-        varsIgnorePattern: "^_",
-        caughtErrorsIgnorePattern: "^_",
-        destructuredArrayIgnorePattern: "^_",
-      }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
 
       "no-unreachable": "error",
       "no-constant-condition": "warn",
 
-      "max-lines": ["warn", {
-        max: 500,
-        skipBlankLines: true,
-        skipComments: true,
-      }],
-      "max-lines-per-function": ["warn", {
-        max: 100,
-        skipBlankLines: true,
-        skipComments: true,
-      }],
+      "max-lines": [
+        "warn",
+        {
+          max: 500,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
+      "max-lines-per-function": [
+        "warn",
+        {
+          max: 100,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
 
       complexity: ["warn", 12],
       "max-depth": ["warn", 4],
@@ -44,7 +81,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    files: ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
+    files: [
+      "apps/**/*.ts",
+      "apps/**/*.tsx",
+      "packages/**/*.ts",
+      "packages/**/*.tsx",
+      "scripts/**/*.ts",
+    ],
     ignores: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
     languageOptions: {
       parserOptions: {
@@ -58,7 +101,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.spec.ts"],
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/__tests__/**/*.ts",
+      "**/__tests__/**/*.tsx",
+      "**/*.spec.ts",
+    ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
@@ -76,11 +125,11 @@ const eslintConfig = defineConfig([
             "@/generated/prisma/*",
             "@prisma/*",
             "@chrona/openclaw-integration*",
-            "@chrona/runtime-openclaw*"
-          ]
-        }
-      ]
-    }
+            "@chrona/runtime-openclaw*",
+          ],
+        },
+      ],
+    },
   },
   globalIgnores([
     "**/.git/**",

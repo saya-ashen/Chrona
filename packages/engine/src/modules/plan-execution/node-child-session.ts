@@ -5,7 +5,7 @@ import {
 } from "@/modules/task-execution/task-sessions";
 import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
 
-export type EnsureNodeChildSessionInput = {
+type EnsureNodeChildSessionInput = {
   taskId: string;
   planId: string;
   nodeId: string;
@@ -13,14 +13,14 @@ export type EnsureNodeChildSessionInput = {
   runtimeName?: string;
 };
 
-export type EnsureNodeChildSessionResult = {
+type EnsureNodeChildSessionResult = {
   sessionId: string;
   sessionKey: string;
   runId: string;
   childTaskId: string | undefined;
 };
 
-export type StartNodeChildRunInput = {
+type StartNodeChildRunInput = {
   taskId: string;
   childSessionId: string;
   childSessionKey: string;
@@ -28,7 +28,7 @@ export type StartNodeChildRunInput = {
   runtimeName?: string;
 };
 
-export type StartNodeChildRunResult = {
+type StartNodeChildRunResult = {
   runId: string;
   runtimeRunRef: string | null;
 };
