@@ -17,7 +17,6 @@ import { validateEditablePlan } from "./validate";
 import { applyPlanPatch } from "./patch";
 import { compileEditablePlan } from "./compile";
 import { createPlanRun, applyRuntimeCommand } from "./run";
-import { buildPlanPatchPrompt } from "./prompts";
 
 // ─── Helpers ───
 

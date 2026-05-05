@@ -4,7 +4,7 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
-import { getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -33,8 +33,8 @@ export async function applySchedule(input: {
   });
 
   if (input.scheduledStartAt && input.scheduledEndAt) {
-    const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-    const planId = acceptedPlan?.id ?? null;
+    const acceptedPlan = await getAcceptedCompiledPlan(input.taskId);
+    const planId = acceptedPlan?.compiledPlan.editablePlanId ?? null;
 
     const existingBlock = await db.workBlock.findFirst({
       where: { taskId: input.taskId, status: "Scheduled" },

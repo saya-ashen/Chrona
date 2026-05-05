@@ -3,10 +3,10 @@ import { db } from "@/lib/db";
 import { startRun } from "@/modules/commands/start-run";
 import { materializeTaskPlan } from "@/modules/commands/materialize-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import {
   getAcceptedCompiledPlan,
-  getLatestCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
 import { getLayers } from "@/modules/plan-execution/plan-run-store";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
@@ -51,7 +51,8 @@ export async function syncParentTaskStateFromAcceptedPlan(parentTaskId: string) 
     return { parentCompleted: false, status: parentTask.status };
   }
 
-  const layers = await getLayers(parentTaskId, accepted.planId);
+  const planId = accepted.compiledPlan.editablePlanId;
+  const layers = await getLayers(parentTaskId, planId);
   const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
   const nextStatus = deriveParentTaskStatusFromEffectivePlan(effective);
   if (!nextStatus) {
@@ -86,7 +87,8 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
     };
   }
 
-  const layers = await getLayers(input.parentTaskId, accepted.planId);
+  const planId = accepted.compiledPlan.editablePlanId;
+  const layers = await getLayers(input.parentTaskId, planId);
   const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
 
   // Find ready, auto-runnable, non-materialized nodes
@@ -104,7 +106,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
 
     if (materialized.createdTaskIds.length > 0) {
       // Re-read layers after materialization (which may have appended layers)
-      const refreshedLayers = await getLayers(input.parentTaskId, accepted.planId);
+      const refreshedLayers = await getLayers(input.parentTaskId, planId);
       const refreshedEffective = resolveEffectivePlanGraph(accepted.compiledPlan, refreshedLayers);
       const readyTaskIds = new Set(
         refreshedEffective.nodes
@@ -138,7 +140,9 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
           await ensureDefaultTaskSession({
             taskId: childTask.id,
             taskTitle: childTask.title,
-            runtimeName: childTask.runtimeAdapterKey ?? parentTask.runtimeAdapterKey ?? "openclaw",
+            runtimeName: resolveRuntimeAdapterKey({
+              runtimeAdapterKey: childTask.runtimeAdapterKey ?? parentTask.runtimeAdapterKey,
+            }),
             defaultSessionId: childTask.defaultSessionId,
             suffix: "subtask",
             label: `${childTask.title} · Subtask session`,
@@ -152,7 +156,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
   }
 
   // Re-check completion after progression
-  const finalLayers = await getLayers(input.parentTaskId, accepted.planId);
+  const finalLayers = await getLayers(input.parentTaskId, planId);
   const finalEffective = resolveEffectivePlanGraph(accepted.compiledPlan, finalLayers);
   const allDone = Boolean(
     finalEffective.nodes.length > 0 &&

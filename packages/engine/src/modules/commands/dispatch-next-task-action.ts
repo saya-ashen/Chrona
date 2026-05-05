@@ -29,7 +29,8 @@ export async function dispatchNextTaskAction(input: {
     throw new Error(`No accepted plan found for task ${input.taskId}`);
   }
 
-  const layers = await getLayers(input.taskId, accepted.planId);
+  const planId = accepted.compiledPlan.editablePlanId;
+  const layers = await getLayers(input.taskId, planId);
   const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
 
   const linkedTasks = effective.nodes
@@ -96,7 +97,7 @@ export async function dispatchNextTaskAction(input: {
 
   // Build a summary of the plan for AI dispatch
   const planSummary = {
-    planId: accepted.planId,
+    planId: accepted.compiledPlan.editablePlanId,
     nodes: effective.nodes.map((n) => ({
       id: n.localId ?? n.id,
       title: n.title,
@@ -109,7 +110,7 @@ export async function dispatchNextTaskAction(input: {
   const result = await aiDispatchTask({
     taskId: input.taskId,
     workspaceId: input.workspaceId,
-    acceptedPlan: planSummary as unknown as import("@chrona/contracts/ai").TaskPlanGraph,
+    acceptedPlan: planSummary as unknown as import("@chrona/contracts/ai").PlanBlueprint,
     linkedTasks,
     latestRuns,
     recentEvents,

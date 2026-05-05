@@ -3,11 +3,9 @@ import { randomUUID } from "node:crypto";
 import type {
   AIPlanEdge,
   AIPlanOutput,
-  AIPlanNode,
   CompiledPlan,
   RuntimeLayer,
   LayerSource,
-  PlanOverlayLayer,
 } from "@chrona/contracts/ai";
 import { PlanCompileError, upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 import { compileEditablePlan } from "@chrona/domain";

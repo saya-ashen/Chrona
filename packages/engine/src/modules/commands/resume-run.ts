@@ -4,8 +4,8 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import {
   createRuntimeAdapter,
-  type OpenClawAdapter,
-} from "@chrona/openclaw";
+  type RuntimeAdapter,
+} from "@chrona/providers-core";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
@@ -15,9 +15,9 @@ export async function resumeRun(input: {
   runId: string;
   approvalId?: string;
   inputText?: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeAdapter;
 }) {
-  const adapter = input.adapter ?? (await createRuntimeAdapter());
+  const adapter: RuntimeAdapter = input.adapter ?? (await createRuntimeAdapter());
   const run = await db.run.findUnique({
     where: { id: input.runId },
     include: { task: true, taskSession: true },

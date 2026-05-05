@@ -1,12 +1,12 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { resumeRun } from "@/modules/commands/resume-run";
-import type { OpenClawAdapter } from "@chrona/openclaw";
+import type { RuntimeAdapter } from "@chrona/providers-core";
 
 export async function provideInput(input: {
   runId: string;
   inputText: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeAdapter;
 }) {
   const run = await db.run.findUnique({ where: { id: input.runId } });
 

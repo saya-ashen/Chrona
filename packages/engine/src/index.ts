@@ -58,6 +58,7 @@ export {
   executePlanNode,
   settlePlanNodeFromRun,
   startPlanExecution,
+  createPlanRunFromCompiledPlan,
 } from "./modules/plan-execution";
 
 export {
@@ -70,12 +71,6 @@ export {
   appendLayer,
   getLayers,
 } from "./modules/plan-execution/plan-run-store";
-
-export {
-  createPlanRunFromCompiledPlan,
-  applyCommandAndProduceLayer,
-  buildResultLayer,
-} from "./modules/plan-execution/plan-run-bridge";
 
 export {
   saveCompiledPlan,
@@ -106,7 +101,20 @@ export { startAutoStartScheduler } from "./modules/scheduler/auto-start-runner";
 export { overrideRuntimeExecutionAdapter } from "./modules/task-execution/execution-registry";
 export { ensureDefaultTaskSession } from "./modules/task-execution/task-sessions";
 
-export { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "./modules/tasks/plan-blueprint-compiler";
+export {
+  compilePlanBlueprint,
+  compileBlueprintToCompiledPlan,
+} from "./modules/tasks/plan-blueprint-compiler";
+
+export {
+  saveTaskPlanGraph,
+  getLatestTaskPlanGraph,
+  getAcceptedTaskPlanGraph,
+  acceptTaskPlanGraph,
+  enrichPlanGraphNodes,
+  getReadyAutoRunnableNodes,
+} from "./modules/plan-execution/compat";
+export { getLatestSavedAiPlanSnapshot } from "./modules/plan-execution/saved-plan-snapshot";
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
 

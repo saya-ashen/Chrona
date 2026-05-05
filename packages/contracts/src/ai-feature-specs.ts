@@ -37,7 +37,7 @@ export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME =
   "analyze_schedule_conflicts";
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
-export const GENERATE_TASK_PLAN_GRAPH_TOOL_NAME = "generate_task_plan_graph";
+export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "generate_task_plan_graph";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION =
@@ -52,8 +52,8 @@ export const SUGGEST_TASK_TIMESLOTS_TOOL_DESCRIPTION =
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_DESCRIPTION =
   "Return Chrona's next task dispatch decision as structured tool arguments.";
 
-export const GENERATE_TASK_PLAN_GRAPH_TOOL_DESCRIPTION =
-  "Create and persist the Chrona task plan graph as structured tool arguments.";
+export const GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION =
+  "Create and persist the Chrona plan blueprint as structured tool arguments.";
 
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
@@ -330,10 +330,10 @@ export const dispatchNextTaskActionToolSpec: AiFeatureToolSpec = {
   },
 };
 
-export const generateTaskPlanGraphToolSpec: AiFeatureToolSpec = {
+export const generatePlanBlueprintToolSpec: AiFeatureToolSpec = {
   type: "function",
-  name: GENERATE_TASK_PLAN_GRAPH_TOOL_NAME,
-  description: GENERATE_TASK_PLAN_GRAPH_TOOL_DESCRIPTION,
+  name: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
+  description: GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION,
   parameters: {
     type: "object",
     additionalProperties: false,
@@ -559,7 +559,7 @@ export function buildGeneratePlanFeatureSpec(
     feature: "generate_plan",
     instructions: GENERATE_PLAN_SYSTEM_PROMPT,
     inputText: buildGeneratePlanFeatureInputText(input),
-    requiredTool: generateTaskPlanGraphToolSpec,
+    requiredTool: generatePlanBlueprintToolSpec,
     toolChoice: "required",
   };
 }

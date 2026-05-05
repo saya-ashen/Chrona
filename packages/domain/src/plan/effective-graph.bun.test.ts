@@ -33,7 +33,7 @@ function makeTask(
   };
 }
 
-function makeCheckpoint(
+function _makeCheckpoint(
   id: string,
   overrides?: Partial<EditableCheckpointNode>,
 ): EditableCheckpointNode {

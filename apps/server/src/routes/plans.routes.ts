@@ -23,20 +23,16 @@ import {
   saveCompiledPlan,
   getLatestCompiledPlan,
   getAcceptedCompiledPlan,
-  getEditablePlan,
-  appendLayer,
   getLayers,
   createPlanRunFromCompiledPlan,
-  applyCommandAndProduceLayer,
 } from "@chrona/engine";
-import { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "@chrona/engine";
+import { compilePlanBlueprint } from "@chrona/engine";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
 } from "@chrona/engine";
-import { compileEditablePlan, resolveEffectivePlanGraph } from "@chrona/domain";
-import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
+import { resolveEffectivePlanGraph, applyRuntimeCommand } from "@chrona/domain";
 
 import {
   buildSavedPlanSummary,
@@ -476,7 +472,6 @@ export function createPlansRoutes() {
 
       let compiledPlan: CompiledPlan | null = null;
       let planId: string | null = null;
-      let graphPlan: { compiledPlan: CompiledPlan; planId: string } | null = null;
       if (providedBlueprint && Array.isArray(providedBlueprint.nodes) && providedBlueprint.nodes.length > 0) {
         const compResult = compilePlanBlueprint({
           taskId,
@@ -486,7 +481,6 @@ export function createPlansRoutes() {
         });
         compiledPlan = compResult.compiledPlan;
         planId = compResult.planId;
-        graphPlan = { compiledPlan: compResult.compiledPlan, planId: compResult.planId };
 
         await saveCompiledPlan({
           workspaceId: task.workspaceId,
@@ -512,13 +506,12 @@ export function createPlansRoutes() {
         }
         compiledPlan = savedCompiled.compiledPlan;
         planId = savedCompiled.compiledPlan.editablePlanId;
-        graphPlan = { compiledPlan: savedCompiled.compiledPlan, planId: savedCompiled.compiledPlan.editablePlanId };
       }
 
       const materialized = await materializeTaskPlan({ taskId: task.id });
       const createdTasks = await getTasksWithProjections(materialized.createdTaskIds);
       const accepted = await getAcceptedCompiledPlan(taskId);
-      const layers = accepted ? await getLayers(taskId, accepted.planId) : [];
+      const layers = accepted ? await getLayers(taskId, accepted.compiledPlan.editablePlanId) : [];
       const effective = accepted ? resolveEffectivePlanGraph(accepted.compiledPlan, layers) : null;
       const materializedNodeIds = new Set(
         (effective?.nodes ?? [])
@@ -598,7 +591,7 @@ export function createPlansRoutes() {
       await savePlanRun({
         workspaceId: task.workspaceId,
         taskId,
-        planId: accepted.planId,
+        planId: accepted.compiledPlan.editablePlanId,
         run: result,
       });
 
@@ -627,24 +620,24 @@ export function createPlansRoutes() {
       const accepted = await getAcceptedCompiledPlan(taskId);
       if (!accepted) return error(c, "No accepted plan found for this task", 404);
 
-      const runAndLayers = await getPlanRun(taskId, accepted.planId);
+      const runAndLayers = await getPlanRun(taskId, accepted.compiledPlan.editablePlanId);
       if (!runAndLayers) return error(c, "No PlanRun found. Create one first via POST /api/plan-runs/from-accepted", 404);
 
-      const result = applyCommandAndProduceLayer(runAndLayers.planRun, accepted.compiledPlan, command, 1);
+      const result = applyRuntimeCommand(runAndLayers.planRun, accepted.compiledPlan, command, 1);
 
       if (!result.ok || !result.run) {
         return json(c, { ok: false, error: result.error }, 400);
       }
 
       const layers = [...runAndLayers.layers];
-      if (result.layer) {
-        layers.push(result.layer);
+      if (result.layers) {
+        layers.push(...result.layers);
       }
 
       await savePlanRun({
         workspaceId: task.workspaceId,
         taskId,
-        planId: accepted.planId,
+        planId: accepted.compiledPlan.editablePlanId,
         run: result.run,
         layers,
       });

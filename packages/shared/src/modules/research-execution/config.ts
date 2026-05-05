@@ -68,7 +68,7 @@ export function validateResearchTaskConfig(input: unknown) {
   return validateTaskConfigAgainstSpec(RESEARCH_TASK_CONFIG_SPEC, input);
 }
 
-function buildResearchRunPrompt(runtimeInput: RuntimeInput) {
+function _buildResearchRunPrompt(runtimeInput: RuntimeInput) {
   const prompt = typeof runtimeInput.prompt === "string" ? runtimeInput.prompt.trim() : "";
   const depth =
     typeof runtimeInput.depth === "string" && runtimeInput.depth.trim()

@@ -14,8 +14,17 @@ import { describe, expect, it } from "bun:test";
 
 import { extractJSON, llmCall } from "@/modules/ai/providers";
 import { SYSTEM_PROMPTS } from "@/modules/ai/prompts";
-import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
-import { getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
+import type {
+  PlanBlueprintNode,
+  PlanBlueprintEdge,
+  CompiledPlan,
+  CompiledNode,
+  CompiledEdge,
+  NodeConfig,
+  PlanOverlayLayer,
+  RuntimeLayer,
+} from "@chrona/contracts/ai";
+import { getReadyAutoRunnableNodes } from "@/modules/plan-execution/compat";
 
 // -- Config --
 
@@ -47,17 +56,17 @@ async function ensureApiKey() {
 
 // -- Helpers --
 
-function normalizeNodeType(value: unknown): TaskPlanNode["type"] {
+function normalizeNodeType(value: unknown): PlanBlueprintNode["type"] {
   const valid = ["task", "checkpoint", "condition", "wait"];
-  return valid.includes(value as string) ? (value as TaskPlanNode["type"]) : "task";
+  return valid.includes(value as string) ? (value as PlanBlueprintNode["type"]) : "task";
 }
 
-function normalizeEdgeType(value: unknown): TaskPlanEdge["type"] {
+function _normalizeEdgeType(value: unknown): string {
   const valid = ["sequential", "depends_on"];
-  return valid.includes(value as string) ? (value as TaskPlanEdge["type"]) : "sequential";
+  return valid.includes(value as string) ? (value as string) : "sequential";
 }
 
-function normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent" | null {
+function _normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent" | null {
   if (typeof value !== "string") return null;
   const n = value.trim().toLowerCase();
   if (n === "low") return "Low";
@@ -79,46 +88,28 @@ function parseGraphResponse(raw: string) {
     edges?: Array<Record<string, unknown>>;
   } | null;
 
-  const nodes: TaskPlanNode[] = (parsed?.nodes ?? []).map((n: Record<string, unknown>, i: number) => {
-    const execMode =
-      n.executionMode === "manual" || n.executionMode === "hybrid"
-        ? (n.executionMode as "manual" | "hybrid")
-        : ("automatic" as const);
-    const requiresInput = Boolean(n.requiresHumanInput);
-    const requiresApproval = Boolean(n.requiresHumanApproval);
-    const autoRunnable = execMode === "automatic" && !requiresInput && !requiresApproval;
-
-    return {
-      id: (n.id as string) ?? `node-${i + 1}`,
-      type: normalizeNodeType(n.type),
-      title: (n.title as string) ?? `Step ${i + 1}`,
-      objective: (n.objective as string) ?? (n.title as string) ?? `Step ${i + 1}`,
-      description: (n.description as string) ?? null,
-      status: "pending" as const,
-      phase: (n.phase as string) ?? null,
+  const nodes: PlanBlueprintNode[] = (parsed?.nodes ?? []).map((n: Record<string, unknown>, i: number) => ({
+    id: (n.id as string) ?? `node-${i + 1}`,
+    type: normalizeNodeType(n.type),
+    title: (n.title as string) ?? `Step ${i + 1}`,
+    ...((n.type as string) === "task" ? {
+      executor: (n.executor as "ai" | "user" | "system") ?? "ai",
       estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : 30,
-      priority: normalizePriority(n.priority),
-      executionMode: execMode,
-      requiresHumanInput: requiresInput,
-      requiresHumanApproval: requiresApproval,
-      autoRunnable,
-      blockingReason: requiresInput
-        ? ("needs_user_input" as const)
-        : requiresApproval
-          ? ("needs_approval" as const)
-          : null,
-      linkedTaskId: null,
-      completionSummary: null,
-      metadata: null,
-    };
-  });
+    } : (n.type as string) === "checkpoint" ? {
+      checkpointType: (n.checkpointType as string) ?? "confirm",
+      prompt: (n.prompt as string) ?? "",
+    } : (n.type as string) === "condition" ? {
+      condition: (n.condition as string) ?? "",
+      branches: (n.branches as Array<{ label: string; nextNodeId: string }>) ?? [],
+    } : (n.type as string) === "wait" ? {
+      waitFor: (n.waitFor as string) ?? "",
+    } : {}),
+  })) as PlanBlueprintNode[];
 
-  const edges: TaskPlanEdge[] = (parsed?.edges ?? []).map((e: Record<string, unknown>, i: number) => ({
-    id: (e.id as string) ?? `edge-${i + 1}`,
-    fromNodeId: ((e.fromNodeId ?? e.from ?? "") as string),
-    toNodeId: ((e.toNodeId ?? e.to ?? "") as string),
-    type: normalizeEdgeType(e.type),
-    metadata: null,
+  const edges: PlanBlueprintEdge[] = (parsed?.edges ?? []).map((_e: Record<string, unknown>, i: number) => ({
+    from: ((_e.fromNodeId ?? _e.from ?? "") as string),
+    to: ((_e.toNodeId ?? _e.to ?? "") as string),
+    label: (_e.type as string) ?? `edge-${i + 1}`,
   }));
 
   return {
@@ -156,28 +147,29 @@ Return JSON.`;
 
     // Every node has required fields
     for (const n of graph.nodes) {
-      expect(n.id).toBeTruthy();
-      expect(n.title).toBeTruthy();
-      expect(n.objective).toBeTruthy();
-      expect(["automatic", "manual", "hybrid"]).toContain(n.executionMode);
-      expect(typeof n.autoRunnable).toBe("boolean");
-      expect(typeof n.requiresHumanInput).toBe("boolean");
-      expect(typeof n.requiresHumanApproval).toBe("boolean");
+      const node = n as unknown as Record<string, unknown>;
+      expect(node.id).toBeTruthy();
+      expect(node.title).toBeTruthy();
+      expect(node.objective).toBeTruthy();
+      expect(["automatic", "manual", "hybrid"]).toContain(node.executionMode as string);
+      expect(typeof node.autoRunnable).toBe("boolean");
+      expect(typeof node.requiresHumanInput).toBe("boolean");
+      expect(typeof node.requiresHumanApproval).toBe("boolean");
     }
 
     // Every edge references valid nodes
     const nodeIds = new Set(graph.nodes.map((n) => n.id));
     for (const e of graph.edges) {
-      expect(nodeIds.has(e.fromNodeId)).toBe(true);
-      expect(nodeIds.has(e.toNodeId)).toBe(true);
+      expect(nodeIds.has(e.from)).toBe(true);
+      expect(nodeIds.has(e.to)).toBe(true);
     }
 
     // Graph must NOT be purely linear — should have parallelism
     const outDeg = new Map<string, number>();
     const inDeg = new Map<string, number>();
     for (const e of graph.edges) {
-      outDeg.set(e.fromNodeId, (outDeg.get(e.fromNodeId) ?? 0) + 1);
-      inDeg.set(e.toNodeId, (inDeg.get(e.toNodeId) ?? 0) + 1);
+      outDeg.set(e.from, (outDeg.get(e.from) ?? 0) + 1);
+      inDeg.set(e.to, (inDeg.get(e.to) ?? 0) + 1);
     }
     const hasFanOut = [...outDeg.values()].some((d) => d > 1);
     const hasFanIn = [...inDeg.values()].some((d) => d > 1);
@@ -201,8 +193,8 @@ Return JSON.`;
 
     const graph = parseGraphResponse(raw);
 
-    const autoNodes = graph.nodes.filter((n) => n.autoRunnable);
-    const manualNodes = graph.nodes.filter((n) => !n.autoRunnable);
+    const autoNodes = graph.nodes.filter((n) => (n as unknown as Record<string, unknown>).autoRunnable);
+    const manualNodes = graph.nodes.filter((n) => !(n as unknown as Record<string, unknown>).autoRunnable);
 
     // Should have both types — deployment has auto steps (build, deploy)
     // and manual steps (code review approval)
@@ -229,8 +221,9 @@ Return JSON.`;
 
     // Normalization should ensure this invariant
     for (const n of graph.nodes) {
-      if (n.requiresHumanApproval || n.requiresHumanInput) {
-        expect(n.autoRunnable).toBe(false);
+      const node = n as unknown as Record<string, unknown>;
+      if (node.requiresHumanApproval || node.requiresHumanInput) {
+        expect(node.autoRunnable).toBe(false);
       }
     }
   }, 120_000);
@@ -238,142 +231,90 @@ Return JSON.`;
 
 describe("getReadyAutoRunnableNodes", () => {
   it("returns root auto nodes when nothing is completed", () => {
-    const graph = {
-      id: "test-1",
-      taskId: "t1",
-      status: "draft" as const,
-      revision: 1,
-      source: "ai" as const,
-      generatedBy: "test",
-      prompt: null,
-      summary: "test",
-      changeSummary: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      nodes: [
-        makeNode("n1", { autoRunnable: true, executionMode: "automatic" }),
-        makeNode("n2", { autoRunnable: false, executionMode: "manual", requiresHumanInput: true }),
-        makeNode("n3", { autoRunnable: true, executionMode: "automatic" }),
+    const { compiledPlan, layers } = makeCompiledPlan(
+      [
+        makeCompiledNode("n1", { mode: "auto" }),
+        makeCompiledNode("n2", { mode: "manual" }),
+        makeCompiledNode("n3", { mode: "auto" }),
       ],
-      edges: [
-        makeEdge("e1", "n1", "n2"),
-        makeEdge("e2", "n2", "n3"),
+      [
+        makeCompiledEdge("e1", "n1", "n2"),
+        makeCompiledEdge("e2", "n2", "n3"),
       ],
-    };
+    );
 
-    const ready = getReadyAutoRunnableNodes(graph);
+    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
     // n1 has no deps → ready. n3 depends on n2 (pending) → not ready.
-    expect(ready.map((n) => n.id)).toEqual(["n1"]);
+    expect(ready.map((n) => n.nodeId)).toEqual(["n1"]);
   });
 
   it("unblocks auto node after manual predecessor completes", () => {
-    const graph = {
-      id: "test-2",
-      taskId: "t1",
-      status: "draft" as const,
-      revision: 1,
-      source: "ai" as const,
-      generatedBy: "test",
-      prompt: null,
-      summary: "test",
-      changeSummary: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      nodes: [
-        makeNode("n1", { autoRunnable: false, executionMode: "manual", requiresHumanInput: true, status: "done" }),
-        makeNode("n2", { autoRunnable: true, executionMode: "automatic" }),
-        makeNode("n3", { autoRunnable: true, executionMode: "automatic" }),
+    const { compiledPlan, layers } = makeCompiledPlan(
+      [
+        makeCompiledNode("n1", { mode: "manual" }),
+        makeCompiledNode("n2", { mode: "auto" }),
+        makeCompiledNode("n3", { mode: "auto" }),
       ],
-      edges: [
-        makeEdge("e1", "n1", "n2"),
-        makeEdge("e2", "n1", "n3"),
+      [
+        makeCompiledEdge("e1", "n1", "n2"),
+        makeCompiledEdge("e2", "n1", "n3"),
       ],
-    };
+      { n1: "completed" },
+    );
 
-    const ready = getReadyAutoRunnableNodes(graph);
+    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
     // n1 done → n2, n3 both ready (parallel)
-    expect(ready.map((n) => n.id).sort()).toEqual(["n2", "n3"]);
+    expect(ready.map((n) => n.nodeId).sort()).toEqual(["n2", "n3"]);
   });
 
   it("blocks auto node when manual predecessor is pending", () => {
-    const graph = {
-      id: "test-3",
-      taskId: "t1",
-      status: "draft" as const,
-      revision: 1,
-      source: "ai" as const,
-      generatedBy: "test",
-      prompt: null,
-      summary: "test",
-      changeSummary: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      nodes: [
-        makeNode("n1", { autoRunnable: true, executionMode: "automatic", status: "done" }),
-        makeNode("n2", { autoRunnable: false, executionMode: "manual", requiresHumanApproval: true }),
-        makeNode("n3", { autoRunnable: true, executionMode: "automatic" }),
+    const { compiledPlan, layers } = makeCompiledPlan(
+      [
+        makeCompiledNode("n1", { mode: "auto" }),
+        makeCompiledNode("n2", { mode: "manual" }),
+        makeCompiledNode("n3", { mode: "auto" }),
       ],
-      edges: [
-        makeEdge("e1", "n1", "n2"),
-        makeEdge("e2", "n2", "n3"),
+      [
+        makeCompiledEdge("e1", "n1", "n2"),
+        makeCompiledEdge("e2", "n2", "n3"),
       ],
-    };
+      { n1: "completed" },
+    );
 
-    const ready = getReadyAutoRunnableNodes(graph);
+    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
     // n2 is pending manual → n3 is blocked
     expect(ready).toEqual([]);
   });
 
   it("auto nodes with no edges are immediately ready", () => {
-    const graph = {
-      id: "test-4",
-      taskId: "t1",
-      status: "draft" as const,
-      revision: 1,
-      source: "ai" as const,
-      generatedBy: "test",
-      prompt: null,
-      summary: "test",
-      changeSummary: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      nodes: [
-        makeNode("n1", { autoRunnable: true, executionMode: "automatic" }),
-        makeNode("n2", { autoRunnable: true, executionMode: "automatic" }),
+    const { compiledPlan, layers } = makeCompiledPlan(
+      [
+        makeCompiledNode("n1", { mode: "auto" }),
+        makeCompiledNode("n2", { mode: "auto" }),
       ],
-      edges: [],
-    };
+      [],
+    );
 
-    const ready = getReadyAutoRunnableNodes(graph);
-    expect(ready.map((n) => n.id).sort()).toEqual(["n1", "n2"]);
+    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    expect(ready.map((n) => n.nodeId).sort()).toEqual(["n1", "n2"]);
   });
 
   it("does not return already completed nodes", () => {
-    const graph = {
-      id: "test-5",
-      taskId: "t1",
-      status: "draft" as const,
-      revision: 1,
-      source: "ai" as const,
-      generatedBy: "test",
-      prompt: null,
-      summary: "test",
-      changeSummary: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      nodes: [
-        makeNode("n1", { autoRunnable: true, executionMode: "automatic", status: "done" }),
+    const { compiledPlan, layers } = makeCompiledPlan(
+      [
+        makeCompiledNode("n1", { mode: "auto" }),
       ],
-      edges: [],
-    };
+      [],
+      { n1: "completed" },
+    );
 
-    const ready = getReadyAutoRunnableNodes(graph);
+    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
     expect(ready).toEqual([]);
   });
 
   it("returns no subtask or decomposition types anywhere", () => {
     // Verify the graph structure has zero legacy fields
-    const node = makeNode("n1", { autoRunnable: true, executionMode: "automatic" });
+    const node = makeCompiledNode("n1", { mode: "auto" });
     const keys = Object.keys(node);
     expect(keys).not.toContain("subtask");
     expect(keys).not.toContain("subtasks");
@@ -387,36 +328,68 @@ describe("getReadyAutoRunnableNodes", () => {
 
 // -- Factories --
 
-function makeNode(
+function makeCompiledNode(
   id: string,
-  overrides: Partial<TaskPlanNode> = {},
-): TaskPlanNode {
+  overrides: Partial<CompiledNode> = {},
+): CompiledNode {
   return {
     id,
+    localId: id,
     type: "task",
     title: `Node ${id}`,
-    objective: `Objective for ${id}`,
-    description: null,
-    status: "pending",
-    phase: null,
-    estimatedMinutes: 10,
-    priority: "Medium",
-    executionMode: "automatic",
-    requiresHumanInput: false,
-    requiresHumanApproval: false,
-    autoRunnable: true,
-    blockingReason: null,
-    linkedTaskId: null,
-    completionSummary: null,
-    metadata: null,
+    config: {} as NodeConfig,
+    dependencies: [],
+    dependents: [],
+    mode: "auto",
     ...overrides,
   };
 }
 
-function makeEdge(
+function makeCompiledEdge(
   id: string,
   from: string,
   to: string,
-): TaskPlanEdge {
-  return { id, fromNodeId: from, toNodeId: to, type: "depends_on", metadata: null };
+): CompiledEdge {
+  return { id, from, to };
+}
+
+function makeCompiledPlan(
+  nodes: CompiledNode[],
+  edges: CompiledEdge[],
+  runtimeStatuses?: Record<string, "pending" | "completed" | "skipped">,
+): { compiledPlan: CompiledPlan; layers: PlanOverlayLayer[] } {
+  const planId = "ep-test";
+  const compiledPlan: CompiledPlan = {
+    id: "plan-test",
+    editablePlanId: planId,
+    sourceVersion: 1,
+    title: "Test Plan",
+    goal: "Test",
+    assumptions: [],
+    nodes,
+    edges,
+    entryNodeIds: nodes.filter((n) => !edges.some((e) => e.to === n.id)).map((n) => n.id),
+    terminalNodeIds: nodes.filter((n) => !edges.some((e) => e.from === n.id)).map((n) => n.id),
+    topologicalOrder: nodes.map((n) => n.id),
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+
+  const layers: PlanOverlayLayer[] = [];
+  if (runtimeStatuses && Object.keys(runtimeStatuses).length > 0) {
+    const layer: RuntimeLayer = {
+      type: "runtime",
+      planId,
+      layerId: "rl-test",
+      version: 1,
+      active: true,
+      timestamp: new Date().toISOString(),
+      nodeStates: Object.fromEntries(
+        Object.entries(runtimeStatuses).map(([nodeId, status]) => [nodeId, { status }]),
+      ),
+    };
+    layers.push(layer);
+  }
+
+  return { compiledPlan, layers };
 }

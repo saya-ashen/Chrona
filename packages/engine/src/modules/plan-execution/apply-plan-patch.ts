@@ -1,11 +1,8 @@
 import type {
   PlanPatch,
-  PlanPatchOperation,
   StructuralLayer,
   StructuralOperation,
   RuntimeLayer,
-  EditablePlan,
-  EditableTaskNode,
   EffectivePlanNode,
   EffectivePlanGraph,
   NodeRuntimeStatus,
@@ -14,9 +11,8 @@ import type {
 } from "@chrona/contracts/ai";
 
 import { applyPlanPatch as domainApplyPlanPatch } from "@chrona/domain/plan/patch";
-import { compileEditablePlan, resolveEffectivePlanGraph } from "@chrona/domain";
+import { compileEditablePlan } from "@chrona/domain";
 import { getEditablePlan } from "./compiled-plan-store";
-import type { SavedCompiledPlan } from "./compiled-plan-store";
 
 export type ApplyPlanPatchResult = {
   newLayers: PlanOverlayLayer[];
@@ -120,7 +116,7 @@ export async function applyPlanPatch(input: {
     throw new Error("No EditablePlan found for task");
   }
 
-  const planId = input.effectiveGraph.planId;
+  const _planId = input.effectiveGraph.planId;
   const appliedOperationIds = new Set(
     input.patch.operations
       .filter((op) => "nodeId" in op)

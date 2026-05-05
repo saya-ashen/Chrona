@@ -15,6 +15,7 @@ import type {
   TimelineDragItem,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
+import type { LegacyPlanGraph } from "@/components/schedule/schedule-page-types";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 import {
   applyScheduleToListItem,
@@ -535,8 +536,8 @@ export async function handleApplyDecompositionFromDialogAction({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         taskId: created.taskId,
-        nodes: result.planGraph.nodes,
-        edges: result.planGraph.edges,
+        nodes: (result.planGraph as LegacyPlanGraph).nodes,
+        edges: (result.planGraph as LegacyPlanGraph).edges,
       }),
     });
 

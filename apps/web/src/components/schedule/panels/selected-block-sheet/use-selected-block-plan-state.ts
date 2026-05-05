@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ScheduledItem, ScheduleAiPlanGenerationStatus } from "@/components/schedule/schedule-page-types";
-import type { TaskPlanGraph, TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { ScheduledItem, ScheduleAiPlanGenerationStatus, LegacySavedPlan } from "@/components/schedule/schedule-page-types";
+import type { TaskPlanGraphResponse, CompiledPlan } from "@chrona/contracts/ai";
 
 export type SavedTaskPlan = {
   id: string;
@@ -11,7 +11,7 @@ export type SavedTaskPlan = {
   revision?: number;
   summary?: string | null;
   updatedAt: string;
-  plan?: TaskPlanGraph;
+  plan?: CompiledPlan;
 };
 
 type TaskPlanStateResponse = {
@@ -30,8 +30,9 @@ function acceptedResponseFromSavedPlan(saved: SavedTaskPlan | null): TaskPlanGra
   }
 
   return {
+    plan: { title: "", goal: "", nodes: [], edges: [] },
     source: "saved",
-    planGraph: saved.plan,
+    planGraph: saved.plan as unknown,
     savedPlan: {
       id: saved.id,
       status: saved.status,
@@ -39,26 +40,22 @@ function acceptedResponseFromSavedPlan(saved: SavedTaskPlan | null): TaskPlanGra
       revision: saved.revision ?? 0,
       summary: saved.summary ?? null,
       updatedAt: saved.updatedAt,
-    },
+    } as unknown,
   };
 }
 
 function acceptedResponseFromGeneratedResult(result: TaskPlanGraphResponse): TaskPlanGraphResponse {
+  const rSavedPlan = result.savedPlan as Record<string, unknown> | undefined;
+  const rPlanGraph = result.planGraph as Record<string, unknown> | undefined;
   return {
     ...result,
     source: "saved",
-    savedPlan: result.savedPlan
-      ? {
-          ...result.savedPlan,
-          status: "accepted",
-        }
-      : result.savedPlan,
-    planGraph: result.planGraph
-      ? {
-          ...result.planGraph,
-          status: "accepted",
-        }
-      : result.planGraph,
+    savedPlan: rSavedPlan
+      ? { ...rSavedPlan, status: "accepted" }
+      : rSavedPlan,
+    planGraph: rPlanGraph
+      ? { ...rPlanGraph, status: "accepted" }
+      : rPlanGraph,
   };
 }
 
@@ -117,11 +114,13 @@ export function useSelectedBlockPlanState({
     const accepted = acceptedResponseFromSavedPlan(next);
     if (accepted) {
       setAcceptedPlan((current) => {
+        const curSaved = current?.savedPlan as LegacySavedPlan | undefined;
+        const accSaved = accepted.savedPlan as LegacySavedPlan | undefined;
         if (
-          current?.savedPlan?.id === accepted.savedPlan?.id
-          && current?.savedPlan?.status === accepted.savedPlan?.status
-          && current?.savedPlan?.revision === accepted.savedPlan?.revision
-          && current?.savedPlan?.updatedAt === accepted.savedPlan?.updatedAt
+          curSaved?.id === accSaved?.id
+          && curSaved?.status === accSaved?.status
+          && curSaved?.revision === accSaved?.revision
+          && curSaved?.updatedAt === accSaved?.updatedAt
         ) {
           return current;
         }
@@ -216,11 +215,13 @@ export function useSelectedBlockPlanState({
     }
 
     setAcceptedPlan((current) => {
+      const curSaved = current?.savedPlan as LegacySavedPlan | undefined;
+      const accSaved = accepted.savedPlan as LegacySavedPlan | undefined;
       if (
-        current?.savedPlan?.id === accepted.savedPlan?.id
-        && current?.savedPlan?.status === accepted.savedPlan?.status
-        && current?.savedPlan?.revision === accepted.savedPlan?.revision
-        && current?.savedPlan?.updatedAt === accepted.savedPlan?.updatedAt
+        curSaved?.id === accSaved?.id
+        && curSaved?.status === accSaved?.status
+        && curSaved?.revision === accSaved?.revision
+        && curSaved?.updatedAt === accSaved?.updatedAt
       ) {
         return current;
       }
@@ -230,7 +231,8 @@ export function useSelectedBlockPlanState({
   }, []);
 
   const handleApplyPlan = useCallback(async (result: TaskPlanGraphResponse) => {
-    if (!result.savedPlan?.id) return;
+    const savedPlan = result.savedPlan as LegacySavedPlan | undefined;
+    if (!savedPlan?.id) return;
     setIsApplying(true);
     try {
       const res = await fetch("/api/ai/task-plan/accept", {
@@ -238,21 +240,22 @@ export function useSelectedBlockPlanState({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId: item.taskId,
-          planId: result.savedPlan.id,
+          planId: savedPlan.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to accept plan");
 
       const accepted = acceptedResponseFromGeneratedResult(result);
+      const accSavedPlan = accepted.savedPlan as LegacySavedPlan;
       setAcceptedPlan(accepted);
       const acceptedSavedPlan: SavedTaskPlan = {
-        id: accepted.savedPlan!.id,
+        id: accSavedPlan.id,
         status: "accepted",
-        prompt: accepted.savedPlan!.prompt,
-        revision: accepted.savedPlan!.revision,
-        summary: accepted.savedPlan!.summary,
-        updatedAt: accepted.savedPlan!.updatedAt,
-        plan: accepted.planGraph,
+        prompt: accSavedPlan.prompt,
+        revision: accSavedPlan.revision,
+        summary: accSavedPlan.summary,
+        updatedAt: accSavedPlan.updatedAt,
+        plan: accepted.planGraph as CompiledPlan | undefined,
       };
       setDisplayedSavedPlan(acceptedSavedPlan);
       generationStatusRef.current = "accepted";

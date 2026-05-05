@@ -1,7 +1,6 @@
 import type {
   CompiledPlan,
   CompiledNode,
-  CompiledEdge,
   PlanOverlayLayer,
   StructuralLayer,
   RuntimeLayer,
@@ -11,6 +10,8 @@ import type {
   EffectivePlanNode,
   EffectivePlanEdge,
   NodeResult,
+  NodeRuntimeState,
+  PlanRun,
 } from "@chrona/contracts/ai";
 
 // ─── Resolve ───
@@ -75,6 +76,7 @@ export function resolveEffectivePlanGraph(
       const node = nodeMap.get(nodeId);
       if (!node) continue;
       node.status = state.status;
+      if (state.linkedTaskId !== undefined) node.linkedTaskId = state.linkedTaskId;
       if (state.attempts !== undefined) node.attempts = state.attempts;
       if (state.lastError !== undefined) node.lastError = state.lastError;
       if (state.startedAt !== undefined) node.startedAt = state.startedAt;
@@ -302,4 +304,124 @@ function rebuildDependencies(
       toNode.dependencies.push(edge.from);
     }
   }
+}
+
+// ─── Layer Constructors ───
+
+function layerId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function nodeStateToRuntimeLayer(
+  planId: string,
+  nodeId: string,
+  state: NodeRuntimeState,
+  version: number,
+): RuntimeLayer {
+  return {
+    type: "runtime",
+    layerId: layerId("rl"),
+    version,
+    active: true,
+    planId,
+    timestamp: new Date().toISOString(),
+    nodeStates: {
+      [nodeId]: {
+        status: state.status,
+        attempts: state.attempts,
+        lastError: state.lastError,
+        startedAt: state.startedAt,
+        completedAt: state.completedAt,
+      },
+    },
+  };
+}
+
+export function nodeResultToResultLayer(
+  planId: string,
+  nodeId: string,
+  result: NodeResult,
+  version: number,
+): ResultLayer {
+  return {
+    type: "result",
+    layerId: layerId("resl"),
+    version,
+    active: true,
+    planId,
+    timestamp: new Date().toISOString(),
+    nodeResults: {
+      [nodeId]: result,
+    },
+  };
+}
+
+/**
+ * Converts a PlanRun's current state into a sequence of versioned layers.
+ * Produces one RuntimeLayer covering all node states, followed by
+ * ResultLayers for nodes with checkpoint responses or artifacts.
+ *
+ * This is a bridge function — it snapshots existing PlanRun state
+ * (which predates the append-only layer model) into layered form.
+ */
+export function planRunToLayers(
+  run: PlanRun,
+  compiled: CompiledPlan,
+): PlanOverlayLayer[] {
+  const layers: PlanOverlayLayer[] = [];
+  let version = 1;
+
+  if (Object.keys(run.nodeStates).length > 0) {
+    layers.push({
+      type: "runtime",
+      layerId: `rl_bridge_${run.id}`,
+      version: version++,
+      active: true,
+      planId: compiled.editablePlanId,
+      timestamp: run.createdAt,
+      nodeStates: Object.fromEntries(
+        Object.entries(run.nodeStates).map(([id, s]) => [
+          id,
+          {
+            status: s.status,
+            attempts: s.attempts,
+            lastError: s.lastError,
+            startedAt: s.startedAt,
+            completedAt: s.completedAt,
+          },
+        ]),
+      ),
+    });
+  }
+
+  const nodeResults = new Map<string, NodeResult>();
+
+  for (const cr of run.checkpointResponses) {
+    const existing = nodeResults.get(cr.nodeId) ?? {};
+    existing.checkpointResponse = cr.response;
+    nodeResults.set(cr.nodeId, existing);
+  }
+
+  for (const ar of run.artifactRefs) {
+    const existing = nodeResults.get(ar.nodeId) ?? {};
+    if (!existing.artifactRefs) existing.artifactRefs = [];
+    existing.artifactRefs.push(ar);
+    nodeResults.set(ar.nodeId, existing);
+  }
+
+  for (const [nodeId, result] of nodeResults) {
+    layers.push({
+      type: "result",
+      layerId: `resl_bridge_${run.id}_${nodeId}`,
+      version: version++,
+      active: true,
+      planId: compiled.editablePlanId,
+      timestamp: run.completedAt ?? run.createdAt,
+      nodeResults: {
+        [nodeId]: result,
+      },
+    });
+  }
+
+  return layers;
 }

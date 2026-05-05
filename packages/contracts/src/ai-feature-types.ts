@@ -3,7 +3,6 @@
  */
 
 import type { PlanBlueprint } from "./ai-plan-blueprint";
-import type { TaskPlanGraph } from "./ai-plan-runtime";
 
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
@@ -264,7 +263,7 @@ export interface ExecutionContextStats {
 export interface DispatchTaskInput {
   taskId: string;
   workspaceId: string;
-  acceptedPlan: TaskPlanGraph;
+  acceptedPlan: PlanBlueprint;
   linkedTasks: LinkedPlanTaskSummary[];
   latestRuns: RuntimeRunSummary[];
   recentEvents: TaskEventSummary[];

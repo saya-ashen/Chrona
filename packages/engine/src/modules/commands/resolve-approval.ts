@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resumeRun } from "@/modules/commands/resume-run";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@chrona/openclaw";
+import { createRuntimeAdapter, type RuntimeAdapter } from "@chrona/providers-core";
 import {
   resolveTaskSessionKey,
   updateTaskSessionStateFromRun,
@@ -56,7 +56,7 @@ export async function resolveApproval(input: {
   decision: "Approved" | "Rejected" | "EditedAndApproved";
   resolutionNote?: string;
   editedContent?: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeAdapter;
 }) {
   const approval = await db.approval.findUnique({
     where: { id: input.approvalId },
@@ -72,7 +72,7 @@ export async function resolveApproval(input: {
   }
 
   if (input.decision === "Rejected") {
-    const adapter = input.adapter ?? (await createRuntimeAdapter());
+    const adapter: RuntimeAdapter = input.adapter ?? (await createRuntimeAdapter());
 
     const runtimeSessionKey = resolveTaskSessionKey(approval.run);
 

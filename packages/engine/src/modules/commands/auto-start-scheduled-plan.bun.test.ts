@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
-import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 
 const startPlanExecutionMock = mock();
 mock.module("@/modules/plan-execution", () => ({
@@ -104,69 +104,59 @@ describe("auto-start-scheduled-plan", () => {
       },
     });
 
-    await saveTaskPlanGraph({
+    await saveCompiledPlan({
       workspaceId: workspace.id,
       taskId: parentTask.id,
       status: "accepted",
-      plan: {
+      summary: "accepted graph",
+      generatedBy: "planner",
+      compiledPlan: {
         id: "graph-1",
-        taskId: parentTask.id,
-        status: "accepted",
-        revision: 1,
-        source: "ai",
-        generatedBy: "planner",
-        prompt: null,
-        summary: "accepted graph",
-        changeSummary: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        editablePlanId: "ep-graph-1",
+        sourceVersion: 1,
+        title: "Ship weekly plan",
+        goal: "Ship weekly plan",
+        assumptions: [],
         nodes: [
           {
             id: "node-auto-1",
+            localId: "node-auto-1",
             type: "task",
             title: "Collect evidence",
-            objective: "Collect evidence",
-            description: null,
-            status: "pending",
-            phase: null,
-            estimatedMinutes: 20,
-            priority: "High",
-            executionMode: "automatic",
-            requiresHumanInput: false,
-            requiresHumanApproval: false,
-            autoRunnable: true,
-            blockingReason: null,
-            linkedTaskId: null,
-            completionSummary: null,
-            metadata: { materialization: "child_task" },
+            config: { expectedOutput: "Collect evidence" } as import("@chrona/contracts/ai").NodeConfig,
+            dependencies: [],
+            dependents: [],
+            mode: "auto",
+            executor: "ai",
           },
           {
             id: "node-manual-1",
+            localId: "node-manual-1",
             type: "checkpoint",
             title: "Confirm direction",
-            objective: "Confirm direction",
-            description: null,
-            status: "pending",
-            phase: null,
-            estimatedMinutes: 5,
-            priority: "Medium",
-            executionMode: "manual",
-            requiresHumanInput: true,
-            requiresHumanApproval: false,
-            autoRunnable: false,
-            blockingReason: "needs_user_input",
-            linkedTaskId: null,
-            completionSummary: null,
-            metadata: null,
+            config: {
+              checkpointType: "confirm",
+              prompt: "Confirm direction",
+              required: true,
+            } as import("@chrona/contracts/ai").NodeConfig,
+            dependencies: [],
+            dependents: [],
+            mode: "manual",
+            executor: "user",
           },
         ],
         edges: [],
+        entryNodeIds: ["node-auto-1"],
+        terminalNodeIds: ["node-manual-1"],
+        topologicalOrder: ["node-auto-1", "node-manual-1"],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
       },
     });
 
     startPlanExecutionMock.mockResolvedValue({
       taskId: parentTask.id,
-      planId: "graph-1",
+      planId: "ep-graph-1",
       mainSessionId: "session-1",
       status: "running",
       currentNodeId: "node-auto-1",
@@ -180,7 +170,7 @@ describe("auto-start-scheduled-plan", () => {
 
     expect(result.started.length).toBeGreaterThanOrEqual(1);
     expect(result.started[0]?.taskId).toBe(parentTask.id);
-    expect(result.started[0]?.runId).toBe("graph-1");
+    expect(result.started[0]?.runId).toBe("ep-graph-1");
     expect(result.skipped).toEqual([]);
     expect(result.failed).toEqual([]);
 

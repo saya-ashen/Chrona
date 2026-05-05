@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createMockOpenClawAdapter } from "@chrona/openclaw/runtime/mock-adapter";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
+import type { NodeConfig } from "@chrona/contracts/ai";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -73,47 +75,39 @@ describe("plan node sync on run completion", () => {
       data: { latestRunId: run.id },
     });
 
-    await saveTaskPlanGraph({
+    await saveCompiledPlan({
       workspaceId: workspace.id,
       taskId: parentTask.id,
       status: "accepted",
-      source: "ai",
+      summary: "Test graph",
       generatedBy: "test",
-      prompt: "Generate executable graph",
-      plan: {
+      compiledPlan: {
         id: "plan-node-sync",
-        taskId: parentTask.id,
-        status: "accepted",
-        revision: 1,
-        source: "ai",
-        generatedBy: "test",
-        prompt: "Generate executable graph",
-        summary: "Test graph",
-        changeSummary: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        editablePlanId: "ep-plan-node-sync",
+        sourceVersion: 1,
+        title: "Test graph",
+        goal: "Test graph",
+        assumptions: [],
         nodes: [
           {
             id: "node-child",
+            localId: "node-child",
             type: "task",
             title: "Child node task",
-            objective: "Do the child task",
-            description: null,
-            status: "pending",
-            phase: null,
-            estimatedMinutes: 10,
-            priority: "Medium",
-            executionMode: "automatic",
-            requiresHumanInput: false,
-            requiresHumanApproval: false,
-            autoRunnable: true,
-            blockingReason: null,
+            config: { expectedOutput: "Do the child task" } as NodeConfig,
+            dependencies: [],
+            dependents: [],
+            mode: "auto",
+            executor: "ai",
             linkedTaskId: childTask.id,
-            completionSummary: null,
-            metadata: null,
           },
         ],
         edges: [],
+        entryNodeIds: ["node-child"],
+        terminalNodeIds: ["node-child"],
+        topologicalOrder: ["node-child"],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
       },
     });
 
@@ -122,12 +116,10 @@ describe("plan node sync on run completion", () => {
       adapter: createMockOpenClawAdapter({ fixtureName: "run-completed" }),
     });
 
-    const accepted = await getAcceptedTaskPlanGraph(parentTask.id);
-    expect(accepted?.plan.nodes).toHaveLength(1);
-    expect(accepted?.plan.nodes[0]).toMatchObject({
+    const accepted = await getAcceptedCompiledPlan(parentTask.id);
+    expect(accepted?.compiledPlan.nodes).toHaveLength(1);
+    expect(accepted?.compiledPlan.nodes[0]).toMatchObject({
       id: "node-child",
-      status: "done",
-      completionSummary: "Awaiting agent-authored completion summary.",
     });
   });
 });

@@ -13,7 +13,7 @@ import {
   SurfaceCard,
   SurfaceCardHeader,
 } from "@/components/ui/surface-card";
-import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import type { TaskWorkspaceUpdateProposal, CompiledPlan } from "@chrona/contracts/ai";
 
 type TaskData = {
   id: string;
@@ -41,42 +41,7 @@ type TaskData = {
     revision?: number;
     summary?: string | null;
     updatedAt: string;
-    plan?: {
-      id: string;
-      taskId: string;
-      status: "draft" | "accepted" | "superseded" | "archived";
-      revision: number;
-      source: "ai" | "user" | "mixed";
-      generatedBy: string | null;
-      prompt: string | null;
-      summary: string | null;
-      changeSummary: string | null;
-      createdAt: string;
-      updatedAt: string;
-      nodes: Array<{
-        id: string;
-        type: string;
-        title: string;
-        objective: string;
-        description: string | null;
-        status: "pending" | "in_progress" | "waiting_for_user" | "waiting_for_child" | "waiting_for_approval" | "blocked" | "done" | "skipped";
-        phase: string | null;
-        estimatedMinutes: number | null;
-        priority: string | null;
-        executionMode: "automatic" | "manual" | "hybrid";
-        linkedTaskId: string | null;
-        requiresHumanInput: boolean;
-        requiresHumanApproval: boolean;
-        autoRunnable: boolean;
-        blockingReason: string | null;
-      }>;
-      edges: Array<{
-        id: string;
-        fromNodeId: string;
-        toNodeId: string;
-        type: string;
-      }>;
-    };
+    plan?: CompiledPlan;
   } | null;
   aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
   blockReason: {
@@ -357,49 +322,20 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 
     if (proposal.planPatch && plan) {
       try {
-        const operation = proposal.planPatch.operation;
-        if (operation === "materialize_child_tasks") {
-          const response = await fetch("/api/ai/batch-apply-plan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskId: task.id }),
-          });
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({ error: "Failed to materialize plan" }));
-            errors.push(`Plan materialize failed: ${(err as { error?: string }).error ?? "Unknown error"}`);
-          }
-        } else if (operation === "replace_plan" && proposal.planPatch.nodes) {
-          const response = await fetch("/api/ai/batch-apply-plan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              taskId: task.id,
-              nodes: proposal.planPatch.nodes,
-              edges: proposal.planPatch.edges ?? [],
-            }),
-          });
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({ error: "Failed to update plan" }));
-            errors.push(`Plan update failed: ${(err as { error?: string }).error ?? "Unknown error"}`);
-          }
-        } else {
-          const body: Record<string, unknown> = { operation };
-          if (proposal.planPatch.nodes) body.nodes = proposal.planPatch.nodes;
-          if (proposal.planPatch.edges) body.edges = proposal.planPatch.edges;
-          if (proposal.planPatch.nodePatches) body.nodePatches = proposal.planPatch.nodePatches;
-          if (proposal.planPatch.deletedNodeIds) body.deletedNodeIds = proposal.planPatch.deletedNodeIds;
-          if (proposal.planPatch.reorder) body.reorder = proposal.planPatch.reorder;
-          if (proposal.planPatch.summary !== undefined) body.summary = proposal.planPatch.summary;
-
-          const response = await fetch(`/api/tasks/${task.id}/plan`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({ error: `Failed to apply plan ${operation}` }));
-            errors.push(`Plan ${operation} failed: ${(err as { error?: string }).error ?? "Unknown error"}`);
-          }
+        const patch = proposal.planPatch;
+        const response = await fetch(`/api/tasks/${task.id}/plan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            operations: patch.operations,
+            rationale: patch.rationale,
+            basePlanId: patch.basePlanId,
+            baseVersion: patch.baseVersion,
+          }),
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: "Failed to apply plan patch" }));
+          errors.push(`Plan patch failed: ${(err as { error?: string }).error ?? "Unknown error"}`);
         }
       } catch (cause) {
         errors.push(`Plan update error: ${cause instanceof Error ? cause.message : "Unknown"}`);
@@ -456,30 +392,30 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     const p = plan.plan;
     const deps = new Map<string, string[]>();
     for (const edge of p.edges) {
-      if (!deps.has(edge.toNodeId)) deps.set(edge.toNodeId, []);
-      deps.get(edge.toNodeId)!.push(edge.fromNodeId);
+      if (!deps.has(edge.to)) deps.set(edge.to, []);
+      deps.get(edge.to)!.push(edge.from);
     }
     return {
       id: p.id,
-      status: p.status,
-      revision: p.revision,
-      summary: p.summary,
+      status: "draft" as const,
+      revision: p.sourceVersion,
+      summary: p.goal,
       nodes: p.nodes.map((n) => ({
         id: n.id,
         title: n.title,
-        objective: n.objective,
-        description: n.description,
-        status: n.status,
-        estimatedMinutes: n.estimatedMinutes,
-        priority: n.priority,
-        executionMode: n.executionMode,
+        objective: n.description ?? "",
+        description: n.description ?? null,
+        status: "pending" as const,
+        estimatedMinutes: n.estimatedMinutes ?? null,
+        priority: n.priority ?? null,
+        executionMode: n.mode ?? "automatic",
         dependsOn: deps.get(n.id) ?? [],
       })),
       edges: p.edges.map((e) => ({
         id: e.id,
-        fromNodeId: e.fromNodeId,
-        toNodeId: e.toNodeId,
-        type: e.type,
+        fromNodeId: e.from,
+        toNodeId: e.to,
+        type: "sequential",
       })),
     };
   }, [plan]);

@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
-import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers } from "@/modules/plan-execution/plan-run-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";
 import { isMissingRecordError, toIsoString, classifyWorkstreamItem, formatEventTitle, summarizePayload } from "./helpers";
@@ -86,7 +88,10 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     where: { parentTaskId: task.id },
     orderBy: { createdAt: "desc" },
   });
-  const savedPlan = (await getAcceptedTaskPlanGraph(task.id)) ?? (await getLatestTaskPlanGraph(task.id));
+  const savedPlan = (await getAcceptedCompiledPlan(task.id)) ?? (await getLatestCompiledPlan(task.id));
+  const effectivePlanGraph = savedPlan && savedPlan.status === "accepted"
+    ? resolveEffectivePlanGraph(savedPlan.compiledPlan, await getLayers(task.id, savedPlan.compiledPlan.editablePlanId))
+    : null;
   const blockReason = readBlockReason(task);
   const approvals =
     currentRun?.approvals.map((approval) => ({
@@ -185,7 +190,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     : null;
 
   const planExecution = (() => {
-    if (!savedPlan || savedPlan.status !== "accepted") {
+    if (!effectivePlanGraph) {
       return {
         status: "no_plan" as const,
         currentNodeId: null,
@@ -196,21 +201,16 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       };
     }
 
-    const planNodes = savedPlan.plan.nodes;
-    const executed = planNodes
-      .filter((n) => n.status === "done" || n.status === "skipped")
-      .map((n) => n.id);
-    const waiting = planNodes
+    const effective = effectivePlanGraph;
+
+    const executed = effective.completedNodeIds;
+    const waiting = effective.nodes
       .filter((n) => n.status === "waiting_for_user")
       .map((n) => n.id);
-    const blocked = planNodes
-      .filter((n) => n.status === "blocked")
-      .map((n) => n.id);
-    const inProgress = planNodes.find((n) => n.status === "in_progress");
+    const blocked = effective.blockedNodeIds;
+    const inProgress = effective.nodes.find((n) => n.status === "running");
 
-    const allDone = planNodes.every(
-      (n) => n.status === "done" || n.status === "skipped",
-    );
+    const allDone = effective.pendingNodeIds.length === 0 && effective.runningNodeIds.length === 0 && effective.blockedNodeIds.length === 0 && effective.failedNodeIds.length === 0;
 
     if (allDone) {
       return {

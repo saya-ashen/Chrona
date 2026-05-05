@@ -1,6 +1,7 @@
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { PlanRun, PlanOverlayLayer } from "@chrona/contracts/ai";
+import { saveLayer as saveIndependentLayer, loadLayers as loadIndependentLayers } from "./layer-store";
 
 type StoredPlanRunPayload = {
   type: "plan_run_v2";
@@ -36,6 +37,10 @@ function parsePlanRun(content: string): { planRun: PlanRun; layers: PlanOverlayL
   }
 }
 
+function matchesPlanId(planRun: PlanRun, planId: string): boolean {
+  return planRun.editablePlanId === planId || planRun.compiledPlanId === planId;
+}
+
 export async function savePlanRun(input: {
   workspaceId: string;
   taskId: string;
@@ -55,7 +60,7 @@ export async function savePlanRun(input: {
 
   const existingRunMemories = memories.filter((m) => {
     const parsed = parsePlanRun(m.content);
-    return parsed !== null && parsed.planRun.compiledPlanId === input.planId;
+    return parsed !== null && matchesPlanId(parsed.planRun, input.planId);
   });
 
   if (existingRunMemories.length > 0) {
@@ -95,8 +100,13 @@ export async function getPlanRun(taskId: string, planId: string): Promise<{ plan
 
   for (const memory of memories) {
     const parsed = parsePlanRun(memory.content);
-    if (parsed && parsed.planRun.compiledPlanId === planId) {
-      return parsed;
+    if (parsed && matchesPlanId(parsed.planRun, planId)) {
+      // Prefer independent layers when available
+      const independent = await loadIndependentLayers(taskId, planId);
+      return {
+        planRun: parsed.planRun,
+        layers: independent.length > 0 ? independent : parsed.layers,
+      };
     }
   }
 
@@ -148,7 +158,7 @@ export async function appendLayer(input: {
 
   const existingRunMemories = memories.filter((m) => {
     const parsed = parsePlanRun(m.content);
-    return parsed !== null && parsed.planRun.compiledPlanId === input.planId;
+    return parsed !== null && matchesPlanId(parsed.planRun, input.planId);
   });
 
   if (existingRunMemories.length > 0) {
@@ -170,10 +180,22 @@ export async function appendLayer(input: {
     },
   });
 
+  // Dual-write: also persist the layer independently
+  await saveIndependentLayer({
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    planId: input.planId,
+    layer: input.layer,
+  });
+
   return layers;
 }
 
 export async function getLayers(taskId: string, planId: string): Promise<PlanOverlayLayer[]> {
+  // Prefer independent layer rows (new storage), fall back to embedded
+  const independent = await loadIndependentLayers(taskId, planId);
+  if (independent.length > 0) return independent;
+
   const runAndLayers = await getPlanRun(taskId, planId);
   return runAndLayers?.layers ?? [];
 }

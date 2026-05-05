@@ -5,6 +5,7 @@ import { useI18n, useLocale } from "@/i18n/client";
 import { SelectedBlockAiSidebar } from "@/components/schedule/panels/selected-block-sheet/selected-block-ai-sidebar";
 import { SelectedBlockMainColumn } from "@/components/schedule/panels/selected-block-sheet/selected-block-main-column";
 import { SelectedBlockSheetHeader } from "@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header";
+import type { LegacySavedPlan } from "@/components/schedule/schedule-page-types";
 import type { SelectedBlockSheetProps } from "@/components/schedule/panels/selected-block-sheet/types";
 import { useSelectedBlockConfigState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-config-state";
 import { useSelectedBlockPlanState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-plan-state";
@@ -83,7 +84,7 @@ export function SelectedBlockSheet({
               planningTaskDraft={planningTaskDraft}
               savedPlan={displayedSavedPlan}
               generationStatus={generationStatus}
-              acceptedPlanId={acceptedPlan?.savedPlan?.id ?? null}
+              acceptedPlanId={(acceptedPlan?.savedPlan as LegacySavedPlan | undefined)?.id ?? null}
               hasUnsavedConfigChanges={Boolean(taskConfigDraftState?.isDirty)}
               unsavedConfigDraft={taskConfigDraftState?.values ?? null}
               onPlanLoaded={handlePlanLoaded}

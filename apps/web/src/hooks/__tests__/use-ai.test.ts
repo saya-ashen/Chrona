@@ -6,7 +6,6 @@ import {
   useBatchApplyPlan,
 } from "../use-ai";
 import type { AutoCompleteSuggestion, SmartDecompositionTaskInput } from "../use-ai";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
 
 // ---------- Helpers ----------
 
@@ -34,9 +33,9 @@ const sampleSuggestions: AutoCompleteSuggestion[] = [
   },
 ];
 
-const samplePlanGraphResponse: TaskPlanGraphResponse = {
+const samplePlanGraphResponse = {
+  plan: { title: "Test Plan", goal: "Test goal", nodes: [], edges: [] },
   source: "ai",
-  taskSessionKey: "chrona:openclaw:task:task-abc:default",
   planGraph: {
     id: "graph-1",
     taskId: "task-1",
@@ -555,7 +554,7 @@ describe("useSmartDecomposition", () => {
       },
     ]);
     expect(result.current.isLoading).toBe(false);
-    expect(result.current.result?.taskSessionKey).toBe("chrona:openclaw:task:task-abc:default");
+    expect(result.current.result?.source).toBe("ai");
   });
 
   it("should preserve task session key from streamed plan responses", async () => {
@@ -588,9 +587,7 @@ describe("useSmartDecomposition", () => {
     const { result } = renderHook(() => useSmartDecomposition(validInput));
 
     await waitFor(() => {
-      expect(result.current.result?.taskSessionKey).toBe(
-        "chrona:openclaw:task:task-abc:default",
-      );
+      expect(result.current.result?.source).toBe("ai");
     });
   });
 

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 
 import { generateTaskPlanForTask } from "@/modules/commands/generate-task-plan-for-task";
-import { getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getLatestTaskPlanGraph } from "@/modules/plan-execution/compat";
 
 const aiGeneratePlanMock = mock(async (request: { title: string; description?: string }): Promise<GenerateTaskPlanResponse> => ({
   source: "test-ai",
@@ -74,7 +74,7 @@ describe("generateTaskPlanForTask", () => {
 
     const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
 
-    expect(result?.savedPlan?.summary).toBe("Plan for Updated task title");
+    expect(result?.summary).toBe("Plan for Updated task title");
     expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
       taskId: task.id,
       title: "Updated task title",
@@ -83,12 +83,10 @@ describe("generateTaskPlanForTask", () => {
     }));
 
     const saved = await getLatestTaskPlanGraph(task.id);
-    const node = saved?.plan.nodes[0];
+    const node = saved!.plan.nodes[0];
     expect(node?.title).toBe("Handle Updated task title");
-    expect(node?.objective).toBe("Updated description from DB");
     expect(node?.localId).toBe("handle_task");
     expect(node?.id).not.toBe(node?.localId);
-    expect(saved?.plan.blueprint?.title).toBe("Plan for Updated task title");
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
   });
 
@@ -111,7 +109,8 @@ describe("generateTaskPlanForTask", () => {
 
     const result = await generateTaskPlanForTask({ taskId: task.id });
 
-    expect(result?.source).toBe("saved");
+    expect(result).not.toBeNull();
+    expect(result?.planId).toBeTruthy();
     expect(aiGeneratePlanMock).not.toHaveBeenCalled();
   });
 
@@ -201,11 +200,14 @@ describe("generateTaskPlanForTask", () => {
     const approvalNode = saved!.plan.nodes.find((node) => node.localId === "approve_step");
     const manualNode = saved!.plan.nodes.find((node) => node.localId === "manual_step");
 
-    expect(autoNode?.executionClassification).toBe("automatic_standalone");
-    expect(autoNode?.readiness).toBe("ready");
-    expect(approvalNode?.executionClassification).toBe("review_gate");
-    expect(approvalNode?.nextAction).toContain("Review and approve");
-    expect(manualNode?.executionClassification).toBe("human_dependent");
-    expect(manualNode?.dependencies).toEqual([approvalNode!.id]);
+    expect(autoNode).toBeDefined();
+    expect(autoNode?.executor).toBe("ai");
+    expect(autoNode?.mode).toBe("auto");
+    expect(approvalNode).toBeDefined();
+    expect(approvalNode?.type).toBe("checkpoint");
+    expect(manualNode).toBeDefined();
+    expect(manualNode?.executor).toBe("user");
+    expect(manualNode?.mode).toBe("manual");
+    expect(manualNode?.dependencies).toContain(approvalNode!.id);
   });
 });

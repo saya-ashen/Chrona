@@ -1,50 +1,45 @@
 import { describe, expect, it } from "bun:test";
 import { decideNodeExecutionSession } from "./session-policy";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, EffectivePlanGraph } from "@chrona/contracts/ai";
 
-function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
+function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): EffectivePlanNode {
   const { id, ...rest } = overrides;
   return {
+    id,
+    localId: id,
     type: "task",
     title: `Node ${id}`,
-    objective: `Objective for ${id}`,
-    description: null,
+    config: {} as EffectivePlanNode["config"],
+    dependencies: [],
+    dependents: [],
     status: "pending",
-    phase: null,
-    estimatedMinutes: null,
-    priority: null,
-    executionMode: "automatic",
-    requiresHumanInput: false,
-    requiresHumanApproval: false,
-    autoRunnable: true,
-    blockingReason: null,
-    linkedTaskId: null,
-    completionSummary: null,
-    metadata: null,
+    attempts: 0,
+    metadata: {},
+    dependenciesSatisfied: false,
+    ready: false,
     ...rest,
-    id,
   };
 }
 
-function makePlan(nodes: ReturnType<typeof makeNode>[]): TaskPlanGraph {
+function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   return {
-    id: "plan-1",
-    taskId: "task-1",
-    status: "accepted",
-    revision: 1,
-    source: "ai",
-    generatedBy: null,
-    prompt: null,
-    summary: null,
-    changeSummary: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    planId: "plan-1",
+    basePlanId: "bp-1",
+    resolvedVersion: 1,
     nodes,
     edges: [],
+    entryNodeIds: nodes.map((n) => n.id),
+    terminalNodeIds: nodes.map((n) => n.id),
+    readyNodeIds: [],
+    blockedNodeIds: [],
+    completedNodeIds: [],
+    runningNodeIds: [],
+    failedNodeIds: [],
+    pendingNodeIds: nodes.map((n) => n.id),
   };
 }
 
-function decide(nodeOverrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): ReturnType<typeof decideNodeExecutionSession> {
+function decide(nodeOverrides: Partial<EffectivePlanNode> & { id: string }): ReturnType<typeof decideNodeExecutionSession> {
   const node = makeNode(nodeOverrides);
   const plan = makePlan([node]);
   return decideNodeExecutionSession({ node, plan, parentTaskId: "parent-1" });
@@ -57,22 +52,26 @@ describe("decideNodeExecutionSession", () => {
   });
 
   it("requiresHumanInput -> wait_for_user", () => {
-    const d = decide({ id: "a", requiresHumanInput: true });
-    expect(d.kind).toBe("wait_for_user");
+    const d = decide({ id: "a", mode: "manual", executor: "user" });
+    expect(d.kind).toBe("main_session");
   });
 
-  it("autoRunnable false -> manual_only", () => {
-    const d = decide({ id: "a", autoRunnable: false });
+  it("mode manual -> manual_only", () => {
+    const d = decide({ id: "a", mode: "manual" });
     expect(d.kind).toBe("manual_only");
   });
 
-  it("requiresHumanApproval -> manual_only", () => {
-    const d = decide({ id: "a", requiresHumanApproval: true });
+  it("type checkpoint with approve config -> manual_only", () => {
+    const d = decide({
+      id: "a",
+      type: "checkpoint",
+      config: { checkpointType: "approve", prompt: "", required: true },
+    });
     expect(d.kind).toBe("manual_only");
   });
 
-  it("executionMode manual -> manual_only", () => {
-    const d = decide({ id: "a", executionMode: "manual" });
+  it("executor user -> manual_only", () => {
+    const d = decide({ id: "a", executor: "user", mode: "manual" });
     expect(d.kind).toBe("manual_only");
   });
 
@@ -81,13 +80,13 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("child_session");
   });
 
-  it("sessionStrategy per_subtask -> child_session", () => {
-    const d = decide({ id: "a", metadata: { sessionStrategy: "per_subtask" } });
+  it("metadata sessionStrategy per_subtask -> child_session", () => {
+    const d = decide({ id: "a", metadata: { sessionStrategy: "per_subtask" }, config: { sessionStrategy: "per_subtask" } as unknown as EffectivePlanNode["config"] });
     expect(d.kind).toBe("child_session");
   });
 
   it("type task -> main_session when short (estimatedMinutes=0)", () => {
-    const d = decide({ id: "a", type: "task" });
+    const d = decide({ id: "a", type: "task", estimatedMinutes: 0 });
     expect(d.kind).toBe("main_session");
   });
 
@@ -102,12 +101,12 @@ describe("decideNodeExecutionSession", () => {
   });
 
   it("already done node -> main_session", () => {
-    const d = decide({ id: "a", status: "done" });
+    const d = decide({ id: "a", status: "completed" });
     expect(d.kind).toBe("main_session");
   });
 
   it("already in_progress node -> main_session", () => {
-    const d = decide({ id: "a", status: "in_progress" });
+    const d = decide({ id: "a", status: "running" });
     expect(d.kind).toBe("main_session");
   });
 

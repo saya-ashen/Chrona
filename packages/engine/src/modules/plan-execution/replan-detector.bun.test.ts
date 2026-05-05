@@ -1,29 +1,42 @@
 import { describe, expect, it } from "bun:test";
 import { detectPlanDrift } from "./replan-detector";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, EffectivePlanGraph } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executor";
 
-function makeNode(overrides: Partial<TaskPlanGraph["nodes"][number]> & { id: string }): TaskPlanGraph["nodes"][number] {
+function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): EffectivePlanNode {
   const { id, ...rest } = overrides;
   return {
+    id,
+    localId: id,
     type: "task",
     title: `Node ${id}`,
-    objective: `Objective for ${id}`,
-    description: null,
+    config: {} as EffectivePlanNode["config"],
+    dependencies: [],
+    dependents: [],
     status: "pending",
-    phase: null,
-    estimatedMinutes: null,
-    priority: null,
-    executionMode: "automatic",
-    requiresHumanInput: false,
-    requiresHumanApproval: false,
-    autoRunnable: true,
-    blockingReason: null,
-    linkedTaskId: null,
-    completionSummary: null,
-    metadata: null,
+    attempts: 0,
+    metadata: {},
+    dependenciesSatisfied: false,
+    ready: false,
     ...rest,
-    id,
+  };
+}
+
+function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
+  return {
+    planId: "p1",
+    basePlanId: "bp-1",
+    resolvedVersion: 1,
+    nodes,
+    edges: [],
+    entryNodeIds: nodes.map((n) => n.id),
+    terminalNodeIds: nodes.map((n) => n.id),
+    readyNodeIds: [],
+    blockedNodeIds: [],
+    completedNodeIds: [],
+    runningNodeIds: [],
+    failedNodeIds: [],
+    pendingNodeIds: nodes.map((n) => n.id),
   };
 }
 
@@ -31,12 +44,8 @@ describe("detectPlanDrift", () => {
   it("no drift when node completes normally", () => {
     const node = makeNode({ id: "a" });
     const result: NodeExecutionResult = { status: "done", summary: "ok", evidence: {} };
-    const plan = {
-      id: "p1", taskId: "t1", status: "accepted" as const, revision: 1,
-      source: "ai" as const, generatedBy: null, prompt: null, summary: null,
-      changeSummary: null, createdAt: "", updatedAt: "", nodes: [node], edges: [],
-    };
-    const d = detectPlanDrift({ node, nodeResult: result, plan, mainSessionSummary: null });
+    const plan = makePlan([node]);
+    const d = detectPlanDrift({ node, nodeResult: result, plan });
     expect(d.needsReplan).toBe(false);
   });
 
@@ -47,12 +56,8 @@ describe("detectPlanDrift", () => {
       reason: "Plan is outdated",
       evidence: {},
     };
-    const plan = {
-      id: "p1", taskId: "t1", status: "accepted" as const, revision: 1,
-      source: "ai" as const, generatedBy: null, prompt: null, summary: null,
-      changeSummary: null, createdAt: "", updatedAt: "", nodes: [node], edges: [],
-    };
-    const d = detectPlanDrift({ node, nodeResult: result, plan, mainSessionSummary: null });
+    const plan = makePlan([node]);
+    const d = detectPlanDrift({ node, nodeResult: result, plan });
     expect(d.needsReplan).toBe(true);
     if (d.needsReplan) {
       expect(d.risk).toBe("medium");
@@ -67,12 +72,8 @@ describe("detectPlanDrift", () => {
       error: "Execution error",
       evidence: {},
     };
-    const plan = {
-      id: "p1", taskId: "t1", status: "accepted" as const, revision: 1,
-      source: "ai" as const, generatedBy: null, prompt: null, summary: null,
-      changeSummary: null, createdAt: "", updatedAt: "", nodes: [node], edges: [],
-    };
-    const d = detectPlanDrift({ node, nodeResult: result, plan, mainSessionSummary: null });
+    const plan = makePlan([node]);
+    const d = detectPlanDrift({ node, nodeResult: result, plan });
     expect(d.needsReplan).toBe(true);
     if (d.needsReplan) {
       expect(d.risk).toBe("high");
@@ -86,12 +87,8 @@ describe("detectPlanDrift", () => {
       prompt: "What is your name?",
       reason: "Needs user input",
     };
-    const plan = {
-      id: "p1", taskId: "t1", status: "accepted" as const, revision: 1,
-      source: "ai" as const, generatedBy: null, prompt: null, summary: null,
-      changeSummary: null, createdAt: "", updatedAt: "", nodes: [node], edges: [],
-    };
-    const d = detectPlanDrift({ node, nodeResult: result, plan, mainSessionSummary: null });
+    const plan = makePlan([node]);
+    const d = detectPlanDrift({ node, nodeResult: result, plan });
     expect(d.needsReplan).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import type { TaskPlanEdge, TaskPlanNode } from "@chrona/contracts/ai";
+import type { CompiledEdge, CompiledNode } from "./ai-plan-runtime";
 
 export type TaskDispatchAction =
   | "run_node"
@@ -16,13 +16,13 @@ export interface TaskPlanPatch {
   changeSummary: string;
   sourceRunId?: string;
   sourceNodeId?: string;
-  nodesToAdd?: TaskPlanNode[];
+  nodesToAdd?: CompiledNode[];
   nodesToUpdate?: Array<{
     nodeId: string;
-    patch: Partial<TaskPlanNode>;
+    patch: Partial<CompiledNode>;
   }>;
   nodeIdsToRemove?: string[];
-  edgesToAdd?: TaskPlanEdge[];
+  edgesToAdd?: CompiledEdge[];
   edgeIdsToRemove?: string[];
 }
 

@@ -102,6 +102,7 @@ enum MemorySourceType {
   agent_inferred
   imported
   system_rule
+  plan_layer
 }
 
 enum MemoryStatus {

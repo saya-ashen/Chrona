@@ -3,7 +3,9 @@ import type {
   PlanRun,
   NodeRuntimeState,
   RuntimeCommand,
+  PlanOverlayLayer,
 } from "@chrona/contracts/ai";
+import { nodeStateToRuntimeLayer, nodeResultToResultLayer } from "./effective-graph";
 
 /**
  * Creates a new PlanRun from a CompiledPlan.
@@ -41,19 +43,42 @@ export function createPlanRun(compiledPlan: CompiledPlan): PlanRun {
   };
 }
 
+export type RuntimeCommandResult = {
+  ok: boolean;
+  run?: PlanRun;
+  layers?: PlanOverlayLayer[];
+  error?: string;
+};
+
 /**
  * Apply a RuntimeCommand to a PlanRun, returning the updated PlanRun.
  * Commands only modify PlanRun state, never the CompiledPlan or EditablePlan.
  *
- * Returns { ok: boolean, run?: PlanRun, error?: string }
+ * When `layerVersion` is provided, also produces PlanOverlayLayers
+ * reflecting the node state changes caused by the command.
+ *
+ * Returns RuntimeCommandResult.
  */
 export function applyRuntimeCommand(
   run: PlanRun,
   compiledPlan: CompiledPlan,
   command: RuntimeCommand,
-): { ok: boolean; run?: PlanRun; error?: string } {
+  layerVersion?: number,
+): RuntimeCommandResult {
   const now = new Date().toISOString();
   const newRun = structuredClone(run);
+
+  const layers: PlanOverlayLayer[] = [];
+
+  function recordRuntimeLayer(nodeId: string) {
+    if (layerVersion === undefined) return;
+    const nodeState = newRun.nodeStates[nodeId];
+    if (nodeState) {
+      layers.push(
+        nodeStateToRuntimeLayer(compiledPlan.editablePlanId, nodeId, nodeState, layerVersion),
+      );
+    }
+  }
 
   switch (command.type) {
     case "start_plan": {
@@ -105,13 +130,29 @@ export function applyRuntimeCommand(
       nodeState.attempts += 1;
       nodeState.completedAt = now;
 
+      recordRuntimeLayer(command.nodeId);
+
       // Check if downstream nodes can become ready
       unlockDownstreamNodes(newRun, compiledPlan, command.nodeId);
+
+      // Record downstream node state changes in additional runtime layers
+      if (layerVersion !== undefined) {
+        for (const nodeId of Object.keys(newRun.nodeStates)) {
+          if (nodeId === command.nodeId) continue;
+          const prev = run.nodeStates[nodeId];
+          const next = newRun.nodeStates[nodeId];
+          if (prev && next && prev.status !== next.status) {
+            layers.push(
+              nodeStateToRuntimeLayer(compiledPlan.editablePlanId, nodeId, next, layerVersion),
+            );
+          }
+        }
+      }
 
       // Check if plan is complete
       checkPlanCompletion(newRun, compiledPlan);
 
-      return { ok: true, run: newRun };
+      return { ok: true, run: newRun, ...(layers.length > 0 ? { layers } : {}) };
     }
 
     case "approve_checkpoint": {
@@ -129,6 +170,8 @@ export function applyRuntimeCommand(
       nodeState.attempts += 1;
       nodeState.completedAt = now;
 
+      recordRuntimeLayer(command.nodeId);
+
       // Record checkpoint response
       if (command.response !== undefined) {
         newRun.checkpointResponses.push({
@@ -142,9 +185,33 @@ export function applyRuntimeCommand(
 
       // Unlock downstream
       unlockDownstreamNodes(newRun, compiledPlan, command.nodeId);
+
+      // Record downstream node state changes
+      if (layerVersion !== undefined) {
+        for (const nodeId of Object.keys(newRun.nodeStates)) {
+          if (nodeId === command.nodeId) continue;
+          const prev = run.nodeStates[nodeId];
+          const next = newRun.nodeStates[nodeId];
+          if (prev && next && prev.status !== next.status) {
+            layers.push(
+              nodeStateToRuntimeLayer(compiledPlan.editablePlanId, nodeId, next, layerVersion),
+            );
+          }
+        }
+      }
+
+      // Record checkpoint response as a ResultLayer
+      if (layerVersion !== undefined && command.response !== undefined) {
+        layers.push(
+          nodeResultToResultLayer(compiledPlan.editablePlanId, command.nodeId, {
+            checkpointResponse: command.response,
+          }, layerVersion),
+        );
+      }
+
       checkPlanCompletion(newRun, compiledPlan);
 
-      return { ok: true, run: newRun };
+      return { ok: true, run: newRun, ...(layers.length > 0 ? { layers } : {}) };
     }
 
     case "reject_checkpoint": {
@@ -165,7 +232,9 @@ export function applyRuntimeCommand(
       nodeState.attempts += 1;
       newRun.status = "paused";
 
-      return { ok: true, run: newRun };
+      recordRuntimeLayer(command.nodeId);
+
+      return { ok: true, run: newRun, ...(layers.length > 0 ? { layers } : {}) };
     }
 
     case "retry_node": {
@@ -183,7 +252,9 @@ export function applyRuntimeCommand(
       nodeState.status = "ready";
       nodeState.lastError = undefined;
 
-      return { ok: true, run: newRun };
+      recordRuntimeLayer(command.nodeId);
+
+      return { ok: true, run: newRun, ...(layers.length > 0 ? { layers } : {}) };
     }
 
     default:
