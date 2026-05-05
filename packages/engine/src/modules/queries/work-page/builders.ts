@@ -1,6 +1,6 @@
 import { SYNC_STALE_MS } from "@/modules/runtime-sync/freshness";
-import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
-import type { EvidenceItem, TaskPlanProjection, TaskPlanProjectionStep, WorkPageCopy } from "./types";
+import type { SavedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import type { EvidenceItem, TaskPlanProjection, TaskPlanProjectionStep, TaskPlanStepStatus, WorkPageCopy } from "./types";
 import { makeEvidence, toIsoString } from "./helpers";
 
 export function buildScheduleImpact(task: {
@@ -56,7 +56,7 @@ export function readBlockReason(
   );
 }
 
-function deriveTaskPlanStepStatus(
+function _deriveTaskPlanStepStatus(
   stepId: string,
   currentRun: { status: string } | null,
   closure: { isDone: boolean },
@@ -138,45 +138,48 @@ function deriveTaskPlanStepStatus(
 export function buildTaskPlanFromGraph({
   savedPlan,
 }: {
-  savedPlan: Awaited<ReturnType<typeof getAcceptedTaskPlanGraph>> | Awaited<ReturnType<typeof getLatestTaskPlanGraph>>;
+  savedPlan: SavedCompiledPlan | null;
 }): TaskPlanProjection | null {
   if (!savedPlan) {
     return null;
   }
 
-  const steps: TaskPlanProjectionStep[] = savedPlan.plan.nodes.map((node) => ({
-    id: node.id,
-    title: node.title,
-    objective: node.objective,
-    phase: node.phase ?? node.type,
-    status: node.status === "skipped" ? "done" : node.status,
-    requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
-    type: node.type,
-    linkedTaskId: node.linkedTaskId,
-    executionMode: node.executionMode,
-    estimatedMinutes: node.estimatedMinutes,
-    priority: node.priority,
-    completionSummary: node.completionSummary,
-  }));
+  const steps: TaskPlanProjectionStep[] = savedPlan.compiledPlan.nodes.map((node) => {
+    const config = node.config as Record<string, unknown> | undefined;
+    return {
+      id: node.id,
+      title: node.title,
+      objective: (config?.objective as string) ?? (config?.expectedOutput as string) ?? "",
+      phase: node.type,
+      status: "pending" as TaskPlanStepStatus,
+      requiresHumanInput: false,
+      type: node.type,
+      linkedTaskId: node.linkedTaskId,
+      executionMode: (node.mode as string) ?? undefined,
+      estimatedMinutes: node.estimatedMinutes,
+      priority: node.priority,
+      completionSummary: undefined,
+    };
+  });
 
   const currentStepId =
     steps.find((step) => ["in_progress", "waiting_for_user", "blocked"].includes(step.status))?.id ?? null;
 
   return {
     state: "ready",
-    revision: `r${savedPlan.revision}`,
+    revision: `r${savedPlan.compiledPlan.sourceVersion}`,
     generatedBy: savedPlan.generatedBy,
     isMock: false,
     summary: savedPlan.summary,
     updatedAt: savedPlan.updatedAt,
-    changeSummary: savedPlan.changeSummary,
+    changeSummary: null,
     currentStepId,
     steps,
-    edges: savedPlan.plan.edges.map((edge) => ({
+    edges: savedPlan.compiledPlan.edges.map((edge) => ({
       id: edge.id,
-      fromNodeId: edge.fromNodeId,
-      toNodeId: edge.toNodeId,
-      type: edge.type,
+      fromNodeId: edge.from,
+      toNodeId: edge.to,
+      type: edge.label ?? "sequential",
     })),
   };
 }

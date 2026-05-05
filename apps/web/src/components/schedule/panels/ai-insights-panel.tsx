@@ -2,12 +2,13 @@
 
 import { Sparkles } from "lucide-react";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduledItem, LegacyPlanGraph } from "@/components/schedule/schedule-page-types";
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
 import { SurfaceCard } from "@/components/ui/surface-card";
 
 function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
-  if (!planResult?.planGraph?.nodes) {
+  const graph = planResult?.planGraph as LegacyPlanGraph | undefined;
+  if (!graph?.nodes) {
     return [] as Array<{
       id: string;
       title: string;
@@ -16,7 +17,7 @@ function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
     }>;
   }
 
-  return planResult.planGraph.nodes.map((node) => ({
+  return graph.nodes.map((node) => ({
     id: node.id,
     title: node.title,
     status: node.status,

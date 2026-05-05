@@ -3,7 +3,7 @@ import type {
 } from "./orchestrator";
 import { advancePlanExecution } from "./orchestrator";
 import { getAcceptedCompiledPlan } from "./compiled-plan-store";
-import { appendLayer, getLayers, getPlanRun } from "./plan-run-store";
+import { appendLayer, getLayers } from "./plan-run-store";
 import { appendMainSessionEvent, ensurePlanMainSession } from "./plan-state-store";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
@@ -31,7 +31,9 @@ export async function settlePlanNodeFromRun(input: {
     };
   }
 
-  const { compiledPlan, planId, workspaceId } = savedCompiled;
+  const compiledPlan = savedCompiled.compiledPlan;
+  const planId = savedCompiled.compiledPlan.editablePlanId;
+  const workspaceId = savedCompiled.workspaceId;
   let layers = await getLayers(input.taskId, planId);
 
   const mainSession = await ensurePlanMainSession({

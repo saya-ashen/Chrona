@@ -2,7 +2,7 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
-import type { OpenClawAdapter } from "@chrona/openclaw";
+import type { RuntimeAdapter } from "@chrona/providers-core";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import { resolveTaskSessionKey } from "@/modules/task-execution/task-sessions";
 import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
@@ -68,7 +68,7 @@ export async function sendOperatorMessage(input: {
     dedupeKey: `operator.note_added:${run.id}:${Date.now()}`,
   });
 
-  await syncRunFromRuntime({ runId: run.id, adapter: adapter as OpenClawAdapter });
+  await syncRunFromRuntime({ runId: run.id, adapter: adapter as RuntimeAdapter });
 
   return {
     taskId: run.taskId,

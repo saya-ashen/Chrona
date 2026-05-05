@@ -2,8 +2,8 @@ import { ApprovalStatus, Prisma, RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
   createRuntimeAdapter,
-  type OpenClawAdapter,
-} from "@chrona/openclaw";
+  type RuntimeAdapter,
+} from "@chrona/providers-core";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
@@ -11,7 +11,7 @@ import {
   progressAcceptedTaskPlan,
   syncParentTaskStateFromAcceptedPlan,
 } from "@/modules/commands/progress-accepted-task-plan";
-import { syncAcceptedTaskPlanForTask } from "@/modules/tasks/sync-task-plan-graph";
+import { syncAcceptedTaskPlanForTask } from "@/modules/plan-execution/sync-accepted-plan";
 import {
   decodeSyncCursor,
   encodeSyncCursor,
@@ -59,9 +59,9 @@ function toRunStatus(status: string): RunStatus {
 
 export async function syncRunFromRuntime(input: {
   runId: string;
-  adapter?: OpenClawAdapter;
+  adapter?: RuntimeAdapter;
 }) {
-  const adapter = input.adapter ?? (await createRuntimeAdapter());
+  const adapter: RuntimeAdapter = input.adapter ?? (await createRuntimeAdapter());
   const cursorRecord = await db.runtimeCursor.findUnique({
     where: { runId: input.runId },
   });
@@ -288,8 +288,6 @@ export async function syncRunFromRuntime(input: {
   if (run.task.parentTaskId) {
     await syncAcceptedTaskPlanForTask({
       taskId: run.task.parentTaskId,
-      linkedTaskId: run.taskId,
-      taskStatus: snapshot.status,
     });
     if (snapshot.status === "Completed") {
       await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });

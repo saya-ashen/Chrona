@@ -3,6 +3,7 @@ import {
   ensureDefaultTaskSession,
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
+import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
 
 export type EnsureNodeChildSessionInput = {
   taskId: string;
@@ -48,7 +49,7 @@ function buildNodeChildSessionKey(input: {
 export async function ensureNodeChildSession(
   input: EnsureNodeChildSessionInput,
 ): Promise<EnsureNodeChildSessionResult> {
-  const runtimeName = input.runtimeName ?? "openclaw";
+  const runtimeName = input.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
@@ -97,7 +98,7 @@ export async function ensureNodeChildSession(
 export async function startNodeChildRun(
   input: StartNodeChildRunInput,
 ): Promise<StartNodeChildRunResult> {
-  const runtimeName = input.runtimeName ?? "openclaw";
+  const runtimeName = input.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
 
   const { RunStatus } = await import("@/generated/prisma/client");
 

@@ -1,7 +1,59 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { CompiledPlan } from "@chrona/contracts/ai";
+export interface LegacyPlanGraphNode {
+  id: string;
+  type: string;
+  title: string;
+  objective: string;
+  description: string | null;
+  status: string;
+  phase: string | null;
+  estimatedMinutes: number | null;
+  priority: string | null;
+  executionMode: string;
+  linkedTaskId: string | null;
+  requiresHumanInput: boolean;
+  requiresHumanApproval: boolean;
+  autoRunnable: boolean;
+  blockingReason: string | null;
+  completionSummary?: string | null;
+  metadata: unknown;
+}
+
+export interface LegacyPlanGraphEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  type: string;
+  metadata?: unknown;
+}
+
+export interface LegacyPlanGraph {
+  id: string;
+  taskId: string;
+  status: string;
+  revision: number;
+  source: string;
+  generatedBy: string | null;
+  prompt: string | null;
+  summary: string | null;
+  changeSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+  nodes: LegacyPlanGraphNode[];
+  edges: LegacyPlanGraphEdge[];
+}
+
+export interface LegacySavedPlan {
+  id: string;
+  status: string;
+  prompt: string | null;
+  revision?: number;
+  summary?: string | null;
+  updatedAt: string;
+}
 
 type SchedulePageSummary = {
   scheduledCount: number;
@@ -67,7 +119,7 @@ type ScheduleTaskPlanSnapshot = {
   revision?: number;
   summary?: string | null;
   updatedAt: string;
-  plan?: TaskPlanGraph;
+  plan?: CompiledPlan;
 };
 
 export type ScheduleAiPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";

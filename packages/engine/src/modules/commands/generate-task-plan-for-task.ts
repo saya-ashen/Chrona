@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
 import { createLogger, summarizeText } from "@/lib/logger";
 import { aiGeneratePlan } from "@/modules/ai/ai-service";
-import type { PlanOverlayLayer, RuntimeLayer } from "@chrona/contracts/ai";
-import { saveCompiledPlan, getLatestCompiledPlan, getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { savePlanRun, appendLayer, getLayers } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-run-bridge";
+import type { PlanOverlayLayer } from "@chrona/contracts/ai";
+import { saveCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { savePlanRun, getLayers } from "@/modules/plan-execution/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 
 const logger = createLogger("command.generate-task-plan-for-task");
@@ -43,7 +43,9 @@ export async function generateTaskPlanForTask(input: {
     await ensureDefaultTaskSession({
       taskId: task.id,
       taskTitle: task.title,
-      runtimeName: task.runtimeAdapterKey ?? "openclaw",
+      runtimeName: resolveRuntimeAdapterKey({
+        runtimeAdapterKey: task.runtimeAdapterKey,
+      }),
       defaultSessionId: task.defaultSessionId,
     })
   ).sessionKey;

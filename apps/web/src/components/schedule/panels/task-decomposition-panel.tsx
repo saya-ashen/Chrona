@@ -15,7 +15,8 @@ import {
   Square,
 } from "lucide-react";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
-import type { TaskPlanGraph as TaskPlanGraphData, TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { TaskPlanGraphResponse, CompiledPlan } from "@chrona/contracts/ai";
+import type { LegacyPlanGraph, LegacyPlanGraphNode, LegacyPlanGraphEdge, LegacySavedPlan } from "@/components/schedule/schedule-page-types";
 import { normalizePlanNodeTypeForDisplay } from "./selected-block-sheet/plan-utils";
 import { useSmartDecomposition } from "@/hooks/use-ai";
 
@@ -39,7 +40,7 @@ interface TaskDecompositionPanelProps {
     revision?: number;
     summary?: string | null;
     updatedAt: string;
-    plan?: TaskPlanGraphData;
+    plan?: CompiledPlan;
   } | null;
   generationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
   onApply?: (result: TaskPlanGraphResponse) => Promise<void> | void;
@@ -50,7 +51,7 @@ interface TaskDecompositionPanelProps {
     revision?: number;
     summary?: string | null;
     updatedAt: string;
-    plan?: TaskPlanGraphData;
+    plan?: CompiledPlan;
   } | null) => void;
   activeAcceptedPlanId?: string | null;
   hasUnsavedConfigChanges?: boolean;
@@ -58,7 +59,7 @@ interface TaskDecompositionPanelProps {
   onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
 }
 
-function summarizePlanGraph(graph: TaskPlanGraphData | null) {
+function summarizePlanGraph(graph: LegacyPlanGraph | null) {
   if (!graph) {
     return {
       totalEstimatedMinutes: 0,
@@ -67,10 +68,14 @@ function summarizePlanGraph(graph: TaskPlanGraphData | null) {
     };
   }
 
-  const totalEstimatedMinutes = graph.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0);
-  const firstWarnings = graph.nodes.find((node) => Array.isArray(node.metadata?.warnings))?.metadata?.warnings;
+  const totalEstimatedMinutes = graph.nodes.reduce((sum: number, node: LegacyPlanGraphNode) => sum + (node.estimatedMinutes ?? 0), 0);
+  const metaWarnings = graph.nodes.find((node: LegacyPlanGraphNode) => {
+    const meta = node.metadata as Record<string, unknown> | null;
+    return Array.isArray(meta?.warnings);
+  })?.metadata as { warnings?: unknown } | null;
+  const firstWarnings = metaWarnings?.warnings;
   const warnings = Array.isArray(firstWarnings)
-    ? firstWarnings.filter((warning): warning is string => typeof warning === "string")
+    ? firstWarnings.filter((warning: unknown): warning is string => typeof warning === "string")
     : [];
 
   return {
@@ -164,17 +169,19 @@ export function TaskDecompositionPanel({
       return null;
     }
 
+    const sp = result.savedPlan as LegacySavedPlan;
     return {
-      ...result.savedPlan,
-      plan: result.planGraph,
+      ...sp,
+      plan: result.planGraph as CompiledPlan | undefined,
     };
   }, [result]);
   const savedPlanMeta = hookSavedPlanMeta ?? savedPlan;
-  const displayPlanGraph = result?.planGraph ?? savedPlanMeta?.plan ?? null;
+  const displayPlanGraph = (result?.planGraph as LegacyPlanGraph | undefined) ?? (savedPlanMeta?.plan as LegacyPlanGraph | undefined) ?? null;
   const displayResult = result ?? (savedPlanMeta?.plan
     ? {
+        plan: { title: "", goal: "", nodes: [], edges: [] },
         source: "saved",
-        planGraph: savedPlanMeta.plan,
+        planGraph: savedPlanMeta.plan as unknown,
         savedPlan: {
           id: savedPlanMeta.id,
           status: savedPlanMeta.status,
@@ -182,7 +189,7 @@ export function TaskDecompositionPanel({
           revision: savedPlanMeta.revision ?? 0,
           summary: savedPlanMeta.summary ?? null,
           updatedAt: savedPlanMeta.updatedAt,
-        },
+        } as unknown,
       }
     : null);
 
@@ -201,13 +208,13 @@ export function TaskDecompositionPanel({
       updatedAt: graph.updatedAt,
       changeSummary: graph.changeSummary,
       currentStepId:
-        graph.nodes.find((node) => ["in_progress", "waiting_for_user", "blocked"].includes(node.status))?.id ?? null,
-      steps: graph.nodes.map((node) => ({
+        graph.nodes.find((node: LegacyPlanGraphNode) => ["in_progress", "waiting_for_user", "blocked"].includes(node.status))?.id ?? null,
+      steps: graph.nodes.map((node: LegacyPlanGraphNode) => ({
         id: node.id,
         title: node.title,
         objective: node.objective,
         phase: node.phase ?? node.type,
-        status: node.status === "skipped" ? "done" : node.status,
+        status: (node.status === "skipped" ? "done" : node.status) as "pending" | "in_progress" | "waiting_for_user" | "waiting_for_child" | "waiting_for_approval" | "done" | "blocked" | "skipped",
         requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
         requiresHumanApproval: node.requiresHumanApproval ?? false,
         type: node.type,
@@ -218,7 +225,7 @@ export function TaskDecompositionPanel({
         priority: node.priority,
         metadata: node.metadata as Record<string, unknown> | null,
       })),
-      edges: graph.edges.map((edge) => ({
+      edges: graph.edges.map((edge: LegacyPlanGraphEdge) => ({
         id: edge.id,
         fromNodeId: edge.fromNodeId,
         toNodeId: edge.toNodeId,
@@ -309,7 +316,8 @@ export function TaskDecompositionPanel({
       return;
     }
 
-    onPlanLoaded?.(hookSavedPlanMeta);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onPlanLoaded?.(hookSavedPlanMeta as any);
   }, [onPlanLoaded, hookSavedPlanMeta]);
 
   const isGenerationRunning = isLoading || generationStatus === "generating";

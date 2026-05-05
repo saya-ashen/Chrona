@@ -1,9 +1,9 @@
 import {
+  DEFAULT_RUNTIME_ADAPTER_KEY,
   getOpenClawTaskConfigSpec,
   OPENCLAW_RUNTIME_INPUT_VERSION,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
   validateOpenClawTaskConfig,
-} from "@chrona/openclaw";
+} from "@chrona/providers-core";
 import {
   getResearchTaskConfigSpec,
   RESEARCH_RUNTIME_ADAPTER_KEY,
@@ -18,9 +18,9 @@ import type {
 
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
   [
-    OPENCLAW_RUNTIME_ADAPTER_KEY,
+    DEFAULT_RUNTIME_ADAPTER_KEY,
     {
-      key: OPENCLAW_RUNTIME_ADAPTER_KEY,
+      key: DEFAULT_RUNTIME_ADAPTER_KEY,
       inputVersion: OPENCLAW_RUNTIME_INPUT_VERSION,
       getTaskConfigSpec: getOpenClawTaskConfigSpec,
       validateTaskConfig: validateOpenClawTaskConfig,
@@ -66,7 +66,7 @@ export function resolveRuntimeAdapterKey(input: {
   return (
     input.runtimeAdapterKey?.trim() ||
     input.workspaceDefaultRuntime?.trim() ||
-    OPENCLAW_RUNTIME_ADAPTER_KEY
+    DEFAULT_RUNTIME_ADAPTER_KEY
   );
 }
 

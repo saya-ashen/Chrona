@@ -37,11 +37,10 @@ import {
   suggestStream,
   generatePlanStream,
 } from "@/modules/ai/streaming";
-import type { CompiledPlan, RuntimeLayer } from "@chrona/contracts/ai";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-run-bridge";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution

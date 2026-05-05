@@ -147,34 +147,34 @@ function computeTaskDiff(taskPatch: NonNullable<TaskWorkspaceUpdateProposal["tas
 function computePlanSummary(planPatch: NonNullable<TaskWorkspaceUpdateProposal["planPatch"]>) {
   const points: string[] = [];
 
-  if (planPatch.summary) {
-    points.push(`Summary: ${planPatch.summary}`);
+  if (planPatch.rationale) {
+    points.push(`Rationale: ${planPatch.rationale}`);
   }
 
-  if (planPatch.operation === "replace_plan") {
-    const count = planPatch.nodes?.length ?? 0;
-    points.push(`Replace entire plan with ${count} new node${count !== 1 ? "s" : ""}`);
-    if (planPatch.edges?.length) {
-      points.push(`${planPatch.edges.length} new edge${planPatch.edges.length !== 1 ? "s" : ""}`);
+  for (const op of planPatch.operations) {
+    switch (op.op) {
+      case "update_plan":
+        points.push("Update plan fields");
+        break;
+      case "add_node":
+        points.push(`Add node: ${op.node.title}`);
+        break;
+      case "update_node":
+        points.push(`Update node ${op.nodeId}`);
+        break;
+      case "delete_node":
+        points.push(`Delete node: ${op.nodeId}`);
+        break;
+      case "add_edge":
+        points.push(`Add edge ${op.edge.from} -> ${op.edge.to}`);
+        break;
+      case "delete_edge":
+        points.push(`Delete edge ${op.from} -> ${op.to}`);
+        break;
+      case "replace_subgraph":
+        points.push(`Replace subgraph (+${op.addNodes.length} nodes)`);
+        break;
     }
-  } else if (planPatch.operation === "add_node") {
-    const names = planPatch.nodes?.map((n) => n.title).join(", ") ?? "";
-    points.push(`Add node${(planPatch.nodes?.length ?? 0) > 1 ? "s" : ""}: ${names}`);
-  } else if (planPatch.operation === "delete_node") {
-    const ids = planPatch.deletedNodeIds?.join(", ") ?? "";
-    points.push(`Delete node${(planPatch.deletedNodeIds?.length ?? 0) > 1 ? "s" : ""}: ${ids}`);
-  } else if (planPatch.operation === "update_node") {
-    const count = planPatch.nodePatches?.length ?? 0;
-    points.push(`Update ${count} node${count !== 1 ? "s" : ""}`);
-  } else if (planPatch.operation === "reorder_nodes") {
-    const count = planPatch.reorder?.length ?? 0;
-    points.push(`Reorder ${count} node${count !== 1 ? "s" : ""}`);
-  } else if (planPatch.operation === "update_dependencies") {
-    points.push("Update dependencies between nodes");
-  } else if (planPatch.operation === "materialize_child_tasks") {
-    points.push("Materialize plan nodes into child tasks");
-  } else if (planPatch.operation === "update_plan_summary") {
-    points.push("Update plan summary");
   }
   return points;
 }
@@ -196,9 +196,10 @@ function isHighRisk(
   }
 
   if (pp) {
-    if (pp.operation === "replace_plan") risks.push("Replacing the entire plan");
-    if (pp.operation === "delete_node") risks.push("Deleting plan node(s)");
-    if (pp.operation === "materialize_child_tasks") risks.push("Materializing into child tasks");
+    const hasReplace = pp.operations.some((op) => op.op === "replace_subgraph");
+    const hasDelete = pp.operations.some((op) => op.op === "delete_node");
+    if (hasReplace) risks.push("Replacing subgraph");
+    if (hasDelete) risks.push("Deleting plan node(s)");
   }
 
   return risks;
@@ -282,33 +283,45 @@ export function TaskWorkspaceDiffPreview({
             Plan Changes
           </p>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-4 space-y-2">
-            <StatusBadge tone="info">{proposal.planPatch?.operation ?? "custom"}</StatusBadge>
+            <StatusBadge tone="info">plan patch</StatusBadge>
             <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
               {planSummary.map((point, i) => (
                 <li key={i}>{point}</li>
               ))}
             </ul>
 
-            {proposal.planPatch?.nodes && proposal.planPatch.nodes.length > 0 ? (
-              <div className="mt-2 space-y-1">
-                <p className="text-xs font-medium text-foreground">Nodes:</p>
-                {proposal.planPatch.nodes.map((node, i) => (
-                  <div key={i} className="rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-xs">
-                    <span className="font-medium text-foreground">{node.title}</span>
-                    {node.estimatedDurationMinutes ? (
-                      <span className="ml-2 text-muted-foreground">({node.estimatedDurationMinutes}m)</span>
-                    ) : null}
+            {(() => {
+              const addNodes = proposal.planPatch?.operations.filter((op) => op.op === "add_node") ?? [];
+              if (addNodes.length > 0) {
+                return (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-foreground">Nodes:</p>
+                    {addNodes.map((op, i) => (
+                      <div key={i} className="rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-xs">
+                        <span className="font-medium text-foreground">{op.node.title}</span>
+                        {"estimatedMinutes" in op.node && op.node.estimatedMinutes ? (
+                          <span className="ml-2 text-muted-foreground">({op.node.estimatedMinutes}m)</span>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : null}
+                );
+              }
+              return null;
+            })()}
 
-            {proposal.planPatch?.deletedNodeIds && proposal.planPatch.deletedNodeIds.length > 0 ? (
-              <div className="mt-2 text-xs text-red-600">
-                <span className="font-medium">To delete: </span>
-                {proposal.planPatch.deletedNodeIds.join(", ")}
-              </div>
-            ) : null}
+            {(() => {
+              const deleteNodes = proposal.planPatch?.operations.filter((op) => op.op === "delete_node") ?? [];
+              if (deleteNodes.length > 0) {
+                return (
+                  <div className="mt-2 text-xs text-red-600">
+                    <span className="font-medium">To delete: </span>
+                    {deleteNodes.map((op) => op.nodeId).join(", ")}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       ) : null}

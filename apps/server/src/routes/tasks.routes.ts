@@ -5,15 +5,12 @@ import {
   createTask,
   deleteTask,
   ensureTaskInWorkspace,
-  getAcceptedCompiledPlan,
-  getLatestCompiledPlan,
-  getLayers,
+  getLatestSavedAiPlanSnapshot,
   getTaskPage,
   isTaskPlanGenerationRunning,
   listTasksByWorkspace,
   updateTask,
 } from "@chrona/engine";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
 
 import {
   VALID_TASK_STATUSES,
@@ -196,11 +193,12 @@ export function createTasksRoutes() {
   api.get("/tasks/:taskId/plan-state", async (c) => {
     try {
       const taskId = c.req.param("taskId");
-      const plan = await getAcceptedCompiledPlan(taskId);
-      const layers = plan ? await getLayers(taskId, plan.planId) : [];
-      const effective = plan ? resolveEffectivePlanGraph(plan.compiledPlan, layers) : null;
-      const planStatus = plan?.compiledPlan?.editablePlanId ? "accepted" : 
-        (await getLatestCompiledPlan(taskId)) ? "waiting_acceptance" : "no_plan";
+      const savedAiPlan = await getLatestSavedAiPlanSnapshot(taskId);
+      const planStatus = savedAiPlan?.status === "accepted"
+        ? "accepted"
+        : savedAiPlan
+          ? "waiting_acceptance"
+          : "no_plan";
       const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
         ? "generating"
         : planStatus === "accepted"
@@ -211,21 +209,7 @@ export function createTasksRoutes() {
       return json(c, {
         taskId,
         aiPlanGenerationStatus,
-        plan: effective
-          ? {
-              id: plan?.planId,
-              status: planStatus,
-              nodes: effective.nodes.map((n) => ({
-                id: n.id,
-                localId: n.localId,
-                title: n.title,
-                type: n.type,
-                status: n.status,
-                ready: n.ready,
-                blockedReason: n.blockedReason,
-              })),
-            }
-          : null,
+        savedAiPlan,
       });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to get task plan state";

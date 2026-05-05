@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Bot, Check, Clock, Loader2, Network, Sparkles } from "lucide-react";
+import { Bot, Check, Clock, Loader2, Network } from "lucide-react";
 import {
   SurfaceCard,
   SurfaceCardDescription,
@@ -11,6 +11,8 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskPlanGraph } from "@/components/work/task-plan-graph";
 
+import type { CompiledPlan, CompiledNode, CompiledEdge } from "@chrona/contracts/ai";
+
 type PlanData = {
   id: string;
   status: "draft" | "accepted" | "superseded" | "archived";
@@ -18,42 +20,7 @@ type PlanData = {
   revision?: number;
   summary?: string | null;
   updatedAt: string;
-  plan?: {
-    id: string;
-    taskId: string;
-    status: "draft" | "accepted" | "superseded" | "archived";
-    revision: number;
-    source: "ai" | "user" | "mixed";
-    generatedBy: string | null;
-    prompt: string | null;
-    summary: string | null;
-    changeSummary: string | null;
-    createdAt: string;
-    updatedAt: string;
-    nodes: Array<{
-      id: string;
-      type: string;
-      title: string;
-      objective: string;
-      description: string | null;
-      status: "pending" | "in_progress" | "waiting_for_user" | "waiting_for_child" | "waiting_for_approval" | "blocked" | "done" | "skipped";
-      phase: string | null;
-      estimatedMinutes: number | null;
-      priority: string | null;
-      executionMode: "automatic" | "manual" | "hybrid";
-      linkedTaskId: string | null;
-      requiresHumanInput: boolean;
-      requiresHumanApproval: boolean;
-      autoRunnable: boolean;
-      blockingReason: string | null;
-    }>;
-    edges: Array<{
-      id: string;
-      fromNodeId: string;
-      toNodeId: string;
-      type: string;
-    }>;
-  };
+  plan?: CompiledPlan;
 } | null;
 
 type Props = {
@@ -79,23 +46,18 @@ function planStatusTone(status: string) {
 function toGraphPlan(plan: NonNullable<PlanData>["plan"]) {
   if (!plan?.nodes?.length) return null;
 
-  const steps = plan.nodes.map((node) => ({
+  const steps = plan.nodes.map((node: CompiledNode) => ({
     id: node.id,
     title: node.title,
-    objective: node.objective,
-    phase: node.phase ?? node.type,
-    status: (node.status === "skipped" ? "done" : node.status) as
-      | "pending"
-      | "in_progress"
-      | "waiting_for_user"
-      | "done"
-      | "blocked",
-    requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
+    objective: node.description ?? "",
+    phase: node.type,
+    status: "pending" as "pending" | "in_progress" | "waiting_for_user" | "done" | "blocked",
+    requiresHumanInput: node.mode === "manual",
     type: node.type,
     linkedTaskId: node.linkedTaskId,
-    executionMode: node.executionMode,
-    estimatedMinutes: node.estimatedMinutes,
-    priority: node.priority,
+    executionMode: node.mode ?? null,
+    estimatedMinutes: node.estimatedMinutes ?? null,
+    priority: node.priority ?? null,
   }));
 
   const currentStepId =
@@ -105,11 +67,11 @@ function toGraphPlan(plan: NonNullable<PlanData>["plan"]) {
     state: "ready" as const,
     currentStepId,
     steps,
-    edges: plan.edges.map((edge) => ({
+    edges: plan.edges.map((edge: CompiledEdge) => ({
       id: edge.id,
-      fromNodeId: edge.fromNodeId,
-      toNodeId: edge.toNodeId,
-      type: edge.type,
+      fromNodeId: edge.from,
+      toNodeId: edge.to,
+      type: "sequential",
     })),
   };
 }
@@ -151,8 +113,7 @@ function NoPlanCard({ status }: { status?: string }) {
 }
 
 function PlanMetaCard({ plan }: { plan: NonNullable<PlanData> }) {
-  const totalEst = plan.plan?.nodes.reduce((sum, n) => sum + (n.estimatedMinutes ?? 0), 0) ?? 0;
-  const doneNodes = plan.plan?.nodes.filter((n) => n.status === "done" || n.status === "skipped").length ?? 0;
+  const totalEst = plan.plan?.nodes.reduce((sum: number, n: CompiledNode) => sum + (n.estimatedMinutes ?? 0), 0) ?? 0;
   const totalNodes = plan.plan?.nodes.length ?? 0;
 
   return (
@@ -165,14 +126,14 @@ function PlanMetaCard({ plan }: { plan: NonNullable<PlanData> }) {
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Revision</p>
-        <p className="mt-2 text-xl font-semibold">r{plan.revision ?? plan.plan?.revision ?? "-"}</p>
+        <p className="mt-2 text-xl font-semibold">r{plan.revision ?? plan.plan?.sourceVersion ?? "-"}</p>
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Progress</p>
         <p className="mt-2 text-xl font-semibold">
-          {doneNodes}/{totalNodes}
+          {totalNodes}
         </p>
-        <p className="text-xs text-muted-foreground">nodes complete</p>
+        <p className="text-xs text-muted-foreground">nodes</p>
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Estimate</p>
@@ -221,24 +182,18 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
         <SurfaceCardTitle>{copy.planPanelTitle ?? "Plan"}</SurfaceCardTitle>
         <SurfaceCardDescription>
           {copy.planPanelDescription ?? "Task execution plan with nodes, dependencies, and status."}
-          {plan.plan?.summary ? (
+          {plan.plan?.goal ? (
             <>
               {" — "}
-              <span className="font-medium text-foreground">{plan.plan.summary}</span>
+              <span className="font-medium text-foreground">{plan.plan.goal}</span>
             </>
           ) : null}
         </SurfaceCardDescription>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {plan.plan?.generatedBy ? (
+          {plan.plan?.title ? (
             <span className="inline-flex items-center gap-1">
               <Bot className="size-3" />
-              Generated by {plan.plan.generatedBy}
-            </span>
-          ) : null}
-          {plan.plan?.source ? (
-            <span className="inline-flex items-center gap-1">
-              <Sparkles className="size-3" />
-              Source: {plan.plan.source}
+              {plan.plan.title}
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1">
@@ -268,13 +223,6 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
           {acceptError ? (
             <p className="text-xs text-red-600">{acceptError}</p>
           ) : null}
-        </div>
-      ) : null}
-
-      {plan.plan?.changeSummary ? (
-        <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Latest change: </span>
-          {plan.plan.changeSummary}
         </div>
       ) : null}
 

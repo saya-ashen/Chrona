@@ -4,11 +4,12 @@ import {
   getAcceptedCompiledPlan,
   getLatestCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
-import { getLayers, appendLayer } from "@/modules/plan-execution/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import { appendLayer, getLayers, getPlanRun, savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getRuntimeAdapterDefinition, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import type {
   RuntimeLayer,
-  EffectivePlanGraph,
   EffectivePlanNode,
   TaskConfig,
 } from "@chrona/contracts/ai";
@@ -82,9 +83,17 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     select: {
       id: true,
       workspaceId: true,
+      runtimeAdapterKey: true,
+      runtimeInputVersion: true,
+      runtimeModel: true,
       scheduledStartAt: true,
       scheduledEndAt: true,
       dueAt: true,
+      workspace: {
+        select: {
+          defaultRuntime: true,
+        },
+      },
     },
   });
 
@@ -95,6 +104,12 @@ export async function materializeTaskPlan(input: { taskId: string }) {
 
   const createdTaskIds: string[] = [];
   const materializedNodeIds = new Set<string>();
+  const resolvedLinkedTaskIds = new Map<string, string>();
+  const runtimeAdapterKey = resolveRuntimeAdapterKey({
+    runtimeAdapterKey: parentTask.runtimeAdapterKey,
+    workspaceDefaultRuntime: parentTask.workspace.defaultRuntime,
+  });
+  const runtimeDefinition = getRuntimeAdapterDefinition(runtimeAdapterKey);
 
   for (const node of effective.nodes) {
     if (!isMaterializableNode(node)) {
@@ -118,13 +133,13 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           dueAt: parentTask.dueAt,
           scheduledStartAt: parentTask.scheduledStartAt,
           scheduledEndAt: parentTask.scheduledEndAt,
-          runtimeAdapterKey: "openclaw",
+          runtimeAdapterKey,
           runtimeInput: {
             model: "gpt-5.4",
             prompt: objective,
           },
-          runtimeInputVersion: "openclaw-legacy-v1",
-          runtimeModel: "gpt-5.4",
+          runtimeInputVersion: parentTask.runtimeInputVersion ?? runtimeDefinition.inputVersion,
+          runtimeModel: parentTask.runtimeModel ?? "gpt-5.4",
           prompt: objective,
           runtimeConfig: {
             sessionStrategy:
@@ -166,13 +181,17 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     }
 
     materializedNodeIds.add(node.id);
+    if (linkedTaskId) {
+      resolvedLinkedTaskIds.set(node.id, linkedTaskId);
+    }
   }
 
   // Create task dependencies from edges between materialized nodes
   const nodeTaskMap = new Map<string, string>();
   for (const node of effective.nodes) {
-    if (materializedNodeIds.has(node.id) && node.linkedTaskId) {
-      nodeTaskMap.set(node.id, node.linkedTaskId);
+    const linkedTaskId = resolvedLinkedTaskIds.get(node.id) ?? node.linkedTaskId;
+    if (materializedNodeIds.has(node.id) && linkedTaskId) {
+      nodeTaskMap.set(node.id, linkedTaskId);
     }
   }
 
@@ -203,9 +222,10 @@ export async function materializeTaskPlan(input: { taskId: string }) {
   // Append a RuntimeLayer with linkedTaskId for materialized nodes
   const nodeStates: Record<string, { linkedTaskId: string }> = {};
   for (const node of effective.nodes) {
-    if (materializedNodeIds.has(node.id) && node.linkedTaskId) {
+    const linkedTaskId = resolvedLinkedTaskIds.get(node.id) ?? node.linkedTaskId;
+    if (materializedNodeIds.has(node.id) && linkedTaskId) {
       nodeStates[node.id] = {
-        linkedTaskId: node.linkedTaskId,
+        linkedTaskId,
       };
     }
   }
@@ -222,12 +242,25 @@ export async function materializeTaskPlan(input: { taskId: string }) {
       nodeStates: nodeStates as unknown as RuntimeLayer["nodeStates"],
     };
 
-    await appendLayer({
-      workspaceId: parentTask.workspaceId,
-      taskId: input.taskId,
-      planId,
-      layer,
-    });
+    const existingRun = await getPlanRun(input.taskId, planId);
+
+    if (existingRun) {
+      await appendLayer({
+        workspaceId: parentTask.workspaceId,
+        taskId: input.taskId,
+        planId,
+        layer,
+      });
+    } else {
+      const persistedLayers = [...layers, layer];
+      await savePlanRun({
+        workspaceId: parentTask.workspaceId,
+        taskId: input.taskId,
+        planId,
+        run: createPlanRunFromCompiledPlan(accepted.compiledPlan, persistedLayers),
+        layers: persistedLayers,
+      });
+    }
   }
 
   return {

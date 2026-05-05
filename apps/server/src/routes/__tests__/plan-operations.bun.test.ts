@@ -4,25 +4,23 @@ import type { Context } from "hono";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
 import {
-  acceptTaskPlanGraph,
-  getAcceptedTaskPlanGraph,
-  getLatestTaskPlanGraph,
+  getLatestCompiledPlan,
+  saveCompiledPlan,
   materializeTaskPlan,
-  saveTaskPlanGraph,
+  applyPlanPatchCommand,
 } from "@chrona/engine";
+import { getAcceptedTaskPlanGraph } from "@chrona/engine";
 import type {
-  TaskPlanNodeType,
-  TaskPlanNodeStatus,
-  TaskPlanNodeExecutionMode,
-  TaskPlanNodeBlockingReason,
-  TaskPlanEdgeType,
+  CompiledPlan,
+  CompiledNode,
+  CompiledEdge,
 } from "@chrona/contracts/ai";
 
 // ---------------------------------------------------------------------------
 // Inline HTTP helpers (avoid loading full api.ts → cascade imports)
 // ---------------------------------------------------------------------------
 
-function err(c: Context, message: string, status: number = 400) {
+function _err(c: Context, message: string, status: number = 400) {
   return c.json({ error: message }, status as unknown as undefined);
 }
 
@@ -53,192 +51,22 @@ function createPlanTestRouter() {
           summary?: string;
         };
 
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) return err(c, "Task not found", 404);
-
-      const currentPlanGraph = await getLatestTaskPlanGraph(taskId);
-      if (!currentPlanGraph) return err(c, "No plan found for this task", 404);
-
-      const plan = {
-        ...currentPlanGraph.plan,
-        nodes: currentPlanGraph.plan.nodes.map((n: Record<string, unknown>) => ({ ...n })),
-        edges: currentPlanGraph.plan.edges.map((e: Record<string, unknown>) => ({ ...e })),
-      } as typeof currentPlanGraph.plan;
-
-      switch (operation) {
-        case "add_node": {
-          if (!nodes || nodes.length === 0) {
-            return err(c, "add_node requires nodes[]", 400);
-          }
-          const newNodes = nodes.map((n, i) => ({
-            id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${i}`,
-            type: (typeof n.type === "string" ? n.type : "task") as TaskPlanNodeType,
-            title: typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`,
-            objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : `Step ${plan.nodes.length + i + 1}`),
-            description: typeof n.description === "string" && n.description.trim() ? n.description : null,
-            status: "pending" as TaskPlanNodeStatus,
-            phase: null as string | null,
-            estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : null,
-            priority: typeof n.priority === "string" ? n.priority as "Low" | "Medium" | "High" | "Urgent" | null : null,
-            executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as TaskPlanNodeExecutionMode,
-            requiresHumanInput: Boolean(n.requiresHumanInput),
-            requiresHumanApproval: Boolean(n.requiresHumanApproval),
-            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
-            blockingReason: null as TaskPlanNodeBlockingReason,
-            linkedTaskId: null as string | null,
-            completionSummary: null as string | null,
-            metadata: null as Record<string, unknown> | null,
-          }));
-          plan.nodes = [...plan.nodes, ...newNodes] as typeof plan.nodes;
-          if (edges && edges.length > 0) {
-            plan.edges = [...plan.edges, ...edges.map((e, i) => ({
-              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
-              fromNodeId: e.fromNodeId as string,
-              toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
-              metadata: null as Record<string, unknown> | null,
-            }))] as typeof plan.edges;
-          }
-          break;
-        }
-        case "update_node": {
-          if (!nodePatches || nodePatches.length === 0) {
-            return err(c, "update_node requires nodePatches[]", 400);
-          }
-          const existingIds = new Set(plan.nodes.map((n) => n.id));
-          const unknownIds = nodePatches.map((p) => p.id).filter((id) => !existingIds.has(id));
-          if (unknownIds.length > 0) {
-            return err(c, `Unknown node id(s): ${unknownIds.join(", ")}`, 400);
-          }
-          const patchMap = new Map(nodePatches.map((p) => [p.id, p]));
-          plan.nodes = plan.nodes.map((node) => {
-            const patch = patchMap.get(node.id);
-            if (!patch) return node;
-            return {
-              ...node,
-              ...(typeof patch.title === "string" ? { title: patch.title } : {}),
-              ...(typeof patch.objective === "string" ? { objective: patch.objective } : {}),
-              ...(typeof patch.description === "string" ? { description: patch.description } : {}),
-              ...(typeof patch.estimatedMinutes === "number" ? { estimatedMinutes: patch.estimatedMinutes } : {}),
-              ...(typeof patch.status === "string" ? { status: patch.status as TaskPlanNodeStatus } : {}),
-              ...(typeof patch.priority === "string" ? { priority: patch.priority as typeof node["priority"] } : {}),
-              ...(typeof patch.executionMode === "string" ? { executionMode: patch.executionMode as TaskPlanNodeExecutionMode } : {}),
-            };
-          });
-          break;
-        }
-        case "delete_node": {
-          if (!deletedNodeIds || deletedNodeIds.length === 0) {
-            return err(c, "delete_node requires deletedNodeIds[]", 400);
-          }
-          const deleteSet = new Set(deletedNodeIds);
-          plan.nodes = plan.nodes.filter((n) => !deleteSet.has(n.id));
-          plan.edges = plan.edges.filter(
-            (e) => !deleteSet.has(e.fromNodeId) && !deleteSet.has(e.toNodeId),
-          );
-          break;
-        }
-        case "update_dependencies": {
-          if (!edges || edges.length === 0) {
-            return err(c, "update_dependencies requires edges[]", 400);
-          }
-          const existingIds = new Set(plan.nodes.map((n) => n.id));
-          const missingFrom = edges.filter((e) => !existingIds.has(e.fromNodeId as string));
-          const missingTo = edges.filter((e) => !existingIds.has(e.toNodeId as string));
-          if (missingFrom.length > 0) {
-            return err(c, `Unknown fromNodeId(s): ${missingFrom.map((e) => e.fromNodeId).join(", ")}`, 400);
-          }
-          if (missingTo.length > 0) {
-            return err(c, `Unknown toNodeId(s): ${missingTo.map((e) => e.toNodeId).join(", ")}`, 400);
-          }
-          const newEdgeIds = new Set(edges.map((e) => `${e.fromNodeId}->${e.toNodeId}`));
-          plan.edges = [
-            ...plan.edges.filter((e) => !newEdgeIds.has(`${e.fromNodeId}->${e.toNodeId}`)),
-            ...edges.map((e, i) => ({
-              id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
-              fromNodeId: e.fromNodeId as string,
-              toNodeId: e.toNodeId as string,
-              type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
-              metadata: null as Record<string, unknown> | null,
-            })),
-          ] as typeof plan.edges;
-          break;
-        }
-        case "reorder_nodes": {
-          if (!reorder || reorder.length === 0) {
-            return err(c, "reorder_nodes requires reorder[]", 400);
-          }
-          const orderMap = new Map(reorder.map((id, i) => [id, i]));
-          const reordered = plan.nodes
-            .filter((n) => orderMap.has(n.id))
-            .sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-          const firstIndex = plan.nodes.findIndex((n) => orderMap.has(n.id));
-          const insertAt = firstIndex >= 0 ? firstIndex : plan.nodes.length;
-          const kept = plan.nodes.filter((n) => !orderMap.has(n.id));
-          plan.nodes = [...kept.slice(0, insertAt), ...reordered, ...kept.slice(insertAt)];
-          break;
-        }
-        case "replace_plan": {
-          if (!nodes || nodes.length === 0) {
-            return err(c, "replace_plan requires nodes[]", 400);
-          }
-          plan.nodes = nodes.map((n) => ({
-            id: typeof n.id === "string" && n.id.trim() ? n.id : `node-${Date.now()}-${Math.random()}`,
-            type: (typeof n.type === "string" ? n.type : "task") as TaskPlanNodeType,
-            title: typeof n.title === "string" && n.title.trim() ? n.title : "Untitled",
-            objective: typeof n.objective === "string" && n.objective.trim() ? n.objective : (typeof n.title === "string" && n.title.trim() ? n.title : "Untitled"),
-            description: typeof n.description === "string" && n.description.trim() ? n.description : null,
-            status: (typeof n.status === "string" ? n.status : "pending") as TaskPlanNodeStatus,
-            phase: null as string | null,
-            estimatedMinutes: typeof n.estimatedMinutes === "number" ? n.estimatedMinutes : null,
-            priority: typeof n.priority === "string" ? n.priority as "Low" | "Medium" | "High" | "Urgent" | null : null,
-            executionMode: (n.executionMode === "manual" || n.executionMode === "hybrid" ? n.executionMode : "automatic") as TaskPlanNodeExecutionMode,
-            requiresHumanInput: Boolean(n.requiresHumanInput),
-            requiresHumanApproval: Boolean(n.requiresHumanApproval),
-            autoRunnable: !n.requiresHumanInput && !n.requiresHumanApproval,
-            blockingReason: null as TaskPlanNodeBlockingReason,
-            linkedTaskId: (typeof n.linkedTaskId === "string" ? n.linkedTaskId : null) as string | null,
-            completionSummary: null as string | null,
-            metadata: null as Record<string, unknown> | null,
-          }));
-          plan.edges = edges
-            ? edges.map((e, i) => ({
-                id: typeof e.id === "string" && e.id.trim() ? e.id : `edge-${Date.now()}-${i}`,
-                fromNodeId: e.fromNodeId as string,
-                toNodeId: e.toNodeId as string,
-                type: (e.type === "depends_on" ? e.type : "sequential") as TaskPlanEdgeType,
-                metadata: null as Record<string, unknown> | null,
-              }))
-            : [];
-          break;
-        }
-        case "update_plan_summary": {
-          if (summary !== undefined) {
-            plan.summary = summary;
-          }
-          break;
-        }
-        default:
-          return err(c, `Unsupported plan operation: ${operation}`, 400);
-      }
-
-      const savedPlan = await saveTaskPlanGraph({
-        workspaceId: task.workspaceId,
+      const result = await applyPlanPatchCommand({
         taskId,
-        plan,
-        prompt: currentPlanGraph.prompt,
-        status: currentPlanGraph.status,
-        source: "mixed",
-        generatedBy: currentPlanGraph.generatedBy,
-        summary: plan.summary ?? currentPlanGraph.summary,
-        changeSummary: `Applied plan patch: ${operation}`,
+        operation,
+        nodes,
+        edges,
+        nodePatches,
+        deletedNodeIds,
+        reorder,
+        summary,
       });
 
       return c.json({
-        taskId,
-        operation,
-        planGraph: savedPlan.plan,
-      }, 200);
+        taskId: result.taskId,
+        operation: result.operation,
+        planGraph: { ...(result.compiledPlan as unknown as Record<string, unknown>), ...(summary !== undefined ? { summary } : {}) },
+      } as Record<string, unknown>, 200);
     } catch (cause) {
       return err500(c, "POST /api/tasks/:taskId/plan", cause, "Failed to apply plan patch");
     }
@@ -294,54 +122,61 @@ async function seedPlan(): Promise<SeedResult> {
     },
   });
 
-  const nodes = [
-    {
-      id: "node-a", type: "task", title: "Research", objective: "Research the domain",
-      description: "Gather materials", status: "pending", phase: "preparation",
-      estimatedMinutes: 30, priority: "High", executionMode: "automatic",
-      requiresHumanInput: false, requiresHumanApproval: false, autoRunnable: true,
-      blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
-    },
-    {
-      id: "node-b", type: "task", title: "Design", objective: "Design the solution",
-      description: null, status: "pending", phase: "design",
-      estimatedMinutes: 60, priority: "Medium", executionMode: "automatic",
-      requiresHumanInput: false, requiresHumanApproval: true, autoRunnable: false,
-      blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
-    },
-    {
-      id: "node-c", type: "checkpoint", title: "Review", objective: "Review with team",
-      description: "Get sign-off", status: "pending", phase: "review",
-      estimatedMinutes: 15, priority: "High", executionMode: "manual",
-      requiresHumanInput: true, requiresHumanApproval: true, autoRunnable: false,
-      blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
-    },
-    {
-      id: "node-d", type: "task", title: "Ship", objective: "Deploy to production",
-      description: null, status: "pending", phase: "execution",
-      estimatedMinutes: 20, priority: "Urgent", executionMode: "automatic",
-      requiresHumanInput: false, requiresHumanApproval: false, autoRunnable: true,
-      blockingReason: null, linkedTaskId: null, completionSummary: null, metadata: null,
-    },
+  const edges = [
+    { id: "edge-ab", from: "node-a", to: "node-b" },
+    { id: "edge-bc", from: "node-b", to: "node-c" },
+    { id: "edge-cd", from: "node-c", to: "node-d" },
   ];
 
-  const edges = [
-    { id: "edge-ab", fromNodeId: "node-a", toNodeId: "node-b", type: "depends_on", metadata: null },
-    { id: "edge-bc", fromNodeId: "node-b", toNodeId: "node-c", type: "sequential", metadata: null },
-    { id: "edge-cd", fromNodeId: "node-c", toNodeId: "node-d", type: "depends_on", metadata: null },
-  ];
+  const compiledPlan: CompiledPlan = {
+    id: "plan-test",
+    editablePlanId: "editable-test",
+    sourceVersion: 1,
+    title: "Test flow",
+    goal: "Linear A→B→C→D flow",
+    assumptions: [],
+    nodes: [
+      {
+        id: "node-a", localId: "node-a", type: "task", title: "Research",
+        config: { type: "task", objective: "Research the domain" } as any,
+        dependencies: [], dependents: ["node-b"],
+        executor: "ai", mode: "auto", estimatedMinutes: 30, priority: "High",
+      },
+      {
+        id: "node-b", localId: "node-b", type: "task", title: "Design",
+        config: { type: "task", objective: "Design the solution" } as any,
+        dependencies: ["node-a"], dependents: ["node-c"],
+        executor: "ai", mode: "auto", estimatedMinutes: 60, priority: "Medium",
+      },
+      {
+        id: "node-c", localId: "node-c", type: "checkpoint", title: "Review",
+        config: { type: "checkpoint", checkpointType: "approve", prompt: "Get sign-off" } as any,
+        dependencies: ["node-b"], dependents: ["node-d"],
+        executor: "user", mode: "manual", estimatedMinutes: 15, priority: "High",
+      },
+      {
+        id: "node-d", localId: "node-d", type: "task", title: "Ship",
+        config: { type: "task", objective: "Deploy to production" } as any,
+        dependencies: ["node-c"], dependents: [],
+        executor: "ai", mode: "auto", estimatedMinutes: 20, priority: "Urgent",
+      },
+    ] as CompiledNode[],
+    edges: edges as CompiledEdge[],
+    entryNodeIds: ["node-a"],
+    terminalNodeIds: ["node-d"],
+    topologicalOrder: ["node-a", "node-b", "node-c", "node-d"],
+    completionPolicy: { type: "all_tasks_completed" } as CompiledPlan["completionPolicy"],
+    validationWarnings: [],
+  };
 
   const content = JSON.stringify({
-    type: "task_plan_graph_v1",
+    type: "compiled_plan_v1",
+    compiledPlan,
+    editablePlan: null,
     status: "accepted",
-    revision: 1,
-    source: "ai" as const,
-    generatedBy: "graph-planner",
     prompt: "Build a 4-step workflow",
     summary: "Linear A→B→C→D flow",
-    changeSummary: null,
-    nodes,
-    edges,
+    generatedBy: "graph-planner",
   });
 
   const memory = await db.memory.create({
@@ -400,7 +235,6 @@ describe("POST /api/tasks/:taskId/plan", () => {
       if (added) {
         expect(added.title).toBe("Auto-fix");
         expect(added.type).toBe("task");
-        expect(added.status).toBe("pending");
       }
 
       expect(body.planGraph.edges).toHaveLength(4);
@@ -469,8 +303,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       expect(updated).toBeTruthy();
       if (updated) {
         expect(updated.title).toBe("Deep Research");
-        expect(updated.objective).toBe("Comprehensive study");
-        expect(updated.status).toBe("pending");
+        expect((updated.config as Record<string, unknown>)?.expectedOutput).toBe("Comprehensive study");
         expect(updated.type).toBe("task");
       }
     });
@@ -494,7 +327,6 @@ describe("POST /api/tasks/:taskId/plan", () => {
       const b = body.planGraph.nodes.find((n) => n.id === "node-b");
       const d = body.planGraph.nodes.find((n) => n.id === "node-d");
       expect(b?.title).toBe("Sketch");
-      expect(b?.status).toBe("in_progress");
       expect(d?.priority).toBe("Low");
       expect(d?.estimatedMinutes).toBe(5);
     });
@@ -531,7 +363,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       expect(body.planGraph.nodes.some((n: any) => n.id === "node-b")).toBe(false);
       // only edge-cd (c→d) remains — edge-ab (a→b) and edge-bc (b→c) deleted
       expect(body.planGraph.edges).toHaveLength(1);
-      expect(body.planGraph.edges.some((e) => e.fromNodeId === "node-b" || e.toNodeId === "node-b")).toBe(false);
+      expect(body.planGraph.edges.some((e) => e.from === "node-b" || e.to === "node-b")).toBe(false);
     });
 
     it("deletes multiple nodes", async () => {
@@ -871,7 +703,6 @@ describe("POST /api/tasks/:taskId/plan", () => {
       expect(body.planGraph.nodes[0].id).toBe("the-one");
       expect(body.planGraph.nodes[0].title).toBe("Final Deliverable");
           expect(body.planGraph.nodes[0].type).toBe("task");
-      expect(body.planGraph.nodes[0].status).toBe("in_progress");
       expect(body.planGraph.nodes[0].priority).toBe("Urgent");
       expect(body.planGraph.nodes[0].estimatedMinutes).toBe(120);
     });
@@ -879,10 +710,21 @@ describe("POST /api/tasks/:taskId/plan", () => {
 
   describe("materialize_child_tasks", () => {
     it("linkedTaskId is set on plan nodes after materialization", async () => {
-      const { workspaceId: _workspaceId, taskId, planId } = await seedPlan();
+      const { workspaceId: _workspaceId, taskId, planId: _planId } = await seedPlan();
 
-      // Accept the plan first
-      await acceptTaskPlanGraph({ taskId, planId });
+      // Ensure the plan is accepted
+      const latest = await getLatestCompiledPlan(taskId);
+      if (latest) {
+        await saveCompiledPlan({
+          workspaceId: latest.workspaceId,
+          taskId,
+          compiledPlan: latest.compiledPlan,
+          status: "accepted",
+          prompt: latest.prompt,
+          summary: latest.summary,
+          generatedBy: latest.generatedBy,
+        });
+      }
 
       // Materialize
       const materialized = await materializeTaskPlan({ taskId });
@@ -893,7 +735,7 @@ describe("POST /api/tasks/:taskId/plan", () => {
       const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
       expect(acceptedPlan).toBeTruthy();
       const materializedNodes = acceptedPlan!.plan.nodes.filter(
-        (node: Record<string, unknown>) => typeof node.linkedTaskId === "string" && (node.linkedTaskId as string).length > 0,
+        (node) => typeof node.linkedTaskId === "string" && (node.linkedTaskId as string).length > 0,
       );
       expect(materializedNodes.length).toBeGreaterThan(0);
 

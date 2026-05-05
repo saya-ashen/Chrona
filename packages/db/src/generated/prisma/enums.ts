@@ -134,7 +134,8 @@ export const MemorySourceType = {
   user_input: 'user_input',
   agent_inferred: 'agent_inferred',
   imported: 'imported',
-  system_rule: 'system_rule'
+  system_rule: 'system_rule',
+  plan_layer: 'plan_layer'
 } as const
 
 export type MemorySourceType = (typeof MemorySourceType)[keyof typeof MemorySourceType]

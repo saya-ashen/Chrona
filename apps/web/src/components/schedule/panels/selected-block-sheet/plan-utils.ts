@@ -1,4 +1,5 @@
-import type { TaskPlanGraphResponse, TaskPlanNode } from "@chrona/contracts/ai";
+import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { LegacyPlanGraphNode } from "@/components/schedule/schedule-page-types";
 
 export type PlanDisplayType = "task" | "checkpoint" | "condition" | "wait";
 
@@ -24,9 +25,9 @@ export function normalizePlanNodeTypeForDisplay(rawType: unknown): PlanDisplayTy
 }
 
 export function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
-  if (!res?.planGraph?.nodes?.length) return null;
-  const g = res.planGraph;
-  const steps = g.nodes.map((n: TaskPlanNode) => ({
+  const g = res?.planGraph as { nodes?: LegacyPlanGraphNode[]; edges?: Array<{ id: string; fromNodeId: string; toNodeId: string; type: string; metadata?: unknown }> } | undefined;
+  if (!g?.nodes?.length) return null;
+  const steps = g.nodes.map((n: LegacyPlanGraphNode) => ({
     id: n.id,
     title: n.title,
     objective: n.objective,
@@ -53,7 +54,7 @@ export function toPlanGraphPlan(res: TaskPlanGraphResponse | null) {
     state: "ready" as const,
     currentStepId,
     steps,
-    edges: g.edges.map((e) => ({
+    edges: (g.edges ?? []).map((e) => ({
       id: e.id,
       fromNodeId: e.fromNodeId,
       toNodeId: e.toNodeId,

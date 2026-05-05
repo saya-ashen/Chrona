@@ -22,7 +22,7 @@ vi.mock("@/hooks/use-ai", () => ({
 }));
 
 import { TaskDecompositionPanel } from "@/components/schedule/task-planning-panel";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { CompiledPlan } from "@chrona/contracts/ai";
 
 const defaultProps = {
   taskId: "task_1",
@@ -35,7 +35,8 @@ const defaultProps = {
   activeAcceptedPlanId: null,
 };
 
-const samplePlanResponse: TaskPlanGraphResponse = {
+const samplePlanResponse = {
+  plan: { title: "Test Plan", goal: "Test goal", nodes: [], edges: [] },
   source: "saved",
   planGraph: {
     id: "plan-1",
@@ -167,7 +168,8 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
         {...defaultProps}
         savedPlan={{
           ...samplePlanResponse.savedPlan!,
-          plan: samplePlanResponse.planGraph,
+          status: samplePlanResponse.savedPlan!.status as "draft",
+          plan: samplePlanResponse.planGraph as unknown as CompiledPlan,
         }}
       />,
     );
@@ -219,7 +221,8 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
         {...defaultProps}
         savedPlan={{
           ...samplePlanResponse.savedPlan!,
-          plan: samplePlanResponse.planGraph,
+          status: samplePlanResponse.savedPlan!.status as "draft",
+          plan: samplePlanResponse.planGraph as unknown as CompiledPlan,
         }}
         onPlanLoaded={onPlanLoaded}
       />,
@@ -228,7 +231,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
     await waitFor(() => expect(screen.getByText("AI Task Planning")).toBeInTheDocument());
     expect(onPlanLoaded).not.toHaveBeenCalled();
 
-    const regeneratedResponse: TaskPlanGraphResponse = {
+    const regeneratedResponse = {
       ...samplePlanResponse,
       planGraph: {
         ...samplePlanResponse.planGraph,
@@ -239,7 +242,7 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
       },
       savedPlan: {
         id: "plan-2",
-        status: "draft",
+        status: "draft" as const,
         prompt: null,
         revision: 3,
         summary: "new generated plan",
@@ -263,7 +266,8 @@ describe("TaskDecompositionPanel – opt-in behavior", () => {
         {...defaultProps}
         savedPlan={{
           ...samplePlanResponse.savedPlan!,
-          plan: samplePlanResponse.planGraph,
+          status: samplePlanResponse.savedPlan!.status as "draft",
+          plan: samplePlanResponse.planGraph as unknown as CompiledPlan,
         }}
         onPlanLoaded={onPlanLoaded}
       />,

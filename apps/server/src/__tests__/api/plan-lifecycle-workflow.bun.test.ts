@@ -14,13 +14,16 @@ import { db } from "@chrona/db";
 import {
   getLatestTaskPlanGraph,
   getAcceptedTaskPlanGraph,
-  acceptTaskPlanGraph,
-  saveTaskPlanGraph,
   enrichPlanGraphNodes,
   isTaskPlanGenerationRunning,
   materializeTaskPlan,
+  getLatestCompiledPlan,
+  saveCompiledPlan,
+  compilePlanBlueprint,
+  createPlanRunFromCompiledPlan,
+  savePlanRun,
 } from "@chrona/engine";
-import type { TaskPlanNode, TaskPlanEdge, TaskPlanGraph } from "@chrona/contracts/ai";
+import type { CompiledPlan } from "@chrona/contracts/ai";
 import { resetTestDb, seedWorkspace, seedTask, seedDraftPlan, seedAcceptedPlan } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------
@@ -67,7 +70,10 @@ function createPlanLifecycleRouter() {
               revision: savedAiPlan.revision,
               summary: savedAiPlan.summary,
               updatedAt: savedAiPlan.updatedAt,
-              plan: enrichPlanGraphNodes(savedAiPlan.plan),
+              plan: {
+                nodes: enrichPlanGraphNodes(savedAiPlan.compiledPlan as any),
+                edges: savedAiPlan.compiledPlan.edges,
+              },
             }
           : null,
       });
@@ -87,16 +93,28 @@ function createPlanLifecycleRouter() {
         return err(c, "taskId and planId are required", 400);
       }
 
-      const savedPlan = await acceptTaskPlanGraph({ taskId, planId });
+      const latest = await getLatestCompiledPlan(taskId);
+      if (!latest || latest.compiledPlan.editablePlanId !== planId) {
+        return err(c, "Plan not found", 404);
+      }
+      await saveCompiledPlan({
+        workspaceId: latest.workspaceId,
+        taskId,
+        compiledPlan: latest.compiledPlan,
+        status: "accepted",
+        prompt: latest.prompt,
+        summary: latest.summary,
+        generatedBy: latest.generatedBy,
+      });
       return c.json({
         savedPlan: {
-          id: savedPlan.id,
-          status: savedPlan.status,
-          prompt: savedPlan.prompt,
-          revision: savedPlan.revision,
-          summary: savedPlan.summary,
-          updatedAt: savedPlan.updatedAt,
-          plan: savedPlan.plan,
+          id: planId,
+          status: "accepted",
+          prompt: latest.prompt,
+          revision: latest.compiledPlan.sourceVersion,
+          summary: latest.summary,
+          updatedAt: latest.updatedAt,
+          plan: latest.compiledPlan,
         },
       });
     } catch (cause) {
@@ -110,8 +128,8 @@ function createPlanLifecycleRouter() {
       const body = await c.req.json();
       const { taskId, nodes: providedNodes, edges: providedEdges } = body as {
         taskId?: string;
-        nodes?: TaskPlanNode[];
-        edges?: TaskPlanEdge[];
+        nodes?: Record<string, unknown>[];
+        edges?: Record<string, unknown>[];
       };
 
       if (!taskId) {
@@ -123,38 +141,52 @@ function createPlanLifecycleRouter() {
         return err(c, "Task not found", 404);
       }
 
-      let graphPlan: Awaited<ReturnType<typeof getLatestTaskPlanGraph>> = null;
+      let compiledPlan: CompiledPlan;
+
       if (providedNodes && Array.isArray(providedNodes) && providedNodes.length > 0) {
-        const now = new Date().toISOString();
-        const plan: TaskPlanGraph = {
-          id: `graph-${taskId}-${Date.now()}`,
-          taskId,
-          status: "draft",
-          revision: 1,
-          source: "ai",
+        const blueprint = {
+          title: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
+          goal: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
+          nodes: providedNodes.map((n) => ({
+            id: typeof n.id === "string" ? n.id : `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            type: (typeof n.type === "string" && ["task", "checkpoint", "condition", "wait"].includes(n.type)) ? n.type : "task",
+            title: typeof n.title === "string" ? n.title : "Untitled",
+          })) as any,
+          edges: (providedEdges ?? []).map((e) => ({
+            from: typeof e.fromNodeId === "string" ? e.fromNodeId : "",
+            to: typeof e.toNodeId === "string" ? e.toNodeId : "",
+          })),
+        } as any;
+        const compResult = compilePlanBlueprint({
+          taskId: task.id,
+          blueprint,
           generatedBy: "batch-apply",
-          prompt: null,
-          summary: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
-          changeSummary: null,
-          createdAt: now,
-          updatedAt: now,
-          nodes: providedNodes,
-          edges: providedEdges ?? [],
-        };
-        graphPlan = await saveTaskPlanGraph({
+          source: "ai",
+        });
+        compiledPlan = compResult.compiledPlan;
+
+        await saveCompiledPlan({
           workspaceId: task.workspaceId,
           taskId: task.id,
-          plan,
+          compiledPlan: compResult.compiledPlan,
           status: "draft",
-          source: "ai",
           generatedBy: "batch-apply",
-          summary: plan.summary,
+          summary: blueprint.title,
+        });
+
+        await savePlanRun({
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          planId: compResult.planId,
+          run: createPlanRunFromCompiledPlan(compResult.compiledPlan, []),
+          layers: [compResult.initialLayer],
         });
       } else {
-        graphPlan = await getLatestTaskPlanGraph(taskId);
-        if (!graphPlan) {
+        const latest = await getLatestCompiledPlan(taskId);
+        if (!latest) {
           return err(c, "No plan found for task", 404);
         }
+        compiledPlan = latest.compiledPlan;
       }
 
       const materialized = await materializeTaskPlan({ taskId: task.id });
@@ -167,7 +199,7 @@ function createPlanLifecycleRouter() {
       return c.json({
         parentTaskId: taskId,
         childTasks: createdTasks,
-        planGraph: graphPlan!.plan,
+        planGraph: compiledPlan,
       }, 201);
     } catch (cause) {
       return err500(c, "POST /api/ai/batch-apply-plan", cause, "Failed to apply task plan");
@@ -385,8 +417,8 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const inlineNode: TaskPlanNode = {
-      id: "inline-1",
+    const inlineNode: Record<string, unknown> = {
+      id: "inline_1",
       type: "task",
       title: "Inline Node",
       objective: "Created via batch-apply",
@@ -541,7 +573,7 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 500 for nonexistent planId", async () => {
+  it("returns 404 for nonexistent planId", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -551,7 +583,7 @@ describe("Plan lifecycle workflow", () => {
       body: JSON.stringify({ taskId, planId: "nonexistent-plan-id" }),
     });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
   });
 
   it("accepts a plan without workspace isolation in the inline router", async () => {
@@ -569,7 +601,7 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(200);
   });
 
-  it("accepts malformed inline plan nodes because the inline router does not validate them", async () => {
+  it("accepts minimally valid inline plan nodes", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -578,7 +610,7 @@ describe("Plan lifecycle workflow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         taskId,
-        nodes: [{ id: "bad-node", type: "task", title: "", objective: "" }],
+        nodes: [{ id: "bad_node", type: "task", title: "", objective: "" }],
         edges: [],
       }),
     });

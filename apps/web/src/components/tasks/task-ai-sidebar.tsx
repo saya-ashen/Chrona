@@ -295,7 +295,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
       return;
     }
 
-    const planId = result.savedPlan?.id ?? activePlan?.id;
+    const planId = (result.savedPlan as { id?: string } | undefined)?.id ?? activePlan?.id;
     if (planId) {
       try {
         setIsAccepting(true);
@@ -480,7 +480,7 @@ export function TaskAiSidebar({ task }: TaskAiSidebarProps) {
               planningPrompt={planningPrompt}
               forceRefresh={forceRefresh}
               onApply={handleApplyDecomposition}
-              onPlanLoaded={handlePlanLoaded}
+              onPlanLoaded={handlePlanLoaded as never}
             />
           ) : null}
 

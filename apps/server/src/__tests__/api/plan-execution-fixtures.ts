@@ -1,4 +1,3 @@
-import type { TaskPlanNode, TaskPlanEdge } from "@chrona/contracts/ai";
 import { db } from "@chrona/db";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 
@@ -6,13 +5,37 @@ import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generate
 // Execution-orchestration fixture types
 // ───────────────────────────────────────────────────
 
-export interface FixturePlanNode extends Omit<TaskPlanNode, "type"> {
-  type: TaskPlanNode["type"];
+export interface FixturePlanNode {
+  id: string;
+  type: "task" | "checkpoint" | "condition" | "wait";
+  title: string;
+  objective: string;
+  description: string | null;
+  status: string;
+  phase: string | null;
+  estimatedMinutes: number | null;
+  priority: "Low" | "Medium" | "High" | "Urgent" | null;
+  executionMode: string;
+  requiresHumanInput: boolean;
+  requiresHumanApproval: boolean;
+  autoRunnable: boolean;
+  blockingReason: string | null;
+  linkedTaskId: string | null;
+  completionSummary: string | null;
+  metadata: Record<string, unknown> | null;
   dependencies?: string[];
   requiredInfo?: string[];
   executionClassification?: "automatic_chainable" | "automatic_standalone" | "human_dependent" | "review_gate";
   nextAction?: string | null;
   readiness?: "ready" | "blocked" | "waiting";
+}
+
+export interface FixturePlanEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  type: string;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface FixturePlanGraph {
@@ -23,7 +46,7 @@ export interface FixturePlanGraph {
   source: "ai" | "user" | "mixed";
   summary: string;
   nodes: FixturePlanNode[];
-  edges: TaskPlanEdge[];
+  edges: FixturePlanEdge[];
 }
 
 export interface FixtureWorkBlock {

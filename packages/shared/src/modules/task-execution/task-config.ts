@@ -118,7 +118,7 @@ export function resolveTaskRuntimeConfig(input: {
   };
 }
 
-function validateTaskRuntimeConfig(input: {
+function _validateTaskRuntimeConfig(input: {
   runtimeAdapterKey?: string | null;
   workspaceDefaultRuntime?: string | null;
   runtimeInput?: unknown;

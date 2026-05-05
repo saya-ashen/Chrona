@@ -1,7 +1,7 @@
 "use client";
 
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduledItem, LegacySavedPlan } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
 import { buttonVariants } from "@/components/ui/button";
 import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
@@ -65,12 +65,12 @@ export function SelectedBlockSheetHeader({
             />
             <CompactMetaPill
               label={copy.taskPlanLabel}
-              value={acceptedPlan?.savedPlan?.revision
-                ? `Accepted · r${acceptedPlan.savedPlan.revision}`
-                : acceptedPlan?.savedPlan?.status === "accepted"
+              value={(acceptedPlan?.savedPlan as LegacySavedPlan | undefined)?.revision
+                ? `Accepted · r${(acceptedPlan!.savedPlan as LegacySavedPlan).revision}`
+                : (acceptedPlan?.savedPlan as LegacySavedPlan | undefined)?.status === "accepted"
                   ? "Accepted"
                   : "No accepted plan"}
-              tone={acceptedPlan?.savedPlan?.status === "accepted" ? "accent" : "default"}
+              tone={(acceptedPlan?.savedPlan as LegacySavedPlan | undefined)?.status === "accepted" ? "accent" : "default"}
             />
           </div>
         </div>

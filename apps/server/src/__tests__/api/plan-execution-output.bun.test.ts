@@ -13,7 +13,8 @@ import { db } from "@chrona/db";
 import { MemoryScope, MemorySourceType, MemoryStatus, RunStatus } from "@chrona/db/generated/prisma/client";
 import { resetTestDb, seedWorkspace, seedTask } from "../bun-test-helpers";
 import { overrideRuntimeExecutionAdapter, executePlanNode } from "@chrona/engine";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+
+
 
 // ---------------------------------------------------------------------------
 // Smart mock adapter: stores messages in an in-memory Map and returns them
@@ -141,7 +142,7 @@ async function seedFullSetup(outputContent: string) {
     planId: memory.id,
     sessionId: session.id,
     sessionKey: session.sessionKey,
-    planGraph: { ...planContent, id: memory.id, taskId } as unknown as TaskPlanGraph,
+    planGraph: { ...planContent, id: memory.id, taskId } as any,
   };
 }
 
@@ -165,6 +166,7 @@ describe("executePlanNode output persistence", () => {
       plan: planGraph as any,
       sessionDecision: { kind: "main_session", reason: "auto node" },
       trigger: "auto",
+      runtimeName: "openclaw",
     });
 
     expect(result.status).toBe("done");
@@ -206,6 +208,7 @@ describe("executePlanNode output persistence", () => {
       plan: planGraph as any,
       sessionDecision: { kind: "main_session", reason: "auto node" },
       trigger: "auto",
+      runtimeName: "openclaw",
     });
 
     expect(result.status).toBe("done");
@@ -251,6 +254,7 @@ describe("executePlanNode output persistence", () => {
       plan: planGraph as any,
       sessionDecision: { kind: "main_session", reason: "auto node" },
       trigger: "auto",
+      runtimeName: "openclaw",
     });
 
     expect(result.status).toBe("failed");
@@ -297,6 +301,7 @@ describe("executePlanNode output persistence", () => {
       plan: planGraph as any,
       sessionDecision: { kind: "main_session", reason: "auto node" },
       trigger: "auto",
+      runtimeName: "openclaw",
     });
 
     expect(result.status).toBe("done");

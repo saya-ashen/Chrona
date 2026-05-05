@@ -8,10 +8,13 @@ import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
-import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
-import { getAcceptedTaskPlanGraph, getLatestTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
+import type { CompiledPlan, ScheduledTaskInfo } from "@chrona/contracts/ai";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers } from "@/modules/plan-execution/plan-run-store";
+import { type SavedAiPlanSnapshot, getLatestSavedAiPlanSnapshot } from "@/modules/plan-execution/saved-plan-snapshot";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
   id: string;
@@ -98,6 +101,17 @@ function getScheduledMinutes(item: {
     0,
     Math.round((item.scheduledEndAt.getTime() - item.scheduledStartAt.getTime()) / 60000),
   );
+}
+
+async function getReadyNodeIds(taskId: string) {
+  const acceptedPlan = await getAcceptedCompiledPlan(taskId);
+  if (!acceptedPlan) {
+    return [] as string[];
+  }
+
+  const layers = await getLayers(taskId, acceptedPlan.compiledPlan.editablePlanId);
+  const effective = resolveEffectivePlanGraph(acceptedPlan.compiledPlan, layers);
+  return effective.readyNodeIds;
 }
 
 function buildFocusZones(items: Array<ReturnType<typeof mapProjectionItem>>) {
@@ -226,8 +240,7 @@ async function buildAutomationCandidates(input: {
       item.actionRequired === "Reschedule task";
 
     if (item.isRunnable && !blockedByApproval && !blockedByUser && !riskTaskIds.has(item.taskId)) {
-      const acceptedPlan = await getAcceptedTaskPlanGraph(item.taskId);
-      const readyNodes = acceptedPlan ? getReadyAutoRunnableNodes(acceptedPlan.plan) : [];
+      const readyNodeIds = await getReadyNodeIds(item.taskId);
       const sessionStrategy =
         item.runtimeConfig &&
         typeof item.runtimeConfig === "object" &&
@@ -242,9 +255,9 @@ async function buildAutomationCandidates(input: {
         reason: "Scheduled task is ready to run automatically.",
         priority: item.priority === "Urgent" || item.priority === "High" ? "high" : "medium",
         scheduledStartAt: item.scheduledStartAt,
-        executionMode: readyNodes.length > 0 ? "automatic" : "none",
+        executionMode: readyNodeIds.length > 0 ? "automatic" : "none",
         sessionStrategy,
-        readyNodeIds: readyNodes.map((node) => node.id),
+        readyNodeIds,
       });
     }
   }
@@ -289,16 +302,16 @@ export async function getSchedulePage(workspaceId: string) {
   const listItems = projections.map((item) => mapProjectionItem(item));
   const planSnapshots = new Map<string, {
     id: string;
-    status: "draft" | "accepted" | "superseded" | "archived";
+    status: SavedAiPlanSnapshot["status"];
     prompt: string | null;
     revision?: number;
     summary?: string | null;
     updatedAt: string;
-    plan?: NonNullable<Awaited<ReturnType<typeof getLatestTaskPlanGraph>>>["plan"];
+    plan?: CompiledPlan;
   }>();
   const planStatuses = new Map<string, "idle" | "generating" | "waiting_acceptance" | "accepted">();
   await Promise.all(listItems.map(async (item) => {
-    const savedPlan = (await getAcceptedTaskPlanGraph(item.taskId)) ?? (await getLatestTaskPlanGraph(item.taskId));
+    const savedPlan = await getLatestSavedAiPlanSnapshot(item.taskId);
     if (savedPlan) {
       planSnapshots.set(item.taskId, {
         id: savedPlan.id,
@@ -307,7 +320,7 @@ export async function getSchedulePage(workspaceId: string) {
         revision: savedPlan.revision,
         summary: savedPlan.summary,
         updatedAt: savedPlan.updatedAt,
-        plan: savedPlan.plan,
+        plan: savedPlan.plan as unknown as CompiledPlan,
       });
     }
     planStatuses.set(

@@ -407,8 +407,8 @@ export const aiPlanOutputSchema = planBlueprintSchema;
 
 // ─── AI tool payload types ───
 
-export type GenerateTaskPlanGraphToolPayload = PlanBlueprint;
-export const generateTaskPlanGraphToolPayloadSchema = planBlueprintSchema;
+export type GeneratePlanBlueprintToolPayload = PlanBlueprint;
+export const generatePlanBlueprintToolPayloadSchema = planBlueprintSchema;
 
 // ─── EditablePlan Zod schema (strict) ───
 

@@ -1,6 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createRuntimeAdapter, type OpenClawAdapter } from "@chrona/openclaw";
+import { createRuntimeAdapter, DEFAULT_RUNTIME_ADAPTER_KEY, type RuntimeAdapter } from "@chrona/providers-core";
 
 export const SYNC_STALE_MS = 5 * 60 * 1000;
 
@@ -13,7 +13,7 @@ const ACTIVE_RUN_STATUSES = [
 
 async function markSyncDegraded(run: { id: string; runtimeName: string | null }, message: string) {
   const now = new Date();
-  const runtimeName = run.runtimeName ?? "openclaw";
+  const runtimeName = run.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
 
   await db.run.update({
     where: { id: run.id },
@@ -42,7 +42,7 @@ async function markSyncDegraded(run: { id: string; runtimeName: string | null },
   });
 }
 
-async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
+async function syncRunForRead(runId: string, adapter?: RuntimeAdapter) {
   const run = await db.run.findUniqueOrThrow({
     where: { id: runId },
     select: { id: true, runtimeName: true },
@@ -58,7 +58,7 @@ async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
   }
 }
 
-export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter?: OpenClawAdapter) {
+export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter?: RuntimeAdapter) {
   const staleBefore = new Date(Date.now() - SYNC_STALE_MS);
   const runs = await db.run.findMany({
     where: {
@@ -98,7 +98,7 @@ export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter
 
 export async function syncTaskRunForRead(
   taskId: string,
-  adapter?: OpenClawAdapter,
+  adapter?: RuntimeAdapter,
   options?: { forceActive?: boolean },
 ) {
   const run = await db.run.findFirst({

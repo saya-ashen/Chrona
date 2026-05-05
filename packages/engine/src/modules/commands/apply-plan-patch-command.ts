@@ -5,11 +5,10 @@ import {
   getEditablePlan,
 } from "@/modules/plan-execution/compiled-plan-store";
 import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-run-bridge";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 import { applyPlanPatch, compileEditablePlan } from "@chrona/domain";
 import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 import type {
-  EditablePlan,
   PlanPatch,
   PlanPatchOperation,
   EditableNode,
@@ -46,7 +45,7 @@ function rawToTaskNode(raw: Record<string, unknown>, id: string): EditableTaskNo
   };
 }
 
-function rawToEdge(raw: Record<string, unknown>, id: string): EditableEdge {
+function _rawToEdge(raw: Record<string, unknown>, _id: string): EditableEdge {
   return {
     from: raw.fromNodeId as string,
     to: raw.toNodeId as string,

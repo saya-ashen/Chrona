@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import type { StructuredSuggestion } from "@chrona/contracts";
 import { createLogger, summarizeText } from "@chrona/db/logger";
-import type { TaskPlanStatus } from "@chrona/contracts/ai";
+
 import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/engine";
 import { OpenClawClient } from "@chrona/providers-core";
 

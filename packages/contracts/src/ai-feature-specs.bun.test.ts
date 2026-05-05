@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
   buildSuggestFeatureSpec,
-  GENERATE_TASK_PLAN_GRAPH_TOOL_NAME,
+  GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   buildGeneratePlanFeatureSpec,
   validatePreparedFeaturePayload,
 } from "./ai";
@@ -22,7 +22,7 @@ describe("generate_plan feature spec", () => {
       toolChoice: "required",
       requiredTool: {
         type: "function",
-        name: GENERATE_TASK_PLAN_GRAPH_TOOL_NAME,
+        name: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
       },
     });
     expect(spec.instructions).toContain("You MUST call the business tool generate_task_plan_graph.");
