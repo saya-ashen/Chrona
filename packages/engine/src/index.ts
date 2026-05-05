@@ -64,12 +64,31 @@ export {
   savePlanRun,
   getPlanRun,
   getLatestPlanRun,
-} from "./modules/plan-execution";
+} from "./modules/plan-execution/plan-run-store";
 
 export {
-  createPlanRunFromGraph,
-  applyCommandAndSyncGraph,
-} from "./modules/plan-execution";
+  appendLayer,
+  getLayers,
+} from "./modules/plan-execution/plan-run-store";
+
+export {
+  createPlanRunFromCompiledPlan,
+  applyCommandAndProduceLayer,
+  buildResultLayer,
+} from "./modules/plan-execution/plan-run-bridge";
+
+export {
+  saveCompiledPlan,
+  getCompiledPlan,
+  getAcceptedCompiledPlan,
+  getLatestCompiledPlan,
+  getEditablePlan,
+} from "./modules/plan-execution/compiled-plan-store";
+
+export {
+  resolveEffectivePlanGraph,
+  compileEditablePlan,
+} from "@chrona/domain";
 
 export { getInbox } from "./modules/queries/get-inbox";
 export { getMemoryConsole } from "./modules/queries/get-memory-console";
@@ -87,14 +106,7 @@ export { startAutoStartScheduler } from "./modules/scheduler/auto-start-runner";
 export { overrideRuntimeExecutionAdapter } from "./modules/task-execution/execution-registry";
 export { ensureDefaultTaskSession } from "./modules/task-execution/task-sessions";
 
-export {
-  acceptTaskPlanGraph,
-  enrichPlanGraphNodes,
-  getAcceptedTaskPlanGraph,
-  getLatestTaskPlanGraph,
-  saveTaskPlanGraph,
-} from "./modules/tasks/task-plan-graph-store";
-export { compilePlanBlueprint } from "./modules/tasks/plan-blueprint-compiler";
+export { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "./modules/tasks/plan-blueprint-compiler";
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
 

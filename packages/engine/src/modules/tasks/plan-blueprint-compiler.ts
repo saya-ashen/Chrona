@@ -4,12 +4,10 @@ import type {
   AIPlanEdge,
   AIPlanOutput,
   AIPlanNode,
-  CompiledPlanCompletionPolicy,
-  TaskPlanEdge,
-  TaskPlanEdgeType,
-  TaskPlanGraph,
-  TaskPlanNode,
   CompiledPlan,
+  RuntimeLayer,
+  LayerSource,
+  PlanOverlayLayer,
 } from "@chrona/contracts/ai";
 import { PlanCompileError, upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 import { compileEditablePlan } from "@chrona/domain";
@@ -19,145 +17,6 @@ const HIGH_RISK_PATTERN = /\b(send|email|message|calendar|schedule|book|pay|purc
 
 function compileIssue(path: string, message: string) {
   return { path, message };
-}
-
-function deriveExecution(node: AIPlanNode): Pick<
-  TaskPlanNode,
-  "executionMode" | "requiresHumanInput" | "requiresHumanApproval" | "autoRunnable" | "blockingReason"
-> {
-  switch (node.type) {
-    case "task": {
-      const requiresHumanInput = node.executor === "user" || node.mode === "manual";
-      return {
-        executionMode: requiresHumanInput ? "manual" : "automatic",
-        requiresHumanInput,
-        requiresHumanApproval: false,
-        autoRunnable: !requiresHumanInput,
-        blockingReason: requiresHumanInput ? "needs_user_input" : null,
-      };
-    }
-    case "checkpoint": {
-      const requiresHumanApproval = node.checkpointType === "approve" || node.checkpointType === "confirm";
-      return {
-        executionMode: "manual",
-        requiresHumanInput: true,
-        requiresHumanApproval,
-        autoRunnable: false,
-        blockingReason: requiresHumanApproval ? "needs_approval" : "needs_user_input",
-      };
-    }
-    case "condition": {
-      const requiresHumanInput = node.evaluationBy === "user";
-      return {
-        executionMode: requiresHumanInput ? "manual" : "automatic",
-        requiresHumanInput,
-        requiresHumanApproval: false,
-        autoRunnable: !requiresHumanInput,
-        blockingReason: requiresHumanInput ? "needs_user_input" : null,
-      };
-    }
-    case "wait":
-      return {
-        executionMode: "automatic",
-        requiresHumanInput: false,
-        requiresHumanApproval: false,
-        autoRunnable: true,
-        blockingReason: null,
-      };
-  }
-}
-
-function buildTaskPlanNode(node: AIPlanNode, runtimeId: string): TaskPlanNode {
-  const execution = deriveExecution(node);
-  switch (node.type) {
-    case "task":
-      return {
-        id: runtimeId,
-        localId: node.id,
-        type: node.type,
-        title: node.title,
-        objective: node.expectedOutput ?? node.completionCriteria ?? node.title,
-        description: null,
-        status: "pending",
-        phase: null,
-        estimatedMinutes: node.estimatedMinutes ?? null,
-        priority: null,
-        linkedTaskId: null,
-        completionSummary: null,
-        metadata: {
-          executor: node.executor,
-          mode: node.mode,
-          expectedOutput: node.expectedOutput,
-          completionCriteria: node.completionCriteria,
-        },
-        ...execution,
-      };
-    case "checkpoint":
-      return {
-        id: runtimeId,
-        localId: node.id,
-        type: node.type,
-        title: node.title,
-        objective: node.prompt,
-        description: null,
-        status: "pending",
-        phase: null,
-        estimatedMinutes: 5,
-        priority: null,
-        linkedTaskId: null,
-        completionSummary: null,
-        metadata: {
-          checkpointType: node.checkpointType,
-          prompt: node.prompt,
-          required: node.required,
-          options: node.options,
-          inputFields: node.inputFields,
-        },
-        ...execution,
-      };
-    case "condition":
-      return {
-        id: runtimeId,
-        localId: node.id,
-        type: node.type,
-        title: node.title,
-        objective: node.condition,
-        description: null,
-        status: "pending",
-        phase: null,
-        estimatedMinutes: 5,
-        priority: null,
-        linkedTaskId: null,
-        completionSummary: null,
-        metadata: {
-          condition: node.condition,
-          evaluationBy: node.evaluationBy,
-          branches: node.branches,
-          defaultNextNodeId: node.defaultNextNodeId,
-        },
-        ...execution,
-      };
-    case "wait":
-      return {
-        id: runtimeId,
-        localId: node.id,
-        type: node.type,
-        title: node.title,
-        objective: `Wait for: ${node.waitFor}`,
-        description: null,
-        status: "pending",
-        phase: null,
-        estimatedMinutes: node.estimatedMinutes ?? node.timeout?.minutes ?? null,
-        priority: null,
-        linkedTaskId: null,
-        completionSummary: null,
-        metadata: {
-          waitFor: node.waitFor,
-          timeout: node.timeout,
-        },
-        ...execution,
-      };
-  }
 }
 
 function branchEdges(nodes: AIPlanOutput["nodes"]): AIPlanEdge[] {
@@ -176,19 +35,6 @@ function branchEdges(nodes: AIPlanOutput["nodes"]): AIPlanEdge[] {
 
 function edgeKey(edge: AIPlanEdge) {
   return `${edge.from}->${edge.to}->${edge.label ?? ""}`;
-}
-
-function buildCompiledEdges(edges: AIPlanEdge[], localToRuntimeId: Map<string, string>): TaskPlanEdge[] {
-  return edges.map((edge, index) => ({
-    id: `edge_${index + 1}_${randomUUID()}`,
-    fromNodeId: localToRuntimeId.get(edge.from)!,
-    toNodeId: localToRuntimeId.get(edge.to)!,
-    type: edge.label ? ("depends_on" as TaskPlanEdgeType) : ("sequential" as TaskPlanEdgeType),
-    metadata: edge.label ? { label: edge.label, localFromNodeId: edge.from, localToNodeId: edge.to } : {
-      localFromNodeId: edge.from,
-      localToNodeId: edge.to,
-    },
-  }));
 }
 
 function assertDag(nodeIds: string[], edges: AIPlanEdge[]) {
@@ -245,17 +91,7 @@ function checkHighRiskTasks(nodes: AIPlanOutput["nodes"], edges: AIPlanEdge[]) {
   return issues;
 }
 
-export function compilePlanBlueprint(input: {
-  taskId: string;
-  blueprint: AIPlanOutput;
-  graphId?: string;
-  prompt?: string | null;
-  generatedBy?: string | null;
-  source?: TaskPlanGraph["source"];
-  status?: TaskPlanGraph["status"];
-  revision?: number;
-  now?: string;
-}): TaskPlanGraph {
+function validateBlueprint(input: { blueprint: AIPlanOutput }) {
   const issues: Array<{ path: string; message: string }> = [];
   const seenNodeIds = new Set<string>();
 
@@ -314,48 +150,48 @@ export function compilePlanBlueprint(input: {
   if (issues.length > 0) {
     throw new PlanCompileError("Plan blueprint compilation failed", issues);
   }
+}
 
-  const graphId = input.graphId ?? `graph_${randomUUID()}`;
-  const now = input.now ?? new Date().toISOString();
-  const localToRuntimeId = new Map<string, string>(
-    input.blueprint.nodes.map((node) => [node.id, `${graphId}:node:${node.id}:${randomUUID()}`]),
-  );
-  const nodes = input.blueprint.nodes.map((node) => buildTaskPlanNode(node, localToRuntimeId.get(node.id)!));
-  const edges = buildCompiledEdges(allEdges, localToRuntimeId);
+/**
+ * Compiles a loose AI blueprint (AIPlanOutput) into a CompiledPlan + initial RuntimeLayer.
+ * The RuntimeLayer sets entry nodes to "ready"; all others default to "pending".
+ */
+export function compilePlanBlueprint(input: {
+  taskId: string;
+  blueprint: AIPlanOutput;
+  planId?: string;
+  prompt?: string | null;
+  generatedBy?: string | null;
+  source?: LayerSource;
+}): { compiledPlan: CompiledPlan; initialLayer: RuntimeLayer; planId: string } {
+  validateBlueprint({ blueprint: input.blueprint });
 
-  const indegree = new Map<string, number>(nodes.map((node) => [node.id, 0]));
-  const outdegree = new Map<string, number>(nodes.map((node) => [node.id, 0]));
-  for (const edge of edges) {
-    indegree.set(edge.toNodeId, (indegree.get(edge.toNodeId) ?? 0) + 1);
-    outdegree.set(edge.fromNodeId, (outdegree.get(edge.fromNodeId) ?? 0) + 1);
+  const planId = input.planId ?? `plan_${randomUUID().slice(0, 8)}`;
+  const editable = upgradeBlueprintToEditable(input.blueprint, planId, 1);
+  const compiledPlan = compileEditablePlan(editable);
+
+  // Initial RuntimeLayer: mark entry nodes as ready
+  const nodeStates: Record<string, { status: "ready" }> = {};
+  for (const entryId of compiledPlan.entryNodeIds) {
+    nodeStates[entryId] = { status: "ready" };
   }
 
-  const completionPolicy: CompiledPlanCompletionPolicy = { type: "all_tasks_completed" };
-
-  return {
-    id: graphId,
-    taskId: input.taskId,
-    status: input.status ?? "draft",
-    revision: input.revision ?? 1,
+  const initialLayer: RuntimeLayer = {
+    type: "runtime",
+    planId,
+    timestamp: new Date().toISOString(),
+    layerId: `layer_${randomUUID().slice(0, 12)}`,
+    version: 1,
+    active: true,
     source: input.source ?? "ai",
-    generatedBy: input.generatedBy ?? null,
-    prompt: input.prompt ?? null,
-    summary: input.blueprint.title,
-    changeSummary: null,
-    blueprint: input.blueprint,
-    completionPolicy,
-    entryNodeIds: nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0).map((node) => node.id),
-    terminalNodeIds: nodes.filter((node) => (outdegree.get(node.id) ?? 0) === 0).map((node) => node.id),
-    createdAt: now,
-    updatedAt: now,
-    nodes,
-    edges,
+    nodeStates,
   };
+
+  return { compiledPlan, initialLayer, planId };
 }
 
 /**
  * Compiles a loose AI blueprint (AIPlanOutput) into a new-architecture CompiledPlan.
- * Uses the domain-layer compileEditablePlan underneath.
  */
 export function compileBlueprintToCompiledPlan(blueprint: AIPlanOutput): CompiledPlan {
   const planId = `plan_${randomUUID().slice(0, 8)}`;

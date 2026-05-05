@@ -1,4 +1,4 @@
-import type { TaskPlanNode, TaskPlanGraph } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, EffectivePlanGraph } from "@chrona/contracts/ai";
 
 export type NodeSessionDecision =
   | { kind: "main_session"; reason: string }
@@ -11,76 +11,69 @@ export type NodeSessionDecision =
   | { kind: "manual_only"; reason: string };
 
 export type SessionPolicyInput = {
-  node: TaskPlanNode;
-  plan: TaskPlanGraph;
+  node: EffectivePlanNode;
+  plan: EffectivePlanGraph;
   parentTaskId: string;
 };
 
 const LONG_ESTIMATED_MINUTES = 20;
-
 const CHILD_SESSION_NODE_TYPES = new Set<string>(["task"]);
 
-function looksLikeMultiStep(node: TaskPlanNode): boolean {
-  const text = `${node.title} ${node.objective} ${node.description ?? ""}`.toLowerCase();
+function looksLikeMultiStep(node: EffectivePlanNode): boolean {
+  const config = node.config as Record<string, unknown>;
+  const objective = typeof config.objective === "string" ? config.objective : "";
+  const text = `${node.title} ${objective}`.toLowerCase();
   const multiStepTerms = [
-    "implement",
-    "refactor",
-    "build",
-    "create",
-    "develop",
-    "migrate",
-    "deploy",
-    "integrate",
-    "rewrite",
-    "restructure",
-    "investigate",
-    "audit",
-    "review",
+    "implement", "refactor", "build", "create",
+    "develop", "migrate", "deploy", "integrate",
+    "rewrite", "restructure", "investigate", "audit", "review",
   ];
   return multiStepTerms.some((term) => text.includes(term));
 }
 
-function readSessionStrategy(node: TaskPlanNode): string | undefined {
-  if (node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)) {
-    const raw = (node.metadata as Record<string, unknown>).sessionStrategy;
-    if (typeof raw === "string") return raw;
-  }
-  return undefined;
+function readSessionStrategy(node: EffectivePlanNode): string | undefined {
+  const config = node.config as Record<string, unknown>;
+  const strategy = config.sessionStrategy;
+  return typeof strategy === "string" ? strategy : undefined;
+}
+
+function isUserTask(node: EffectivePlanNode): boolean {
+  return node.executor === "user" || node.mode === "manual";
+}
+
+function needsApproval(node: EffectivePlanNode): boolean {
+  if (node.type !== "checkpoint") return false;
+  const config = node.config as Record<string, unknown>;
+  const checkpointType = config.checkpointType;
+  return checkpointType === "approve" || checkpointType === "confirm";
 }
 
 export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessionDecision {
   const { node } = input;
 
-  if (node.status === "done" || node.status === "skipped") {
+  if (node.status === "completed" || node.status === "skipped") {
     return { kind: "main_session", reason: "Node already completed" };
   }
 
-  if (node.status === "in_progress" || node.status === "waiting_for_child") {
-    return { kind: "main_session", reason: "Node already executing, let it continue" };
+  if (node.status === "running") {
+    return { kind: "main_session", reason: "Node already executing" };
   }
 
-  if (node.requiresHumanInput) {
+  if (isUserTask(node)) {
     return {
       kind: "wait_for_user",
-      reason: `Node ${node.id} requires human input: ${node.objective}`,
+      reason: `Node ${node.id} requires human input: ${node.title}`,
     };
   }
 
-  if (!node.autoRunnable) {
-    return {
-      kind: "manual_only",
-      reason: `Node ${node.id} is not auto-runnable`,
-    };
-  }
-
-  if (node.requiresHumanApproval) {
+  if (needsApproval(node)) {
     return {
       kind: "manual_only",
       reason: `Node ${node.id} requires human approval`,
     };
   }
 
-  if (node.executionMode === "manual") {
+  if (node.mode === "manual") {
     return {
       kind: "manual_only",
       reason: `Node ${node.id} execution mode is manual`,
@@ -96,7 +89,8 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     };
   }
 
-  if (node.linkedTaskId) {
+  const config = node.config as Record<string, unknown>;
+  if (typeof config.linkedTaskId === "string" && config.linkedTaskId.length > 0) {
     return {
       kind: "child_session",
       reason: `Node ${node.id} already linked to child task`,
@@ -105,6 +99,7 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
   }
 
   if (
+    node.estimatedMinutes !== undefined &&
     node.estimatedMinutes !== null &&
     node.estimatedMinutes >= LONG_ESTIMATED_MINUTES
   ) {
@@ -128,7 +123,7 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     if (isShort) {
       return {
         kind: "main_session",
-        reason: `Node ${node.id} type ${node.type} is short (${node.estimatedMinutes}min) and simple, running in main session`,
+        reason: `Node ${node.id} type ${node.type} is short and simple, running in main session`,
       };
     }
     return {

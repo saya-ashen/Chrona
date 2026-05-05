@@ -37,9 +37,11 @@ import {
   suggestStream,
   generatePlanStream,
 } from "@/modules/ai/streaming";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import type { CompiledPlan, RuntimeLayer } from "@chrona/contracts/ai";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
-import { saveTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-run-bridge";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution
@@ -162,43 +164,50 @@ export async function* aiGeneratePlanStream(
 
       const { taskId, workspaceId, planningPrompt } = request;
 
-      const draftPlan: TaskPlanGraph = compilePlanBlueprint({
-        graphId: `graph-${taskId || "adhoc"}-${Date.now()}`,
+      const { compiledPlan, initialLayer, planId } = compilePlanBlueprint({
         taskId: taskId ?? "",
         blueprint: plan.blueprint,
         prompt: planningPrompt ?? null,
         generatedBy: plan.source ?? "ai",
         source: "ai",
-        status: "draft",
-        revision: 1,
       });
 
-      let savedPlan: { id: string; plan: TaskPlanGraph } | null = null;
+      let savedPlanId: string | null = null;
       if (taskId && workspaceId) {
-        savedPlan = await saveTaskPlanGraph({
+        await saveCompiledPlan({
           workspaceId,
           taskId,
-          plan: draftPlan,
-          prompt: planningPrompt ?? null,
+          compiledPlan,
           status: "draft",
-          source: "ai",
+          prompt: planningPrompt ?? null,
+          summary: plan.blueprint.title ?? null,
           generatedBy: plan.source ?? "ai",
-          summary: draftPlan.summary,
         });
+
+        const run = createPlanRunFromCompiledPlan(compiledPlan, [initialLayer]);
+        await savePlanRun({
+          workspaceId,
+          taskId,
+          planId,
+          run,
+          layers: [initialLayer],
+        });
+        savedPlanId = planId;
       }
 
       yield {
         type: "result",
         plan,
         source: plan.source,
-        planGraph: savedPlan?.plan ?? draftPlan,
-        savedPlan: savedPlan
+        compiledPlan,
+        planId,
+        savedPlan: savedPlanId
           ? {
-              id: savedPlan.id,
+              id: savedPlanId,
               status: "draft",
               prompt: planningPrompt ?? null,
               revision: 1,
-              summary: draftPlan.summary,
+              summary: plan.blueprint.title ?? "",
               updatedAt: new Date().toISOString(),
             }
           : undefined,

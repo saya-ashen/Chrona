@@ -4,8 +4,13 @@ import { startRun } from "@/modules/commands/start-run";
 import { materializeTaskPlan } from "@/modules/commands/materialize-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import { getAcceptedTaskPlanGraph, getReadyAutoRunnableNodes } from "@/modules/tasks/task-plan-graph-store";
-import type { TaskPlanGraph } from "@chrona/contracts/ai";
+import {
+  getAcceptedCompiledPlan,
+  getLatestCompiledPlan,
+} from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers } from "@/modules/plan-execution/plan-run-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
+import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 
 type SessionStrategy = "shared" | "per_subtask";
 
@@ -23,39 +28,32 @@ function isTerminalStatus(status: string) {
   return status === "Completed" || status === "Done" || status === "Cancelled" || status === "Failed";
 }
 
-function deriveParentTaskStatusFromPlan(plan: TaskPlanGraph): TaskStatus | null {
-  const statuses = plan.nodes.map((node) => node.status);
-
-  if (statuses.length === 0) {
-    return null;
-  }
-  if (statuses.some((status) => status === "blocked")) {
-    return TaskStatus.Blocked;
-  }
-  if (statuses.some((status) => status === "waiting_for_user")) {
-    return TaskStatus.WaitingForInput;
-  }
-  if (statuses.every((status) => status === "done" || status === "skipped")) {
-    return TaskStatus.Completed;
-  }
-  if (statuses.some((status) => status === "in_progress")) {
-    return TaskStatus.Running;
-  }
-  if (statuses.some((status) => status === "pending")) {
-    return TaskStatus.Ready;
-  }
+function deriveParentTaskStatusFromEffectivePlan(effective: EffectivePlanGraph): TaskStatus | null {
+  if (effective.nodes.length === 0) return null;
+  const anyBlocked = effective.nodes.some((n) => n.status === "blocked");
+  if (anyBlocked) return TaskStatus.Blocked;
+  const anyWaiting = effective.nodes.some((n) => n.status === "waiting_for_user");
+  if (anyWaiting) return TaskStatus.WaitingForInput;
+  const allDone = effective.nodes.every((n) => n.status === "completed" || n.status === "skipped");
+  if (allDone) return TaskStatus.Completed;
+  const anyRunning = effective.nodes.some((n) => n.status === "running");
+  if (anyRunning) return TaskStatus.Running;
+  const anyPending = effective.nodes.some((n) => n.status === "pending" || n.status === "ready");
+  if (anyPending) return TaskStatus.Ready;
   return null;
 }
 
 export async function syncParentTaskStateFromAcceptedPlan(parentTaskId: string) {
-  const acceptedPlan = await getAcceptedTaskPlanGraph(parentTaskId);
+  const accepted = await getAcceptedCompiledPlan(parentTaskId);
   const parentTask = await db.task.findUniqueOrThrow({ where: { id: parentTaskId } });
 
-  if (!acceptedPlan) {
+  if (!accepted) {
     return { parentCompleted: false, status: parentTask.status };
   }
 
-  const nextStatus = deriveParentTaskStatusFromPlan(acceptedPlan.plan);
+  const layers = await getLayers(parentTaskId, accepted.planId);
+  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
+  const nextStatus = deriveParentTaskStatusFromEffectivePlan(effective);
   if (!nextStatus) {
     return { parentCompleted: false, status: parentTask.status };
   }
@@ -76,9 +74,9 @@ export async function syncParentTaskStateFromAcceptedPlan(parentTaskId: string) 
 
 export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) {
   const parentTask = await db.task.findUniqueOrThrow({ where: { id: input.parentTaskId } });
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.parentTaskId);
+  const accepted = await getAcceptedCompiledPlan(input.parentTaskId);
 
-  if (!acceptedPlan) {
+  if (!accepted) {
     return {
       parentTaskId: input.parentTaskId,
       startedTaskIds: [],
@@ -88,8 +86,14 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
     };
   }
 
-  const readyNodes = getReadyAutoRunnableNodes(acceptedPlan.plan).filter((node) => !node.linkedTaskId);
-  const readyNodeIds = readyNodes.map((node) => node.id);
+  const layers = await getLayers(input.parentTaskId, accepted.planId);
+  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
+
+  // Find ready, auto-runnable, non-materialized nodes
+  const readyAutoNodes = effective.nodes.filter(
+    (n) => n.ready && !n.linkedTaskId,
+  );
+  const readyNodeIds = readyAutoNodes.map((n) => n.id);
 
   let materializedTaskIds: string[] = [];
   const startedTaskIds: string[] = [];
@@ -99,11 +103,13 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
     materializedTaskIds = materialized.createdTaskIds;
 
     if (materialized.createdTaskIds.length > 0) {
-      const refreshedAfterMaterialize = await getAcceptedTaskPlanGraph(input.parentTaskId);
+      // Re-read layers after materialization (which may have appended layers)
+      const refreshedLayers = await getLayers(input.parentTaskId, accepted.planId);
+      const refreshedEffective = resolveEffectivePlanGraph(accepted.compiledPlan, refreshedLayers);
       const readyTaskIds = new Set(
-        (refreshedAfterMaterialize?.plan.nodes ?? [])
-          .filter((node) => readyNodeIds.includes(node.id) && node.linkedTaskId)
-          .map((node) => node.linkedTaskId as string),
+        refreshedEffective.nodes
+          .filter((n) => readyNodeIds.includes(n.id) && n.linkedTaskId)
+          .map((n) => n.linkedTaskId as string),
       );
 
       const childTasks = await db.task.findMany({
@@ -113,9 +119,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
 
       const strategy = readSessionStrategy(parentTask.runtimeConfig);
       for (const childTask of childTasks) {
-        if (!readyTaskIds.has(childTask.id)) {
-          continue;
-        }
+        if (!readyTaskIds.has(childTask.id)) continue;
 
         const existingRunning = await db.run.findFirst({
           where: {
@@ -123,9 +127,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
             status: { in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] },
           },
         });
-        if (existingRunning) {
-          continue;
-        }
+        if (existingRunning) continue;
 
         if (strategy === "shared") {
           await db.task.update({
@@ -149,11 +151,12 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
     }
   }
 
-  const refreshedPlan = await getAcceptedTaskPlanGraph(input.parentTaskId);
+  // Re-check completion after progression
+  const finalLayers = await getLayers(input.parentTaskId, accepted.planId);
+  const finalEffective = resolveEffectivePlanGraph(accepted.compiledPlan, finalLayers);
   const allDone = Boolean(
-    refreshedPlan &&
-      refreshedPlan.plan.nodes.length > 0 &&
-      refreshedPlan.plan.nodes.every((node) => node.status === "done" || node.status === "skipped"),
+    finalEffective.nodes.length > 0 &&
+    finalEffective.nodes.every((n) => n.status === "completed" || n.status === "skipped"),
   );
 
   let parentCompleted = false;

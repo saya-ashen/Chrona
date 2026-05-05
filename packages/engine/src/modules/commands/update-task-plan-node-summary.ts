@@ -1,43 +1,42 @@
-import { saveTaskPlanGraph, getAcceptedTaskPlanGraph } from "@/modules/tasks/task-plan-graph-store";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { appendLayer } from "@/modules/plan-execution/plan-run-store";
+import type { ResultLayer, NodeResult } from "@chrona/contracts/ai";
 
 export async function updateTaskPlanNodeSummary(input: {
   taskId: string;
   nodeId: string;
   completionSummary: string | null;
 }) {
-  const acceptedPlan = await getAcceptedTaskPlanGraph(input.taskId);
-  if (!acceptedPlan) {
-    throw new Error("Accepted task plan graph not found");
-  }
-  if (!acceptedPlan.taskId) {
-    throw new Error("Accepted task plan graph is missing taskId");
+  const accepted = await getAcceptedCompiledPlan(input.taskId);
+  if (!accepted) {
+    throw new Error("Accepted compiled plan not found");
   }
 
-  const nextPlan = {
-    ...acceptedPlan.plan,
-    nodes: acceptedPlan.plan.nodes.map((node) =>
-      node.id === input.nodeId
-        ? {
-            ...node,
-            completionSummary:
-              typeof input.completionSummary === "string" && input.completionSummary.trim().length > 0
-                ? input.completionSummary.trim()
-                : null,
-          }
-        : node,
-    ),
+  const summary = typeof input.completionSummary === "string" &&
+    input.completionSummary.trim().length > 0
+    ? input.completionSummary.trim()
+    : undefined;
+
+  const layer: ResultLayer = {
+    type: "result",
+    planId: accepted.planId,
+    timestamp: new Date().toISOString(),
+    layerId: `result_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: 1,
+    active: true,
+    source: "user",
+    nodeResults: {
+      [input.nodeId]: {
+        outputSummary: summary ?? null,
+      } as NodeResult,
+    },
   };
 
-  await saveTaskPlanGraph({
-    workspaceId: acceptedPlan.workspaceId,
-    taskId: acceptedPlan.taskId,
-    plan: nextPlan,
-    prompt: acceptedPlan.prompt,
-    status: acceptedPlan.status,
-    source: acceptedPlan.source,
-    generatedBy: acceptedPlan.generatedBy,
-    summary: acceptedPlan.summary,
-    changeSummary: acceptedPlan.changeSummary,
+  await appendLayer({
+    workspaceId: accepted.workspaceId,
+    taskId: input.taskId,
+    planId: accepted.planId,
+    layer,
   });
 
   return { taskId: input.taskId, nodeId: input.nodeId };

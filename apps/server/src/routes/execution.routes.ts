@@ -10,7 +10,7 @@ import {
   decideScheduleProposal,
   ensureProposalInWorkspace,
   ensureTaskInWorkspace,
-  getAcceptedTaskPlanGraph,
+  getAcceptedCompiledPlan,
   getActiveMessageableRun,
   getAssistantMessages,
   getTaskOrThrow,
@@ -47,7 +47,7 @@ export function createExecutionRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      const acceptedPlan = await getAcceptedCompiledPlan(taskId);
       if (!acceptedPlan) {
         return error(c, "No accepted plan. Create or accept a plan before execution.", 400);
       }
@@ -79,7 +79,7 @@ export function createExecutionRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      const acceptedPlan = await getAcceptedCompiledPlan(taskId);
       if (acceptedPlan) {
         const result = await startPlanExecution({
           taskId,
@@ -106,7 +106,7 @@ export function createExecutionRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      const acceptedPlan = await getAcceptedCompiledPlan(taskId);
       if (acceptedPlan && task.status === "WaitingForInput") {
         const result = await continuePlanExecution({
           taskId,
@@ -141,7 +141,7 @@ export function createExecutionRoutes() {
 
       const task = await getTaskOrThrow(taskId);
 
-      const acceptedPlan = await getAcceptedTaskPlanGraph(taskId);
+      const acceptedPlan = await getAcceptedCompiledPlan(taskId);
       if (acceptedPlan) {
         const trigger = task.status === "WaitingForInput" ? "user_provided_input" : "user_message";
         const result = await continuePlanExecution({

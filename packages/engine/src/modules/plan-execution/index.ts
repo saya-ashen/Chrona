@@ -8,6 +8,8 @@ export {
 
 export { settlePlanNodeFromRun } from "./settle-node-run";
 
-export { savePlanRun, getPlanRun, getLatestPlanRun } from "./plan-run-store";
+export { savePlanRun, getPlanRun, getLatestPlanRun, appendLayer, getLayers } from "./plan-run-store";
 
-export { createPlanRunFromGraph, applyCommandAndSyncGraph } from "./plan-run-bridge";
+export { getAcceptedCompiledPlan, saveCompiledPlan } from "./compiled-plan-store";
+
+export { createPlanRunFromCompiledPlan, applyCommandAndProduceLayer } from "./plan-run-bridge";

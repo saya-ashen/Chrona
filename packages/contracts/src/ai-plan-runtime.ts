@@ -1,3 +1,5 @@
+export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
+
 import type {
   PlanBlueprint,
   ValidationWarning,
@@ -58,6 +60,9 @@ export interface CompiledNode {
   localId: string;
   type: "task" | "checkpoint" | "condition" | "wait";
   title: string;
+  description?: string;
+  priority?: TaskPriority;
+  linkedTaskId?: string;
   config: NodeConfig;
   dependencies: string[];
   dependents: string[];
@@ -84,6 +89,7 @@ export interface CompiledPlan {
   edges: CompiledEdge[];
   entryNodeIds: string[];
   terminalNodeIds: string[];
+  topologicalOrder: string[];
   completionPolicy: CompiledPlanCompletionPolicy;
   validationWarnings: ValidationWarning[];
 }
@@ -99,6 +105,8 @@ export type NodeRuntimeStatus =
   | "ready"
   | "running"
   | "blocked"
+  | "waiting_for_user"
+  | "waiting_for_approval"
   | "completed"
   | "failed"
   | "cancelled"
@@ -176,6 +184,149 @@ export type RuntimeCommand =
   | { type: "approve_checkpoint"; nodeId: string; response?: unknown }
   | { type: "reject_checkpoint"; nodeId: string; reason?: string }
   | { type: "retry_node"; nodeId: string };
+
+// ═══════════════════════════════════════════════════════════════
+// Layer 5: Plan Overlay Model (EffectivePlanGraph)
+// ═══════════════════════════════════════════════════════════════
+//
+// CompiledPlanBase is the immutable base graph (CompiledPlan).
+// All mutations, state, and results are append-only overlay
+// layers stacked on top.
+//
+//   CompiledPlanBase
+//     + StructuralLayer(s)
+//     + RuntimeLayer(s)
+//     + ResultLayer(s)
+//     = EffectivePlanGraph
+//
+// PlanRunner reads resolve() output; never mutates base or
+// layers directly.
+
+export type LayerSource = "user" | "ai" | "system";
+
+// ─── Structural Layer ───
+
+export type StructuralOperation =
+  | { op: "add_node"; nodeId: string; localId: string; type: "task" | "checkpoint" | "condition" | "wait"; title: string; config: NodeConfig; executor?: TaskExecutor; mode?: TaskMode; estimatedMinutes?: number }
+  | { op: "update_node"; nodeId: string; patch: Partial<Pick<CompiledNode, "title" | "type" | "config" | "executor" | "mode" | "estimatedMinutes">> }
+  | { op: "delete_node"; nodeId: string }
+  | { op: "add_edge"; from: string; to: string; label?: string }
+  | { op: "delete_edge"; from: string; to: string }
+  | { op: "replace_subgraph"; removeNodeIds: string[]; addNodes: Array<{ nodeId: string; localId: string; type: "task" | "checkpoint" | "condition" | "wait"; title: string; config: NodeConfig; executor?: TaskExecutor; mode?: TaskMode; estimatedMinutes?: number }>; addEdges: Array<{ from: string; to: string; label?: string }> };
+
+export interface StructuralLayer {
+  layerId: string;
+  planId: string;
+  type: "structural";
+  version: number;
+  source: LayerSource;
+  active: boolean;
+  timestamp: string;
+  rationale?: string;
+  operations: StructuralOperation[];
+}
+
+// ─── Runtime Layer (execution status) ───
+
+export interface RuntimeLayer {
+  layerId: string;
+  planId: string;
+  type: "runtime";
+  version: number;
+  active: boolean;
+  timestamp: string;
+  source?: LayerSource;
+  /** nodeId → status update. Only changed nodes need entries. Each entry must include 'status'; other fields are optional. */
+  nodeStates: Record<string, Pick<NodeRuntimeState, "status"> & Partial<Pick<NodeRuntimeState, "attempts" | "lastError" | "startedAt" | "completedAt">>>;
+}
+
+// ─── Result Layer (execution output) ───
+
+export interface NodeResult {
+  outputSummary?: string;
+  artifactRefs?: ArtifactRef[];
+  checkpointResponse?: CheckpointResponse["response"];
+  error?: string;
+}
+
+export interface ResultLayer {
+  layerId: string;
+  planId: string;
+  type: "result";
+  version: number;
+  active: boolean;
+  timestamp: string;
+  source?: LayerSource;
+  /** nodeId → result. Only nodes that produced results need entries. */
+  nodeResults: Record<string, NodeResult>;
+}
+
+export type PlanOverlayLayer = StructuralLayer | RuntimeLayer | ResultLayer;
+
+// ─── Effective Plan Graph (resolved view) ───
+
+export interface EffectivePlanNode {
+  /** Stable compiled node ID */
+  id: string;
+  /** Original editable plan node ID */
+  localId: string;
+  type: "task" | "checkpoint" | "condition" | "wait";
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  linkedTaskId?: string;
+  config: NodeConfig;
+  executor?: TaskExecutor;
+  mode?: TaskMode;
+  estimatedMinutes?: number;
+  /** Compiled node IDs this node depends on */
+  dependencies: string[];
+  /** Compiled node IDs that depend on this node */
+  dependents: string[];
+  /** Merged from latest active RuntimeLayer */
+  status: NodeRuntimeStatus;
+  attempts: number;
+  lastError?: string;
+  startedAt?: string;
+  completedAt?: string;
+  /** Merged from latest active ResultLayer */
+  result?: NodeResult;
+  /** Reason why node is blocked or waiting */
+  blockedReason?: string;
+  /** Engine-level metadata (e.g. linkedTaskId for materialized child tasks) */
+  metadata: Record<string, unknown>;
+  /** Computed: all dependencies are completed/skipped */
+  dependenciesSatisfied: boolean;
+  /** Computed: can be executed now */
+  ready: boolean;
+}
+
+export interface EffectivePlanEdge {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;
+}
+
+export interface EffectivePlanGraph {
+  planId: string;
+  basePlanId: string;
+  /** max(activeLayers.version) */
+  resolvedVersion: number;
+  nodes: EffectivePlanNode[];
+  edges: EffectivePlanEdge[];
+  /** Computed: nodes with no incoming edges */
+  entryNodeIds: string[];
+  /** Computed: nodes with no outgoing edges */
+  terminalNodeIds: string[];
+  /** Denormalized subsets for fast runtime lookup */
+  readyNodeIds: string[];
+  blockedNodeIds: string[];
+  completedNodeIds: string[];
+  runningNodeIds: string[];
+  failedNodeIds: string[];
+  pendingNodeIds: string[];
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Legacy types retained for backward compatibility

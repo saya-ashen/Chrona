@@ -1,4 +1,4 @@
-import type { TaskPlanNode, TaskPlanGraph, PlanUpdatePatch } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 import type { NodeSessionDecision } from "./session-policy";
 import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session";
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
@@ -15,46 +15,13 @@ export type NodeExecutionEvidence = {
 };
 
 export type NodeExecutionResult =
-  | {
-      status: "done";
-      summary: string;
-      evidence: NodeExecutionEvidence;
-      output?: unknown;
-    }
-  | {
-      status: "waiting_for_user";
-      prompt: string;
-      reason: string;
-      evidence?: NodeExecutionEvidence;
-    }
-  | {
-      status: "waiting_for_approval";
-      prompt: string;
-      reason: string;
-      evidence?: NodeExecutionEvidence;
-    }
-  | {
-      status: "blocked";
-      reason: string;
-      evidence?: NodeExecutionEvidence;
-    }
-  | {
-      status: "replan_required";
-      reason: string;
-      evidence?: NodeExecutionEvidence;
-      proposedPatch?: PlanUpdatePatch;
-    }
-  | {
-      status: "child_running";
-      summary: string;
-      evidence: NodeExecutionEvidence;
-      output?: unknown;
-    }
-  | {
-      status: "failed";
-      error: string;
-      evidence?: NodeExecutionEvidence;
-    };
+  | { status: "done"; summary: string; evidence: NodeExecutionEvidence; output?: unknown }
+  | { status: "waiting_for_user"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
+  | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
+  | { status: "blocked"; reason: string; evidence?: NodeExecutionEvidence }
+  | { status: "replan_required"; reason: string; evidence?: NodeExecutionEvidence; proposedPatch?: PlanPatch }
+  | { status: "child_running"; summary: string; evidence: NodeExecutionEvidence; output?: unknown }
+  | { status: "failed"; error: string; evidence?: NodeExecutionEvidence };
 
 export type NodeExecutorInput = {
   taskId: string;
@@ -64,27 +31,28 @@ export type NodeExecutorInput = {
     taskId: string;
     sessionKey: string;
   };
-  node: TaskPlanNode;
-  plan: TaskPlanGraph;
+  node: EffectivePlanNode;
+  plan: EffectivePlanGraph;
   sessionDecision: NodeSessionDecision;
   trigger: "manual" | "scheduler" | "system" | "auto";
+  runtimeName: string;
 };
 
 function buildInstructions(input: NodeExecutorInput): string {
   const completedNodes = input.plan.nodes
-    .filter((n) => n.status === "done" || n.status === "skipped")
+    .filter((n) => n.status === "completed" || n.status === "skipped")
     .map((n) => n.title);
 
+  const nodeConfig = input.node.config as Record<string, unknown>;
+  const objective = typeof nodeConfig.objective === "string" ? nodeConfig.objective : input.node.title;
+
   return [
-    `Task: ${input.plan.summary ?? "Execute plan node"}`,
+    `Task: ${input.plan.planId}`,
     `Current node: [${input.node.id}] ${input.node.title}`,
-    `Objective: ${input.node.objective}`,
+    `Objective: ${objective}`,
     completedNodes.length > 0
       ? `Already completed: ${completedNodes.join(", ")}`
       : "",
-    "IMPORTANT: Return the node status as one of: done, waiting_for_user, blocked, replan_required.",
-    "Do NOT skip steps that require human input.",
-    "Do NOT fabricate user input.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -93,31 +61,20 @@ function buildInstructions(input: NodeExecutorInput): string {
 export async function executePlanNode(
   input: NodeExecutorInput,
 ): Promise<NodeExecutionResult> {
-  const { node, sessionDecision } = input;
+  const { node, sessionDecision, runtimeName } = input;
 
   // Guard: already done
-  if (node.status === "done" || node.status === "skipped") {
-    return {
-      status: "done",
-      summary: node.completionSummary ?? `Node ${node.id} was already completed`,
-      evidence: {},
-    };
-  }
-
-  // Ensure in_progress marker
-  if (node.status !== "in_progress") {
-    return {
-      status: "blocked",
-      reason: `Node ${node.id} status is ${node.status}, must be set to in_progress before execution`,
-      evidence: {},
-    };
+  if (node.status === "completed" || node.status === "skipped") {
+    const nodeConfig = input.node.config as Record<string, unknown>;
+    const summary = typeof nodeConfig.completionSummary === "string" ? nodeConfig.completionSummary : `Node ${node.id} was already completed`;
+    return { status: "done", summary, evidence: {} };
   }
 
   switch (sessionDecision.kind) {
     case "wait_for_user":
       return {
         status: "waiting_for_user",
-        prompt: `Please provide input for: ${node.objective}`,
+        prompt: `Please provide input for: ${node.title}`,
         reason: sessionDecision.reason,
         evidence: { sessionId: input.mainSession.id },
       };
@@ -142,7 +99,7 @@ export async function executePlanNode(
           planId: input.planId,
           nodeId: node.id,
           nodeTitle: node.title,
-          runtimeName: input.mainSession.sessionKey.includes("openclaw") ? "openclaw" : undefined,
+          runtimeName,
         });
 
         childSessionId = childSession.sessionId;
@@ -154,7 +111,7 @@ export async function executePlanNode(
             childSessionId: childSession.sessionId,
             childSessionKey: childSession.sessionKey,
             prompt: instructions,
-            runtimeName: input.mainSession.sessionKey.includes("openclaw") ? "openclaw" : undefined,
+            runtimeName,
           });
           childRunId = childRun.runId;
         } else {
@@ -169,7 +126,7 @@ export async function executePlanNode(
         };
       }
 
-      // Check if the child run completed synchronously (has assistant output)
+      // Check if the child run completed synchronously
       if (childRunId) {
         const hasAssistant = await db.conversationEntry.findFirst({
           where: { runId: childRunId, role: "assistant" },
@@ -199,10 +156,7 @@ export async function executePlanNode(
           runId: childRunId,
           childTaskId,
         },
-        output: {
-          instructions,
-          pendingChildExecution: true,
-        },
+        output: { instructions, pendingChildExecution: true },
       };
     }
 
@@ -216,7 +170,7 @@ export async function executePlanNode(
           data: {
             taskId: input.taskId,
             taskSessionId: input.mainSession.id,
-            runtimeName: "openclaw",
+            runtimeName,
             runtimeSessionRef: input.mainSession.sessionKey,
             status: RunStatus.Pending,
             triggeredBy: "system",
@@ -225,7 +179,7 @@ export async function executePlanNode(
           },
         });
 
-        const adapter = await createRuntimeExecutionAdapter("openclaw");
+        const adapter = await createRuntimeExecutionAdapter(runtimeName);
         const created = await adapter.createRun({
           prompt: instructions,
           runtimeInput: {},
@@ -244,8 +198,6 @@ export async function executePlanNode(
           };
         }
 
-        // Persist the runtime output immediately — the adapter's in-memory sessions
-        // are lost when this function returns, so we must read output now.
         const history = await adapter.readHistory({ runtimeSessionKey: input.mainSession.sessionKey }) as {
           messages?: Array<{ role?: string; content?: string }>;
         };
@@ -268,9 +220,7 @@ export async function executePlanNode(
                 },
               });
               totalSaved++;
-              if (msg.role === "assistant") {
-                hasAssistantOutput = true;
-              }
+              if (msg.role === "assistant") hasAssistantOutput = true;
             }
           }
         }

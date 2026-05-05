@@ -19,6 +19,19 @@ export type EnsureNodeChildSessionResult = {
   childTaskId: string | undefined;
 };
 
+export type StartNodeChildRunInput = {
+  taskId: string;
+  childSessionId: string;
+  childSessionKey: string;
+  prompt: string;
+  runtimeName?: string;
+};
+
+export type StartNodeChildRunResult = {
+  runId: string;
+  runtimeRunRef: string | null;
+};
+
 function buildNodeChildSessionKey(input: {
   taskId: string;
   runtimeName: string;
@@ -70,7 +83,7 @@ export async function ensureNodeChildSession(
     taskTitle: task.title,
     runtimeName,
     suffix: `plan-${input.planId}-node-${input.nodeId}`,
-    label: `${task.title} · ${input.nodeTitle} · Plan node child session`,
+    label: `${task.title} \u00b7 ${input.nodeTitle} \u00b7 Plan node child session`,
   });
 
   return {
@@ -81,13 +94,9 @@ export async function ensureNodeChildSession(
   };
 }
 
-export async function startNodeChildRun(input: {
-  taskId: string;
-  childSessionId: string;
-  childSessionKey: string;
-  prompt: string;
-  runtimeName?: string;
-}): Promise<{ runId: string; runtimeRunRef: string | null }> {
+export async function startNodeChildRun(
+  input: StartNodeChildRunInput,
+): Promise<StartNodeChildRunResult> {
   const runtimeName = input.runtimeName ?? "openclaw";
 
   const { RunStatus } = await import("@/generated/prisma/client");
@@ -97,7 +106,6 @@ export async function startNodeChildRun(input: {
     select: { workspaceId: true, runtimeInput: true, runtimeInputVersion: true, runtimeModel: true, runtimeConfig: true },
   });
 
-  // Create run record as Pending first
   const run = await db.run.create({
     data: {
       taskId: input.taskId,
@@ -111,7 +119,6 @@ export async function startNodeChildRun(input: {
     },
   });
 
-  // Actually invoke the runtime
   let runtimeRunRef: string | null = null;
   try {
     const { createRuntimeExecutionAdapter } = await import("@/modules/task-execution/execution-registry");
@@ -135,8 +142,6 @@ export async function startNodeChildRun(input: {
       },
     });
 
-    // Persist the runtime output immediately — the adapter's in-memory sessions
-    // are lost when this function returns, so we must read output now.
     let hasAssistantOutput = false;
     try {
       const runtimeSessionKey = created.runtimeSessionKey ?? created.runtimeSessionRef ?? input.childSessionKey;
@@ -186,7 +191,6 @@ export async function startNodeChildRun(input: {
       });
     }
   } catch (err) {
-    // Runtime invoke failed — mark run as Failed
     const message = err instanceof Error ? err.message : "Unknown error";
     await db.run.update({
       where: { id: run.id },

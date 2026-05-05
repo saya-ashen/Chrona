@@ -1,11 +1,17 @@
 import { TaskPriority, TaskStatus, type Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import type { TaskPlanEdge, TaskPlanNode } from "@chrona/contracts/ai";
 import {
-  getAcceptedTaskPlanGraph,
-  getLatestTaskPlanGraph,
-  saveTaskPlanGraph,
-} from "@/modules/tasks/task-plan-graph-store";
+  getAcceptedCompiledPlan,
+  getLatestCompiledPlan,
+} from "@/modules/plan-execution/compiled-plan-store";
+import { getLayers, appendLayer } from "@/modules/plan-execution/plan-run-store";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
+import type {
+  RuntimeLayer,
+  EffectivePlanGraph,
+  EffectivePlanNode,
+  TaskConfig,
+} from "@chrona/contracts/ai";
 
 function normalizePriority(priority: string | null | undefined): TaskPriority {
   switch (priority) {
@@ -20,11 +26,11 @@ function normalizePriority(priority: string | null | undefined): TaskPriority {
   }
 }
 
-function deriveTaskStatus(node: TaskPlanNode): TaskStatus {
-  switch (node.status) {
-    case "in_progress":
+function deriveTaskStatus(nodeStatus: string): TaskStatus {
+  switch (nodeStatus) {
+    case "running":
       return TaskStatus.Running;
-    case "done":
+    case "completed":
       return TaskStatus.Completed;
     case "blocked":
       return TaskStatus.Blocked;
@@ -48,29 +54,27 @@ function createTaskProjectionData(params: {
   } satisfies Prisma.TaskProjectionUncheckedCreateInput;
 }
 
-function isMaterializableNode(node: TaskPlanNode) {
-  const executionMode = (node as Record<string, unknown>).executionMode;
-  // Canonical graph contract only emits automatic/manual/hybrid.
-  // `child_task` is accepted here as a legacy persisted value to keep old plans re-materializable.
-  // TODO(chrona-refactor): remove `child_task` fallback after all stored v1 plans are migrated.
-  return executionMode === "automatic" || executionMode === "child_task";
+function isMaterializableNode(node: EffectivePlanNode) {
+  return node.mode === "auto" || node.mode === "assist"
+    || (node as unknown as { mode?: string }).mode === "assisted"
+    || (node as unknown as { mode?: string }).mode === "automatic"
+    || (node as unknown as { mode?: string }).mode === "child_task";
 }
 
-function isSequentialMaterializedEdge(edge: TaskPlanEdge, materializedNodeIds: Set<string>) {
-  return (
-    edge.type === "sequential" &&
-    materializedNodeIds.has(edge.fromNodeId) &&
-    materializedNodeIds.has(edge.toNodeId)
-  );
+function getTaskConfig(node: EffectivePlanNode): TaskConfig | null {
+  if (node.type === "task" && node.config && "expectedOutput" in (node.config as Record<string, unknown>)) {
+    return node.config as TaskConfig;
+  }
+  return null;
 }
 
 export async function materializeTaskPlan(input: { taskId: string }) {
-  const savedPlan =
-    (await getAcceptedTaskPlanGraph(input.taskId)) ??
-    (await getLatestTaskPlanGraph(input.taskId));
+  const accepted =
+    (await getAcceptedCompiledPlan(input.taskId)) ??
+    (await getLatestCompiledPlan(input.taskId));
 
-  if (!savedPlan) {
-    throw new Error("Task plan graph not found");
+  if (!accepted) {
+    throw new Error("Task plan not found");
   }
 
   const parentTask = await db.task.findUniqueOrThrow({
@@ -84,24 +88,30 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     },
   });
 
-  const nextNodes = savedPlan.plan.nodes.map((node) => ({ ...node }));
+  const planId = "planId" in accepted ? (accepted as { planId: string }).planId : accepted.compiledPlan.editablePlanId;
+
+  const layers = await getLayers(input.taskId, planId);
+  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
+
   const createdTaskIds: string[] = [];
-  const updatedNodeIds: string[] = [];
   const materializedNodeIds = new Set<string>();
 
-  for (const node of nextNodes) {
+  for (const node of effective.nodes) {
     if (!isMaterializableNode(node)) {
       continue;
     }
 
+    const taskConfig = getTaskConfig(node);
     let linkedTaskId = node.linkedTaskId;
+
     if (!linkedTaskId) {
+      const objective = taskConfig?.expectedOutput ?? node.title;
       const createdTask = await db.task.create({
         data: {
           workspaceId: parentTask.workspaceId,
           title: node.title,
-          description: node.description,
-          status: deriveTaskStatus(node),
+          description: node.description ?? null,
+          status: deriveTaskStatus(node.status),
           priority: normalizePriority(node.priority),
           ownerType: "human",
           parentTaskId: parentTask.id,
@@ -111,16 +121,14 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           runtimeAdapterKey: "openclaw",
           runtimeInput: {
             model: "gpt-5.4",
-            prompt: node.objective,
+            prompt: objective,
           },
-          // TODO(chrona-runtime): bump to a non-legacy runtime input version once
-          // the runtime schema migration lands end-to-end.
           runtimeInputVersion: "openclaw-legacy-v1",
           runtimeModel: "gpt-5.4",
-          prompt: node.objective,
+          prompt: objective,
           runtimeConfig: {
             sessionStrategy:
-              node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
+              node.metadata && typeof node.metadata === "object"
                 ? (node.metadata as Record<string, unknown>).sessionStrategy ?? "per_subtask"
                 : "per_subtask",
           },
@@ -149,35 +157,29 @@ export async function materializeTaskPlan(input: { taskId: string }) {
         where: { id: linkedTaskId },
         data: {
           title: node.title,
-          description: node.description,
+          description: node.description ?? null,
           priority: normalizePriority(node.priority),
-          status: deriveTaskStatus(node),
+          status: deriveTaskStatus(node.status),
           parentTaskId: parentTask.id,
         },
       });
     }
 
-    node.linkedTaskId = linkedTaskId;
-    updatedNodeIds.push(node.id);
     materializedNodeIds.add(node.id);
   }
 
-  const nodeTaskMap = new Map(
-    nextNodes
-      .filter((node) => node.linkedTaskId)
-      .map((node) => [node.id, node.linkedTaskId!] as const),
-  );
-
-  for (const edge of savedPlan.plan.edges) {
-    if (!isSequentialMaterializedEdge(edge, materializedNodeIds)) {
-      continue;
+  // Create task dependencies from edges between materialized nodes
+  const nodeTaskMap = new Map<string, string>();
+  for (const node of effective.nodes) {
+    if (materializedNodeIds.has(node.id) && node.linkedTaskId) {
+      nodeTaskMap.set(node.id, node.linkedTaskId);
     }
+  }
 
-    const fromTaskId = nodeTaskMap.get(edge.fromNodeId);
-    const toTaskId = nodeTaskMap.get(edge.toNodeId);
-    if (!fromTaskId || !toTaskId) {
-      continue;
-    }
+  for (const edge of effective.edges) {
+    const fromTaskId = nodeTaskMap.get(edge.from);
+    const toTaskId = nodeTaskMap.get(edge.to);
+    if (!fromTaskId || !toTaskId) continue;
 
     await db.taskDependency.upsert({
       where: {
@@ -198,26 +200,39 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     });
   }
 
-  const updatedPlan = {
-    ...savedPlan.plan,
-    nodes: nextNodes,
-  };
+  // Append a RuntimeLayer with linkedTaskId for materialized nodes
+  const nodeStates: Record<string, { linkedTaskId: string }> = {};
+  for (const node of effective.nodes) {
+    if (materializedNodeIds.has(node.id) && node.linkedTaskId) {
+      nodeStates[node.id] = {
+        linkedTaskId: node.linkedTaskId,
+      };
+    }
+  }
 
-  await saveTaskPlanGraph({
-    workspaceId: savedPlan.workspaceId,
-    taskId: parentTask.id,
-    plan: updatedPlan,
-    prompt: savedPlan.prompt,
-    status: savedPlan.status,
-    source: savedPlan.source,
-    generatedBy: savedPlan.generatedBy,
-    summary: savedPlan.summary,
-    changeSummary: savedPlan.changeSummary,
-  });
+  if (Object.keys(nodeStates).length > 0) {
+    const layer: RuntimeLayer = {
+      type: "runtime",
+      planId,
+      timestamp: new Date().toISOString(),
+      layerId: `materialize_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      version: 1,
+      active: true,
+      source: "system",
+      nodeStates: nodeStates as unknown as RuntimeLayer["nodeStates"],
+    };
+
+    await appendLayer({
+      workspaceId: parentTask.workspaceId,
+      taskId: input.taskId,
+      planId,
+      layer,
+    });
+  }
 
   return {
     taskId: parentTask.id,
     createdTaskIds,
-    updatedNodeIds,
+    updatedNodeIds: [...materializedNodeIds],
   };
 }

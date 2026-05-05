@@ -6,10 +6,8 @@ import { compilePlanBlueprint, compileBlueprintToCompiledPlan } from "./plan-blu
 
 describe("compilePlanBlueprint", () => {
   it("compiles a blueprint, derives graph metadata, and preserves local ids", () => {
-    const graph = compilePlanBlueprint({
+    const result = compilePlanBlueprint({
       taskId: "task-1",
-      graphId: "graph-1",
-      now: "2026-05-04T00:00:00.000Z",
       blueprint: {
         title: "Trip plan",
         goal: "Book a safe trip",
@@ -34,18 +32,20 @@ describe("compilePlanBlueprint", () => {
       },
     });
 
-    expect(graph.completionPolicy).toEqual({ type: "all_tasks_completed" });
-    expect(graph.blueprint?.title).toBe("Trip plan");
-    expect(graph.entryNodeIds).toHaveLength(1);
-    expect(graph.terminalNodeIds).toHaveLength(1);
+    expect(result.compiledPlan.completionPolicy).toEqual({ type: "all_tasks_completed" });
+    expect(result.compiledPlan.entryNodeIds).toHaveLength(1);
+    expect(result.compiledPlan.terminalNodeIds).toHaveLength(1);
+    expect(result.compiledPlan.nodes).toHaveLength(2);
+    expect(result.planId).toBeDefined();
+    expect(result.initialLayer.nodeStates[result.compiledPlan.entryNodeIds[0]].status).toBe("ready");
 
-    const checkpoint = graph.nodes.find((node) => node.localId === "review_budget");
-    const task = graph.nodes.find((node) => node.localId === "book_trip");
+    const checkpoint = result.compiledPlan.nodes.find((node) => node.localId === "review_budget");
+    const task = result.compiledPlan.nodes.find((node) => node.localId === "book_trip");
 
     expect(checkpoint?.id).not.toBe(checkpoint?.localId);
     expect(task?.id).not.toBe(task?.localId);
-    expect(graph.entryNodeIds).toEqual([checkpoint!.id]);
-    expect(graph.terminalNodeIds).toEqual([task!.id]);
+    expect(result.compiledPlan.entryNodeIds).toEqual([checkpoint!.id]);
+    expect(result.compiledPlan.terminalNodeIds).toEqual([task!.id]);
   });
 
   it("fails on invalid edge references", () => {
