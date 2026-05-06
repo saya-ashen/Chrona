@@ -65,4 +65,3 @@ export function deleteJson<T>(input: RequestInfo | URL, body?: unknown, init?: R
     ...init,
   });
 }
-

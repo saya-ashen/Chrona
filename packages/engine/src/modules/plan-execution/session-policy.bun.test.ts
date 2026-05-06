@@ -52,8 +52,8 @@ describe("decideNodeExecutionSession", () => {
   });
 
   it("requiresHumanInput -> wait_for_user", () => {
-    const d = decide({ id: "a", mode: "manual", executor: "user" });
-    expect(d.kind).toBe("main_session");
+    const d = decide({ id: "a", executor: "user" });
+    expect(d.kind).toBe("wait_for_user");
   });
 
   it("mode manual -> manual_only", () => {

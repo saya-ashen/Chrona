@@ -9,6 +9,7 @@
     "@chrona/runtime-core": "workspace:*"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./logger": "./src/logger.ts"
   }
 }

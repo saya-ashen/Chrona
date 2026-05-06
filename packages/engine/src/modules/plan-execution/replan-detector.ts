@@ -26,24 +26,13 @@ export function detectPlanDrift(input: {
         proposedPatch: nodeResult.proposedPatch,
       };
 
-    case "failed": {
-      // Check if the failed node has dependents that would be stranded
-      const hasDependents = node.dependents.length > 0;
-      if (hasDependents) {
-        return {
-          needsReplan: true,
-          reason: `Node ${node.id} (${node.title}) failed and has downstream dependents. Blocking or replan required.`,
-          risk: "medium",
-          requiresUserConfirmation: true,
-        };
-      }
+    case "failed":
       return {
-        needsReplan: false,
-        reason: `Node ${node.id} failed but has no dependents — terminal failure.`,
-        risk: "low",
-        requiresUserConfirmation: false,
+        needsReplan: true,
+        reason: `Node ${node.id} (${node.title}) failed. Replan required.`,
+        risk: "high",
+        requiresUserConfirmation: true,
       };
-    }
 
     case "blocked": {
       const completedCount = plan.nodes.filter(

@@ -315,7 +315,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     })),
     latestFollowUp,
   });
-  const taskPlan = buildTaskPlanFromGraph({ savedPlan }) ?? {
+  const taskPlan = buildTaskPlanFromGraph({ savedPlan, effectivePlanGraph }) ?? {
     state: "empty" as const,
     revision: null,
     generatedBy: null,

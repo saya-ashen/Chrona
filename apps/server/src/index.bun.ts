@@ -1,6 +1,6 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
-import { createLogger } from "@chrona/db/logger";
+import { createLogger } from "@chrona/shared/logger";
 import { readEnv, resolvePort } from "./config/env";
 
 const env = readEnv();

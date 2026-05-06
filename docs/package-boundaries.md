@@ -11,7 +11,7 @@ Use this when `apps/web` and `apps/server` feel clear, but `packages/*` feels ab
 - `packages/contracts`: shared schema and payload contracts
 - `packages/domain`: pure business rules
 - `packages/db`: Prisma, SQLite bootstrap, repositories
-- `packages/runtime`: application orchestration and use cases
+- `packages/engine`: application orchestration and use cases
 - `packages/ai-features`, `packages/runtime-core`, `packages/i18n`, `packages/cli`: reusable system support packages
 - `packages/providers/*`: external AI/runtime provider integrations
 
@@ -23,7 +23,7 @@ Prefer this direction:
 
 ```text
 apps/web, apps/server
-  -> runtime
+  -> engine
   -> ai-features, providers/*
   -> contracts, domain, db, runtime-core
 ```
@@ -31,7 +31,7 @@ apps/web, apps/server
 And at a lower level:
 
 ```text
-runtime
+engine
   -> contracts
   -> domain
   -> db
@@ -61,7 +61,7 @@ packages/
   contracts/            # canonical shared contracts and schemas
   domain/               # pure business rules
   db/                   # Prisma/bootstrap/repositories
-  runtime/              # application orchestration and use cases
+  engine/              # application orchestration and use cases
   runtime-core/         # backend-agnostic runtime adapter contracts
   ai-features/          # provider-neutral AI feature APIs
   providers/
@@ -89,7 +89,7 @@ These are real system layers and should not be collapsed back into `apps/server`
 - `packages/contracts`
 - `packages/domain`
 - `packages/db`
-- `packages/runtime`
+- `packages/engine`
 - `packages/runtime-core`
 - `packages/providers/openclaw/*`
 - `packages/providers/hermes/*` when it becomes real
@@ -198,7 +198,7 @@ Put here:
 - repositories
 - persistence implementation details
 
-### `packages/runtime`
+### `packages/engine`
 
 Put here:
 - command/query handlers
@@ -275,8 +275,8 @@ runtime / apps
 
 With responsibility split like this:
 
-- `packages/runtime`
-  - consumes normalized feature results
+- `packages/engine`
+   - consumes normalized feature results
   - does business orchestration, storage, projections, and execution flow
   - must not parse provider protocol details
 - `packages/common/ai-features`
@@ -409,7 +409,7 @@ Healthy boundary status:
 Rule of thumb:
 - if the code knows SQL/Prisma/table persistence details, it belongs here
 
-### `packages/runtime`
+### `packages/engine`
 
 Responsible for:
 - application orchestration
@@ -593,7 +593,7 @@ Before adding a new file, ask in order:
 4. Is this persistence or Prisma-specific?
    If yes, put it in `packages/db`.
 5. Is this orchestrating a use case across multiple lower layers?
-   If yes, put it in `packages/runtime`.
+   If yes, put it in `packages/engine`.
 6. Is this feature-level AI behavior that should feel provider-neutral to callers?
    If yes, put it in `packages/ai-features`.
 7. Does this concept only exist because of one external provider?
@@ -635,4 +635,4 @@ If you want to reduce package confusion further, the highest-value cleanup targe
 2. make `packages/providers/core` truly middle-layer oriented and less OpenClaw-shaped
 3. narrow the public surface of `packages/ai-features` to feature APIs, not transport helpers
 4. replace deprecated runtime compatibility exports with direct imports from `@chrona/contracts`
-5. make `packages/runtime/src/index.ts` reflect the package's real role more honestly
+5. make `packages/engine/src/index.ts` reflect the package's real role more honestly

@@ -10,7 +10,7 @@
     "@chrona/i18n": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
-    "@chrona/domain": "workspace:*",
+    "@chrona/shared": "workspace:*",
     "@chrona/engine": "workspace:*",
     "@chrona/providers-core": "workspace:*"
   }

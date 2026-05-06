@@ -33,7 +33,7 @@ import type { AIPlanOutput } from "@chrona/contracts/ai";
 import {
   validateAIPlanOutput,
 } from "@chrona/contracts/ai";
-import { createLogger } from "@chrona/db/logger";
+import { createLogger } from "@chrona/shared/logger";
 
 const logger = createLogger("ai-features.features");
 

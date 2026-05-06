@@ -63,8 +63,9 @@ describe("OpenClawBridgeClient", () => {
     });
     expect(calls[0]?.body.input).toEqual([
       {
-        type: "input_text",
-        text: [
+        type: "message",
+        role: "user",
+        content: [
           "Task title: Task title from runtime input",
           "Runtime adapter: openclaw",
           "Runtime input JSON:\n{\n  \"model\": \"gpt-5\",\n  \"prompt\": \"Task title from runtime input\",\n  \"maxTokens\": 321\n}",
@@ -149,7 +150,7 @@ describe("OpenClawBridgeClient", () => {
                 id: "call-1",
                 call_id: "call-1",
                 name: "generate_task_plan_graph",
-                arguments: JSON.stringify({ summary: "plan", title: "Plan", goal: "Goal", nodes: [{ id: "n1", type: "task", title: "Step" }], edges: [] }),
+                arguments: JSON.stringify({ title: "Plan", goal: "Goal", nodes: [{ id: "n1", type: "task", title: "Step" }], edges: [] }),
               },
             ],
           }),
@@ -159,7 +160,7 @@ describe("OpenClawBridgeClient", () => {
     }) as typeof fetch;
 
     const client = new OpenClawBridgeClient({ baseUrl: "http://bridge.local" });
-    const result = await client.createStructuredRun<{ summary: string }>({
+    const result = await client.createStructuredRun<{ title: string }>({
       feature: "generate_plan",
       prompt: "Build a plan",
       runtimeSessionKey: "tenant-a:plan-1",
@@ -178,13 +179,14 @@ describe("OpenClawBridgeClient", () => {
     expect(calls[0]?.tools).toEqual([featureSpec.requiredTool]);
     expect(calls[0]?.input).toEqual([
       {
-        type: "input_text",
-        text: featureSpec.inputText,
+        type: "message",
+        role: "user",
+        content: featureSpec.inputText,
       },
     ]);
     expect(result).toMatchObject({
       ok: true,
-      parsed: { summary: "plan" },
+      parsed: { title: "Plan" },
       runId: "resp-plan-1",
       sessionId: "tenant-a:plan-1",
     });

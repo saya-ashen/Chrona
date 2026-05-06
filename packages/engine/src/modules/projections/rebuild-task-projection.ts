@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { SYNC_STALE_MS } from "@/modules/runtime-sync/freshness";
+import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
 
 export async function rebuildTaskProjection(taskId: string) {

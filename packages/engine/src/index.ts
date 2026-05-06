@@ -96,10 +96,8 @@ export {
 } from "./modules/tasks/plan-blueprint-compiler";
 
 export {
-  saveTaskPlanGraph,
   getLatestTaskPlanGraph,
   getAcceptedTaskPlanGraph,
-  acceptTaskPlanGraph,
   enrichPlanGraphNodes,
   getReadyAutoRunnableNodes,
 } from "./modules/plan-execution/compat";

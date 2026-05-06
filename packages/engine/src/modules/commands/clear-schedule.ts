@@ -18,6 +18,11 @@ export async function clearSchedule(input: { taskId: string }) {
   const task = await db.task.update({
     where: { id: input.taskId },
     data: {
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      scheduleStatus: "Unscheduled",
+      scheduleSource: null,
     },
   });
 
@@ -34,8 +39,8 @@ export async function clearSchedule(input: { taskId: string }) {
     source: "ui",
     payload: {
       previous_due_at: existingTask.dueAt?.toISOString() ?? null,
-      previous_scheduled_start_at: currentWorkBlock?.scheduledStartAt?.toISOString() ?? null,
-      previous_scheduled_end_at: currentWorkBlock?.scheduledEndAt?.toISOString() ?? null,
+      previous_scheduled_start_at: existingTask.scheduledStartAt?.toISOString() ?? null,
+      previous_scheduled_end_at: existingTask.scheduledEndAt?.toISOString() ?? null,
     },
     dedupeKey: `task.unscheduled:${task.id}:${task.updatedAt.toISOString()}`,
   });
