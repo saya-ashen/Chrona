@@ -13,7 +13,7 @@ import {
   SurfaceCard,
   SurfaceCardHeader,
 } from "@/components/ui/surface-card";
-import type { TaskWorkspaceUpdateProposal, CompiledPlan } from "@chrona/contracts/ai";
+import type { TaskWorkspaceUpdateProposal, TaskPlanReadModel } from "@chrona/contracts/ai";
 
 type TaskData = {
   id: string;
@@ -34,15 +34,7 @@ type TaskData = {
   runnabilitySummary: string;
   runnabilityState?: string;
   ownerType?: string;
-  savedAiPlan?: {
-    id: string;
-    status: "draft" | "accepted" | "superseded" | "archived";
-    prompt: string | null;
-    revision?: number;
-    summary?: string | null;
-    updatedAt: string;
-    plan?: CompiledPlan;
-  } | null;
+  savedPlan?: TaskPlanReadModel | null;
   aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
   blockReason: {
     blockType?: string;
@@ -181,7 +173,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [plan, setPlan] = useState(data.task.savedAiPlan ?? null);
+  const [plan, setPlan] = useState(data.task.savedPlan ?? null);
   const [_isRefetchingPlan, setIsRefetchingPlan] = useState(false);
   const [planGenerationStatus, setPlanGenerationStatus] = useState(data.task.aiPlanGenerationStatus ?? "idle");
 
@@ -192,11 +184,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       if (res.ok) {
         const state = (await res.json()) as {
           aiPlanGenerationStatus?: string;
-          savedAiPlan?: typeof plan;
+          savedPlan?: typeof plan;
         };
-        if (state.savedAiPlan) {
-          setPlan(state.savedAiPlan);
-        }
+        setPlan(state.savedPlan ?? null);
         if (typeof state.aiPlanGenerationStatus === "string") {
           setPlanGenerationStatus(state.aiPlanGenerationStatus as typeof planGenerationStatus);
         }
@@ -388,8 +378,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   }), [task]);
 
   const assistantBuildCurrentPlan = useCallback(() => {
-    if (!plan?.plan) return null;
-    const p = plan.plan;
+    if (!plan?.compiledPlan) return null;
+    const p = plan.compiledPlan;
     const deps = new Map<string, string[]>();
     for (const edge of p.edges) {
       if (!deps.has(edge.to)) deps.set(edge.to, []);

@@ -22,6 +22,7 @@ export type SavedCompiledPlan = {
   workspaceId: string;
   taskId: string;
   compiledPlan: CompiledPlan;
+  editablePlan: EditablePlan | null;
   status: "draft" | "accepted" | "superseded" | "archived";
   prompt: string | null;
   summary: string | null;
@@ -274,6 +275,7 @@ function toSavedCompiledPlanFromLegacy(memory: CompiledPlanMemoryRecord, parsed:
     workspaceId: memory.workspaceId,
     taskId: memory.taskId ?? taskId,
     compiledPlan: buildLegacyCompiledPlan(memory.id, parsed),
+    editablePlan: null,
     status: (parsed.status === "accepted" || parsed.status === "draft" || parsed.status === "superseded" || parsed.status === "archived"
       ? parsed.status
       : "draft") as SavedCompiledPlan["status"],
@@ -385,6 +387,7 @@ export async function getAcceptedCompiledPlan(taskId: string): Promise<SavedComp
         workspaceId: memory.workspaceId,
         taskId: memory.taskId ?? taskId,
         compiledPlan: parsed.compiledPlan,
+        editablePlan: parsed.editablePlan,
         status: parsed.status as SavedCompiledPlan["status"],
         prompt: parsed.prompt,
         summary: parsed.summary,
@@ -415,6 +418,7 @@ export async function getLatestCompiledPlan(taskId: string): Promise<SavedCompil
         workspaceId: memory.workspaceId,
         taskId: memory.taskId ?? taskId,
         compiledPlan: parsed.compiledPlan,
+        editablePlan: parsed.editablePlan,
         status: parsed.status as SavedCompiledPlan["status"],
         prompt: parsed.prompt,
         summary: parsed.summary,

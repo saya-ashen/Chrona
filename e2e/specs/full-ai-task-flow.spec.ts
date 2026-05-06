@@ -275,9 +275,9 @@ test("full deterministic AI task flow persists plan updates", async ({
           );
           expect(planStateResp.ok()).toBeTruthy();
           const planState = (await planStateResp.json()) as {
-            savedAiPlan?: { plan?: { nodes?: Array<{ title: string }> } };
+            savedPlan?: { compiledPlan?: { nodes?: Array<{ title: string }> } };
           };
-          const titles = (planState.savedAiPlan?.plan?.nodes ?? []).map(
+          const titles = (planState.savedPlan?.compiledPlan?.nodes ?? []).map(
             (n) => n.title,
           );
           expect(titles).toContain("Review plan with stakeholder");

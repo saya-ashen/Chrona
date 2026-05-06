@@ -2,8 +2,7 @@ import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
-import { getLatestSavedAiPlanSnapshot } from "@/modules/plan-execution/saved-plan-snapshot";
-import type { CompiledPlan } from "@chrona/contracts/ai";
+import { getLatestTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
 
 type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -38,29 +37,15 @@ function readBlockReason(
   );
 }
 
-function toTaskPageSavedAiPlan(snapshot: Awaited<ReturnType<typeof getLatestSavedAiPlanSnapshot>>) {
-  if (!snapshot) return null;
-
-  return {
-    id: snapshot.id,
-    status: snapshot.status,
-    prompt: snapshot.prompt,
-    revision: snapshot.revision,
-    summary: snapshot.summary,
-    updatedAt: snapshot.updatedAt,
-    plan: snapshot.plan as unknown as CompiledPlan,
-  };
-}
-
 export async function getTaskPage(taskId: string) {
   await syncTaskRunForRead(taskId);
 
-  const savedAiPlan = await getLatestSavedAiPlanSnapshot(taskId);
+  const savedPlan = await getLatestTaskPlanReadModel(taskId);
   const aiPlanGenerationStatus: TaskPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
     ? "generating"
-    : savedAiPlan !== null && savedAiPlan.status === "accepted"
+    : savedPlan !== null && savedPlan.status === "accepted"
       ? "accepted"
-      : savedAiPlan !== null
+      : savedPlan !== null
         ? "waiting_acceptance"
         : "idle";
 
@@ -122,7 +107,7 @@ export async function getTaskPage(taskId: string) {
       runnabilitySummary: runnability.summary,
       runnabilityState: runnability.state,
       ownerType: task.ownerType,
-      savedAiPlan: toTaskPageSavedAiPlan(savedAiPlan),
+      savedPlan,
       aiPlanGenerationStatus,
       blockReason: readBlockReason(task),
       dependencies: task.dependencies.map((dependency) => ({

@@ -2,13 +2,13 @@
 
 import { Sparkles } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
-import type { ScheduledItem, LegacyPlanGraph } from "@/components/schedule/schedule-page-types";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { SurfaceCard } from "@/components/ui/surface-card";
 
-function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
-  const graph = planResult?.planGraph as LegacyPlanGraph | undefined;
-  if (!graph?.nodes) {
+function toCompactPlan(planResult: TaskPlanReadModel | null) {
+  const nodes = planResult?.compiledPlan?.nodes;
+  if (!nodes?.length) {
     return [] as Array<{
       id: string;
       title: string;
@@ -17,11 +17,11 @@ function toCompactPlan(planResult: TaskPlanGraphResponse | null) {
     }>;
   }
 
-  return graph.nodes.map((node) => ({
+  return nodes.map((node) => ({
     id: node.id,
     title: node.title,
-    status: node.status,
-    priority: node.priority,
+    status: "pending",
+    priority: node.priority ?? null,
   }));
 }
 
@@ -32,10 +32,9 @@ export function AiInsightsPanel({
   onApplyDecomposition,
 }: {
   item: ScheduledItem;
-  planResult: TaskPlanGraphResponse | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onPlanLoaded?: (savedPlan: any) => void;
-  onApplyDecomposition: (result: TaskPlanGraphResponse) => Promise<void>;
+  planResult: TaskPlanReadModel | null;
+  onPlanLoaded?: (savedPlan: TaskPlanReadModel | null) => void;
+  onApplyDecomposition: (result: TaskPlanReadModel) => Promise<void>;
 }) {
   const compactNodes = toCompactPlan(planResult);
 

@@ -4,7 +4,7 @@ import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-re
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
 import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
-import type { TaskPlanGraphResponse } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
 export function SelectedBlockAiSidebar({
@@ -33,7 +33,7 @@ export function SelectedBlockAiSidebar({
   hasUnsavedConfigChanges: boolean;
   unsavedConfigDraft: TaskConfigFormDraft | null;
   onPlanLoaded: (savedPlan: SavedTaskPlan | null) => void;
-  onApplyPlan: (result: TaskPlanGraphResponse) => Promise<void>;
+  onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
   onSaveConfigBeforeRegenerate: () => Promise<void>;
 }) {
   const statusConfig = generationStatus === "generating"

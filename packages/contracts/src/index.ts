@@ -72,7 +72,17 @@ export type {
   EffectivePlanGraph,
   EffectivePlanNode,
   EffectivePlanEdge,
-  TaskPlanGraphResponse,
+  TaskPlanReadModel,
+  GeneratePlanStatusPhase,
+  GeneratePlanStatusEvent,
+  GeneratePlanPartialEvent,
+  GeneratePlanToolCallEvent,
+  GeneratePlanResultEvent,
+  GeneratePlanErrorCode,
+  GeneratePlanErrorEvent,
+  GeneratePlanDoneEvent,
+  GeneratePlanSSEEvent,
+  GenerateTaskPlanApiRequest,
 } from "./ai-plan-runtime";
 
 // AI feature specs

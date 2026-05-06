@@ -18,7 +18,7 @@ vi.mock("@/i18n/client", () => ({
 }));
 
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
-import type { CompiledPlan } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 const defaultProps = {
   taskId: "task_1",
@@ -31,92 +31,98 @@ const defaultProps = {
   activeAcceptedPlanId: null,
 };
 
-const sampleResult = {
-  plan: { title: "Test Plan", goal: "Test goal", nodes: [], edges: [] },
-  source: "saved",
-  planGraph: {
-    id: "plan-1",
-    taskId: "task_1",
-    status: "draft",
-    revision: 2,
-    source: "ai",
-    generatedBy: "generate-task-plan",
-    prompt: null,
-    summary: "3 planned nodes",
-    changeSummary: null,
-    createdAt: "2026-04-20T09:00:00.000Z",
-    updatedAt: "2026-04-20T09:05:00.000Z",
-    nodes: [
-      {
-        id: "node-1",
-        type: "task",
-        title: "Review existing documentation",
-        objective: "Read through all current docs and note outdated sections",
-        description: "Read through all current docs and note outdated sections",
-        status: "in_progress",
-        phase: "execution",
-        estimatedMinutes: 40,
-        priority: "High",
-        executionMode: "automatic",
-        linkedTaskId: null,
-        requiresHumanInput: false,
-        requiresHumanApproval: false,
-        autoRunnable: true,
-        blockingReason: null,
-        completionSummary: null,
-        metadata: null,
-      },
-      {
-        id: "node-2",
-        type: "task",
-        title: "Update API reference",
-        objective: "Refresh endpoint descriptions and examples",
-        description: "Refresh endpoint descriptions and examples",
-        status: "pending",
-        phase: "delivery",
-        estimatedMinutes: 50,
-        priority: "High",
-        executionMode: "automatic",
-        linkedTaskId: null,
-        requiresHumanInput: false,
-        requiresHumanApproval: false,
-        autoRunnable: true,
-        blockingReason: null,
-        completionSummary: null,
-        metadata: null,
-      },
-      {
-        id: "node-3",
-        type: "checkpoint",
-        title: "Update deployment guide",
-        objective: "Revise deployment steps for v2.1",
-        description: "Revise deployment steps for v2.1",
-        status: "pending",
-        phase: "review",
-        estimatedMinutes: 30,
-        priority: "Medium",
-        executionMode: "manual",
-        linkedTaskId: null,
-        requiresHumanInput: false,
-        requiresHumanApproval: false,
-        autoRunnable: false,
-        blockingReason: null,
-        completionSummary: null,
-        metadata: null,
-      },
-    ],
-    edges: [
-      { id: "edge-1", fromNodeId: "node-1", toNodeId: "node-2", type: "sequential", metadata: null },
-      { id: "edge-2", fromNodeId: "node-2", toNodeId: "node-3", type: "depends_on", metadata: null },
-    ],
+const sampleCompiledPlan = {
+  id: "compiled-plan-1",
+  editablePlanId: "plan-1",
+  sourceVersion: 2,
+  title: "Test Plan",
+  goal: "Test goal",
+  assumptions: [],
+  nodes: [
+    {
+      id: "node-1",
+      localId: "node-1",
+      type: "task" as const,
+      title: "Review existing documentation",
+      description: "Read through all current docs and note outdated sections",
+      priority: "High" as const,
+      config: { expectedOutput: "Review existing documentation" },
+      dependencies: [] as string[],
+      dependents: ["node-2"] as string[],
+      executor: "ai" as const,
+      mode: "auto" as const,
+      estimatedMinutes: 40,
+    },
+    {
+      id: "node-2",
+      localId: "node-2",
+      type: "task" as const,
+      title: "Update API reference",
+      description: "Refresh endpoint descriptions and examples",
+      priority: "High" as const,
+      config: { expectedOutput: "Update API reference" },
+      dependencies: ["node-1"] as string[],
+      dependents: ["node-3"] as string[],
+      executor: "ai" as const,
+      mode: "auto" as const,
+      estimatedMinutes: 50,
+    },
+    {
+      id: "node-3",
+      localId: "node-3",
+      type: "checkpoint" as const,
+      title: "Update deployment guide",
+      description: "Revise deployment steps for v2.1",
+      priority: "Medium" as const,
+      config: { checkpointType: "confirm", prompt: "Review deployment steps", required: true },
+      dependencies: ["node-2"] as string[],
+      dependents: [] as string[],
+      executor: "user" as const,
+      mode: "manual" as const,
+      estimatedMinutes: 30,
+    },
+  ],
+  edges: [
+    { id: "edge-1", from: "node-1", to: "node-2", label: "sequential" },
+    { id: "edge-2", from: "node-2", to: "node-3", label: "depends_on" },
+  ],
+  entryNodeIds: ["node-1"] as string[],
+  terminalNodeIds: ["node-3"] as string[],
+  topologicalOrder: ["node-1", "node-2", "node-3"] as string[],
+  completionPolicy: { type: "all_tasks_completed" as const },
+  validationWarnings: [] as Array<{ path: string; message: string }>,
+};
+
+const sampleReadModel: TaskPlanReadModel = {
+  id: "plan-1",
+  status: "draft",
+  revision: 2,
+  prompt: null,
+  summary: "3 planned nodes",
+  updatedAt: "2026-04-20T09:05:00.000Z",
+  generatedBy: "generate-task-plan",
+  blueprint: {
+    title: "Test Plan",
+    goal: "Test goal",
+    assumptions: [],
+    nodes: [],
+    edges: [],
   },
-  savedPlan: {
-    id: "plan-1",
-    status: "draft",
-    prompt: null,
-    revision: 2,
-    summary: "3 planned nodes",
-    updatedAt: "2026-04-20T09:05:00.000Z",
+  compiledPlan: sampleCompiledPlan,
+  effectivePlan: {
+    planId: "plan-1",
+    basePlanId: "compiled-plan-1",
+    resolvedVersion: 1,
+    nodes: [],
+    edges: [],
+    entryNodeIds: ["node-1"],
+    terminalNodeIds: ["node-3"],
+    readyNodeIds: [],
+    blockedNodeIds: [],
+    completedNodeIds: [],
+    runningNodeIds: [],
+    failedNodeIds: [],
+    pendingNodeIds: ["node-1", "node-2", "node-3"],
   },
 };
 
@@ -179,9 +185,8 @@ describe("TaskPlanGenerationPanel", () => {
       <TaskPlanGenerationPanel
         {...defaultProps}
         savedPlan={{
-          ...sampleResult.savedPlan,
-          status: sampleResult.savedPlan.status as "draft",
-          plan: sampleResult.planGraph as unknown as CompiledPlan,
+          ...sampleReadModel,
+          status: "draft",
         }}
       />,
     );
@@ -207,12 +212,12 @@ describe("TaskPlanGenerationPanel", () => {
   it("requests a new plan on click and forwards the generated saved plan", async () => {
     const onPlanLoaded = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(
-      createSseResponse([
-        { event: "status", data: { message: "Thinking" } },
-        { event: "partial", data: { text: "Drafting steps" } },
-        { event: "result", data: sampleResult },
-      ]),
-    );
+        createSseResponse([
+          { event: "status", data: { message: "Thinking" } },
+          { event: "partial", data: { text: "Drafting steps" } },
+          { event: "result", data: { type: "result", result: sampleReadModel } },
+        ]),
+      );
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const user = userEvent.setup();

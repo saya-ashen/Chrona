@@ -37,10 +37,6 @@ import {
   suggestStream,
   generatePlanStream,
 } from "@/modules/ai/streaming";
-import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 
 // ────────────────────────────────────────────────────────────────────
 // Client Resolution
@@ -131,67 +127,8 @@ export async function* aiSuggestStream(request: SmartSuggestRequest): AsyncGener
   yield* suggestStream(client, request);
 }
 
-async function materializePlanFromAI(
-  plan: GenerateTaskPlanResponse,
-  request: {
-    taskId?: string;
-    workspaceId?: string;
-    planningPrompt?: string | null;
-    sessionKey?: string;
-  },
-): Promise<Extract<StreamEvent, { type: "result" }>> {
-  const { compiledPlan, initialLayer, planId } = compilePlanBlueprint({
-    taskId: request.taskId ?? "",
-    blueprint: plan.blueprint,
-    prompt: request.planningPrompt ?? null,
-    generatedBy: plan.source ?? "ai",
-    source: "ai",
-  });
-
-  let savedPlanId: string | null = null;
-  if (request.taskId && request.workspaceId) {
-    await saveCompiledPlan({
-      workspaceId: request.workspaceId,
-      taskId: request.taskId,
-      compiledPlan,
-      status: "draft",
-      prompt: request.planningPrompt ?? null,
-      summary: plan.blueprint.title ?? null,
-      generatedBy: plan.source ?? "ai",
-    });
-
-    const run = createPlanRunFromCompiledPlan(compiledPlan, [initialLayer]);
-    await savePlanRun({
-      workspaceId: request.workspaceId,
-      taskId: request.taskId,
-      planId,
-      run,
-      layers: [initialLayer],
-    });
-    savedPlanId = planId;
-  }
-
-  return {
-    type: "result",
-    plan,
-    source: plan.source,
-    compiledPlan,
-    planId,
-    savedPlan: savedPlanId
-      ? { id: savedPlanId, status: "draft", prompt: request.planningPrompt ?? null, revision: 1, summary: plan.blueprint.title ?? "", updatedAt: new Date().toISOString() }
-      : undefined,
-    taskSessionKey: request.sessionKey,
-  };
-}
-
-const PASSTHROUGH_EVENTS = new Set(["status", "partial", "tool_call", "tool_result"]);
-
 export async function* aiGeneratePlanStream(
-  request: GenerateTaskPlanRequest & {
-    taskId?: string;
-    workspaceId?: string;
-    planningPrompt?: string | null;
-  },
+  request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
   const client = await getClientForFeature("generate_plan");
   if (!client) {
@@ -200,29 +137,8 @@ export async function* aiGeneratePlanStream(
   }
 
   for await (const event of generatePlanStream(client, request)) {
-    if (PASSTHROUGH_EVENTS.has(event.type)) {
-      yield event;
-      continue;
-    }
-
-    if (event.type === "result" && "plan" in event) {
-      const { plan } = event;
-      if (plan.blueprint.nodes.length === 0) {
-        const message = plan.structured?.error?.trim() ?? "AI returned an empty task plan with zero nodes.";
-        yield { type: "error", message };
-        return;
-      }
-      yield await materializePlanFromAI(plan, request);
-      continue;
-    }
-
-    if (event.type === "done") {
-      yield { type: "done", text: event.text, structured: event.structured };
-      return;
-    }
-
     yield event;
-    if (event.type === "error") return;
+    if (event.type === "error" || event.type === "done") return;
   }
 }
 

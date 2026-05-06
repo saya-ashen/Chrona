@@ -12,12 +12,10 @@ import type { Context } from "hono";
 import { db } from "@chrona/db";
 // MemoryScope, MemorySourceType, MemoryStatus from @chrona/db used via db proxy
 import {
-  getLatestTaskPlanGraph,
-  getAcceptedTaskPlanGraph,
-  enrichPlanGraphNodes,
   isTaskPlanGenerationRunning,
   materializeTaskPlan,
   getLatestCompiledPlan,
+  getLatestTaskPlanReadModel,
   saveCompiledPlan,
   compilePlanBlueprint,
   createPlanRunFromCompiledPlan,
@@ -49,33 +47,18 @@ function createPlanLifecycleRouter() {
   api.get("/tasks/:taskId/plan/state", async (c) => {
     try {
       const taskId = c.req.param("taskId");
-      const savedAiPlan =
-        (await getAcceptedTaskPlanGraph(taskId)) ??
-        (await getLatestTaskPlanGraph(taskId));
+      const savedPlan = await getLatestTaskPlanReadModel(taskId);
       const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
         ? "generating"
-        : savedAiPlan?.status === "accepted"
+        : savedPlan?.status === "accepted"
           ? "accepted"
-          : savedAiPlan
+          : savedPlan
             ? "waiting_acceptance"
             : "idle";
       return c.json({
         taskId,
         aiPlanGenerationStatus,
-        savedAiPlan: savedAiPlan
-          ? {
-              id: savedAiPlan.id,
-              status: savedAiPlan.status,
-              prompt: savedAiPlan.prompt,
-              revision: savedAiPlan.revision,
-              summary: savedAiPlan.summary,
-              updatedAt: savedAiPlan.updatedAt,
-              plan: {
-                nodes: enrichPlanGraphNodes(savedAiPlan.compiledPlan as any),
-                edges: savedAiPlan.compiledPlan.edges,
-              },
-            }
-          : null,
+        savedPlan,
       });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to get task plan state";
@@ -101,21 +84,15 @@ function createPlanLifecycleRouter() {
         workspaceId: latest.workspaceId,
         taskId,
         compiledPlan: latest.compiledPlan,
+        editablePlan: latest.editablePlan,
         status: "accepted",
         prompt: latest.prompt,
         summary: latest.summary,
         generatedBy: latest.generatedBy,
       });
+      const savedPlan = await getLatestTaskPlanReadModel(taskId);
       return c.json({
-        savedPlan: {
-          id: planId,
-          status: "accepted",
-          prompt: latest.prompt,
-          revision: latest.compiledPlan.sourceVersion,
-          summary: latest.summary,
-          updatedAt: latest.updatedAt,
-          plan: latest.compiledPlan,
-        },
+        savedPlan,
       });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to accept task AI plan";
@@ -233,7 +210,7 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.aiPlanGenerationStatus).toBe("idle");
-    expect(body.savedAiPlan).toBeNull();
+    expect(body.savedPlan).toBeNull();
   });
 
   it("returns waiting_acceptance for a draft plan", async () => {
@@ -246,9 +223,9 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.aiPlanGenerationStatus).toBe("waiting_acceptance");
-    expect(body.savedAiPlan).not.toBeNull();
-    expect(body.savedAiPlan.status).toBe("draft");
-    expect(body.savedAiPlan.plan.nodes).toHaveLength(2);
+    expect(body.savedPlan).not.toBeNull();
+    expect(body.savedPlan.status).toBe("draft");
+    expect(body.savedPlan.compiledPlan.nodes).toHaveLength(2);
   });
 
   it("returns accepted after plan is accepted", async () => {
@@ -268,7 +245,7 @@ describe("Plan lifecycle workflow", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.aiPlanGenerationStatus).toBe("accepted");
-    expect(body.savedAiPlan.status).toBe("accepted");
+    expect(body.savedPlan.status).toBe("accepted");
   });
 
   // -----------------------------------------------------------------------
@@ -627,7 +604,7 @@ describe("Plan lifecycle workflow", () => {
     expect(body.error).toBe("No plan found for task");
   });
 
-  it("plan state endpoint returns enriched node metadata (executionClassification, readiness, nextAction)", async () => {
+  it("plan state endpoint returns canonical effective-plan runtime state", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -683,20 +660,21 @@ describe("Plan lifecycle workflow", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
-    expect(body.savedAiPlan).not.toBeNull();
-    expect(body.savedAiPlan.plan).not.toBeNull();
-    expect(body.savedAiPlan.plan.nodes).toHaveLength(2);
+    expect(body.savedPlan).not.toBeNull();
+    expect(body.savedPlan.compiledPlan).not.toBeNull();
+    expect(body.savedPlan.compiledPlan.nodes).toHaveLength(2);
 
-    const node1 = body.savedAiPlan.plan.nodes.find((n: any) => n.id === "enr-node-1");
+    const node1 = body.savedPlan.effectivePlan.nodes.find((n: any) => n.id === "enr-node-1");
     expect(node1).not.toBeUndefined();
-    expect(node1.executionClassification).toBe("automatic_standalone");
-    expect(node1.readiness).toBe("ready");
-    expect(node1.nextAction).toBe("Ready to auto-start");
+    expect(node1.status).toBe("pending");
+    expect(node1.ready).toBe(true);
+    expect(node1.dependenciesSatisfied).toBe(true);
 
-    const node2 = body.savedAiPlan.plan.nodes.find((n: any) => n.id === "enr-node-2");
+    const node2 = body.savedPlan.effectivePlan.nodes.find((n: any) => n.id === "enr-node-2");
     expect(node2).not.toBeUndefined();
-    expect(node2.executionClassification).toBe("review_gate");
+    expect(node2.config.checkpointType).toBe("approve");
     expect(node2.dependencies).toEqual(["enr-node-1"]);
-    expect(node2.nextAction).toContain("Review and approve");
+    expect(node2.ready).toBe(false);
+    expect(node2.dependenciesSatisfied).toBe(false);
   });
 });

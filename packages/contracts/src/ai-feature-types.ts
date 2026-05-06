@@ -123,6 +123,7 @@ export interface GenerateTaskPlanRequest {
   title: string;
   description?: string;
   estimatedMinutes?: number;
+  planningPrompt?: string;
   sessionKey?: string;
 }
 
@@ -301,7 +302,7 @@ export type StreamEvent =
   | { type: "tool_result"; tool: string; result: string }
   | { type: "partial"; text: string }
   | { type: "result"; suggestions: SmartSuggestResponse }
-  | { type: "result"; plan: GenerateTaskPlanResponse; planGraph?: unknown; compiledPlan?: unknown; planId?: string; savedPlan?: unknown; source?: string; taskSessionKey?: string }
+  | { type: "result"; plan: GenerateTaskPlanResponse; taskSessionKey?: string }
   | { type: "done"; text: string; structured?: StructuredDebugInfo | null }
   | {
       type: "error";

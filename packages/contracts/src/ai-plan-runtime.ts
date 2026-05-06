@@ -340,23 +340,100 @@ export interface GenerateTaskPlanRequest {
   planningPrompt?: string;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TaskPlanReadModel — canonical frontend-facing stable shape
+// ═══════════════════════════════════════════════════════════════
+
+export interface TaskPlanReadModel {
+  id: string;
+  status: "draft" | "accepted" | "superseded" | "archived";
+  revision: number;
+  prompt: string | null;
+  summary: string | null;
+  updatedAt: string;
+  generatedBy: string | null;
+  blueprint: PlanBlueprint;
+  compiledPlan: CompiledPlan;
+  effectivePlan: EffectivePlanGraph;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Manual generation SSE event types
+// ═══════════════════════════════════════════════════════════════
+
+export type GeneratePlanStatusPhase =
+  | "starting"
+  | "loading_task"
+  | "requesting_provider"
+  | "streaming"
+  | "extracting_tool_payload"
+  | "compiling"
+  | "saving"
+  | "completed";
+
+export interface GeneratePlanStatusEvent {
+  type: "status";
+  phase: GeneratePlanStatusPhase;
+  message: string;
+}
+
+export interface GeneratePlanPartialEvent {
+  type: "partial";
+  text: string;
+}
+
+export interface GeneratePlanToolCallEvent {
+  type: "tool_call";
+  tool: "generate_task_plan_graph";
+  input: PlanBlueprint;
+}
+
+export interface GeneratePlanResultEvent {
+  type: "result";
+  result: TaskPlanReadModel;
+  taskSessionKey?: string;
+}
+
+export type GeneratePlanErrorCode =
+  | "TASK_NOT_FOUND"
+  | "PLAN_GENERATION_IN_FLIGHT"
+  | "NO_AI_CLIENT"
+  | "INVALID_TOOL_PAYLOAD"
+  | "EMPTY_PLAN"
+  | "PROVIDER_ERROR"
+  | "ABORTED"
+  | "INTERNAL_ERROR";
+
+export interface GeneratePlanErrorEvent {
+  type: "error";
+  code: GeneratePlanErrorCode;
+  message: string;
+}
+
+export interface GeneratePlanDoneEvent {
+  type: "done";
+}
+
+export type GeneratePlanSSEEvent =
+  | GeneratePlanStatusEvent
+  | GeneratePlanPartialEvent
+  | GeneratePlanToolCallEvent
+  | GeneratePlanResultEvent
+  | GeneratePlanErrorEvent
+  | GeneratePlanDoneEvent;
+
+// ═══════════════════════════════════════════════════════════════
+// Manual generation request
+// ═══════════════════════════════════════════════════════════════
+
+export interface GenerateTaskPlanApiRequest {
+  forceRefresh?: boolean;
+  planningPrompt?: string | null;
+}
+
+/** @deprecated Replaced by TaskPlanReadModel + GeneratePlanSSEEvent */
 export interface TaskPlanGraphResponse {
-  /** The generated plan blueprint */
-  plan: PlanBlueprint;
-  /** Original user prompt that generated the plan */
-  prompt?: string;
-  /** Compiled plan derived from the blueprint */
-  compiledPlan?: CompiledPlan;
-  /** Validation warnings */
-  warnings?: string[];
-  /** AI feature metadata */
-  featureResult?: unknown;
-  /** @deprecated Legacy: rendered plan graph data (use compiledPlan instead) */
-  planGraph?: unknown;
-  /** @deprecated Legacy: saved plan metadata (use compiledPlan instead) */
-  savedPlan?: unknown;
-  /** @deprecated Legacy: generation source */
-  source?: string;
+  taskSessionKey?: string;
 }
 
 export type TaskUpdatePatch = {
