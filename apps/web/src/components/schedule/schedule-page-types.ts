@@ -1,7 +1,7 @@
-import type { Prisma } from "@/generated/prisma/client";
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
 import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
 import type { CompiledPlan } from "@chrona/contracts/ai";
+import type { RuntimeInput } from "@chrona/runtime-core";
 export interface LegacyPlanGraphNode {
   id: string;
   type: string;
@@ -364,12 +364,12 @@ export type TimelineCreateInput = {
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
   runtimeAdapterKey: string;
-  runtimeInput: Prisma.InputJsonObject;
+  runtimeInput: RuntimeInput;
   runtimeInputVersion: string;
   runtimeModel: string | null;
   prompt: string | null;
   dueAt: Date | null;
-  runtimeConfig?: Prisma.InputJsonObject | null;
+  runtimeConfig?: RuntimeInput | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
 };

@@ -3,9 +3,6 @@
  * graph migration. Current engine code should prefer direct compiled-plan,
  * effective-graph, and saved-plan snapshot modules instead of importing here.
  */
-export { savePlanRun as saveTaskPlanGraph } from "./plan-run-store";
-export { getCompiledPlan as acceptTaskPlanGraph } from "./compiled-plan-store";
-
 import type { CompiledPlan, PlanOverlayLayer } from "@chrona/contracts/ai";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan, type SavedCompiledPlan } from "./compiled-plan-store";
@@ -83,7 +80,11 @@ export function getReadyAutoRunnableNodes(
   layers: PlanOverlayLayer[],
 ) {
   const effective = resolveEffectivePlanGraph(compiledPlan, layers);
-  return effective.readyNodeIds.map((nodeId) => {
+  const autoReadyNodeIds = effective.readyNodeIds.filter((nodeId) => {
+    const node = effective.nodes.find((n) => n.id === nodeId);
+    return node && node.mode !== "manual";
+  });
+  return autoReadyNodeIds.map((nodeId) => {
     const node = effective.nodes.find((n) => n.id === nodeId)!;
     return { nodeId, title: node.title, type: node.type, isReady: true };
   });

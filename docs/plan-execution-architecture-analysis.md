@@ -165,7 +165,7 @@ PlanBlueprint                 EditablePlan               CompiledPlan
 └──────────────────────┬──────────────────────────────────────┘
                        │ calls
 ┌──────────────────────▼──────────────────────────────────────┐
-│  Runtime / Application Layer (packages/runtime/src/modules/)  │
+│  Runtime / Application Layer (packages/engine/src/modules/)  │
 │  ────────────────────────────────────────────────────────────│
 │  Command handlers: startPlan(), advanceNode(), applyPatch()  │
 │  Query handlers: getEffectivePlanView()                      │
@@ -321,7 +321,7 @@ The engine's `computeExecutablePath()` in `executable-path.ts` reads `TaskPlanGr
 
 ### 4.6 Gap: No Orchestration in the Runtime Layer
 
-The engine layer (`packages/engine/`) contains the orchestrator (`orchestrator.ts:advancePlanExecution()`), but the architecture prescribes that `packages/runtime/src/modules/` should own orchestration.
+The engine layer (`packages/engine/`) contains the orchestrator (`orchestrator.ts:advancePlanExecution()`), but the architecture prescribes that `packages/engine/src/modules/` should own orchestration.
 
 **Current state:** `packages/engine/` does everything:
 - Orchestration (pick ready nodes, execute, handle replan)
@@ -330,7 +330,7 @@ The engine layer (`packages/engine/`) contains the orchestrator (`orchestrator.t
 - Persistence (save/load TaskPlanGraph, PlanRun, sessions)
 - Replan detection and application
 
-**Target state:** `packages/runtime/src/modules/plan-execution/` owns orchestration. Engine should be a facade.
+**Target state:** `packages/engine/src/modules/plan-execution/` owns orchestration.
 
 ### 4.7 Gap: Settling Logic Spread Across Files
 
@@ -437,7 +437,7 @@ async function syncRunEvents(
 
 The engine calls `syncRunEvents()` — it never sees OpenClaw-specific wire types. Mapper logic stays in `packages/providers/openclaw/`.
 
-### 5.4 Execution Coordinator (packages/runtime/src/modules/plan-execution/)
+### 5.4 Execution Coordinator (packages/engine/src/modules/plan-execution/)
 
 ```typescript
 // coordinator.ts
@@ -651,7 +651,7 @@ Each phase:
 
 5. **Settling logic fragmentation** — 3+ files handle pieces of node settlement (status update, child run creation, conversation entry persistence, task status update).
 
-6. **Orchestration at wrong layer** — The orchestrator lives in `packages/engine/` but should be in `packages/runtime/src/modules/` per the prescribed architecture.
+6. **Orchestration consolidation** — The orchestrator lives in `packages/engine/` and orchestration concerns should be consolidated there.
 
 ### Recommended Execution Order
 

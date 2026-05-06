@@ -16,7 +16,7 @@ import type {
   SuggestTimeslotRequest,
   ChatRequest,
 } from "@chrona/contracts";
-import { createLogger } from "@chrona/db/logger";
+import { createLogger } from "@chrona/shared/logger";
 import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-core";
 import {
   normalizeGeneratePlanResponse,
@@ -556,102 +556,74 @@ export function buildGeneratePlanScope(
   return `adhoc-${titlePart}-${nonce}`;
 }
 
+type GeneratePlanAccumulator = {
+  finalText: string;
+  latestToolInput: Record<string, unknown> | null;
+};
+
+function collectGeneratePlanResult(
+  acc: GeneratePlanAccumulator,
+  doneEvent: Extract<StreamEvent, { type: "done" }>,
+  source: string,
+): StreamEvent {
+  const text = doneEvent.text ?? acc.finalText;
+  const structuredToolGraph = extractPreferredPlanGraphFromStructured(doneEvent.structured ?? null);
+
+  let parsed: unknown = acc.latestToolInput ?? structuredToolGraph ?? null;
+  if (!acc.latestToolInput && !structuredToolGraph) {
+    try { parsed = text ? JSON.parse(text) : null; } catch { parsed = null; }
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    const diagnostics = buildGeneratePlanDiagnostics({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph });
+    return {
+      type: "error",
+      message: describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph }),
+      rawText: text, structured: doneEvent.structured ?? null, diagnostics,
+    };
+  }
+
+  const plan = normalizeGeneratePlanResponse({ parsed, source, structured: doneEvent.structured });
+  if (plan.blueprint.nodes.length === 0) {
+    const diagnostics = buildGeneratePlanDiagnostics({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph });
+    return {
+      type: "error",
+      message: `${describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph })} Normalized plan blueprint contained zero nodes.`,
+      rawText: text, structured: doneEvent.structured ?? null, diagnostics,
+    };
+  }
+
+  return { type: "result", plan };
+}
+
 export async function* generatePlanStream(
   client: AiClientRecord,
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const generator = dispatchStream(
-    client,
-    "generate_plan",
-    request,
-    buildGeneratePlanScope(request),
-  );
-
-  let finalText = "";
-  let latestToolInput: Record<string, unknown> | null = null;
-  let latestStructured: NonNullable<
-    Extract<StreamEvent, { type: "done" }>["structured"]
-  > | null = null;
+  const generator = dispatchStream(client, "generate_plan", request, buildGeneratePlanScope(request));
+  const acc: GeneratePlanAccumulator = { finalText: "", latestToolInput: null };
+  let latestStructured: NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> | null = null;
 
   for await (const event of generator) {
-    if (
-      event.type === "tool_call" &&
-      event.tool === "generate_task_plan_graph"
-    ) {
-      latestToolInput = event.input;
+    if (event.type === "tool_call" && event.tool === "generate_task_plan_graph") {
+      acc.latestToolInput = event.input;
       yield event;
       continue;
     }
 
     if (event.type === "partial") {
-      finalText += event.text;
+      acc.finalText += event.text;
       yield event;
       continue;
     }
 
     if (event.type === "done") {
-      const text = event.text ?? finalText;
       latestStructured = event.structured ?? null;
-      const structuredToolGraph = extractPreferredPlanGraphFromStructured(
-        event.structured ?? null,
-      );
-      let parsed: unknown = latestToolInput ?? structuredToolGraph ?? null;
-      if (!latestToolInput && !structuredToolGraph) {
-        try {
-          parsed = text ? JSON.parse(text) : null;
-        } catch {
-          parsed = null;
-        }
+      const resolved = collectGeneratePlanResult(acc, event, client.type);
+      yield resolved;
+      if (resolved.type === "result") {
+        yield { type: "done", text: event.text ?? acc.finalText, structured: latestStructured ?? null };
       }
-      if (!parsed || typeof parsed !== "object") {
-        const diagnostics = buildGeneratePlanDiagnostics({
-          text,
-          structured: event.structured ?? null,
-          latestToolInput,
-          structuredToolGraph,
-        });
-        yield {
-          type: "error",
-          message: describeGeneratePlanFailure({
-            text,
-            structured: event.structured ?? null,
-            latestToolInput,
-            structuredToolGraph,
-          }),
-          rawText: text,
-          structured: event.structured ?? null,
-          diagnostics,
-        };
-        return;
-      }
-      const plan = normalizeGeneratePlanResponse({
-        parsed,
-        source: client.type,
-        structured: event.structured,
-      });
-      if (plan.blueprint.nodes.length === 0) {
-        const diagnostics = buildGeneratePlanDiagnostics({
-          text,
-          structured: event.structured ?? null,
-          latestToolInput,
-          structuredToolGraph,
-        });
-        yield {
-          type: "error",
-          message: `${describeGeneratePlanFailure({
-            text,
-            structured: event.structured ?? null,
-            latestToolInput,
-            structuredToolGraph,
-          })} Normalized plan blueprint contained zero nodes.`,
-          rawText: text,
-          structured: event.structured ?? null,
-          diagnostics,
-        };
-        return;
-      }
-      yield { type: "result", plan };
-      yield { type: "done", text, structured: latestStructured ?? null };
       return;
     }
 

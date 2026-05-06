@@ -1,4 +1,4 @@
-import { SYNC_STALE_MS } from "@/modules/runtime-sync/freshness";
+import { SYNC_STALE_MS } from "../../../constants";
 import type { SavedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import type { EvidenceItem, TaskPlanProjection, TaskPlanProjectionStep, TaskPlanStepStatus, WorkPageCopy } from "./types";
 import { makeEvidence, toIsoString } from "./helpers";
@@ -135,24 +135,46 @@ function _deriveTaskPlanStepStatus(
   }
 }
 
+import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
+
 export function buildTaskPlanFromGraph({
   savedPlan,
+  effectivePlanGraph,
 }: {
   savedPlan: SavedCompiledPlan | null;
+  effectivePlanGraph?: EffectivePlanGraph | null;
 }): TaskPlanProjection | null {
   if (!savedPlan) {
     return null;
   }
 
+  const effectiveNodesById = new Map<string, EffectivePlanNode>();
+  if (effectivePlanGraph) {
+    for (const node of effectivePlanGraph.nodes) {
+      effectiveNodesById.set(node.id, node);
+    }
+  }
+
+  const legacyStatuses = savedPlan.legacyNodeStatuses;
+
   const steps: TaskPlanProjectionStep[] = savedPlan.compiledPlan.nodes.map((node) => {
     const config = node.config as Record<string, unknown> | undefined;
+    const effectiveNode = effectiveNodesById.get(node.id);
+    const legacyStatus = legacyStatuses?.[node.id];
+    const status: TaskPlanStepStatus = effectiveNode && effectiveNode.status !== "pending"
+      ? (effectiveNode.status as TaskPlanStepStatus)
+      : legacyStatus
+        ? (legacyStatus as TaskPlanStepStatus)
+        : effectiveNode
+          ? (effectiveNode.status as TaskPlanStepStatus)
+          : "pending";
     return {
       id: node.id,
       title: node.title,
       objective: (config?.objective as string) ?? (config?.expectedOutput as string) ?? "",
       phase: node.type,
-      status: "pending" as TaskPlanStepStatus,
-      requiresHumanInput: false,
+      status,
+      requiresHumanInput: status === "waiting_for_user" || (effectiveNode?.status === "waiting_for_user") || legacyStatus === "waiting_for_user",
       type: node.type,
       linkedTaskId: node.linkedTaskId,
       executionMode: (node.mode as string) ?? undefined,
@@ -172,7 +194,7 @@ export function buildTaskPlanFromGraph({
     isMock: false,
     summary: savedPlan.summary,
     updatedAt: savedPlan.updatedAt,
-    changeSummary: null,
+    changeSummary: savedPlan.changeSummary ?? null,
     currentStepId,
     steps,
     edges: savedPlan.compiledPlan.edges.map((edge) => ({

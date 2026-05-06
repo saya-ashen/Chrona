@@ -23,7 +23,7 @@ bun run test:watch
 
 # Bun 后端测试（指定目录）
 bun test apps/server/src/__tests__/
-bun test packages/runtime/src/modules/
+bun test packages/engine/src/modules/
 
 # 单个 Bun 测试文件
 bun test apps/server/src/__tests__/api/task-workflow.bun.test.ts
@@ -49,7 +49,7 @@ bun run lint && bun run typecheck && bun run test
 
 ### 2. 运行时单元测试（Bun Test — `*.bun.test.ts`）
 
-位于 `packages/runtime/src/modules/` 内各子模块的 `__tests__/` 目录，覆盖：
+位于 `packages/engine/src/modules/` 内各子模块的 `__tests__/` 目录，覆盖：
 
 - **命令（commands）** — create-task、update-task、generate-task-plan 等 CQRS 写操作
 - **查询（queries）** — get-work-page、get-schedule-page 等读模型

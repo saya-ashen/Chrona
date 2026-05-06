@@ -38,7 +38,7 @@ function readSessionStrategy(node: EffectivePlanNode): string | undefined {
 }
 
 function isUserTask(node: EffectivePlanNode): boolean {
-  return node.executor === "user" || node.mode === "manual";
+  return node.executor === "user";
 }
 
 function needsApproval(node: EffectivePlanNode): boolean {
@@ -59,13 +59,6 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     return { kind: "main_session", reason: "Node already executing" };
   }
 
-  if (isUserTask(node)) {
-    return {
-      kind: "wait_for_user",
-      reason: `Node ${node.id} requires human input: ${node.title}`,
-    };
-  }
-
   if (needsApproval(node)) {
     return {
       kind: "manual_only",
@@ -80,6 +73,13 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     };
   }
 
+  if (isUserTask(node)) {
+    return {
+      kind: "wait_for_user",
+      reason: `Node ${node.id} requires human input: ${node.title}`,
+    };
+  }
+
   const strategy = readSessionStrategy(node);
   if (strategy === "per_subtask") {
     return {
@@ -89,8 +89,7 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     };
   }
 
-  const config = node.config as Record<string, unknown>;
-  if (typeof config.linkedTaskId === "string" && config.linkedTaskId.length > 0) {
+  if (typeof node.linkedTaskId === "string" && node.linkedTaskId.length > 0) {
     return {
       kind: "child_session",
       reason: `Node ${node.id} already linked to child task`,

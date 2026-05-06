@@ -26,6 +26,8 @@ export type SavedCompiledPlan = {
   prompt: string | null;
   summary: string | null;
   generatedBy: string | null;
+  changeSummary: string | null;
+  legacyNodeStatuses?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 };
@@ -67,6 +69,7 @@ type LegacyTaskPlanGraphPayload = {
   revision?: number;
   prompt?: string | null;
   summary?: string | null;
+  changeSummary?: string | null;
   generatedBy?: string | null;
   nodes?: Array<Record<string, unknown>>;
   edges?: Array<Record<string, unknown>>;
@@ -256,6 +259,16 @@ async function findLegacyTaskPlanMemories(taskId: string) {
 }
 
 function toSavedCompiledPlanFromLegacy(memory: CompiledPlanMemoryRecord, parsed: LegacyTaskPlanGraphPayload, taskId: string): SavedCompiledPlan {
+  const legacyNodeStatuses: Record<string, string> = {};
+  const rawNodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+  for (const node of rawNodes) {
+    const id = typeof node.id === "string" ? node.id : null;
+    const status = typeof node.status === "string" ? node.status : null;
+    if (id && status) {
+      legacyNodeStatuses[id] = status;
+    }
+  }
+
   return {
     memoryId: memory.id,
     workspaceId: memory.workspaceId,
@@ -266,7 +279,9 @@ function toSavedCompiledPlanFromLegacy(memory: CompiledPlanMemoryRecord, parsed:
       : "draft") as SavedCompiledPlan["status"],
     prompt: typeof parsed.prompt === "string" ? parsed.prompt : null,
     summary: typeof parsed.summary === "string" ? parsed.summary : null,
+    changeSummary: typeof parsed.changeSummary === "string" ? parsed.changeSummary : null,
     generatedBy: typeof parsed.generatedBy === "string" ? parsed.generatedBy : null,
+    legacyNodeStatuses: Object.keys(legacyNodeStatuses).length > 0 ? legacyNodeStatuses : undefined,
     createdAt: memory.createdAt.toISOString(),
     updatedAt: memory.updatedAt.toISOString(),
   };
@@ -373,6 +388,7 @@ export async function getAcceptedCompiledPlan(taskId: string): Promise<SavedComp
         status: parsed.status as SavedCompiledPlan["status"],
         prompt: parsed.prompt,
         summary: parsed.summary,
+        changeSummary: null,
         generatedBy: parsed.generatedBy,
         createdAt: memory.createdAt.toISOString(),
         updatedAt: memory.updatedAt.toISOString(),
@@ -402,6 +418,7 @@ export async function getLatestCompiledPlan(taskId: string): Promise<SavedCompil
         status: parsed.status as SavedCompiledPlan["status"],
         prompt: parsed.prompt,
         summary: parsed.summary,
+        changeSummary: null,
         generatedBy: parsed.generatedBy,
         createdAt: memory.createdAt.toISOString(),
         updatedAt: memory.updatedAt.toISOString(),

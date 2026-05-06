@@ -2,7 +2,6 @@
 
 import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { Prisma } from "@/generated/prisma/client";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { useI18n } from "@/i18n/client";
@@ -23,11 +22,11 @@ export type TaskConfigFormDraft = {
 
 export type TaskConfigFormInput = TaskConfigFormDraft & {
   runtimeAdapterKey: string;
-  runtimeInput: Prisma.InputJsonObject;
+  runtimeInput: RuntimeInput;
   runtimeInputVersion: string;
   runtimeModel: string | null;
   prompt: string | null;
-  runtimeConfig?: Prisma.InputJsonObject | null;
+  runtimeConfig?: RuntimeInput | null;
   sessionStrategy?: "shared" | "per_subtask";
 };
 
@@ -127,7 +126,7 @@ function formatRuntimeConfig(value: unknown) {
 function parseRuntimeConfig(
   value: string,
   copy: { errorInvalidJson: string; errorJsonObject: string },
-): Prisma.InputJsonObject | null {
+): RuntimeInput | null {
   const trimmed = value.trim();
 
   if (!trimmed) {
@@ -146,7 +145,7 @@ function parseRuntimeConfig(
     throw new Error(copy.errorJsonObject);
   }
 
-  return parsed as Prisma.InputJsonObject;
+  return parsed as RuntimeInput;
 }
 
 function cloneRuntimeInput(input: RuntimeInput) {
@@ -310,7 +309,7 @@ function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
   return {
     runtimeModel,
     prompt,
-    runtimeConfig: Object.keys(runtimeConfig).length > 0 ? (runtimeConfig as Prisma.InputJsonObject) : null,
+    runtimeConfig: Object.keys(runtimeConfig).length > 0 ? (runtimeConfig as RuntimeInput) : null,
   };
 }
 
@@ -321,7 +320,7 @@ function buildTaskConfigFormInput(
   options?: { throwOnInvalidJson?: boolean },
 ): TaskConfigFormInput | null {
   const runtimeAdapter = resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, formState.runtimeAdapterKey);
-  let extraRuntimeInput: Prisma.InputJsonObject | null;
+  let extraRuntimeInput: RuntimeInput | null;
   try {
     extraRuntimeInput = parseRuntimeConfig(formState.extraRuntimeConfig, copy);
   } catch (error) {
@@ -334,7 +333,7 @@ function buildTaskConfigFormInput(
     ...cloneRuntimeInput(formState.fieldRuntimeInput),
     ...(extraRuntimeInput ?? {}),
   };
-  const runtimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput) as Prisma.InputJsonObject;
+  const runtimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput) as RuntimeInput;
   const runtimeInputWithoutDefaults = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput, {
     applyDefaults: false,
   });

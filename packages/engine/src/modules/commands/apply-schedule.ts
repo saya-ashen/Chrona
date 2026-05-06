@@ -25,6 +25,10 @@ export async function applySchedule(input: {
     where: { id: input.taskId },
     data: {
       dueAt: input.dueAt,
+      scheduledStartAt: input.scheduledStartAt,
+      scheduledEndAt: input.scheduledEndAt,
+      scheduleStatus: input.scheduledStartAt ? "Scheduled" : "Unscheduled",
+      scheduleSource: input.scheduleSource,
     },
   });
 

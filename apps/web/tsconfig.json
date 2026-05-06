@@ -13,8 +13,6 @@
       "@chrona/shared": ["../../packages/shared/src/index.ts"],
       "@chrona/engine/*": ["../../packages/engine/src/*"],
       "@chrona/engine": ["../../packages/engine/src/index.ts"],
-      "@chrona/db/*": ["../../packages/db/src/*"],
-      "@chrona/db": ["../../packages/db/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],
       "@chrona/contracts": ["../../packages/contracts/src/index.ts"],
       "@chrona/domain/*": ["../../packages/domain/src/*"],

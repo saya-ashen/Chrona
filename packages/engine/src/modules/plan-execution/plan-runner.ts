@@ -26,6 +26,7 @@ import { TaskNodeExecutor } from "./node-executors/task-executor";
 import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
 import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
+import type { Prisma as PrismaNS } from "@/generated/prisma/client";
 
 type PlanExecutionStatus =
   | "started"
@@ -163,6 +164,190 @@ function makeRuntimeLayer(
   };
 }
 
+// ── Result handler strategies ──
+
+type ResultOf<S extends NodeExecutionResult["status"]> = Extract<NodeExecutionResult, { status: S }>;
+
+interface ResultContext {
+  nextNodeId: string;
+  result: NodeExecutionResult;
+  effective: EffectivePlanGraph;
+  compiledPlan: CompiledPlan;
+  planId: string;
+  workspaceId: string;
+  taskId: string;
+  mainSession: { id: string };
+  layers: PlanOverlayLayer[];
+  executedNodeIds: string[];
+}
+
+interface ResultStrategy {
+  layerStatus: string;
+  decision: "continue" | "return";
+  eventType: string;
+  eventPayload: (r: NodeExecutionResult, ctx: ResultContext) => Record<string, unknown>;
+  taskUpdate?: (r: NodeExecutionResult, ctx: ResultContext) => { status: TaskStatus; blockReason: PrismaNS.InputJsonValue };
+  executionStatus: PlanExecutionStatus;
+  getMessage: (r: NodeExecutionResult) => string;
+}
+
+const RESULT_STRATEGIES: Record<string, ResultStrategy> = {
+  done: {
+    layerStatus: "completed",
+    decision: "continue",
+    eventType: "node_completed",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, summary: (r as ResultOf<"done">).summary }),
+    executionStatus: "running",
+    getMessage: (r) => (r as ResultOf<"done">).summary,
+  },
+
+  waiting_for_user: {
+    layerStatus: "blocked",
+    decision: "return",
+    eventType: "node_waiting_for_user",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, prompt: (r as ResultOf<"waiting_for_user">).prompt }),
+    taskUpdate: (r, ctx) => ({
+      status: TaskStatus.WaitingForInput,
+      blockReason: { blockType: "human_input_required", scope: "plan_node", actionRequired: (r as ResultOf<"waiting_for_user">).prompt, nodeId: ctx.nextNodeId },
+    }),
+    executionStatus: "waiting_for_user",
+    getMessage: (r) => (r as ResultOf<"waiting_for_user">).prompt,
+  },
+
+  waiting_for_approval: {
+    layerStatus: "blocked",
+    decision: "return",
+    eventType: "node_waiting_for_approval",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, prompt: (r as ResultOf<"waiting_for_approval">).prompt }),
+    taskUpdate: (r, ctx) => ({
+      status: TaskStatus.WaitingForApproval,
+      blockReason: { blockType: "approval_required", scope: "plan_node", actionRequired: (r as ResultOf<"waiting_for_approval">).prompt, nodeId: ctx.nextNodeId },
+    }),
+    executionStatus: "waiting_for_approval",
+    getMessage: (r) => (r as ResultOf<"waiting_for_approval">).prompt,
+  },
+
+  child_running: {
+    layerStatus: "running",
+    decision: "return",
+    eventType: "child_run_started",
+    eventPayload: (r, ctx) => ({
+      nodeId: ctx.nextNodeId,
+      childSessionId: (r as ResultOf<"child_running">).evidence.childSessionId,
+      childRunId: (r as ResultOf<"child_running">).evidence.runId,
+      childTaskId: (r as ResultOf<"child_running">).evidence.childTaskId,
+    }),
+    executionStatus: "running",
+    getMessage: (r) => (r as ResultOf<"child_running">).summary,
+  },
+
+  blocked: {
+    layerStatus: "blocked",
+    decision: "return",
+    eventType: "node_blocked",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, reason: (r as ResultOf<"blocked">).reason }),
+    taskUpdate: (r, ctx) => ({
+      status: TaskStatus.Blocked,
+      blockReason: { blockType: "node_blocked", scope: "plan_node", actionRequired: (r as ResultOf<"blocked">).reason, nodeId: ctx.nextNodeId },
+    }),
+    executionStatus: "blocked",
+    getMessage: (r) => (r as ResultOf<"blocked">).reason,
+  },
+
+  failed: {
+    layerStatus: "blocked",
+    decision: "return",
+    eventType: "node_blocked",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, reason: (r as ResultOf<"failed">).error }),
+    taskUpdate: (r, ctx) => ({
+      status: TaskStatus.Blocked,
+      blockReason: { blockType: "node_blocked", scope: "plan_node", actionRequired: (r as ResultOf<"failed">).error, nodeId: ctx.nextNodeId },
+    }),
+    executionStatus: "blocked",
+    getMessage: (r) => (r as ResultOf<"failed">).error,
+  },
+
+  replan_required: {
+    layerStatus: "blocked",
+    decision: "return",
+    eventType: "replan_proposed",
+    eventPayload: (r, ctx) => ({ nodeId: ctx.nextNodeId, reason: (r as ResultOf<"replan_required">).reason }),
+    taskUpdate: (r, ctx) => ({
+      status: TaskStatus.WaitingForApproval,
+      blockReason: { blockType: "replan_required", scope: "plan", actionRequired: (r as ResultOf<"replan_required">).reason, nodeId: ctx.nextNodeId },
+    }),
+    executionStatus: "waiting_for_approval",
+    getMessage: (r) => (r as ResultOf<"replan_required">).reason,
+  },
+};
+
+async function applyDriftResultStrategy(params: {
+  nextNodeId: string;
+  result: NodeExecutionResult;
+  effective: EffectivePlanGraph;
+  compiledPlan: CompiledPlan;
+  planId: string;
+  workspaceId: string;
+  taskId: string;
+  mainSession: { id: string };
+  layers: PlanOverlayLayer[];
+  executedNodeIds: string[];
+}) {
+  const { nextNodeId, result, effective, compiledPlan, planId, workspaceId, taskId, mainSession, executedNodeIds } = params;
+  let layers = [...params.layers];
+
+  const drift = detectPlanDrift({ node: effective.nodes.find((n: EffectivePlanNode) => n.id === nextNodeId)!, nodeResult: result, plan: effective });
+
+  if (drift.requiresUserConfirmation || drift.risk !== "low") {
+    const blockedLayer = makeRuntimeLayer(planId, nextNodeId, "blocked", layers.length + 1, { lastError: drift.reason });
+    layers = await appendLayer({ workspaceId, taskId, planId, layer: blockedLayer });
+
+    await appendMainSessionEvent({
+      taskId, planId, sessionId: mainSession.id,
+      eventType: "replan_proposed",
+      payload: { nodeId: nextNodeId, reason: drift.reason, risk: drift.risk, proposedPatch: drift.proposedPatch },
+    });
+
+    await db.task.update({
+      where: { id: taskId },
+      data: { status: TaskStatus.WaitingForApproval, blockReason: { blockType: "replan_required", scope: "plan", actionRequired: drift.reason, nodeId: nextNodeId } },
+    });
+
+    await rebuildTaskProjection(taskId);
+
+    return {
+      layers, decision: "return" as const,
+      returnValue: {
+        taskId, planId, mainSessionId: mainSession.id,
+        status: "waiting_for_approval" as const, currentNodeId: nextNodeId,
+        executedNodeIds, waitingNodeIds: [], blockedNodeIds: [nextNodeId],
+        message: drift.reason,
+      },
+    };
+  }
+
+  if (drift.proposedPatch) {
+    const patchResult = await applyPlanPatch({
+      taskId, patch: drift.proposedPatch,
+      compiledPlanId: compiledPlan.id,
+      effectiveGraph: effective,
+      source: "system",
+    });
+
+    for (const newLayer of patchResult.newLayers) {
+      layers = await appendLayer({ workspaceId, taskId, planId, layer: newLayer });
+    }
+
+    await appendMainSessionEvent({
+      taskId, planId, sessionId: mainSession.id,
+      eventType: "replan_proposed",
+      payload: { nodeId: nextNodeId, reason: drift.reason, autoApplied: true },
+    });
+  }
+
+  return { layers, decision: "continue" as const };
+}
+
 async function handleNodeResult(params: {
   nextNodeId: string;
   result: NodeExecutionResult;
@@ -175,229 +360,61 @@ async function handleNodeResult(params: {
   layers: readonly PlanOverlayLayer[];
   executedNodeIds: string[];
 }): Promise<{ layers: PlanOverlayLayer[]; decision: "continue" | "return"; returnValue?: PlanExecutionResult }> {
-  const {
-    nextNodeId, result, effective, compiledPlan,
-    planId, workspaceId, taskId, mainSession,
-    executedNodeIds,
-  } = params;
-  let layers = [...params.layers];
+  const { nextNodeId, result, effective, compiledPlan, planId, workspaceId, taskId, mainSession, executedNodeIds } = params;
 
-  // Replan detection
   const node = effective.nodes.find((n) => n.id === nextNodeId)!;
   const drift = detectPlanDrift({ node, nodeResult: result, plan: effective });
 
   if (drift.needsReplan) {
-    if (drift.requiresUserConfirmation || drift.risk !== "low") {
-      const blockedLayer = makeRuntimeLayer(planId, nextNodeId, "blocked", layers.length + 1, { lastError: drift.reason });
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: blockedLayer });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "replan_proposed",
-        payload: { nodeId: nextNodeId, reason: drift.reason, risk: drift.risk, proposedPatch: drift.proposedPatch },
-      });
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: TaskStatus.WaitingForApproval,
-          blockReason: { blockType: "replan_required" as const, scope: "plan" as const, actionRequired: drift.reason, nodeId: nextNodeId },
-        },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers,
-        decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "waiting_for_approval", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [], blockedNodeIds: [nextNodeId],
-          message: drift.reason,
-        },
-      };
-    }
-
-    if (drift.proposedPatch) {
-      const patchResult = await applyPlanPatch({
-        taskId, patch: drift.proposedPatch,
-        compiledPlanId: compiledPlan.id,
-        effectiveGraph: effective,
-        source: "system" as const,
-      });
-
-      for (const newLayer of patchResult.newLayers) {
-        layers = await appendLayer({ workspaceId, taskId, planId, layer: newLayer });
-      }
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "replan_proposed",
-        payload: { nodeId: nextNodeId, reason: drift.reason, autoApplied: true },
-      });
-    }
-
-    return { layers, decision: "continue" };
+    return applyDriftResultStrategy({ nextNodeId, result, effective, compiledPlan, planId, workspaceId, taskId, mainSession, layers: [...params.layers], executedNodeIds });
   }
 
   executedNodeIds.push(nextNodeId);
 
-  switch (result.status) {
-    case "done": {
-      const doneLayer = makeRuntimeLayer(planId, nextNodeId, "completed", layers.length + 1);
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: doneLayer });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "node_completed", payload: { nodeId: nextNodeId, summary: result.summary },
-      });
-      return { layers, decision: "continue" };
-    }
-
-    case "waiting_for_user": {
-      const waitLayer = makeRuntimeLayer(planId, nextNodeId, "blocked", layers.length + 1);
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: waitLayer });
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: TaskStatus.WaitingForInput,
-          blockReason: { blockType: "human_input_required" as const, scope: "plan_node" as const, actionRequired: result.prompt, nodeId: nextNodeId },
-        },
-      });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "node_waiting_for_user", payload: { nodeId: nextNodeId, prompt: result.prompt },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers, decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "waiting_for_user", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [nextNodeId], blockedNodeIds: [],
-          message: result.prompt,
-        },
-      };
-    }
-
-    case "waiting_for_approval": {
-      const approvalLayer = makeRuntimeLayer(planId, nextNodeId, "blocked", layers.length + 1);
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: approvalLayer });
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: TaskStatus.WaitingForApproval,
-          blockReason: { blockType: "approval_required" as const, scope: "plan_node" as const, actionRequired: result.prompt, nodeId: nextNodeId },
-        },
-      });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "node_waiting_for_approval", payload: { nodeId: nextNodeId, prompt: result.prompt },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers, decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "waiting_for_approval", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [], blockedNodeIds: [],
-          message: result.prompt,
-        },
-      };
-    }
-
-    case "child_running": {
-      const childLayer = makeRuntimeLayer(planId, nextNodeId, "running", layers.length + 1);
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: childLayer });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "child_run_started",
-        payload: { nodeId: nextNodeId, childSessionId: result.evidence.childSessionId, childRunId: result.evidence.runId, childTaskId: result.evidence.childTaskId },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers, decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "running", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [], blockedNodeIds: [],
-          message: result.summary,
-        },
-      };
-    }
-
-    case "blocked":
-    case "failed": {
-      const blockMessage = result.status === "blocked" ? result.reason : result.error;
-
-      const blockedLayer = makeRuntimeLayer(planId, nextNodeId, "blocked", layers.length + 1, { lastError: blockMessage });
-      layers = await appendLayer({ workspaceId, taskId, planId, layer: blockedLayer });
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: TaskStatus.Blocked,
-          blockReason: { blockType: "node_blocked" as const, scope: "plan_node" as const, actionRequired: blockMessage, nodeId: nextNodeId },
-        },
-      });
-
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "node_blocked", payload: { nodeId: nextNodeId, reason: blockMessage },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers, decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "blocked", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [], blockedNodeIds: [nextNodeId],
-          message: blockMessage,
-        },
-      };
-    }
-
-    case "replan_required": {
-      await appendMainSessionEvent({
-        taskId, planId, sessionId: mainSession.id,
-        eventType: "replan_proposed", payload: { nodeId: nextNodeId, reason: result.reason },
-      });
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: TaskStatus.WaitingForApproval,
-          blockReason: { blockType: "replan_required" as const, scope: "plan" as const, actionRequired: result.reason, nodeId: nextNodeId },
-        },
-      });
-
-      await rebuildTaskProjection(taskId);
-
-      return {
-        layers, decision: "return",
-        returnValue: {
-          taskId, planId, mainSessionId: mainSession.id,
-          status: "waiting_for_approval", currentNodeId: nextNodeId,
-          executedNodeIds, waitingNodeIds: [], blockedNodeIds: [],
-          message: result.reason,
-        },
-      };
-    }
+  const strategy = RESULT_STRATEGIES[result.status];
+  if (!strategy) {
+    throw new Error(`Unknown node result status: ${result.status}`);
   }
+
+  let layers = [...params.layers];
+  const blockMessage = strategy.getMessage(result);
+
+  const extra = strategy.layerStatus === "blocked" && (result.status === "blocked" || result.status === "failed" || result.status === "replan_required")
+    ? { lastError: blockMessage }
+    : undefined;
+  const layer = makeRuntimeLayer(planId, nextNodeId, strategy.layerStatus, layers.length + 1, extra);
+  layers = await appendLayer({ workspaceId, taskId, planId, layer });
+
+  await appendMainSessionEvent({
+    taskId, planId, sessionId: mainSession.id,
+    eventType: strategy.eventType as Parameters<typeof appendMainSessionEvent>[0]["eventType"],
+    payload: strategy.eventPayload(result, { nextNodeId, result, effective, compiledPlan, planId, workspaceId, taskId, mainSession, layers, executedNodeIds }),
+  });
+
+  if (strategy.taskUpdate) {
+    await db.task.update({
+      where: { id: taskId },
+      data: strategy.taskUpdate(result, { nextNodeId, result, effective, compiledPlan, planId, workspaceId, taskId, mainSession, layers, executedNodeIds }),
+    });
+  }
+
+  if (strategy.decision === "return" || strategy.layerStatus === "completed") {
+    await rebuildTaskProjection(taskId);
+  }
+
+  if (strategy.decision === "continue") return { layers, decision: "continue" };
+
+  return {
+    layers, decision: "return",
+    returnValue: {
+      taskId, planId, mainSessionId: mainSession.id,
+      status: strategy.executionStatus, currentNodeId: nextNodeId,
+      executedNodeIds,
+      waitingNodeIds: strategy.executionStatus === "waiting_for_user" ? [nextNodeId] : [],
+      blockedNodeIds: strategy.executionStatus === "blocked" || strategy.executionStatus === "waiting_for_approval" ? [nextNodeId] : [],
+      message: blockMessage,
+    },
+  };
 }
 
 async function advancePlanExecution(input: {

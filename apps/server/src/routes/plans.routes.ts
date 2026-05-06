@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -17,7 +18,7 @@ import {
   TaskPlanGenerationInFlightError,
 } from "@chrona/engine";
 
-import { planGenerationConflictBody, sseEncode, logger } from "./helpers";
+import { planGenerationConflictBody, logger } from "./helpers";
 import { error, internalServerError, json } from "../lib/http";
 
 export function createPlansRoutes() {
@@ -133,122 +134,75 @@ export function createPlansRoutes() {
       });
 
       const streamLock = startTaskPlanGeneration(taskId);
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        async start(controller) {
-          let streamClosed = false;
-          try {
-            const eventCounts: Record<string, number> = {};
 
-            const safeEnqueue = (event: string, data: unknown) => {
-              if (streamClosed) return false;
-              try {
-                controller.enqueue(encoder.encode(sseEncode(event, data)));
-                return true;
-              } catch {
-                streamClosed = true;
-                return false;
-              }
-            };
+      return streamSSE(c, async (stream) => {
+        const eventCounts: Record<string, number> = {};
+        stream.onAbort(() => streamLock.finish());
 
-            for await (const event of streamTaskPlanGeneration({
-              taskId,
-              forceRefresh,
-            })) {
-              eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
-              logger.info("stream.event", {
-                requestId,
-                feature: "generate_plan",
-                taskId,
-                eventType: event.type,
-              });
-
-              if (event.type === "status") {
-                if (!safeEnqueue("status", { message: event.message })) break;
-                continue;
-              }
-              if (event.type === "tool_call") {
-                if (
-                  !safeEnqueue("tool_call", {
-                    tool: event.tool,
-                    input: event.input,
-                  })
-                )
-                  break;
-                continue;
-              }
-              if (event.type === "tool_result") {
-                if (
-                  !safeEnqueue("tool_result", {
-                    tool: event.tool,
-                    result: event.result,
-                  })
-                )
-                  break;
-                continue;
-              }
-              if (event.type === "partial") {
-                if (!safeEnqueue("partial", { text: event.text })) break;
-                continue;
-              }
-              if (event.type === "result") {
-                if (!safeEnqueue("result", event.response)) break;
-                continue;
-              }
-              if (event.type === "error") {
-                safeEnqueue("error", { message: event.message });
-                break;
-              }
-              if (event.type === "done") {
-                safeEnqueue("done", {});
-                break;
-              }
-            }
-
-            logger.info("request.done", {
+        try {
+          for await (const event of streamTaskPlanGeneration({
+            taskId,
+            forceRefresh,
+          })) {
+            eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
+            logger.info("stream.event", {
               requestId,
               feature: "generate_plan",
               taskId,
-              eventCounts,
+              eventType: event.type,
             });
-          } catch (cause) {
-            logger.error("request.stream_error", {
-              requestId,
-              feature: "generate_plan",
-              taskId,
-              error: cause instanceof Error ? cause.message : String(cause),
-            });
-            try {
-              controller.enqueue(
-                encoder.encode(
-                  sseEncode("error", {
-                    message:
-                      cause instanceof Error
-                        ? cause.message
-                        : "Failed to generate task plan",
-                  }),
-                ),
-              );
-            } catch {
-              /* stream may already be closed */
-            }
-          } finally {
-            streamLock.finish();
-            try {
-              controller.close();
-            } catch {
-              /* stream may already be closed */
+
+            switch (event.type) {
+              case "status":
+                await stream.writeSSE({ event: "status", data: JSON.stringify({ message: event.message }) });
+                break;
+              case "tool_call":
+                await stream.writeSSE({ event: "tool_call", data: JSON.stringify({ tool: event.tool, input: event.input }) });
+                break;
+              case "tool_result":
+                await stream.writeSSE({ event: "tool_result", data: JSON.stringify({ tool: event.tool, result: event.result }) });
+                break;
+              case "partial":
+                await stream.writeSSE({ event: "partial", data: JSON.stringify({ text: event.text }) });
+                break;
+              case "result":
+                await stream.writeSSE({ event: "result", data: JSON.stringify(event.response) });
+                break;
+              case "error":
+                await stream.writeSSE({ event: "error", data: JSON.stringify({ message: event.message }) });
+                return;
+              case "done":
+                await stream.writeSSE({ event: "done", data: "{}" });
+                return;
             }
           }
-        },
-      });
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
+          logger.info("request.done", {
+            requestId,
+            feature: "generate_plan",
+            taskId,
+            eventCounts,
+          });
+        } catch (cause) {
+          logger.error("request.stream_error", {
+            requestId,
+            feature: "generate_plan",
+            taskId,
+            error: cause instanceof Error ? cause.message : String(cause),
+          });
+          try {
+            await stream.writeSSE({
+              event: "error",
+              data: JSON.stringify({
+                message: cause instanceof Error ? cause.message : "Failed to generate task plan",
+              }),
+            });
+          } catch {
+            /* stream may already be closed */
+          }
+        } finally {
+          streamLock.finish();
+        }
       });
     } catch (cause) {
       if (cause instanceof TaskPlanGenerationInFlightError) {

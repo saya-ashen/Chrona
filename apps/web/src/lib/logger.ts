@@ -1,1 +1,1 @@
-export { createLogger, summarizeText } from "@chrona/db/logger";
+export { createLogger, summarizeText } from "@chrona/shared/logger";

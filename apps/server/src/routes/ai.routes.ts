@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
-import { summarizeText } from "@chrona/db/logger";
+import { summarizeText } from "@chrona/shared/logger";
 import type { TaskSnapshot, ScheduleHealthSnapshot } from "@chrona/engine";
 import {
   aiChat,

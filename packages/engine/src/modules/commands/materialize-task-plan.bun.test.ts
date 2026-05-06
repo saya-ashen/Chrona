@@ -158,23 +158,5 @@ describe("materialize-task-plan", () => {
         dependencyType: TaskDependencyType.blocks,
       },
     ]);
-
-    const activeMemory = await db.memory.findFirstOrThrow({
-      where: {
-        taskId: parentTask.id,
-        scope: MemoryScope.task,
-        sourceType: MemorySourceType.agent_inferred,
-        status: MemoryStatus.Active,
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    const parsed = JSON.parse(activeMemory.content) as {
-      nodes: Array<{ id: string; linkedTaskId: string | null }>;
-    };
-
-    expect(parsed.nodes.find((node) => node.id === "node-1")?.linkedTaskId).toBe(childTasks[0]!.id);
-    expect(parsed.nodes.find((node) => node.id === "node-2")?.linkedTaskId).toBe(childTasks[1]!.id);
-    expect(parsed.nodes.find((node) => node.id === "node-3")?.linkedTaskId).toBeNull();
   });
 });

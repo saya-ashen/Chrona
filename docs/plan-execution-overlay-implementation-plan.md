@@ -258,7 +258,7 @@ Every mutation appends a new layer. No mutation of existing layers.
 ### 4.1 PlanRunner
 
 ```typescript
-// packages/runtime/src/modules/plan-execution/plan-runner.ts
+// packages/engine/src/modules/plan-execution/plan-runner.ts
 
 class PlanRunner {
   async advance(taskId: string): Promise<PlanAdvancementResult> {
@@ -328,8 +328,8 @@ Current reality:
 
 | Change | File |
 |--------|------|
-| New | `packages/runtime/src/modules/plan-execution/plan-runner.ts` |
-| New | `packages/runtime/src/modules/plan-execution/node-executors/*.ts` |
+| New | `packages/engine/src/modules/plan-execution/plan-runner.ts` |
+| New | `packages/engine/src/modules/plan-execution/node-executors/*.ts` |
 | Refactor | `engine/src/modules/plan-execution/orchestrator.ts` |
 | Remove | `engine/src/modules/plan-execution/plan-run-bridge.ts` |
 

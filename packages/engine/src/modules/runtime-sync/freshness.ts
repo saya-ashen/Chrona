@@ -2,7 +2,7 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createRuntimeAdapter, DEFAULT_RUNTIME_ADAPTER_KEY, type RuntimeAdapter } from "@chrona/providers-core";
 
-export const SYNC_STALE_MS = 5 * 60 * 1000;
+import { SYNC_STALE_MS } from "../../constants";
 
 const ACTIVE_RUN_STATUSES = [
   RunStatus.Pending,
