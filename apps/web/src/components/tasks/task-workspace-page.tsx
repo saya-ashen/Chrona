@@ -13,6 +13,8 @@ import {
   SurfaceCard,
   SurfaceCardHeader,
 } from "@/components/ui/surface-card";
+
+import { api } from "@/lib/rpc-client";
 import type { TaskWorkspaceUpdateProposal, TaskPlanReadModel } from "@chrona/contracts/ai";
 
 type TaskData = {
@@ -180,7 +182,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const fetchPlan = useCallback(async () => {
     setIsRefetchingPlan(true);
     try {
-      const res = await fetch(`/api/tasks/${task.id}/plan/state`);
+      const res = await api.tasks[":taskId"].plan.state.$get({
+        param: { taskId: task.id },
+      });
       if (res.ok) {
         const state = (await res.json()) as {
           aiPlanGenerationStatus?: string;
@@ -230,10 +234,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         runtimeConfig: editing.runtimeConfig ?? undefined,
       };
 
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const response = await api.tasks[":taskId"].$patch({
+        param: { taskId: task.id },
+        json: body,
       });
 
       if (!response.ok) {
@@ -282,10 +285,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         if (patch.prompt !== undefined) body.prompt = patch.prompt ?? undefined;
         if (patch.runtimeConfig !== undefined) body.runtimeConfig = patch.runtimeConfig ?? undefined;
 
-        const response = await fetch(`/api/tasks/${task.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+        const response = await api.tasks[":taskId"].$patch({
+          param: { taskId: task.id },
+          json: body,
         });
         if (!response.ok) {
           const err = await response.json().catch(() => ({ error: "Failed to apply task patch" }));
@@ -313,15 +315,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     if (proposal.planPatch && plan) {
       try {
         const patch = proposal.planPatch;
-        const response = await fetch(`/api/tasks/${task.id}/plan`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operations: patch.operations,
-            rationale: patch.rationale,
-            basePlanId: patch.basePlanId,
-            baseVersion: patch.baseVersion,
-          }),
+        const response = await api.tasks[":taskId"].plan.$post({
+          param: { taskId: task.id },
+          json: {
+            operation: "batch",
+            operations: patch.operations.map((op) => JSON.stringify(op)),
+          },
         });
         if (!response.ok) {
           const err = await response.json().catch(() => ({ error: "Failed to apply plan patch" }));
@@ -349,7 +348,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     setIsDeleting(true);
     setSaveError(null);
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+      const response = await api.tasks[":taskId"].$delete({ param: { taskId: task.id }, query: {} });
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: "Failed to delete task" }));
         throw new Error((err as { error?: string }).error ?? "Failed to delete task");

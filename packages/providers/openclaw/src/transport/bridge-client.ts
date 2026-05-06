@@ -30,8 +30,15 @@ import type {
   BridgeFeature,
 } from "./bridge-types";
 import { normalizeGatewayHttpUrl } from "../shared/constants";
-import type { BridgeEnvironment, BridgeLogger, RouteKind } from "../shared/types";
-import { checkGatewayAvailable, executeGatewayRequest } from "../execution/gateway";
+import type {
+  BridgeEnvironment,
+  BridgeLogger,
+  RouteKind,
+} from "../shared/types";
+import {
+  checkGatewayAvailable,
+  executeGatewayRequest,
+} from "../execution/gateway";
 import type { RuntimeInput } from "@chrona/runtime-core";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
 
@@ -111,43 +118,6 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
   close(): void {
     // no-op for gateway client
-  }
-
-  async createRun(input: {
-    prompt: string;
-    runtimeInput: RuntimeInput;
-    runtimeSessionKey?: string;
-  }): Promise<{
-    runtimeRunRef?: string;
-    runtimeSessionRef?: string;
-    runtimeSessionKey?: string;
-    runStarted: boolean;
-  }> {
-    const sessionKey = input.runtimeSessionKey ?? crypto.randomUUID();
-    const requestBody: BridgeExecutionTaskRequest = {
-      sessionId: sessionKey,
-      sessionKey,
-      instructions: input.prompt,
-      taskTitle:
-        typeof input.runtimeInput.prompt === "string" && input.runtimeInput.prompt.trim()
-          ? input.runtimeInput.prompt
-          : undefined,
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: input.runtimeInput,
-      timeout: this.timeoutSeconds,
-    };
-    const response = await this.executeRoute(
-      { kind: "execution", stream: false },
-      requestBody,
-    );
-    this.recordBridgeResponse(sessionKey, input.prompt, response);
-
-    return {
-      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
-      runtimeSessionRef: response.sessionId,
-      runtimeSessionKey: sessionKey,
-      runStarted: true,
-    };
   }
 
   async createStructuredRun<T = unknown>(input: {
@@ -250,7 +220,8 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
     return {
       accepted: !response.error,
-      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
+      runtimeRunRef:
+        response.responseId ?? response.runId ?? response.sessionId,
       runtimeSessionKey: input.runtimeSessionKey,
       runStarted: true,
     };
@@ -298,7 +269,8 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
   ): void {
     const session = this.getOrCreateSession(sessionKey);
     session.sessionId = response.sessionId;
-    session.lastRunRef = response.responseId ?? response.runId ?? response.sessionId;
+    session.lastRunRef =
+      response.responseId ?? response.runId ?? response.sessionId;
     session.lastResponseId = response.responseId ?? null;
     session.lastOutput = response.output;
     session.lastRunStatus = response.error ? "Failed" : "Completed";
@@ -320,9 +292,16 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
   private async executeRoute(
     route: RouteKind,
-    request: BridgeExecutionTaskRequest | BridgeFeatureRequest<Record<string, unknown>>,
+    request:
+      | BridgeExecutionTaskRequest
+      | BridgeFeatureRequest<Record<string, unknown>>,
   ): Promise<BridgeResponse> {
-    const result = await executeGatewayRequest(route, request, NOOP_LOGGER, this.environment);
+    const result = await executeGatewayRequest(
+      route,
+      request,
+      NOOP_LOGGER,
+      this.environment,
+    );
     for (const event of result.events) {
       this.onEvent?.(event);
     }

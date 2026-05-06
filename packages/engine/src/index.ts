@@ -1,7 +1,6 @@
 export {
   aiAnalyzeConflicts,
   aiChat,
-  aiGeneratePlan,
   aiGeneratePlanStream,
   aiSuggestStream,
   aiSuggestTimeslots,
@@ -29,7 +28,6 @@ export { createFollowUpTask } from "./modules/commands/create-follow-up-task";
 export { createTask } from "./modules/commands/create-task";
 export { decideScheduleProposal } from "./modules/commands/decide-schedule-proposal";
 export { dispatchNextTaskAction } from "./modules/commands/dispatch-next-task-action";
-export { generateTaskPlanForTask } from "./modules/commands/generate-task-plan-for-task";
 export { invalidateMemory } from "./modules/commands/invalidate-memory";
 export { markTaskDone } from "./modules/commands/mark-task-done";
 export { materializeTaskPlan } from "./modules/commands/materialize-task-plan";
@@ -137,7 +135,6 @@ export { suggestStream, generatePlanStream } from "./modules/ai/streaming";
 export {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
-  generatePlan,
   suggest,
   analyzeConflicts,
   suggestTimeslots,

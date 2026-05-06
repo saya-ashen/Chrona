@@ -8,10 +8,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@chrona/i18n": "workspace:*",
     "@chrona/contracts": "workspace:*",
+    "@chrona/i18n": "workspace:*",
+    "@chrona/runtime-core": "workspace:*",
+    "@chrona/server": "workspace:*",
     "@chrona/shared": "workspace:*",
-    "@chrona/runtime-core": "workspace:*"
+    "@microsoft/fetch-event-source": "^2.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

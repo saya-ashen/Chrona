@@ -6,8 +6,8 @@ import {
   AI_TASK_EXECUTORS,
   AI_TASK_MODES,
   AI_WAIT_TIMEOUT_ACTIONS,
-  validateAIPlanOutput,
 } from "./ai-plan-blueprint";
+import { normalizeGeneratePlanResponse } from "@chrona/engine";
 
 export type AiFeatureToolSpec = {
   type: "function";
@@ -788,20 +788,15 @@ export function validatePreparedFeaturePayload(
 
   switch (spec.feature) {
     case "generate_plan": {
-      const validation = validateAIPlanOutput(payload);
-      if (
-        !validation.valid.title ||
-        !validation.valid.goal ||
-        validation.valid.nodes.length === 0
-      ) {
+      try {
+        normalizeGeneratePlanResponse(payload);
+        return { ok: true };
+      } catch (error) {
         return {
           ok: false,
-          error:
-            validation.warnings[0] ??
-            "Feature 'generate_plan' payload does not match AIPlanOutput",
+          error: error instanceof Error ? error.message : "Unknown error",
         };
       }
-      return { ok: true };
     }
     case "suggest":
       return validateSuggestPayload(payload);

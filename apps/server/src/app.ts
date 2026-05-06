@@ -28,6 +28,15 @@ function wantsHtml(acceptHeader: string | undefined) {
   return typeof acceptHeader === "string" && acceptHeader.includes("text/html");
 }
 
+/**
+ * Creates the Hono server app with all middleware and routes mounted.
+ *
+ * Returns a fresh app instance (factory pattern). The returned type is used
+ * by the frontend hono/client RPC — import via:
+ *   import type { AppType } from "@chrona/server/app";
+ *   import { hc } from "hono/client";
+ *   const client = hc<AppType>("/api");
+ */
 export async function createServerApp() {
   const app = new Hono();
   const api = createApiRouter();

@@ -47,16 +47,14 @@ export abstract class ProviderClient {
     },
   ): AsyncGenerator<StreamEvent>;
 
-  abstract executeTask(
-    input: {
-      sessionKey?: string;
-      instructions: string;
-      prompt?: string;
-      runtimeInput?: Record<string, unknown>;
-      timeout?: number;
-      [key: string]: unknown;
-    },
-  ): Promise<ProviderResponse>;
+  abstract executeTask(input: {
+    sessionKey?: string;
+    instructions: string;
+    prompt?: string;
+    runtimeInput?: Record<string, unknown>;
+    timeout?: number;
+    [key: string]: unknown;
+  }): Promise<ProviderResponse>;
 
   abstract checkHealth(): Promise<boolean>;
 }

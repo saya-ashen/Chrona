@@ -1,41 +1,53 @@
 import { randomUUID } from "node:crypto";
 
 import type {
-  AIPlanEdge,
-  AIPlanOutput,
   CompiledPlan,
   RuntimeLayer,
   LayerSource,
+  PlanBlueprint,
+  PlanBlueprintEdge
 } from "@chrona/contracts/ai";
-import { PlanCompileError, upgradeBlueprintToEditable } from "@chrona/contracts/ai";
+import {
+  PlanCompileError,
+  upgradeBlueprintToEditable,
+} from "@chrona/contracts/ai";
 import { compileEditablePlan } from "@chrona/domain";
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
-const HIGH_RISK_PATTERN = /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update)\b/i;
+const HIGH_RISK_PATTERN =
+  /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update)\b/i;
 
 function compileIssue(path: string, message: string) {
   return { path, message };
 }
 
-function branchEdges(nodes: AIPlanOutput["nodes"]): AIPlanEdge[] {
-  const result: AIPlanEdge[] = [];
+function branchEdges(nodes: PlanBlueprint["nodes"]): PlanBlueprintEdge[] {
+  const result: PlanBlueprintEdge[] = [];
   for (const node of nodes) {
     if (node.type !== "condition") continue;
     for (const branch of node.branches) {
-      result.push({ from: node.id, to: branch.nextNodeId, label: branch.label });
+      result.push({
+        from: node.id,
+        to: branch.nextNodeId,
+        label: branch.label,
+      });
     }
     if (node.defaultNextNodeId) {
-      result.push({ from: node.id, to: node.defaultNextNodeId, label: "default" });
+      result.push({
+        from: node.id,
+        to: node.defaultNextNodeId,
+        label: "default",
+      });
     }
   }
   return result;
 }
 
-function edgeKey(edge: AIPlanEdge) {
+function edgeKey(edge: PlanBlueprintEdge) {
   return `${edge.from}->${edge.to}->${edge.label ?? ""}`;
 }
 
-function assertDag(nodeIds: string[], edges: AIPlanEdge[]) {
+function assertDag(nodeIds: string[], edges: PlanBlueprintEdge[]) {
   const indegree = new Map(nodeIds.map((id) => [id, 0]));
   const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
   for (const edge of edges) {
@@ -59,7 +71,7 @@ function assertDag(nodeIds: string[], edges: AIPlanEdge[]) {
   return visited === nodeIds.length;
 }
 
-function checkHighRiskTasks(nodes: AIPlanOutput["nodes"], edges: AIPlanEdge[]) {
+function checkHighRiskTasks(nodes: PlanBlueprint["nodes"], edges: PlanBlueprintEdge[]) {
   const issues: Array<{ path: string; message: string }> = [];
   const incoming = new Map<string, string[]>();
   for (const edge of edges) {
@@ -70,13 +82,18 @@ function checkHighRiskTasks(nodes: AIPlanOutput["nodes"], edges: AIPlanEdge[]) {
 
   for (const node of nodes) {
     if (node.type !== "task") continue;
-    const haystack = [node.title, node.expectedOutput, node.completionCriteria].filter(Boolean).join(" ");
+    const haystack = [node.title, node.expectedOutput, node.completionCriteria]
+      .filter(Boolean)
+      .join(" ");
     if (!HIGH_RISK_PATTERN.test(haystack)) continue;
     const predecessors = incoming.get(node.id) ?? [];
     const hasGate = predecessors.some((candidateId) => {
       const candidate = nodeMap.get(candidateId);
-      return candidate?.type === "checkpoint"
-        && (candidate.checkpointType === "approve" || candidate.checkpointType === "confirm");
+      return (
+        candidate?.type === "checkpoint" &&
+        (candidate.checkpointType === "approve" ||
+          candidate.checkpointType === "confirm")
+      );
     });
     if (!hasGate) {
       issues.push({
@@ -89,16 +106,23 @@ function checkHighRiskTasks(nodes: AIPlanOutput["nodes"], edges: AIPlanEdge[]) {
   return issues;
 }
 
-function validateBlueprint(input: { blueprint: AIPlanOutput }) {
+function validateBlueprint(input: { blueprint: PlanBlueprint }) {
   const issues: Array<{ path: string; message: string }> = [];
   const seenNodeIds = new Set<string>();
 
   input.blueprint.nodes.forEach((node, index) => {
     if (!STABLE_NODE_ID.test(node.id)) {
-      issues.push(compileIssue(`nodes.${index}.id`, `Node id '${node.id}' must be snake_case`));
+      issues.push(
+        compileIssue(
+          `nodes.${index}.id`,
+          `Node id '${node.id}' must be snake_case`,
+        ),
+      );
     }
     if (seenNodeIds.has(node.id)) {
-      issues.push(compileIssue(`nodes.${index}.id`, `Duplicate node id '${node.id}'`));
+      issues.push(
+        compileIssue(`nodes.${index}.id`, `Duplicate node id '${node.id}'`),
+      );
     }
     seenNodeIds.add(node.id);
   });
@@ -107,10 +131,17 @@ function validateBlueprint(input: { blueprint: AIPlanOutput }) {
   const nodeIdSet = new Set(nodeIds);
   input.blueprint.edges.forEach((edge, index) => {
     if (!nodeIdSet.has(edge.from)) {
-      issues.push(compileIssue(`edges.${index}.from`, `Unknown source node '${edge.from}'`));
+      issues.push(
+        compileIssue(
+          `edges.${index}.from`,
+          `Unknown source node '${edge.from}'`,
+        ),
+      );
     }
     if (!nodeIdSet.has(edge.to)) {
-      issues.push(compileIssue(`edges.${index}.to`, `Unknown target node '${edge.to}'`));
+      issues.push(
+        compileIssue(`edges.${index}.to`, `Unknown target node '${edge.to}'`),
+      );
     }
   });
 
@@ -118,22 +149,26 @@ function validateBlueprint(input: { blueprint: AIPlanOutput }) {
     if (node.type !== "condition") return;
     node.branches.forEach((branch, branchIndex) => {
       if (!nodeIdSet.has(branch.nextNodeId)) {
-        issues.push(compileIssue(
-          `nodes.${index}.branches.${branchIndex}.nextNodeId`,
-          `Unknown branch target '${branch.nextNodeId}'`,
-        ));
+        issues.push(
+          compileIssue(
+            `nodes.${index}.branches.${branchIndex}.nextNodeId`,
+            `Unknown branch target '${branch.nextNodeId}'`,
+          ),
+        );
       }
     });
     if (node.defaultNextNodeId && !nodeIdSet.has(node.defaultNextNodeId)) {
-      issues.push(compileIssue(
-        `nodes.${index}.defaultNextNodeId`,
-        `Unknown default branch target '${node.defaultNextNodeId}'`,
-      ));
+      issues.push(
+        compileIssue(
+          `nodes.${index}.defaultNextNodeId`,
+          `Unknown default branch target '${node.defaultNextNodeId}'`,
+        ),
+      );
     }
   });
 
   const semanticEdges = branchEdges(input.blueprint.nodes);
-  const uniqueEdges = new Map<string, AIPlanEdge>();
+  const uniqueEdges = new Map<string, PlanBlueprintEdge>();
   [...input.blueprint.edges, ...semanticEdges].forEach((edge) => {
     uniqueEdges.set(edgeKey(edge), edge);
   });
@@ -156,9 +191,8 @@ function validateBlueprint(input: { blueprint: AIPlanOutput }) {
  */
 export function compilePlanBlueprint(input: {
   taskId: string;
-  blueprint: AIPlanOutput;
+  blueprint: PlanBlueprint;
   planId?: string;
-  prompt?: string | null;
   generatedBy?: string | null;
   source?: LayerSource;
 }): { compiledPlan: CompiledPlan; initialLayer: RuntimeLayer; planId: string } {
@@ -191,7 +225,9 @@ export function compilePlanBlueprint(input: {
 /**
  * Compiles a loose AI blueprint (AIPlanOutput) into a new-architecture CompiledPlan.
  */
-export function compileBlueprintToCompiledPlan(blueprint: AIPlanOutput): CompiledPlan {
+export function compileBlueprintToCompiledPlan(
+  blueprint: PlanBlueprint,
+): CompiledPlan {
   const planId = `plan_${randomUUID().slice(0, 8)}`;
   const editable = upgradeBlueprintToEditable(blueprint, planId, 1);
   return compileEditablePlan(editable);

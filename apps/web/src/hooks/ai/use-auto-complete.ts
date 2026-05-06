@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createLogger, summarizeText } from "@/lib/logger";
+import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 
 const logger = createLogger("hook.use-auto-complete");
 import type {
@@ -77,109 +78,93 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
       const isActiveRequest = () => requestId === requestSeqRef.current && !controller.signal.aborted;
 
       try {
-        const res = await fetch("/api/ai/auto-complete", {
+        let handledNonStreamResponse = false;
+        let sawTerminalError = false;
+
+        await fetchJsonEventSource("/api/ai/auto-complete", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
           body: JSON.stringify({ title: trimmed }),
           signal: controller.signal,
-        });
-
-        if (!isActiveRequest()) return;
-
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(
-            (errBody as { error?: string }).error ?? `Request failed (${res.status})`,
-          );
-        }
-
-        const contentType = res.headers.get("Content-Type") ?? "";
-        if (contentType.includes("text/event-stream") && res.body) {
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let sawTerminalError = false;
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done || !isActiveRequest()) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-
-            let eventType = "";
-            for (const line of lines) {
-              if (line.startsWith("event: ")) {
-                eventType = line.slice(7).trim();
-              } else if (line.startsWith("data: ")) {
-                const raw = line.slice(6).trim();
-                try {
-                  const data = JSON.parse(raw) as Record<string, unknown>;
-                  if (!isActiveRequest()) return;
-                  logger.info("stream.event", { requestId, eventType });
-                  switch (eventType) {
-                    case "status":
-                      setPhase("thinking");
-                      setStatusMessage(data.message as string);
-                      break;
-                    case "tool_call":
-                      setPhase("thinking");
-                      setToolCalls((prev) => [...prev, {
-                        tool: data.tool as string,
-                        input: data.input as Record<string, unknown>,
-                      }]);
-                      break;
-                    case "tool_result":
-                      setToolResults((prev) => [...prev, {
-                        tool: data.tool as string,
-                        result: data.result as string,
-                      }]);
-                      break;
-                    case "partial":
-                      setPhase("streaming");
-                      setPartialText((prev) => prev + (data.text as string));
-                      break;
-                    case "suggestions": {
-                      const suggestions = data.suggestions as StructuredSuggestion[];
-                      const isFinal = data.isFinal as boolean;
-                      setStructuredSuggestions(suggestions ?? []);
-                      if (isFinal) {
-                        lastFetchedRef.current = trimmed;
-                      }
-                      break;
-                    }
-                    case "error":
-                      sawTerminalError = true;
-                      setError(data.message as string);
-                      setIsLoading(false);
-                      setPhase("error");
-                      break;
-                    case "done":
-                      setPhase("done");
-                      setIsLoading(false);
-                      break;
-                  }
-                } catch {
-                  // skip unparseable
-                }
-                eventType = "";
-              }
-            }
-          }
-          if (isActiveRequest()) {
-            setIsLoading(false);
-            if (!sawTerminalError) {
-              setPhase("done");
-            }
-          }
-        } else {
-          const data = (await res.json()) as { suggestions?: StructuredSuggestion[] };
-          if (isActiveRequest()) {
+          async onNonStreamResponse(response) {
+            handledNonStreamResponse = true;
+            const data = (await response.json().catch(() => ({}))) as {
+              suggestions?: StructuredSuggestion[];
+            };
+            if (!isActiveRequest()) return;
             setStructuredSuggestions(data.suggestions ?? []);
             setIsLoading(false);
             setPhase("done");
             lastFetchedRef.current = trimmed;
+          },
+          onEvent({ event, data }) {
+            if (!isActiveRequest()) return;
+
+            logger.info("stream.event", { requestId, eventType: event });
+
+            switch (event) {
+              case "status":
+                setPhase("thinking");
+                setStatusMessage(typeof data.message === "string" ? data.message : null);
+                break;
+              case "tool_call":
+                setPhase("thinking");
+                setToolCalls((prev) => [...prev, {
+                  tool: typeof data.tool === "string" ? data.tool : "unknown",
+                  input: (data.input as Record<string, unknown> | undefined) ?? {},
+                }]);
+                break;
+              case "tool_result":
+                setToolResults((prev) => [...prev, {
+                  tool: typeof data.tool === "string" ? data.tool : "unknown",
+                  result:
+                    typeof data.result === "string"
+                      ? data.result
+                      : JSON.stringify(data.result ?? ""),
+                }]);
+                break;
+              case "partial":
+                setPhase("streaming");
+                setPartialText((prev) => prev + (typeof data.text === "string" ? data.text : ""));
+                break;
+              case "suggestions": {
+                const suggestions = data.suggestions as StructuredSuggestion[] | undefined;
+                const isFinal = data.isFinal === true;
+                setStructuredSuggestions(suggestions ?? []);
+                if (isFinal) {
+                  lastFetchedRef.current = trimmed;
+                }
+                break;
+              }
+              case "error":
+                sawTerminalError = true;
+                setError(
+                  typeof data.message === "string"
+                    ? data.message
+                    : "Failed to fetch suggestions",
+                );
+                setIsLoading(false);
+                setPhase("error");
+                break;
+              case "done":
+                setPhase("done");
+                setIsLoading(false);
+                break;
+            }
+          },
+        });
+
+        if (handledNonStreamResponse) {
+          return;
+        }
+
+        if (isActiveRequest()) {
+          setIsLoading(false);
+          if (!sawTerminalError) {
+            setPhase("done");
           }
         }
       } catch (err: unknown) {

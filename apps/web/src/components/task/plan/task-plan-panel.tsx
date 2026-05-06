@@ -8,6 +8,8 @@ import {
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
+
+import { api } from "@/lib/rpc-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
 import { compiledPlanToGraphPlan } from "@/components/task/plan/task-plan-view-model";
@@ -121,10 +123,9 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
     setIsAccepting(true);
     setAcceptError(null);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/plan/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: plan.id }),
+      const res = await api.tasks[":taskId"].plan.accept.$post({
+        param: { taskId },
+        json: { planId: plan.id },
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed to accept plan" }));

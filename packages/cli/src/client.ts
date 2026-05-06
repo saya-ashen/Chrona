@@ -52,7 +52,9 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 }
 
-function buildQuery(query?: Record<string, string | number | undefined>): string {
+function buildQuery(
+  query?: Record<string, string | number | undefined>,
+): string {
   if (!query) return "";
 
   const params = new URLSearchParams();
@@ -92,13 +94,18 @@ export class ApiClient {
         // ignore invalid/non-json error bodies
       }
 
-      throw new Error(`${method} ${path} failed (${response.status}): ${message}`);
+      throw new Error(
+        `${method} ${path} failed (${response.status}): ${message}`,
+      );
     }
 
     return (await response.json()) as T;
   }
 
-  listTasks(workspaceId: string, options: { status?: string; limit?: number } = {}) {
+  listTasks(
+    workspaceId: string,
+    options: { status?: string; limit?: number } = {},
+  ) {
     return this.request<unknown>(
       "GET",
       `/api/tasks${buildQuery({ workspaceId, status: options.status, limit: options.limit })}`,
@@ -106,7 +113,10 @@ export class ApiClient {
   }
 
   getTaskDetail(taskId: string) {
-    return this.request<unknown>("GET", `/api/tasks/${encodeURIComponent(taskId)}/detail`);
+    return this.request<unknown>(
+      "GET",
+      `/api/tasks/${encodeURIComponent(taskId)}/detail`,
+    );
   }
 
   createTask(input: CreateTaskInput) {
@@ -114,47 +124,83 @@ export class ApiClient {
   }
 
   updateTask(taskId: string, input: UpdateTaskInput) {
-    return this.request<unknown>("PATCH", `/api/tasks/${encodeURIComponent(taskId)}`, input);
+    return this.request<unknown>(
+      "PATCH",
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+      input,
+    );
   }
 
   deleteTask(taskId: string) {
-    return this.request<unknown>("DELETE", `/api/tasks/${encodeURIComponent(taskId)}`);
+    return this.request<unknown>(
+      "DELETE",
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+    );
   }
 
   markDone(taskId: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/done`);
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/done`,
+    );
   }
 
   reopenTask(taskId: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/reopen`);
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/reopen`,
+    );
   }
 
   startExecution(taskId: string, prompt?: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/run`, prompt ? { prompt } : {});
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/run`,
+      prompt ? { prompt } : {},
+    );
   }
 
   sendMessage(taskId: string, message: string, runId?: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/message`, {
-      message,
-      runId,
-    });
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/message`,
+      {
+        message,
+        runId,
+      },
+    );
   }
 
   submitExecutionInput(taskId: string, inputText: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/input`, {
-      inputText,
-    });
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/input`,
+      {
+        inputText,
+      },
+    );
   }
 
-  scheduleTask(taskId: string, scheduledStartAt: string, scheduledEndAt: string) {
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/schedule`, {
-      scheduledStartAt,
-      scheduledEndAt,
-    });
+  scheduleTask(
+    taskId: string,
+    scheduledStartAt: string,
+    scheduledEndAt: string,
+  ) {
+    return this.request<unknown>(
+      "POST",
+      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
+      {
+        scheduledStartAt,
+        scheduledEndAt,
+      },
+    );
   }
 
   clearSchedule(taskId: string) {
-    return this.request<unknown>("DELETE", `/api/tasks/${encodeURIComponent(taskId)}/schedule`);
+    return this.request<unknown>(
+      "DELETE",
+      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
+    );
   }
 
   getScheduleProjection(workspaceId: string) {
@@ -169,14 +215,17 @@ export class ApiClient {
   }
 
   async generateTaskPlan(input: GenerateTaskPlanInput) {
-    const response = await fetch(`${this.baseUrl}/api/tasks/${encodeURIComponent(input.taskId)}/plan/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
+    const response = await fetch(
+      `${this.baseUrl}/api/tasks/${encodeURIComponent(input.taskId)}/plan/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({ forceRefresh: input.forceRefresh }),
       },
-      body: JSON.stringify({ forceRefresh: input.forceRefresh }),
-    });
+    );
 
     if (!response.ok) {
       let message = response.statusText;
@@ -187,7 +236,9 @@ export class ApiClient {
         // ignore invalid/non-json error bodies
       }
 
-      throw new Error(`POST /api/tasks/${encodeURIComponent(input.taskId)}/plan/generate failed (${response.status}): ${message}`);
+      throw new Error(
+        `POST /api/tasks/${encodeURIComponent(input.taskId)}/plan/generate failed (${response.status}): ${message}`,
+      );
     }
 
     if (!response.body) {
@@ -227,22 +278,20 @@ export class ApiClient {
 
         if (eventType === "error") {
           throw new Error(
-            typeof payload?.message === "string" ? payload.message : "Failed to generate task plan",
+            typeof payload?.message === "string"
+              ? payload.message
+              : "Failed to generate task plan",
           );
         }
       }
     }
 
     if (!finalResult) {
-      throw new Error("Plan generation stream completed without a result event");
+      throw new Error(
+        "Plan generation stream completed without a result event",
+      );
     }
 
     return finalResult;
   }
-
-  batchApplyPlan(input: BatchApplyPlanInput) {
-    const { taskId, ...body } = input;
-    return this.request<unknown>("POST", `/api/tasks/${encodeURIComponent(taskId)}/plan/materialize`, body);
-  }
-
 }

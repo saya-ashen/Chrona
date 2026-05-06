@@ -5,6 +5,7 @@ import { Bot, Loader2, Send, Sparkles, AlertTriangle, Check, X } from "lucide-re
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import { api } from "@/lib/rpc-client";
 
 type ChatHistoryEntry = {
   id: string;
@@ -65,7 +66,9 @@ type Props = {
 
 async function loadMessages(taskId: string): Promise<ChatHistoryEntry[]> {
   try {
-    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`);
+    const res = await api.tasks[":taskId"].assistant.messages.$get({
+      param: { taskId },
+    });
     if (!res.ok) return [];
     const data = await res.json() as {
       messages: Array<{
@@ -97,10 +100,9 @@ async function saveMessage(
   proposal?: TaskWorkspaceUpdateProposal | null,
 ): Promise<ChatHistoryEntry | null> {
   try {
-    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role, content, proposal }),
+    const res = await api.tasks[":taskId"].assistant.messages.$post({
+      param: { taskId },
+      json: { role, content, proposal },
     });
     if (!res.ok) return null;
     const data = await res.json() as {
@@ -126,8 +128,8 @@ async function saveMessage(
 
 async function markMessageApplied(taskId: string, messageId: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/tasks/${taskId}/assistant/messages/${messageId}/apply`, {
-      method: "PATCH",
+    const res = await api.tasks[":taskId"].assistant.messages[":messageId"].apply.$patch({
+      param: { taskId, messageId },
     });
     return res.ok;
   } catch {
@@ -191,17 +193,14 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
         content: h.content,
       }));
 
-      const response = await fetch("/api/ai/task-workspace/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const response = await api.ai["task-workspace"].chat.$post({
+        json: {
           taskId,
           message: trimmed,
           currentTask,
           currentPlan,
           history: apiHistory,
-          enablePatchTools: true,
-        }),
+        },
       });
 
       if (!response.ok && response.status !== 503) {

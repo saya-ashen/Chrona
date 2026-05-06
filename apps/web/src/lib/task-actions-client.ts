@@ -1,19 +1,10 @@
-import { deleteJson, patchJson, postJson } from "./http-client";
+import { api } from "./rpc-client";
 
-type TaskMutationResult = {
-  taskId: string;
-  workspaceId: string;
-};
+// ═══════════════════════════════════════════════════════════════
+// Task CRUD
+// ═══════════════════════════════════════════════════════════════
 
-type FollowUpTaskResult = TaskMutationResult & {
-  followUpTaskId: string;
-};
-
-type RunMutationResult = TaskMutationResult & {
-  runId?: string;
-};
-
-function createTask(input: {
+export function createTaskFromSchedule(input: {
   workspaceId: string;
   title: string;
   description?: string | null;
@@ -27,13 +18,25 @@ function createTask(input: {
   runtimeConfig?: unknown;
   parentTaskId?: string | null;
 }) {
-  return postJson<TaskMutationResult>("/api/tasks", {
-    ...input,
-    dueAt: input.dueAt ? input.dueAt.toISOString() : input.dueAt ?? undefined,
-  });
+  return api.tasks.$post({
+    json: {
+      workspaceId: input.workspaceId,
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority as "Low" | "Medium" | "High" | "Urgent" | undefined,
+      dueAt: input.dueAt ? input.dueAt.toISOString() : null,
+      runtimeAdapterKey: input.runtimeAdapterKey,
+      runtimeInput: input.runtimeInput,
+      runtimeInputVersion: input.runtimeInputVersion,
+      runtimeModel: input.runtimeModel,
+      prompt: input.prompt,
+      runtimeConfig: input.runtimeConfig,
+      parentTaskId: input.parentTaskId,
+    },
+  }).then((r) => r.json());
 }
 
-function updateTask(input: {
+export function updateTaskConfigFromSchedule(input: {
   taskId: string;
   title?: string;
   description?: string | null;
@@ -48,32 +51,38 @@ function updateTask(input: {
   prompt?: string | null;
   runtimeConfig?: unknown;
 }) {
-  const { taskId, ...body } = input;
-  return patchJson<TaskMutationResult>(`/api/tasks/${taskId}`, {
-    ...body,
-    dueAt: body.dueAt === undefined ? undefined : body.dueAt ? body.dueAt.toISOString() : null,
-    scheduledStartAt:
-      body.scheduledStartAt === undefined
-        ? undefined
-        : body.scheduledStartAt
-          ? body.scheduledStartAt.toISOString()
-          : null,
-    scheduledEndAt:
-      body.scheduledEndAt === undefined
-        ? undefined
-        : body.scheduledEndAt
-          ? body.scheduledEndAt.toISOString()
-          : null,
-  });
+  return api.tasks[":taskId"].$patch({
+    param: { taskId: input.taskId },
+    json: {
+      title: input.title,
+      description: input.description ?? undefined,
+      priority: input.priority as "Low" | "Medium" | "High" | "Urgent" | undefined,
+      dueAt: input.dueAt === undefined ? undefined : input.dueAt ? input.dueAt.toISOString() : null,
+      scheduledStartAt:
+        input.scheduledStartAt === undefined
+          ? undefined
+          : input.scheduledStartAt
+            ? input.scheduledStartAt.toISOString()
+            : null,
+      scheduledEndAt:
+        input.scheduledEndAt === undefined
+          ? undefined
+          : input.scheduledEndAt
+            ? input.scheduledEndAt.toISOString()
+            : null,
+      runtimeAdapterKey: input.runtimeAdapterKey,
+      runtimeInput: input.runtimeInput,
+      runtimeInputVersion: input.runtimeInputVersion,
+      runtimeModel: input.runtimeModel,
+      prompt: input.prompt,
+      runtimeConfig: input.runtimeConfig,
+    },
+  }).then((r) => r.json());
 }
 
-export function createTaskFromSchedule(input: Parameters<typeof createTask>[0]) {
-  return createTask(input);
-}
-
-export function updateTaskConfigFromSchedule(input: Parameters<typeof updateTask>[0]) {
-  return updateTask(input);
-}
+// ═══════════════════════════════════════════════════════════════
+// Schedule
+// ═══════════════════════════════════════════════════════════════
 
 export function applySchedule(input: {
   taskId: string;
@@ -82,83 +91,119 @@ export function applySchedule(input: {
   dueAt?: Date | null;
   scheduleSource?: "human" | "ai" | "system";
 }) {
-  const { taskId, ...body } = input;
-  return postJson<TaskMutationResult>(`/api/tasks/${taskId}/schedule`, {
-    ...body,
-    scheduledStartAt: body.scheduledStartAt ? body.scheduledStartAt.toISOString() : null,
-    scheduledEndAt: body.scheduledEndAt ? body.scheduledEndAt.toISOString() : null,
-    dueAt: body.dueAt ? body.dueAt.toISOString() : null,
-  });
+  return api.tasks[":taskId"].schedule.$post({
+    param: { taskId: input.taskId },
+    json: {
+      scheduledStartAt: input.scheduledStartAt?.toISOString() ?? "",
+      scheduledEndAt: input.scheduledEndAt?.toISOString() ?? "",
+      dueAt: input.dueAt?.toISOString() ?? null,
+      scheduleSource: input.scheduleSource ?? "system",
+    },
+  }).then((r) => r.json());
 }
 
 export function clearSchedule(input: { taskId: string }) {
-  return deleteJson<TaskMutationResult>(`/api/tasks/${input.taskId}/schedule`);
+  return api.tasks[":taskId"].schedule.$delete({
+    param: { taskId: input.taskId },
+  }).then((r) => r.json());
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Execution
+// ═══════════════════════════════════════════════════════════════
+
 export function startExecution(input: { taskId: string; prompt?: string | null }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/run`, {
-    prompt: input.prompt,
-  });
+  return api.tasks[":taskId"].run.$post({
+    param: { taskId: input.taskId },
+    json: { prompt: input.prompt ?? undefined },
+  }).then((r) => r.json());
 }
 
 export function retryExecution(input: { taskId: string; prompt?: string | null }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/retry`, {
-    prompt: input.prompt,
-  });
+  return api.tasks[":taskId"].retry.$post({
+    param: { taskId: input.taskId },
+    json: { prompt: input.prompt ?? undefined },
+  }).then((r) => r.json());
 }
 
 export function submitExecutionInput(input: { taskId: string; inputText: string }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/input`, {
-    inputText: input.inputText,
-  });
+  return api.tasks[":taskId"].input.$post({
+    param: { taskId: input.taskId },
+    json: { inputText: input.inputText },
+  }).then((r) => r.json());
 }
 
 export function sendExecutionMessage(input: { taskId: string; message: string }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/message`, {
-    message: input.message,
-  });
+  return api.tasks[":taskId"].message.$post({
+    param: { taskId: input.taskId },
+    json: { message: input.message },
+  }).then((r) => r.json());
 }
 
 export function markTaskDone(input: { taskId: string }) {
-  return postJson<TaskMutationResult>(`/api/tasks/${input.taskId}/done`);
+  return api.tasks[":taskId"].done.$post({
+    param: { taskId: input.taskId },
+  }).then((r) => r.json());
 }
 
 export function reopenTask(input: { taskId: string }) {
-  return postJson<TaskMutationResult>(`/api/tasks/${input.taskId}/reopen`);
+  return api.tasks[":taskId"].reopen.$post({
+    param: { taskId: input.taskId },
+  }).then((r) => r.json());
 }
 
 export function acceptTaskResult(input: { taskId: string }) {
-  return postJson<RunMutationResult>(`/api/tasks/${input.taskId}/result/accept`);
+  return api.tasks[":taskId"].result.accept.$post({
+    param: { taskId: input.taskId },
+  }).then((r) => r.json());
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Schedule Proposals
+// ═══════════════════════════════════════════════════════════════
+
 export function acceptScheduleProposal(proposalId: string, resolutionNote?: string) {
-  return postJson<TaskMutationResult & { proposalId: string }>("/api/schedule/proposals/decision", {
-    proposalId,
-    decision: "Accepted",
-    resolutionNote,
-  });
+  return api.schedule.proposals.decision.$post({
+    json: {
+      proposalId,
+      decision: "Accepted",
+      resolutionNote,
+    },
+  }).then((r) => r.json());
 }
 
 export function rejectScheduleProposal(proposalId: string, resolutionNote?: string) {
-  return postJson<TaskMutationResult & { proposalId: string }>("/api/schedule/proposals/decision", {
-    proposalId,
-    decision: "Rejected",
-    resolutionNote,
-  });
+  return api.schedule.proposals.decision.$post({
+    json: {
+      proposalId,
+      decision: "Rejected",
+      resolutionNote,
+    },
+  }).then((r) => r.json());
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Approvals
+// ═══════════════════════════════════════════════════════════════
+
 export function approveApproval(approvalId: string) {
-  return postJson<TaskMutationResult & { runId?: string }>(`/api/approvals/${approvalId}/resolve`, {
-    decision: "Approved",
-    resolutionNote: "Approved from inbox",
-  });
+  return api.approvals[":approvalId"].resolve.$post({
+    param: { approvalId },
+    json: {
+      decision: "Approved",
+      resolutionNote: "Approved from inbox",
+    },
+  }).then((r) => r.json());
 }
 
 export function rejectApproval(approvalId: string) {
-  return postJson<TaskMutationResult & { runId?: string }>(`/api/approvals/${approvalId}/resolve`, {
-    decision: "Rejected",
-    resolutionNote: "Rejected from inbox",
-  });
+  return api.approvals[":approvalId"].resolve.$post({
+    param: { approvalId },
+    json: {
+      decision: "Rejected",
+      resolutionNote: "Rejected from inbox",
+    },
+  }).then((r) => r.json());
 }
 
 export function editAndApproveApproval(formData: FormData) {
@@ -169,26 +214,40 @@ export function editAndApproveApproval(formData: FormData) {
     throw new Error("approvalId is required");
   }
 
-  return postJson<TaskMutationResult & { runId?: string }>(`/api/approvals/${approvalId}/resolve`, {
-    decision: "EditedAndApproved",
-    editedContent,
-    resolutionNote: "Edited and approved from inbox",
-  });
+  return api.approvals[":approvalId"].resolve.$post({
+    param: { approvalId },
+    json: {
+      decision: "EditedAndApproved",
+      editedContent,
+      resolutionNote: "Edited and approved from inbox",
+    },
+  }).then((r) => r.json());
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Memory
+// ═══════════════════════════════════════════════════════════════
+
 export function invalidateMemory(memoryId: string) {
-  return postJson<{ memoryId: string; workspaceId: string; taskId: string | null }>(
-    `/api/memories/${memoryId}/invalidate`,
-  );
+  return api.memories[":memoryId"].invalidate.$post({
+    param: { memoryId },
+  }).then((r) => r.json());
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Follow-Up
+// ═══════════════════════════════════════════════════════════════
 
 export function createFollowUpTask(input: {
   taskId: string;
   title: string;
   dueAt?: Date | null;
 }) {
-  return postJson<FollowUpTaskResult>(`/api/tasks/${input.taskId}/follow-up`, {
-    title: input.title,
-    dueAt: input.dueAt ? input.dueAt.toISOString() : input.dueAt ?? null,
-  });
+  return api.tasks[":taskId"]["follow-up"].$post({
+    param: { taskId: input.taskId },
+    json: {
+      title: input.title,
+      dueAt: input.dueAt ? input.dueAt.toISOString() : null,
+    },
+  }).then((r) => r.json());
 }

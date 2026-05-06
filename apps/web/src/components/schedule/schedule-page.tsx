@@ -38,6 +38,8 @@ import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-pan
 import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageDialogs } from "@/components/schedule/dialogs/schedule-page-dialogs";
 import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
+
+import { api } from "@/lib/rpc-client";
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
@@ -298,8 +300,8 @@ export function SchedulePage({
   async function handleDeleteTask(taskId: string) {
     await runSchedulePageAction({
       action: async () => {
-        const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-        if (!response.ok) {
+        const res = await api.tasks[":taskId"].$delete({ param: { taskId }, query: {} });
+        if (!res.ok) {
           throw new Error(actionFailedMessage);
         }
       },

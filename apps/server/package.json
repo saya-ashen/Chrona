@@ -2,6 +2,9 @@
   "name": "@chrona/server",
   "private": true,
   "type": "module",
+  "exports": {
+    "./routes": "./src/routes/api.ts"
+  },
   "scripts": {
     "dev": "bun --watch src/index.bun.ts",
     "start": "bun run src/index.bun.ts"

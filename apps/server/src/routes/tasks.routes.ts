@@ -1,6 +1,6 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 
-import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import {
   createTask,
   deleteTask,
@@ -9,184 +9,169 @@ import {
   listTasksByWorkspace,
   updateTask,
 } from "@chrona/engine";
-
 import {
-  VALID_TASK_STATUSES,
-  toDateOrNull,
-  ensureValidDateFields,
-} from "./helpers";
+  listTasksQuerySchema,
+  createTaskBodySchema,
+  taskDetailParamSchema,
+  updateTaskParamSchema,
+  updateTaskBodySchema,
+  deleteTaskParamSchema,
+  deleteTaskQuerySchema,
+} from "@chrona/contracts/api";
+
+import { toDateOrNull, ensureValidDateFields } from "./helpers";
 import {
   error,
   internalServerError,
   json,
-  parseLimit,
   toHttpError,
 } from "../lib/http";
 
 export function createTasksRoutes() {
-  const api = new Hono();
+  return new Hono()
+    .get("/tasks", zValidator("query", listTasksQuerySchema), async (c) => {
+      try {
+        const { workspaceId, status, limit } = c.req.valid("query");
 
-  api.get("/tasks", async (c) => {
-    try {
-      const workspaceId = c.req.query("workspaceId");
-      if (!workspaceId) {
-        return error(c, "workspaceId query parameter is required", 400);
+        const result = await listTasksByWorkspace({
+          workspaceId,
+          status: status ?? undefined,
+          limit,
+        });
+
+        return json(c, result);
+      } catch (cause) {
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return internalServerError(c, "GET /api/tasks", cause, "Failed to list tasks");
       }
+    })
+    .post("/tasks", zValidator("json", createTaskBodySchema), async (c) => {
+      try {
+        const body = c.req.valid("json");
+        const dueAt = toDateOrNull(body.dueAt);
+        const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
+        const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
 
-      const status = c.req.query("status");
-      const limit = parseLimit(c.req.query("limit"), 50, 200);
+        ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
 
-      if (status && !VALID_TASK_STATUSES.has(status as TaskStatus)) {
-        return error(c, `Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`, 400);
+        const result = await createTask({
+          workspaceId: body.workspaceId,
+          title: body.title,
+          description: body.description,
+          priority: body.priority,
+          dueAt,
+          scheduledStartAt,
+          scheduledEndAt,
+          runtimeAdapterKey: body.runtimeAdapterKey,
+          runtimeInput: body.runtimeInput,
+          runtimeInputVersion: body.runtimeInputVersion,
+          runtimeModel: body.runtimeModel,
+          prompt: body.prompt,
+          runtimeConfig: body.runtimeConfig,
+        });
+
+        return json(c, result, 201);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Failed to create task";
+        if (message.includes("No 'Workspace' record") || message.includes("Expected a record")) {
+          return error(c, "Workspace not found", 404);
+        }
+        if (
+          message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
+          message.includes("must be a valid date string") ||
+          message.includes("runtimeConfig must be an object") ||
+          message.includes("cannot be empty") ||
+          message.includes("parentTaskId must reference a task in the same workspace")
+        ) {
+          return error(c, message, 400);
+        }
+        return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
       }
-
-      const result = await listTasksByWorkspace({
-        workspaceId,
-        status: status ?? undefined,
-        limit,
-      });
-
-      return json(c, result);
-    } catch (cause) {
-      const httpError = toHttpError(cause);
-      if (httpError) {
-        return error(c, httpError.message, httpError.status);
+    })
+    .get("/tasks/:taskId/detail", zValidator("param", taskDetailParamSchema), async (c) => {
+      try {
+        const { taskId } = c.req.valid("param");
+        return json(c, await getTaskPage(taskId));
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Failed to get task detail";
+        return error(c, message, message.includes("not found") ? 404 : 500);
       }
-      return internalServerError(c, "GET /api/tasks", cause, "Failed to list tasks");
-    }
-  });
+    })
+    .patch(
+      "/tasks/:taskId",
+      zValidator("param", updateTaskParamSchema),
+      zValidator("json", updateTaskBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const body = c.req.valid("json");
+          const workspaceId = body.workspaceId;
+          if (workspaceId) {
+            await ensureTaskInWorkspace(taskId, workspaceId);
+          }
 
-  api.post("/tasks", async (c) => {
-    try {
-      const body = await c.req.json();
-      const workspaceId = body.workspaceId;
-      const title = body.title;
-      const dueAt = toDateOrNull(body.dueAt);
-      const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
-      const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
+          const dueAt = toDateOrNull(body.dueAt);
+          const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
+          const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
+          ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
 
-      if (!workspaceId) {
-        return error(c, "workspaceId is required", 400);
-      }
+          const result = await updateTask({
+            taskId,
+            title: body.title,
+            description: body.description,
+            priority: body.priority,
+            status: body.status,
+            dueAt,
+            scheduledStartAt,
+            scheduledEndAt,
+            runtimeAdapterKey: body.runtimeAdapterKey,
+            runtimeInput: body.runtimeInput,
+            runtimeInputVersion: body.runtimeInputVersion,
+            runtimeModel: body.runtimeModel,
+            prompt: body.prompt,
+            runtimeConfig: body.runtimeConfig,
+          });
 
-      if (!title || (typeof title === "string" && !title.trim())) {
-        return error(c, "title is required", 400);
-      }
-
-      ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
-
-      const result = await createTask({
-        workspaceId,
-        title,
-        description: body.description,
-        priority: body.priority,
-        dueAt,
-        scheduledStartAt,
-        scheduledEndAt,
-        runtimeAdapterKey: body.runtimeAdapterKey,
-        runtimeInput: body.runtimeInput,
-        runtimeInputVersion: body.runtimeInputVersion,
-        runtimeModel: body.runtimeModel,
-        prompt: body.prompt,
-        runtimeConfig: body.runtimeConfig,
-      });
-
-      return json(c, result, 201);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to create task";
-      if (message.includes("No 'Workspace' record") || message.includes("Expected a record")) {
-        return error(c, "Workspace not found", 404);
-      }
-      if (
-        message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
-        message.includes("must be a valid date string") ||
-        message.includes("runtimeConfig must be an object") ||
-        message.includes("cannot be empty") ||
-        message.includes("parentTaskId must reference a task in the same workspace")
-      ) {
-        return error(c, message, 400);
-      }
-      return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
-    }
-  });
-
-  api.get("/tasks/:taskId/detail", async (c) => {
-    try {
-      return json(c, await getTaskPage(c.req.param("taskId")));
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to get task detail";
-      return error(c, message, message.includes("not found") ? 404 : 500);
-    }
-  });
-
-  api.patch("/tasks/:taskId", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json();
-      const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
-      if (workspaceId) {
-        await ensureTaskInWorkspace(taskId, workspaceId);
-      }
-
-      const dueAt = toDateOrNull(body.dueAt);
-      const scheduledStartAt = toDateOrNull(body.scheduledStartAt);
-      const scheduledEndAt = toDateOrNull(body.scheduledEndAt);
-      ensureValidDateFields({ dueAt, scheduledStartAt, scheduledEndAt });
-
-      if (body.status !== undefined && !VALID_TASK_STATUSES.has(body.status as TaskStatus)) {
-        return error(c, `Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`, 400);
-      }
-
-      const result = await updateTask({
-        taskId,
-        title: body.title,
-        description: body.description,
-        priority: body.priority,
-        status: body.status,
-        dueAt,
-        scheduledStartAt,
-        scheduledEndAt,
-        runtimeAdapterKey: body.runtimeAdapterKey,
-        runtimeInput: body.runtimeInput,
-        runtimeInputVersion: body.runtimeInputVersion,
-        runtimeModel: body.runtimeModel,
-        prompt: body.prompt,
-        runtimeConfig: body.runtimeConfig,
-      });
-
-      return json(c, result);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to update task";
-      if (message.includes("Record to update not found") || message.includes("not found")) {
-        return error(c, "Task not found", 404);
-      }
-      if (
-        message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
-        message.includes("must be a valid date string") ||
-        message.includes("cannot be empty") ||
-        message.includes("runtimeConfig must be an object")
-      ) {
-        return error(c, message, 400);
-      }
-      return internalServerError(c, "PATCH /api/tasks/:taskId", cause, "Failed to update task");
-    }
-  });
-
-  api.delete("/tasks/:taskId", async (c) => {
-    try {
-      const workspaceId = c.req.query("workspaceId");
-      if (workspaceId) {
-        await ensureTaskInWorkspace(c.req.param("taskId"), workspaceId);
-      }
-      return json(c, await deleteTask(c.req.param("taskId")));
-    } catch (cause) {
-      const httpError = toHttpError(cause);
-      if (httpError) {
-        return error(c, httpError.message, httpError.status);
-      }
-      return internalServerError(c, "DELETE /api/tasks/:taskId", cause, "Failed to delete task");
-    }
-  });
-
-  return api;
+          return json(c, result);
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : "Failed to update task";
+          if (message.includes("Record to update not found") || message.includes("not found")) {
+            return error(c, "Task not found", 404);
+          }
+          if (
+            message.includes("scheduledEndAt cannot be earlier than scheduledStartAt") ||
+            message.includes("must be a valid date string") ||
+            message.includes("cannot be empty") ||
+            message.includes("runtimeConfig must be an object")
+          ) {
+            return error(c, message, 400);
+          }
+          return internalServerError(c, "PATCH /api/tasks/:taskId", cause, "Failed to update task");
+        }
+      },
+    )
+    .delete(
+      "/tasks/:taskId",
+      zValidator("param", deleteTaskParamSchema),
+      zValidator("query", deleteTaskQuerySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const { workspaceId } = c.req.valid("query");
+          if (workspaceId) {
+            await ensureTaskInWorkspace(taskId, workspaceId);
+          }
+          return json(c, await deleteTask(taskId));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "DELETE /api/tasks/:taskId", cause, "Failed to delete task");
+        }
+      },
+    );
 }

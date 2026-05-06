@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/i18n/client";
+import { api } from "@/lib/rpc-client";
 
 interface AiClientInfo {
   id: string;
@@ -56,11 +57,7 @@ function buildClientPayload(input: {
 }
 
 async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
-  const res = await fetch("/api/ai/clients/test", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const res = await api.ai.clients.test.$post({ json: payload });
 
   const data = (await res.json()) as { available?: boolean; reason?: string; error?: string };
 
@@ -329,7 +326,7 @@ export function AiClientsManager() {
   const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>({});
 
   const fetchClients = useCallback(async () => {
-    const res = await fetch("/api/ai/clients");
+    const res = await api.ai.clients.$get();
     const data = await res.json();
     setClients(data.clients ?? []);
     setLoading(false);
@@ -340,27 +337,22 @@ export function AiClientsManager() {
   }, [fetchClients]);
 
   const handleCreate = async (data: ClientFormPayload) => {
-    await fetch("/api/ai/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    await api.ai.clients.$post({ json: data });
     setShowForm(false);
     void fetchClients();
   };
 
   const handleUpdate = async (id: string, data: ClientFormPayload) => {
-    await fetch(`/api/ai/clients/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+    await api.ai.clients[":clientId"].$patch({
+      param: { clientId: id },
+      json: data,
     });
     setEditingId(null);
     void fetchClients();
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/ai/clients/${id}`, { method: "DELETE" });
+    await api.ai.clients[":clientId"].$delete({ param: { clientId: id } });
     void fetchClients();
   };
 
@@ -370,19 +362,17 @@ export function AiClientsManager() {
 
     const newFeatures = currentlyBound ? client.bindings.filter((item) => item !== feature) : [...client.bindings, feature];
 
-    await fetch(`/api/ai/clients/${clientId}/bindings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features: newFeatures }),
+    await api.ai.clients[":clientId"].bindings.$put({
+      param: { clientId },
+      json: { features: newFeatures },
     });
     void fetchClients();
   };
 
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
-    await fetch(`/api/ai/clients/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
+    await api.ai.clients[":clientId"].$patch({
+      param: { clientId: id },
+      json: { enabled },
     });
     void fetchClients();
   };
