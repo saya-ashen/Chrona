@@ -27,14 +27,14 @@ export type {
   PlanBlueprintConditionNode,
   PlanBlueprintWaitNode,
   PlanBlueprintEdge,
-  AIPlanNode,
-  AIPlanNodeType,
-  AITaskNode,
-  AICheckpointNode,
-  AIConditionNode,
-  AIWaitNode,
-  AIPlanEdge,
-  AIPlanOutput,
+  PlanBlueprintNode,
+  PlanNodeType,
+  PlanBlueprintTaskNode,
+  PlanBlueprintCheckpointNode,
+  PlanBlueprintConditionNode,
+  PlanBlueprintWaitNode,
+  PlanBlueprintEdge,
+  PlanBlueprint,
   AIPlanValidationResult,
   AIPlanCompletionPolicy,
 } from "./ai-plan-blueprint";
@@ -92,13 +92,9 @@ export type {
   EditPlanFeatureInput,
 } from "./ai-feature-specs";
 
-export type {
-  AiFeatureToolSpec,
-} from "./ai-feature-specs";
+export type { AiFeatureToolSpec } from "./ai-feature-specs";
 
-export type {
-  StructuredSuggestion,
-} from "./ai-shared-types";
+export type { StructuredSuggestion } from "./ai-shared-types";
 
 // AI feature request/response contracts
 export type {
@@ -141,7 +137,6 @@ export {
   generatePlanBlueprintToolSpec,
   suggestTaskCompletionsToolSpec,
   suggestTaskTimeslotsToolSpec,
-  validateAIPlanOutput,
   validatePreparedFeaturePayload,
 } from "./ai";
 

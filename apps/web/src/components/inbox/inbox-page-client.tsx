@@ -10,6 +10,7 @@ import {
 } from "@/lib/task-actions-client";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { InboxList } from "@/components/inbox/inbox-list";
+import { api } from "@/lib/rpc-client";
 
 type InboxPageClientProps = {
   workspaceId: string;
@@ -26,8 +27,8 @@ export function InboxPageClient({ workspaceId, initialData, copy }: InboxPageCli
   const [items, setItems] = useState(initialData);
 
   const refresh = useCallback(async () => {
-    const response = await fetch(`/api/inbox/projection?workspaceId=${encodeURIComponent(workspaceId)}`, {
-      cache: "no-store",
+    const response = await api.inbox.projection.$get({
+      query: { workspaceId },
     });
 
     if (!response.ok) return;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScheduledItem, ScheduleAiPlanGenerationStatus } from "@/components/schedule/schedule-page-types";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import { api } from "@/lib/rpc-client";
 
 /** Subset of TaskPlanReadModel used as the accepted-plan shape in UI state. */
 export type SavedTaskPlan = TaskPlanReadModel;
@@ -95,8 +96,8 @@ export function useSelectedBlockPlanState({
   }, []);
 
   const fetchPlanState = useCallback(async () => {
-    const response = await fetch(`/api/tasks/${item.taskId}/plan/state`, {
-      cache: "no-store",
+    const response = await api.tasks[":taskId"].plan.state.$get({
+      param: { taskId: item.taskId },
     });
 
     if (!response.ok) {
@@ -196,12 +197,9 @@ export function useSelectedBlockPlanState({
     if (!result.id) return;
     setIsApplying(true);
     try {
-      const res = await fetch(`/api/tasks/${item.taskId}/plan/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: result.id,
-        }),
+      const res = await api.tasks[":taskId"].plan.accept.$post({
+        param: { taskId: item.taskId },
+        json: { planId: result.id },
       });
       if (!res.ok) throw new Error("Failed to accept plan");
 

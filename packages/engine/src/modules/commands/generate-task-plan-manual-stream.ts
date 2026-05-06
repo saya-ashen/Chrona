@@ -18,7 +18,6 @@ const logger = createLogger("command.generate-task-plan-manual-stream");
 export async function* generateTaskPlanManualStream(input: {
   taskId: string;
   forceRefresh?: boolean;
-  planningPrompt?: string | null;
 }): AsyncGenerator<GeneratePlanSSEEvent> {
   const task = await db.task.findUnique({
     where: { id: input.taskId },
@@ -50,7 +49,9 @@ export async function* generateTaskPlanManualStream(input: {
     await ensureDefaultTaskSession({
       taskId: task.id,
       taskTitle: task.title,
-      runtimeName: resolveRuntimeAdapterKey({ runtimeAdapterKey: task.runtimeAdapterKey }),
+      runtimeName: resolveRuntimeAdapterKey({
+        runtimeAdapterKey: task.runtimeAdapterKey,
+      }),
       defaultSessionId: task.defaultSessionId,
     })
   ).sessionKey;
@@ -78,7 +79,7 @@ export async function* generateTaskPlanManualStream(input: {
     title: task.title,
     description: task.description ?? undefined,
     estimatedMinutes,
-    planningPrompt: input.planningPrompt ?? undefined,
+    planningPrompt: task.prompt,
     sessionKey: taskSessionKey,
   })) {
     switch (event.type) {
@@ -134,7 +135,7 @@ export async function* generateTaskPlanManualStream(input: {
               taskId: task.id,
               workspaceId: task.workspaceId,
               blueprint: plan.blueprint,
-              planningPrompt: input.planningPrompt ?? null,
+              planningPrompt: task.prompt,
               generatedBy: plan.source,
             });
 
@@ -147,9 +148,10 @@ export async function* generateTaskPlanManualStream(input: {
             yield {
               type: "error",
               code: "INTERNAL_ERROR",
-              message: error instanceof Error
-                ? error.message
-                : "Failed to persist generated plan.",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to persist generated plan.",
             };
             return;
           }
@@ -170,7 +172,8 @@ export async function* generateTaskPlanManualStream(input: {
           yield {
             type: "error",
             code: "INVALID_TOOL_PAYLOAD",
-            message: "Provider completed without a generate_task_plan_graph tool payload.",
+            message:
+              "Provider completed without a generate_task_plan_graph tool payload.",
           };
           return;
         }

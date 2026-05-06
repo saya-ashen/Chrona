@@ -9,15 +9,19 @@ import { createPlansRoutes } from "./plans.routes";
 import { createAiRoutes } from "./ai.routes";
 
 export function createApiRouter() {
-  const api = new Hono();
-
-  api.get("/health", (c) => json(c, { status: "ok" }));
-
-  api.route("/", createTasksRoutes());
-  api.route("/", createProjectionsRoutes());
-  api.route("/", createExecutionRoutes());
-  api.route("/", createPlansRoutes());
-  api.route("/", createAiRoutes());
-
-  return api;
+  return new Hono()
+    .get("/health", (c) => json(c, { status: "ok" }))
+    .route("/", createTasksRoutes())
+    .route("/", createProjectionsRoutes())
+    .route("/", createExecutionRoutes())
+    .route("/", createPlansRoutes())
+    .route("/", createAiRoutes());
 }
+
+/**
+ * Exported type for the hono/client RPC:
+ *   import type { ApiType } from "@chrona/server/routes/api";
+ *   import { hc } from "hono/client";
+ *   const client = hc<ApiType>("/api");
+ */
+export type ApiType = ReturnType<typeof createApiRouter>;

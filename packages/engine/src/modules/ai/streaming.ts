@@ -15,6 +15,7 @@ import type {
   AnalyzeConflictsRequest,
   SuggestTimeslotRequest,
   ChatRequest,
+  EditablePlan,
 } from "@chrona/contracts";
 import { createLogger } from "@chrona/shared/logger";
 import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-core";
@@ -159,10 +160,10 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-      const text = await openclawCall(config, feature, {
-        ...buildPreparedFeatureRequest(input),
-        sessionKey: scope,
-      });
+    const text = await openclawCall(config, feature, {
+      ...buildPreparedFeatureRequest(input),
+      sessionKey: scope,
+    });
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -567,29 +568,37 @@ function collectGeneratePlanResult(
   source: string,
 ): StreamEvent {
   const text = doneEvent.text ?? acc.finalText;
-  const structuredToolGraph = extractPreferredPlanGraphFromStructured(doneEvent.structured ?? null);
+  const structuredToolGraph = extractPreferredPlanGraphFromStructured(
+    doneEvent.structured ?? null,
+  );
 
-  let parsed: unknown = acc.latestToolInput ?? structuredToolGraph ?? null;
+  let parsed: EditablePlan = acc.latestToolInput ?? structuredToolGraph ?? null;
   if (!acc.latestToolInput && !structuredToolGraph) {
-    try { parsed = text ? JSON.parse(text) : null; } catch { parsed = null; }
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = null;
+    }
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    const diagnostics = buildGeneratePlanDiagnostics({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph });
-    return {
-      type: "error",
-      message: describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph }),
-      rawText: text, structured: doneEvent.structured ?? null, diagnostics,
-    };
-  }
-
-  const plan = normalizeGeneratePlanResponse({ parsed, source, structured: doneEvent.structured });
+  const plan = normalizeGeneratePlanResponse({
+    parsed,
+    source,
+    structured: doneEvent.structured,
+  });
   if (plan.blueprint.nodes.length === 0) {
-    const diagnostics = buildGeneratePlanDiagnostics({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph });
+    const diagnostics = buildGeneratePlanDiagnostics({
+      text,
+      structured: doneEvent.structured ?? null,
+      latestToolInput: acc.latestToolInput,
+      structuredToolGraph,
+    });
     return {
       type: "error",
       message: `${describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph })} Normalized plan blueprint contained zero nodes.`,
-      rawText: text, structured: doneEvent.structured ?? null, diagnostics,
+      rawText: text,
+      structured: doneEvent.structured ?? null,
+      diagnostics,
     };
   }
 
@@ -600,12 +609,22 @@ export async function* generatePlanStream(
   client: AiClientRecord,
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const generator = dispatchStream(client, "generate_plan", request, buildGeneratePlanScope(request));
+  const generator = dispatchStream(
+    client,
+    "generate_plan",
+    request,
+    buildGeneratePlanScope(request),
+  );
   const acc: GeneratePlanAccumulator = { finalText: "", latestToolInput: null };
-  let latestStructured: NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> | null = null;
+  let latestStructured: NonNullable<
+    Extract<StreamEvent, { type: "done" }>["structured"]
+  > | null = null;
 
   for await (const event of generator) {
-    if (event.type === "tool_call" && event.tool === "generate_task_plan_graph") {
+    if (
+      event.type === "tool_call" &&
+      event.tool === "generate_task_plan_graph"
+    ) {
       acc.latestToolInput = event.input;
       yield event;
       continue;
@@ -622,7 +641,11 @@ export async function* generatePlanStream(
       const resolved = collectGeneratePlanResult(acc, event, client.type);
       yield resolved;
       if (resolved.type === "result") {
-        yield { type: "done", text: event.text ?? acc.finalText, structured: latestStructured ?? null };
+        yield {
+          type: "done",
+          text: event.text ?? acc.finalText,
+          structured: latestStructured ?? null,
+        };
       }
       return;
     }

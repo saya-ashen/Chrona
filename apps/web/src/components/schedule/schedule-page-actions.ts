@@ -27,6 +27,7 @@ import {
   hydrateSchedulePageData,
   sortScheduledItems,
 } from "@/components/schedule/schedule-page-utils";
+import { api } from "@/lib/rpc-client";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 
 export function getQuickCreateDefaults(data: SchedulePageData) {
@@ -71,7 +72,7 @@ export function buildDraggedItem({
   const draggedScheduledItem =
     draggedTask?.kind === "scheduled"
       ? (activeGroupItems.find((item) => item.taskId === draggedTask.taskId) ??
-          null)
+        null)
       : null;
 
   if (draggedQueueItem) {
@@ -150,12 +151,9 @@ export async function refreshScheduleProjection({
   const requestId = ++requestIdRef.current;
 
   try {
-    const response = await fetch(
-      `/api/schedule/projection?workspaceId=${workspaceId}`,
-      {
-        cache: "no-store",
-      },
-    );
+    const response = await api.schedule.projection.$get({
+      query: { workspaceId },
+    });
 
     if (!response.ok) {
       throw new Error(actionFailedMessage);
@@ -227,7 +225,9 @@ export async function handleScheduleDropAction({
   draggedQueueItem: UnscheduledItem | null;
   locale: string;
   copy: SchedulePageCopy;
-  applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
+  applyOptimisticViewData: (
+    updater: (current: SchedulePageData) => SchedulePageData,
+  ) => void;
   removeExpandedQueueTask: (taskId: string) => void;
   _setLocalSelectedTaskId: (taskId: string) => void;
   setAnnouncement: (value: string) => void;
@@ -323,7 +323,9 @@ export async function handleCreateTaskBlockAction({
   activeView: ScheduleViewMode;
   locale: string;
   copy: SchedulePageCopy;
-  applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
+  applyOptimisticViewData: (
+    updater: (current: SchedulePageData) => SchedulePageData,
+  ) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   pushRoute: (href: string) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -416,7 +418,9 @@ export async function handleTaskConfigSaveAction({
 }: {
   taskId: string;
   input: TaskConfigFormInput;
-  applyOptimisticViewData: (updater: (current: SchedulePageData) => SchedulePageData) => void;
+  applyOptimisticViewData: (
+    updater: (current: SchedulePageData) => SchedulePageData,
+  ) => void;
   setIsPending: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
   refreshProjection: () => Promise<void>;
@@ -467,4 +471,3 @@ export async function handleTaskConfigSaveAction({
     setIsPending(false);
   }
 }
-

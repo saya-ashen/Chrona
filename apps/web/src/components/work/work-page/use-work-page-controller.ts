@@ -23,6 +23,7 @@ import {
 import { useAppRouter } from "@/lib/router";
 import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
 import { parseDateInputForSubmission } from "./work-page-formatters";
+import { api } from "@/lib/rpc-client";
 
 type RefreshOptions = {
   silent?: boolean;
@@ -67,12 +68,9 @@ export function useWorkPageController(
       epoch = refreshEpochRef.current,
     }: RefreshOptions = {}) => {
       try {
-        const response = await fetch(
-          `/api/work/${data.taskShell.id}/projection`,
-          {
-            cache: "no-store",
-          },
-        );
+        const response = await api.work[":taskId"].projection.$get({
+          param: { taskId: data.taskShell.id },
+        });
 
         if (!response.ok) {
           throw new Error(copy.actionFailed);

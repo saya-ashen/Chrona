@@ -118,18 +118,6 @@ export interface PlanBlueprint {
   edges: PlanBlueprintEdge[];
 }
 
-// ─── Legacy type aliases ───
-
-export type PlanBlueprintNodeType = PlanNodeType;
-export type AIPlanNodeType = PlanNodeType;
-export type AIPlanNode = PlanBlueprintNode;
-export type AITaskNode = PlanBlueprintTaskNode;
-export type AICheckpointNode = PlanBlueprintCheckpointNode;
-export type AIConditionNode = PlanBlueprintConditionNode;
-export type AIWaitNode = PlanBlueprintWaitNode;
-export type AIPlanEdge = PlanBlueprintEdge;
-export type AIPlanOutput = PlanBlueprint;
-
 // ═══════════════════════════════════════════════════════════════
 // EditablePlan — strict internal format (domain layer)
 // Always has id, version, and required fields filled in.
@@ -448,8 +436,6 @@ export const planBlueprintSchema = z
   })
   .strict();
 
-const aiPlanOutputSchema = planBlueprintSchema;
-
 // ─── AI tool payload types ───
 
 export type GeneratePlanBlueprintToolPayload = PlanBlueprint;
@@ -559,72 +545,3 @@ export const editablePlanSchema = z
     edges: z.array(editableEdgeSchema).optional().default([]),
   })
   .strict();
-
-// ═══════════════════════════════════════════════════════════════
-// Legacy validateAIPlanOutput — uses loose PlanBlueprint schema
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * @deprecated Use validateEditablePlan from @chrona/domain/plan instead
- */
-export interface AIPlanValidationResult {
-  valid: AIPlanOutput;
-  warnings: string[];
-}
-
-/**
- * @deprecated Use validateEditablePlan from @chrona/domain/plan instead
- */
-export function validateAIPlanOutput(raw: unknown): AIPlanValidationResult {
-  const parsed = aiPlanOutputSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map(
-      (issue) => `[${issue.path.join(".")}] ${issue.message}`,
-    );
-    return {
-      valid: { title: "", goal: "", nodes: [], edges: [] },
-      warnings: [`Zod validation failed: ${errorMessages.join("; ")}`],
-    };
-  }
-
-  const aiPlan = parsed.data as AIPlanOutput;
-  const nodeIds = new Set(aiPlan.nodes.map((node) => node.id));
-  const warnings: string[] = [];
-
-  const seenNodeIds = new Set<string>();
-  for (const node of aiPlan.nodes) {
-    if (seenNodeIds.has(node.id)) {
-      warnings.push(`Duplicate node id: ${node.id}`);
-    }
-    seenNodeIds.add(node.id);
-  }
-
-  for (const edge of aiPlan.edges) {
-    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-      warnings.push(
-        `Edge ${edge.from} -> ${edge.to} references missing node ID(s)`,
-      );
-    }
-  }
-
-  for (const node of aiPlan.nodes) {
-    if (node.type !== "condition") {
-      continue;
-    }
-    for (const branch of node.branches) {
-      if (!nodeIds.has(branch.nextNodeId)) {
-        warnings.push(
-          `Condition node ${node.id} branch "${branch.label}" references missing nodeId ${branch.nextNodeId}`,
-        );
-      }
-    }
-    if (node.defaultNextNodeId && !nodeIds.has(node.defaultNextNodeId)) {
-      warnings.push(
-        `Condition node ${node.id} defaultNextNodeId ${node.defaultNextNodeId} references missing node`,
-      );
-    }
-  }
-
-  return { valid: aiPlan, warnings };
-}

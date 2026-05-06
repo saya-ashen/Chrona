@@ -3,6 +3,7 @@
 import { startTransition, useCallback, useState } from "react";
 import { invalidateMemory } from "@/lib/task-actions-client";
 import { MemoryConsole } from "@/components/memory/memory-console";
+import { api } from "@/lib/rpc-client";
 
 type MemoryPageClientProps = {
   workspaceId: string;
@@ -14,8 +15,8 @@ export function MemoryPageClient({ workspaceId, initialData, copy }: MemoryPageC
   const [items, setItems] = useState(initialData);
 
   const refresh = useCallback(async () => {
-    const response = await fetch(`/api/memory/projection?workspaceId=${encodeURIComponent(workspaceId)}`, {
-      cache: "no-store",
+    const response = await api.memory.projection.$get({
+      query: { workspaceId },
     });
     if (!response.ok) return;
     const next = await response.json();

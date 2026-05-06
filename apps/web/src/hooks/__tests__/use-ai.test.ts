@@ -123,7 +123,10 @@ describe("useAutoComplete", () => {
       "/api/ai/auto-complete",
       expect.objectContaining({
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        }),
         body: JSON.stringify({ title: "Write tests" }),
       }),
     );

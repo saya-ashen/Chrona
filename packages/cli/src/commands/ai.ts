@@ -6,12 +6,12 @@ import {
   runCommand,
   type CommonCommandOptions,
 } from "./shared.js";
-import {
-  formatAutoComplete,
-  formatPlanResult,
-} from "../output/ai.js";
+import { formatAutoComplete, formatPlanResult } from "../output/ai.js";
 
-export function registerAiCommands(program: Command, getClient: ClientResolver): void {
+export function registerAiCommands(
+  program: Command,
+  getClient: ClientResolver,
+): void {
   const ai = program.command("ai").description("AI-related app API commands");
 
   createOutputOption(
@@ -20,41 +20,24 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
       .description("Generate a task plan graph for an existing task")
       .requiredOption("-t, --task-id <id>", "Task ID")
       .option("--force-refresh", "Ignore cached plan", false)
-      .action(async (options: CommonCommandOptions & {
-        taskId: string;
-        forceRefresh: boolean;
-      }) => {
-        await runCommand(
-          () =>
-            getClient().generateTaskPlan({
-              taskId: options.taskId,
-              forceRefresh: options.forceRefresh,
-            }),
-          options,
-          formatPlanResult,
-        );
-      }),
-  );
-
-  createOutputOption(
-    ai
-      .command("apply-plan")
-      .description("Materialize a generated task plan")
-      .requiredOption("-t, --task-id <id>", "Parent task ID")
-      .option("--nodes <json>", "Optional JSON array of plan nodes")
-      .option("--edges <json>", "Optional JSON array of plan edges")
-      .action(async (options: CommonCommandOptions & { taskId: string; nodes?: string; edges?: string }) => {
-        await runCommand(
-          () =>
-            getClient().batchApplyPlan({
-              taskId: options.taskId,
-              nodes: options.nodes ? parseJsonOption<unknown[]>(options.nodes, "--nodes") : undefined,
-              edges: options.edges ? parseJsonOption<unknown[]>(options.edges, "--edges") : undefined,
-            }),
-          options,
-          formatPlanResult,
-        );
-      }),
+      .action(
+        async (
+          options: CommonCommandOptions & {
+            taskId: string;
+            forceRefresh: boolean;
+          },
+        ) => {
+          await runCommand(
+            () =>
+              getClient().generateTaskPlan({
+                taskId: options.taskId,
+                forceRefresh: options.forceRefresh,
+              }),
+            options,
+            formatPlanResult,
+          );
+        },
+      ),
   );
 
   createOutputOption(
@@ -63,13 +46,24 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
       .description("Request task creation auto-complete suggestions")
       .requiredOption("--title <title>", "Partial title")
       .option("-w, --workspace-id <id>", "Workspace ID for richer context")
-      .action(async (options: CommonCommandOptions & { title: string; workspaceId?: string }) => {
-        await runCommand(
-          () => getClient().autoComplete({ title: options.title, workspaceId: options.workspaceId }),
-          options,
-          formatAutoComplete,
-        );
-      }),
+      .action(
+        async (
+          options: CommonCommandOptions & {
+            title: string;
+            workspaceId?: string;
+          },
+        ) => {
+          await runCommand(
+            () =>
+              getClient().autoComplete({
+                title: options.title,
+                workspaceId: options.workspaceId,
+              }),
+            options,
+            formatAutoComplete,
+          );
+        },
+      ),
   );
 
   createOutputOption(
@@ -80,20 +74,6 @@ export function registerAiCommands(program: Command, getClient: ClientResolver):
       .action(async (options: CommonCommandOptions & { taskId: string }) => {
         await runCommand(
           () => getClient().generateTaskPlan({ taskId: options.taskId }),
-          options,
-          formatPlanResult,
-        );
-      }),
-  );
-
-  createOutputOption(
-    ai
-      .command("batch-decompose")
-      .description("Compatibility alias for apply-plan using latest saved plan")
-      .requiredOption("-t, --task-id <id>", "Task ID")
-      .action(async (options: CommonCommandOptions & { taskId: string }) => {
-        await runCommand(
-          () => getClient().batchApplyPlan({ taskId: options.taskId }),
           options,
           formatPlanResult,
         );

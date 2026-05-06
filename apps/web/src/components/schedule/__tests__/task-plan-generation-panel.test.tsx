@@ -128,30 +128,21 @@ const sampleReadModel: TaskPlanReadModel = {
 
 function createSseResponse(events: Array<{ event: string; data: unknown }>) {
   const encoder = new TextEncoder();
-  const chunks = events.map((event) =>
-    encoder.encode(`event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`),
-  );
-  let index = 0;
-
-  return {
-    ok: true,
-    body: {
-      getReader() {
-        return {
-          async read() {
-            if (index >= chunks.length) {
-              return { done: true, value: undefined };
-            }
-
-            const value = chunks[index];
-            index += 1;
-            return { done: false, value };
-          },
-        };
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (const event of events) {
+          controller.enqueue(
+            encoder.encode(
+              `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+            ),
+          );
+        }
+        controller.close();
       },
-    },
-    json: async () => ({}),
-  };
+    }),
+    { headers: { "Content-Type": "text/event-stream" } },
+  );
 }
 
 afterEach(() => {

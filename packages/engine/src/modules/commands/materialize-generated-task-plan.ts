@@ -1,10 +1,10 @@
-import type {
-  PlanBlueprint,
-  TaskPlanReadModel,
-} from "@chrona/contracts";
+import type { PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
-import { saveCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import {
+  saveCompiledPlan,
+  getLatestCompiledPlan,
+} from "@/modules/plan-execution/compiled-plan-store";
 import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 import { buildTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
@@ -25,7 +25,6 @@ export async function materializeGeneratedTaskPlan(input: {
   const { compiledPlan, initialLayer, planId } = compilePlanBlueprint({
     taskId: input.taskId,
     blueprint: input.blueprint,
-    prompt: input.planningPrompt ?? null,
     generatedBy: input.generatedBy ?? "ai",
     source: "ai",
   });
@@ -50,7 +49,9 @@ export async function materializeGeneratedTaskPlan(input: {
     layers: [initialLayer],
   });
 
-  const effectivePlanGraph = resolveEffectivePlanGraph(compiledPlan, [initialLayer]);
+  const effectivePlanGraph = resolveEffectivePlanGraph(compiledPlan, [
+    initialLayer,
+  ]);
 
   // Fetch the just-saved record for accurate timestamps
   const saved = await getLatestCompiledPlan(input.taskId);

@@ -29,15 +29,16 @@ import { parseTaskDispatchDecision } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
 import { buildGeneratePlanScope } from "./streaming";
-import type { AIPlanOutput } from "@chrona/contracts/ai";
-import {
-  validateAIPlanOutput,
-} from "@chrona/contracts/ai";
+import type { EditablePlan, PlanBlueprint } from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/shared/logger";
+import { validateEditablePlan } from "@chrona/domain";
 
 const logger = createLogger("ai-features.features");
 
-function ensureObject(value: unknown, context: string): Record<string, unknown> {
+function ensureObject(
+  value: unknown,
+  context: string,
+): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new AiClientError(
       `${context} must be an object`,
@@ -64,7 +65,9 @@ export function normalizeSuggestResponse(input: {
 }): SmartSuggestResponse {
   const parsed = ensureObject(input.parsed, "suggest result");
   return {
-    suggestions: ((parsed.suggestions as Array<Partial<SmartSuggestion>> | undefined) ?? [])
+    suggestions: (
+      (parsed.suggestions as Array<Partial<SmartSuggestion>> | undefined) ?? []
+    )
       .filter((suggestion) => suggestion.title)
       .map((suggestion) => ({
         title: suggestion.title!,
@@ -106,7 +109,7 @@ export async function suggest(
 }
 
 export function normalizeGeneratePlanResponse(input: {
-  parsed: unknown;
+  parsed: EditablePlan;
   source: string;
   structured?: StructuredDebugInfo | null;
 }): GenerateTaskPlanResponse {
@@ -120,11 +123,11 @@ export function normalizeGeneratePlanResponse(input: {
     return defaultResult;
   }
 
-  let aiPlan: AIPlanOutput;
+  let aiPlan: PlanBlueprint;
   let warnings: string[] = [];
 
   try {
-    const validation = validateAIPlanOutput(input.parsed);
+    const validation = validateEditablePlan(input.parsed);
     aiPlan = validation.valid;
     warnings = validation.warnings;
   } catch {
@@ -140,25 +143,6 @@ export function normalizeGeneratePlanResponse(input: {
     source: input.source,
     structured: input.structured ?? undefined,
   };
-}
-
-export async function generatePlan(
-  client: AiClientRecord,
-  request: GenerateTaskPlanRequest,
-): Promise<GenerateTaskPlanResponse> {
-  const result = await parseStructuredFeatureResult<{
-    title?: string;
-    goal?: string;
-    assumptions?: string[];
-    nodes?: Array<Record<string, unknown>>;
-    edges?: Array<Record<string, unknown>>;
-  }>(client, "generate_plan", request, buildGeneratePlanScope(request));
-
-  return normalizeGeneratePlanResponse({
-    parsed: result.parsed,
-    source: client.type,
-    structured: result.debug,
-  });
 }
 
 export async function analyzeConflicts(
