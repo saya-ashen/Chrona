@@ -141,7 +141,7 @@ function createJsonResponse(body: unknown, status = 200) {
 }
 
 import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduledItem, ScheduledAiTaskPlan } from "@/components/schedule/schedule-page-types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -178,6 +178,55 @@ const mockItem: ScheduledItem = {
   runnabilitySummary: "Ready",
   parentTaskId: null,
 };
+
+function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {}): ScheduledAiTaskPlan {
+  return {
+    id: overrides.id ?? "plan-stub",
+    status: overrides.status ?? "draft",
+    revision: overrides.revision ?? 5,
+    prompt: overrides.prompt ?? null,
+    summary: overrides.summary ?? "stub draft",
+    updatedAt: overrides.updatedAt ?? "2026-04-25T14:45:00.000Z",
+    generatedBy: overrides.generatedBy ?? "generate-task-plan",
+    blueprint: overrides.blueprint ?? {
+      title: "stub plan",
+      goal: "stub goal",
+      assumptions: [],
+      nodes: [],
+      edges: [],
+    },
+    compiledPlan: overrides.compiledPlan ?? {
+      id: overrides.id ?? "plan-stub",
+      editablePlanId: "editable-stub",
+      sourceVersion: 5,
+      title: "stub plan",
+      goal: "stub goal",
+      assumptions: [],
+      nodes: [],
+      edges: [],
+      entryNodeIds: [],
+      terminalNodeIds: [],
+      topologicalOrder: [],
+      completionPolicy: { type: "all_tasks_completed" },
+      validationWarnings: [],
+    },
+    effectivePlan: overrides.effectivePlan ?? {
+      planId: overrides.id ?? "plan-stub",
+      basePlanId: overrides.id ?? "plan-stub",
+      resolvedVersion: 1,
+      nodes: [],
+      edges: [],
+      entryNodeIds: [],
+      terminalNodeIds: [],
+      readyNodeIds: [],
+      blockedNodeIds: [],
+      completedNodeIds: [],
+      runningNodeIds: [],
+      failedNodeIds: [],
+      pendingNodeIds: [],
+    },
+  };
+}
 
 const defaultSheetProps = {
   item: mockItem,
@@ -216,7 +265,7 @@ beforeEach(() => {
       return Promise.resolve(createJsonResponse({
         taskId: "task-1",
         aiPlanGenerationStatus: "idle",
-        savedAiPlan: null,
+        savedPlan: null,
       }));
     }
 
@@ -377,29 +426,13 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(latestPanelProps.onPlanLoaded).toBeTypeOf("function");
 
     await act(async () => {
-      latestPanelProps.onPlanLoaded?.({
+      latestPanelProps.onPlanLoaded?.(makeStubTaskPlanReadModel({
         id: "plan-new",
         status: "draft",
-        prompt: null,
         revision: 3,
         summary: "new generated plan",
         updatedAt: "2026-04-25T12:00:00.000Z",
-        plan: {
-          id: "plan-new",
-          taskId: "task-1",
-          status: "draft",
-          revision: 3,
-          source: "ai",
-          generatedBy: "generate-task-plan",
-          prompt: null,
-          summary: "new generated plan",
-          changeSummary: null,
-          createdAt: "2026-04-25T12:00:00.000Z",
-          updatedAt: "2026-04-25T12:00:00.000Z",
-          nodes: [],
-          edges: [],
-        },
-      });
+      }));
     });
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-new");
@@ -418,29 +451,13 @@ describe("SelectedBlockSheet – layout order", () => {
     const itemWithNewPlan: ScheduledItem = {
       ...mockItem,
       aiPlanGenerationStatus: "waiting_acceptance",
-      savedAiPlan: {
+      savedPlan: makeStubTaskPlanReadModel({
         id: "plan-from-parent",
         status: "draft",
-        prompt: null,
         revision: 4,
         summary: "parent refreshed plan",
         updatedAt: "2026-04-25T13:00:00.000Z",
-        plan: {
-          id: "plan-from-parent",
-          editablePlanId: "editable-plan-1",
-          sourceVersion: 4,
-          title: "parent refreshed plan",
-          goal: "parent refreshed plan",
-          assumptions: [],
-          nodes: [],
-          edges: [],
-          entryNodeIds: [],
-          terminalNodeIds: [],
-          topologicalOrder: [],
-          completionPolicy: { type: "all_tasks_completed" as const },
-          validationWarnings: [],
-        },
-      },
+      }),
     };
 
     rerender(<SelectedBlockSheet {...defaultSheetProps} item={itemWithNewPlan} />);
@@ -461,29 +478,13 @@ describe("SelectedBlockSheet – layout order", () => {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "waiting_acceptance",
-          savedAiPlan: {
+          savedPlan: makeStubTaskPlanReadModel({
             id: "plan-polled",
             status: "draft",
-            prompt: null,
             revision: 5,
             summary: "polled draft",
             updatedAt: "2026-04-25T14:45:00.000Z",
-            plan: {
-              id: "plan-polled",
-              taskId: "task-1",
-              status: "draft",
-              revision: 5,
-              source: "ai",
-              generatedBy: "generate-task-plan",
-              prompt: null,
-              summary: "polled draft",
-              changeSummary: null,
-              createdAt: "2026-04-25T14:45:00.000Z",
-              updatedAt: "2026-04-25T14:45:00.000Z",
-              nodes: [],
-              edges: [],
-            },
-          },
+          }),
         }));
       }
 
@@ -536,7 +537,7 @@ describe("SelectedBlockSheet – layout order", () => {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "idle",
-          savedAiPlan: null,
+          savedPlan: null,
         }));
       }
 
@@ -576,7 +577,7 @@ describe("SelectedBlockSheet – layout order", () => {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "generating",
-          savedAiPlan: null,
+          savedPlan: null,
         }));
       }
 
@@ -619,7 +620,7 @@ describe("SelectedBlockSheet – layout order", () => {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "idle",
-          savedAiPlan: null,
+          savedPlan: null,
         }));
       }
 

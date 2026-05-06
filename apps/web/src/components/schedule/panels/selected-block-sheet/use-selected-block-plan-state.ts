@@ -1,62 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ScheduledItem, ScheduleAiPlanGenerationStatus, LegacySavedPlan } from "@/components/schedule/schedule-page-types";
-import type { TaskPlanGraphResponse, CompiledPlan } from "@chrona/contracts/ai";
+import type { ScheduledItem, ScheduleAiPlanGenerationStatus } from "@/components/schedule/schedule-page-types";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
-export type SavedTaskPlan = {
-  id: string;
-  status: "draft" | "accepted" | "superseded" | "archived";
-  prompt: string | null;
-  revision?: number;
-  summary?: string | null;
-  updatedAt: string;
-  plan?: CompiledPlan;
-};
+/** Subset of TaskPlanReadModel used as the accepted-plan shape in UI state. */
+export type SavedTaskPlan = TaskPlanReadModel;
 
 type TaskPlanStateResponse = {
   taskId: string;
   aiPlanGenerationStatus: ScheduleAiPlanGenerationStatus;
-  savedAiPlan: SavedTaskPlan | null;
+  savedPlan: SavedTaskPlan | null;
 };
 
 function savedPlanKey(saved: SavedTaskPlan | null) {
-  return saved ? `${saved.id}:${saved.status}:${saved.revision ?? 0}:${saved.updatedAt}` : null;
+  return saved ? `${saved.id}:${saved.status}:${saved.revision}:${saved.updatedAt}` : null;
 }
 
-function acceptedResponseFromSavedPlan(saved: SavedTaskPlan | null): TaskPlanGraphResponse | null {
-  if (!saved || saved.status !== "accepted" || !saved.plan) {
+function acceptedResponseFromSavedPlan(saved: SavedTaskPlan | null): TaskPlanReadModel | null {
+  if (!saved || saved.status !== "accepted") {
     return null;
   }
 
-  return {
-    plan: { title: "", goal: "", nodes: [], edges: [] },
-    source: "saved",
-    planGraph: saved.plan as unknown,
-    savedPlan: {
-      id: saved.id,
-      status: saved.status,
-      prompt: saved.prompt,
-      revision: saved.revision ?? 0,
-      summary: saved.summary ?? null,
-      updatedAt: saved.updatedAt,
-    } as unknown,
-  };
-}
-
-function acceptedResponseFromGeneratedResult(result: TaskPlanGraphResponse): TaskPlanGraphResponse {
-  const rSavedPlan = result.savedPlan as Record<string, unknown> | undefined;
-  const rPlanGraph = result.planGraph as Record<string, unknown> | undefined;
-  return {
-    ...result,
-    source: "saved",
-    savedPlan: rSavedPlan
-      ? { ...rSavedPlan, status: "accepted" }
-      : rSavedPlan,
-    planGraph: rPlanGraph
-      ? { ...rPlanGraph, status: "accepted" }
-      : rPlanGraph,
-  };
+  return saved;
 }
 
 export function useSelectedBlockPlanState({
@@ -66,12 +32,12 @@ export function useSelectedBlockPlanState({
   item: ScheduledItem;
   onMutatedAction: () => Promise<void>;
 }) {
-  const [displayedSavedPlan, setDisplayedSavedPlan] = useState<SavedTaskPlan | null>(item.savedAiPlan ?? null);
+  const [displayedSavedPlan, setDisplayedSavedPlan] = useState<SavedTaskPlan | null>(item.savedPlan ?? null);
   const [generationStatus, setGenerationStatus] = useState(item.aiPlanGenerationStatus ?? "idle");
-  const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanGraphResponse | null>(() => acceptedResponseFromSavedPlan(item.savedAiPlan ?? null));
+  const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanReadModel | null>(() => acceptedResponseFromSavedPlan(item.savedPlan ?? null));
   const [isApplying, setIsApplying] = useState(false);
   const [pollCycle, setPollCycle] = useState(0);
-  const lastDisplayedSavedPlanKeyRef = useRef<string | null>(savedPlanKey(item.savedAiPlan ?? null));
+  const lastDisplayedSavedPlanKeyRef = useRef<string | null>(savedPlanKey(item.savedPlan ?? null));
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshInFlightRef = useRef(false);
   const newTaskProbeCountRef = useRef(0);
@@ -79,10 +45,10 @@ export function useSelectedBlockPlanState({
   const generationStatusRef = useRef<ScheduleAiPlanGenerationStatus>(item.aiPlanGenerationStatus ?? "idle");
 
   const applyPlanStateSnapshot = useCallback((snapshot: {
-    savedAiPlan: SavedTaskPlan | null;
+    savedPlan: SavedTaskPlan | null;
     aiPlanGenerationStatus: ScheduleAiPlanGenerationStatus;
   }) => {
-    const next = snapshot.savedAiPlan;
+    const next = snapshot.savedPlan;
     const nextKey = savedPlanKey(next);
     const nextStatus = snapshot.aiPlanGenerationStatus;
     const currentPlanKey = lastDisplayedSavedPlanKeyRef.current;
@@ -114,13 +80,11 @@ export function useSelectedBlockPlanState({
     const accepted = acceptedResponseFromSavedPlan(next);
     if (accepted) {
       setAcceptedPlan((current) => {
-        const curSaved = current?.savedPlan as LegacySavedPlan | undefined;
-        const accSaved = accepted.savedPlan as LegacySavedPlan | undefined;
         if (
-          curSaved?.id === accSaved?.id
-          && curSaved?.status === accSaved?.status
-          && curSaved?.revision === accSaved?.revision
-          && curSaved?.updatedAt === accSaved?.updatedAt
+          current?.id === accepted.id
+          && current?.status === accepted.status
+          && current?.revision === accepted.revision
+          && current?.updatedAt === accepted.updatedAt
         ) {
           return current;
         }
@@ -147,10 +111,10 @@ export function useSelectedBlockPlanState({
   useEffect(() => {
     generationStatusRef.current = item.aiPlanGenerationStatus ?? "idle";
     applyPlanStateSnapshot({
-      savedAiPlan: item.savedAiPlan ?? null,
+      savedPlan: item.savedPlan ?? null,
       aiPlanGenerationStatus: item.aiPlanGenerationStatus ?? "idle",
     });
-  }, [applyPlanStateSnapshot, item.aiPlanGenerationStatus, item.savedAiPlan]);
+  }, [applyPlanStateSnapshot, item.aiPlanGenerationStatus, item.savedPlan]);
 
   useEffect(() => {
     newTaskProbeCountRef.current = 0;
@@ -215,13 +179,11 @@ export function useSelectedBlockPlanState({
     }
 
     setAcceptedPlan((current) => {
-      const curSaved = current?.savedPlan as LegacySavedPlan | undefined;
-      const accSaved = accepted.savedPlan as LegacySavedPlan | undefined;
       if (
-        curSaved?.id === accSaved?.id
-        && curSaved?.status === accSaved?.status
-        && curSaved?.revision === accSaved?.revision
-        && curSaved?.updatedAt === accSaved?.updatedAt
+        current?.id === accepted.id
+        && current?.status === accepted.status
+        && current?.revision === accepted.revision
+        && current?.updatedAt === accepted.updatedAt
       ) {
         return current;
       }
@@ -230,36 +192,29 @@ export function useSelectedBlockPlanState({
     });
   }, []);
 
-  const handleApplyPlan = useCallback(async (result: TaskPlanGraphResponse) => {
-    const savedPlan = result.savedPlan as LegacySavedPlan | undefined;
-    if (!savedPlan?.id) return;
+  const handleApplyPlan = useCallback(async (result: TaskPlanReadModel) => {
+    if (!result.id) return;
     setIsApplying(true);
     try {
       const res = await fetch(`/api/tasks/${item.taskId}/plan/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          planId: savedPlan.id,
+          planId: result.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to accept plan");
 
-      const accepted = acceptedResponseFromGeneratedResult(result);
-      const accSavedPlan = accepted.savedPlan as LegacySavedPlan;
-      setAcceptedPlan(accepted);
-      const acceptedSavedPlan: SavedTaskPlan = {
-        id: accSavedPlan.id,
+      // Mark as accepted in local state mirrors
+      const accepted: TaskPlanReadModel = {
+        ...result,
         status: "accepted",
-        prompt: accSavedPlan.prompt,
-        revision: accSavedPlan.revision,
-        summary: accSavedPlan.summary,
-        updatedAt: accSavedPlan.updatedAt,
-        plan: accepted.planGraph as CompiledPlan | undefined,
       };
-      setDisplayedSavedPlan(acceptedSavedPlan);
+      setAcceptedPlan(accepted);
+      setDisplayedSavedPlan(accepted);
       generationStatusRef.current = "accepted";
       setGenerationStatus("accepted");
-      lastDisplayedSavedPlanKeyRef.current = savedPlanKey(acceptedSavedPlan);
+      lastDisplayedSavedPlanKeyRef.current = savedPlanKey(accepted);
 
       await onMutatedAction();
     } catch (err) {

@@ -1,7 +1,6 @@
 import type { ScheduleSource } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { enqueueTaskPlanGeneration } from "@/modules/commands/queue-task-plan-generation";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
@@ -94,8 +93,6 @@ export async function applySchedule(input: {
   });
 
   await rebuildTaskProjection(task.id);
-
-  enqueueTaskPlanGeneration({ taskId: task.id, reason: "task_updated", forceRefresh: true });
 
   return {
     taskId: task.id,

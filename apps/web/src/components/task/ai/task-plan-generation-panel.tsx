@@ -16,14 +16,10 @@ import {
 } from "lucide-react";
 import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
 import {
-  legacyPlanGraphToGraphPlan,
-  summarizeLegacyPlanGraph,
+  compiledPlanToGraphPlan,
+  summarizeCompiledPlan,
 } from "@/components/task/plan/task-plan-view-model";
-import type { TaskPlanGraphResponse, CompiledPlan } from "@chrona/contracts/ai";
-import type {
-  LegacyPlanGraph,
-  LegacySavedPlan,
-} from "@/components/schedule/schedule-page-types";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 import { useI18n } from "@/i18n/client";
 import { buttonVariants } from "@/components/ui/button";
@@ -39,28 +35,10 @@ interface TaskPlanGenerationPanelProps {
   autoRequest?: boolean;
   planningPrompt?: string;
   forceRefresh?: boolean;
-  savedPlan?: {
-    id: string;
-    status: "draft" | "accepted" | "superseded" | "archived";
-    prompt: string | null;
-    revision?: number;
-    summary?: string | null;
-    updatedAt: string;
-    plan?: CompiledPlan;
-  } | null;
+  savedPlan?: TaskPlanReadModel | null;
   generationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
-  onApply?: (result: TaskPlanGraphResponse) => Promise<void> | void;
-  onPlanLoaded?: (
-    savedPlan: {
-      id: string;
-      status: "draft" | "accepted" | "superseded" | "archived";
-      prompt: string | null;
-      revision?: number;
-      summary?: string | null;
-      updatedAt: string;
-      plan?: CompiledPlan;
-    } | null,
-  ) => void;
+  onApply?: (result: TaskPlanReadModel) => Promise<void> | void;
+  onPlanLoaded?: (savedPlan: TaskPlanReadModel | null) => void;
   activeAcceptedPlanId?: string | null;
   hasUnsavedConfigChanges?: boolean;
   unsavedConfigDraft?: TaskConfigFormDraft | null;
@@ -153,7 +131,7 @@ export function TaskPlanGenerationPanel({
     };
   }, [localForceRefresh, requestKey, requestSnapshot.taskId, requested]);
 
-  const [result, setResult] = useState<TaskPlanGraphResponse | null>(null);
+  const [result, setResult] = useState<TaskPlanReadModel | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<StreamPhase>("idle");
@@ -204,7 +182,10 @@ export function TaskPlanGenerationPanel({
             "Content-Type": "application/json",
             Accept: "text/event-stream",
           },
-          body: JSON.stringify({ forceRefresh: activeRequest.forceRefresh }),
+          body: JSON.stringify({
+            forceRefresh: activeRequest.forceRefresh,
+            planningPrompt: requestSnapshot.planningPrompt ?? null,
+          }),
           signal: controller.signal,
         });
 
@@ -267,7 +248,7 @@ export function TaskPlanGenerationPanel({
                 setPartialText((current) => current + (typeof data.text === "string" ? data.text : ""));
                 break;
               case "result":
-                setResult(data as unknown as TaskPlanGraphResponse);
+                setResult((data.result as TaskPlanReadModel | undefined) ?? null);
                 setPhase("done");
                 setIsLoading(false);
                 break;
@@ -310,54 +291,23 @@ export function TaskPlanGenerationPanel({
         abortRef.current = null;
       }
     };
-  }, [planInput]);
+  }, [planInput, requestSnapshot.planningPrompt]);
 
-  const hookSavedPlanMeta = useMemo(() => {
-    if (!result?.savedPlan) {
-      return null;
-    }
-
-    const sp = result.savedPlan as LegacySavedPlan;
-    return {
-      ...sp,
-      plan: result.planGraph as CompiledPlan | undefined,
-    };
-  }, [result]);
-  const savedPlanMeta = hookSavedPlanMeta ?? savedPlan;
-  const displayPlanGraph =
-    (result?.planGraph as LegacyPlanGraph | undefined) ??
-    (savedPlanMeta?.plan as LegacyPlanGraph | undefined) ??
-    null;
-  const displayResult =
-    result ??
-    (savedPlanMeta?.plan
-      ? {
-          plan: { title: "", goal: "", nodes: [], edges: [] },
-          source: "saved",
-          planGraph: savedPlanMeta.plan as unknown,
-          savedPlan: {
-            id: savedPlanMeta.id,
-            status: savedPlanMeta.status,
-            prompt: savedPlanMeta.prompt,
-            revision: savedPlanMeta.revision ?? 0,
-            summary: savedPlanMeta.summary ?? null,
-            updatedAt: savedPlanMeta.updatedAt,
-          } as unknown,
-        }
-      : null);
+  const activeReadModel = result ?? savedPlan ?? null;
+  const compiledPlan = activeReadModel?.compiledPlan ?? null;
 
   const planGraph = useMemo(() => {
-    return legacyPlanGraphToGraphPlan(displayPlanGraph ?? null);
-  }, [displayPlanGraph]);
+    return compiledPlanToGraphPlan(compiledPlan);
+  }, [compiledPlan]);
 
   const graphSummary = useMemo(
-    () => summarizeLegacyPlanGraph(displayPlanGraph ?? null),
-    [displayPlanGraph],
+    () => summarizeCompiledPlan(compiledPlan),
+    [compiledPlan],
   );
   const isAppliedPlan = Boolean(
     activeAcceptedPlanId &&
-      savedPlanMeta?.id &&
-      savedPlanMeta.id === activeAcceptedPlanId,
+      activeReadModel?.id &&
+      activeReadModel.id === activeAcceptedPlanId,
   );
 
   const requestFreshPlan = (draft?: TaskConfigFormDraft | null) => {
@@ -431,13 +381,12 @@ export function TaskPlanGenerationPanel({
   }, [autoRequest]);
 
   useEffect(() => {
-    if (!hookSavedPlanMeta) {
+    if (!result) {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onPlanLoaded?.(hookSavedPlanMeta as any);
-  }, [onPlanLoaded, hookSavedPlanMeta]);
+    onPlanLoaded?.(result);
+  }, [onPlanLoaded, result]);
 
   const isGenerationRunning = isLoading || generationStatus === "generating";
 
@@ -570,7 +519,7 @@ export function TaskPlanGenerationPanel({
     </div>
   ) : null;
 
-  if (!displayResult || !planGraph) {
+  if (!activeReadModel || !planGraph) {
     return (
       <div className="space-y-3 rounded-xl border border-transparent bg-transparent p-0">
         {renderPanelHeader(
@@ -663,7 +612,7 @@ export function TaskPlanGenerationPanel({
             <div className="flex justify-end rounded-lg border border-border/40 bg-background/70 px-3 py-2">
               <button
                 type="button"
-                onClick={() => displayResult && onApply(displayResult)}
+                onClick={() => activeReadModel && onApply(activeReadModel)}
                 className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/20"
               >
                 <Check className="size-4" />

@@ -1,10 +1,14 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 
-const enqueueTaskPlanGenerationMock = mock(async () => undefined);
+// Auto plan generation was removed in the plan refactor.
+// Plan generation is now manual-only via the SSE streaming endpoint.
+// This test verifies createTask does NOT trigger any plan generation.
 
-mock.module("@/modules/commands/queue-task-plan-generation", () => ({
-  enqueueTaskPlanGeneration: enqueueTaskPlanGenerationMock,
+const materializationMock = mock(async () => undefined);
+
+mock.module("@/modules/commands/materialize-generated-task-plan", () => ({
+  materializeGeneratedTaskPlan: materializationMock,
 }));
 
 import { createTask } from "@/modules/commands/create-task";
@@ -26,10 +30,10 @@ async function resetDb() {
   await db.workspace.deleteMany();
 }
 
-describe("createTask automatic plan generation", () => {
+describe("createTask (no auto plan generation)", () => {
   beforeEach(async () => {
     await resetDb();
-    enqueueTaskPlanGenerationMock.mockClear();
+    materializationMock.mockClear();
   });
 
   afterAll(async () => {
@@ -37,23 +41,23 @@ describe("createTask automatic plan generation", () => {
     await db.$disconnect();
   });
 
-  it("asks the backend plan-generation queue to plan the newly persisted task", async () => {
+  it("creates a task but does NOT trigger any plan generation", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Auto Plan Workspace", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "No Auto Plan Workspace", status: "Active", defaultRuntime: "openclaw" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
-      title: "Create task and plan it",
-      description: "This task is never opened in the UI before planning.",
+      title: "Create task without auto plan",
+      description: "Plan generation must be explicitly requested via the SSE endpoint.",
       runtimeAdapterKey: "openclaw",
       runtimeInput: { prompt: "Do it" },
       prompt: "Do it",
     });
 
-    expect(enqueueTaskPlanGenerationMock).toHaveBeenCalledWith({
-      taskId: result.taskId,
-      reason: "task_created",
-    });
+    expect(result.taskId).toBeDefined();
+
+    // Plan generation is now manual-only — no automatic enqueue.
+    expect(materializationMock).not.toHaveBeenCalled();
   });
 });

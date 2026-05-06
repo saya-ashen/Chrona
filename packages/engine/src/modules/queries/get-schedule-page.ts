@@ -8,10 +8,10 @@ import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
-import type { CompiledPlan, ScheduledTaskInfo } from "@chrona/contracts/ai";
+import type { ScheduledTaskInfo, TaskPlanReadModel } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { getLayers } from "@/modules/plan-execution/plan-run-store";
-import { type SavedAiPlanSnapshot, getLatestSavedAiPlanSnapshot } from "@/modules/plan-execution/saved-plan-snapshot";
+import { getLatestTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
 import { resolveEffectivePlanGraph } from "@chrona/domain";
@@ -300,28 +300,12 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   const listItems = projections.map((item) => mapProjectionItem(item));
-  const planSnapshots = new Map<string, {
-    id: string;
-    status: SavedAiPlanSnapshot["status"];
-    prompt: string | null;
-    revision?: number;
-    summary?: string | null;
-    updatedAt: string;
-    plan?: CompiledPlan;
-  }>();
+  const planSnapshots = new Map<string, TaskPlanReadModel>();
   const planStatuses = new Map<string, "idle" | "generating" | "waiting_acceptance" | "accepted">();
   await Promise.all(listItems.map(async (item) => {
-    const savedPlan = await getLatestSavedAiPlanSnapshot(item.taskId);
+    const savedPlan = await getLatestTaskPlanReadModel(item.taskId);
     if (savedPlan) {
-      planSnapshots.set(item.taskId, {
-        id: savedPlan.id,
-        status: savedPlan.status,
-        prompt: savedPlan.prompt,
-        revision: savedPlan.revision,
-        summary: savedPlan.summary,
-        updatedAt: savedPlan.updatedAt,
-        plan: savedPlan.plan as unknown as CompiledPlan,
-      });
+      planSnapshots.set(item.taskId, savedPlan);
     }
     planStatuses.set(
       item.taskId,
@@ -336,7 +320,7 @@ export async function getSchedulePage(workspaceId: string) {
   }));
   const listItemsWithPlanState = listItems.map((item) => ({
     ...item,
-    savedAiPlan: planSnapshots.get(item.taskId) ?? null,
+    savedPlan: planSnapshots.get(item.taskId) ?? null,
     aiPlanGenerationStatus: planStatuses.get(item.taskId) ?? "idle",
   }));
   const topLevelItems = listItemsWithPlanState.filter((item) => item.parentTaskId === null);

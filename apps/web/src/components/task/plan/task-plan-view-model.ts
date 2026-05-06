@@ -1,14 +1,5 @@
-import type { CompiledPlan, CompiledNode, TaskPlanGraphResponse } from "@chrona/contracts/ai";
-import type { LegacyPlanGraph, LegacyPlanGraphEdge, LegacyPlanGraphNode } from "@/components/schedule/schedule-page-types";
+import type { CompiledPlan, CompiledNode } from "@chrona/contracts/ai";
 import type { PlanStep, TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
-
-type LegacyPlanGraphNodeExtras = LegacyPlanGraphNode & {
-  readiness?: PlanStep["readiness"];
-  dependencies?: string[];
-  executionClassification?: PlanStep["executionClassification"];
-  nextAction?: string | null;
-  requiredInfo?: string[];
-};
 
 type PlanDisplayType = "task" | "checkpoint" | "condition" | "wait";
 
@@ -73,82 +64,22 @@ export function compiledPlanToGraphPlan(
   };
 }
 
-export function legacyPlanGraphToGraphPlan(graph: LegacyPlanGraph | null | undefined): TaskPlanGraphPlan | null {
-  if (!graph?.nodes?.length) {
-    return null;
-  }
-
-  const steps: PlanStep[] = graph.nodes.map((node: LegacyPlanGraphNode) => {
-    const extraNode = node as LegacyPlanGraphNodeExtras;
-
-    return ({
-    id: node.id,
-    title: node.title,
-    objective: node.objective,
-    phase: node.phase ?? node.type,
-    status: (node.status === "skipped" ? "done" : node.status) as PlanStep["status"],
-    requiresHumanInput: node.requiresHumanInput || node.status === "waiting_for_user",
-    requiresHumanApproval: node.requiresHumanApproval ?? false,
-    type: node.type,
-    displayType: normalizePlanNodeTypeForDisplay(node.type),
-    linkedTaskId: node.linkedTaskId,
-    executionMode: node.executionMode,
-    estimatedMinutes: node.estimatedMinutes,
-    priority: node.priority,
-    completionSummary: node.completionSummary ?? null,
-    metadata: node.metadata as Record<string, unknown> | null,
-    readiness: extraNode.readiness,
-    dependencies: extraNode.dependencies,
-    executionClassification: extraNode.executionClassification,
-    nextAction: extraNode.nextAction,
-    requiredInfo: extraNode.requiredInfo,
-  });
-  });
-
-  return {
-    state: "ready",
-    revision: typeof graph.revision === "number" ? `r${graph.revision}` : null,
-    generatedBy: graph.generatedBy,
-    isMock: false,
-    summary: graph.summary,
-    updatedAt: graph.updatedAt,
-    changeSummary: graph.changeSummary,
-    currentStepId: currentStepIdFromSteps(steps),
-    steps,
-    edges: graph.edges.map((edge: LegacyPlanGraphEdge) => ({
-      id: edge.id,
-      fromNodeId: edge.fromNodeId,
-      toNodeId: edge.toNodeId,
-      type: edge.type,
-      label: edge.metadata && typeof edge.metadata === "object" && !Array.isArray(edge.metadata)
-        ? (edge.metadata as Record<string, unknown>).label as string | undefined
-        : undefined,
-    })),
-  };
-}
-
-export function taskPlanResponseToGraphPlan(response: TaskPlanGraphResponse | null | undefined) {
-  return legacyPlanGraphToGraphPlan((response?.planGraph as LegacyPlanGraph | undefined) ?? null);
-}
-
-export function summarizeLegacyPlanGraph(graph: LegacyPlanGraph | null | undefined) {
-  if (!graph) {
+export function summarizeCompiledPlan(plan: CompiledPlan | null | undefined) {
+  if (!plan) {
     return { totalEstimatedMinutes: 0, nodeCount: 0, warnings: [] as string[] };
   }
 
-  const totalEstimatedMinutes = graph.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0);
-  const warnings = graph.nodes.flatMap((node) => {
-    const rawWarnings = node.metadata && typeof node.metadata === "object" && !Array.isArray(node.metadata)
-      ? (node.metadata as Record<string, unknown>).warnings
-      : null;
-    return Array.isArray(rawWarnings)
-      ? rawWarnings.filter((warning): warning is string => typeof warning === "string")
-      : [];
-  });
+  const totalEstimatedMinutes = plan.nodes.reduce(
+    (sum, node) => sum + (node.estimatedMinutes ?? 0),
+    0,
+  );
+  const warnings = plan.validationWarnings.map(
+    (w) => `${w.path}: ${w.message}`,
+  );
 
   return {
     totalEstimatedMinutes,
-    nodeCount: graph.nodes.length,
+    nodeCount: plan.nodes.length,
     warnings,
   };
 }

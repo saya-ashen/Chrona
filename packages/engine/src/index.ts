@@ -44,6 +44,8 @@ export {
   TASK_PLAN_GENERATION_IN_FLIGHT_CODE,
   TaskPlanGenerationInFlightError,
 } from "./modules/commands/task-plan-generation-registry";
+export { generateTaskPlanManualStream } from "./modules/commands/generate-task-plan-manual-stream";
+export { materializeGeneratedTaskPlan } from "./modules/commands/materialize-generated-task-plan";
 export { updateTask } from "./modules/commands/update-task";
 
 export {
@@ -78,6 +80,10 @@ export { getInbox } from "./modules/queries/get-inbox";
 export { getMemoryConsole } from "./modules/queries/get-memory-console";
 export { getSchedulePage } from "./modules/queries/get-schedule-page";
 export { getTaskPage } from "./modules/queries/get-task-page";
+export {
+  buildTaskPlanReadModel,
+  getLatestTaskPlanReadModel,
+} from "./modules/queries/task-plan-read-model";
 export { getWorkspaceOverview } from "./modules/queries/get-workspace-overview";
 export { getWorkspaces } from "./modules/queries/get-workspaces";
 export {
@@ -101,7 +107,6 @@ export {
   enrichPlanGraphNodes,
   getReadyAutoRunnableNodes,
 } from "./modules/plan-execution/compat";
-export { getLatestSavedAiPlanSnapshot } from "./modules/plan-execution/saved-plan-snapshot";
 
 export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
 

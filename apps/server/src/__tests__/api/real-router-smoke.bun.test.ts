@@ -99,11 +99,11 @@ describe("Real router smoke", () => {
     expect(stateRes.status).toBe(200);
     const stateBody = await json<{
       aiPlanGenerationStatus: string;
-      savedAiPlan: { id: string; status: string; plan: { nodes: unknown[] } } | null;
+      savedPlan: { id: string; status: string; compiledPlan: { nodes: unknown[] } } | null;
     }>(stateRes);
     expect(stateBody.aiPlanGenerationStatus).toBe("accepted");
-    expect(stateBody.savedAiPlan?.id).toBe(planId);
-    expect(stateBody.savedAiPlan?.plan.nodes.length).toBeGreaterThan(0);
+    expect(stateBody.savedPlan?.id).toBe(planId);
+    expect(stateBody.savedPlan?.compiledPlan.nodes.length).toBeGreaterThan(0);
 
     const applyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",

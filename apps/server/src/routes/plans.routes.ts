@@ -1,23 +1,28 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
+import { upgradeBlueprintToEditable } from "@chrona/contracts";
 
 import {
+  compilePlanBlueprint,
+  createPlanRunFromCompiledPlan,
   ensureTaskInWorkspace,
   ensurePlanInWorkspace,
   applyPlanPatchCommand,
+  materializeTaskPlan,
   saveCompiledPlan,
   getLatestCompiledPlan,
-  streamTaskPlanGeneration,
-  getLatestSavedAiPlanSnapshot,
   isTaskPlanGenerationRunning,
+  generateTaskPlanManualStream,
+  getLatestTaskPlanReadModel,
+  savePlanRun,
 } from "@chrona/engine";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
 } from "@chrona/engine";
-
+import { db } from "@chrona/db";
 import { planGenerationConflictBody, logger } from "./helpers";
 import { error, internalServerError, json } from "../lib/http";
 
@@ -27,13 +32,15 @@ export function createPlansRoutes() {
   api.get("/tasks/:taskId/plan/state", async (c) => {
     try {
       const taskId = c.req.param("taskId");
-      const savedAiPlan = await getLatestSavedAiPlanSnapshot(taskId);
+      const savedPlan = await getLatestTaskPlanReadModel(taskId);
+
       const planStatus =
-        savedAiPlan?.status === "accepted"
+        savedPlan?.status === "accepted"
           ? "accepted"
-          : savedAiPlan
+          : savedPlan
             ? "waiting_acceptance"
             : "no_plan";
+
       const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
         ? "generating"
         : planStatus === "accepted"
@@ -41,10 +48,11 @@ export function createPlansRoutes() {
           : planStatus === "waiting_acceptance"
             ? "waiting_acceptance"
             : "idle";
+
       return json(c, {
         taskId,
         aiPlanGenerationStatus,
-        savedAiPlan,
+        savedPlan,
       });
     } catch (cause) {
       const message =
@@ -80,19 +88,15 @@ export function createPlansRoutes() {
         workspaceId: latest.workspaceId,
         taskId,
         compiledPlan: latest.compiledPlan,
+        editablePlan: latest.editablePlan,
         status: "accepted",
         prompt: latest.prompt,
         summary: latest.summary,
         generatedBy: latest.generatedBy,
       });
+      const acceptedPlan = await getLatestTaskPlanReadModel(taskId);
       return json(c, {
-        savedPlan: {
-          id: planId,
-          status: "accepted",
-          prompt: latest.prompt,
-          plan: latest.compiledPlan,
-          summary: latest.summary,
-        },
+        savedPlan: acceptedPlan,
       });
     } catch (cause) {
       const message =
@@ -106,7 +110,6 @@ export function createPlansRoutes() {
   api.post("/tasks/:taskId/plan/generate/stop", async (c) => {
     try {
       const taskId = c.req.param("taskId");
-
       return json(c, { taskId, stopped: stopTaskPlanGeneration(taskId) });
     } catch (cause) {
       return internalServerError(
@@ -123,6 +126,10 @@ export function createPlansRoutes() {
     try {
       const body = await c.req.json();
       const forceRefresh = body.forceRefresh === true;
+      const planningPrompt =
+        typeof body.planningPrompt === "string" && body.planningPrompt.trim().length > 0
+          ? body.planningPrompt
+          : null;
 
       const requestId = randomUUID();
       logger.info("request.start", {
@@ -140,9 +147,10 @@ export function createPlansRoutes() {
         stream.onAbort(() => streamLock.finish());
 
         try {
-          for await (const event of streamTaskPlanGeneration({
+          for await (const event of generateTaskPlanManualStream({
             taskId,
             forceRefresh,
+            planningPrompt,
           })) {
             eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
             logger.info("stream.event", {
@@ -154,22 +162,34 @@ export function createPlansRoutes() {
 
             switch (event.type) {
               case "status":
-                await stream.writeSSE({ event: "status", data: JSON.stringify({ message: event.message }) });
+                await stream.writeSSE({
+                  event: "status",
+                  data: JSON.stringify({ phase: event.phase, message: event.message }),
+                });
                 break;
               case "tool_call":
-                await stream.writeSSE({ event: "tool_call", data: JSON.stringify({ tool: event.tool, input: event.input }) });
-                break;
-              case "tool_result":
-                await stream.writeSSE({ event: "tool_result", data: JSON.stringify({ tool: event.tool, result: event.result }) });
+                await stream.writeSSE({
+                  event: "tool_call",
+                  data: JSON.stringify({ tool: event.tool, input: event.input }),
+                });
                 break;
               case "partial":
-                await stream.writeSSE({ event: "partial", data: JSON.stringify({ text: event.text }) });
+                await stream.writeSSE({
+                  event: "partial",
+                  data: JSON.stringify({ text: event.text }),
+                });
                 break;
               case "result":
-                await stream.writeSSE({ event: "result", data: JSON.stringify(event.response) });
+                await stream.writeSSE({
+                  event: "result",
+                  data: JSON.stringify(event),
+                });
                 break;
               case "error":
-                await stream.writeSSE({ event: "error", data: JSON.stringify({ message: event.message }) });
+                await stream.writeSSE({
+                  event: "error",
+                  data: JSON.stringify({ code: event.code, message: event.message }),
+                });
                 return;
               case "done":
                 await stream.writeSSE({ event: "done", data: "{}" });
@@ -194,6 +214,7 @@ export function createPlansRoutes() {
             await stream.writeSSE({
               event: "error",
               data: JSON.stringify({
+                code: "INTERNAL_ERROR",
                 message: cause instanceof Error ? cause.message : "Failed to generate task plan",
               }),
             });
@@ -211,6 +232,109 @@ export function createPlansRoutes() {
       const message =
         cause instanceof Error ? cause.message : "Failed to generate task plan";
       return error(c, message, message.includes("Task not found") ? 404 : 500);
+    }
+  });
+
+  api.post("/tasks/:taskId/plan/materialize", async (c) => {
+    try {
+      const taskId = c.req.param("taskId");
+      const body = await c.req.json();
+      const workspaceId =
+        typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+      const providedNodes = Array.isArray(body.nodes) ? body.nodes : undefined;
+      const providedEdges = Array.isArray(body.edges) ? body.edges : undefined;
+
+      if (workspaceId) {
+        await ensureTaskInWorkspace(taskId, workspaceId);
+      }
+
+      const task = await db.task.findUnique({ where: { id: taskId } });
+      if (!task) {
+        return error(c, "Task not found", 404);
+      }
+
+      let compiledPlan = null;
+
+      if (providedNodes && providedNodes.length > 0) {
+        const nodeCountLabel = `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`;
+        const blueprint = {
+          title: nodeCountLabel,
+          goal: nodeCountLabel,
+          nodes: providedNodes.map((node: Record<string, unknown>) => ({
+            id:
+              typeof node.id === "string"
+                ? node.id
+                : `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            type:
+              typeof node.type === "string" && ["task", "checkpoint", "condition", "wait"].includes(node.type)
+                ? node.type
+                : "task",
+            title: typeof node.title === "string" ? node.title : "Untitled",
+          })),
+          edges: (providedEdges ?? []).map((edge: Record<string, unknown>) => ({
+            from: typeof edge.fromNodeId === "string" ? edge.fromNodeId : "",
+            to: typeof edge.toNodeId === "string" ? edge.toNodeId : "",
+          })),
+        } as const;
+
+        const compiled = compilePlanBlueprint({
+          taskId: task.id,
+          blueprint,
+          generatedBy: "batch-apply",
+          source: "ai",
+        });
+
+        compiledPlan = compiled.compiledPlan;
+
+        await saveCompiledPlan({
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          compiledPlan: compiled.compiledPlan,
+          editablePlan: upgradeBlueprintToEditable(blueprint, compiled.planId, 1),
+          status: "draft",
+          generatedBy: "batch-apply",
+          summary: blueprint.title,
+        });
+
+        await savePlanRun({
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          planId: compiled.planId,
+          run: createPlanRunFromCompiledPlan(compiled.compiledPlan, []),
+          layers: [compiled.initialLayer],
+        });
+      } else {
+        const latest = await getLatestCompiledPlan(taskId);
+        if (!latest) {
+          return error(c, "No plan found for task", 404);
+        }
+        compiledPlan = latest.compiledPlan;
+      }
+
+      const materialization = await materializeTaskPlan({ taskId: task.id });
+      const childTasks = await db.task.findMany({
+        where: { id: { in: materialization.createdTaskIds } },
+        include: { projection: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return json(c, {
+        parentTaskId: taskId,
+        childTasks,
+        planGraph: compiledPlan,
+        materialization: {
+          createdTaskIds: materialization.createdTaskIds,
+          updatedNodeIds: materialization.updatedNodeIds,
+          skippedNodeIds: [],
+        },
+      }, 201);
+    } catch (cause) {
+      return internalServerError(
+        c,
+        "POST /api/tasks/:taskId/plan/materialize",
+        cause,
+        "Failed to apply task plan",
+      );
     }
   });
 
