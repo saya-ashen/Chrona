@@ -1,0 +1,157 @@
+import { describe, expect, it } from "vitest";
+import { compiledPlanToGraphPlan, taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
+import type { CompiledPlan, TaskPlanReadModel } from "@chrona/contracts/ai";
+
+const compiledPlan: CompiledPlan = {
+  id: "compiled-plan-1",
+  editablePlanId: "plan-1",
+  sourceVersion: 2,
+  title: "做汉堡",
+  goal: "完成午餐",
+  assumptions: [],
+  nodes: [
+    {
+      id: "condition-1",
+      localId: "condition_local",
+      type: "condition",
+      title: "是否加芝士",
+      config: {
+        condition: "用户是否要芝士",
+        evaluationBy: "user",
+        branches: [
+          { label: "是", nextNodeId: "task_add_cheese" },
+          { label: "否", nextNodeId: "task_skip_cheese" },
+        ],
+        defaultNextNodeId: "task_skip_cheese",
+      },
+      dependencies: [],
+      dependents: ["task-yes", "task-no"],
+    },
+    {
+      id: "task-yes",
+      localId: "task_add_cheese",
+      type: "task",
+      title: "加芝士",
+      config: { expectedOutput: "加好芝士" },
+      dependencies: ["condition-1"],
+      dependents: [],
+      executor: "user",
+      mode: "manual",
+    },
+  ],
+  edges: [
+    { id: "edge-yes", from: "condition-1", to: "task-yes", label: "是" },
+  ],
+  entryNodeIds: ["condition-1"],
+  terminalNodeIds: ["task-yes"],
+  topologicalOrder: ["condition-1", "task-yes"],
+  completionPolicy: { type: "all_tasks_completed" },
+  validationWarnings: [],
+};
+
+describe("task-plan-view-model", () => {
+  it("preserves condition metadata and edge labels for compiled plans", () => {
+    const graphPlan = compiledPlanToGraphPlan(compiledPlan);
+
+    expect(graphPlan?.steps[0]?.metadata).toMatchObject({
+      condition: "用户是否要芝士",
+      evaluationBy: "user",
+    });
+    expect(graphPlan?.steps[0]?.metadata?.branches).toEqual([
+      { label: "是", nextNodeId: "task_add_cheese" },
+      { label: "否", nextNodeId: "task_skip_cheese" },
+    ]);
+    expect(graphPlan?.edges?.[0]?.label).toBe("是");
+  });
+
+  it("uses effective plan runtime status and active labeled edges from read model", () => {
+    const readModel: TaskPlanReadModel = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      prompt: null,
+      summary: "午餐计划",
+      updatedAt: "2026-05-07T10:00:00.000Z",
+      generatedBy: "ai",
+      blueprint: {
+        title: "做汉堡",
+        goal: "完成午餐",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan,
+      effectivePlan: {
+        planId: "plan-1",
+        basePlanId: "compiled-plan-1",
+        resolvedVersion: 3,
+        nodes: [
+          {
+            id: "condition-1",
+            localId: "condition_local",
+            type: "condition",
+            title: "是否加芝士",
+            config: compiledPlan.nodes[0]!.config,
+            dependencies: [],
+            dependents: ["task-yes"],
+            status: "completed",
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: false,
+            reachable: true,
+            result: {
+              outputSummary: "选择了是",
+              selectedBranch: { label: "是", nextNodeId: "task-yes", source: "user" },
+            },
+          },
+          {
+            id: "task-yes",
+            localId: "task_add_cheese",
+            type: "task",
+            title: "加芝士",
+            config: { expectedOutput: "加好芝士" },
+            dependencies: ["condition-1"],
+            dependents: [],
+            status: "ready",
+            attempts: 0,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: true,
+            reachable: true,
+            executor: "user",
+            mode: "manual",
+          },
+        ],
+        edges: [
+          { id: "edge-yes", from: "condition-1", to: "task-yes", label: "是", active: true },
+          { id: "edge-no", from: "condition-1", to: "task-no", label: "否", active: false },
+        ],
+        entryNodeIds: ["condition-1"],
+        terminalNodeIds: ["task-yes"],
+        readyNodeIds: ["task-yes"],
+        blockedNodeIds: [],
+        completedNodeIds: ["condition-1"],
+        runningNodeIds: [],
+        failedNodeIds: [],
+        pendingNodeIds: [],
+      },
+    };
+
+    const graphPlan = taskPlanReadModelToGraphPlan(readModel);
+
+    expect(graphPlan?.currentStepId).toBe(null);
+    expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.status).toBe("done");
+    expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.status).toBe("pending");
+    expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.readiness).toBe("ready");
+    expect(graphPlan?.edges).toEqual([
+      {
+        id: "edge-yes",
+        fromNodeId: "condition-1",
+        toNodeId: "task-yes",
+        type: "sequential",
+        label: "是",
+      },
+    ]);
+  });
+});

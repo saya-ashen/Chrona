@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
-import type { RuntimeAdapter } from "@chrona/providers-core";
+import type { RuntimeAdapter } from "@chrona/providers-foundation";
 import { Prisma } from "@/generated/prisma/client";
 
 async function markApprovalResolved(input: {

@@ -2,20 +2,19 @@ import {
   buildGatewayBody,
   checkGatewayAvailable as checkGateway,
   gatewayHeaders,
-  normalizeGatewayHttpUrl,
-  type BridgeEnvironment,
-} from "@chrona/openclaw";
+} from "../provider-client";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
-import {
-  ProviderClient,
-  type ProviderConfig,
-  type ProviderFeature,
-  type ProviderResponse,
-  type StreamEvent,
-} from "./ProviderClient";
+import { normalizeGatewayHttpUrl } from "../shared/constants";
+import type { BridgeEnvironment } from "../shared/types";
+import type {
+  OpenClawClientConfig,
+  OpenClawFeature,
+  OpenClawResponse,
+  OpenClawStreamEvent,
+} from "./types";
 
 type GatewayRoute =
-  | { kind: "feature"; feature: ProviderFeature; stream: boolean }
+  | { kind: "feature"; feature: OpenClawFeature; stream: boolean }
   | { kind: "execution"; stream: boolean };
 
 type GatewayRequestInput = {
@@ -40,9 +39,19 @@ function parseToolArguments(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+function extractFunctionCallsFromOutput(
+  output: unknown,
+): Array<Record<string, unknown>> {
+  if (!Array.isArray(output)) return [];
+  return output.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  );
+}
+
 function buildRoute(
   kind: "feature" | "execution",
-  feature: ProviderFeature | undefined,
+  feature: OpenClawFeature | undefined,
   stream: boolean,
 ): GatewayRoute {
   return kind === "feature" && feature
@@ -84,7 +93,7 @@ function normalizeGatewayRequestInput(
 
 async function* parseStreamingGatewayGenerator(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-): AsyncGenerator<StreamEvent> {
+): AsyncGenerator<OpenClawStreamEvent> {
   const decoder = new TextDecoder();
   let buffer = "";
   let currentEventType = "";
@@ -153,16 +162,42 @@ async function* parseStreamingGatewayGenerator(
         }
       }
 
+      if (currentEventType === "response.completed") {
+        const response = parsed.response;
+        if (
+          response &&
+          typeof response === "object" &&
+          !Array.isArray(response)
+        ) {
+          for (const item of extractFunctionCallsFromOutput(
+            (response as Record<string, unknown>).output,
+          )) {
+            if (item.type !== "function_call") continue;
+            yield {
+              type: "tool_call",
+              data: JSON.stringify(item),
+              toolCall: {
+                tool: (item.name as string) ?? "unknown",
+                callId: (item.call_id as string) ?? `${Date.now()}`,
+                input: parseToolArguments(item.arguments),
+                status: "completed" as const,
+              },
+            };
+          }
+        }
+        currentEventType = "";
+        continue;
+      }
+
       currentEventType = "";
     }
   }
 }
 
-export class OpenClawClient extends ProviderClient {
+export class OpenClawClient {
   private env: BridgeEnvironment;
 
-  constructor(config: ProviderConfig) {
-    super(config);
+  constructor(config: OpenClawClientConfig) {
     this.env = {
       gatewayHttpUrl: normalizeGatewayHttpUrl(config.gatewayUrl),
       gatewayToken: config.gatewayToken ?? "",
@@ -176,14 +211,14 @@ export class OpenClawClient extends ProviderClient {
   }
 
   async executeFeature(
-    feature: ProviderFeature,
+    feature: OpenClawFeature,
     input: {
       sessionKey?: string;
       instructions?: string;
       timeout?: number;
       [key: string]: unknown;
     },
-  ): Promise<ProviderResponse> {
+  ): Promise<OpenClawResponse> {
     throw new Error(
       "executeFeature is not supported, use executeFeatureStream instead: " +
         JSON.stringify({ feature, input }),
@@ -191,14 +226,14 @@ export class OpenClawClient extends ProviderClient {
   }
 
   async *executeFeatureStream(
-    feature: ProviderFeature,
+    feature: OpenClawFeature,
     input: {
       sessionKey?: string;
       instructions?: string;
       timeout?: number;
       [key: string]: unknown;
     },
-  ): AsyncGenerator<StreamEvent> {
+  ): AsyncGenerator<OpenClawStreamEvent> {
     const route = buildRoute("feature", feature, true);
     const request = normalizeGatewayRequestInput(input);
     const sessionId = `${request.sessionKey}-${Date.now()}`;
@@ -242,7 +277,7 @@ export class OpenClawClient extends ProviderClient {
     prompt?: string;
     timeout?: number;
     [key: string]: unknown;
-  }): Promise<ProviderResponse> {
+  }): Promise<OpenClawResponse> {
     throw new Error(
       "this method is not supported, use executeFeatureStream instead: " +
         JSON.stringify(input),

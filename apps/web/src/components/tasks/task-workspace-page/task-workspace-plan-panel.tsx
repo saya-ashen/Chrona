@@ -1,36 +1,25 @@
-"use client";
-
 import { useCallback, useState } from "react";
 import { Bot, Check, Clock, Loader2, Network } from "lucide-react";
+import type { CompiledNode, TaskPlanReadModel } from "@chrona/contracts/ai";
+import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   SurfaceCard,
   SurfaceCardDescription,
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-
 import { api } from "@/lib/rpc-client";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
-import { compiledPlanToGraphPlan } from "@/components/task/plan/task-plan-view-model";
-
-import type { CompiledPlan, CompiledNode } from "@chrona/contracts/ai";
-
-type PlanData = {
-  id: string;
-  status: "draft" | "accepted" | "superseded" | "archived";
-  prompt: string | null;
-  revision?: number;
-  summary?: string | null;
-  updatedAt: string;
-  plan?: CompiledPlan;
-} | null;
 
 type Props = {
-  plan: PlanData | null;
+  plan: TaskPlanReadModel | null;
   taskId: string;
-  workspaceId: string;
-  aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
+  aiPlanGenerationStatus?:
+    | "idle"
+    | "generating"
+    | "waiting_acceptance"
+    | "accepted";
   copy: Record<string, string>;
   onPlanAccepted?: () => void;
 };
@@ -62,15 +51,21 @@ function NoPlanCard({ status }: { status?: string }) {
           <>
             <Loader2 className="size-5 animate-spin text-primary" />
             <div>
-              <p className="text-sm font-medium text-foreground">Generating plan...</p>
-              <p className="text-xs text-muted-foreground">This may take up to a minute.</p>
+              <p className="text-sm font-medium text-foreground">
+                Generating plan...
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This may take up to a minute.
+              </p>
             </div>
           </>
         ) : (
           <>
             <Network className="size-5 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium text-foreground">No plan available</p>
+              <p className="text-sm font-medium text-foreground">
+                No plan available
+              </p>
               <p className="text-xs text-muted-foreground">
                 Ask the AI assistant to create an execution plan for this task.
               </p>
@@ -82,31 +77,43 @@ function NoPlanCard({ status }: { status?: string }) {
   );
 }
 
-function PlanMetaCard({ plan }: { plan: NonNullable<PlanData> }) {
-  const totalEst = plan.plan?.nodes.reduce((sum: number, n: CompiledNode) => sum + (n.estimatedMinutes ?? 0), 0) ?? 0;
-  const totalNodes = plan.plan?.nodes.length ?? 0;
+function PlanMetaCard({ plan }: { plan: TaskPlanReadModel }) {
+  const totalEst =
+    plan.compiledPlan.nodes.reduce(
+      (sum: number, node: CompiledNode) => sum + (node.estimatedMinutes ?? 0),
+      0,
+    ) ?? 0;
+  const totalNodes = plan.compiledPlan.nodes.length ?? 0;
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Status</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Status
+        </p>
         <div className="mt-2">
-          <StatusBadge tone={planStatusTone(plan.status)}>{plan.status}</StatusBadge>
+          <StatusBadge tone={planStatusTone(plan.status)}>
+            {plan.status}
+          </StatusBadge>
         </div>
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Revision</p>
-        <p className="mt-2 text-xl font-semibold">r{plan.revision ?? plan.plan?.sourceVersion ?? "-"}</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Revision
+        </p>
+        <p className="mt-2 text-xl font-semibold">r{plan.revision ?? plan.compiledPlan.sourceVersion ?? "-"}</p>
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Progress</p>
-        <p className="mt-2 text-xl font-semibold">
-          {totalNodes}
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Progress
         </p>
+        <p className="mt-2 text-xl font-semibold">{totalNodes}</p>
         <p className="text-xs text-muted-foreground">nodes</p>
       </div>
       <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Estimate</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Estimate
+        </p>
         <p className="mt-2 text-xl font-semibold">{totalEst}m</p>
         <p className="text-xs text-muted-foreground">total estimated</p>
       </div>
@@ -114,7 +121,13 @@ function PlanMetaCard({ plan }: { plan: NonNullable<PlanData> }) {
   );
 }
 
-export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPlanAccepted }: Props) {
+export function TaskWorkspacePlanPanel({
+  plan,
+  aiPlanGenerationStatus,
+  copy,
+  taskId,
+  onPlanAccepted,
+}: Props) {
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
 
@@ -128,12 +141,18 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
         json: { planId: plan.id },
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to accept plan" }));
-        throw new Error((err as { error?: string }).error ?? "Failed to accept plan");
+        const err = await res
+          .json()
+          .catch(() => ({ error: "Failed to accept plan" }));
+        throw new Error(
+          (err as { error?: string }).error ?? "Failed to accept plan",
+        );
       }
       onPlanAccepted?.();
     } catch (cause) {
-      setAcceptError(cause instanceof Error ? cause.message : "Failed to accept plan");
+      setAcceptError(
+        cause instanceof Error ? cause.message : "Failed to accept plan",
+      );
     } finally {
       setIsAccepting(false);
     }
@@ -143,26 +162,29 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
     return <NoPlanCard status={aiPlanGenerationStatus} />;
   }
 
-  const graphPlan = compiledPlanToGraphPlan(plan.plan);
+  const graphPlan = taskPlanReadModelToGraphPlan(plan);
 
   return (
     <SurfaceCard className="space-y-4" padding="lg">
       <SurfaceCardHeader>
         <SurfaceCardTitle>{copy.planPanelTitle ?? "Plan"}</SurfaceCardTitle>
         <SurfaceCardDescription>
-          {copy.planPanelDescription ?? "Task execution plan with nodes, dependencies, and status."}
-          {plan.plan?.goal ? (
+          {copy.planPanelDescription ??
+            "Task execution plan with nodes, dependencies, and status."}
+          {plan.compiledPlan.goal ? (
             <>
-              {" — "}
-              <span className="font-medium text-foreground">{plan.plan.goal}</span>
+              {" - "}
+              <span className="font-medium text-foreground">
+                {plan.compiledPlan.goal}
+              </span>
             </>
           ) : null}
         </SurfaceCardDescription>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {plan.plan?.title ? (
+          {plan.compiledPlan.title ? (
             <span className="inline-flex items-center gap-1">
               <Bot className="size-3" />
-              {plan.plan.title}
+              {plan.compiledPlan.title}
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1">
@@ -198,7 +220,9 @@ export function TaskPlanPanel({ plan, aiPlanGenerationStatus, copy, taskId, onPl
       {graphPlan ? (
         <TaskPlanGraph mode="auto" plan={graphPlan} />
       ) : (
-        <p className="text-sm text-muted-foreground">No plan nodes available.</p>
+        <p className="text-sm text-muted-foreground">
+          No plan nodes available.
+        </p>
       )}
     </SurfaceCard>
   );

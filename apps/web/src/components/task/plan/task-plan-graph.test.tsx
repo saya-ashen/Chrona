@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";

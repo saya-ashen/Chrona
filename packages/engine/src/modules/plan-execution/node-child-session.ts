@@ -3,7 +3,7 @@ import {
   ensureDefaultTaskSession,
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
+import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
 
 type EnsureNodeChildSessionInput = {
   taskId: string;

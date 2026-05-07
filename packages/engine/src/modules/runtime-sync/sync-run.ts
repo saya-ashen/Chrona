@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import {
   createRuntimeAdapter,
   type RuntimeAdapter,
-} from "@chrona/providers-core";
+} from "@chrona/providers-foundation";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";

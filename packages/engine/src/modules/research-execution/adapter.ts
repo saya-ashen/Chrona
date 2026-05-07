@@ -20,7 +20,7 @@ export async function createResearchRuntimeAdapter(
 ): Promise<RuntimeExecutionAdapter> {
   const runtimeAdapter: RuntimeExecutionAdapter =
     baseAdapter ??
-    (await (await import("@chrona/providers-core")).createRuntimeAdapter()) as unknown as RuntimeExecutionAdapter;
+    (await (await import("@chrona/providers-foundation")).createRuntimeAdapter()) as unknown as RuntimeExecutionAdapter;
 
   return {
     ...runtimeAdapter,

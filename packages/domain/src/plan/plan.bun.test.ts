@@ -17,6 +17,7 @@ import { validateEditablePlan } from "./validate";
 import { applyPlanPatch } from "./patch";
 import { compileEditablePlan } from "./compile";
 import { createPlanRun, applyRuntimeCommand } from "./run";
+import { resolveEffectivePlanGraph, nodeResultToResultLayer } from "./effective-graph";
 
 // ─── Helpers ───
 
@@ -673,6 +674,70 @@ describe("compileEditablePlan", () => {
     expect(edges.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("32b. keeps explicit condition branch labels when default shares the same edge", () => {
+    const plan = makePlan(
+      "plan_cond_labels",
+      [
+        makeCondition(
+          "check",
+          [
+            { label: "yes", nextNodeId: "do_yes" },
+            { label: "no", nextNodeId: "do_no" },
+          ],
+          {
+            defaultNextNodeId: "do_no",
+          },
+        ),
+        makeTask("do_yes"),
+        makeTask("do_no"),
+      ],
+      [
+        { from: "check", to: "do_yes" },
+        { from: "check", to: "do_no", label: "wrong" },
+      ],
+    );
+
+    const compiled = compileEditablePlan(plan);
+    const conditionNode = compiled.nodes.find((n) => n.localId === "check")!;
+    const yesNode = compiled.nodes.find((n) => n.localId === "do_yes")!;
+    const noNode = compiled.nodes.find((n) => n.localId === "do_no")!;
+
+    expect(
+      compiled.edges.find(
+        (edge) => edge.from === conditionNode.id && edge.to === yesNode.id,
+      )?.label,
+    ).toBe("yes");
+    expect(
+      compiled.edges.find(
+        (edge) => edge.from === conditionNode.id && edge.to === noNode.id,
+      )?.label,
+    ).toBe("no");
+  });
+
+  it("32c. labels fallback-only condition edges as default", () => {
+    const plan = makePlan(
+      "plan_cond_default_only",
+      [
+        makeCondition("check", [{ label: "yes", nextNodeId: "do_yes" }], {
+          defaultNextNodeId: "do_no",
+        }),
+        makeTask("do_yes"),
+        makeTask("do_no"),
+      ],
+      [{ from: "check", to: "do_yes" }],
+    );
+
+    const compiled = compileEditablePlan(plan);
+    const conditionNode = compiled.nodes.find((n) => n.localId === "check")!;
+    const noNode = compiled.nodes.find((n) => n.localId === "do_no")!;
+
+    expect(
+      compiled.edges.find(
+        (edge) => edge.from === conditionNode.id && edge.to === noNode.id,
+      )?.label,
+    ).toBe("default");
+  });
+
   it("33. stores node config correctly for each type", () => {
     const plan = makePlan(
       "plan_config",
@@ -759,6 +824,71 @@ describe("createPlanRun", () => {
     expect(run.nodeStates[aId].status).toBe("ready");
     expect(run.nodeStates[bId].status).toBe("ready");
     expect(run.nodeStates[cId].status).toBe("pending");
+  });
+});
+
+describe("resolveEffectivePlanGraph condition branches", () => {
+  it("skips non-selected condition branches at runtime", () => {
+    const plan = makePlan(
+      "plan_cond_runtime",
+      [
+        makeCondition("check", [{ label: "yes", nextNodeId: "do_yes" }], {
+          defaultNextNodeId: "do_no",
+        }),
+        makeTask("do_yes"),
+        makeTask("do_no"),
+        makeTask("wrap_up"),
+      ],
+      [
+        { from: "do_yes", to: "wrap_up" },
+        { from: "do_no", to: "wrap_up" },
+      ],
+    );
+
+    const compiled = compileEditablePlan(plan);
+    const conditionNode = compiled.nodes.find((node) => node.localId === "check")!;
+    const yesNode = compiled.nodes.find((node) => node.localId === "do_yes")!;
+    const noNode = compiled.nodes.find((node) => node.localId === "do_no")!;
+    const wrapNode = compiled.nodes.find((node) => node.localId === "wrap_up")!;
+
+    const effective = resolveEffectivePlanGraph(compiled, [
+      {
+        type: "runtime",
+        layerId: "runtime-condition-complete",
+        planId: compiled.editablePlanId,
+        version: 1,
+        active: true,
+        timestamp: new Date().toISOString(),
+        nodeStates: {
+          [conditionNode.id]: { status: "completed" },
+        },
+      },
+      nodeResultToResultLayer(
+        compiled.editablePlanId,
+        conditionNode.id,
+        {
+          selectedBranch: {
+            label: "yes",
+            nextNodeId: yesNode.id,
+            source: "user",
+          },
+        },
+        2,
+      ),
+    ]);
+
+    const resolvedYes = effective.nodes.find((node) => node.id === yesNode.id)!;
+    const resolvedNo = effective.nodes.find((node) => node.id === noNode.id)!;
+    const resolvedWrap = effective.nodes.find((node) => node.id === wrapNode.id)!;
+
+    expect(resolvedYes.ready).toBe(true);
+    expect(resolvedNo.status).toBe("skipped");
+    expect(resolvedNo.reachable).toBe(false);
+    expect(resolvedWrap.ready).toBe(false);
+    expect(resolvedWrap.dependencies).toEqual([yesNode.id]);
+    expect(effective.edges.filter((edge) => edge.from === conditionNode.id && edge.active)).toHaveLength(1);
+    expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === yesNode.id)?.active).toBe(true);
+    expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === noNode.id)?.active).toBe(false);
   });
 });
 

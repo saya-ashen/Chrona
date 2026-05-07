@@ -196,11 +196,22 @@ export function createPlansRoutes() {
                     });
                     break;
                   case "error":
+                    logger.error("request.stream_event_error", {
+                      requestId,
+                      feature: "generate_plan",
+                      taskId,
+                      code: event.code,
+                      message: event.message,
+                      rawText: event.rawText ?? null,
+                      diagnostics: event.diagnostics ?? null,
+                    });
                     await stream.writeSSE({
                       event: "error",
                       data: JSON.stringify({
                         code: event.code,
                         message: event.message,
+                        rawText: event.rawText,
+                        diagnostics: event.diagnostics,
                       }),
                     });
                     return;

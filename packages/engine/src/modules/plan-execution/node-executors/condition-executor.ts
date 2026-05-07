@@ -1,7 +1,56 @@
-import type { EffectivePlanNode } from "@chrona/contracts/ai";
+import type { ConditionConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
-import { decideNodeExecutionSession } from "../session-policy";
-import { executePlanNode } from "../node-executor";
+
+function normalizeBranchToken(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function pickUserBranch(input: string | undefined, config: ConditionConfig) {
+  if (!input) return null;
+
+  const normalizedInput = normalizeBranchToken(input);
+  const direct = config.branches.find((branch) => {
+    const label = normalizeBranchToken(branch.label);
+    const nextNodeId = normalizeBranchToken(branch.nextNodeId);
+    return (
+      normalizedInput === label ||
+      normalizedInput === nextNodeId ||
+      normalizedInput.includes(label)
+    );
+  });
+
+  if (direct) {
+    return {
+      label: direct.label,
+      nextNodeId: direct.nextNodeId,
+      source: "user" as const,
+    };
+  }
+
+  if (
+    config.defaultNextNodeId &&
+    ["default", "fallback", "其他", "默认"].some((token) =>
+      normalizedInput.includes(token),
+    )
+  ) {
+    return {
+      label: "default",
+      nextNodeId: config.defaultNextNodeId,
+      source: "default" as const,
+    };
+  }
+
+  return null;
+}
+
+function buildUserPrompt(node: EffectivePlanNode, config: ConditionConfig) {
+  const branchOptions = config.branches.map((branch) => branch.label).join(" / ");
+  return `请选择条件节点“${node.title}”的分支：${branchOptions}${config.defaultNextNodeId ? " / default" : ""}`;
+}
+
+function toCompiledBranchTarget(input: NodeExecutorInput, nextNodeId: string) {
+  return input.plan.nodes.find((node) => node.localId === nextNodeId)?.id ?? nextNodeId;
+}
 
 export class ConditionNodeExecutor implements NodeExecutor {
   readonly nodeType = "condition" as const;
@@ -11,21 +60,34 @@ export class ConditionNodeExecutor implements NodeExecutor {
   }
 
   async execute(input: NodeExecutorInput): Promise<NodeExecutionResult> {
-    const sessionDecision = decideNodeExecutionSession({
-      node: input.node,
-      plan: input.plan,
-      parentTaskId: input.taskId,
-    });
+    const config = input.node.config as ConditionConfig;
 
-    return executePlanNode({
-      taskId: input.taskId,
-      planId: input.planId,
-      mainSession: input.mainSession,
-      node: input.node,
-      plan: input.plan,
-      sessionDecision,
-      trigger: input.trigger,
-      runtimeName: input.runtimeName,
-    });
+    if (config.evaluationBy === "user") {
+      const selectedBranch = pickUserBranch(input.userInput, config);
+      if (!selectedBranch) {
+        return {
+          status: "waiting_for_user",
+          prompt: buildUserPrompt(input.node, config),
+          reason: `Condition node ${input.node.id} requires an explicit branch selection`,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      }
+
+      return {
+        status: "done",
+        summary: `Condition resolved to branch: ${selectedBranch.label}`,
+        evidence: { sessionId: input.mainSession.id },
+        selectedBranch: {
+          ...selectedBranch,
+          nextNodeId: toCompiledBranchTarget(input, selectedBranch.nextNodeId),
+        },
+      };
+    }
+
+    return {
+      status: "blocked",
+      reason: `Condition node ${input.node.id} uses ${config.evaluationBy} evaluation, but only explicit user branch selection is implemented in runtime.`,
+      evidence: { sessionId: input.mainSession.id },
+    };
   }
 }

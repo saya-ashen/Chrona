@@ -249,6 +249,11 @@ export interface NodeResult {
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
+  selectedBranch?: {
+    label: string;
+    nextNodeId: string;
+    source: "user" | "ai" | "system" | "default";
+  };
 }
 
 export interface ResultLayer {
@@ -301,6 +306,8 @@ export interface EffectivePlanNode {
   dependenciesSatisfied: boolean;
   /** Computed: can be executed now */
   ready: boolean;
+  /** Computed: whether this node is still reachable in the selected branch path */
+  reachable: boolean;
 }
 
 export interface EffectivePlanEdge {
@@ -308,6 +315,7 @@ export interface EffectivePlanEdge {
   from: string;
   to: string;
   label?: string;
+  active: boolean;
 }
 
 export interface EffectivePlanGraph {
@@ -337,7 +345,8 @@ export interface GenerateTaskPlanRequest {
   priority?: string;
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
-  planningPrompt?: string;
+  planningPrompt?: string | null;
+  sessionKey?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -408,6 +417,8 @@ export interface GeneratePlanErrorEvent {
   type: "error";
   code: GeneratePlanErrorCode;
   message: string;
+  rawText?: string;
+  diagnostics?: Record<string, unknown>;
 }
 
 export interface GeneratePlanDoneEvent {

@@ -52,7 +52,7 @@
         "@chrona/db": "workspace:*",
         "@chrona/engine": "workspace:*",
         "@chrona/i18n": "workspace:*",
-        "@chrona/providers-core": "workspace:*",
+        "@chrona/openclaw": "workspace:*",
         "@chrona/shared": "workspace:*",
       },
     },
@@ -112,7 +112,7 @@
         "@chrona/db": "workspace:*",
         "@chrona/domain": "workspace:*",
         "@chrona/openclaw": "workspace:*",
-        "@chrona/providers-core": "workspace:*",
+        "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
         "@chrona/shared": "workspace:*",
       },
@@ -121,12 +121,13 @@
       "name": "@chrona/i18n",
       "version": "0.1.0",
     },
-    "packages/providers/core": {
-      "name": "@chrona/providers-core",
+    "packages/providers/foundation": {
+      "name": "@chrona/providers-foundation",
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/openclaw": "workspace:*",
+        "@chrona/runtime-core": "workspace:*",
       },
     },
     "packages/providers/openclaw": {
@@ -134,7 +135,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
       },
     },
     "packages/runtime-core": {
@@ -146,7 +146,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
-        "@chrona/providers-core": "workspace:*",
+        "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
       },
     },
@@ -199,7 +199,7 @@
 
     "@chrona/openclaw": ["@chrona/openclaw@workspace:packages/providers/openclaw"],
 
-    "@chrona/providers-core": ["@chrona/providers-core@workspace:packages/providers/core"],
+    "@chrona/providers-foundation": ["@chrona/providers-foundation@workspace:packages/providers/foundation"],
 
     "@chrona/runtime-core": ["@chrona/runtime-core@workspace:packages/runtime-core"],
 

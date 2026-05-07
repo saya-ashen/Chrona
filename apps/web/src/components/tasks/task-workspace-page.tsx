@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Ellipsis, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskPlanPanel } from "@/components/task/plan/task-plan-panel";
 import { TaskEditForm } from "@/components/tasks/task-edit-form";
+import { TaskWorkspacePlanPanel } from "@/components/tasks/task-workspace-page/task-workspace-plan-panel";
 import { TaskWorkspaceAssistant } from "@/components/tasks/task-workspace-assistant";
 import { TaskWorkspaceDiffPreview } from "@/components/tasks/task-workspace-diff-preview";
 import { buttonVariants } from "@/components/ui/button";
@@ -530,10 +530,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           ) : null}
         </SurfaceCard>
 
-        <TaskPlanPanel
+        <TaskWorkspacePlanPanel
           plan={plan}
           taskId={task.id}
-          workspaceId={task.workspaceId}
           aiPlanGenerationStatus={planGenerationStatus}
           copy={copy}
           onPlanAccepted={() => { fetchPlan(); }}

@@ -11,6 +11,18 @@ export {
   buildFeatureResultFromResponse,
 } from "./provider-client";
 
+export {
+  OpenClawClient,
+} from "./client/OpenClawClient";
+
+export type {
+  OpenClawClientConfig,
+  OpenClawFeature,
+  OpenClawResponse,
+  OpenClawStreamEvent,
+  OpenClawToolCall,
+} from "./client/types";
+
 export { normalizeGatewayHttpUrl } from "./shared/constants";
 
 export type { BridgeEnvironment } from "./shared/types";
@@ -22,25 +34,3 @@ export type {
   NDJSONEvent,
   ToolCallInfo,
 } from "./transport/bridge-types";
-
-export {
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
-  OPENCLAW_RUNTIME_INPUT_VERSION,
-  getOpenClawTaskConfigSpec,
-  validateOpenClawTaskConfig,
-} from "./config/config";
-
-export {
-  createRuntimeAdapter,
-  type OpenClawAdapter,
-  type OpenClawAdapterConfig,
-} from "./runtime/adapter";
-
-
-
-export type {
-  OpenClawApprovalDecision,
-  OpenClawChatHistory,
-  OpenClawPendingApproval,
-  OpenClawRunSnapshot,
-} from "./protocol/openclaw";

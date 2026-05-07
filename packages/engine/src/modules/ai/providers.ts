@@ -1,5 +1,5 @@
-import { OpenClawClient } from "@chrona/providers-core";
-import type { ProviderFeature, ProviderResponse } from "@chrona/providers-core";
+import { OpenClawClient } from "@chrona/openclaw";
+import type { ProviderFeature, ProviderResponse } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
   AiFeature,

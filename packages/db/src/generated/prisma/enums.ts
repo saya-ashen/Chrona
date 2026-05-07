@@ -151,6 +151,16 @@ export const MemoryStatus = {
 export type MemoryStatus = (typeof MemoryStatus)[keyof typeof MemoryStatus]
 
 
+export const TaskPlanStatus = {
+  Draft: 'Draft',
+  Accepted: 'Accepted',
+  Superseded: 'Superseded',
+  Archived: 'Archived'
+} as const
+
+export type TaskPlanStatus = (typeof TaskPlanStatus)[keyof typeof TaskPlanStatus]
+
+
 export const TaskDependencyType = {
   blocks: 'blocks',
   relates_to: 'relates_to',

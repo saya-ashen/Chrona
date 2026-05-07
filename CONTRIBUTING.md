@@ -100,6 +100,30 @@ Do not cross layers without reason. Prefer moving files and fixing imports over 
 - Command/query/projection handlers in `packages/runtime/src/modules/`
 - API routes validate input, call runtime handlers, return responses — no direct DB access
 
+## Schema-First Contracts
+
+Runtime contracts must be schema-first, not interface-first.
+
+- Define contract shape in Zod inside `packages/contracts`
+- Derive TypeScript types from schemas with `z.infer<...>`
+- Derive provider/tool JSON Schema from the same Zod schema
+- Validate runtime payloads with the same Zod schema that generated the types and tool schema
+
+Do not maintain parallel handwritten versions of the same contract across:
+
+- TypeScript interfaces/types
+- Zod validators
+- AI tool parameter JSON Schema
+
+For AI-facing structured payloads such as plan generation:
+
+- Zod schema is the single source of truth
+- Field descriptions belong on the Zod schema via `.describe(...)`
+- Tool schemas sent to providers must be generated from Zod, not handwritten JSON objects
+- If a node/variant is discriminated by `type`, keep fields strict per variant instead of merging all fields into one broad object
+
+Goal: avoid schema drift, prevent provider payloads from being broader than backend validation, and keep contracts synchronized across compile-time types, runtime validation, and AI tool transport.
+
 ## Testing
 
 ```bash

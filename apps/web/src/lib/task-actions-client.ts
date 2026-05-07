@@ -91,20 +91,23 @@ export function applySchedule(input: {
   dueAt?: Date | null;
   scheduleSource?: "human" | "ai" | "system";
 }) {
-  return api.tasks[":taskId"].schedule.$post({
+  return api.tasks[":taskId"].$patch({
     param: { taskId: input.taskId },
     json: {
-      scheduledStartAt: input.scheduledStartAt?.toISOString() ?? "",
-      scheduledEndAt: input.scheduledEndAt?.toISOString() ?? "",
+      scheduledStartAt: input.scheduledStartAt?.toISOString() ?? null,
+      scheduledEndAt: input.scheduledEndAt?.toISOString() ?? null,
       dueAt: input.dueAt?.toISOString() ?? null,
-      scheduleSource: input.scheduleSource ?? "system",
     },
   }).then((r) => r.json());
 }
 
 export function clearSchedule(input: { taskId: string }) {
-  return api.tasks[":taskId"].schedule.$delete({
+  return api.tasks[":taskId"].$patch({
     param: { taskId: input.taskId },
+    json: {
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+    },
   }).then((r) => r.json());
 }
 

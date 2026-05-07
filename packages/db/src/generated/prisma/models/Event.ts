@@ -661,14 +661,6 @@ export type EventUncheckedUpdateManyWithoutRunNestedInput = {
   deleteMany?: Prisma.EventScalarWhereInput | Prisma.EventScalarWhereInput[]
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type EventCreateWithoutWorkspaceInput = {
   id?: string
   eventType: string

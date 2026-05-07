@@ -6,7 +6,6 @@ export {
   type ProviderToolCall,
   type StreamEvent,
 } from "./ProviderClient";
-export { OpenClawClient } from "./OpenClawClient";
 export {
   createRuntimeAdapter,
   registerRuntimeAdapterFactory,

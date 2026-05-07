@@ -2,7 +2,7 @@ import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-store";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-core";
+import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
 import { detectPlanDrift } from "./replan-detector";
 import { applyPlanPatch } from "./apply-plan-patch";
 import {
@@ -12,8 +12,9 @@ import {
   getLayers,
 } from "./plan-run-store";
 import { getAcceptedCompiledPlan } from "./compiled-plan-store";
-import { resolveEffectivePlanGraph, createPlanRun } from "@chrona/domain";
+import { resolveEffectivePlanGraph, createPlanRun, nodeResultToResultLayer } from "@chrona/domain";
 import type {
+  NodeResult,
   PlanRun,
   CompiledPlan,
   EffectivePlanGraph,
@@ -379,6 +380,19 @@ async function handleNodeResult(params: {
   let layers = [...params.layers];
   const blockMessage = strategy.getMessage(result);
 
+  if (result.status === "done" && result.selectedBranch) {
+    const resultLayer = nodeResultToResultLayer(
+      planId,
+      nextNodeId,
+      {
+        outputSummary: result.summary,
+        selectedBranch: result.selectedBranch,
+      } satisfies NodeResult,
+      layers.length + 1,
+    );
+    layers = await appendLayer({ workspaceId, taskId, planId, layer: resultLayer });
+  }
+
   const extra = strategy.layerStatus === "blocked" && (result.status === "blocked" || result.status === "failed" || result.status === "replan_required")
     ? { lastError: blockMessage }
     : undefined;
@@ -421,6 +435,7 @@ async function advancePlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   maxSteps?: number;
+  userInput?: string;
 }): Promise<PlanExecutionResult> {
   const maxSteps = input.maxSteps ?? DEFAULT_MAX_STEPS;
 
@@ -543,6 +558,7 @@ async function advancePlanExecution(input: {
       plan: effective,
       trigger: input.trigger,
       runtimeName,
+      userInput: input.userInput,
     });
 
     const handled = await handleNodeResult({
@@ -673,5 +689,9 @@ export async function continuePlanExecution(input: {
     }
   }
 
-  return advancePlanExecution({ taskId: input.taskId, trigger: "manual" });
+  return advancePlanExecution({
+    taskId: input.taskId,
+    trigger: "manual",
+    userInput: input.userInput,
+  });
 }

@@ -112,6 +112,13 @@ enum MemoryStatus {
   Expired
 }
 
+enum TaskPlanStatus {
+  Draft
+  Accepted
+  Superseded
+  Archived
+}
+
 enum TaskDependencyType {
   blocks
   relates_to
@@ -136,6 +143,9 @@ model Workspace {
   scheduleProposals ScheduleProposal[]
   workBlocks        WorkBlock[]
   executionSessions ExecutionSession[]
+  taskPlans         TaskPlan[]
+  taskPlanRuns      TaskPlanRun[]
+  taskPlanLayers    TaskPlanLayer[]
 }
 
 model Task {
@@ -177,6 +187,9 @@ model Task {
   assistantMessages   TaskAssistantMessage[]
   workBlocks          WorkBlock[]
   executionSessions   ExecutionSession[]
+  taskPlans           TaskPlan[]
+  taskPlanRuns        TaskPlanRun[]
+  taskPlanLayers      TaskPlanLayer[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -217,6 +230,63 @@ model TaskDependency {
   @@unique([taskId, dependsOnTaskId])
   @@index([workspaceId, taskId])
   @@index([workspaceId, dependsOnTaskId])
+}
+
+model TaskPlan {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  taskId       String
+  planId       String         @unique
+  revision     Int
+  status       TaskPlanStatus
+  prompt       String?
+  summary      String?
+  generatedBy  String?
+  compiledPlan Json
+  editablePlan Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id])
+  task         Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  runs         TaskPlanRun[]
+  layers       TaskPlanLayer[]
+
+  @@index([workspaceId, taskId, updatedAt])
+  @@index([taskId, status, updatedAt])
+}
+
+model TaskPlanRun {
+  id          String    @id @default(cuid())
+  workspaceId String
+  taskId      String
+  planId      String
+  planRun     Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  plan        TaskPlan  @relation(fields: [planId], references: [planId], onDelete: Cascade)
+
+  @@unique([taskId, planId])
+  @@index([workspaceId, taskId, updatedAt])
+}
+
+model TaskPlanLayer {
+  id          String    @id @default(cuid())
+  workspaceId String
+  taskId      String
+  planId      String
+  layerId     String    @unique
+  version     Int
+  layer       Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  plan        TaskPlan  @relation(fields: [planId], references: [planId], onDelete: Cascade)
+
+  @@index([taskId, planId, version])
+  @@index([workspaceId, taskId, createdAt])
 }
 
 model Run {

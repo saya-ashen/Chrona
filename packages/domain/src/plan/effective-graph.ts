@@ -51,7 +51,7 @@ export function resolveEffectivePlanGraph(
   }
   for (const e of basePlan.edges) {
     const key = edgeKey(e.from, e.to);
-    edgeMap.set(key, { id: e.id, from: e.from, to: e.to, label: e.label });
+    edgeMap.set(key, { id: e.id, from: e.from, to: e.to, label: e.label, active: true });
   }
 
   // ── Step 2: apply active structural layers ──
@@ -63,10 +63,7 @@ export function resolveEffectivePlanGraph(
     applyStructuralLayer(nodeMap, edgeMap, layer.operations);
   }
 
-  // ── Step 3: recompute dependencies/dependents from edges ──
-  rebuildDependencies(nodeMap, edgeMap);
-
-  // ── Step 4: apply active runtime layers (latest active wins per node) ──
+  // ── Step 3: apply active runtime layers (latest active wins per node) ──
   const activeRuntime = layers
     .filter((l): l is RuntimeLayer => l.type === "runtime" && l.active)
     .sort((a, b) => a.version - b.version);
@@ -84,7 +81,7 @@ export function resolveEffectivePlanGraph(
     }
   }
 
-  // ── Step 5: apply active result layers (latest active wins per node) ──
+  // ── Step 4: apply active result layers (latest active wins per node) ──
   const activeResult = layers
     .filter((l): l is ResultLayer => l.type === "result" && l.active)
     .sort((a, b) => a.version - b.version);
@@ -98,8 +95,15 @@ export function resolveEffectivePlanGraph(
       if (result.artifactRefs !== undefined) node.result.artifactRefs = result.artifactRefs;
       if (result.checkpointResponse !== undefined) node.result.checkpointResponse = result.checkpointResponse;
       if (result.error !== undefined) node.result.error = result.error;
+      if (result.selectedBranch !== undefined) node.result.selectedBranch = result.selectedBranch;
     }
   }
+
+  // ── Step 5: prune inactive branches, then recompute reachability/dependencies ──
+  applyConditionBranchSelections(nodeMap, edgeMap);
+  const reachableNodeIds = computeReachableNodeIds(basePlan.entryNodeIds, edgeMap);
+  rebuildDependencies(nodeMap, edgeMap, reachableNodeIds);
+  markPrunedNodesSkipped(nodeMap, reachableNodeIds);
 
   // ── Step 6: compute ready/blocked/completed ──
   const entryNodeIds: string[] = [];
@@ -112,11 +116,13 @@ export function resolveEffectivePlanGraph(
   const pendingNodeIds: string[] = [];
 
   for (const [id, node] of nodeMap) {
-    const hasIncomingEdges = [...edgeMap.values()].some((e) => e.to === id);
-    const hasOutgoingEdges = [...edgeMap.values()].some((e) => e.from === id);
+    const hasIncomingEdges = [...edgeMap.values()].some((e) => e.active && e.to === id);
+    const hasOutgoingEdges = [...edgeMap.values()].some((e) => e.active && e.from === id);
 
-    if (!hasIncomingEdges) entryNodeIds.push(id);
-    if (!hasOutgoingEdges) terminalNodeIds.push(id);
+    node.reachable = reachableNodeIds.has(id);
+
+    if (node.reachable && !hasIncomingEdges) entryNodeIds.push(id);
+    if (node.reachable && !hasOutgoingEdges) terminalNodeIds.push(id);
 
     // Compute dependenciesSatisfied + ready
     const allDepsSatisfied = node.dependencies.every((depId: string) => {
@@ -127,10 +133,10 @@ export function resolveEffectivePlanGraph(
     node.dependenciesSatisfied = allDepsSatisfied;
 
     // Ready: status is already "ready", OR (pending + all deps satisfied)
-    if (node.status === "ready") {
+    if (node.reachable && node.status === "ready") {
       node.ready = true;
       readyNodeIds.push(id);
-    } else if (node.status === "pending" && allDepsSatisfied) {
+    } else if (node.reachable && node.status === "pending" && allDepsSatisfied) {
       node.ready = true;
       readyNodeIds.push(id);
     } else {
@@ -203,6 +209,7 @@ function cloneBaseNode(n: CompiledNode): EffectivePlanNode {
     attempts: 0,
     dependenciesSatisfied: false,
     ready: false,
+    reachable: true,
   };
 }
 
@@ -233,6 +240,7 @@ function applyStructuralLayer(
           attempts: 0,
           dependenciesSatisfied: false,
           ready: false,
+          reachable: true,
           metadata: {},
           description: (op as { description?: string }).description,
           priority: (op as { priority?: string }).priority as import("@chrona/contracts/ai").TaskPriority | undefined,
@@ -269,6 +277,7 @@ function applyStructuralLayer(
             from: op.from,
             to: op.to,
             label: op.label,
+            active: true,
           });
         }
         break;
@@ -285,6 +294,7 @@ function applyStructuralLayer(
 function rebuildDependencies(
   nodeMap: Map<string, EffectivePlanNode>,
   edgeMap: Map<string, EffectivePlanEdge>,
+  reachableNodeIds: Set<string>,
 ): void {
   // Clear existing
   for (const node of nodeMap.values()) {
@@ -293,15 +303,72 @@ function rebuildDependencies(
   }
 
   for (const edge of edgeMap.values()) {
+    if (!edge.active) continue;
     const fromNode = nodeMap.get(edge.from);
     const toNode = nodeMap.get(edge.to);
     if (!fromNode || !toNode) continue;
+    if (!reachableNodeIds.has(edge.from) || !reachableNodeIds.has(edge.to)) continue;
 
     if (!fromNode.dependents.includes(edge.to)) {
       fromNode.dependents.push(edge.to);
     }
     if (!toNode.dependencies.includes(edge.from)) {
       toNode.dependencies.push(edge.from);
+    }
+  }
+}
+
+function applyConditionBranchSelections(
+  nodeMap: Map<string, EffectivePlanNode>,
+  edgeMap: Map<string, EffectivePlanEdge>,
+) {
+  for (const node of nodeMap.values()) {
+    if (node.type !== "condition") continue;
+    const selectedNextNodeId = node.result?.selectedBranch?.nextNodeId;
+    if (!selectedNextNodeId) continue;
+
+    for (const edge of edgeMap.values()) {
+      if (edge.from !== node.id) continue;
+      edge.active = edge.to === selectedNextNodeId;
+    }
+  }
+}
+
+function computeReachableNodeIds(
+  entryNodeIds: string[],
+  edgeMap: Map<string, EffectivePlanEdge>,
+) {
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edgeMap.values()) {
+    if (!edge.active) continue;
+    const next = adjacency.get(edge.from) ?? [];
+    next.push(edge.to);
+    adjacency.set(edge.from, next);
+  }
+
+  const reachable = new Set<string>();
+  const queue = [...entryNodeIds];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || reachable.has(current)) continue;
+    reachable.add(current);
+    for (const next of adjacency.get(current) ?? []) {
+      if (!reachable.has(next)) queue.push(next);
+    }
+  }
+
+  return reachable;
+}
+
+function markPrunedNodesSkipped(
+  nodeMap: Map<string, EffectivePlanNode>,
+  reachableNodeIds: Set<string>,
+) {
+  for (const [nodeId, node] of nodeMap) {
+    if (reachableNodeIds.has(nodeId)) continue;
+    if (node.status === "pending" || node.status === "ready") {
+      node.status = "skipped";
+      node.ready = false;
     }
   }
 }

@@ -337,9 +337,9 @@ Current reality:
 
 ## Phase 5 (Done) — Clean Provider Boundary
 
-**Goal:** No `@chrona/openclaw` imports in engine. All provider access through `providers/core`.
+**Goal:** Minimize engine provider coupling. Runtime/provider-shared access goes through `providers/foundation`, while feature-streaming `OpenClawClient` lives in `openclaw`.
 
-**Status:** Done for production code. Engine/shared no longer import `@chrona/openclaw` directly, provider-specific config helpers are re-exported via `@chrona/providers-core`, and engine production paths no longer hardcode `"openclaw"` as the runtime-adapter default.
+**Status:** Historical note. The current layout uses `@chrona/providers-foundation` for runtime/provider-shared helpers and `@chrona/openclaw` for feature-streaming client code.
 
 Delivered in the final cleanup batch:
 - `packages/providers/core/src/adapter-factory.ts` now owns the exported runtime adapter key/default + OpenClaw config helper surface

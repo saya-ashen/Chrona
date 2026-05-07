@@ -1,13 +1,8 @@
 import type { GenerateTaskPlanRequest } from "./ai-plan-runtime";
 import {
-  AI_CHECKPOINT_TYPES,
-  AI_CONDITION_EVALUATORS,
-  AI_PLAN_NODE_TYPES,
-  AI_TASK_EXECUTORS,
-  AI_TASK_MODES,
-  AI_WAIT_TIMEOUT_ACTIONS,
+  planBlueprintSchema,
 } from "./ai-plan-blueprint";
-import { normalizeGeneratePlanResponse } from "@chrona/engine";
+import { z } from "zod";
 
 export type AiFeatureToolSpec = {
   type: "function";
@@ -105,6 +100,7 @@ You are a task planning assistant that generates concise execution blueprints as
 Given a task, produce a structured plan using ONLY these 4 node types: task, checkpoint, condition, wait.
 You MUST call the business tool generate_task_plan_graph.
 Put the final graph directly into that tool input. Assistant free text is optional and non-authoritative.
+Only include fields that belong to the chosen node type. Do NOT copy task-only fields onto checkpoint, condition, or wait nodes.
 
 ## Node types
 
@@ -151,6 +147,14 @@ Pause execution for a time duration or external event.
 10. Maximize parallelism: independent tasks should not be chained sequentially.
 
 Respond in the same language as the input.`.trim();
+
+function toProviderJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  // Provider gateways may validate tool schemas with older/default Ajv setups
+  // that reject draft-2020-12 metaschema declarations.
+  delete jsonSchema.$schema;
+  return jsonSchema;
+}
 
 export const EDIT_PLAN_PATCH_SYSTEM_PROMPT = `
 You are a plan editor. Given an existing plan and a user instruction, propose ONLY a PlanPatch.
@@ -334,151 +338,7 @@ export const generatePlanBlueprintToolSpec: AiFeatureToolSpec = {
   type: "function",
   name: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   description: GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION,
-  parameters: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      title: {
-        type: "string",
-        description: "Brief plan title.",
-      },
-      goal: {
-        type: "string",
-        description: "What this plan is meant to achieve.",
-      },
-      assumptions: {
-        type: "array",
-        items: { type: "string" },
-        description: "Optional assumptions the plan relies on.",
-      },
-      nodes: {
-        type: "array",
-        description:
-          "Execution nodes in dependency order. Provide at least one node.",
-        minItems: 1,
-        items: {
-          type: "object",
-          additionalProperties: true,
-          properties: {
-            id: {
-              type: "string",
-              description: "Stable local id, e.g. node-1.",
-            },
-            type: {
-              type: "string",
-              enum: [...AI_PLAN_NODE_TYPES],
-            },
-            title: {
-              type: "string",
-              description: "Short node label shown to the user.",
-            },
-            expectedOutput: {
-              type: "string",
-              description:
-                "What successful completion of this node should produce.",
-            },
-            completionCriteria: {
-              type: "string",
-              description: "How to determine the node is done.",
-            },
-            estimatedMinutes: {
-              type: "number",
-              description: "Best-effort duration estimate for just this node.",
-            },
-            executor: {
-              type: "string",
-              enum: [...AI_TASK_EXECUTORS],
-              description:
-                "Who must perform the node. Use 'ai' when model-driven software work can complete it, 'system' for deterministic software automation/integrations, and 'user' for approvals, choices, clarifications, payment, pickup, travel, waiting, receiving items, or any in-person/manual action.",
-            },
-            mode: {
-              type: "string",
-              enum: [...AI_TASK_MODES],
-              description:
-                "manual = user performs it, assist = AI helps while user remains active, auto = fully software-executable.",
-            },
-            checkpointType: {
-              type: "string",
-              enum: [...AI_CHECKPOINT_TYPES],
-              description:
-                "Checkpoint subtype for human confirmation, choice, input, edit, or approval.",
-            },
-            prompt: {
-              type: "string",
-              description: "Prompt shown to the user for checkpoint nodes.",
-            },
-            required: {
-              type: "boolean",
-              description: "Whether the checkpoint can be skipped.",
-            },
-            options: {
-              type: "array",
-              items: { type: "string" },
-              description: "Available options for choose-style checkpoints.",
-            },
-            condition: {
-              type: "string",
-              description: "Human-readable branching condition.",
-            },
-            evaluationBy: {
-              type: "string",
-              enum: [...AI_CONDITION_EVALUATORS],
-              description: "Who evaluates the condition branch.",
-            },
-            branches: {
-              type: "array",
-              description: "Branch targets for a condition node.",
-              items: {
-                type: "object",
-                additionalProperties: true,
-                properties: {
-                  label: { type: "string" },
-                  nextNodeId: { type: "string" },
-                },
-                required: ["label", "nextNodeId"],
-              },
-            },
-            defaultNextNodeId: {
-              type: "string",
-              description: "Optional fallback branch target.",
-            },
-            waitFor: {
-              type: "string",
-              description:
-                "What external event or duration this wait node depends on.",
-            },
-            timeout: {
-              type: "object",
-              additionalProperties: true,
-              properties: {
-                minutes: { type: "number" },
-                onTimeout: {
-                  type: "string",
-                  enum: [...AI_WAIT_TIMEOUT_ACTIONS],
-                },
-              },
-              required: ["minutes", "onTimeout"],
-            },
-          },
-          required: ["id", "type", "title"],
-        },
-      },
-      edges: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: true,
-          properties: {
-            from: { type: "string" },
-            to: { type: "string" },
-            label: { type: "string" },
-          },
-          required: ["from", "to"],
-        },
-      },
-    },
-    required: ["title", "goal", "nodes", "edges"],
-  },
+  parameters: toProviderJsonSchema(planBlueprintSchema),
 };
 
 export const editPlanPatchToolSpec: AiFeatureToolSpec = {
@@ -547,6 +407,9 @@ export function buildGeneratePlanFeatureInputText(
   }
   if (typeof input.estimatedMinutes === "number") {
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
+  }
+  if (input.planningPrompt?.trim()) {
+    parts.push("", "Additional planning guidance:", input.planningPrompt.trim());
   }
 
   return parts.join("\n");
@@ -786,17 +649,18 @@ export function validatePreparedFeaturePayload(
     };
   }
 
-  switch (spec.feature) {
+    switch (spec.feature) {
     case "generate_plan": {
-      try {
-        normalizeGeneratePlanResponse(payload);
-        return { ok: true };
-      } catch (error) {
+      const validation = planBlueprintSchema.safeParse(payload);
+      if (!validation.success) {
         return {
           ok: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'generate_plan' returned an invalid plan payload",
         };
       }
+      return { ok: true };
     }
     case "suggest":
       return validateSuggestPayload(payload);

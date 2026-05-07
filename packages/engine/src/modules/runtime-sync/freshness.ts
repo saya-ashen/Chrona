@@ -1,6 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createRuntimeAdapter, DEFAULT_RUNTIME_ADAPTER_KEY, type RuntimeAdapter } from "@chrona/providers-core";
+import { createRuntimeAdapter, DEFAULT_RUNTIME_ADAPTER_KEY, type RuntimeAdapter } from "@chrona/providers-foundation";
 
 import { SYNC_STALE_MS } from "../../constants";
 

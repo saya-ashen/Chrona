@@ -1,16 +1,16 @@
 import {
   createRuntimeAdapter as createOpenClawAdapter,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
   type OpenClawAdapterConfig,
-} from "@chrona/openclaw";
-import type { OpenClawAdapter } from "@chrona/openclaw";
+} from "./openclaw/runtime/adapter";
+import type { OpenClawAdapter } from "./openclaw/runtime/adapter";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY } from "./openclaw/config/config";
 
-export { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
+export { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "./openclaw/config/config";
 export {
   getOpenClawTaskConfigSpec,
   OPENCLAW_RUNTIME_INPUT_VERSION,
   validateOpenClawTaskConfig,
-} from "@chrona/openclaw";
+} from "./openclaw/config/config";
 
 export type RuntimeAdapter = OpenClawAdapter;
 export type RuntimeAdapterConfig = OpenClawAdapterConfig;
@@ -20,7 +20,7 @@ export type {
   OpenClawChatHistory,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
-} from "@chrona/openclaw";
+} from "./openclaw/protocol/openclaw";
 
 export type RuntimeAdapterFactory<A = RuntimeAdapter> = (config?: RuntimeAdapterConfig) => Promise<A>;
 

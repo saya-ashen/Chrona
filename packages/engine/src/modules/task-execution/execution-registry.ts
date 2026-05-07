@@ -4,7 +4,7 @@ import {
   DEFAULT_RUNTIME_ADAPTER_KEY,
   registerRuntimeAdapterFactory,
   type RuntimeAdapterConfig,
-} from "@chrona/providers-core";
+} from "@chrona/providers-foundation";
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 import { db } from "@/lib/db";
 

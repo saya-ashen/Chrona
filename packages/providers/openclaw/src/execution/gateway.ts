@@ -303,7 +303,12 @@ export function buildGatewayBody(
     const requiredTool = resolveRequiredTool(featureSpec);
     if (requiredTool) {
       body.tools = [requiredTool];
-      body.tool_choice = "required";
+      body.tool_choice = {
+        type: "function",
+        function: {
+          name: requiredTool.name,
+        },
+      };
     }
 
     if (previousResponseId) {

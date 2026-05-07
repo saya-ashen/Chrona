@@ -73,6 +73,86 @@ export type OpenClawAdapterConfig = {
   mode?: "live" | "mock";
 };
 
+function createLiveOpenClawAdapter(
+  client: OpenClawRuntimeClient,
+): OpenClawAdapter {
+  const baseAdapter = {
+    createRun(input: {
+      prompt: string;
+      runtimeInput: RuntimeInput;
+      runtimeSessionKey?: string;
+    }) {
+      return client.createRun(input);
+    },
+    sendOperatorMessage(input: {
+      runtimeSessionKey: string;
+      message: string;
+    }) {
+      return client.sendInput(input);
+    },
+    getRunSnapshot(input: {
+      runtimeRunRef: string;
+      runtimeSessionKey?: string;
+      timeoutMs?: number;
+    }) {
+      return client.waitForRun(input);
+    },
+    readHistory(input: { runtimeSessionKey: string }) {
+      return client.readOutputs(input.runtimeSessionKey);
+    },
+    async listApprovals(input: { runtimeSessionKey: string }) {
+      const approvals = await client.listApprovals();
+      return approvals.filter(
+        (approval) => approval.sessionKey === input.runtimeSessionKey,
+      );
+    },
+    async waitForApprovalDecision(approvalId: string) {
+      try {
+        return await client.waitForApprovalDecision(approvalId);
+      } catch {
+        return null;
+      }
+    },
+    async resumeRun(input: {
+      runtimeSessionKey: string;
+      approvalId?: string;
+      decision?: "approve" | "reject";
+      inputText?: string;
+    }) {
+      if (input.approvalId && input.decision) {
+        return client.resolveApproval({
+          approvalId: input.approvalId,
+          decision: input.decision,
+        });
+      }
+      if (input.inputText?.trim()) {
+        return client.sendInput({
+          runtimeSessionKey: input.runtimeSessionKey,
+          message: input.inputText,
+        });
+      }
+      return { accepted: true };
+    },
+  } satisfies Omit<
+    OpenClawAdapter,
+    "executeTask" | "getSessionStatus"
+  >;
+
+  const orchestrator = new OpenClawOrchestrator({
+    adapter: baseAdapter as OpenClawAdapter,
+  });
+
+  return {
+    ...baseAdapter,
+    executeTask(input: OpenClawExecuteTaskInput) {
+      return orchestrator.executeTask(input);
+    },
+    getSessionStatus(runtimeSessionKey: string) {
+      return orchestrator.getSessionStatus(runtimeSessionKey);
+    },
+  };
+}
+
 export async function createRuntimeAdapter(
   config?: OpenClawAdapterConfig,
 ): Promise<OpenClawAdapter> {

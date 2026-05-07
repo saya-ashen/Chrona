@@ -3,6 +3,7 @@
  */
 
 import type { PlanBlueprint } from "./ai-plan-blueprint";
+import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./ai-plan-runtime";
 
 export type AiClientType = "openclaw" | "llm";
 export type AiFeature =
@@ -118,14 +119,7 @@ export interface SmartSuggestResponse extends StructuredResponseMeta {
   requestId: string;
 }
 
-export interface GenerateTaskPlanRequest {
-  taskId: string;
-  title: string;
-  description?: string;
-  estimatedMinutes?: number;
-  planningPrompt?: string;
-  sessionKey?: string;
-}
+export type GenerateTaskPlanRequest = RuntimeGenerateTaskPlanRequest;
 
 export interface GenerateTaskPlanResponse extends StructuredResponseMeta {
   blueprint: PlanBlueprint;
@@ -247,7 +241,10 @@ export interface BlockerSummary {
   reason: string;
 }
 
-import type { TaskDispatchDecision, TaskDispatchPolicy } from "./ai-dispatch-types";
+import type {
+  TaskDispatchDecision,
+  TaskDispatchPolicy,
+} from "./ai-dispatch-types";
 
 export interface ExecutionContextStats {
   messageCount: number;
