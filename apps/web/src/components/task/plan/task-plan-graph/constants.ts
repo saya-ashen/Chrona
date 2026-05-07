@@ -1,8 +1,8 @@
 import type { GraphCopy } from "./types";
 
 export const AUTO_FULL_MODE_MIN_WIDTH = 820;
-export const NODE_WIDTH = 224;
-export const NODE_HEIGHT = 120;
+export const NODE_WIDTH = 216;
+export const NODE_HEIGHT = 92;
 export const LAYOUT_DIRECTION = "TB";
 export const LAYOUT_PADDING = 32;
 export const LAYOUT_NODE_SEP = 34;

@@ -8,7 +8,7 @@ type TaskEditPanelProps = {
   title?: string;
   description?: ReactNode;
   actions?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
 };
 
@@ -39,7 +39,7 @@ export function TaskEditPanel({
             {actions ? <div className="shrink-0">{actions}</div> : null}
           </div>
         </div>
-        <div className="px-1">{children}</div>
+        {children ? <div className="px-1">{children}</div> : null}
       </div>
     </SurfaceCard>
   );

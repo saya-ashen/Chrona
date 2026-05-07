@@ -14,6 +14,30 @@ import {
 import { buildEdgeStyle, getNodeTone, nodeShapeForKind } from "./logic";
 import type { FlowGraphEdge, FlowGraphNode, GraphCopy, TaskPlanGraphPlan } from "./types";
 
+function resolveRuntimeEdgeState(sourceNode: TaskPlanGraphPlan["nodes"][number] | undefined, targetNode: TaskPlanGraphPlan["nodes"][number] | undefined) {
+  if (!sourceNode || !targetNode) {
+    return null;
+  }
+
+  if (targetNode.status === "blocked") {
+    return "blocked" as const;
+  }
+
+  if (targetNode.status === "waiting" && targetNode.intent === "approval") {
+    return "approval" as const;
+  }
+
+  if (targetNode.status === "waiting") {
+    return "input" as const;
+  }
+
+  if (sourceNode.status === "active" || targetNode.status === "active") {
+    return "active" as const;
+  }
+
+  return null;
+}
+
 export function buildFlowLayout(input: {
   plan: TaskPlanGraphPlan;
   selectedNodeId: string | null;
@@ -72,6 +96,7 @@ export function buildFlowLayout(input: {
   const viewportHeight = Math.max(Math.min(contentHeight, input.maxViewportHeight), MIN_VIEWPORT_HEIGHT);
 
   const focusSet = new Set(input.plan.analytics.reachableFromActiveIds);
+  const nodeById = new Map(input.plan.nodes.map((node) => [node.id, node]));
 
   const nodes: FlowGraphNode[] = input.plan.nodes.map((node) => {
     const layoutNode = graph.node(node.id) ?? { x: 0, y: 0, width: NODE_WIDTH, height: NODE_HEIGHT };
@@ -108,25 +133,44 @@ export function buildFlowLayout(input: {
     };
   });
 
-  const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.from,
-    target: edge.to,
-    type: "smoothstep",
-    selectable: false,
-    reconnectable: false,
-    animated: false,
-    pathOptions: { borderRadius: 0, offset: EDGE_OFFSET },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: buildEdgeStyle(edge.kind, edge.emphasis).stroke,
-    },
-    style: {
-      ...buildEdgeStyle(edge.kind, edge.emphasis),
-      opacity: edge.emphasis === "normal" && focusSet.size > 0 && !focusSet.has(edge.from) && !focusSet.has(edge.to) ? 0.35 : 1,
-    },
-    label: edge.label ?? undefined,
-  }));
+  const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => {
+    const baseStyle = buildEdgeStyle(edge.kind, edge.emphasis);
+    const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(edge.from), nodeById.get(edge.to));
+
+    const runtimeStyle = runtimeEdgeState === "active"
+      ? { stroke: "rgba(14, 165, 233, 0.96)", strokeWidth: 3.1, strokeDasharray: undefined }
+      : runtimeEdgeState === "approval"
+        ? { stroke: "rgba(217, 70, 239, 0.92)", strokeWidth: 3, strokeDasharray: "8 4" }
+        : runtimeEdgeState === "input"
+          ? { stroke: "rgba(245, 158, 11, 0.92)", strokeWidth: 3, strokeDasharray: "8 4" }
+          : runtimeEdgeState === "blocked"
+            ? { stroke: "rgba(244, 63, 94, 0.94)", strokeWidth: 3, strokeDasharray: undefined }
+            : null;
+
+    return {
+      id: edge.id,
+      source: edge.from,
+      target: edge.to,
+      type: "smoothstep",
+      selectable: false,
+      reconnectable: false,
+      animated: runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input",
+      pathOptions: { borderRadius: 0, offset: EDGE_OFFSET },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: (runtimeStyle ?? baseStyle).stroke,
+      },
+      style: {
+        ...(runtimeStyle ?? baseStyle),
+        opacity: runtimeStyle || edge.emphasis !== "normal"
+          ? 1
+          : focusSet.size > 0 && !focusSet.has(edge.from) && !focusSet.has(edge.to)
+            ? 0.35
+            : 1,
+      },
+      label: edge.label ?? undefined,
+    };
+  });
 
   return { nodes, edges, contentWidth, contentHeight, viewportHeight };
 }

@@ -70,46 +70,60 @@ This is the role of the existing `Workbench Hub` concept.
 
 ## Target Information Architecture
 
-The unified task page should have two top-level modes for the same task:
+The unified task page should be a single graph-centered page, not a `Plan / Run` split.
 
-1. `Plan`
-2. `Run`
+The plan graph should become the primary execution surface for the task.
 
-These should be modes or tabs inside the task page, not separate routes with different product identities.
+That does not mean every runtime detail must literally live inside the canvas. It means:
 
-### Plan mode
+- the graph is the primary entry point
+- the graph is the primary status map
+- execution starts from the graph
+- runtime intervention is anchored to the selected node / current action in the graph context
 
-Purpose: define and revise the intended work before or between execution attempts.
+### Graph-first, not graph-only
+
+The plan graph should sit at the center of the page and answer:
+
+1. what is supposed to happen next?
+2. what is currently blocked, waiting, running, or done?
+3. where does the user need to act?
+
+But the page should still use adjacent surfaces for heavier interaction:
+
+- node detail panel
+- current action panel
+- output / result panel
+- timeline / event history panel
+- approvals / artifacts / context drawers or tabs
+
+The graph is the command center. It is not the only container.
+
+### Core page regions
+
+Purpose: define, execute, observe, and intervene on one task from one canonical page.
 
 Core regions:
 
 - compact task summary + expandable edit form
-- plan graph as the visual center of the page
+- plan graph as the main visual center
 - AI planning workspace for:
   - generate plan
   - revise plan
   - propose task edits
   - propose plan edits
-- plan acceptance state
-- schedule context relevant to planning
-
-### Run mode
-
-Purpose: monitor execution, review outputs, and handle human-in-the-loop intervention.
-
-Core regions:
-
-- execution status summary
-- latest output / latest result
-- execution timeline / event stream
-- approvals and pending intervention state
-- artifacts produced by the run
-- runtime health / sync state / current node
-- human intervention composer for:
-  - input
-  - approval
-  - retry
-  - review
+- current execution summary tied to graph state
+- node detail / inspector surface for:
+  - next action
+  - available actions
+  - interactive fields
+  - node-level output / notes / rationale
+- graph-adjacent runtime surfaces for:
+  - latest output / latest result
+  - execution timeline / event stream
+  - approvals and pending human input
+  - artifacts
+  - runtime health / sync state / block reason
 - task-level execution actions such as:
   - start
   - retry
@@ -124,15 +138,23 @@ Core regions:
 
 Planning AI and runtime intervention are different interactions, but they should still live under one task page.
 
-They should be separated by mode and wording:
+They should be separated by intent and wording, not by route:
 
-- `Plan` mode: "help me define the work"
-- `Run` mode: "help me complete the work in progress"
+- planning: "help me define or revise the work"
+- execution: "help me complete the current step or unblock the run"
 
-### Keep one dominant visual center per mode
+### Keep one dominant visual center
 
-- In `Plan`, the graph should remain the center.
-- In `Run`, the current execution state and latest output should be the center.
+- the graph should remain the center of the page
+- execution details should attach to graph state, not compete with it as a second page-level center
+
+### Keep node cards lightweight
+
+The graph should surface actionability, but node cards should not become mini applications.
+
+Do not cram large approval forms, retry flows, long outputs, or multi-step intervention UI directly into small node cards.
+
+Use node selection to open richer adjacent surfaces instead.
 
 ### Avoid duplicate task headers and duplicate plan surfaces
 
@@ -140,20 +162,22 @@ The unified page should not repeat the same task context in multiple cards or re
 
 ## Functional Scope Mapping
 
-### Keep in Plan
+### Keep in the primary graph workspace
 
-These concerns belong in `Plan` mode:
+These concerns belong in the main task page flow:
 
 - task title, description, priority, schedule edits
 - runtime adapter selection and task runtime config
 - plan generation
 - plan revision
 - plan acceptance
+- execution start / current state visibility
+- node-level next actions and intervention affordances
 - AI proposal generation for task/plan edits
 
-### Move into Run
+### Keep graph-adjacent, not canvas-embedded
 
-These concerns belong in `Run` mode:
+These concerns should live on the same page, but in side panels, bottom panels, drawers, or tabs rather than directly inside node cards:
 
 - latest run summary
 - latest output
@@ -198,6 +222,18 @@ The current work page contains the execution-side concepts that need to be absor
 
 These are the real capabilities to preserve, not the old page structure itself.
 
+### Existing graph already supports this direction conceptually
+
+The current graph model already contains useful execution-oriented primitives:
+
+- node statuses like `ready`, `active`, `waiting`, `blocked`, `done`
+- node intent types like `approval`, `input`, `decision`, `pause`
+- node-level `nextAction`
+- `availableActions`
+- `interactiveFields`
+
+This means the target direction is not speculative. The data model already points toward a graph-centered execution UX. The missing work is UI wiring and runtime command integration.
+
 ## Recommended Final Layout
 
 ### Shared page frame
@@ -208,33 +244,33 @@ Always visible:
 - compact status badges
 - back navigation
 - overflow actions
-- mode switch: `Plan | Run`
+- compact task summary + expandable editor
 
-### Plan layout
+### Main desktop layout
 
-- left/main:
-  - compact edit summary + expandable edit panel
+- center / left-main:
   - large plan graph panel
+  - selected node detail / current action surface attached to graph context
 - right:
   - AI planning workspace
-
-### Run layout
-
-- left/main:
+  - compact execution summary / next-step summary
+- lower or secondary region:
   - latest output
   - execution timeline
-  - current node / status / block reason
-- right:
-  - intervention composer
-  - approvals
-  - quick actions
-  - artifact summary
+  - approvals / artifacts / context inspection
+
+### Interaction model
+
+- clicking a node reveals the relevant detail and actions
+- starting execution happens from the graph context
+- waiting-for-input / waiting-for-approval states should highlight the responsible node and open the associated action panel
+- runtime outputs should stay easily reachable without replacing the graph as the page center
 
 Alternative on narrower viewports:
 
-- stack sections vertically
-- keep the mode switch persistent at top
-- prioritize latest actionable surface before historical details
+- stack graph first, then current action, then output/history
+- keep the current actionable surface directly under the graph
+- move historical details below the current action region
 
 ## Non-Goals
 
@@ -264,36 +300,37 @@ Success criteria:
 
 - users do not need per-task workbench for planning or task understanding
 
-### Phase 2: add Run mode to the task page
+### Phase 2: make the graph execution-aware
 
-Goal: bring execution visibility into the canonical task page.
+Goal: turn the graph from a planning view into the primary execution map.
 
 Tasks:
 
-1. add `Plan / Run` mode switch to task page
-2. surface latest output
-3. surface execution timeline / workstream history
-4. surface runtime health and current execution state
-5. surface approvals / pending input / blocked reasons
+1. map runtime execution state onto graph and node UI
+2. highlight current node, blocked node, waiting node, and next-action node
+3. expose node-level next actions and interactive fields through inspector / side panel UI
+4. surface approvals / pending input / blocked reasons from graph context
 
 Success criteria:
 
-- users can monitor task execution without leaving the task page
+- users can understand execution state by looking at the graph first
 
 ### Phase 3: embed intervention and execution actions
 
-Goal: make task page executable, not just observable.
+Goal: make the graph-centered task page executable, not just observable.
 
 Tasks:
 
-1. add intervention composer for runtime-stage human input
-2. add approval / reject / edit-and-approve flows
-3. add retry / accept result / reopen / mark done flows
-4. add follow-up task creation where still useful
+1. add execution start from the graph context
+2. add intervention composer for runtime-stage human input tied to selected/current node
+3. add approval / reject / edit-and-approve flows
+4. add retry / accept result / reopen / mark done flows
+5. add follow-up task creation where still useful
+6. surface latest output and execution timeline as graph-adjacent panels
 
 Success criteria:
 
-- users can handle live execution and human-in-the-loop actions from the task page
+- users can handle live execution and human-in-the-loop actions without leaving the graph-centered task page
 
 ### Phase 4: simplify routing and terminology
 
@@ -305,8 +342,8 @@ Tasks:
 2. remove per-task workbench wording from primary navigation
 3. collapse duplicated routes once unified task page fully covers execution needs
 4. update docs and product copy to reflect:
-   - one task page
-   - one work queue page
+    - one task page
+    - one work queue page
 
 Success criteria:
 
@@ -319,9 +356,9 @@ Success criteria:
 
 Mitigation:
 
-- keep `Plan` and `Run` as separate modes
-- avoid showing all surfaces at once
-- preserve strong hierarchy inside each mode
+- keep the graph as the dominant center
+- use progressive disclosure for node detail, output, history, and artifacts
+- avoid showing every execution surface at once
 
 ### Risk: planning chat and runtime input feel conflated
 
@@ -329,6 +366,14 @@ Mitigation:
 
 - use separate components and labels for planning vs intervention
 - do not reuse the same wording for proposal chat and live run input
+
+### Risk: graph becomes overloaded and unusable
+
+Mitigation:
+
+- keep node cards lightweight
+- move heavy forms and long outputs into adjacent panels
+- treat the graph as the map and launcher, not the container for every detail
 
 ### Risk: implementation copies old workbench instead of simplifying
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import {
   compiledPlanToGraphPlan,
@@ -34,6 +34,9 @@ interface TaskPlanGenerationPanelProps {
   unsavedConfigDraft?: TaskConfigFormDraft | null;
   onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
   showGraph?: boolean;
+  requestGenerationKey?: number;
+  showEmptyGenerateButton?: boolean;
+  emptyStateDescription?: string;
 }
 
 const DEFAULT_DECOMP_COPY = {
@@ -67,6 +70,9 @@ export function TaskPlanGenerationPanel({
   unsavedConfigDraft = null,
   onSaveConfigBeforeRegenerate,
   showGraph = true,
+  requestGenerationKey,
+  showEmptyGenerateButton = true,
+  emptyStateDescription,
 }: TaskPlanGenerationPanelProps) {
   const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] =
     useState(false);
@@ -116,19 +122,27 @@ export function TaskPlanGenerationPanel({
       activeReadModel.id === activeAcceptedPlanId,
   );
 
-  const requestFreshPlan = (_draft?: TaskConfigFormDraft | null) => {
+  const requestFreshPlan = useCallback((_draft?: TaskConfigFormDraft | null) => {
     setHasRequestedStop(false);
     requestGeneration(true);
-  };
+  }, [requestGeneration]);
 
-  const handleRegenerate = () => {
+  const handleRegenerate = useCallback(() => {
     if (hasUnsavedConfigChanges) {
       setShowSaveBeforeRegenerate(true);
       return;
     }
 
     requestFreshPlan();
-  };
+  }, [hasUnsavedConfigChanges, requestFreshPlan]);
+
+  useEffect(() => {
+    if (!requestGenerationKey) {
+      return;
+    }
+
+    handleRegenerate();
+  }, [handleRegenerate, requestGenerationKey]);
 
   const handleSaveAndRegenerate = async () => {
     setIsSavingBeforeRegenerate(true);
@@ -212,7 +226,11 @@ export function TaskPlanGenerationPanel({
     return (
       <div className="space-y-3">
         {saveBeforeRegenerateDialog}
-        <TaskPlanEmptyState onGenerate={handleRegenerate} />
+        <TaskPlanEmptyState
+          onGenerate={handleRegenerate}
+          showGenerateButton={showEmptyGenerateButton}
+          description={emptyStateDescription}
+        />
       </div>
     );
   }
