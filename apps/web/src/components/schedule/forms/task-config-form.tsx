@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
@@ -18,6 +18,8 @@ export type TaskConfigFormDraft = {
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
   dueAt: Date | null;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
 };
 
 export type TaskConfigFormInput = TaskConfigFormDraft & {
@@ -48,6 +50,9 @@ type TaskConfigFormState = {
   description: string;
   priority: TaskConfigFormInput["priority"];
   dueAt: string;
+  scheduledDate: string;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
   runtimeAdapterKey: string;
   runtimeInputVersion: string;
   fieldRuntimeInput: RuntimeInput;
@@ -68,6 +73,8 @@ type TaskConfigFormProps = {
     description?: string | null;
     priority?: "Low" | "Medium" | "High" | "Urgent";
     dueAt?: Date | null;
+    scheduledStartAt?: Date | null;
+    scheduledEndAt?: Date | null;
     runtimeAdapterKey?: string | null;
     runtimeInput?: unknown;
     runtimeInputVersion?: string | null;
@@ -79,6 +86,7 @@ type TaskConfigFormProps = {
   pendingLabel: string;
   isPending?: boolean;
   presets?: TaskConfigPreset[];
+  footerActions?: ReactNode;
   onDraftStateChange?: (state: TaskConfigDraftState) => void;
   onSubmitAction: (input: TaskConfigFormInput) => Promise<void> | void;
 };
@@ -89,13 +97,18 @@ const DEFAULT_COPY = {
   title: "Title",
   titlePlaceholder: "Add the next task to execute",
   priority: "Priority",
+  schedule: "Schedule",
+  scheduleHint: "Adjust when this block should run.",
+  scheduleDate: "Date",
+  scheduleStart: "Start",
+  scheduleEnd: "End",
+  scheduleDuration: "Duration",
   priorities: {
     Low: "Low",
     Medium: "Medium",
     High: "High",
     Urgent: "Urgent",
   },
-  dueDate: "Due date",
   adapter: "Adapter",
   advancedFields: "Advanced fields",
   description: "Description",
@@ -104,12 +117,55 @@ const DEFAULT_COPY = {
   runtimeParamsPlaceholder: '{"customFlag": true}',
   errorInvalidJson: "Runtime params must be valid JSON",
   errorJsonObject: "Runtime params must be a JSON object",
+  errorIncompleteSchedule: "Set date, start, and end time together",
+  errorInvalidScheduleRange: "End time must be after start time",
   actionFailed: "Action failed",
 } as const;
 
 function formatDateTimeInput(value?: Date | null) {
   return value ? value.toISOString().slice(0, 16) : "";
 }
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatLocalDateInput(value?: Date | null) {
+  if (!value) return "";
+  return `${value.getFullYear()}-${padDatePart(value.getMonth() + 1)}-${padDatePart(value.getDate())}`;
+}
+
+function formatLocalTimeInput(value?: Date | null) {
+  if (!value) return "";
+  return `${padDatePart(value.getHours())}:${padDatePart(value.getMinutes())}`;
+}
+
+function buildDateTimeFromLocalParts(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) return null;
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hours, minutes] = timeValue.split(":").map(Number);
+  if ([year, month, day, hours, minutes].some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+function formatDurationLabel(startAt: Date | null, endAt: Date | null) {
+  if (!startAt || !endAt) return null;
+  const durationMinutes = Math.round((endAt.getTime() - startAt.getTime()) / 60000);
+  if (durationMinutes <= 0) return null;
+  if (durationMinutes % 60 === 0) return `${durationMinutes / 60}h`;
+  if (durationMinutes > 60) return `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`;
+  return `${durationMinutes}m`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, index) => {
+  const totalMinutes = index * 15;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${padDatePart(hours)}:${padDatePart(minutes)}`;
+});
 
 function isRuntimeInputObject(value: unknown): value is RuntimeInput {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -294,6 +350,9 @@ function toFormState(
     description: initialValues?.description ?? "",
     priority: initialValues?.priority ?? "Medium",
     dueAt: formatDateTimeInput(initialValues?.dueAt),
+    scheduledDate: formatLocalDateInput(initialValues?.scheduledStartAt),
+    scheduledStartTime: formatLocalTimeInput(initialValues?.scheduledStartAt),
+    scheduledEndTime: formatLocalTimeInput(initialValues?.scheduledEndAt),
     ...runtimeState,
   };
 }
@@ -344,11 +403,32 @@ function buildTaskConfigFormInput(
       ? (runtimeInput.sessionStrategy as "shared" | "per_subtask")
       : undefined;
 
+  const hasPartialSchedule =
+    !!formState.scheduledDate || !!formState.scheduledStartTime || !!formState.scheduledEndTime;
+  const scheduledStartAt = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledStartTime);
+  const scheduledEndAt = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledEndTime);
+
+  if (hasPartialSchedule && (!scheduledStartAt || !scheduledEndAt)) {
+    if (options?.throwOnInvalidJson) {
+      throw new Error(DEFAULT_COPY.errorIncompleteSchedule);
+    }
+    return null;
+  }
+
+  if (scheduledStartAt && scheduledEndAt && scheduledEndAt <= scheduledStartAt) {
+    if (options?.throwOnInvalidJson) {
+      throw new Error(DEFAULT_COPY.errorInvalidScheduleRange);
+    }
+    return null;
+  }
+
   return {
     title: formState.title,
     description: formState.description,
     priority: formState.priority,
     dueAt: formState.dueAt ? new Date(formState.dueAt) : null,
+    scheduledStartAt,
+    scheduledEndAt,
     runtimeAdapterKey: runtimeAdapter.key,
     runtimeInputVersion: runtimeAdapter.spec.version,
     runtimeInput,
@@ -408,6 +488,12 @@ function applyPresetValues(
 
   if ("dueAt" in values) {
     next.dueAt = formatDateTimeInput(values.dueAt ?? null);
+  }
+
+  if ("scheduledStartAt" in values || "scheduledEndAt" in values) {
+    next.scheduledDate = formatLocalDateInput(values.scheduledStartAt ?? null);
+    next.scheduledStartTime = formatLocalTimeInput(values.scheduledStartAt ?? null);
+    next.scheduledEndTime = formatLocalTimeInput(values.scheduledEndAt ?? null);
   }
 
   if (
@@ -492,6 +578,7 @@ export function TaskConfigForm({
   pendingLabel,
   isPending = false,
   presets,
+  footerActions,
   onDraftStateChange,
   onSubmitAction,
 }: TaskConfigFormProps) {
@@ -510,6 +597,8 @@ export function TaskConfigForm({
   const initialDescription = initialValues?.description;
   const initialPriority = initialValues?.priority;
   const initialDueAt = initialValues?.dueAt;
+  const initialScheduledStartAt = initialValues?.scheduledStartAt;
+  const initialScheduledEndAt = initialValues?.scheduledEndAt;
   const initialRuntimeAdapterKey = initialValues?.runtimeAdapterKey;
   const initialRuntimeInput = initialValues?.runtimeInput;
   const initialRuntimeInputVersion = initialValues?.runtimeInputVersion;
@@ -524,6 +613,8 @@ export function TaskConfigForm({
           description: initialDescription,
           priority: initialPriority,
           dueAt: initialDueAt,
+          scheduledStartAt: initialScheduledStartAt,
+          scheduledEndAt: initialScheduledEndAt,
           runtimeAdapterKey: initialRuntimeAdapterKey,
           runtimeInput: initialRuntimeInput,
           runtimeInputVersion: initialRuntimeInputVersion,
@@ -541,6 +632,8 @@ export function TaskConfigForm({
       initialDescription,
       initialPriority,
       initialDueAt,
+      initialScheduledStartAt,
+      initialScheduledEndAt,
       initialRuntimeAdapterKey,
       initialRuntimeInput,
       initialRuntimeInputVersion,
@@ -594,6 +687,9 @@ export function TaskConfigForm({
   const visibleAdvancedFields = selectedRuntimeAdapter.spec.fields.filter(
     (field) => field.advanced && isFieldVisible(field, visibleRuntimeInput),
   );
+  const scheduledStartAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledStartTime);
+  const scheduledEndAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledEndTime);
+  const scheduleDurationLabel = formatDurationLabel(scheduledStartAtPreview, scheduledEndAtPreview);
   const requiredRuntimeFields = visibleStandardFields.filter((field) =>
     selectedRuntimeAdapter.spec.runnability.requiredPaths.includes(field.path),
   );
@@ -675,50 +771,100 @@ export function TaskConfigForm({
         </Field>
 
         {!compact ? (
-          <>
-            <Field label={copy.description} className="text-xs text-muted-foreground">
-              <textarea
-                name="description"
-                rows={3}
-                value={formState.description}
-                onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
-                placeholder={copy.descriptionPlaceholder}
-                className={textareaClassName}
-              />
-            </Field>
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
+            <div className="space-y-3">
+              <Field label={copy.description} className="text-xs text-muted-foreground">
+                <textarea
+                  name="description"
+                  rows={5}
+                  value={formState.description}
+                  onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                  placeholder={copy.descriptionPlaceholder}
+                  className={textareaClassName}
+                />
+              </Field>
+            </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-3">
               <Field label={copy.priority} className="text-xs text-muted-foreground">
                 <select
                   name="priority"
                   value={formState.priority}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    priority: event.target.value as TaskConfigFormInput["priority"],
-                  }))
-                }
-                className={selectClassName}
-              >
-                {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
-                  <option key={priority} value={priority}>
-                    {copy.priorities[priority]}
-                  </option>
-                ))}
-              </select>
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      priority: event.target.value as TaskConfigFormInput["priority"],
+                    }))
+                  }
+                  className={selectClassName}
+                >
+                  {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
+                    <option key={priority} value={priority}>
+                      {copy.priorities[priority]}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
-              <Field label={copy.dueDate} className="text-xs text-muted-foreground">
-                <input
-                  name="dueAt"
-                  type="datetime-local"
-                  value={formState.dueAt}
-                  onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
-                  className={inputClassName}
-                />
-              </Field>
+              <div className="rounded-[1.2rem] border border-border/60 bg-muted/25 p-3 shadow-sm">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{copy.schedule}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{copy.scheduleHint}</p>
+                  </div>
+                  {scheduleDurationLabel ? (
+                    <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
+                      {scheduleDurationLabel}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Field label={copy.scheduleDate} className="text-xs text-muted-foreground">
+                    <input
+                      name="scheduledDate"
+                      type="date"
+                      value={formState.scheduledDate}
+                      onChange={(event) => setFormState((current) => ({ ...current, scheduledDate: event.target.value }))}
+                      className={inputClassName}
+                    />
+                  </Field>
+
+                  <Field label={copy.scheduleStart} className="text-xs text-muted-foreground">
+                    <select
+                      name="scheduledStartTime"
+                      value={formState.scheduledStartTime}
+                      onChange={(event) => setFormState((current) => ({ ...current, scheduledStartTime: event.target.value }))}
+                      className={selectClassName}
+                    >
+                      <option value="">--</option>
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label={copy.scheduleEnd} className="text-xs text-muted-foreground">
+                    <select
+                      name="scheduledEndTime"
+                      value={formState.scheduledEndTime}
+                      onChange={(event) => setFormState((current) => ({ ...current, scheduledEndTime: event.target.value }))}
+                      className={selectClassName}
+                    >
+                      <option value="">--</option>
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
             </div>
-          </>
+          </div>
         ) : null}
 
 
@@ -846,16 +992,6 @@ export function TaskConfigForm({
                       </option>
                     ))}
                   </select>
-                </Field>
-
-                <Field label={copy.dueDate} className="text-xs text-muted-foreground">
-                  <input
-                    name="dueAt"
-                    type="datetime-local"
-                    value={formState.dueAt}
-                    onChange={(event) => setFormState((current) => ({ ...current, dueAt: event.target.value }))}
-                    className={inputClassName}
-                  />
                 </Field>
 
                 {runtimeAdapters.length > 1 ? (
@@ -1031,7 +1167,8 @@ export function TaskConfigForm({
           </div>
         </details>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-2">{footerActions}</div>
           <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "default" })}>
             {isPending ? pendingLabel : submitLabel}
           </button>

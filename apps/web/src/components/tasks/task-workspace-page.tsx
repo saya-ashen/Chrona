@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Ellipsis, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Clock, Ellipsis, Loader2, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskEditForm } from "@/components/tasks/task-edit-form";
-import { TaskWorkspacePlanPanel } from "@/components/tasks/task-workspace-page/task-workspace-plan-panel";
-import { TaskWorkspaceAssistant } from "@/components/tasks/task-workspace-assistant";
+import {
+  TaskConfigForm,
+  type TaskConfigDraftState,
+  type TaskConfigFormInput,
+  type TaskConfigRuntimeAdapter,
+} from "@/components/schedule/task-config-form";
+import { TaskEditPanel } from "@/components/task/panels/task-edit-panel";
+import { TaskPlanGraphPanel } from "@/components/task/panels/task-plan-graph-panel";
+import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
+import { TaskAiWorkspacePanel } from "@/components/tasks/task-ai-workspace-panel";
 import { TaskWorkspaceDiffPreview } from "@/components/tasks/task-workspace-diff-preview";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -22,6 +29,9 @@ type TaskData = {
   workspaceId: string;
   title: string;
   description: string | null;
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig: unknown;
@@ -56,6 +66,8 @@ type TaskData = {
 };
 
 type TaskPageData = {
+  defaultRuntimeAdapterKey: string;
+  runtimeAdapters: TaskConfigRuntimeAdapter[];
   task: TaskData;
   latestRunSummary: {
     id: string;
@@ -123,6 +135,9 @@ type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
+  runtimeAdapterKey: string | null;
+  runtimeInput: unknown;
+  runtimeInputVersion: string | null;
   runtimeModel: string | null;
   prompt: string | null;
   runtimeConfig: unknown;
@@ -137,9 +152,62 @@ function taskToEditable(task: TaskData): EditableTask {
     scheduledStartAt: task.scheduledStartAt,
     scheduledEndAt: task.scheduledEndAt,
     scheduleStatus: task.scheduleStatus,
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    runtimeInput: task.runtimeInput,
+    runtimeInputVersion: task.runtimeInputVersion,
     runtimeModel: task.runtimeModel,
     prompt: task.prompt,
     runtimeConfig: task.runtimeConfig,
+  };
+}
+
+function toIsoStringOrNull(value: Date | null) {
+  return value ? value.toISOString() : null;
+}
+
+function taskToTaskConfigInitialValues(task: TaskData) {
+  return {
+    title: task.title,
+    description: task.description,
+    priority: task.priority as TaskConfigFormInput["priority"],
+    dueAt: task.dueAt ? new Date(task.dueAt) : null,
+    scheduledStartAt: task.scheduledStartAt ? new Date(task.scheduledStartAt) : null,
+    scheduledEndAt: task.scheduledEndAt ? new Date(task.scheduledEndAt) : null,
+    runtimeAdapterKey: task.runtimeAdapterKey,
+    runtimeInput: task.runtimeInput,
+    runtimeInputVersion: task.runtimeInputVersion,
+    runtimeModel: task.runtimeModel,
+    prompt: task.prompt,
+    runtimeConfig: task.runtimeConfig,
+  };
+}
+
+function taskConfigInputToEditableTask(input: TaskConfigFormInput, scheduleStatus: string): EditableTask {
+  return {
+    title: input.title,
+    description: input.description || null,
+    priority: input.priority,
+    dueAt: toIsoStringOrNull(input.dueAt),
+    scheduledStartAt: toIsoStringOrNull(input.scheduledStartAt),
+    scheduledEndAt: toIsoStringOrNull(input.scheduledEndAt),
+    scheduleStatus,
+    runtimeAdapterKey: input.runtimeAdapterKey,
+    runtimeInput: input.runtimeInput,
+    runtimeInputVersion: input.runtimeInputVersion,
+    runtimeModel: input.runtimeModel,
+    prompt: input.prompt,
+    runtimeConfig: input.runtimeConfig ?? null,
+  };
+}
+
+function editableTaskToPlanDraft(task: EditableTask) {
+  return {
+    title: task.title,
+    description: task.description ?? "",
+    priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
+    dueAt: task.dueAt ? new Date(task.dueAt) : null,
+    scheduledStartAt: task.scheduledStartAt ? new Date(task.scheduledStartAt) : null,
+    scheduledEndAt: task.scheduledEndAt ? new Date(task.scheduledEndAt) : null,
   };
 }
 
@@ -157,11 +225,56 @@ function statusTone(status: string) {
   return "neutral" as const;
 }
 
+function formatPlanUpdatedAt(iso: string) {
+  return iso.replace("T", " ").slice(0, 16);
+}
+
+function formatTaskDate(iso: string | null) {
+  if (!iso) return null;
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return null;
+  return `${value.getMonth() + 1}/${value.getDate()}`;
+}
+
+function formatTaskTime(iso: string | null) {
+  if (!iso) return null;
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return null;
+  return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+}
+
+function buildEditSummary(task: EditableTask) {
+  const scheduleDate = formatTaskDate(task.scheduledStartAt);
+  const startTime = formatTaskTime(task.scheduledStartAt);
+  const endTime = formatTaskTime(task.scheduledEndAt);
+  const schedule = scheduleDate && startTime && endTime ? `${scheduleDate} ${startTime}-${endTime}` : "Unscheduled";
+  const model = task.runtimeModel?.trim() || task.runtimeAdapterKey?.trim() || "Default runtime";
+  const description = task.description?.trim()
+    ? task.description.trim().length > 140
+      ? `${task.description.trim().slice(0, 137)}...`
+      : task.description.trim()
+    : "No description";
+
+  return {
+    schedule,
+    model,
+    description,
+  };
+}
+
+function planStatusTone(status: string) {
+  if (status === "accepted") return "success" as const;
+  if (status === "draft") return "warning" as const;
+  if (status === "superseded") return "neutral" as const;
+  return "neutral" as const;
+}
+
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
 
   const [task, setTask] = useState<TaskData>(data.task);
-  const [editing, setEditing] = useState<EditableTask>(taskToEditable(data.task));
+  const [taskConfigDraft, setTaskConfigDraft] = useState<TaskConfigFormInput | null>(null);
+  const [hasUnsavedConfigChanges, setHasUnsavedConfigChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -178,6 +291,13 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const [plan, setPlan] = useState(data.task.savedPlan ?? null);
   const [_isRefetchingPlan, setIsRefetchingPlan] = useState(false);
   const [planGenerationStatus, setPlanGenerationStatus] = useState(data.task.aiPlanGenerationStatus ?? "idle");
+  const [graphViewportHeight, setGraphViewportHeight] = useState(820);
+  const leftColumnRef = useRef<HTMLDivElement | null>(null);
+  const topSectionRef = useRef<HTMLDivElement | null>(null);
+  const editFormRef = useRef<HTMLDivElement | null>(null);
+  const [isEditExpanded, setIsEditExpanded] = useState(
+    () => !( ["Ready", "Completed", "Done"].includes(data.task.status) || data.task.aiPlanGenerationStatus === "accepted"),
+  );
 
   const fetchPlan = useCallback(async () => {
     setIsRefetchingPlan(true);
@@ -211,27 +331,31 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     return () => clearInterval(interval);
   }, [planGenerationStatus, fetchPlan]);
 
-  const handleFieldChange = useCallback((field: string, value: string | null) => {
-    setEditing((prev) => ({ ...prev, [field]: value }));
+  const handleTaskConfigDraftStateChange = useCallback((state: TaskConfigDraftState) => {
+    setTaskConfigDraft(state.values);
+    setHasUnsavedConfigChanges(state.isDirty);
     setSaveSuccess(false);
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const persistTaskConfig = useCallback(async (input: TaskConfigFormInput) => {
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
 
     try {
       const body: Record<string, unknown> = {
-        title: editing.title,
-        description: editing.description,
-        priority: editing.priority,
-        dueAt: editing.dueAt ?? undefined,
-        scheduledStartAt: editing.scheduledStartAt ?? undefined,
-        scheduledEndAt: editing.scheduledEndAt ?? undefined,
-        runtimeModel: editing.runtimeModel ?? undefined,
-        prompt: editing.prompt ?? undefined,
-        runtimeConfig: editing.runtimeConfig ?? undefined,
+        title: input.title,
+        description: input.description || undefined,
+        priority: input.priority,
+        dueAt: input.dueAt?.toISOString() ?? undefined,
+        scheduledStartAt: input.scheduledStartAt?.toISOString() ?? undefined,
+        scheduledEndAt: input.scheduledEndAt?.toISOString() ?? undefined,
+        runtimeAdapterKey: input.runtimeAdapterKey,
+        runtimeInput: input.runtimeInput,
+        runtimeInputVersion: input.runtimeInputVersion,
+        runtimeModel: input.runtimeModel ?? undefined,
+        prompt: input.prompt ?? undefined,
+        runtimeConfig: input.runtimeConfig ?? undefined,
       };
 
       const response = await api.tasks[":taskId"].$patch({
@@ -247,24 +371,37 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       await response.json();
       setTask((prev) => ({
         ...prev,
-        title: editing.title,
-        description: editing.description,
-        priority: editing.priority,
-        dueAt: editing.dueAt,
-        scheduledStartAt: editing.scheduledStartAt,
-        scheduledEndAt: editing.scheduledEndAt,
-        scheduleStatus: editing.scheduleStatus,
-        runtimeModel: editing.runtimeModel,
-        prompt: editing.prompt,
-        runtimeConfig: editing.runtimeConfig,
+        title: input.title,
+        description: input.description || null,
+        priority: input.priority,
+        dueAt: toIsoStringOrNull(input.dueAt),
+        scheduledStartAt: toIsoStringOrNull(input.scheduledStartAt),
+        scheduledEndAt: toIsoStringOrNull(input.scheduledEndAt),
+        scheduleStatus: prev.scheduleStatus,
+        runtimeAdapterKey: input.runtimeAdapterKey,
+        runtimeInput: input.runtimeInput,
+        runtimeInputVersion: input.runtimeInputVersion,
+        runtimeModel: input.runtimeModel,
+        prompt: input.prompt,
+        runtimeConfig: input.runtimeConfig ?? null,
       }));
+      setTaskConfigDraft(input);
+      setHasUnsavedConfigChanges(false);
       setSaveSuccess(true);
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : "Failed to save task");
     } finally {
       setIsSaving(false);
     }
-  }, [editing, task.id]);
+  }, [task.id]);
+
+  const handleSaveCurrentDraft = useCallback(async () => {
+    if (!taskConfigDraft) {
+      return;
+    }
+
+    await persistTaskConfig(taskConfigDraft);
+  }, [persistTaskConfig, taskConfigDraft]);
 
   const handleApplyProposal = useCallback(async (proposal: TaskWorkspaceUpdateProposal) => {
     setIsApplying(true);
@@ -305,7 +442,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           if (patch.prompt !== undefined) patchedFields.prompt = patch.prompt;
           if (patch.runtimeConfig !== undefined) patchedFields.runtimeConfig = patch.runtimeConfig;
           setTask((prev) => ({ ...prev, ...patchedFields }));
-          setEditing((prev) => ({ ...prev, ...patchedFields }));
         }
       } catch (cause) {
         errors.push(`Task update error: ${cause instanceof Error ? cause.message : "Unknown"}`);
@@ -362,20 +498,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     }
   }, [task.id]);
 
-  const assistantBuildCurrentTask = useCallback(() => ({
-    title: task.title,
-    description: task.description,
-    priority: task.priority,
-    dueAt: task.dueAt,
-    scheduledStartAt: task.scheduledStartAt,
-    scheduledEndAt: task.scheduledEndAt,
-    scheduleStatus: task.scheduleStatus,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
-    status: task.status,
-  }), [task]);
-
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;
     const p = plan.compiledPlan;
@@ -411,6 +533,73 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const graphPlan = taskPlanReadModelToGraphPlan(plan);
+  const canAcceptPlan = Boolean(plan?.id && planGenerationStatus === "waiting_acceptance");
+  const [isAcceptingPlan, setIsAcceptingPlan] = useState(false);
+  const [acceptPlanError, setAcceptPlanError] = useState<string | null>(null);
+  const taskConfigInitialValues = useMemo(() => taskToTaskConfigInitialValues(task), [
+    task.title,
+    task.description,
+    task.priority,
+    task.dueAt,
+    task.scheduledStartAt,
+    task.scheduledEndAt,
+    task.runtimeAdapterKey,
+    task.runtimeInput,
+    task.runtimeInputVersion,
+    task.runtimeModel,
+    task.prompt,
+    task.runtimeConfig,
+  ]);
+  const originalEditableTask = taskToEditable(task);
+  const draftEditableTask = taskConfigDraft
+    ? taskConfigInputToEditableTask(taskConfigDraft, task.scheduleStatus)
+    : originalEditableTask;
+  const editSummary = buildEditSummary(draftEditableTask);
+  const planningTaskDraft = taskConfigDraft
+    ? {
+        title: taskConfigDraft.title,
+        description: taskConfigDraft.description,
+        priority: taskConfigDraft.priority,
+        dueAt: taskConfigDraft.dueAt,
+        scheduledStartAt: taskConfigDraft.scheduledStartAt,
+        scheduledEndAt: taskConfigDraft.scheduledEndAt,
+      }
+    : editableTaskToPlanDraft(originalEditableTask);
+  const assistantBuildCurrentTask = useCallback(() => ({
+    title: draftEditableTask.title,
+    description: draftEditableTask.description,
+    priority: draftEditableTask.priority,
+    dueAt: draftEditableTask.dueAt,
+    scheduledStartAt: draftEditableTask.scheduledStartAt,
+    scheduledEndAt: draftEditableTask.scheduledEndAt,
+    scheduleStatus: draftEditableTask.scheduleStatus,
+    runtimeModel: draftEditableTask.runtimeModel,
+    prompt: draftEditableTask.prompt,
+    runtimeConfig: draftEditableTask.runtimeConfig,
+    status: task.status,
+  }), [draftEditableTask, task.status]);
+
+  const handleAcceptPlan = useCallback(async () => {
+    if (!plan?.id) return;
+    setIsAcceptingPlan(true);
+    setAcceptPlanError(null);
+    try {
+      const res = await api.tasks[":taskId"].plan.accept.$post({
+        param: { taskId: task.id },
+        json: { planId: plan.id },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to accept plan" }));
+        throw new Error((err as { error?: string }).error ?? "Failed to accept plan");
+      }
+      await fetchPlan();
+    } catch (cause) {
+      setAcceptPlanError(cause instanceof Error ? cause.message : "Failed to accept plan");
+    } finally {
+      setIsAcceptingPlan(false);
+    }
+  }, [fetchPlan, plan?.id, task.id]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -424,16 +613,48 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     }
   }, [showMoreMenu]);
 
+  useEffect(() => {
+    const leftColumn = leftColumnRef.current;
+    const topSection = topSectionRef.current;
+    if (!leftColumn || !topSection || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const measure = () => {
+      const leftHeight = leftColumn.getBoundingClientRect().height;
+      const topHeight = topSection.getBoundingClientRect().height;
+      if (leftHeight <= 0 || topHeight <= 0) {
+        return;
+      }
+
+      const remainingHeight = leftHeight - topHeight - 16;
+      const nextViewportHeight = Math.max(420, Math.min(820, Math.floor(remainingHeight - 72)));
+      setGraphViewportHeight((current) => (Math.abs(current - nextViewportHeight) < 2 ? current : nextViewportHeight));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(leftColumn);
+    observer.observe(topSection);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [currentProposal, graphPlan, showDeleteConfirm]);
+
   return (
-    <div className="h-full overflow-y-auto space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
-      <div className="space-y-6">
-        <SurfaceCard className="space-y-6" padding="lg">
-          <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-6">
-            <div className="max-w-3xl space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-balance">
+    <div className="h-full min-h-0 space-y-4 overflow-visible rounded-[1.75rem] border border-border/40 bg-[linear-gradient(180deg,hsl(var(--muted)/0.18),transparent_20%),hsl(var(--background))] p-3 xl:grid xl:overflow-hidden xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-4">
+      <div ref={leftColumnRef} className="space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-4">
+        <div ref={topSectionRef} className="xl:shrink-0">
+          <SurfaceCard className="space-y-4 rounded-[1.45rem] border-border/50 bg-background/55 shadow-none backdrop-blur-[2px]" variant="inset" padding="lg">
+          <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-4">
+            <div className="max-w-3xl space-y-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-balance xl:text-[1.65rem]">
                 {task.title}
               </h1>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge>
                 <StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge>
                 {task.runnabilityState && (
@@ -444,16 +665,16 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <LocalizedLink
                 href="/schedule"
-                className={buttonVariants({ variant: "outline", className: "rounded-xl" })}
+                className={buttonVariants({ variant: "outline", className: "h-9 rounded-xl px-3" })}
               >
                 {copy.backToSchedule}
               </LocalizedLink>
               <LocalizedLink
                 href={`/workspaces/${task.workspaceId}/work/${task.id}`}
-                className={buttonVariants({ variant: "default", className: "rounded-xl" })}
+                className={buttonVariants({ variant: "default", className: "h-9 rounded-xl px-3" })}
               >
                 {copy.openWorkbench}
               </LocalizedLink>
@@ -461,7 +682,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className={buttonVariants({ variant: "ghost", className: "rounded-xl size-9" })}
+                  className={buttonVariants({ variant: "ghost", className: "size-9 rounded-xl" })}
                 >
                   <Ellipsis className="size-4" />
                 </button>
@@ -483,40 +704,91 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             </div>
           </SurfaceCardHeader>
 
-          {showDeleteConfirm && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-medium text-red-800">Are you sure you want to delete this task?</p>
-              <p className="mt-1 text-xs text-red-600">This action cannot be undone. All runs, plans, and data will be permanently removed.</p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={buttonVariants({ variant: "destructive", size: "sm" })}
-                >
-                  {isDeleting ? "Deleting..." : "Confirm Delete"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Cancel
-                </button>
+          {showDeleteConfirm ? (
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <p className="font-medium">Delete &ldquo;{task.title}&rdquo;?</p>
+                  <p className="text-xs text-destructive/80">This cannot be undone.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    className={buttonVariants({ variant: "destructive", size: "sm" })}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting..." : "Confirm delete"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className={buttonVariants({ variant: "ghost", size: "sm" })}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-          )}
+          ) : null}
 
-          <TaskEditForm
-            task={editing}
-            originalTask={taskToEditable(task)}
-            onChange={handleFieldChange}
-            onSave={handleSave}
-            isSaving={isSaving}
-            saveError={saveError}
-            saveSuccess={saveSuccess}
-            copy={copy}
-          />
+          <TaskEditPanel
+            title="Edit task"
+            description={(
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{editSummary.description}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={priorityTone(draftEditableTask.priority)}>{draftEditableTask.priority}</StatusBadge>
+                  <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground">
+                    {editSummary.schedule}
+                  </span>
+                  <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground">
+                    {editSummary.model}
+                  </span>
+                  {hasUnsavedConfigChanges ? <StatusBadge tone="warning">Unsaved</StatusBadge> : null}
+                </div>
+              </div>
+            )}
+            actions={(
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditExpanded((current) => {
+                    const next = !current;
+                    if (!current) {
+                      requestAnimationFrame(() => {
+                        editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      });
+                    }
+                    return next;
+                  });
+                }}
+                className={buttonVariants({ variant: "ghost", size: "sm", className: "rounded-xl" })}
+              >
+                {isEditExpanded ? "Collapse" : "Edit"}
+                <ChevronDown className={`size-4 transition-transform ${isEditExpanded ? "rotate-180" : "rotate-0"}`} />
+              </button>
+            )}
+          >
+            <div ref={editFormRef} className={isEditExpanded ? "block" : "hidden"}>
+              <TaskConfigForm
+                runtimeAdapters={data.runtimeAdapters}
+                defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                isPending={isSaving}
+                initialValues={taskConfigInitialValues}
+                submitLabel="Save changes"
+                pendingLabel="Saving..."
+                onDraftStateChange={handleTaskConfigDraftStateChange}
+                onSubmitAction={persistTaskConfig}
+              />
+              {saveSuccess ? (
+                <p className="mt-2 text-xs text-emerald-600">Saved successfully</p>
+              ) : null}
+              {saveError ? (
+                <p className="mt-2 text-xs text-red-600">{saveError}</p>
+              ) : null}
+            </div>
+          </TaskEditPanel>
 
           {currentProposal ? (
             <TaskWorkspaceDiffPreview
@@ -528,32 +800,92 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
               applyError={saveError}
             />
           ) : null}
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
 
-        <TaskWorkspacePlanPanel
-          plan={plan}
-          taskId={task.id}
-          aiPlanGenerationStatus={planGenerationStatus}
-          copy={copy}
-          onPlanAccepted={() => { fetchPlan(); }}
-        />
+        {graphPlan && plan ? (
+          <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+            <TaskPlanGraphPanel
+              label={copy.planPanelTitle ?? "Plan"}
+              plan={graphPlan}
+              maxViewportHeight={graphViewportHeight}
+              className="min-w-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col"
+              description={(
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {graphPlan.nodes.length} steps · {graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min
+                  </span>
+                  <StatusBadge tone={planStatusTone(plan.status)}>{plan.status}</StatusBadge>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="size-3" />
+                    Updated: {formatPlanUpdatedAt(plan.updatedAt)}
+                  </span>
+                </div>
+              )}
+              actions={canAcceptPlan ? (
+                <button
+                  type="button"
+                  disabled={isAcceptingPlan}
+                  onClick={() => void handleAcceptPlan()}
+                  className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
+                >
+                  {isAcceptingPlan ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                  {isAcceptingPlan ? "Accepting..." : "Accept Plan"}
+                </button>
+              ) : null}
+            />
+            {acceptPlanError ? (
+              <p className="text-xs text-red-600">{acceptPlanError}</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto">
-        <TaskWorkspaceAssistant
+      <aside className="space-y-4 xl:min-h-0 xl:self-start">
+        <TaskAiWorkspacePanel
           taskId={task.id}
+          planningTaskDraft={planningTaskDraft}
+          savedPlan={plan}
+          generationStatus={planGenerationStatus}
+          acceptedPlanId={plan?.status === "accepted" ? plan.id : null}
+          hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+          unsavedConfigDraft={planningTaskDraft}
+          onPlanLoaded={(savedPlan) => {
+            setPlan(savedPlan);
+          }}
+          onApplyPlan={async (result) => {
+            if (!result.id) return;
+            setIsAcceptingPlan(true);
+            setAcceptPlanError(null);
+            try {
+              const res = await api.tasks[":taskId"].plan.accept.$post({
+                param: { taskId: task.id },
+                json: { planId: result.id },
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: "Failed to accept plan" }));
+                throw new Error((err as { error?: string }).error ?? "Failed to accept plan");
+              }
+              await fetchPlan();
+            } catch (cause) {
+              setAcceptPlanError(cause instanceof Error ? cause.message : "Failed to accept plan");
+            } finally {
+              setIsAcceptingPlan(false);
+            }
+          }}
+           onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
           buildCurrentTask={assistantBuildCurrentTask}
           buildCurrentPlan={assistantBuildCurrentPlan}
           onProposal={(proposal) => {
-            setCurrentProposal({
-              proposal,
-              originalTask: editing,
-            });
+              setCurrentProposal({
+                proposal,
+                originalTask: draftEditableTask,
+              });
           }}
-          onApply={async (proposal) => {
+          onApplyProposal={async (proposal) => {
               await handleApplyProposal(proposal);
             }}
-          onDismiss={() => {
+          onDismissProposal={() => {
             setCurrentProposal(null);
           }}
           isApplying={isApplying}

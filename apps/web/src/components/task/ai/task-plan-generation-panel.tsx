@@ -33,6 +33,7 @@ interface TaskPlanGenerationPanelProps {
   hasUnsavedConfigChanges?: boolean;
   unsavedConfigDraft?: TaskConfigFormDraft | null;
   onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
+  showGraph?: boolean;
 }
 
 const DEFAULT_DECOMP_COPY = {
@@ -65,6 +66,7 @@ export function TaskPlanGenerationPanel({
   hasUnsavedConfigChanges = false,
   unsavedConfigDraft = null,
   onSaveConfigBeforeRegenerate,
+  showGraph = true,
 }: TaskPlanGenerationPanelProps) {
   const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] =
     useState(false);
@@ -225,6 +227,7 @@ export function TaskPlanGenerationPanel({
         isAppliedPlan={isAppliedPlan}
         onRegenerate={handleRegenerate}
         onApply={onApply}
+        showGraph={showGraph}
       />
     </div>
   );

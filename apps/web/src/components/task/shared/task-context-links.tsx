@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, PanelRightOpen } from "lucide-react";
+import { BriefcaseBusiness, ExternalLink } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export function TaskContextLinks({
         href={`/workspaces/${workspaceId}/work/${taskId}`}
         className={buttonVariants({ variant: "secondary", size })}
       >
-        <PanelRightOpen className="size-3.5" />
+        <BriefcaseBusiness className="size-3.5" />
         {workLabel ?? (latestRunStatus ? t("common.openWorkbench") : t("common.startWork"))}
       </LocalizedLink>
     </div>

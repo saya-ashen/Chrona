@@ -453,6 +453,8 @@ export async function handleTaskConfigSaveAction({
       description: input.description || null,
       priority: input.priority,
       dueAt: input.dueAt,
+      scheduledStartAt: input.scheduledStartAt,
+      scheduledEndAt: input.scheduledEndAt,
       runtimeAdapterKey: input.runtimeAdapterKey,
       runtimeInput: input.runtimeInput,
       runtimeInputVersion: input.runtimeInputVersion,

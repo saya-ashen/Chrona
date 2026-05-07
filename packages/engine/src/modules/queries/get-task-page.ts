@@ -3,6 +3,7 @@ import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
+import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task-execution/registry";
 
 type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -85,6 +86,12 @@ export async function getTaskPage(taskId: string) {
   });
 
   return {
+    defaultRuntimeAdapterKey: task.workspace.defaultRuntime,
+    runtimeAdapters: listRuntimeAdapterKeys().map((key) => ({
+      key,
+      label: key,
+      spec: getRuntimeTaskConfigSpec(key),
+    })),
     task: {
       id: task.id,
       workspaceId: task.workspaceId,

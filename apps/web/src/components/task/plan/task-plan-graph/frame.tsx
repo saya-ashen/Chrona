@@ -44,8 +44,8 @@ export function TaskPlanGraphFrame({
       data-renderer="react-flow"
       data-testid={testId}
     >
-      <div className="relative">
-        <div className="w-full overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
+      <div className="relative min-w-0">
+        <div className="w-full min-w-0 overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
           <div className="min-w-full" data-testid="task-plan-graph-canvas" style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px` }}>
             <ReactFlow
               nodes={nodes}
