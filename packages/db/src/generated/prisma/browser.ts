@@ -38,6 +38,21 @@ export type TaskSession = Prisma.TaskSessionModel
  */
 export type TaskDependency = Prisma.TaskDependencyModel
 /**
+ * Model TaskPlan
+ * 
+ */
+export type TaskPlan = Prisma.TaskPlanModel
+/**
+ * Model TaskPlanRun
+ * 
+ */
+export type TaskPlanRun = Prisma.TaskPlanRunModel
+/**
+ * Model TaskPlanLayer
+ * 
+ */
+export type TaskPlanLayer = Prisma.TaskPlanLayerModel
+/**
  * Model Run
  * 
  */

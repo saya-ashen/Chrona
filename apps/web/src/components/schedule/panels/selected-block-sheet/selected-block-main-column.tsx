@@ -12,7 +12,7 @@ import {
   type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
 import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
-import { compiledPlanToGraphPlan } from "@/components/task/plan/task-plan-view-model";
+import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
@@ -39,7 +39,7 @@ export function SelectedBlockMainColumn({
   onTaskConfigDraftStateChange: (state: TaskConfigDraftState) => void;
   onSaveTaskConfig: (input: TaskConfigFormInput) => Promise<void>;
 }) {
-  const acceptedGraphPlan = compiledPlanToGraphPlan(acceptedPlan?.compiledPlan ?? null);
+  const acceptedGraphPlan = taskPlanReadModelToGraphPlan(acceptedPlan);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (

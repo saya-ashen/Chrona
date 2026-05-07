@@ -50,10 +50,6 @@ export type TaskMinAggregateOutputType = {
   sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  scheduledStartAt: Date | null
-  scheduledEndAt: Date | null
-  scheduleStatus: $Enums.ScheduleStatus | null
-  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   defaultSessionId: string | null
   latestRunId: string | null
@@ -78,10 +74,6 @@ export type TaskMaxAggregateOutputType = {
   sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  scheduledStartAt: Date | null
-  scheduledEndAt: Date | null
-  scheduleStatus: $Enums.ScheduleStatus | null
-  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   defaultSessionId: string | null
   latestRunId: string | null
@@ -108,10 +100,6 @@ export type TaskCountAggregateOutputType = {
   sourceSessionId: number
   parentTaskId: number
   dueAt: number
-  scheduledStartAt: number
-  scheduledEndAt: number
-  scheduleStatus: number
-  scheduleSource: number
   budgetLimit: number
   blockReason: number
   defaultSessionId: number
@@ -147,10 +135,6 @@ export type TaskMinAggregateInputType = {
   sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  scheduledStartAt?: true
-  scheduledEndAt?: true
-  scheduleStatus?: true
-  scheduleSource?: true
   budgetLimit?: true
   defaultSessionId?: true
   latestRunId?: true
@@ -175,10 +159,6 @@ export type TaskMaxAggregateInputType = {
   sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  scheduledStartAt?: true
-  scheduledEndAt?: true
-  scheduleStatus?: true
-  scheduleSource?: true
   budgetLimit?: true
   defaultSessionId?: true
   latestRunId?: true
@@ -205,10 +185,6 @@ export type TaskCountAggregateInputType = {
   sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  scheduledStartAt?: true
-  scheduledEndAt?: true
-  scheduleStatus?: true
-  scheduleSource?: true
   budgetLimit?: true
   blockReason?: true
   defaultSessionId?: true
@@ -323,10 +299,6 @@ export type TaskGroupByOutputType = {
   sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  scheduledStartAt: Date | null
-  scheduledEndAt: Date | null
-  scheduleStatus: $Enums.ScheduleStatus
-  scheduleSource: $Enums.ScheduleSource | null
   budgetLimit: number | null
   blockReason: runtime.JsonValue | null
   defaultSessionId: string | null
@@ -377,10 +349,6 @@ export type TaskWhereInput = {
   sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -402,6 +370,9 @@ export type TaskWhereInput = {
   assistantMessages?: Prisma.TaskAssistantMessageListRelationFilter
   workBlocks?: Prisma.WorkBlockListRelationFilter
   executionSessions?: Prisma.ExecutionSessionListRelationFilter
+  taskPlans?: Prisma.TaskPlanListRelationFilter
+  taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
+  taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
 }
 
 export type TaskOrderByWithRelationInput = {
@@ -422,10 +393,6 @@ export type TaskOrderByWithRelationInput = {
   sourceSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduleStatus?: Prisma.SortOrder
-  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
   budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -447,6 +414,9 @@ export type TaskOrderByWithRelationInput = {
   assistantMessages?: Prisma.TaskAssistantMessageOrderByRelationAggregateInput
   workBlocks?: Prisma.WorkBlockOrderByRelationAggregateInput
   executionSessions?: Prisma.ExecutionSessionOrderByRelationAggregateInput
+  taskPlans?: Prisma.TaskPlanOrderByRelationAggregateInput
+  taskPlanRuns?: Prisma.TaskPlanRunOrderByRelationAggregateInput
+  taskPlanLayers?: Prisma.TaskPlanLayerOrderByRelationAggregateInput
 }
 
 export type TaskWhereUniqueInput = Prisma.AtLeast<{
@@ -470,10 +440,6 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -495,6 +461,9 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   assistantMessages?: Prisma.TaskAssistantMessageListRelationFilter
   workBlocks?: Prisma.WorkBlockListRelationFilter
   executionSessions?: Prisma.ExecutionSessionListRelationFilter
+  taskPlans?: Prisma.TaskPlanListRelationFilter
+  taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
+  taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
 }, "id">
 
 export type TaskOrderByWithAggregationInput = {
@@ -515,10 +484,6 @@ export type TaskOrderByWithAggregationInput = {
   sourceSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  scheduleStatus?: Prisma.SortOrder
-  scheduleSource?: Prisma.SortOrderInput | Prisma.SortOrder
   budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -554,10 +519,6 @@ export type TaskScalarWhereWithAggregatesInput = {
   sourceSessionId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
-  scheduledStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
-  scheduledEndAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusWithAggregatesFilter<"Task"> | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.EnumScheduleSourceNullableWithAggregatesFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableWithAggregatesFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
   defaultSessionId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
@@ -584,10 +545,6 @@ export type TaskCreateInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -609,6 +566,9 @@ export type TaskCreateInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateInput = {
@@ -629,10 +589,6 @@ export type TaskUncheckedCreateInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -653,6 +609,9 @@ export type TaskUncheckedCreateInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUpdateInput = {
@@ -672,10 +631,6 @@ export type TaskUpdateInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -697,6 +652,9 @@ export type TaskUpdateInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateInput = {
@@ -717,10 +675,6 @@ export type TaskUncheckedUpdateInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -741,6 +695,9 @@ export type TaskUncheckedUpdateInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyInput = {
@@ -761,10 +718,6 @@ export type TaskCreateManyInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -791,10 +744,6 @@ export type TaskUpdateManyMutationInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -822,10 +771,6 @@ export type TaskUncheckedUpdateManyInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -863,10 +808,6 @@ export type TaskCountOrderByAggregateInput = {
   sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  scheduledStartAt?: Prisma.SortOrder
-  scheduledEndAt?: Prisma.SortOrder
-  scheduleStatus?: Prisma.SortOrder
-  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   blockReason?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
@@ -896,10 +837,6 @@ export type TaskMaxOrderByAggregateInput = {
   sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  scheduledStartAt?: Prisma.SortOrder
-  scheduledEndAt?: Prisma.SortOrder
-  scheduleStatus?: Prisma.SortOrder
-  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
@@ -924,10 +861,6 @@ export type TaskMinOrderByAggregateInput = {
   sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  scheduledStartAt?: Prisma.SortOrder
-  scheduledEndAt?: Prisma.SortOrder
-  scheduleStatus?: Prisma.SortOrder
-  scheduleSource?: Prisma.SortOrder
   budgetLimit?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
@@ -1008,14 +941,6 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
 
-export type EnumScheduleStatusFieldUpdateOperationsInput = {
-  set?: $Enums.ScheduleStatus
-}
-
-export type NullableEnumScheduleSourceFieldUpdateOperationsInput = {
-  set?: $Enums.ScheduleSource | null
-}
-
 export type NullableIntFieldUpdateOperationsInput = {
   set?: number | null
   increment?: number
@@ -1064,6 +989,48 @@ export type TaskUpdateOneRequiredWithoutDependentTasksNestedInput = {
   upsert?: Prisma.TaskUpsertWithoutDependentTasksInput
   connect?: Prisma.TaskWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutDependentTasksInput, Prisma.TaskUpdateWithoutDependentTasksInput>, Prisma.TaskUncheckedUpdateWithoutDependentTasksInput>
+}
+
+export type TaskCreateNestedOneWithoutTaskPlansInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlansInput, Prisma.TaskUncheckedCreateWithoutTaskPlansInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlansInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutTaskPlansNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlansInput, Prisma.TaskUncheckedCreateWithoutTaskPlansInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlansInput
+  upsert?: Prisma.TaskUpsertWithoutTaskPlansInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTaskPlansInput, Prisma.TaskUpdateWithoutTaskPlansInput>, Prisma.TaskUncheckedUpdateWithoutTaskPlansInput>
+}
+
+export type TaskCreateNestedOneWithoutTaskPlanRunsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanRunsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanRunsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutTaskPlanRunsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanRunsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanRunsInput
+  upsert?: Prisma.TaskUpsertWithoutTaskPlanRunsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTaskPlanRunsInput, Prisma.TaskUpdateWithoutTaskPlanRunsInput>, Prisma.TaskUncheckedUpdateWithoutTaskPlanRunsInput>
+}
+
+export type TaskCreateNestedOneWithoutTaskPlanLayersInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedCreateWithoutTaskPlanLayersInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanLayersInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutTaskPlanLayersNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedCreateWithoutTaskPlanLayersInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanLayersInput
+  upsert?: Prisma.TaskUpsertWithoutTaskPlanLayersInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTaskPlanLayersInput, Prisma.TaskUpdateWithoutTaskPlanLayersInput>, Prisma.TaskUncheckedUpdateWithoutTaskPlanLayersInput>
 }
 
 export type TaskCreateNestedOneWithoutRunsInput = {
@@ -1225,10 +1192,6 @@ export type TaskCreateWithoutWorkspaceInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1249,6 +1212,9 @@ export type TaskCreateWithoutWorkspaceInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkspaceInput = {
@@ -1268,10 +1234,6 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1292,6 +1254,9 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkspaceInput = {
@@ -1340,10 +1305,6 @@ export type TaskScalarWhereInput = {
   sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduledEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFilter<"Task"> | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.EnumScheduleSourceNullableFilter<"Task"> | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -1370,10 +1331,6 @@ export type TaskCreateWithoutSessionsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1394,6 +1351,9 @@ export type TaskCreateWithoutSessionsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutSessionsInput = {
@@ -1414,10 +1374,6 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1437,6 +1393,9 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutSessionsInput = {
@@ -1472,10 +1431,6 @@ export type TaskUpdateWithoutSessionsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1496,6 +1451,9 @@ export type TaskUpdateWithoutSessionsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutSessionsInput = {
@@ -1516,10 +1474,6 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1539,6 +1493,9 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutDependenciesInput = {
@@ -1558,10 +1515,6 @@ export type TaskCreateWithoutDependenciesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1582,6 +1535,9 @@ export type TaskCreateWithoutDependenciesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependenciesInput = {
@@ -1602,10 +1558,6 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1625,6 +1577,9 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependenciesInput = {
@@ -1649,10 +1604,6 @@ export type TaskCreateWithoutDependentTasksInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1673,6 +1624,9 @@ export type TaskCreateWithoutDependentTasksInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependentTasksInput = {
@@ -1693,10 +1647,6 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1716,6 +1666,9 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependentTasksInput = {
@@ -1751,10 +1704,6 @@ export type TaskUpdateWithoutDependenciesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1775,6 +1724,9 @@ export type TaskUpdateWithoutDependenciesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependenciesInput = {
@@ -1795,10 +1747,6 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1818,6 +1766,9 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUpsertWithoutDependentTasksInput = {
@@ -1848,10 +1799,6 @@ export type TaskUpdateWithoutDependentTasksInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1872,6 +1819,9 @@ export type TaskUpdateWithoutDependentTasksInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependentTasksInput = {
@@ -1892,10 +1842,6 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1915,6 +1861,561 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutTaskPlansInput = {
+  id?: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutTaskPlansInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutTaskPlansInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlansInput, Prisma.TaskUncheckedCreateWithoutTaskPlansInput>
+}
+
+export type TaskUpsertWithoutTaskPlansInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlansInput, Prisma.TaskUncheckedUpdateWithoutTaskPlansInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlansInput, Prisma.TaskUncheckedCreateWithoutTaskPlansInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutTaskPlansInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlansInput, Prisma.TaskUncheckedUpdateWithoutTaskPlansInput>
+}
+
+export type TaskUpdateWithoutTaskPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutTaskPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutTaskPlanRunsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutTaskPlanRunsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanRunsInput>
+}
+
+export type TaskUpsertWithoutTaskPlanRunsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanRunsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanRunsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutTaskPlanRunsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanRunsInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanRunsInput>
+}
+
+export type TaskUpdateWithoutTaskPlanRunsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutTaskPlanLayersInput = {
+  id?: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  runtimeAdapterKey?: string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: string | null
+  runtimeModel?: string | null
+  prompt?: string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  ownerType: $Enums.OwnerType
+  assigneeAgentId?: string | null
+  sourceSessionId?: string | null
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  budgetLimit?: number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutTaskPlanLayersInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedCreateWithoutTaskPlanLayersInput>
+}
+
+export type TaskUpsertWithoutTaskPlanLayersInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanLayersInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedCreateWithoutTaskPlanLayersInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutTaskPlanLayersInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanLayersInput>
+}
+
+export type TaskUpdateWithoutTaskPlanLayersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
+  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutRunsInput = {
@@ -1934,10 +2435,6 @@ export type TaskCreateWithoutRunsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -1958,6 +2455,9 @@ export type TaskCreateWithoutRunsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutRunsInput = {
@@ -1978,10 +2478,6 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2001,6 +2497,9 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutRunsInput = {
@@ -2036,10 +2535,6 @@ export type TaskUpdateWithoutRunsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2060,6 +2555,9 @@ export type TaskUpdateWithoutRunsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutRunsInput = {
@@ -2080,10 +2578,6 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2103,6 +2597,9 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutApprovalsInput = {
@@ -2122,10 +2619,6 @@ export type TaskCreateWithoutApprovalsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2146,6 +2639,9 @@ export type TaskCreateWithoutApprovalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutApprovalsInput = {
@@ -2166,10 +2662,6 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2189,6 +2681,9 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutApprovalsInput = {
@@ -2224,10 +2719,6 @@ export type TaskUpdateWithoutApprovalsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2248,6 +2739,9 @@ export type TaskUpdateWithoutApprovalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutApprovalsInput = {
@@ -2268,10 +2762,6 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2291,6 +2781,9 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutArtifactsInput = {
@@ -2310,10 +2803,6 @@ export type TaskCreateWithoutArtifactsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2334,6 +2823,9 @@ export type TaskCreateWithoutArtifactsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutArtifactsInput = {
@@ -2354,10 +2846,6 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2377,6 +2865,9 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutArtifactsInput = {
@@ -2412,10 +2903,6 @@ export type TaskUpdateWithoutArtifactsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2436,6 +2923,9 @@ export type TaskUpdateWithoutArtifactsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutArtifactsInput = {
@@ -2456,10 +2946,6 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2479,6 +2965,9 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutMemoriesInput = {
@@ -2498,10 +2987,6 @@ export type TaskCreateWithoutMemoriesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2522,6 +3007,9 @@ export type TaskCreateWithoutMemoriesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutMemoriesInput = {
@@ -2542,10 +3030,6 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2565,6 +3049,9 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutMemoriesInput = {
@@ -2600,10 +3087,6 @@ export type TaskUpdateWithoutMemoriesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2624,6 +3107,9 @@ export type TaskUpdateWithoutMemoriesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutMemoriesInput = {
@@ -2644,10 +3130,6 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2667,6 +3149,9 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutEventsInput = {
@@ -2686,10 +3171,6 @@ export type TaskCreateWithoutEventsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2710,6 +3191,9 @@ export type TaskCreateWithoutEventsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutEventsInput = {
@@ -2730,10 +3214,6 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2753,6 +3233,9 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutEventsInput = {
@@ -2788,10 +3271,6 @@ export type TaskUpdateWithoutEventsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2812,6 +3291,9 @@ export type TaskUpdateWithoutEventsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutEventsInput = {
@@ -2832,10 +3314,6 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2855,6 +3333,9 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutProjectionInput = {
@@ -2874,10 +3355,6 @@ export type TaskCreateWithoutProjectionInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2898,6 +3375,9 @@ export type TaskCreateWithoutProjectionInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutProjectionInput = {
@@ -2918,10 +3398,6 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -2941,6 +3417,9 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutProjectionInput = {
@@ -2976,10 +3455,6 @@ export type TaskUpdateWithoutProjectionInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3000,6 +3475,9 @@ export type TaskUpdateWithoutProjectionInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutProjectionInput = {
@@ -3020,10 +3498,6 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3043,6 +3517,9 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutScheduleProposalsInput = {
@@ -3062,10 +3539,6 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3086,6 +3559,9 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
@@ -3106,10 +3582,6 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3129,6 +3601,9 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutScheduleProposalsInput = {
@@ -3164,10 +3639,6 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3188,6 +3659,9 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
@@ -3208,10 +3682,6 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3231,6 +3701,9 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutAssistantMessagesInput = {
@@ -3250,10 +3723,6 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3274,6 +3743,9 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
@@ -3294,10 +3766,6 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3317,6 +3785,9 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutAssistantMessagesInput = {
@@ -3352,10 +3823,6 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3376,6 +3843,9 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
@@ -3396,10 +3866,6 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3419,6 +3885,9 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutWorkBlocksInput = {
@@ -3438,10 +3907,6 @@ export type TaskCreateWithoutWorkBlocksInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3462,6 +3927,9 @@ export type TaskCreateWithoutWorkBlocksInput = {
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkBlocksInput = {
@@ -3482,10 +3950,6 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3505,6 +3969,9 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkBlocksInput = {
@@ -3540,10 +4007,6 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3564,6 +4027,9 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
@@ -3584,10 +4050,6 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3607,6 +4069,9 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutExecutionSessionsInput = {
@@ -3626,10 +4091,6 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3650,6 +4111,9 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
   assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
@@ -3670,10 +4134,6 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3693,6 +4153,9 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
   workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutExecutionSessionsInput = {
@@ -3728,10 +4191,6 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3752,6 +4211,9 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
@@ -3772,10 +4234,6 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3795,6 +4253,9 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyWorkspaceInput = {
@@ -3814,10 +4275,6 @@ export type TaskCreateManyWorkspaceInput = {
   sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  scheduledStartAt?: Date | string | null
-  scheduledEndAt?: Date | string | null
-  scheduleStatus?: $Enums.ScheduleStatus
-  scheduleSource?: $Enums.ScheduleSource | null
   budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
@@ -3844,10 +4301,6 @@ export type TaskUpdateWithoutWorkspaceInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3868,6 +4321,9 @@ export type TaskUpdateWithoutWorkspaceInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkspaceInput = {
@@ -3887,10 +4343,6 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3911,6 +4363,9 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
   workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
@@ -3930,10 +4385,6 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  scheduleStatus?: Prisma.EnumScheduleStatusFieldUpdateOperationsInput | $Enums.ScheduleStatus
-  scheduleSource?: Prisma.NullableEnumScheduleSourceFieldUpdateOperationsInput | $Enums.ScheduleSource | null
   budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3961,6 +4412,9 @@ export type TaskCountOutputType = {
   assistantMessages: number
   workBlocks: number
   executionSessions: number
+  taskPlans: number
+  taskPlanRuns: number
+  taskPlanLayers: number
 }
 
 export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3976,6 +4430,9 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   assistantMessages?: boolean | TaskCountOutputTypeCountAssistantMessagesArgs
   workBlocks?: boolean | TaskCountOutputTypeCountWorkBlocksArgs
   executionSessions?: boolean | TaskCountOutputTypeCountExecutionSessionsArgs
+  taskPlans?: boolean | TaskCountOutputTypeCountTaskPlansArgs
+  taskPlanRuns?: boolean | TaskCountOutputTypeCountTaskPlanRunsArgs
+  taskPlanLayers?: boolean | TaskCountOutputTypeCountTaskPlanLayersArgs
 }
 
 /**
@@ -4072,6 +4529,27 @@ export type TaskCountOutputTypeCountExecutionSessionsArgs<ExtArgs extends runtim
   where?: Prisma.ExecutionSessionWhereInput
 }
 
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountTaskPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskPlanWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountTaskPlanRunsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskPlanRunWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountTaskPlanLayersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskPlanLayerWhereInput
+}
+
 
 export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4091,10 +4569,6 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  scheduledStartAt?: boolean
-  scheduledEndAt?: boolean
-  scheduleStatus?: boolean
-  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
@@ -4116,6 +4590,9 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   assistantMessages?: boolean | Prisma.Task$assistantMessagesArgs<ExtArgs>
   workBlocks?: boolean | Prisma.Task$workBlocksArgs<ExtArgs>
   executionSessions?: boolean | Prisma.Task$executionSessionsArgs<ExtArgs>
+  taskPlans?: boolean | Prisma.Task$taskPlansArgs<ExtArgs>
+  taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
+  taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["task"]>
 
@@ -4137,10 +4614,6 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  scheduledStartAt?: boolean
-  scheduledEndAt?: boolean
-  scheduleStatus?: boolean
-  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
@@ -4169,10 +4642,6 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  scheduledStartAt?: boolean
-  scheduledEndAt?: boolean
-  scheduleStatus?: boolean
-  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
@@ -4201,10 +4670,6 @@ export type TaskSelectScalar = {
   sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  scheduledStartAt?: boolean
-  scheduledEndAt?: boolean
-  scheduleStatus?: boolean
-  scheduleSource?: boolean
   budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
@@ -4214,7 +4679,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeAdapterKey" | "runtimeInput" | "runtimeInputVersion" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "budgetLimit" | "blockReason" | "defaultSessionId" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeAdapterKey" | "runtimeInput" | "runtimeInputVersion" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "budgetLimit" | "blockReason" | "defaultSessionId" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -4230,6 +4695,9 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   assistantMessages?: boolean | Prisma.Task$assistantMessagesArgs<ExtArgs>
   workBlocks?: boolean | Prisma.Task$workBlocksArgs<ExtArgs>
   executionSessions?: boolean | Prisma.Task$executionSessionsArgs<ExtArgs>
+  taskPlans?: boolean | Prisma.Task$taskPlansArgs<ExtArgs>
+  taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
+  taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4256,6 +4724,9 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     assistantMessages: Prisma.$TaskAssistantMessagePayload<ExtArgs>[]
     workBlocks: Prisma.$WorkBlockPayload<ExtArgs>[]
     executionSessions: Prisma.$ExecutionSessionPayload<ExtArgs>[]
+    taskPlans: Prisma.$TaskPlanPayload<ExtArgs>[]
+    taskPlanRuns: Prisma.$TaskPlanRunPayload<ExtArgs>[]
+    taskPlanLayers: Prisma.$TaskPlanLayerPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -4275,10 +4746,6 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     sourceSessionId: string | null
     parentTaskId: string | null
     dueAt: Date | null
-    scheduledStartAt: Date | null
-    scheduledEndAt: Date | null
-    scheduleStatus: $Enums.ScheduleStatus
-    scheduleSource: $Enums.ScheduleSource | null
     budgetLimit: number | null
     blockReason: runtime.JsonValue | null
     defaultSessionId: string | null
@@ -4694,6 +5161,9 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   assistantMessages<T extends Prisma.Task$assistantMessagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$assistantMessagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskAssistantMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   workBlocks<T extends Prisma.Task$workBlocksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$workBlocksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   executionSessions<T extends Prisma.Task$executionSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$executionSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExecutionSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  taskPlans<T extends Prisma.Task$taskPlansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  taskPlanRuns<T extends Prisma.Task$taskPlanRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  taskPlanLayers<T extends Prisma.Task$taskPlanLayersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanLayersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanLayerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4740,10 +5210,6 @@ export interface TaskFieldRefs {
   readonly sourceSessionId: Prisma.FieldRef<"Task", 'String'>
   readonly parentTaskId: Prisma.FieldRef<"Task", 'String'>
   readonly dueAt: Prisma.FieldRef<"Task", 'DateTime'>
-  readonly scheduledStartAt: Prisma.FieldRef<"Task", 'DateTime'>
-  readonly scheduledEndAt: Prisma.FieldRef<"Task", 'DateTime'>
-  readonly scheduleStatus: Prisma.FieldRef<"Task", 'ScheduleStatus'>
-  readonly scheduleSource: Prisma.FieldRef<"Task", 'ScheduleSource'>
   readonly budgetLimit: Prisma.FieldRef<"Task", 'Int'>
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>
   readonly defaultSessionId: Prisma.FieldRef<"Task", 'String'>
@@ -5454,6 +5920,78 @@ export type Task$executionSessionsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.ExecutionSessionScalarFieldEnum | Prisma.ExecutionSessionScalarFieldEnum[]
+}
+
+/**
+ * Task.taskPlans
+ */
+export type Task$taskPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskPlan
+   */
+  select?: Prisma.TaskPlanSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskPlan
+   */
+  omit?: Prisma.TaskPlanOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskPlanInclude<ExtArgs> | null
+  where?: Prisma.TaskPlanWhereInput
+  orderBy?: Prisma.TaskPlanOrderByWithRelationInput | Prisma.TaskPlanOrderByWithRelationInput[]
+  cursor?: Prisma.TaskPlanWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskPlanScalarFieldEnum | Prisma.TaskPlanScalarFieldEnum[]
+}
+
+/**
+ * Task.taskPlanRuns
+ */
+export type Task$taskPlanRunsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskPlanRun
+   */
+  select?: Prisma.TaskPlanRunSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskPlanRun
+   */
+  omit?: Prisma.TaskPlanRunOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskPlanRunInclude<ExtArgs> | null
+  where?: Prisma.TaskPlanRunWhereInput
+  orderBy?: Prisma.TaskPlanRunOrderByWithRelationInput | Prisma.TaskPlanRunOrderByWithRelationInput[]
+  cursor?: Prisma.TaskPlanRunWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskPlanRunScalarFieldEnum | Prisma.TaskPlanRunScalarFieldEnum[]
+}
+
+/**
+ * Task.taskPlanLayers
+ */
+export type Task$taskPlanLayersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskPlanLayer
+   */
+  select?: Prisma.TaskPlanLayerSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskPlanLayer
+   */
+  omit?: Prisma.TaskPlanLayerOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskPlanLayerInclude<ExtArgs> | null
+  where?: Prisma.TaskPlanLayerWhereInput
+  orderBy?: Prisma.TaskPlanLayerOrderByWithRelationInput | Prisma.TaskPlanLayerOrderByWithRelationInput[]
+  cursor?: Prisma.TaskPlanLayerWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskPlanLayerScalarFieldEnum | Prisma.TaskPlanLayerScalarFieldEnum[]
 }
 
 /**

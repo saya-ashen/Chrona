@@ -53,7 +53,7 @@ This brownfield planning step documents how the current Chrona codebase already 
 - `AIPlanOutput` is the authoritative provider-facing shape for generated plan graphs and is the canonical payload for the `generate_task_plan_graph` business tool.
 - `TaskPlanGraph` is a downstream runtime/storage model derived from `AIPlanOutput`; it is not the canonical provider/tool payload contract.
 - Any provider-specific compatibility normalization (for example legacy field names) must remain explicitly transitional and must not redefine the canonical contract.
-- Chrona's OpenClaw integration boundary is the provider package layer under `packages/providers/openclaw/*` plus the provider client in `packages/providers/core/src/OpenClawClient.ts`.
+- Chrona's OpenClaw integration boundary is the provider package layer under `packages/providers/openclaw/*`, with shared runtime/provider foundations under `packages/providers/foundation/*`.
 - Chrona sends planning requests to OpenClaw through the OpenResponses-compatible `/v1/responses` API shape.
 - `generate_plan` is not allowed to depend on OpenClaw structured-output support. OpenClaw does not provide the required structured-output contract for Chrona's plan graph generation path.
 - For `generate_plan`, Chrona must register the `generate_task_plan_graph` function tool and force `tool_choice: "required"`.

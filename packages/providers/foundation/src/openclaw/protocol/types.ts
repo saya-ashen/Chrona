@@ -65,7 +65,7 @@ export type OpenClawSendInputResult = {
   runStarted: boolean;
 };
 
-import type { StructuredAgentResult } from "./structured-result";
+import type { StructuredAgentResult } from "@chrona/openclaw/protocol/structured-result";
 
 export type OpenClawStructuredRunResult<T = unknown> = StructuredAgentResult<T>;
 

@@ -16,7 +16,7 @@ type CompatPlan = SavedCompiledPlan & {
 function toCompatPlan(sp: SavedCompiledPlan): CompatPlan {
   return {
     ...sp,
-    id: sp.memoryId,
+    id: sp.recordId,
     planId: sp.compiledPlan.editablePlanId,
     revision: sp.compiledPlan.sourceVersion,
     plan: sp.compiledPlan,

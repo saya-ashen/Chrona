@@ -29,11 +29,21 @@ import { parseTaskDispatchDecision } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
 import { buildGeneratePlanScope } from "./streaming";
-import type { EditablePlan, PlanBlueprint } from "@chrona/contracts/ai";
+import {
+  type PlanBlueprint,
+  planBlueprintSchema,
+} from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/shared/logger";
-import { validateEditablePlan } from "@chrona/domain";
+import type { ZodIssue } from "zod";
 
 const logger = createLogger("ai-features.features");
+
+function formatZodIssues(issues: ZodIssue[]): Array<{ path: string; message: string }> {
+  return issues.map((issue) => ({
+    path: issue.path.join("."),
+    message: issue.message,
+  }));
+}
 
 function ensureObject(
   value: unknown,
@@ -109,10 +119,14 @@ export async function suggest(
 }
 
 export function normalizeGeneratePlanResponse(input: {
-  parsed: EditablePlan;
+  parsed: PlanBlueprint;
   source: string;
   structured?: StructuredDebugInfo | null;
-}): GenerateTaskPlanResponse {
+}): {
+  plan: GenerateTaskPlanResponse;
+  validationErrors: Array<{ path: string; message: string }>;
+  validationWarnings: Array<{ path: string; message: string }>;
+} {
   const defaultResult = {
     blueprint: { title: "", goal: "", nodes: [], edges: [] },
     source: input.source,
@@ -120,28 +134,32 @@ export function normalizeGeneratePlanResponse(input: {
   };
 
   if (!input.parsed || typeof input.parsed !== "object") {
-    return defaultResult;
+    return {
+      plan: defaultResult,
+      validationErrors: [
+        { path: "", message: "generate_plan payload must be an object" },
+      ],
+      validationWarnings: [],
+    };
   }
 
-  let aiPlan: PlanBlueprint;
-  let warnings: string[] = [];
-
-  try {
-    const validation = validateEditablePlan(input.parsed);
-    aiPlan = validation.valid;
-    warnings = validation.warnings;
-  } catch {
-    return defaultResult;
-  }
-
-  if (warnings.length > 0) {
-    logger.warn("plan.validation_warnings", { warnings, source: input.source });
+  const parsed = planBlueprintSchema.safeParse(input.parsed);
+  if (!parsed.success) {
+    return {
+      plan: defaultResult,
+      validationErrors: formatZodIssues(parsed.error.issues),
+      validationWarnings: [],
+    };
   }
 
   return {
-    blueprint: aiPlan,
-    source: input.source,
-    structured: input.structured ?? undefined,
+    plan: {
+      blueprint: parsed.data,
+      source: input.source,
+      structured: input.structured ?? undefined,
+    },
+    validationErrors: [],
+    validationWarnings: [],
   };
 }
 

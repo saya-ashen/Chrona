@@ -8,6 +8,22 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("command.generate-task-plan-manual-stream");
 
+function hasNonEmptyPlanBlueprint(
+  plan: unknown,
+): plan is { blueprint: PlanBlueprint; source: string } {
+  if (!plan || typeof plan !== "object") {
+    return false;
+  }
+
+  const blueprint = (plan as { blueprint?: unknown }).blueprint;
+  if (!blueprint || typeof blueprint !== "object") {
+    return false;
+  }
+
+  return Array.isArray((blueprint as { nodes?: unknown }).nodes)
+    && (blueprint as { nodes: unknown[] }).nodes.length > 0;
+}
+
 /**
  * Manual plan generation stream — the only engine entry point for generating
  * a plan. Orchestrates provider streaming, extracts the authoritative tool
@@ -115,11 +131,12 @@ export async function* generateTaskPlanManualStream(input: {
       case "result":
         if ("plan" in event) {
           const plan = event.plan;
-          if (plan.blueprint.nodes.length === 0) {
+          if (!hasNonEmptyPlanBlueprint(plan)) {
             yield {
               type: "error",
-              code: "EMPTY_PLAN",
-              message: "AI returned an empty task plan with zero nodes.",
+              code: "INVALID_TOOL_PAYLOAD",
+              message:
+                "AI returned an invalid task plan payload: missing blueprint.nodes or zero nodes.",
             };
             return;
           }
@@ -163,7 +180,13 @@ export async function* generateTaskPlanManualStream(input: {
         const msg = event.message;
         let code: "PROVIDER_ERROR" | "NO_AI_CLIENT" = "PROVIDER_ERROR";
         if (msg.includes("No AI client")) code = "NO_AI_CLIENT";
-        yield { type: "error", code, message: msg };
+        yield {
+          type: "error",
+          code,
+          message: msg,
+          rawText: event.rawText,
+          diagnostics: event.diagnostics,
+        };
         return;
       }
 

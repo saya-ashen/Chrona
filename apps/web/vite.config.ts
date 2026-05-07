@@ -6,6 +6,9 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  optimizeDeps: {
+    exclude: ["@chrona/server", "@chrona/engine", "@chrona/db"],
+  },
   server: {
     port: 3100,
     proxy: {

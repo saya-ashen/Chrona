@@ -172,7 +172,12 @@ describe("OpenClawBridgeClient", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       user: "tenant-a:plan-1",
-      tool_choice: "required",
+      tool_choice: {
+        type: "function",
+        function: {
+          name: featureSpec.requiredTool.name,
+        },
+      },
     });
     expect(String(calls[0]?.instructions)).toContain("Feature: generate_plan");
     expect(String(calls[0]?.instructions)).toContain(featureSpec.instructions);

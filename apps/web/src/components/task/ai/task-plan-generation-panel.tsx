@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import {
   compiledPlanToGraphPlan,
+  taskPlanReadModelToGraphPlan,
   summarizeCompiledPlan,
 } from "@/components/task/plan/task-plan-view-model";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
@@ -98,8 +99,10 @@ export function TaskPlanGenerationPanel({
   const compiledPlan = activeReadModel?.compiledPlan ?? null;
 
   const planGraph = useMemo(() => {
-    return compiledPlanToGraphPlan(compiledPlan);
-  }, [compiledPlan]);
+    return activeReadModel
+      ? taskPlanReadModelToGraphPlan(activeReadModel)
+      : compiledPlanToGraphPlan(compiledPlan);
+  }, [activeReadModel, compiledPlan]);
 
   const graphSummary = useMemo(
     () => summarizeCompiledPlan(compiledPlan),

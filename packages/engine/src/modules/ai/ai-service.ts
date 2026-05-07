@@ -131,8 +131,6 @@ export async function* aiSuggestStream(
 export async function* aiGeneratePlanStream(
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  console.log("Starting AI plan generation stream with request:", request);
-  throw new Error("Test error in aiGeneratePlanStream");
   const client = await getClientForFeature("generate_plan");
   if (!client) {
     yield {

@@ -11,7 +11,17 @@ type NodeExecutionEvidence = {
 };
 
 export type NodeExecutionResult =
-  | { status: "done"; summary: string; evidence: NodeExecutionEvidence; output?: unknown }
+  | {
+      status: "done";
+      summary: string;
+      evidence: NodeExecutionEvidence;
+      output?: unknown;
+      selectedBranch?: {
+        label: string;
+        nextNodeId: string;
+        source: "user" | "ai" | "system" | "default";
+      };
+    }
   | { status: "waiting_for_user"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "blocked"; reason: string; evidence?: NodeExecutionEvidence }
@@ -37,4 +47,5 @@ export interface NodeExecutorInput {
   plan: EffectivePlanGraph;
   trigger: "manual" | "scheduler" | "system" | "auto";
   runtimeName: string;
+  userInput?: string;
 }

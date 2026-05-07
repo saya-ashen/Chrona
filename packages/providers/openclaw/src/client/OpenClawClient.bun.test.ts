@@ -61,4 +61,56 @@ describe("OpenClawClient", () => {
       { type: "text", data: "done", toolCall: undefined },
     ]);
   });
+
+  it("extracts function calls from response.completed when output_item events are missing", async () => {
+    globalThis.fetch = (async () => {
+      const sse = [
+        'event: response.output_text.delta\n',
+        'data: {"delta":"Planning ","type":"response.output_text.delta"}\n\n',
+        'event: response.completed\n',
+        'data: {"response":{"id":"resp-1","status":"completed","output":[{"type":"function_call","name":"generate_task_plan_graph","call_id":"call-2","arguments":"{\\"title\\":\\"Plan ready\\",\\"goal\\":\\"Produce the requested plan\\",\\"summary\\":\\"Plan ready\\",\\"nodes\\":[],\\"edges\\":[]}"}]}}\n\n',
+      ].join("");
+
+      return new Response(sse, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new OpenClawClient({
+      gatewayUrl: "http://gateway.local",
+      gatewayToken: "secret",
+    });
+
+    const events = [] as Array<{ type: string; data: string; toolCall?: { tool: string; callId: string } }>;
+    for await (const event of client.executeFeatureStream("generate_plan", {
+      sessionKey: "sess-2",
+      instructions: "plan this task",
+      task: { title: "Write docs" },
+      timeout: 5,
+    })) {
+      events.push({
+        type: event.type,
+        data: event.data,
+        toolCall: event.toolCall
+          ? { tool: event.toolCall.tool, callId: event.toolCall.callId }
+          : undefined,
+      });
+    }
+
+    expect(events).toEqual([
+      { type: "text", data: "Planning ", toolCall: undefined },
+      {
+        type: "tool_call",
+        data: JSON.stringify({
+          type: "function_call",
+          name: "generate_task_plan_graph",
+          call_id: "call-2",
+          arguments:
+            '{"title":"Plan ready","goal":"Produce the requested plan","summary":"Plan ready","nodes":[],"edges":[]}',
+        }),
+        toolCall: { tool: "generate_task_plan_graph", callId: "call-2" },
+      },
+    ]);
+  });
 });

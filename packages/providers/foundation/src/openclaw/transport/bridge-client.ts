@@ -28,17 +28,13 @@ import type {
   BridgeResponse,
   NDJSONEvent,
   BridgeFeature,
-} from "./bridge-types";
-import { normalizeGatewayHttpUrl } from "../shared/constants";
-import type {
-  BridgeEnvironment,
-  BridgeLogger,
-  RouteKind,
-} from "../shared/types";
+} from "@chrona/openclaw/transport/bridge-types";
+import { normalizeGatewayHttpUrl } from "@chrona/openclaw/shared/constants";
+import type { BridgeEnvironment, BridgeLogger, RouteKind } from "@chrona/openclaw/shared/types";
 import {
   checkGatewayAvailable,
   executeGatewayRequest,
-} from "../execution/gateway";
+} from "@chrona/openclaw/execution/gateway";
 import type { RuntimeInput } from "@chrona/runtime-core";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
 
@@ -118,6 +114,45 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
   close(): void {
     // no-op for gateway client
+  }
+
+  async createRun(input: {
+    prompt: string;
+    runtimeInput: RuntimeInput;
+    runtimeSessionKey?: string;
+  }): Promise<{
+    runtimeRunRef?: string;
+    runtimeSessionRef?: string;
+    runtimeSessionKey?: string;
+    runStarted: boolean;
+  }> {
+    const sessionKey = input.runtimeSessionKey ?? crypto.randomUUID();
+    const taskTitle =
+      typeof input.runtimeInput?.prompt === "string" &&
+      input.runtimeInput.prompt.trim()
+        ? input.runtimeInput.prompt
+        : undefined;
+    const requestBody: BridgeExecutionTaskRequest = {
+      sessionId: sessionKey,
+      sessionKey,
+      instructions: input.prompt,
+      ...(taskTitle ? { taskTitle } : {}),
+      runtimeAdapterKey: "openclaw",
+      runtimeInput: input.runtimeInput,
+      timeout: this.timeoutSeconds,
+    };
+    const response = await this.executeRoute(
+      { kind: "execution", stream: false },
+      requestBody,
+    );
+    this.recordBridgeResponse(sessionKey, input.prompt, response);
+
+    return {
+      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
+      runtimeSessionRef: response.sessionId,
+      runtimeSessionKey: sessionKey,
+      runStarted: !response.error,
+    };
   }
 
   async createStructuredRun<T = unknown>(input: {

@@ -17,6 +17,7 @@ function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): Effec
     metadata: {},
     dependenciesSatisfied: false,
     ready: false,
+    reachable: true,
     ...rest,
   };
 }

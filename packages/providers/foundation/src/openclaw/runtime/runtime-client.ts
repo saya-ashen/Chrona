@@ -11,7 +11,7 @@ import type {
   OpenClawSendInputResult,
   OpenClawStructuredRunResult,
 } from "../protocol/types";
-import type { BridgeFeature } from "../transport/bridge-types";
+import type { BridgeFeature } from "@chrona/openclaw/transport/bridge-types";
 import type { RuntimeInput } from "@chrona/runtime-core";
 
 export type OpenClawWaitForRunInput = {
@@ -56,5 +56,4 @@ export interface OpenClawRuntimeClient {
     accepted: boolean;
   }>;
 }
-
 

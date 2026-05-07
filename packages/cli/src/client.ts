@@ -187,8 +187,8 @@ export class ApiClient {
     scheduledEndAt: string,
   ) {
     return this.request<unknown>(
-      "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
+      "PATCH",
+      `/api/tasks/${encodeURIComponent(taskId)}`,
       {
         scheduledStartAt,
         scheduledEndAt,
@@ -198,8 +198,12 @@ export class ApiClient {
 
   clearSchedule(taskId: string) {
     return this.request<unknown>(
-      "DELETE",
-      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
+      "PATCH",
+      `/api/tasks/${encodeURIComponent(taskId)}`,
+      {
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+      },
     );
   }
 

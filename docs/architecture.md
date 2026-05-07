@@ -15,9 +15,10 @@
 5. [Data Flow](#data-flow)
 6. [Module Dependency Map](#module-dependency-map)
 7. [Suggest-Confirm AI Pattern](#suggest-confirm-ai-pattern)
-8. [Server Modes](#server-modes)
-9. [Architecture Decision Records](#architecture-decision-records-adrs)
-10. [Performance & Scale Characteristics](#performance--scale-characteristics)
+8. [Schema-First Contracts](#schema-first-contracts)
+9. [Server Modes](#server-modes)
+10. [Architecture Decision Records](#architecture-decision-records-adrs)
+11. [Performance & Scale Characteristics](#performance--scale-characteristics)
 
 ---
 
@@ -287,6 +288,45 @@ This ensures: no silent data corruption, full auditability, and user remains the
 | Task decomposition | LLM plan generation | Template-based breakdown |
 
 Core functionality never requires an LLM to be available.
+
+---
+
+## Schema-First Contracts
+
+Chrona uses a schema-first contract model for shared DTOs and AI structured payloads.
+
+The rule is simple: define the contract once in Zod, then derive everything else from that schema.
+
+### Single source of truth
+
+- Zod schema defines runtime shape
+- TypeScript types derive from Zod via `z.infer`
+- Provider-facing JSON Schema derives from the same Zod schema
+- Runtime validation uses the same Zod schema again at the boundary
+
+This removes drift between compile-time types, runtime validation, and AI tool transport.
+
+### Required practices
+
+- Put shared contract schemas in `packages/contracts`
+- Prefer exported `...Schema` values over handwritten structural interfaces
+- Prefer `export type X = z.infer<typeof xSchema>` over duplicated interface definitions
+- Use `.describe(...)` on Zod fields that need to be understood by external providers or other developers
+- Generate tool/input JSON Schema from Zod instead of maintaining handwritten JSON schema copies
+
+### What to avoid
+
+Do not maintain parallel versions of the same contract in multiple forms:
+
+- handwritten TypeScript interfaces
+- separate handwritten Zod validators
+- separate handwritten provider tool parameter schemas
+
+Do not use broad union-like object schemas for discriminated payloads when variants have different fields. If a payload uses `type` to distinguish variants, each variant must stay strict to its own fields.
+
+### Why this matters
+
+Chrona's AI features depend on structured tool payloads. If the schema sent to the model is broader than the schema used for backend validation, the model will learn the broader shape and emit invalid payloads. Schema-first design prevents that failure mode by making provider schema generation and runtime validation come from the same source.
 
 ---
 

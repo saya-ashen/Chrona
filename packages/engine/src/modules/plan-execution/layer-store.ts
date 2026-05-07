@@ -1,14 +1,10 @@
-import { MemoryScope, MemorySourceType, MemoryStatus } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { PlanOverlayLayer } from "@chrona/contracts/ai";
 
-type StoredLayerPayload = {
-  type: "plan_layer_v1";
-  planId: string;
-  layerId: string;
-  version: number;
-  layer: PlanOverlayLayer;
-};
+function asJsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
 
 export async function saveLayer(input: {
   workspaceId: string;
@@ -16,24 +12,56 @@ export async function saveLayer(input: {
   planId: string;
   layer: PlanOverlayLayer;
 }): Promise<void> {
-  const payload: StoredLayerPayload = {
-    type: "plan_layer_v1",
-    planId: input.planId,
-    layerId: input.layer.layerId,
-    version: input.layer.version,
-    layer: input.layer,
-  };
-
-  await db.memory.create({
-    data: {
+  await db.taskPlanLayer.upsert({
+    where: {
+      layerId: input.layer.layerId,
+    },
+    create: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,
-      content: JSON.stringify(payload),
-      scope: MemoryScope.task,
-      sourceType: MemorySourceType.plan_layer,
-      status: MemoryStatus.Active,
-      confidence: 1,
+      planId: input.planId,
+      layerId: input.layer.layerId,
+      version: input.layer.version,
+      layer: asJsonValue(input.layer),
     },
+    update: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      planId: input.planId,
+      version: input.layer.version,
+      layer: asJsonValue(input.layer),
+    },
+  });
+}
+
+export async function replaceLayers(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  layers: PlanOverlayLayer[];
+}): Promise<void> {
+  await db.$transaction(async (tx) => {
+    await tx.taskPlanLayer.deleteMany({
+      where: {
+        taskId: input.taskId,
+        planId: input.planId,
+      },
+    });
+
+    if (input.layers.length === 0) {
+      return;
+    }
+
+    await tx.taskPlanLayer.createMany({
+      data: input.layers.map((layer) => ({
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        planId: input.planId,
+        layerId: layer.layerId,
+        version: layer.version,
+        layer: asJsonValue(layer),
+      })),
+    });
   });
 }
 
@@ -41,28 +69,13 @@ export async function loadLayers(
   taskId: string,
   planId: string,
 ): Promise<PlanOverlayLayer[]> {
-  const memories = await db.memory.findMany({
+  const rows = await db.taskPlanLayer.findMany({
     where: {
       taskId,
-      scope: MemoryScope.task,
-      sourceType: MemorySourceType.plan_layer,
-      status: MemoryStatus.Active,
+      planId,
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ version: "asc" }, { createdAt: "asc" }],
   });
 
-  const layers: PlanOverlayLayer[] = [];
-
-  for (const m of memories) {
-    try {
-      const parsed = JSON.parse(m.content) as StoredLayerPayload;
-      if (parsed.type === "plan_layer_v1" && parsed.planId === planId && parsed.layer) {
-        layers.push(parsed.layer);
-      }
-    } catch {
-      // skip malformed rows
-    }
-  }
-
-  return layers;
+  return rows.map((row) => row.layer as unknown as PlanOverlayLayer);
 }

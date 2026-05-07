@@ -95,7 +95,7 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     },
   });
 
-  const planId = "planId" in accepted ? (accepted as { planId: string }).planId : accepted.compiledPlan.editablePlanId;
+  const planId = accepted.compiledPlan.editablePlanId;
 
   const layers = await getLayers(input.taskId, planId);
   const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);

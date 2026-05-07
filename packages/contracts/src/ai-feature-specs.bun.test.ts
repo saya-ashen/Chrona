@@ -53,6 +53,54 @@ describe("generate_plan feature spec", () => {
       }),
     ).toMatchObject({ ok: false });
   });
+
+  it("derives generate_plan tool schema from the strict PlanBlueprint zod schema", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      title: "制作一个汉堡",
+    });
+
+    const parameters = spec.requiredTool.parameters as {
+      additionalProperties?: unknown;
+      properties?: {
+        nodes?: {
+          items?: {
+            oneOf?: Array<Record<string, unknown>>;
+          };
+        };
+      };
+    };
+
+    expect(parameters.additionalProperties).toBe(false);
+
+    const nodeVariants = parameters.properties?.nodes?.items?.oneOf;
+    expect(Array.isArray(nodeVariants)).toBe(true);
+    expect(nodeVariants).toHaveLength(4);
+
+    const conditionVariant = nodeVariants?.find(
+      (variant) =>
+        (variant.properties as { type?: { const?: string } } | undefined)?.type
+          ?.const === "condition",
+    ) as {
+      additionalProperties?: unknown;
+      properties?: Record<string, unknown>;
+    } | undefined;
+
+    expect(conditionVariant?.additionalProperties).toBe(false);
+    expect(conditionVariant?.properties?.branches).toBeTruthy();
+    expect(conditionVariant?.properties?.executor).toBeUndefined();
+  });
+
+  it("omits provider-incompatible metaschema declarations from generate_plan tool schema", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      title: "制作一个汉堡",
+    });
+
+    const parameters = spec.requiredTool.parameters as {
+      $schema?: unknown;
+    };
+
+    expect(parameters.$schema).toBeUndefined();
+  });
 });
 
 describe("structured feature specs", () => {

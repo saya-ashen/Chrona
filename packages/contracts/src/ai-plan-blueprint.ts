@@ -40,165 +40,6 @@ export type ConditionEvaluator = (typeof AI_CONDITION_EVALUATORS)[number];
 export type WaitTimeoutAction = (typeof AI_WAIT_TIMEOUT_ACTIONS)[number];
 
 // ═══════════════════════════════════════════════════════════════
-// PlanBlueprint — loose AI output format (backward compatible)
-// Used by AI tool calls, existing engine code. Fields are optional
-// where the AI may omit them; validation normalizes missing values.
-// ═══════════════════════════════════════════════════════════════
-
-export interface PlanBlueprintTaskNode {
-  id: string;
-  type: "task";
-  title: string;
-  executor?: TaskExecutor;
-  mode?: TaskMode;
-  expectedOutput?: string;
-  completionCriteria?: string;
-  estimatedMinutes?: number;
-}
-
-export interface PlanBlueprintCheckpointNode {
-  id: string;
-  type: "checkpoint";
-  title: string;
-  checkpointType: CheckpointType;
-  prompt: string;
-  required?: boolean;
-  options?: string[];
-  inputFields?: Array<{
-    key: string;
-    label: string;
-    inputType: (typeof AI_INPUT_FIELD_TYPES)[number];
-    required?: boolean;
-    options?: string[];
-  }>;
-}
-
-export interface PlanBlueprintConditionNode {
-  id: string;
-  type: "condition";
-  title: string;
-  condition: string;
-  evaluationBy?: ConditionEvaluator;
-  branches: Array<{
-    label: string;
-    nextNodeId: string;
-  }>;
-  defaultNextNodeId?: string;
-}
-
-export interface PlanBlueprintWaitNode {
-  id: string;
-  type: "wait";
-  title: string;
-  waitFor: string;
-  estimatedMinutes?: number;
-  timeout?: {
-    minutes: number;
-    onTimeout: WaitTimeoutAction;
-  };
-}
-
-export type PlanBlueprintNode =
-  | PlanBlueprintTaskNode
-  | PlanBlueprintCheckpointNode
-  | PlanBlueprintConditionNode
-  | PlanBlueprintWaitNode;
-
-export interface PlanBlueprintEdge {
-  from: string;
-  to: string;
-  label?: string;
-}
-
-export interface PlanBlueprint {
-  title: string;
-  goal: string;
-  assumptions?: string[];
-  nodes: PlanBlueprintNode[];
-  edges: PlanBlueprintEdge[];
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EditablePlan — strict internal format (domain layer)
-// Always has id, version, and required fields filled in.
-// ═══════════════════════════════════════════════════════════════
-
-export interface EditableTaskNode {
-  id: string;
-  type: "task";
-  title: string;
-  executor: TaskExecutor;
-  mode: TaskMode;
-  expectedOutput?: string;
-  completionCriteria?: string;
-  estimatedMinutes?: number;
-}
-
-export interface EditableCheckpointNode {
-  id: string;
-  type: "checkpoint";
-  title: string;
-  checkpointType: CheckpointType;
-  prompt: string;
-  required: boolean;
-  options?: string[];
-  inputFields?: Array<{
-    name: string;
-    label: string;
-    type?: InputFieldType;
-    required?: boolean;
-    options?: string[];
-  }>;
-}
-
-export interface EditableConditionNode {
-  id: string;
-  type: "condition";
-  title: string;
-  condition: string;
-  evaluationBy: ConditionEvaluator;
-  branches: Array<{
-    label: string;
-    nextNodeId: string;
-  }>;
-  defaultNextNodeId?: string;
-}
-
-export interface EditableWaitNode {
-  id: string;
-  type: "wait";
-  title: string;
-  waitFor: string;
-  estimatedMinutes?: number;
-  timeout?: {
-    minutes: number;
-    onTimeout: WaitTimeoutAction;
-  };
-}
-
-export type EditableNode =
-  | EditableTaskNode
-  | EditableCheckpointNode
-  | EditableConditionNode
-  | EditableWaitNode;
-
-export interface EditableEdge {
-  from: string;
-  to: string;
-  label?: string;
-}
-
-export interface EditablePlan {
-  id: string;
-  version: number;
-  title: string;
-  goal: string;
-  assumptions?: string[];
-  nodes: EditableNode[];
-  edges: EditableEdge[];
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Convert PlanBlueprint → EditablePlan
 // ═══════════════════════════════════════════════════════════════
 
@@ -338,102 +179,112 @@ export interface PlanPatch {
 
 const aiPlanInputFieldSchema = z
   .object({
-    key: z.string().min(1),
-    label: z.string().min(1),
-    inputType: z.enum(AI_INPUT_FIELD_TYPES),
-    required: z.boolean().optional(),
-    options: z.array(z.string()).optional(),
+    key: z.string().min(1).describe("Stable input field key."),
+    label: z.string().min(1).describe("User-facing input field label."),
+    inputType: z.enum(AI_INPUT_FIELD_TYPES).describe("Input control type."),
+    required: z.boolean().optional().describe("Whether this field is required."),
+    options: z.array(z.string()).optional().describe("Allowed options for choice-style fields."),
   })
+  .describe("Structured user input field for checkpoint nodes.")
   .strict();
 
-const planBlueprintTaskNodeSchema = z
+export const planBlueprintTaskNodeSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("task"),
-    title: z.string().min(1),
-    executor: z.enum(AI_TASK_EXECUTORS).optional(),
-    mode: z.enum(AI_TASK_MODES).optional(),
-    expectedOutput: z.string().optional(),
-    completionCriteria: z.string().optional(),
-    estimatedMinutes: z.number().positive().optional(),
+    id: z.string().min(1).describe("Stable local node id, ideally snake_case."),
+    type: z.literal("task").describe("Core execution node."),
+    title: z.string().min(1).describe("Short node label shown to the user."),
+    executor: z.enum(AI_TASK_EXECUTORS).optional().describe("Who performs this task node."),
+    mode: z.enum(AI_TASK_MODES).optional().describe("How this task node is executed."),
+    expectedOutput: z.string().optional().describe("What successful completion should produce."),
+    completionCriteria: z.string().optional().describe("How to determine this node is done."),
+    estimatedMinutes: z.number().positive().optional().describe("Best-effort duration estimate for this node."),
   })
+  .describe("Task node. Only task nodes may include executor/mode/output fields.")
   .strict();
 
-const planBlueprintCheckpointNodeSchema = z
+export const planBlueprintCheckpointNodeSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("checkpoint"),
-    title: z.string().min(1),
-    checkpointType: z.enum(AI_CHECKPOINT_TYPES),
-    prompt: z.string().min(1),
-    required: z.boolean().optional(),
-    options: z.array(z.string()).optional(),
-    inputFields: z.array(aiPlanInputFieldSchema).optional(),
+    id: z.string().min(1).describe("Stable local node id, ideally snake_case."),
+    type: z.literal("checkpoint").describe("Human interaction gate node."),
+    title: z.string().min(1).describe("Short node label shown to the user."),
+    checkpointType: z.enum(AI_CHECKPOINT_TYPES).describe("Checkpoint subtype for confirmation, choice, input, edit, or approval."),
+    prompt: z.string().min(1).describe("Prompt shown to the user for this checkpoint."),
+    required: z.boolean().optional().describe("Whether this checkpoint can be skipped."),
+    options: z.array(z.string()).optional().describe("Available options for choose-style checkpoints."),
+    inputFields: z.array(aiPlanInputFieldSchema).optional().describe("Input fields for input-style checkpoints."),
   })
+  .describe("Checkpoint node. Use for human confirmation, choice, input, edit, or approval.")
   .strict();
 
-const planBlueprintConditionNodeSchema = z
+export const planBlueprintConditionNodeSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("condition"),
-    title: z.string().min(1),
-    condition: z.string().min(1),
-    evaluationBy: z.enum(AI_CONDITION_EVALUATORS).optional(),
+    id: z.string().min(1).describe("Stable local node id, ideally snake_case."),
+    type: z.literal("condition").describe("Branching logic gate node."),
+    title: z.string().min(1).describe("Short node label shown to the user."),
+    condition: z.string().min(1).describe("Human-readable branching condition."),
+    evaluationBy: z.enum(AI_CONDITION_EVALUATORS).optional().describe("Who evaluates the condition branch."),
     branches: z
       .array(
         z.object({
-          label: z.string().min(1),
-          nextNodeId: z.string().min(1),
-        }),
+          label: z.string().min(1).describe("Branch label shown on the outgoing edge."),
+          nextNodeId: z.string().min(1).describe("Target node id for this branch."),
+        }).strict().describe("Condition branch target."),
       )
       .min(1, "condition must have at least one branch"),
-    defaultNextNodeId: z.string().optional(),
+    defaultNextNodeId: z.string().optional().describe("Optional fallback branch target if no explicit branch matches."),
   })
+  .describe("Condition node. Only condition nodes may include condition/evaluation/branches fields.")
   .strict();
 
-const planBlueprintWaitNodeSchema = z
+export const planBlueprintWaitNodeSchema = z
   .object({
-    id: z.string().min(1),
-    type: z.literal("wait"),
-    title: z.string().min(1),
-    waitFor: z.string().min(1),
-    estimatedMinutes: z.number().positive().optional(),
+    id: z.string().min(1).describe("Stable local node id, ideally snake_case."),
+    type: z.literal("wait").describe("Pause or external-event dependency node."),
+    title: z.string().min(1).describe("Short node label shown to the user."),
+    waitFor: z.string().min(1).describe("What external event or duration this node waits for."),
+    estimatedMinutes: z.number().positive().optional().describe("Best-effort duration estimate for this wait."),
     timeout: z
       .object({
-        minutes: z.number().positive(),
-        onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS),
+        minutes: z.number().positive().describe("Timeout duration in minutes."),
+        onTimeout: z.enum(AI_WAIT_TIMEOUT_ACTIONS).describe("Action to take when the wait times out."),
       })
+      .describe("Optional timeout policy for this wait node.")
       .strict()
       .optional(),
   })
+  .describe("Wait node. Only wait nodes may include waitFor/timeout fields.")
   .strict();
 
-export const planBlueprintNodeSchema: z.ZodType<PlanBlueprintNode> =
-  z.discriminatedUnion("type", [
+export const planBlueprintNodeSchema = z
+  .discriminatedUnion("type", [
     planBlueprintTaskNodeSchema,
     planBlueprintCheckpointNodeSchema,
     planBlueprintConditionNodeSchema,
     planBlueprintWaitNodeSchema,
-  ]);
+  ])
+  .describe("Plan node. Must be exactly one of: task, checkpoint, condition, wait.");
 
 export const planBlueprintEdgeSchema = z
   .object({
-    from: z.string().min(1),
-    to: z.string().min(1),
-    label: z.string().optional(),
+    from: z.string().min(1).describe("Source node id."),
+    to: z.string().min(1).describe("Target node id."),
+    label: z.string().optional().describe("Optional edge label, especially for condition branches."),
   })
+  .describe("Directed edge between two nodes.")
   .strict();
 
 export const planBlueprintSchema = z
   .object({
-    title: z.string().min(1),
-    goal: z.string().min(1),
-    assumptions: z.array(z.string().min(1)).optional(),
+    title: z.string().min(1).describe("Brief plan title."),
+    goal: z.string().min(1).describe("What this plan is meant to achieve."),
+    assumptions: z.array(z.string().min(1)).optional().describe("Optional assumptions the plan relies on."),
     nodes: z
       .array(planBlueprintNodeSchema)
-      .min(1, "plan must have at least one node"),
-    edges: z.array(planBlueprintEdgeSchema).optional().default([]),
+      .min(1, "plan must have at least one node")
+      .describe("Execution nodes in dependency order. Provide at least one node."),
+    edges: z.array(planBlueprintEdgeSchema).optional().default([]).describe("Main flow edges between nodes."),
   })
+  .describe("Structured task execution blueprint as a DAG.")
   .strict();
 
 // ─── AI tool payload types ───
@@ -452,7 +303,7 @@ const editableInputFieldSchema = z
   })
   .strict();
 
-const editableTaskNodeSchema = z
+export const editableTaskNodeSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("task"),
@@ -465,7 +316,7 @@ const editableTaskNodeSchema = z
   })
   .strict();
 
-const editableCheckpointNodeSchema = z
+export const editableCheckpointNodeSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("checkpoint"),
@@ -478,7 +329,7 @@ const editableCheckpointNodeSchema = z
   })
   .strict();
 
-const editableConditionNodeSchema = z
+export const editableConditionNodeSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("condition"),
@@ -497,7 +348,7 @@ const editableConditionNodeSchema = z
   })
   .strict();
 
-const editableWaitNodeSchema = z
+export const editableWaitNodeSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("wait"),
@@ -514,15 +365,12 @@ const editableWaitNodeSchema = z
   })
   .strict();
 
-const editableNodeSchema: z.ZodType<EditableNode> = z.discriminatedUnion(
-  "type",
-  [
-    editableTaskNodeSchema,
-    editableCheckpointNodeSchema,
-    editableConditionNodeSchema,
-    editableWaitNodeSchema,
-  ],
-);
+export const editableNodeSchema = z.discriminatedUnion("type", [
+  editableTaskNodeSchema,
+  editableCheckpointNodeSchema,
+  editableConditionNodeSchema,
+  editableWaitNodeSchema,
+]);
 
 export const editableEdgeSchema = z
   .object({
@@ -545,3 +393,23 @@ export const editablePlanSchema = z
     edges: z.array(editableEdgeSchema).optional().default([]),
   })
   .strict();
+
+// ═══════════════════════════════════════════════════════════════
+// Schema-derived types
+// ═══════════════════════════════════════════════════════════════
+
+export type PlanBlueprintTaskNode = z.infer<typeof planBlueprintTaskNodeSchema>;
+export type PlanBlueprintCheckpointNode = z.infer<typeof planBlueprintCheckpointNodeSchema>;
+export type PlanBlueprintConditionNode = z.infer<typeof planBlueprintConditionNodeSchema>;
+export type PlanBlueprintWaitNode = z.infer<typeof planBlueprintWaitNodeSchema>;
+export type PlanBlueprintNode = z.infer<typeof planBlueprintNodeSchema>;
+export type PlanBlueprintEdge = z.infer<typeof planBlueprintEdgeSchema>;
+export type PlanBlueprint = z.infer<typeof planBlueprintSchema>;
+
+export type EditableTaskNode = z.infer<typeof editableTaskNodeSchema>;
+export type EditableCheckpointNode = z.infer<typeof editableCheckpointNodeSchema>;
+export type EditableConditionNode = z.infer<typeof editableConditionNodeSchema>;
+export type EditableWaitNode = z.infer<typeof editableWaitNodeSchema>;
+export type EditableNode = z.infer<typeof editableNodeSchema>;
+export type EditableEdge = z.infer<typeof editableEdgeSchema>;
+export type EditablePlan = z.infer<typeof editablePlanSchema>;

@@ -15,6 +15,6 @@
     "@chrona/db": "workspace:*",
     "@chrona/shared": "workspace:*",
     "@chrona/engine": "workspace:*",
-    "@chrona/providers-core": "workspace:*"
+    "@chrona/openclaw": "workspace:*"
   }
 }

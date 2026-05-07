@@ -76,6 +76,10 @@ function buildCompiledNode(
   return base;
 }
 
+function edgeKey(from: string, to: string): string {
+  return `${from}→${to}`;
+}
+
 /**
  * Compiles an EditablePlan into a CompiledPlan.
  *
@@ -109,7 +113,7 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
   });
 
   // 3. Rewrite edges
-  const compiledEdges: CompiledEdge[] = [];
+  const compiledEdgeMap = new Map<string, CompiledEdge>();
   for (const edge of plan.edges) {
     const fromCompiled = localToCompiled.get(edge.from);
     const toCompiled = localToCompiled.get(edge.to);
@@ -118,27 +122,29 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
         { path: "edges", message: `Cannot resolve edge ${edge.from} → ${edge.to}` },
       ]);
     }
-    compiledEdges.push({
+    const compiledEdge: CompiledEdge = {
       id: `ce_${generateCompiledId()}`,
       from: fromCompiled,
       to: toCompiled,
       label: edge.label,
-    });
+    };
+    compiledEdgeMap.set(edgeKey(compiledEdge.from, compiledEdge.to), compiledEdge);
   }
 
-  // Also add implicit edges from condition branches
+  // Condition branch semantics are the canonical source for condition edge labels.
+  // Explicit edges only establish connectivity; branch/default metadata owns the label.
   for (const node of plan.nodes) {
     if (node.type !== "condition") continue;
     const fromCompiled = localToCompiled.get(node.id)!;
     for (const branch of node.branches) {
       const toCompiled = localToCompiled.get(branch.nextNodeId);
       if (toCompiled) {
-        // Only add if not already present
-        const exists = compiledEdges.some(
-          (e) => e.from === fromCompiled && e.to === toCompiled,
-        );
-        if (!exists) {
-          compiledEdges.push({
+        const key = edgeKey(fromCompiled, toCompiled);
+        const existing = compiledEdgeMap.get(key);
+        if (existing) {
+          existing.label = branch.label;
+        } else {
+          compiledEdgeMap.set(key, {
             id: `ce_${generateCompiledId()}`,
             from: fromCompiled,
             to: toCompiled,
@@ -150,11 +156,13 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
     if (node.defaultNextNodeId) {
       const toCompiled = localToCompiled.get(node.defaultNextNodeId);
       if (toCompiled) {
-        const exists = compiledEdges.some(
-          (e) => e.from === fromCompiled && e.to === toCompiled,
-        );
-        if (!exists) {
-          compiledEdges.push({
+        const key = edgeKey(fromCompiled, toCompiled);
+        const existing = compiledEdgeMap.get(key);
+        if (existing) {
+          // Keep explicit branch labels canonical when the default target overlaps
+          // an existing condition branch. Default only labels fallback-only edges.
+        } else {
+          compiledEdgeMap.set(key, {
             id: `ce_${generateCompiledId()}`,
             from: fromCompiled,
             to: toCompiled,
@@ -164,6 +172,8 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
       }
     }
   }
+
+  const compiledEdges = [...compiledEdgeMap.values()];
 
   // 4. Compute dependencies / dependents
   const indegree = new Map<string, string[]>();

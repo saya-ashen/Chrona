@@ -9,6 +9,7 @@ import type {
   AiFeature,
   OpenClawClientConfig,
   LLMClientConfig,
+  PreparedAiFeatureSpec,
   SmartSuggestRequest,
   StreamEvent,
   GenerateTaskPlanRequest,
@@ -17,8 +18,12 @@ import type {
   ChatRequest,
   EditablePlan,
 } from "@chrona/contracts";
+import {
+  buildGeneratePlanFeatureSpec,
+  buildSuggestFeatureSpec,
+} from "@chrona/contracts";
 import { createLogger } from "@chrona/shared/logger";
-import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-core";
+import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-foundation";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
@@ -37,7 +42,17 @@ function summarizeText(value: string, maxLength: number) {
 
 const logger = createLogger("ai-features.openclaw.streaming");
 
-function toFeatureInput(
+type PreparedStreamInput = {
+  scope: string;
+  instructions: string;
+  inputText: string;
+  input: Record<string, unknown>;
+  featureSpec?: PreparedAiFeatureSpec;
+  userMessage: string;
+};
+
+function prepareStreamInput(
+  scope: string,
   input:
     | string
     | SmartSuggestRequest
@@ -45,13 +60,52 @@ function toFeatureInput(
     | AnalyzeConflictsRequest
     | SuggestTimeslotRequest
     | ChatRequest,
-): Record<string, unknown> {
+  featureSpec?: PreparedAiFeatureSpec,
+): PreparedStreamInput {
   const prepared = buildPreparedFeatureRequest(input);
   return {
-    instructions: prepared.instructions,
-    inputText: prepared.inputText,
-    featureSpec: prepared.featureSpec,
+    scope,
+    instructions: featureSpec?.instructions ?? prepared.instructions,
+    inputText: featureSpec?.inputText ?? prepared.inputText,
+    featureSpec,
     input: prepared.input,
+    userMessage: featureSpec?.inputText ?? prepared.inputText,
+  };
+}
+
+function toOpenClawStreamRequest(
+  input: PreparedStreamInput,
+  timeout: number,
+): {
+  sessionKey: string;
+  instructions: string;
+  inputText: string;
+  featureSpec?: PreparedAiFeatureSpec;
+  input: Record<string, unknown>;
+  timeout: number;
+} {
+  return {
+    sessionKey: input.scope,
+    instructions: input.instructions,
+    inputText: input.inputText,
+    featureSpec: input.featureSpec,
+    input: input.input,
+    timeout,
+  };
+}
+
+function toLlmStreamRequest(
+  feature: AiFeature,
+  input: PreparedStreamInput,
+): {
+  systemPrompt: string;
+  userMessage: string;
+  options: { jsonMode: boolean };
+} {
+  return {
+    systemPrompt: input.instructions || `Feature: ${feature}`,
+    userMessage: input.userMessage,
+    options: { jsonMode: feature !== "chat" },
   };
 }
 
@@ -86,27 +140,21 @@ function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
 async function* openclawStream(
   config: OpenClawClientConfig,
   feature: AiFeature,
-  scope: string,
-  input:
-    | string
-    | SmartSuggestRequest
-    | GenerateTaskPlanRequest
-    | AnalyzeConflictsRequest
-    | SuggestTimeslotRequest
-    | ChatRequest,
+  input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
   const timeout = config.timeoutSeconds ?? 120;
+  const providerInput = toOpenClawStreamRequest(input, timeout);
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
     feature,
-    scope,
+    input.scope,
   );
 
   logger.info("openclaw.stream.start", {
     feature,
-    scope,
+    scope: input.scope,
     sessionId,
     timeout,
-    inputSummary: summarizeText(JSON.stringify(input), 160),
+    inputSummary: summarizeText(JSON.stringify(input.input), 160),
   });
 
   yield { type: "status", message: "正在连接 AI 服务..." };
@@ -121,11 +169,7 @@ async function* openclawStream(
 
       for await (const event of client.executeFeatureStream(
         feature as "suggest" | "generate_plan",
-        {
-          sessionKey,
-          ...toFeatureInput(input),
-          timeout,
-        },
+        { ...providerInput, sessionKey },
       )) {
         const parsed = convertProviderEvent(event);
         if (!parsed) continue;
@@ -140,7 +184,7 @@ async function* openclawStream(
 
       logger.info("openclaw.stream.done", {
         feature,
-        scope,
+        scope: input.scope,
         sessionId,
         ok: true,
         textLength: fullText.length,
@@ -151,19 +195,25 @@ async function* openclawStream(
     } catch (error) {
       logger.warn("openclaw.stream.fallback_to_blocking", {
         feature,
-        scope,
+        scope: input.scope,
         sessionId,
         error: error instanceof Error ? error.message : String(error),
       });
+
+      if (feature === "generate_plan") {
+        yield {
+          type: "error",
+          message:
+            error instanceof Error ? error.message : "Unknown streaming error",
+        };
+        return;
+      }
     }
   }
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(config, feature, {
-      ...buildPreparedFeatureRequest(input),
-      sessionKey: scope,
-    });
+    const text = await openclawCall(config, feature, providerInput);
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -263,28 +313,21 @@ async function* llmStream(
 function dispatchStream(
   client: AiClientRecord,
   feature: AiFeature,
-  input:
-    | string
-    | SmartSuggestRequest
-    | GenerateTaskPlanRequest
-    | AnalyzeConflictsRequest
-    | SuggestTimeslotRequest
-    | ChatRequest,
-  scope = "default",
+  input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
   if (client.type === "openclaw") {
     return openclawStream(
       client.config as OpenClawClientConfig,
       feature,
-      scope,
       input,
     );
   }
+  const request = toLlmStreamRequest(feature, input);
   return llmStream(
     client.config as LLMClientConfig,
-    `Feature: ${feature}`,
-    typeof input === "string" ? input : JSON.stringify(input),
-    { jsonMode: feature !== "chat" },
+    request.systemPrompt,
+    request.userMessage,
+    request.options,
   );
 }
 
@@ -323,12 +366,12 @@ export async function* suggestStream(
   client: AiClientRecord,
   request: SmartSuggestRequest,
 ): AsyncGenerator<StreamEvent> {
-  const generator = dispatchStream(
-    client,
-    "suggest",
-    request,
+  const preparedInput = prepareStreamInput(
     buildSuggestScope(request),
+    request,
+    buildSuggestFeatureSpec(),
   );
+  const generator = dispatchStream(client, "suggest", preparedInput);
 
   let finalText = "";
   let latestToolInput: Record<string, unknown> | null = null;
@@ -415,6 +458,7 @@ function describeGeneratePlanFailure(params: {
     | undefined;
   latestToolInput: Record<string, unknown> | null;
   structuredToolGraph: Record<string, unknown> | null;
+  validationErrors?: Array<{ path: string; message: string }>;
 }): string {
   const parts: string[] = [
     "OpenClaw did not return a usable generate_task_plan_graph result.",
@@ -481,6 +525,15 @@ function describeGeneratePlanFailure(params: {
     parts.push(`Raw output preview: ${textPreview}`);
   }
 
+  if (params.validationErrors && params.validationErrors.length > 0) {
+    parts.push(
+      `Validation errors: ${params.validationErrors
+        .slice(0, 3)
+        .map((error) => `${error.path || "<root>"}: ${error.message}`)
+        .join(" | ")}`,
+    );
+  }
+
   return parts.join(" ");
 }
 
@@ -492,6 +545,8 @@ function buildGeneratePlanDiagnostics(params: {
     | undefined;
   latestToolInput: Record<string, unknown> | null;
   structuredToolGraph: Record<string, unknown> | null;
+  validationErrors?: Array<{ path: string; message: string }>;
+  validationWarnings?: Array<{ path: string; message: string }>;
 }): Record<string, unknown> {
   const structuredRecord = params.structured as
     | {
@@ -516,6 +571,8 @@ function buildGeneratePlanDiagnostics(params: {
     hasLiveToolCall: Boolean(params.latestToolInput),
     hasStructuredToolGraph: Boolean(params.structuredToolGraph),
     rawTextPreview: previewText(params.text, 400),
+    validationErrors: params.validationErrors ?? [],
+    validationWarnings: params.validationWarnings ?? [],
     structured: structuredRecord
       ? {
           ok: structuredRecord.ok ?? null,
@@ -562,6 +619,22 @@ type GeneratePlanAccumulator = {
   latestToolInput: Record<string, unknown> | null;
 };
 
+function hasNonEmptyPlanBlueprint(
+  plan: unknown,
+): plan is { blueprint: { nodes: unknown[] } } {
+  if (!plan || typeof plan !== "object") {
+    return false;
+  }
+
+  const blueprint = (plan as { blueprint?: unknown }).blueprint;
+  if (!blueprint || typeof blueprint !== "object") {
+    return false;
+  }
+
+  const nodes = (blueprint as { nodes?: unknown }).nodes;
+  return Array.isArray(nodes) && nodes.length > 0;
+}
+
 function collectGeneratePlanResult(
   acc: GeneratePlanAccumulator,
   doneEvent: Extract<StreamEvent, { type: "done" }>,
@@ -572,30 +645,35 @@ function collectGeneratePlanResult(
     doneEvent.structured ?? null,
   );
 
-  let parsed: EditablePlan = acc.latestToolInput ?? structuredToolGraph ?? null;
+  let parsed = (acc.latestToolInput ??
+    structuredToolGraph ??
+    null) as EditablePlan | null;
   if (!acc.latestToolInput && !structuredToolGraph) {
     try {
-      parsed = text ? JSON.parse(text) : null;
+      parsed = text ? (JSON.parse(text) as EditablePlan) : null;
     } catch {
       parsed = null;
     }
   }
 
-  const plan = normalizeGeneratePlanResponse({
-    parsed,
+  const normalized = normalizeGeneratePlanResponse({
+    parsed: parsed,
     source,
     structured: doneEvent.structured,
   });
-  if (plan.blueprint.nodes.length === 0) {
+  const plan = normalized.plan;
+  if (!hasNonEmptyPlanBlueprint(plan)) {
     const diagnostics = buildGeneratePlanDiagnostics({
       text,
       structured: doneEvent.structured ?? null,
       latestToolInput: acc.latestToolInput,
       structuredToolGraph,
+      validationErrors: normalized.validationErrors,
+      validationWarnings: normalized.validationWarnings,
     });
     return {
       type: "error",
-      message: `${describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph })} Normalized plan blueprint contained zero nodes.`,
+      message: `${describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph, validationErrors: normalized.validationErrors })} Normalized plan blueprint contained zero nodes.`,
       rawText: text,
       structured: doneEvent.structured ?? null,
       diagnostics,
@@ -609,18 +687,20 @@ export async function* generatePlanStream(
   client: AiClientRecord,
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const generator = dispatchStream(
-    client,
-    "generate_plan",
-    request,
+  const featureSpec = buildGeneratePlanFeatureSpec(request);
+  const preparedInput = prepareStreamInput(
     buildGeneratePlanScope(request),
+    request,
+    featureSpec,
   );
+  const generator = dispatchStream(client, "generate_plan", preparedInput);
   const acc: GeneratePlanAccumulator = { finalText: "", latestToolInput: null };
   let latestStructured: NonNullable<
     Extract<StreamEvent, { type: "done" }>["structured"]
   > | null = null;
 
   for await (const event of generator) {
+    console.log("Received event:", event);
     if (
       event.type === "tool_call" &&
       event.tool === "generate_task_plan_graph"

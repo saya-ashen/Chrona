@@ -4,18 +4,20 @@ import { json } from "../lib/http";
 
 import { createTasksRoutes } from "./tasks.routes";
 import { createProjectionsRoutes } from "./projections.routes";
-import { createExecutionRoutes } from "./execution.routes";
+// import { createExecutionRoutes } from "./execution.routes";
 import { createPlansRoutes } from "./plans.routes";
 import { createAiRoutes } from "./ai.routes";
 
 export function createApiRouter() {
-  return new Hono()
-    .get("/health", (c) => json(c, { status: "ok" }))
-    .route("/", createTasksRoutes())
-    .route("/", createProjectionsRoutes())
-    .route("/", createExecutionRoutes())
-    .route("/", createPlansRoutes())
-    .route("/", createAiRoutes());
+  return (
+    new Hono()
+      .get("/health", (c) => json(c, { status: "ok" }))
+      .route("/", createTasksRoutes())
+      .route("/", createProjectionsRoutes())
+      // .route("/", createExecutionRoutes())
+      .route("/", createPlansRoutes())
+      .route("/", createAiRoutes())
+  );
 }
 
 /**
