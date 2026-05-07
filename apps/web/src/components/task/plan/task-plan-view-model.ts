@@ -9,21 +9,43 @@ import type {
   TaskPlanReadModel,
   WaitConfig,
 } from "@chrona/contracts/ai";
-import type { PlanStep, TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import type {
+  PlanEdgeDataModel,
+  PlanGraphAnalytics,
+  PlanNodeAction,
+  PlanNodeDataModel,
+  PlanNodeField,
+  PlanNodeIntent,
+  PlanNodeKind,
+  PlanNodeStatus,
+  TaskPlanGraphPlan,
+} from "@/components/task/plan/task-plan-graph";
 
-type PlanDisplayType = "task" | "checkpoint" | "condition" | "wait";
+type PlanMetadata = {
+  executor: string | null;
+  mode: string | null;
+  checkpointType?: string;
+  prompt?: string;
+  required?: boolean;
+  options?: string[];
+  inputFields?: Array<{ key?: string; label?: string; type?: string; required?: boolean; options?: string[] }>;
+  condition?: string;
+  evaluationBy?: string;
+  branches?: Array<{ label?: string }>;
+  defaultNextNodeId?: string;
+  waitFor?: string;
+  timeout?: { minutes?: number };
+  expectedOutput?: string;
+  completionCriteria?: string[];
+};
 
-function normalizePlanNodeTypeForDisplay(rawType: unknown): PlanDisplayType {
+function normalizePlanNodeKind(rawType: unknown): PlanNodeKind {
   switch (rawType) {
     case "task":
     case "checkpoint":
     case "condition":
     case "wait":
       return rawType;
-    case "step":
-    case "deliverable":
-    case "tool_action":
-      return "task";
     case "decision":
       return "condition";
     case "user_input":
@@ -33,24 +55,75 @@ function normalizePlanNodeTypeForDisplay(rawType: unknown): PlanDisplayType {
   }
 }
 
-function currentStepIdFromSteps(steps: PlanStep[]) {
-  return steps.find((step) => ["in_progress", "waiting_for_user", "blocked"].includes(step.status))?.id ?? null;
+function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined): PlanNodeStatus {
+  switch (status) {
+    case "running":
+      return "active";
+    case "waiting_for_approval":
+    case "waiting_for_user":
+      return "waiting";
+    case "blocked":
+    case "failed":
+      return "blocked";
+    case "completed":
+      return "done";
+    case "cancelled":
+      return "skipped";
+    case "ready":
+      return "ready";
+    case "pending":
+      return "idle";
+    default:
+      return "idle";
+  }
+}
+
+function inferIntent(kind: PlanNodeKind, metadata: PlanMetadata, status: PlanNodeStatus): PlanNodeIntent {
+  if (kind === "condition") return "decision";
+  if (kind === "wait") return "pause";
+  if (kind === "checkpoint") {
+    if (metadata.checkpointType === "approve" || status === "waiting") return "approval";
+    return "input";
+  }
+  return "execution";
+}
+
+function statusLabel(status: PlanNodeStatus) {
+  switch (status) {
+    case "active":
+      return "进行中";
+    case "waiting":
+      return "待处理";
+    case "blocked":
+      return "阻塞";
+    case "done":
+      return "已完成";
+    case "ready":
+      return "就绪";
+    case "skipped":
+      return "已跳过";
+    default:
+      return "待开始";
+  }
+}
+
+function statusGroup(status: PlanNodeStatus): PlanNodeDataModel["group"] {
+  if (status === "active") return "active";
+  if (status === "waiting" || status === "blocked") return "attention";
+  if (status === "done" || status === "skipped") return "done";
+  if (status === "ready") return "upcoming";
+  return "idle";
 }
 
 function nodeConfigToMetadata(node: {
   config: NodeConfig;
   executor?: string;
   mode?: string;
-}): Record<string, unknown> {
+}): PlanMetadata {
   const base = {
-    executor: node.executor,
-    mode: node.mode,
+    executor: node.executor ?? null,
+    mode: node.mode ?? null,
   };
-
-  switch ((node.config as { condition?: unknown; checkpointType?: unknown; waitFor?: unknown }).condition ? "condition" : null) {
-    default:
-      break;
-  }
 
   if ("checkpointType" in node.config) {
     const config = node.config as CheckpointConfig;
@@ -88,125 +161,431 @@ function nodeConfigToMetadata(node: {
   return {
     ...base,
     expectedOutput: config.expectedOutput,
-    completionCriteria: config.completionCriteria,
+    completionCriteria: Array.isArray(config.completionCriteria)
+      ? config.completionCriteria.filter((item): item is string => typeof item === "string")
+      : undefined,
   };
 }
 
-function mapEffectiveStatus(status: EffectivePlanNode["status"]): PlanStep["status"] {
-  switch (status) {
-    case "ready":
-    case "pending":
-    case "paused":
-      return "pending";
-    case "running":
-      return "in_progress";
-    case "waiting_for_approval":
-      return "waiting_for_approval";
-    case "waiting_for_user":
-      return "waiting_for_user";
-    case "blocked":
-      return "blocked";
-    case "completed":
-      return "done";
-    case "failed":
-      return "blocked";
-    case "cancelled":
-      return "skipped";
-    default:
-      return "pending";
+function buildInteractiveFields(node: {
+  kind: PlanNodeKind;
+  metadata: PlanMetadata;
+  requiredInfo: string[];
+}): PlanNodeField[] {
+  const fields: PlanNodeField[] = [];
+
+  for (const item of node.requiredInfo) {
+    fields.push({
+      key: `required:${item}`,
+      label: item,
+      value: "",
+      control: "text",
+      required: true,
+    });
   }
+
+  if (node.kind === "checkpoint" && node.metadata.inputFields?.length) {
+    for (const [index, input] of node.metadata.inputFields.entries()) {
+      fields.push({
+        key: input.key ?? `checkpoint:${index}`,
+        label: input.label ?? `输入 ${index + 1}`,
+        value: "",
+        control: input.type === "textarea" ? "textarea" : input.options?.length ? "select" : "text",
+        required: input.required ?? false,
+        options: input.options,
+      });
+    }
+  }
+
+  if (node.kind === "checkpoint" && node.metadata.options?.length) {
+    fields.push({
+      key: "checkpoint:decision",
+      label: "决策",
+      value: "",
+      control: "select",
+      required: Boolean(node.metadata.required),
+      options: node.metadata.options,
+    });
+  }
+
+  return fields;
 }
 
-function effectiveNodeToPlanStep(node: EffectivePlanNode): PlanStep {
+function buildAvailableActions(node: {
+  id: string;
+  status: PlanNodeStatus;
+  intent: PlanNodeIntent;
+  hasInteractiveFields: boolean;
+}): PlanNodeAction[] {
+  const actions: PlanNodeAction[] = [];
+
+  if (node.hasInteractiveFields) {
+    actions.push({
+      id: `${node.id}:input`,
+      label: "提交输入",
+      kind: "input",
+      emphasis: "primary",
+    });
+  }
+
+  if (node.intent === "approval") {
+    actions.push({
+      id: `${node.id}:approve`,
+      label: "审批",
+      kind: "approve",
+      emphasis: node.status === "blocked" ? "warning" : "primary",
+    });
+  }
+
+  if (actions.length === 0 && (node.status === "ready" || node.status === "active")) {
+    actions.push({
+      id: `${node.id}:open`,
+      label: "查看节点",
+      kind: "open",
+      emphasis: "default",
+    });
+  }
+
+  return actions;
+}
+
+function buildNodeSummary(kind: PlanNodeKind, metadata: PlanMetadata, objective: string) {
+  if (kind === "condition") return metadata.condition ?? objective;
+  if (kind === "wait") return metadata.waitFor ?? objective;
+  if (kind === "checkpoint") return metadata.prompt ?? objective;
+  return metadata.expectedOutput ?? objective;
+}
+
+function toPlanNode(node: {
+  id: string;
+  title: string;
+  description?: string | null;
+  type: string;
+  mode?: string | null;
+  executor?: string | null;
+  linkedTaskId?: string | null;
+  estimatedMinutes?: number | null;
+  priority?: string | null;
+  dependencies?: string[];
+  requiredInfo?: string[];
+  status?: EffectivePlanNode["status"] | null;
+  ready?: boolean;
+  result?: { outputSummary?: string | null } | null;
+  nextAction?: string | null;
+  config: NodeConfig;
+}): PlanNodeDataModel {
+  const kind = normalizePlanNodeKind(node.type);
+  const metadata = nodeConfigToMetadata({
+    config: node.config,
+    executor: node.executor ?? undefined,
+    mode: node.mode ?? undefined,
+  });
+  const status = normalizeStatus(node.status);
+  const objective = node.description ?? node.title;
+  const requiredInfo = node.requiredInfo ?? [];
+  const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo });
+  const intent = inferIntent(kind, metadata, status);
+
   return {
     id: node.id,
     title: node.title,
-    objective: node.description ?? node.title,
+    summary: buildNodeSummary(kind, metadata, objective),
+    objective,
     phase: node.type,
-    status: mapEffectiveStatus(node.status),
-    requiresHumanInput:
-      node.mode === "manual" ||
-      node.status === "waiting_for_user" ||
-      node.status === "waiting_for_approval",
-    requiresHumanApproval: node.status === "waiting_for_approval",
-    type: node.type,
-    displayType: normalizePlanNodeTypeForDisplay(node.type),
-    linkedTaskId: node.linkedTaskId ?? null,
-    executionMode: node.mode ?? null,
+    kind,
+    status,
+    intent,
+    group: statusGroup(status),
+    statusLabel: statusLabel(status),
+    badges: [kind, intent, node.mode].filter((value): value is string => Boolean(value)),
+    executionMode: node.mode ?? metadata.mode,
+    executor: node.executor ?? metadata.executor,
     estimatedMinutes: node.estimatedMinutes ?? null,
     priority: node.priority ?? null,
+    linkedTaskId: node.linkedTaskId ?? null,
+    readiness: node.ready ? "ready" : status === "blocked" ? "blocked" : "waiting",
+    dependencies: node.dependencies ?? [],
+    requiredInfo,
+    nextAction: node.nextAction ?? null,
     completionSummary: node.result?.outputSummary ?? null,
-    metadata: nodeConfigToMetadata(node),
-    readiness: node.ready ? "ready" : node.status === "blocked" ? "blocked" : "waiting",
-    dependencies: node.dependencies,
+    branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `分支 ${index + 1}`) ?? [],
+    options: metadata.options ?? [],
+    active: status === "active",
+    blocked: status === "blocked",
+    actionable: interactiveFields.length > 0 || intent === "approval" || status === "ready",
+    interactiveFields,
+    availableActions: buildAvailableActions({
+      id: node.id,
+      status,
+      intent,
+      hasInteractiveFields: interactiveFields.length > 0,
+    }),
+    metadata: metadata as Record<string, unknown>,
   };
 }
 
-export function compiledPlanToGraphPlan(
-  plan: CompiledPlan | null | undefined,
-  meta?: Partial<Omit<TaskPlanGraphPlan, "state" | "currentStepId" | "steps" | "edges">>,
-): TaskPlanGraphPlan | null {
-  if (!plan?.nodes?.length) {
-    return null;
+function edgeKindFromLabel(label: string | null | undefined, sourceKind: PlanNodeKind): PlanEdgeDataModel["kind"] {
+  const value = (label ?? "").toLowerCase();
+  if (sourceKind === "condition") {
+    if (value === "true" || value === "yes") return "branch_true";
+    if (value === "false" || value === "no") return "branch_false";
+    return "branch_option";
+  }
+  if (value.includes("depend")) return "dependency";
+  if (value.includes("resume")) return "resume";
+  return "sequential";
+}
+
+function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]): PlanGraphAnalytics {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const incoming = new Map<string, string[]>();
+  const outgoing = new Map<string, string[]>();
+
+  for (const node of nodes) {
+    incoming.set(node.id, []);
+    outgoing.set(node.id, []);
   }
 
-  const steps: PlanStep[] = plan.nodes.map((node: CompiledNode) => ({
-    id: node.id,
-    title: node.title,
-    objective: node.description ?? node.title,
-    phase: node.type,
-    status: "pending",
-    requiresHumanInput: node.mode === "manual",
-    type: node.type,
-    displayType: normalizePlanNodeTypeForDisplay(node.type),
-    linkedTaskId: node.linkedTaskId,
-    executionMode: node.mode ?? null,
-    estimatedMinutes: node.estimatedMinutes ?? null,
-    priority: node.priority ?? null,
-    metadata: nodeConfigToMetadata(node),
+  for (const edge of edges) {
+    incoming.get(edge.to)?.push(edge.from);
+    outgoing.get(edge.from)?.push(edge.to);
+  }
+
+  const entryNodeIds = nodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
+  const terminalNodeIds = nodes.filter((node) => (outgoing.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
+  const activeNodeIds = nodes.filter((node) => node.status === "active").map((node) => node.id);
+  const attentionNodeIds = nodes.filter((node) => node.status === "waiting" || node.status === "blocked").map((node) => node.id);
+  const blockedNodeIds = nodes.filter((node) => node.status === "blocked").map((node) => node.id);
+
+  const indegree = new Map<string, number>();
+  for (const node of nodes) indegree.set(node.id, incoming.get(node.id)?.length ?? 0);
+  const queue = [...entryNodeIds];
+  const topo: string[] = [];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+    topo.push(current);
+    for (const next of outgoing.get(current) ?? []) {
+      const nextDegree = (indegree.get(next) ?? 0) - 1;
+      indegree.set(next, nextDegree);
+      if (nextDegree === 0) queue.push(next);
+    }
+  }
+
+  const rankByNodeId: Record<string, number> = {};
+  for (const nodeId of topo) {
+    const parents = incoming.get(nodeId) ?? [];
+    rankByNodeId[nodeId] = parents.length === 0 ? 0 : Math.max(...parents.map((parent) => rankByNodeId[parent] ?? 0)) + 1;
+  }
+  for (const node of nodes) {
+    rankByNodeId[node.id] ??= 0;
+  }
+
+  const laneByNodeId: Record<string, number> = {};
+  const rankGroups = new Map<number, string[]>();
+  for (const node of nodes) {
+    const rank = rankByNodeId[node.id] ?? 0;
+    const group = rankGroups.get(rank) ?? [];
+    group.push(node.id);
+    rankGroups.set(rank, group);
+  }
+  for (const [rank, ids] of rankGroups.entries()) {
+    ids.sort((left, right) => {
+      const leftNode = nodeMap.get(left);
+      const rightNode = nodeMap.get(right);
+      return Number(Boolean(rightNode?.active)) - Number(Boolean(leftNode?.active)) || left.localeCompare(right);
+    });
+    ids.forEach((id, index) => {
+      laneByNodeId[id] = index;
+    });
+  }
+
+  const reachable = new Set<string>();
+  const walk = (starts: string[]) => {
+    const pending = [...starts];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (!current || reachable.has(current)) continue;
+      reachable.add(current);
+      for (const next of outgoing.get(current) ?? []) pending.push(next);
+    }
+  };
+  walk(activeNodeIds.length > 0 ? activeNodeIds : entryNodeIds);
+
+  const distance = new Map<string, number>();
+  for (const nodeId of topo) {
+    const currentNode = nodeMap.get(nodeId);
+    const weight = currentNode?.estimatedMinutes ?? 1;
+    const parents = incoming.get(nodeId) ?? [];
+    distance.set(
+      nodeId,
+      parents.length === 0 ? weight : Math.max(...parents.map((parent) => distance.get(parent) ?? 0)) + weight,
+    );
+  }
+  let criticalTail = nodes[0]?.id ?? null;
+  for (const node of nodes) {
+    if (!criticalTail || (distance.get(node.id) ?? 0) > (distance.get(criticalTail) ?? 0)) {
+      criticalTail = node.id;
+    }
+  }
+
+  const criticalPathNodeIds: string[] = [];
+  let cursor = criticalTail;
+  while (cursor) {
+    criticalPathNodeIds.unshift(cursor);
+    const parents = incoming.get(cursor) ?? [];
+    if (parents.length === 0) break;
+    cursor = parents.reduce((best, parent) => ((distance.get(parent) ?? 0) > (distance.get(best) ?? 0) ? parent : best), parents[0]);
+  }
+
+  return {
+    entryNodeIds,
+    terminalNodeIds,
+    activeNodeIds,
+    reachableFromActiveIds: [...reachable],
+    criticalPathNodeIds,
+    attentionNodeIds,
+    blockedNodeIds,
+    rankByNodeId,
+    laneByNodeId,
+    upstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, incoming.get(node.id) ?? []])),
+    downstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, outgoing.get(node.id) ?? []])),
+  };
+}
+
+function buildGraphPlan(input: {
+  title?: string | null;
+  summary?: string | null;
+  revision?: string | null;
+  generatedBy?: string | null;
+  updatedAt?: string | null;
+  nodes: PlanNodeDataModel[];
+  rawEdges: Array<{ id: string; from: string; to: string; label?: string | null }>;
+}): TaskPlanGraphPlan {
+  const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
+  const provisionalEdges = input.rawEdges.map((edge) => {
+    const source = nodeById.get(edge.from);
+    return {
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      label: edge.label ?? null,
+      kind: edgeKindFromLabel(edge.label, source?.kind ?? "task"),
+      emphasis: "normal" as const,
+    };
+  });
+
+  const analytics = buildAnalytics(input.nodes, provisionalEdges);
+  const activeSet = new Set(analytics.activeNodeIds);
+  const blockedSet = new Set(analytics.blockedNodeIds);
+  const edgeEmphasisFor = (edge: { from: string; to: string }): PlanEdgeDataModel["emphasis"] => {
+    if (activeSet.has(edge.from) || activeSet.has(edge.to)) return "active";
+    if (blockedSet.has(edge.from) || blockedSet.has(edge.to)) return "blocked";
+    return "normal";
+  };
+  const edges = provisionalEdges.map((edge) => ({
+    ...edge,
+    emphasis: edgeEmphasisFor(edge),
   }));
 
   return {
-    state: "ready",
-    currentStepId: currentStepIdFromSteps(steps),
-    steps,
-    edges: (plan.edges ?? []).map((edge) => ({
-      id: edge.id,
-      fromNodeId: edge.from,
-      toNodeId: edge.to,
-      type: "sequential",
-      label: edge.label,
-    })),
-    ...meta,
+    state: input.nodes.length === 0 ? "empty" : "ready",
+    graphTitle: input.title ?? null,
+    graphSummary: input.summary ?? null,
+    revision: input.revision ?? null,
+    generatedBy: input.generatedBy ?? null,
+    updatedAt: input.updatedAt ?? null,
+    nodes: input.nodes,
+    edges,
+    analytics,
   };
 }
 
-export function taskPlanReadModelToGraphPlan(
-  readModel: TaskPlanReadModel | null | undefined,
-): TaskPlanGraphPlan | null {
+export function compiledPlanToGraphPlan(plan: CompiledPlan | null | undefined): TaskPlanGraphPlan | null {
+  if (!plan?.nodes?.length) return null;
+
+  return buildGraphPlan({
+    title: plan.title ?? null,
+    summary: plan.goal ?? null,
+    revision: plan.sourceVersion ? `r${plan.sourceVersion}` : null,
+    generatedBy: null,
+    updatedAt: null,
+    nodes: plan.nodes.map((node: CompiledNode) =>
+      toPlanNode({
+        id: node.id,
+        title: node.title,
+        description: node.description,
+        type: node.type,
+        mode: node.mode ?? null,
+        executor: node.executor ?? null,
+        linkedTaskId: node.linkedTaskId ?? null,
+        estimatedMinutes: node.estimatedMinutes ?? null,
+        priority: node.priority ?? null,
+        dependencies: node.dependencies ?? [],
+        requiredInfo: [],
+        nextAction: null,
+        config: node.config,
+      }),
+    ),
+    rawEdges: (plan.edges ?? []).map((edge) => ({
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      label: edge.label ?? null,
+    })),
+  });
+}
+
+export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null | undefined): TaskPlanGraphPlan | null {
   if (!readModel?.effectivePlan?.nodes?.length) {
     return readModel?.compiledPlan ? compiledPlanToGraphPlan(readModel.compiledPlan) : null;
   }
 
-  const steps = readModel.effectivePlan.nodes.map(effectiveNodeToPlanStep);
-  const activeEdges = readModel.effectivePlan.edges.filter((edge) => edge.active !== false);
-
-  return {
-    state: "ready",
-    currentStepId: currentStepIdFromSteps(steps),
-    steps,
-    edges: activeEdges.map((edge) => ({
-      id: edge.id,
-      fromNodeId: edge.from,
-      toNodeId: edge.to,
-      type: "sequential",
-      label: edge.label,
-    })),
-    revision: `r${readModel.revision}`,
-    generatedBy: readModel.generatedBy,
-    summary: readModel.summary,
-    updatedAt: readModel.updatedAt,
+  const readRuntimeArray = (node: EffectivePlanNode, key: string) => {
+    const value = (node as unknown as Record<string, unknown>)[key];
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   };
+
+  const readRuntimeString = (node: EffectivePlanNode, key: string) => {
+    const value = (node as unknown as Record<string, unknown>)[key];
+    return typeof value === "string" ? value : null;
+  };
+
+  return buildGraphPlan({
+    title: readModel.compiledPlan.title ?? null,
+    summary: readModel.summary ?? readModel.compiledPlan.goal ?? null,
+    revision: `r${readModel.revision}`,
+    generatedBy: readModel.generatedBy ?? null,
+    updatedAt: readModel.updatedAt ?? null,
+    nodes: readModel.effectivePlan.nodes.map((node: EffectivePlanNode) =>
+      toPlanNode({
+        id: node.id,
+        title: node.title,
+        description: node.description,
+        type: node.type,
+        mode: node.mode ?? null,
+        executor: node.executor ?? null,
+        linkedTaskId: node.linkedTaskId ?? null,
+        estimatedMinutes: node.estimatedMinutes ?? null,
+        priority: node.priority ?? null,
+        dependencies: node.dependencies ?? [],
+        requiredInfo: readRuntimeArray(node, "requiredInfo"),
+        status: node.status,
+        ready: node.ready,
+        result: node.result,
+        nextAction: readRuntimeString(node, "nextAction"),
+        config: node.config,
+      }),
+    ),
+    rawEdges: readModel.effectivePlan.edges
+      .filter((edge) => edge.active !== false)
+      .map((edge) => ({
+        id: edge.id,
+        from: edge.from,
+        to: edge.to,
+        label: edge.label ?? null,
+      })),
+  });
 }
 
 export function summarizeCompiledPlan(plan: CompiledPlan | null | undefined) {
@@ -214,17 +593,9 @@ export function summarizeCompiledPlan(plan: CompiledPlan | null | undefined) {
     return { totalEstimatedMinutes: 0, nodeCount: 0, warnings: [] as string[] };
   }
 
-  const totalEstimatedMinutes = plan.nodes.reduce(
-    (sum, node) => sum + (node.estimatedMinutes ?? 0),
-    0,
-  );
-  const warnings = plan.validationWarnings.map(
-    (w) => `${w.path}: ${w.message}`,
-  );
-
   return {
-    totalEstimatedMinutes,
+    totalEstimatedMinutes: plan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0),
     nodeCount: plan.nodes.length,
-    warnings,
+    warnings: plan.validationWarnings.map((warning) => `${warning.path}: ${warning.message}`),
   };
 }

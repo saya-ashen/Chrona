@@ -1,5 +1,7 @@
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
 
+import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+
 export type WorkPageClientProps = {
   initialData: {
     taskShell: {
@@ -96,43 +98,7 @@ export type WorkPageClientProps = {
         createdAt: string | null;
       } | null;
     };
-    taskPlan: {
-      state: "empty" | "ready";
-      revision: string | null;
-      generatedBy: string | null;
-      isMock: boolean;
-      summary: string | null;
-      updatedAt: string | null;
-      changeSummary: string | null;
-      currentStepId: string | null;
-      steps: Array<{
-        id: string;
-        title: string;
-        objective: string;
-        phase: string;
-        status:
-          | "pending"
-          | "in_progress"
-          | "waiting_for_user"
-          | "waiting_for_child"
-          | "waiting_for_approval"
-          | "done"
-          | "blocked"
-          | "skipped";
-        requiresHumanInput: boolean;
-        type?: string;
-        linkedTaskId?: string | null;
-        executionMode?: string | null;
-        estimatedMinutes?: number | null;
-        priority?: string | null;
-      }>;
-      edges?: Array<{
-        id: string;
-        fromNodeId: string;
-        toNodeId: string;
-        type: string;
-      }>;
-    };
+    taskPlan: TaskPlanGraphPlan;
     workspaceRail?: {
       sections: Array<{
         id: string;

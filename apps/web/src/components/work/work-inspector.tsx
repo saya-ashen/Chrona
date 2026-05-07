@@ -6,38 +6,14 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
 
 const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
 
 type InspectorSection = (typeof sections)[number];
-type StepStatus = "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked" | "skipped";
 
 type WorkInspectorProps = {
-  plan: {
-    state: "empty" | "ready";
-    revision: string | null;
-    generatedBy: string | null;
-    isMock: boolean;
-    summary: string | null;
-    updatedAt: string | null;
-    changeSummary: string | null;
-    currentStepId: string | null;
-    steps: Array<{
-      id: string;
-      title: string;
-      objective: string;
-      phase: string;
-      status: StepStatus;
-      requiresHumanInput: boolean;
-      type?: string;
-      linkedTaskId?: string | null;
-      executionMode?: string | null;
-      estimatedMinutes?: number | null;
-      priority?: string | null;
-    }>;
-    edges?: Array<{ id: string; fromNodeId: string; toNodeId: string; type: string }>;
-  };
+  plan: TaskPlanGraphPlan;
   currentAction?: { label: string; href: string } | null;
   currentException?: string | null;
   isPending?: boolean;
@@ -64,7 +40,7 @@ type WorkInspectorProps = {
     sections: Record<InspectorSection, string>;
     emptyValue: string;
     emptyScheduleWindow: string;
-    stepStatuses: Record<StepStatus, { label: string; tone: "neutral" | "info" | "success" | "warning" | "critical" }>;
+    stepStatuses: Record<string, { label: string; tone: "neutral" | "info" | "success" | "warning" | "critical" }>;
     planTitle: string;
     planReadySummary: string;
     planEmptySummary: string;
@@ -260,7 +236,7 @@ function renderSectionPanel(
         <div>
           <p className="text-base font-semibold text-foreground">{labels.planTitle}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {plan.state === "ready" ? plan.summary ?? labels.planReadySummary : labels.planEmptySummary}
+            {plan.state === "ready" ? plan.graphSummary ?? labels.planReadySummary : labels.planEmptySummary}
           </p>
         </div>
 

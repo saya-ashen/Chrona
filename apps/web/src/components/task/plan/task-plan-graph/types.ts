@@ -1,62 +1,117 @@
 import type { Edge, Node } from "@xyflow/react";
 
-export type PlanStep = {
+export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait";
+
+export type PlanNodeStatus =
+  | "idle"
+  | "ready"
+  | "active"
+  | "waiting"
+  | "blocked"
+  | "done"
+  | "skipped";
+
+export type PlanNodeIntent =
+  | "execution"
+  | "approval"
+  | "input"
+  | "decision"
+  | "pause";
+
+export type PlanNodeGroup = "active" | "attention" | "upcoming" | "done" | "idle";
+
+export type PlanEdgeKind =
+  | "sequential"
+  | "dependency"
+  | "branch_true"
+  | "branch_false"
+  | "branch_option"
+  | "resume";
+
+export type PlanNodeField = {
+  key: string;
+  label: string;
+  value: string;
+  control?: "text" | "textarea" | "select" | "approval";
+  required?: boolean;
+  options?: string[];
+};
+
+export type PlanNodeAction = {
+  id: string;
+  label: string;
+  kind: "input" | "approve" | "open" | "trigger";
+  emphasis?: "default" | "primary" | "warning";
+};
+
+export type PlanNodeDataModel = {
   id: string;
   title: string;
+  summary: string;
   objective: string;
   phase: string;
-  status:
-    | "pending"
-    | "in_progress"
-    | "waiting_for_child"
-    | "waiting_for_user"
-    | "waiting_for_approval"
-    | "done"
-    | "blocked"
-    | "skipped";
-  requiresHumanInput: boolean;
-  requiresHumanApproval?: boolean;
-  type?: string;
-  displayType?: string;
-  linkedTaskId?: string | null;
-  executionMode?: string | null;
-  estimatedMinutes?: number | null;
-  priority?: string | null;
-  completionSummary?: string | null;
-  metadata?: Record<string, unknown> | null;
-  readiness?: "ready" | "blocked" | "waiting";
-  dependencies?: string[];
-  executionClassification?:
-    | "automatic_chainable"
-    | "automatic_standalone"
-    | "human_dependent"
-    | "review_gate";
-  nextAction?: string | null;
-  requiredInfo?: string[];
+  kind: PlanNodeKind;
+  status: PlanNodeStatus;
+  intent: PlanNodeIntent;
+  group: PlanNodeGroup;
+  statusLabel: string;
+  badges: string[];
+  executionMode: string | null;
+  executor: string | null;
+  estimatedMinutes: number | null;
+  priority: string | null;
+  linkedTaskId: string | null;
+  readiness: "ready" | "blocked" | "waiting";
+  dependencies: string[];
+  requiredInfo: string[];
+  nextAction: string | null;
+  completionSummary: string | null;
+  branchLabels: string[];
+  options: string[];
+  active: boolean;
+  blocked: boolean;
+  actionable: boolean;
+  interactiveFields: PlanNodeField[];
+  availableActions: PlanNodeAction[];
+  metadata: Record<string, unknown>;
 };
 
-export type PlanEdge = {
+export type PlanEdgeDataModel = {
   id: string;
-  fromNodeId: string;
-  toNodeId: string;
-  type: string;
-  label?: string;
+  from: string;
+  to: string;
+  kind: PlanEdgeKind;
+  label: string | null;
+  emphasis: "normal" | "active" | "blocked";
 };
 
-export type TaskPlanGraphMode = "full" | "compact" | "auto";
+export type PlanGraphAnalytics = {
+  entryNodeIds: string[];
+  terminalNodeIds: string[];
+  activeNodeIds: string[];
+  reachableFromActiveIds: string[];
+  criticalPathNodeIds: string[];
+  attentionNodeIds: string[];
+  blockedNodeIds: string[];
+  rankByNodeId: Record<string, number>;
+  laneByNodeId: Record<string, number>;
+  upstreamByNodeId: Record<string, string[]>;
+  downstreamByNodeId: Record<string, string[]>;
+};
 
 export type TaskPlanGraphPlan = {
   state: "empty" | "ready";
-  currentStepId: string | null;
-  steps: PlanStep[];
-  edges?: PlanEdge[];
-  revision?: string | null;
-  generatedBy?: string | null;
-  isMock?: boolean;
-  summary?: string | null;
-  updatedAt?: string | null;
-  changeSummary?: string | null;
+  graphTitle: string | null;
+  graphSummary: string | null;
+  revision: string | null;
+  generatedBy: string | null;
+  updatedAt: string | null;
+  nodes: PlanNodeDataModel[];
+  edges: PlanEdgeDataModel[];
+  analytics: PlanGraphAnalytics;
 };
+
+export type TaskPlanGraphMode = "full" | "compact" | "auto";
 
 export type TaskPlanGraphProps = {
   mode?: TaskPlanGraphMode;
@@ -65,87 +120,112 @@ export type TaskPlanGraphProps = {
 };
 
 export type NodeTone =
-  | "child-task"
-  | "waiting"
-  | "checkpoint"
-  | "checkpoint-approve"
-  | "condition"
-  | "wait"
-  | "done"
+  | "active"
+  | "attention"
   | "blocked"
-  | "current"
-  | "default";
+  | "done"
+  | "upcoming"
+  | "idle";
 
 export type NodeShape = "rounded" | "diamond" | "pill" | "parallelogram";
 
 export type GraphCopy = {
   ariaLabel: string;
-  statusInProgress: string;
-  statusWaitingForChild: string;
-  statusWaitingForUser: string;
-  statusWaitingForApproval: string;
-  statusDone: string;
-  statusBlocked: string;
-  statusSkipped: string;
-  statusPending: string;
-  edgeDependsOn: string;
-  edgeSequential: string;
-  requiresHumanInput: string;
-  detailType: string;
+  openFullGraph: string;
+  compactTitle: string;
+  compactDescription: string;
+  fullTitle: string;
+  fullDescription: string;
+  closeDialog: string;
+  overviewNodes: string;
+  overviewActive: string;
+  overviewAttention: string;
+  overviewDone: string;
+  overviewEstimate: string;
+  focusTitle: string;
+  focusDescription: string;
+  inspectorTitle: string;
+  inspectorEmpty: string;
+  inspectorWhy: string;
+  inspectorDependencies: string;
+  inspectorExecution: string;
+  inspectorOutcomes: string;
+  inspectorFields: string;
+  legendStates: string;
+  legendEdges: string;
+  detailObjective: string;
+  detailPhase: string;
   detailExecutionMode: string;
   detailPriority: string;
   detailEstimatedDuration: string;
   detailLinkedTask: string;
-  detailDescription: string;
-  detailCompletionSummary: string;
-  detailExecutionClassification: string;
   detailReadiness: string;
   detailNextAction: string;
   detailDependencies: string;
   detailRequiredInfo: string;
+  detailCompletionSummary: string;
+  statusIdle: string;
+  statusReady: string;
+  statusActive: string;
+  statusWaiting: string;
+  statusBlocked: string;
+  statusDone: string;
+  statusSkipped: string;
+  edgeSequential: string;
+  edgeDependency: string;
+  edgeBranch: string;
+  edgeResume: string;
   nodeTypeTask: string;
   nodeTypeCheckpoint: string;
   nodeTypeCondition: string;
   nodeTypeWait: string;
-  badgeAuto: string;
-  badgeManual: string;
-  badgeAssist: string;
-  badgeAi: string;
-  badgeUser: string;
-  badgeSystem: string;
-  badgeConfirm: string;
-  badgeChoose: string;
-  badgeInput: string;
-  badgeEdit: string;
-  badgeApprove: string;
-  badgeRequired: string;
-  badgeOptional: string;
+  intentExecution: string;
+  intentApproval: string;
+  intentInput: string;
+  intentDecision: string;
+  intentPause: string;
 };
 
 export type FlowNodeData = {
-  step: PlanStep;
+  node: PlanNodeDataModel;
   tone: NodeTone;
-  isCurrent: boolean;
+  shape: NodeShape;
   isSelected: boolean;
+  isFocus: boolean;
   graphCopy: GraphCopy;
-  onToggle: (nodeId: string) => void;
+  onSelect: (nodeId: string) => void;
 };
 
 export type FlowGraphNode = Node<FlowNodeData, "taskPlanNode">;
-
 export type FlowGraphEdge = Edge;
 
 export type EdgeLegendItem = {
-  type: string;
   label: string;
   stroke: string;
-  dash: string | undefined;
+  dash?: string;
   width: number;
 };
 
 export type NodeLegendItem = {
-  type: string;
   label: string;
   shape: NodeShape;
   tone: NodeTone;
+};
+
+export type CompactStage = {
+  id: string;
+  title: string;
+  nodeIds: string[];
+  activeCount: number;
+  attentionCount: number;
+  doneCount: number;
+};
+
+export type CompactFocusItem = {
+  id: string;
+  title: string;
+  statusLabel: string;
+  summary: string;
+  tone: NodeTone;
+  relationLabel: string | null;
 };

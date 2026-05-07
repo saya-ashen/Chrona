@@ -1,41 +1,13 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui/status-badge";
-import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
 import { useI18n } from "@/i18n/client";
 import type { WorkbenchCopy } from "./work-page/work-page-types";
 
 type TaskPlanSidePanelProps = {
   copy: WorkbenchCopy;
-  plan: {
-    state: "empty" | "ready";
-    revision: string | null;
-    generatedBy: string | null;
-    isMock: boolean;
-    summary: string | null;
-    updatedAt: string | null;
-    changeSummary: string | null;
-    currentStepId: string | null;
-    steps: Array<{
-      id: string;
-      title: string;
-      objective: string;
-      phase: string;
-      status: "pending" | "in_progress" | "waiting_for_child" | "waiting_for_user" | "waiting_for_approval" | "done" | "blocked" | "skipped";
-      requiresHumanInput: boolean;
-      type?: string;
-      linkedTaskId?: string | null;
-      executionMode?: string | null;
-      estimatedMinutes?: number | null;
-      priority?: string | null;
-    }>;
-    edges?: Array<{
-      id: string;
-      fromNodeId: string;
-      toNodeId: string;
-      type: string;
-    }>;
-  };
+  plan: TaskPlanGraphPlan;
   isPending?: boolean;
   currentAction?: {
     label: string;
@@ -99,7 +71,6 @@ export function TaskPlanSidePanel({
           {plan.state === "ready" ? (
             <div className="flex flex-wrap gap-2">
               {plan.revision ? <StatusBadge tone="info">{getRevisionLabel(plan.revision, panelCopy)}</StatusBadge> : null}
-              {plan.isMock ? <StatusBadge tone="warning">{panelCopy.mockPlanBadge}</StatusBadge> : null}
             </div>
           ) : null}
         </div>
@@ -116,8 +87,7 @@ export function TaskPlanSidePanel({
                 <StatusBadge tone="info">{panelCopy.planOverallStatus}</StatusBadge>
                 {plan.generatedBy ? <span className="text-xs text-muted-foreground">{panelCopy.sourcePrefix}{plan.generatedBy}</span> : null}
               </div>
-              {plan.summary ? <p className="mt-3 text-muted-foreground">{plan.summary}</p> : null}
-              {plan.changeSummary ? <p className="mt-3 text-xs text-muted-foreground">{plan.changeSummary}</p> : null}
+              {plan.graphSummary ? <p className="mt-3 text-muted-foreground">{plan.graphSummary}</p> : null}
               <p className="mt-3 text-xs text-muted-foreground">{copy.lastUpdatedLabel}：{formatDateTime(plan.updatedAt, copy.noValue)}</p>
             </div>
 

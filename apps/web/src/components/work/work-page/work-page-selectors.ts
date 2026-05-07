@@ -108,7 +108,7 @@ export function getCurrentPlanAction(
   taskPlan: WorkPageClientProps["initialData"]["taskPlan"],
   copy?: WorkbenchCopy,
 ) {
-  if (taskPlan.state !== "ready" || !taskPlan.currentStepId) {
+  if (taskPlan.state !== "ready" || taskPlan.analytics.activeNodeIds.length === 0) {
     return null;
   }
 

@@ -41,12 +41,12 @@ import type { WorkbenchCopy, WorkPageClientProps } from "./work-page/work-page-t
 type NodeViewStatus = "completed" | "running" | "waiting" | "blocked" | "pending";
 
 function getNodeViewStatus(
-  step: WorkPageClientProps["initialData"]["taskPlan"]["steps"][number],
+  step: WorkPageClientProps["initialData"]["taskPlan"]["nodes"][number],
   planExecution: WorkPageClientProps["initialData"]["planExecution"],
 ): NodeViewStatus {
-  if (planExecution?.executedNodeIds.includes(step.id) || step.status === "done") return "completed";
-  if (planExecution?.currentNodeId === step.id || step.status === "in_progress") return "running";
-  if (planExecution?.waitingNodeIds.includes(step.id) || step.status === "waiting_for_user") return "waiting";
+  if (planExecution?.executedNodeIds.includes(step.id) || step.status === "done" || step.status === "skipped") return "completed";
+  if (planExecution?.currentNodeId === step.id || step.status === "active") return "running";
+  if (planExecution?.waitingNodeIds.includes(step.id) || step.status === "waiting") return "waiting";
   if (planExecution?.blockedNodeIds.includes(step.id) || step.status === "blocked") return "blocked";
   return "pending";
 }
@@ -141,9 +141,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     data.planExecution,
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan, copy);
-  const currentPlanStep = data.taskPlan.steps.find(
-    (step) => step.id === data.taskPlan.currentStepId,
-  ) ?? null;
+  const currentPlanStep = data.taskPlan.nodes.find((step) => step.id === data.taskPlan.analytics.activeNodeIds[0]) ?? null;
   const quickPrompts = workbenchComposer
     ? getQuickPrompts(workbenchComposer, currentRun, data.currentIntervention, copy)
     : [];
@@ -174,11 +172,11 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     .filter((value): value is string => Boolean(value))
     .join(" · ");
   const executionStatus = data.planExecution?.status ?? "no_plan";
-  const nodeCount = data.taskPlan.steps.length;
-  const completedCount = data.taskPlan.steps.filter(
+  const nodeCount = data.taskPlan.nodes.length;
+  const completedCount = data.taskPlan.nodes.filter(
     (step) => getNodeViewStatus(step, data.planExecution) === "completed",
   ).length;
-  const waitingCount = data.taskPlan.steps.filter((step) => {
+  const waitingCount = data.taskPlan.nodes.filter((step) => {
     const status = getNodeViewStatus(step, data.planExecution);
     return status === "waiting" || status === "blocked";
   }).length;
@@ -304,14 +302,14 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
                     <span>Status</span>
                   </div>
                   <ul className="divide-y divide-border/50 text-sm">
-                    {data.taskPlan.steps.map((step) => {
+                    {data.taskPlan.nodes.map((step) => {
                       const status = getNodeViewStatus(step, data.planExecution);
                       const meta = getNodeStatusMeta(status, copy);
                       return (
                         <li key={step.id} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] gap-3 px-4 py-3">
                           <div>
                             <p className="font-medium text-foreground">{step.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{step.objective || step.id}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{step.summary || step.id}</p>
                           </div>
                           <div className="text-muted-foreground">{step.id}</div>
                           <div className="justify-self-end">
@@ -476,7 +474,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         <section className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
           <div className="flex items-center justify-between gap-3">
             <span>No plan yet. Create or accept a plan before execution.</span>
-            {data.taskPlan.steps.length > 0 ? (
+             {data.taskPlan.nodes.length > 0 ? (
               <button
                 type="button"
                 disabled={isPending}
@@ -511,4 +509,3 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     </div>
   );
 }
-

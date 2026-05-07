@@ -700,7 +700,6 @@ export async function* generatePlanStream(
   > | null = null;
 
   for await (const event of generator) {
-    console.log("Received event:", event);
     if (
       event.type === "tool_call" &&
       event.tool === "generate_task_plan_graph"

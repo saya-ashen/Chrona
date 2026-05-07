@@ -2,8 +2,6 @@ import dagre from "@dagrejs/dagre";
 import { MarkerType, Position } from "@xyflow/react";
 import {
   EDGE_OFFSET,
-  EXPANDED_LINKED_NODE_EXTRA_HEIGHT,
-  EXPANDED_NODE_EXTRA_HEIGHT,
   LAYOUT_DIRECTION,
   LAYOUT_NODE_SEP,
   LAYOUT_PADDING,
@@ -13,34 +11,14 @@ import {
   NODE_WIDTH,
   SELECTED_NODE_Z_INDEX,
 } from "./constants";
-import {
-  buildEdgeStyle,
-  getNodeTone,
-} from "./logic";
-import type {
-  FlowGraphEdge,
-  FlowGraphNode,
-  GraphCopy,
-  PlanEdge,
-  PlanStep,
-} from "./types";
-
-function calculateNodeHeight(step: PlanStep, isSelected: boolean) {
-  if (!isSelected) return NODE_HEIGHT;
-  return (
-    NODE_HEIGHT +
-    EXPANDED_NODE_EXTRA_HEIGHT +
-    (step.linkedTaskId ? EXPANDED_LINKED_NODE_EXTRA_HEIGHT : 0)
-  );
-}
+import { buildEdgeStyle, getNodeTone, nodeShapeForKind } from "./logic";
+import type { FlowGraphEdge, FlowGraphNode, GraphCopy, TaskPlanGraphPlan } from "./types";
 
 export function buildFlowLayout(input: {
-  steps: PlanStep[];
-  edges: PlanEdge[];
-  currentStepId: string | null;
-  selectedStepId: string | null;
+  plan: TaskPlanGraphPlan;
+  selectedNodeId: string | null;
   graphCopy: GraphCopy;
-  onToggle: (nodeId: string) => void;
+  onSelect: (nodeId: string) => void;
   maxViewportHeight: number;
 }) {
   const graph = new dagre.graphlib.Graph();
@@ -54,15 +32,12 @@ export function buildFlowLayout(input: {
     marginy: LAYOUT_PADDING,
   });
 
-  for (const step of input.steps) {
-    graph.setNode(step.id, {
-      width: NODE_WIDTH,
-      height: calculateNodeHeight(step, input.selectedStepId === step.id),
-    });
+  for (const node of input.plan.nodes) {
+    graph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
   }
 
-  for (const edge of input.edges) {
-    graph.setEdge(edge.fromNodeId, edge.toNodeId);
+  for (const edge of input.plan.edges) {
+    graph.setEdge(edge.from, edge.to);
   }
 
   dagre.layout(graph);
@@ -72,55 +47,37 @@ export function buildFlowLayout(input: {
   let maxRight = Number.NEGATIVE_INFINITY;
   let maxBottom = Number.NEGATIVE_INFINITY;
 
-  for (const step of input.steps) {
-    const layoutNode = graph.node(step.id);
+  for (const node of input.plan.nodes) {
+    const layoutNode = graph.node(node.id);
     if (!layoutNode) continue;
     const left = layoutNode.x - layoutNode.width / 2;
     const top = layoutNode.y - layoutNode.height / 2;
     const right = layoutNode.x + layoutNode.width / 2;
     const bottom = layoutNode.y + layoutNode.height / 2;
-
     minLeft = Math.min(minLeft, left);
     minTop = Math.min(minTop, top);
     maxRight = Math.max(maxRight, right);
     maxBottom = Math.max(maxBottom, bottom);
   }
 
-  if (
-    !Number.isFinite(minLeft) ||
-    !Number.isFinite(minTop) ||
-    !Number.isFinite(maxRight) ||
-    !Number.isFinite(maxBottom)
-  ) {
+  if (!Number.isFinite(minLeft) || !Number.isFinite(minTop) || !Number.isFinite(maxRight) || !Number.isFinite(maxBottom)) {
     minLeft = 0;
     minTop = 0;
     maxRight = NODE_WIDTH;
     maxBottom = NODE_HEIGHT;
   }
 
-  const contentWidth = Math.max(
-    Math.ceil(maxRight - minLeft + LAYOUT_PADDING * 2),
-    NODE_WIDTH + LAYOUT_PADDING * 2,
-  );
-  const contentHeight = Math.max(
-    Math.ceil(maxBottom - minTop + LAYOUT_PADDING * 2 + (input.selectedStepId ? 32 : 0)),
-    NODE_HEIGHT + LAYOUT_PADDING * 2,
-  );
-  const viewportHeight = Math.min(
-    Math.max(contentHeight, MIN_VIEWPORT_HEIGHT),
-    input.maxViewportHeight,
-  );
+  const contentWidth = Math.max(Math.ceil(maxRight - minLeft + LAYOUT_PADDING * 2), NODE_WIDTH + LAYOUT_PADDING * 2);
+  const contentHeight = Math.max(Math.ceil(maxBottom - minTop + LAYOUT_PADDING * 2), NODE_HEIGHT + LAYOUT_PADDING * 2);
+  const viewportHeight = Math.max(Math.min(contentHeight, input.maxViewportHeight), MIN_VIEWPORT_HEIGHT);
 
-  const nodes: FlowGraphNode[] = input.steps.map((step) => {
-    const layoutNode = graph.node(step.id) ?? {
-      x: 0,
-      y: 0,
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-    };
-    const isSelected = step.id === input.selectedStepId;
+  const focusSet = new Set(input.plan.analytics.reachableFromActiveIds);
+
+  const nodes: FlowGraphNode[] = input.plan.nodes.map((node) => {
+    const layoutNode = graph.node(node.id) ?? { x: 0, y: 0, width: NODE_WIDTH, height: NODE_HEIGHT };
+    const isSelected = node.id === input.selectedNodeId;
     return {
-      id: step.id,
+      id: node.id,
       type: "taskPlanNode",
       position: {
         x: layoutNode.x - layoutNode.width / 2 - minLeft + LAYOUT_PADDING,
@@ -137,35 +94,37 @@ export function buildFlowLayout(input: {
       zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
       style: {
         zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
+        opacity: focusSet.size === 0 || focusSet.has(node.id) || node.status === "blocked" ? 1 : 0.48,
       },
       data: {
-        step,
-        tone: getNodeTone(step),
-        isCurrent: step.id === input.currentStepId,
+        node,
+        tone: getNodeTone(node),
+        shape: nodeShapeForKind(node.kind),
         isSelected,
+        isFocus: focusSet.size === 0 || focusSet.has(node.id) || node.status === "blocked",
         graphCopy: input.graphCopy,
-        onToggle: input.onToggle,
+        onSelect: input.onSelect,
       },
     };
   });
 
-  const edges: FlowGraphEdge[] = input.edges.map((edge) => ({
+  const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => ({
     id: edge.id,
-    source: edge.fromNodeId,
-    target: edge.toNodeId,
+    source: edge.from,
+    target: edge.to,
     type: "smoothstep",
     selectable: false,
     reconnectable: false,
     animated: false,
-    pathOptions: {
-      borderRadius: 0,
-      offset: EDGE_OFFSET,
-    },
+    pathOptions: { borderRadius: 0, offset: EDGE_OFFSET },
     markerEnd: {
       type: MarkerType.ArrowClosed,
-      color: buildEdgeStyle(edge.type).stroke,
+      color: buildEdgeStyle(edge.kind, edge.emphasis).stroke,
     },
-    style: buildEdgeStyle(edge.type),
+    style: {
+      ...buildEdgeStyle(edge.kind, edge.emphasis),
+      opacity: edge.emphasis === "normal" && focusSet.size > 0 && !focusSet.has(edge.from) && !focusSet.has(edge.to) ? 0.35 : 1,
+    },
     label: edge.label ?? undefined,
   }));
 
@@ -174,15 +133,12 @@ export function buildFlowLayout(input: {
 
 export function syncNodeState(
   nodes: FlowGraphNode[],
-  input: {
-    currentStepId: string | null;
-    selectedStepId: string | null;
-    graphCopy: GraphCopy;
-    onToggle: (nodeId: string) => void;
-  },
+  input: { selectedNodeId: string | null; graphCopy: GraphCopy; onSelect: (nodeId: string) => void; focusNodeIds: string[] },
 ) {
+  const focusSet = new Set(input.focusNodeIds);
   return nodes.map((node) => {
-    const isSelected = node.id === input.selectedStepId;
+    const isSelected = node.id === input.selectedNodeId;
+    const isFocus = focusSet.size === 0 || focusSet.has(node.id) || node.data.node.status === "blocked";
     return {
       ...node,
       draggable: false,
@@ -191,15 +147,16 @@ export function syncNodeState(
       style: {
         ...node.style,
         zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
+        opacity: isFocus ? 1 : 0.48,
       },
       sourcePosition: Position.Bottom,
       targetPosition: Position.Top,
       data: {
         ...node.data,
-        isCurrent: node.id === input.currentStepId,
         isSelected,
+        isFocus,
         graphCopy: input.graphCopy,
-        onToggle: input.onToggle,
+        onSelect: input.onSelect,
       },
     };
   });
