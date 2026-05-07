@@ -1,129 +1,116 @@
 import { cn } from "@/lib/utils";
-import { getCompactStatusLabel, getNodeTone, getStatusLabel, TONE_STYLES } from "./logic";
-import type { GraphCopy, PlanStep, TaskPlanGraphPlan } from "./types";
+import { getNodeTone, TONE_STYLES } from "./logic";
+import type { CompactFocusItem, CompactStage, GraphCopy, TaskPlanGraphPlan } from "./types";
 
-export function buildCompactSections(plan: TaskPlanGraphPlan) {
-  const incomingCounts = new Map<string, number>();
-  const outgoingCounts = new Map<string, number>();
+export function buildCompactViewModel(plan: TaskPlanGraphPlan): {
+  stages: CompactStage[];
+  focusItems: CompactFocusItem[];
+} {
+  const nodesById = new Map(plan.nodes.map((node) => [node.id, node]));
+  const stageMap = new Map<number, string[]>();
 
-  for (const step of plan.steps) {
-    incomingCounts.set(step.id, 0);
-    outgoingCounts.set(step.id, 0);
+  for (const node of plan.nodes) {
+    const rank = plan.analytics.rankByNodeId[node.id] ?? 0;
+    const group = stageMap.get(rank) ?? [];
+    group.push(node.id);
+    stageMap.set(rank, group);
   }
 
-  for (const edge of plan.edges ?? []) {
-    incomingCounts.set(edge.toNodeId, (incomingCounts.get(edge.toNodeId) ?? 0) + 1);
-    outgoingCounts.set(edge.fromNodeId, (outgoingCounts.get(edge.fromNodeId) ?? 0) + 1);
-  }
+  const stages = [...stageMap.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([rank, ids]) => {
+      const members = ids.map((id) => nodesById.get(id)).filter(Boolean);
+      return {
+        id: `stage-${rank}`,
+        title: rank === 0 ? "入口" : `阶段 ${rank + 1}`,
+        nodeIds: ids,
+        activeCount: members.filter((node) => node?.status === "active").length,
+        attentionCount: members.filter((node) => node?.status === "waiting" || node?.status === "blocked").length,
+        doneCount: members.filter((node) => node?.status === "done" || node?.status === "skipped").length,
+      };
+    });
 
-  const current = plan.steps.filter((step) => step.id === plan.currentStepId);
-  const attention = plan.steps.filter(
-    (step) => step.id !== plan.currentStepId && (step.status === "waiting_for_user" || step.status === "blocked"),
-  );
-  const next = plan.steps.filter(
-    (step) =>
-      step.id !== plan.currentStepId &&
-      !attention.some((candidate) => candidate.id === step.id) &&
-      ((incomingCounts.get(step.id) ?? 0) > 0 || step.linkedTaskId),
-  );
-  const summary = plan.steps.filter(
-    (step) =>
-      step.id !== plan.currentStepId &&
-      !attention.some((candidate) => candidate.id === step.id) &&
-      !next.some((candidate) => candidate.id === step.id),
-  );
+  const focusIds = [
+    ...plan.analytics.activeNodeIds,
+    ...plan.analytics.blockedNodeIds,
+    ...plan.analytics.criticalPathNodeIds,
+  ].filter((id, index, source) => source.indexOf(id) === index);
 
-  return {
-    incomingCounts,
-    outgoingCounts,
-    groups: [
-      { id: "current", title: "当前推进", steps: current },
-      { id: "attention", title: "待处理 / 阻塞", steps: attention },
-      { id: "next", title: "后续摘要", steps: next },
-      { id: "summary", title: "其余节点", steps: summary },
-    ].filter((group) => group.steps.length > 0),
-  };
+  const focusItems = focusIds.slice(0, 7).map((id) => {
+    const node = nodesById.get(id);
+    const upstreamCount = plan.analytics.upstreamByNodeId[id]?.length ?? 0;
+    const downstreamCount = plan.analytics.downstreamByNodeId[id]?.length ?? 0;
+    return {
+      id,
+      title: node?.title ?? id,
+      statusLabel: node?.statusLabel ?? "",
+      summary: node?.summary ?? "",
+      tone: node ? getNodeTone(node) : "idle",
+      relationLabel:
+        upstreamCount > 0 || downstreamCount > 0 ? `${upstreamCount} 前置 · ${downstreamCount} 后续` : null,
+    };
+  });
+
+  return { stages, focusItems };
 }
 
-export function CompactOutlineNode({
-  step,
-  incomingCount,
-  outgoingCount,
-  graphCopy,
-  isCurrent,
-  isSelected,
-  onToggle,
-}: {
-  step: PlanStep;
-  incomingCount: number;
-  outgoingCount: number;
-  graphCopy: GraphCopy;
-  isCurrent: boolean;
-  isSelected: boolean;
-  onToggle: (nodeId: string) => void;
-}) {
-  const tone = getNodeTone(step);
-  const s = TONE_STYLES[tone];
-  const relationSummary = [
-    incomingCount > 0 ? `${incomingCount} 个前置` : null,
-    outgoingCount > 0 ? `${outgoingCount} 个后续` : null,
-    step.linkedTaskId ? "已关联任务" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
+export function CompactStageStrip({ stages }: { stages: CompactStage[] }) {
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(step.id)}
-      className={cn(
-        "group relative w-full rounded-2xl border px-3 py-2 text-left transition-colors",
-        s.border,
-        s.bg,
-        isCurrent && "ring-2",
-        isCurrent && s.ring,
-        isSelected && !isCurrent && "ring-1 ring-foreground/10",
-      )}
-      data-node-current={isCurrent ? "true" : "false"}
-      data-node-selected={isSelected ? "true" : "false"}
-      data-node-tone={tone}
-      data-testid={`task-plan-outline-node-${step.id}`}
-    >
-      <div className="absolute bottom-2 left-0 top-2 w-px bg-border/50" aria-hidden="true" />
-      <div className="flex items-start gap-2.5 pl-2">
-        <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", s.dot)} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
-            {isCurrent ? <span className="font-semibold text-foreground/80">当前节点</span> : null}
-            {isCurrent ? <span aria-hidden="true">·</span> : null}
-            <span className="font-semibold uppercase tracking-[0.12em]">{step.phase}</span>
-            <span aria-hidden="true">·</span>
-            <span>{getCompactStatusLabel(step.status, graphCopy)}</span>
-            {step.type && step.type !== step.phase?.toLowerCase() ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{step.type}</span>
-              </>
-            ) : null}
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {stages.map((stage) => (
+        <div key={stage.id} className="rounded-[20px] border border-border/60 bg-background/82 px-3 py-3 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{stage.title}</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{stage.nodeIds.length}</p>
+          <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+            {stage.activeCount > 0 ? <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-sky-700">{stage.activeCount} active</span> : null}
+            {stage.attentionCount > 0 ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-700">{stage.attentionCount} attention</span> : null}
+            {stage.doneCount > 0 ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-700">{stage.doneCount} done</span> : null}
           </div>
-          <p className="mt-1 text-sm font-medium leading-snug text-foreground line-clamp-2">{step.title}</p>
-          {relationSummary ? <p className="mt-1 text-[11px] text-muted-foreground">{relationSummary}</p> : null}
-          {isSelected ? (
-            <div className="mt-2 space-y-2 border-t border-border/30 pt-2">
-              <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{getStatusLabel(step.status, graphCopy)}</span>
-                {typeof step.estimatedMinutes === "number" ? (
-                  <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{step.estimatedMinutes}m</span>
-                ) : null}
-                {step.executionMode ? (
-                  <span className="rounded-full bg-foreground/5 px-1.5 py-0.5">{step.executionMode}</span>
-                ) : null}
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground">{step.objective}</p>
-            </div>
-          ) : null}
         </div>
-      </div>
-    </button>
+      ))}
+    </div>
+  );
+}
+
+export function CompactFocusStack({
+  items,
+  selectedNodeId,
+  onSelect,
+  graphCopy: _graphCopy,
+}: {
+  items: CompactFocusItem[];
+  selectedNodeId: string | null;
+  onSelect: (nodeId: string) => void;
+  graphCopy: GraphCopy;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const toneStyle = TONE_STYLES[item.tone];
+        const isSelected = selectedNodeId === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item.id)}
+            data-testid={`task-plan-focus-node-${item.id}`}
+            className={cn(
+              "w-full rounded-[20px] border px-3 py-2.5 text-left transition-colors",
+              toneStyle.border,
+              toneStyle.bg,
+              isSelected && "ring-1 ring-foreground/10",
+            )}
+          >
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span className={cn("size-2 rounded-full", toneStyle.dot)} />
+              <span>{item.statusLabel}</span>
+            </div>
+            <p className="mt-1 text-sm font-medium text-foreground">{item.title}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{item.summary}</p>
+            {item.relationLabel ? <p className="mt-1 text-[10px] text-muted-foreground">{item.relationLabel}</p> : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }

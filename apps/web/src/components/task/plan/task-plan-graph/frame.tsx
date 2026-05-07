@@ -19,11 +19,7 @@ export function TaskPlanGraphFrame({
   testId = "task-plan-graph",
 }: {
   graphCopy: GraphCopy;
-  layout: {
-    contentWidth: number;
-    contentHeight: number;
-    viewportHeight: number;
-  };
+  layout: { contentWidth: number; contentHeight: number; viewportHeight: number };
   nodes: FlowGraphNode[];
   edges: FlowGraphEdge[];
   edgeLegend: EdgeLegendItem[];
@@ -37,7 +33,7 @@ export function TaskPlanGraphFrame({
   return (
     <div
       aria-label={graphCopy.ariaLabel}
-      className="relative overflow-hidden rounded-[22px] border border-border/50 bg-muted/[0.16]"
+      className="relative overflow-hidden rounded-[24px] border border-border/50 bg-muted/[0.16]"
       data-canvas-pan="true"
       data-edge-style="orthogonal"
       data-graph-editable="false"
@@ -50,11 +46,7 @@ export function TaskPlanGraphFrame({
     >
       <div className="relative">
         <div className="w-full overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
-          <div
-            className="min-w-full"
-            data-testid="task-plan-graph-canvas"
-            style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px` }}
-          >
+          <div className="min-w-full" data-testid="task-plan-graph-canvas" style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px` }}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -78,14 +70,11 @@ export function TaskPlanGraphFrame({
               proOptions={{ hideAttribution: true }}
               defaultEdgeOptions={{ zIndex: 0 }}
               className="bg-transparent"
-              translateExtent={[
-                [0, 0],
-                [layout.contentWidth, layout.contentHeight],
-              ]}
+              translateExtent={[[0, 0], [layout.contentWidth, layout.contentHeight]]}
             />
           </div>
         </div>
-        <EdgeLegend edgeItems={edgeLegend} nodeItems={nodeLegend} />
+        <EdgeLegend edgeItems={edgeLegend} nodeItems={nodeLegend} graphCopy={graphCopy} />
       </div>
     </div>
   );

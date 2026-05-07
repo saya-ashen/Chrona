@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 
-import {
-  defaultLocale,
-  getPreferredLocale,
-  hasLocale,
-} from "@chrona/i18n";
+import { defaultLocale, getPreferredLocale, hasLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
-import { createSpaStaticMiddleware, hasSpaDist } from "./static/spa";
+import {
+  createSpaAssetMiddleware,
+  createSpaIndexMiddleware,
+  hasSpaDist,
+  isSpaAssetPath,
+} from "./static/spa";
 import { createLogger } from "@chrona/shared/logger";
 import { apiKeyAuth } from "./middleware/auth";
 import { readEnv, resolveAllowedOrigins } from "./config/env";
@@ -50,26 +51,36 @@ export async function createServerApp() {
     if (origin) {
       c.header("Access-Control-Allow-Origin", origin);
     }
+
     c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    c.header("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
+    c.header(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+    );
+
     await next();
   });
 
   app.options("*", (c) => c.body(null, 204));
 
   app.get("/health", (c) => c.json({ status: "ok", server: "chrona-hono" }));
+
   app.route("/api", api);
 
   if (spaAvailable) {
-    const serveSpa = createSpaStaticMiddleware();
+    const serveSpaAsset = createSpaAssetMiddleware();
+    const serveSpaIndex = createSpaIndexMiddleware();
 
     app.get("/", (c) => {
-      const preferredLocale = getPreferredLocale(c.req.header("accept-language"));
+      const preferredLocale = getPreferredLocale(
+        c.req.header("accept-language"),
+      );
       return c.redirect(`/${preferredLocale}`, 302);
     });
 
     app.get("/*", async (c, next) => {
       const pathname = new URL(c.req.url).pathname;
+
       if (pathname.startsWith("/api/")) {
         return next();
       }
@@ -78,18 +89,26 @@ export async function createServerApp() {
         return next();
       }
 
-      // Serve static assets directly — no locale redirect
-      if (pathname.startsWith("/assets/") || pathname.startsWith("/favicon.")) {
-        return serveSpa(c, next);
+      // Vite build 后的真实静态资源
+      // 例如 /assets/index-xxx.js、/assets/index-xxx.css、/favicon.ico
+      if (isSpaAssetPath(pathname)) {
+        return serveSpaAsset(c, next);
       }
 
       const firstSegment = pathname.split("/").filter(Boolean)[0];
+
       if (!firstSegment || !hasLocale(firstSegment)) {
         const locale = defaultLocale;
-        return c.redirect(`/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}`, 302);
+
+        return c.redirect(
+          `/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}`,
+          302,
+        );
       }
 
-      return serveSpa(c, next);
+      // 例如 /en、/en/settings、/zh/projects/123
+      // 这些都交给 React Router，所以返回 index.html
+      return serveSpaIndex(c, next);
     });
   }
 
@@ -103,8 +122,16 @@ export async function createServerApp() {
   });
 
   app.onError((error, c) => {
-    log.error("unhandled error", { error: error instanceof Error ? error.message : String(error) });
-    return c.json({ error: error instanceof Error ? error.message : "Internal server error" }, 500);
+    log.error("unhandled error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      500,
+    );
   });
 
   return app;
