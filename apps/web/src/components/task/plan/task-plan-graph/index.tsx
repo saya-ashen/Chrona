@@ -18,6 +18,7 @@ export type {
   PlanNodeAction,
   PlanNodeDataModel,
   PlanNodeField,
+  PlanNodeInteractionType,
   PlanEdgeKind,
   PlanNodeIntent,
   PlanNodeKind,
@@ -40,6 +41,7 @@ function GraphShell({
   handleNodeClick,
   stopIfNodeButton,
   onDismissOverlay,
+  inspectorPlacement,
   testId,
 }: {
   graphCopy: GraphCopy;
@@ -54,6 +56,7 @@ function GraphShell({
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
   stopIfNodeButton: (event: MouseEvent<Element>) => void;
   onDismissOverlay: () => void;
+  inspectorPlacement: "overlay" | "none";
   testId?: string;
 }) {
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -92,7 +95,7 @@ function GraphShell({
         handleNodeDragStop={stopIfNodeButton}
         testId={testId}
       />
-      {selectedNode ? (
+      {inspectorPlacement === "overlay" && selectedNode ? (
         <div className="pointer-events-none absolute inset-x-4 top-4 z-[8] flex justify-end">
           <div
             className="pointer-events-auto w-full max-w-[min(340px,calc(100%-32px))]"
@@ -108,7 +111,14 @@ function GraphShell({
   );
 }
 
-export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIEWPORT_HEIGHT }: TaskPlanGraphProps) {
+export function TaskPlanGraph({
+  plan,
+  mode = "full",
+  maxViewportHeight = MAX_VIEWPORT_HEIGHT,
+  inspectorPlacement = "overlay",
+  onSelectedNodeChange,
+  dismissSelectionOnOutsideClick = true,
+}: TaskPlanGraphProps) {
   const { messages } = useI18n();
   const graphCopy = useMemo(
     () => ({ ...DEFAULT_GRAPH_COPY, ...(messages.components?.taskPlanGraph ?? {}) }) as GraphCopy,
@@ -146,6 +156,10 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
   const compact = useMemo(() => buildCompactViewModel(plan), [plan]);
   const selectedNode = plan.nodes.find((node) => node.id === selectedNodeId) ?? null;
 
+  useEffect(() => {
+    onSelectedNodeChange?.(selectedNode, plan.nodes);
+  }, [onSelectedNodeChange, plan.nodes, selectedNode]);
+
   const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(
     (event, node) => {
       const target = event.target as HTMLElement | null;
@@ -163,6 +177,10 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
   }, []);
 
   useEffect(() => {
+    if (!dismissSelectionOnOutsideClick) {
+      return;
+    }
+
     const handlePointerDown = (event: PointerEvent) => {
       if (!selectedNodeId) return;
       const target = event.target as HTMLElement | null;
@@ -173,7 +191,7 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
 
     window.addEventListener("pointerdown", handlePointerDown);
     return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [selectedNodeId]);
+  }, [dismissSelectionOnOutsideClick, selectedNodeId]);
 
   useEffect(() => {
     if (plan.state !== "ready" || plan.nodes.length === 0) {
@@ -317,6 +335,7 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
                   handleNodeClick={handleNodeClick}
                   stopIfNodeButton={stopIfNodeButton}
                   onDismissOverlay={handleDismissOverlay}
+                  inspectorPlacement={inspectorPlacement}
                   testId="task-plan-graph-full-dialog"
                 />
               </div>
@@ -353,6 +372,7 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
         handleNodeClick={handleNodeClick}
         stopIfNodeButton={stopIfNodeButton}
         onDismissOverlay={handleDismissOverlay}
+        inspectorPlacement={inspectorPlacement}
       />
     </div>
   );

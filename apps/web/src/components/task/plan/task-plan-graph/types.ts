@@ -18,6 +18,17 @@ export type PlanNodeIntent =
   | "decision"
   | "pause";
 
+export type PlanNodeInteractionType =
+  | "execute"
+  | "confirm"
+  | "choose"
+  | "input"
+  | "edit"
+  | "approve"
+  | "wait"
+  | "retry"
+  | "observe";
+
 export type PlanNodeGroup = "active" | "attention" | "upcoming" | "done" | "idle";
 
 export type PlanEdgeKind =
@@ -40,7 +51,7 @@ export type PlanNodeField = {
 export type PlanNodeAction = {
   id: string;
   label: string;
-  kind: "input" | "approve" | "open" | "trigger";
+  kind: "input" | "approve" | "confirm" | "choose" | "edit" | "retry" | "observe" | "open" | "trigger";
   emphasis?: "default" | "primary" | "warning";
 };
 
@@ -53,6 +64,7 @@ export type PlanNodeDataModel = {
   kind: PlanNodeKind;
   status: PlanNodeStatus;
   intent: PlanNodeIntent;
+  interactionType: PlanNodeInteractionType;
   group: PlanNodeGroup;
   statusLabel: string;
   badges: string[];
@@ -117,6 +129,9 @@ export type TaskPlanGraphProps = {
   mode?: TaskPlanGraphMode;
   maxViewportHeight?: number;
   plan: TaskPlanGraphPlan;
+  inspectorPlacement?: "overlay" | "none";
+  onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
+  dismissSelectionOnOutsideClick?: boolean;
 };
 
 export type NodeTone =

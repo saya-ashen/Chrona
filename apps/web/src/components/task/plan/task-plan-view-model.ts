@@ -15,6 +15,7 @@ import type {
   PlanNodeAction,
   PlanNodeDataModel,
   PlanNodeField,
+  PlanNodeInteractionType,
   PlanNodeIntent,
   PlanNodeKind,
   PlanNodeStatus,
@@ -86,6 +87,60 @@ function inferIntent(kind: PlanNodeKind, metadata: PlanMetadata, status: PlanNod
     return "input";
   }
   return "execution";
+}
+
+function inferInteractionType(input: {
+  kind: PlanNodeKind;
+  metadata: PlanMetadata;
+  status: PlanNodeStatus;
+  hasInteractiveFields: boolean;
+  hasOptions: boolean;
+  nextAction: string | null | undefined;
+}): PlanNodeInteractionType {
+  if (input.status === "blocked") {
+    return "retry";
+  }
+
+  if (input.kind === "wait") {
+    return "wait";
+  }
+
+  if (input.kind === "condition") {
+    return input.status === "waiting" ? "choose" : "observe";
+  }
+
+  if (input.kind === "checkpoint") {
+    switch (input.metadata.checkpointType) {
+      case "approve":
+        return "approve";
+      case "confirm":
+        return "confirm";
+      case "choose":
+        return "choose";
+      case "edit":
+        return "edit";
+      case "input":
+        return "input";
+      default:
+        if (input.hasOptions) return "choose";
+        if (input.hasInteractiveFields) return "input";
+        return input.status === "waiting" ? "confirm" : "observe";
+    }
+  }
+
+  if (input.status === "ready") {
+    return "execute";
+  }
+
+  if (input.status === "active") {
+    return "observe";
+  }
+
+  if (input.nextAction?.trim()) {
+    return "observe";
+  }
+
+  return "observe";
 }
 
 function statusLabel(status: PlanNodeStatus) {
@@ -214,36 +269,89 @@ function buildInteractiveFields(node: {
 function buildAvailableActions(node: {
   id: string;
   status: PlanNodeStatus;
-  intent: PlanNodeIntent;
+  interactionType: PlanNodeInteractionType;
   hasInteractiveFields: boolean;
 }): PlanNodeAction[] {
   const actions: PlanNodeAction[] = [];
 
-  if (node.hasInteractiveFields) {
+  if (node.interactionType === "retry") {
+    actions.push({
+      id: `${node.id}:retry`,
+      label: "重试节点",
+      kind: "retry",
+      emphasis: "warning",
+    });
+    return actions;
+  }
+
+  if (node.interactionType === "approve") {
+    actions.push({
+      id: `${node.id}:approve`,
+      label: "审批",
+      kind: "approve",
+      emphasis: "primary",
+    });
+    return actions;
+  }
+
+  if (node.interactionType === "confirm") {
+    actions.push({
+      id: `${node.id}:confirm`,
+      label: "确认",
+      kind: "confirm",
+      emphasis: "primary",
+    });
+    return actions;
+  }
+
+  if (node.interactionType === "choose") {
+    actions.push({
+      id: `${node.id}:choose`,
+      label: "提交选择",
+      kind: "choose",
+      emphasis: "primary",
+    });
+    return actions;
+  }
+
+  if (node.interactionType === "edit") {
+    actions.push({
+      id: `${node.id}:edit`,
+      label: "提交修改",
+      kind: "edit",
+      emphasis: "primary",
+    });
+    return actions;
+  }
+
+  if (node.interactionType === "input" || node.hasInteractiveFields) {
     actions.push({
       id: `${node.id}:input`,
       label: "提交输入",
       kind: "input",
       emphasis: "primary",
     });
+    return actions;
   }
 
-  if (node.intent === "approval") {
+  if (node.interactionType === "execute") {
     actions.push({
-      id: `${node.id}:approve`,
-      label: "审批",
-      kind: "approve",
-      emphasis: node.status === "blocked" ? "warning" : "primary",
+      id: `${node.id}:start`,
+      label: "开始节点",
+      kind: "trigger",
+      emphasis: "primary",
     });
+    return actions;
   }
 
-  if (actions.length === 0 && (node.status === "ready" || node.status === "active")) {
+  if (node.interactionType === "observe" && (node.status === "ready" || node.status === "active")) {
     actions.push({
       id: `${node.id}:open`,
-      label: "查看节点",
-      kind: "open",
-      emphasis: "default",
+      label: node.status === "ready" ? "开始节点" : "继续运行",
+      kind: node.status === "ready" ? "trigger" : "observe",
+      emphasis: node.status === "ready" ? "primary" : "default",
     });
+    return actions;
   }
 
   return actions;
@@ -285,6 +393,14 @@ function toPlanNode(node: {
   const requiredInfo = node.requiredInfo ?? [];
   const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo });
   const intent = inferIntent(kind, metadata, status);
+  const interactionType = inferInteractionType({
+    kind,
+    metadata,
+    status,
+    hasInteractiveFields: interactiveFields.length > 0,
+    hasOptions: (metadata.options?.length ?? 0) > 0,
+    nextAction: node.nextAction,
+  });
 
   return {
     id: node.id,
@@ -295,6 +411,7 @@ function toPlanNode(node: {
     kind,
     status,
     intent,
+    interactionType,
     group: statusGroup(status),
     statusLabel: statusLabel(status),
     badges: [kind, intent, node.mode].filter((value): value is string => Boolean(value)),
@@ -312,12 +429,17 @@ function toPlanNode(node: {
     options: metadata.options ?? [],
     active: status === "active",
     blocked: status === "blocked",
-    actionable: interactiveFields.length > 0 || intent === "approval" || status === "ready",
+    actionable:
+      interactiveFields.length > 0
+      || status === "ready"
+      || status === "active"
+      || status === "waiting"
+      || status === "blocked",
     interactiveFields,
     availableActions: buildAvailableActions({
       id: node.id,
       status,
-      intent,
+      interactionType,
       hasInteractiveFields: interactiveFields.length > 0,
     }),
     metadata: metadata as Record<string, unknown>,

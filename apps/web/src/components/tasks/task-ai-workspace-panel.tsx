@@ -1,11 +1,14 @@
 "use client";
 
-import { WandSparkles } from "lucide-react";
+import type { ReactNode } from "react";
+import { WandSparkles, X } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import { TaskWorkspaceAssistant } from "@/components/tasks/task-workspace-assistant";
+import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import { cn } from "@/lib/utils";
 
 type AssistantCurrentTask = {
   title: string;
@@ -62,6 +65,12 @@ type TaskAiWorkspacePanelProps = {
   onApplyProposal?: (proposal: TaskWorkspaceUpdateProposal, messageId: string) => Promise<void>;
   onDismissProposal?: () => void;
   isApplying?: boolean;
+  requestGenerationKey?: number;
+  showInlineGenerateButton?: boolean;
+  emptyPlanDescription?: string;
+  onClose?: () => void;
+  headerActions?: ReactNode;
+  className?: string;
 };
 
 export function TaskAiWorkspacePanel({
@@ -81,16 +90,26 @@ export function TaskAiWorkspacePanel({
   onApplyProposal,
   onDismissProposal,
   isApplying,
+  requestGenerationKey,
+  showInlineGenerateButton = true,
+  emptyPlanDescription,
+  onClose,
+  headerActions,
+  className,
 }: TaskAiWorkspacePanelProps) {
   return (
     <SurfaceCard
       as="section"
       variant="inset"
       padding="sm"
-      className="flex h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-[1.35rem] border border-border/50 bg-background/65 shadow-none"
+      className={cn(
+        "flex h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-[1.35rem] border border-border/50 bg-background/65 shadow-none",
+        className,
+      )}
     >
       <div className="border-b border-border/50 bg-[linear-gradient(180deg,hsl(var(--muted)/0.2),transparent)] px-4 py-3">
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
             <span className="mt-0.5 inline-flex h-8 min-w-8 items-center justify-center rounded-[0.85rem] bg-primary/8 px-2 text-primary ring-1 ring-primary/10">
               <WandSparkles className="size-4" />
             </span>
@@ -100,6 +119,17 @@ export function TaskAiWorkspacePanel({
                 Plan, revise, and apply task changes from one thread.
               </p>
             </div>
+          </div>
+          {headerActions ?? (onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className={buttonVariants({ variant: "ghost", size: "sm", className: "size-8 rounded-lg p-0" })}
+              aria-label="Close AI workspace"
+            >
+              <X className="size-4" />
+            </button>
+          ) : null)}
         </div>
       </div>
 
@@ -132,6 +162,9 @@ export function TaskAiWorkspacePanel({
               unsavedConfigDraft={unsavedConfigDraft}
               onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
               showGraph={false}
+              requestGenerationKey={requestGenerationKey}
+              showEmptyGenerateButton={showInlineGenerateButton}
+              emptyStateDescription={emptyPlanDescription}
             />
           )}
         />

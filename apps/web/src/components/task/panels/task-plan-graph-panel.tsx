@@ -13,6 +13,9 @@ type TaskPlanGraphPanelProps = {
   actions?: ReactNode;
   className?: string;
   maxViewportHeight?: number;
+  inspectorPlacement?: Parameters<typeof TaskPlanGraph>[0]["inspectorPlacement"];
+  onSelectedNodeChange?: Parameters<typeof TaskPlanGraph>[0]["onSelectedNodeChange"];
+  dismissSelectionOnOutsideClick?: Parameters<typeof TaskPlanGraph>[0]["dismissSelectionOnOutsideClick"];
 };
 
 export function TaskPlanGraphPanel({
@@ -22,6 +25,9 @@ export function TaskPlanGraphPanel({
   actions,
   className,
   maxViewportHeight,
+  inspectorPlacement,
+  onSelectedNodeChange,
+  dismissSelectionOnOutsideClick,
 }: TaskPlanGraphPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
@@ -71,14 +77,13 @@ export function TaskPlanGraphPanel({
   }, [maxViewportHeight]);
 
   return (
-    <div ref={panelRef} className="min-w-0">
+    <div ref={panelRef} className={cn("min-w-0", className)}>
       <SurfaceCard
         as="div"
         variant="inset"
         padding="sm"
         className={cn(
-          "min-w-0 rounded-[1.35rem] border-border/50 bg-background/65 shadow-none ring-0",
-          className,
+          "flex min-h-0 h-full min-w-0 flex-col rounded-[1.35rem] border-border/50 bg-background/65 shadow-none ring-0",
         )}
       >
         <div ref={headerRef} className="mb-2 flex min-w-0 items-start justify-between gap-3 px-1">
@@ -92,7 +97,13 @@ export function TaskPlanGraphPanel({
           </div>
           {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
-        <TaskPlanGraph plan={plan} maxViewportHeight={resolvedViewportHeight ?? maxViewportHeight} />
+        <TaskPlanGraph
+          plan={plan}
+          maxViewportHeight={resolvedViewportHeight ?? maxViewportHeight}
+          inspectorPlacement={inspectorPlacement}
+          onSelectedNodeChange={onSelectedNodeChange}
+          dismissSelectionOnOutsideClick={dismissSelectionOnOutsideClick}
+        />
       </SurfaceCard>
     </div>
   );

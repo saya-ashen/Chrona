@@ -98,6 +98,29 @@ export function intentLabel(intent: PlanNodeDataModel["intent"], graphCopy: Grap
   }
 }
 
+export function interactionLabel(interactionType: PlanNodeDataModel["interactionType"]) {
+  switch (interactionType) {
+    case "execute":
+      return "Execute";
+    case "confirm":
+      return "Confirm";
+    case "choose":
+      return "Choose";
+    case "input":
+      return "Input";
+    case "edit":
+      return "Edit";
+    case "approve":
+      return "Approve";
+    case "wait":
+      return "Wait";
+    case "retry":
+      return "Retry";
+    default:
+      return "Observe";
+  }
+}
+
 export function statusLabel(status: PlanNodeDataModel["status"], graphCopy: GraphCopy) {
   switch (status) {
     case "ready":
