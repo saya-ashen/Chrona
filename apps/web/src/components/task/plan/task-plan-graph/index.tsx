@@ -331,12 +331,12 @@ export function TaskPlanGraph({ plan, mode = "full", maxViewportHeight = MAX_VIE
     <div ref={(node) => {
       containerRef(node);
       graphRef.current = node;
-    }} className="w-full space-y-4">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+    }} className="w-full space-y-3">
+      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
         {overviewItems.map((item) => (
-          <div key={item.label} className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2 shadow-sm">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{item.label}</p>
-            <p className="mt-1 text-lg font-semibold text-foreground">{item.value}</p>
+          <div key={item.label} className="rounded-[14px] border border-border/50 bg-background/75 px-2.5 py-1.5 shadow-sm">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{item.label}</p>
+            <p className="mt-0.5 text-base font-semibold leading-none text-foreground">{item.value}</p>
           </div>
         ))}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, Sparkles, AlertTriangle, Check, X } from "lucide-react";
 import { SurfaceCard } from "@/components/ui/surface-card";
@@ -62,13 +63,15 @@ type Props = {
   onApply?: (proposal: TaskWorkspaceUpdateProposal, messageId: string) => Promise<void>;
   onDismiss?: () => void;
   isApplying?: boolean;
+  embedded?: boolean;
+  leadingContent?: ReactNode;
+  inputPlaceholder?: string;
+  className?: string;
 };
 
 async function loadMessages(taskId: string): Promise<ChatHistoryEntry[]> {
   try {
-    const res = await api.tasks[":taskId"].assistant.messages.$get({
-      param: { taskId },
-    });
+    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`);
     if (!res.ok) return [];
     const data = await res.json() as {
       messages: Array<{
@@ -100,9 +103,10 @@ async function saveMessage(
   proposal?: TaskWorkspaceUpdateProposal | null,
 ): Promise<ChatHistoryEntry | null> {
   try {
-    const res = await api.tasks[":taskId"].assistant.messages.$post({
-      param: { taskId },
-      json: { role, content, proposal },
+    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, content, proposal }),
     });
     if (!res.ok) return null;
     const data = await res.json() as {
@@ -128,8 +132,8 @@ async function saveMessage(
 
 async function markMessageApplied(taskId: string, messageId: string): Promise<boolean> {
   try {
-    const res = await api.tasks[":taskId"].assistant.messages[":messageId"].apply.$patch({
-      param: { taskId, messageId },
+    const res = await fetch(`/api/tasks/${taskId}/assistant/messages/${messageId}/apply`, {
+      method: "PATCH",
     });
     return res.ok;
   } catch {
@@ -144,7 +148,19 @@ const SUGGESTIONS = [
   "Increase priority to High",
 ];
 
-export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentPlan, onProposal, onApply, onDismiss, isApplying }: Props) {
+export function TaskWorkspaceAssistant({
+  taskId,
+  buildCurrentTask,
+  buildCurrentPlan,
+  onProposal,
+  onApply,
+  onDismiss,
+  isApplying,
+  embedded = false,
+  leadingContent,
+  inputPlaceholder = "Describe what to change...",
+  className,
+}: Props) {
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -256,22 +272,25 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
     [handleSend],
   );
 
-  return (
-    <SurfaceCard className="sticky top-6 overflow-hidden flex flex-col" style={{ height: "calc(100vh - 9rem)" }} padding="md">
-      <div className="shrink-0 space-y-3 pb-3 border-b border-border/60">
-        <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            <Sparkles className="size-3" />
-            Assistant
+  const body = (
+    <>
+      {embedded ? null : (
+        <div className="shrink-0 space-y-3 border-b border-border/60 pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <Sparkles className="size-3" />
+              Assistant
+            </div>
+            <Bot className="size-4 text-muted-foreground/40" />
           </div>
-          <Bot className="size-4 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground">
+            Describe changes to this task or plan — the assistant proposes updates for your review.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Describe changes to this task or plan — the assistant proposes updates for your review.
-        </p>
-      </div>
+      )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-2">
+      <div className={cn("min-h-0 flex-1 overflow-y-auto space-y-2", embedded ? "py-0" : "py-3")}>
+        {leadingContent ? <div className="pb-2">{leadingContent}</div> : null}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -356,7 +375,7 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
                           {applyingMessageId === entry.id
                             ? "Applying..."
                             : entry.applied
-                              ? "Applied"
+                              ? "Done"
                               : entry.proposal.requiresConfirmation
                                 ? "Accept & Apply"
                                 : "Apply Changes"}
@@ -389,7 +408,7 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="shrink-0 space-y-2 pt-3 border-t border-border/60">
+      <div className={cn("mt-auto shrink-0 space-y-2 border-t border-border/60 pt-3", embedded ? "" : "") }>
         {error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600">
             {error}
@@ -401,7 +420,7 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe what to change..."
+            placeholder={inputPlaceholder}
             rows={2}
             className="flex-1 resize-none rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 placeholder:text-muted-foreground/50"
           />
@@ -420,6 +439,16 @@ export function TaskWorkspaceAssistant({ taskId, buildCurrentTask, buildCurrentP
           </button>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className={cn("flex h-full min-h-0 flex-1 flex-col overflow-hidden", className)}>{body}</div>;
+  }
+
+  return (
+    <SurfaceCard className={cn("sticky top-6 flex flex-col overflow-hidden", className)} style={{ height: "calc(100vh - 9rem)" }} padding="md">
+      {body}
     </SurfaceCard>
   );
 }

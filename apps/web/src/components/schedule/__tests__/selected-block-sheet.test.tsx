@@ -321,10 +321,10 @@ describe("SelectedBlockSheet – layout order", () => {
   });
 
   it("renders a dedicated AI sidebar for the popup", () => {
-    const { container } = render(<SelectedBlockSheet {...defaultSheetProps} />);
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
 
-    const mainColumn = container.querySelector("[data-testid='selected-block-main-column']");
-    const aiSidebar = container.querySelector("[data-testid='selected-block-ai-sidebar']");
+    const mainColumn = document.body.querySelector("[data-testid='selected-block-main-column']");
+    const aiSidebar = document.body.querySelector("[data-testid='selected-block-ai-sidebar']");
 
     expect(mainColumn).toBeTruthy();
     expect(aiSidebar).toBeTruthy();
@@ -333,10 +333,10 @@ describe("SelectedBlockSheet – layout order", () => {
   });
 
   it("keeps schedule editing and task config merged in the main popup column while planning lives in the sidebar", () => {
-    const { container } = render(<SelectedBlockSheet {...defaultSheetProps} />);
+    render(<SelectedBlockSheet {...defaultSheetProps} />);
 
-    const mainColumn = container.querySelector("[data-testid='selected-block-main-column']");
-    const aiSidebar = container.querySelector("[data-testid='selected-block-ai-sidebar']");
+    const mainColumn = document.body.querySelector("[data-testid='selected-block-main-column']");
+    const aiSidebar = document.body.querySelector("[data-testid='selected-block-ai-sidebar']");
 
     expect(mainColumn).toContainElement(screen.getByTestId("schedule-editor-form"));
     expect(mainColumn).toContainElement(screen.getByTestId("task-config-form"));
@@ -355,6 +355,22 @@ describe("SelectedBlockSheet – layout order", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("renders the cockpit outside the local page container", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    render(
+      <div data-testid="host-shell">
+        <SelectedBlockSheet {...defaultSheetProps} />
+      </div>,
+      { container: host },
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(host).not.toContainElement(dialog);
+    expect(document.body).toContainElement(dialog);
   });
 
   it("does not repeatedly push identical clean draft state back into the parent", async () => {

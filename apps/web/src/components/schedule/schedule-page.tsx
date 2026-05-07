@@ -337,7 +337,7 @@ export function SchedulePage({
         </div>
       ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)_340px] gap-4 overflow-hidden rounded-[24px] bg-slate-50/55 p-3">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.8fr)_minmax(0,1.45fr)_minmax(260px,1fr)] gap-4 overflow-hidden rounded-[24px] bg-slate-50/55 p-3">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}
