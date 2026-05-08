@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
-import type { RuntimeAdapter } from "@chrona/providers-foundation";
+import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import { Prisma } from "@/generated/prisma/client";
 
 async function markApprovalResolved(input: {
@@ -53,7 +53,7 @@ export async function resolveApproval(input: {
   decision: "Approved" | "Rejected" | "EditedAndApproved";
   resolutionNote?: string;
   editedContent?: string;
-  adapter?: RuntimeAdapter;
+  adapter?: RuntimeExecutionAdapter;
 }) {
   const approval = await db.approval.findUnique({
     where: { id: input.approvalId },

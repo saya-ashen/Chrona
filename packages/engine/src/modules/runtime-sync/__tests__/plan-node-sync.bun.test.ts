@@ -3,7 +3,7 @@ import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { createMockOpenClawAdapter } from "@chrona/providers-foundation/openclaw/runtime/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw";
 import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
 import type { NodeConfig } from "@chrona/contracts/ai";
 

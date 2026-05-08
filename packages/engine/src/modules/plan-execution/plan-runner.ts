@@ -2,7 +2,7 @@ import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-store";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
 import { detectPlanDrift } from "./replan-detector";
 import { applyPlanPatch } from "./apply-plan-patch";
 import {

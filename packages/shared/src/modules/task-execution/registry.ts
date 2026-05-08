@@ -3,7 +3,7 @@ import {
   getOpenClawTaskConfigSpec,
   OPENCLAW_RUNTIME_INPUT_VERSION,
   validateOpenClawTaskConfig,
-} from "@chrona/providers-foundation/openclaw/config/config";
+} from "@chrona/openclaw";
 import {
   getResearchTaskConfigSpec,
   RESEARCH_RUNTIME_ADAPTER_KEY,

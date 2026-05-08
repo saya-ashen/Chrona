@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { buildGeneratePlanFeatureSpec } from "@chrona/contracts";
-import { OpenClawBridgeClient } from "./bridge-client";
+import { OpenClawBridgeClient } from "./runtime";
 
 const realFetch = globalThis.fetch;
 
@@ -8,7 +8,9 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-function makeGatewayResponse(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function makeGatewayResponse(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     id: "resp-1",
     status: "completed",
@@ -28,7 +30,12 @@ describe("OpenClawBridgeClient", () => {
     }> = [];
 
     globalThis.fetch = (async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
       if (url.endsWith("/v1/responses")) {
         calls.push({
           url,
@@ -68,7 +75,7 @@ describe("OpenClawBridgeClient", () => {
         content: [
           "Task title: Task title from runtime input",
           "Runtime adapter: openclaw",
-          "Runtime input JSON:\n{\n  \"model\": \"gpt-5\",\n  \"prompt\": \"Task title from runtime input\",\n  \"maxTokens\": 321\n}",
+          'Runtime input JSON:\n{\n  "model": "gpt-5",\n  "prompt": "Task title from runtime input",\n  "maxTokens": 321\n}',
           "Analyze code",
         ].join("\n\n"),
       },
@@ -86,7 +93,12 @@ describe("OpenClawBridgeClient", () => {
     const calls: Array<Record<string, unknown>> = [];
 
     globalThis.fetch = (async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
       if (url.endsWith("/v1/responses")) {
         calls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
         return Response.json(
@@ -138,7 +150,12 @@ describe("OpenClawBridgeClient", () => {
     });
 
     globalThis.fetch = (async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
       if (url.endsWith("/v1/responses")) {
         calls.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
         return Response.json(

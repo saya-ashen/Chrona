@@ -228,16 +228,19 @@ Put here:
 - the middle layer Chrona calls for provider access
 - provider-client interfaces
 - normalized provider result types
+- provider session abstractions and virtualization
 
 Do not put here:
 - app orchestration
 - business schema ownership
 - logic that requires upper layers to know provider wire format
+- task or plan lifecycle semantics
 
 ### `packages/providers/<provider>/...`
 
 Put here:
 - anything that exists only because a provider has a specific protocol or transport
+- provider-native session, response, approval, and history adaptation
 - SSE/OpenResponses/tool-call/session quirks
 - bridge/server/client adapters for that provider
 

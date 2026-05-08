@@ -1,9 +1,9 @@
 import {
-  DEFAULT_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY,
   getOpenClawTaskConfigSpec,
   OPENCLAW_RUNTIME_INPUT_VERSION,
   validateOpenClawTaskConfig,
-} from "@chrona/providers-foundation";
+} from "@chrona/openclaw";
 import {
   getResearchTaskConfigSpec,
   RESEARCH_RUNTIME_ADAPTER_KEY,

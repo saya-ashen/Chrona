@@ -1,6 +1,6 @@
 import { WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
 
 export const DEFAULT_WORKSPACE_ID = "ws_default";
 

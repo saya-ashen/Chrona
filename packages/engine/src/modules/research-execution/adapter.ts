@@ -6,6 +6,7 @@ import {
   validateResearchTaskConfig,
 } from "@/modules/research-execution/config";
 import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
+import { createOpenClawAdapter } from "@chrona/openclaw";
 
 export {
   buildResearchRunPrompt,
@@ -19,8 +20,7 @@ export async function createResearchRuntimeAdapter(
   baseAdapter?: RuntimeExecutionAdapter,
 ): Promise<RuntimeExecutionAdapter> {
   const runtimeAdapter: RuntimeExecutionAdapter =
-    baseAdapter ??
-    (await (await import("@chrona/providers-foundation")).createRuntimeAdapter()) as unknown as RuntimeExecutionAdapter;
+    baseAdapter ?? (await createOpenClawAdapter());
 
   return {
     ...runtimeAdapter,

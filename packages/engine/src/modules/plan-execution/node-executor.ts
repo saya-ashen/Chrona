@@ -1,7 +1,7 @@
 import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 import type { NodeSessionDecision } from "./session-policy";
 import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session";
-import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
+import { startRuntimeRun } from "@/modules/task-execution/start-runtime-run";
 import { db } from "@/lib/db";
 
 type NodeExecutionEvidence = {
@@ -174,92 +174,45 @@ export async function executePlanNode(
       const instructions = buildInstructions(input);
 
       try {
-        const { RunStatus } = await import("@/generated/prisma/client");
-
-        const run = await db.run.create({
-          data: {
-            taskId: input.taskId,
-            taskSessionId: input.mainSession.id,
-            runtimeName,
-            runtimeSessionRef: input.mainSession.sessionKey,
-            status: RunStatus.Pending,
-            triggeredBy: "system",
-            startedAt: new Date(),
-            syncStatus: "healthy",
-          },
-        });
-
-        const adapter = await createRuntimeExecutionAdapter(runtimeName);
-        const created = await adapter.createRun({
-          prompt: instructions,
-          runtimeInput: {},
+        const started = await startRuntimeRun({
+          taskId: input.taskId,
+          taskSessionId: input.mainSession.id,
+          runtimeName,
           runtimeSessionKey: input.mainSession.sessionKey,
+          runtimeInput: {},
+          prompt: instructions,
+          triggeredBy: "system",
+          mode: "require_sync_output",
         });
 
-        if (!created.runStarted) {
-          await db.run.update({
-            where: { id: run.id },
-            data: { status: RunStatus.Failed, syncStatus: "healthy" },
-          });
+        if (!started.runStarted) {
           return {
             status: "failed",
             error: `Runtime refused to start main session run for node ${node.id}`,
-            evidence: { sessionId: input.mainSession.id, runId: run.id },
+            evidence: { sessionId: input.mainSession.id, runId: started.runId },
           };
         }
 
-        const history = await adapter.readHistory({ runtimeSessionKey: input.mainSession.sessionKey }) as {
-          messages?: Array<{ role?: string; content?: string }>;
-        };
-
-        let runStatus: (typeof RunStatus)[keyof typeof RunStatus] = RunStatus.Completed;
-        let totalSaved = 0;
-        let hasAssistantOutput = false;
-
-        if (history?.messages?.length) {
-          for (let i = 0; i < history.messages.length; i++) {
-            const msg = history.messages[i];
-            if (typeof msg?.role === "string" && typeof msg?.content === "string" && msg.content.length > 0) {
-              await db.conversationEntry.create({
-                data: {
-                  runId: run.id,
-                  role: msg.role,
-                  content: msg.content,
-                  sequence: i + 1,
-                  runtimeTs: new Date(),
-                },
-              });
-              totalSaved++;
-              if (msg.role === "assistant") hasAssistantOutput = true;
-            }
-          }
+        if (started.status === "Failed") {
+          return {
+            status: "failed",
+            error: `Runtime produced no assistant output for node ${node.id}`,
+            evidence: { sessionId: input.mainSession.id, runId: started.runId },
+          };
         }
-
-        if (totalSaved === 0 || !hasAssistantOutput) {
-          runStatus = RunStatus.Failed;
-        }
-
-        await db.run.update({
-          where: { id: run.id },
-          data: {
-            runtimeRunRef: created.runtimeRunRef ?? null,
-            status: runStatus,
-            syncStatus: "healthy",
-          },
-        });
 
         return {
           status: "done",
           summary: `Started node ${node.id} execution in main session`,
           evidence: {
             sessionId: input.mainSession.id,
-            runId: run.id,
-            conversationEntryIds: [],
+            runId: started.runId,
+            conversationEntryIds: started.conversationEntryIds,
           },
           output: {
             instructions,
-            runId: run.id,
-            runtimeRunRef: created.runtimeRunRef,
+            runId: started.runId,
+            runtimeRunRef: started.runtimeRunRef,
           },
         };
       } catch (err) {

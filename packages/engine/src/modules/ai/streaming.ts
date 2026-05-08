@@ -23,7 +23,7 @@ import {
   buildSuggestFeatureSpec,
 } from "@chrona/contracts";
 import { createLogger } from "@chrona/shared/logger";
-import type { StreamEvent as ProviderStreamEvent } from "@chrona/providers-foundation";
+import type { OpenClawStreamEvent as ProviderStreamEvent } from "@chrona/openclaw";
 import {
   normalizeGeneratePlanResponse,
   normalizeSuggestResponse,
@@ -113,6 +113,8 @@ function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
   switch (evt.type) {
     case "text":
       return { type: "partial", text: evt.data };
+    case "done":
+      return null;
     case "tool_call":
       return evt.toolCall
         ? {

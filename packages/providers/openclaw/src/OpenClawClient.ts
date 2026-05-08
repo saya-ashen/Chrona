@@ -1,17 +1,6 @@
-import {
-  buildGatewayBody,
-  checkGatewayAvailable as checkGateway,
-  gatewayHeaders,
-} from "../provider-client";
+import { buildGatewayBody, checkGatewayAvailable, gatewayHeaders, normalizeGatewayHttpUrl } from "./gateway";
+import type { BridgeEnvironment, OpenClawClientConfig, OpenClawFeature, OpenClawResponse, OpenClawStreamEvent } from "./types";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
-import { normalizeGatewayHttpUrl } from "../shared/constants";
-import type { BridgeEnvironment } from "../shared/types";
-import type {
-  OpenClawClientConfig,
-  OpenClawFeature,
-  OpenClawResponse,
-  OpenClawStreamEvent,
-} from "./types";
 
 type GatewayRoute =
   | { kind: "feature"; feature: OpenClawFeature; stream: boolean }
@@ -34,8 +23,9 @@ function parseToolArguments(raw: unknown): Record<string, unknown> {
       return {};
     }
   }
-  if (raw && typeof raw === "object" && !Array.isArray(raw))
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return raw as Record<string, unknown>;
+  }
   return {};
 }
 
@@ -155,7 +145,7 @@ async function* parseStreamingGatewayGenerator(
                 tool: (toolCall.name as string) ?? "unknown",
                 callId: (toolCall.call_id as string) ?? `${Date.now()}`,
                 input: parseToolArguments(toolCall.arguments),
-                status: "completed" as const,
+                status: "completed",
               },
             };
           }
@@ -180,7 +170,7 @@ async function* parseStreamingGatewayGenerator(
                 tool: (item.name as string) ?? "unknown",
                 callId: (item.call_id as string) ?? `${Date.now()}`,
                 input: parseToolArguments(item.arguments),
-                status: "completed" as const,
+                status: "completed",
               },
             };
           }
@@ -207,7 +197,7 @@ export class OpenClawClient {
   }
 
   async checkHealth(): Promise<boolean> {
-    return checkGateway(this.env);
+    return checkGatewayAvailable(this.env);
   }
 
   async executeFeature(
@@ -269,18 +259,5 @@ export class OpenClawClient {
     }
 
     yield* parseStreamingGatewayGenerator(reader);
-  }
-
-  async executeTask(input: {
-    sessionKey?: string;
-    instructions: string;
-    prompt?: string;
-    timeout?: number;
-    [key: string]: unknown;
-  }): Promise<OpenClawResponse> {
-    throw new Error(
-      "this method is not supported, use executeFeatureStream instead: " +
-        JSON.stringify(input),
-    );
   }
 }

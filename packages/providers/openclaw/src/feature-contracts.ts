@@ -3,7 +3,7 @@ import type {
   BridgeFeatureResult,
   StructuredAgentResult,
   ToolCallInfo,
-} from "../shared/types";
+} from "./types";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
 import { validatePreparedFeaturePayload } from "@chrona/contracts";
 

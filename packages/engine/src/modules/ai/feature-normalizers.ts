@@ -119,7 +119,7 @@ export async function suggest(
 }
 
 export function normalizeGeneratePlanResponse(input: {
-  parsed: PlanBlueprint;
+  parsed: unknown;
   source: string;
   structured?: StructuredDebugInfo | null;
 }): {
