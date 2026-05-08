@@ -66,7 +66,8 @@ const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
       path: "sessionStrategy",
       kind: "select",
       label: "Subtask session strategy",
-      description: "Decide whether child tasks reuse the parent session or get one session per subtask",
+      description:
+        "Decide whether child tasks reuse the parent session or get one session per subtask",
       advanced: true,
       defaultValue: "per_subtask",
       options: [
@@ -87,5 +88,3 @@ export function getOpenClawTaskConfigSpec() {
 export function validateOpenClawTaskConfig(input: unknown) {
   return validateTaskConfigAgainstSpec(OPENCLAW_TASK_CONFIG_SPEC, input);
 }
-
-

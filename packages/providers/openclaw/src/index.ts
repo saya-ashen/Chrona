@@ -7,30 +7,66 @@
 export {
   buildGatewayBody,
   checkGatewayAvailable,
+  executeGatewayRequest,
   gatewayHeaders,
+  normalizeGatewayHttpUrl,
+} from "./gateway";
+
+export {
+  createMockOpenClawAdapter,
+  createOpenClawAdapter,
+  OpenClawBridgeClient,
+  type OpenClawAdapter,
+} from "./runtime";
+
+export {
+  getOpenClawTaskConfigSpec,
+  OPENCLAW_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_RUNTIME_INPUT_VERSION,
+  validateOpenClawTaskConfig,
+} from "./config";
+
+export {
   buildFeatureResultFromResponse,
-} from "./provider-client";
+} from "./feature-contracts";
 
 export {
   OpenClawClient,
-} from "./client/OpenClawClient";
+} from "./OpenClawClient";
 
 export type {
-  OpenClawClientConfig,
-  OpenClawFeature,
-  OpenClawResponse,
-  OpenClawStreamEvent,
-  OpenClawToolCall,
-} from "./client/types";
-
-export { normalizeGatewayHttpUrl } from "./shared/constants";
-
-export type { BridgeEnvironment } from "./shared/types";
-
-export type {
+  BridgeEnvironment,
+  BridgeExecutionTaskRequest,
   BridgeFeature,
   BridgeFeatureRequest,
+  BridgeFeatureResult,
+  BridgeLogger,
+  BridgeRequest,
   BridgeResponse,
+  ExecutionResult,
   NDJSONEvent,
+  OpenClawAdapterConfig,
+  OpenClawApprovalDecision,
+  OpenClawApprovalRequest,
+  OpenClawApprovalRequestResult,
+  OpenClawApprovalResolution,
+  OpenClawClientConfig,
+  OpenClawChatHistory,
+  OpenClawFeature,
+  OpenClawHello,
+  OpenClawPendingApproval,
+  OpenClawResponse,
+  OpenClawRunSnapshot,
+  OpenClawRuntimeClient,
+  OpenClawSendInput,
+  OpenClawSendInputResult,
+  OpenClawSessionStatus,
+  OpenClawStreamEvent,
+  OpenClawStructuredRunResult,
+  OpenClawToolCall,
+  OpenClawWaitForRunInput,
+  RouteKind,
+  StructuredAgentResult,
   ToolCallInfo,
-} from "./transport/bridge-types";
+  ToolCallOutputInfo,
+} from "./types";

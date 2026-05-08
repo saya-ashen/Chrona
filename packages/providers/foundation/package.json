@@ -5,11 +5,9 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
-    "@chrona/openclaw": "workspace:*",
-    "@chrona/runtime-core": "workspace:*"
+    "@chrona/openclaw": "workspace:*"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./*": "./src/*"
+    ".": "./src/index.ts"
   }
 }

@@ -4,7 +4,7 @@ import {
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
 
 type MainSessionEventType =
   | "execution_started"

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { createMockOpenClawAdapter } from "@chrona/providers-foundation/openclaw/runtime/mock-adapter";
+import { createMockOpenClawAdapter } from "@chrona/openclaw";
 import type { NodeConfig } from "@chrona/contracts/ai";
 
 const realProgressAcceptedPlan = await import("@/modules/commands/progress-accepted-task-plan");

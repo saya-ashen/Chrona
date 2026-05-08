@@ -1,6 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createRuntimeAdapter, DEFAULT_RUNTIME_ADAPTER_KEY, type RuntimeAdapter } from "@chrona/providers-foundation";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY, type OpenClawAdapter } from "@chrona/openclaw";
+import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 
 import { SYNC_STALE_MS } from "../../constants";
 
@@ -13,7 +14,7 @@ const ACTIVE_RUN_STATUSES = [
 
 async function markSyncDegraded(run: { id: string; runtimeName: string | null }, message: string) {
   const now = new Date();
-  const runtimeName = run.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
+  const runtimeName = run.runtimeName ?? OPENCLAW_RUNTIME_ADAPTER_KEY;
 
   await db.run.update({
     where: { id: run.id },
@@ -42,14 +43,16 @@ async function markSyncDegraded(run: { id: string; runtimeName: string | null },
   });
 }
 
-async function syncRunForRead(runId: string, adapter?: RuntimeAdapter) {
+async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
   const run = await db.run.findUniqueOrThrow({
     where: { id: runId },
     select: { id: true, runtimeName: true },
   });
 
   try {
-    const activeAdapter = adapter ?? (await createRuntimeAdapter());
+    const activeAdapter =
+      adapter ??
+      ((await createRuntimeExecutionAdapter(OPENCLAW_RUNTIME_ADAPTER_KEY)) as OpenClawAdapter);
     const { syncRunFromRuntime } = await import("@/modules/runtime-sync/sync-run");
     await syncRunFromRuntime({ runId, adapter: activeAdapter });
   } catch (error) {
@@ -58,7 +61,10 @@ async function syncRunForRead(runId: string, adapter?: RuntimeAdapter) {
   }
 }
 
-export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter?: RuntimeAdapter) {
+export async function syncStaleWorkspaceRunsForRead(
+  workspaceId: string,
+  adapter?: OpenClawAdapter,
+) {
   const staleBefore = new Date(Date.now() - SYNC_STALE_MS);
   const runs = await db.run.findMany({
     where: {
@@ -79,7 +85,8 @@ export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter
 
   if (!activeAdapter) {
     try {
-      activeAdapter = await createRuntimeAdapter();
+      activeAdapter =
+        (await createRuntimeExecutionAdapter(OPENCLAW_RUNTIME_ADAPTER_KEY)) as OpenClawAdapter;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime sync failed";
 
@@ -98,7 +105,7 @@ export async function syncStaleWorkspaceRunsForRead(workspaceId: string, adapter
 
 export async function syncTaskRunForRead(
   taskId: string,
-  adapter?: RuntimeAdapter,
+  adapter?: OpenClawAdapter,
   options?: { forceActive?: boolean },
 ) {
   const run = await db.run.findFirst({

@@ -3,7 +3,8 @@ import {
   ensureDefaultTaskSession,
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
-import { DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/providers-foundation";
+import { startRuntimeRun } from "@/modules/task-execution/start-runtime-run";
+import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
 
 type EnsureNodeChildSessionInput = {
   taskId: string;
@@ -104,99 +105,35 @@ export async function startNodeChildRun(
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { workspaceId: true, runtimeInput: true, runtimeInputVersion: true, runtimeModel: true, runtimeConfig: true },
-  });
-
-  const run = await db.run.create({
-    data: {
-      taskId: input.taskId,
-      taskSessionId: input.childSessionId,
-      runtimeName,
-      runtimeSessionRef: input.childSessionKey,
-      status: RunStatus.Pending,
-      triggeredBy: "system",
-      startedAt: new Date(),
-      syncStatus: "healthy",
-    },
+    select: { workspaceId: true, runtimeInput: true },
   });
 
   let runtimeRunRef: string | null = null;
+  let runId = "";
   try {
-    const { createRuntimeExecutionAdapter } = await import("@/modules/task-execution/execution-registry");
-    const adapter = await createRuntimeExecutionAdapter(runtimeName);
-    const created = await adapter.createRun({
-      prompt: input.prompt,
-      runtimeInput: (task.runtimeInput as Record<string, unknown> | undefined) ?? {},
+    const started = await startRuntimeRun({
+      taskId: input.taskId,
+      taskSessionId: input.childSessionId,
+      runtimeName,
       runtimeSessionKey: input.childSessionKey,
+      runtimeInput: (task.runtimeInput as Record<string, unknown> | undefined) ?? {},
+      prompt: input.prompt,
+      triggeredBy: "system",
+      mode: "allow_async",
     });
 
-    runtimeRunRef = created.runtimeRunRef ?? null;
-    const nextStatus = created.runStarted ? RunStatus.Running : RunStatus.Pending;
-
-    await db.run.update({
-      where: { id: run.id },
-      data: {
-        runtimeRunRef,
-        runtimeSessionRef: created.runtimeSessionKey ?? created.runtimeSessionRef ?? input.childSessionKey,
-        status: nextStatus,
-        syncStatus: "healthy",
-      },
-    });
-
-    let hasAssistantOutput = false;
-    try {
-      const runtimeSessionKey = created.runtimeSessionKey ?? created.runtimeSessionRef ?? input.childSessionKey;
-      const history = await adapter.readHistory({ runtimeSessionKey }) as {
-        messages?: Array<{ role?: string; content?: string }>;
-      };
-      if (history?.messages?.length) {
-        for (let i = 0; i < history.messages.length; i++) {
-          const msg = history.messages[i];
-          if (typeof msg?.role === "string" && typeof msg?.content === "string" && msg.content.length > 0) {
-            await db.conversationEntry.create({
-              data: {
-                runId: run.id,
-                role: msg.role,
-                content: msg.content,
-                sequence: i + 1,
-                runtimeTs: new Date(),
-              },
-            });
-            if (msg.role === "assistant") {
-              hasAssistantOutput = true;
-            }
-          }
-        }
-      }
-    } catch {
-      // output persist is best-effort; do not fail the run start
-    }
+    runtimeRunRef = started.runtimeRunRef;
+    runId = started.runId;
 
     await db.taskSession.update({
       where: { id: input.childSessionId },
       data: {
         status: "running",
-        lastRunStatus: hasAssistantOutput ? RunStatus.Completed : nextStatus,
-        activeRunId: run.id,
+        lastRunStatus: started.status,
+        activeRunId: started.runId,
       },
     });
-
-    if (hasAssistantOutput) {
-      await db.run.update({
-        where: { id: run.id },
-        data: {
-          status: RunStatus.Completed,
-          endedAt: new Date(),
-          syncStatus: "healthy",
-        },
-      });
-    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    await db.run.update({
-      where: { id: run.id },
-      data: { status: RunStatus.Failed, errorSummary: message },
-    });
     await db.taskSession.update({
       where: { id: input.childSessionId },
       data: { status: "failed", lastRunStatus: RunStatus.Failed },
@@ -210,7 +147,7 @@ export async function startNodeChildRun(
     eventType: "run.started",
     workspaceId: task.workspaceId,
     taskId: input.taskId,
-    runId: run.id,
+    runId,
     actorType: "system",
     actorId: "plan-orchestrator",
     source: "plan_execution",
@@ -219,8 +156,8 @@ export async function startNodeChildRun(
       triggered_by: "system",
       child_session_key: input.childSessionKey,
     },
-    dedupeKey: `run.started:${run.id}`,
+    dedupeKey: `run.started:${runId}`,
   });
 
-  return { runId: run.id, runtimeRunRef };
+  return { runId, runtimeRunRef };
 }

@@ -1,11 +1,9 @@
 import { ApprovalStatus, Prisma, RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import {
-  createRuntimeAdapter,
-  type RuntimeAdapter,
-} from "@chrona/providers-foundation";
+import type { OpenClawAdapter } from "@chrona/openclaw";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
 import {
   progressAcceptedTaskPlan,
@@ -59,9 +57,10 @@ function toRunStatus(status: string): RunStatus {
 
 export async function syncRunFromRuntime(input: {
   runId: string;
-  adapter?: RuntimeAdapter;
+  adapter?: OpenClawAdapter;
 }) {
-  const adapter: RuntimeAdapter = input.adapter ?? (await createRuntimeAdapter());
+  const adapter: OpenClawAdapter =
+    input.adapter ?? ((await createRuntimeExecutionAdapter("openclaw")) as OpenClawAdapter);
   const cursorRecord = await db.runtimeCursor.findUnique({
     where: { runId: input.runId },
   });

@@ -1,25 +1,35 @@
 import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import {
-  createRuntimeAdapter,
-  DEFAULT_RUNTIME_ADAPTER_KEY,
-  registerRuntimeAdapterFactory,
-  type RuntimeAdapterConfig,
-} from "@chrona/providers-foundation";
+  createOpenClawAdapter,
+  OPENCLAW_RUNTIME_ADAPTER_KEY,
+  type OpenClawAdapterConfig,
+} from "@chrona/openclaw";
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
 import { db } from "@/lib/db";
 
-registerRuntimeAdapterFactory("research", async () =>
-  (await import("@/modules/research-execution/adapter")).createResearchRuntimeAdapter(),
-);
+type RuntimeAdapterFactory = (
+  config?: OpenClawAdapterConfig,
+) => Promise<RuntimeExecutionAdapter>;
+
+const runtimeAdapterFactories = new Map<string, RuntimeAdapterFactory>([
+  [OPENCLAW_RUNTIME_ADAPTER_KEY, createOpenClawAdapter],
+  [
+    "research",
+    async (config) =>
+      (await import("@/modules/research-execution/adapter")).createResearchRuntimeAdapter(
+        await createOpenClawAdapter(config),
+      ),
+  ],
+]);
 
 export function overrideRuntimeExecutionAdapter(
   key: string,
-  factory: (config?: RuntimeAdapterConfig) => Promise<RuntimeExecutionAdapter>,
+  factory: RuntimeAdapterFactory,
 ): void {
-  registerRuntimeAdapterFactory(key, factory);
+  runtimeAdapterFactories.set(key, factory);
 }
 
-async function loadAdapterConfig(): Promise<RuntimeAdapterConfig | undefined> {
+async function loadAdapterConfig(): Promise<OpenClawAdapterConfig | undefined> {
   const client = await db.aiClient.findFirst({
     where: { type: "openclaw", isDefault: true, enabled: true },
   });
@@ -34,6 +44,13 @@ async function loadAdapterConfig(): Promise<RuntimeAdapterConfig | undefined> {
 
 export async function createRuntimeExecutionAdapter(key: string): Promise<RuntimeExecutionAdapter> {
   const definition = getRuntimeAdapterDefinition(key);
-  const config = definition.key === DEFAULT_RUNTIME_ADAPTER_KEY ? await loadAdapterConfig() : undefined;
-  return createRuntimeAdapter<RuntimeExecutionAdapter>(definition.key, config);
+  const factory = runtimeAdapterFactories.get(definition.key);
+  if (!factory) {
+    throw new Error(`No runtime adapter factory registered for key: ${definition.key}`);
+  }
+  const config =
+    definition.key === OPENCLAW_RUNTIME_ADAPTER_KEY || definition.key === "research"
+      ? await loadAdapterConfig()
+      : undefined;
+  return factory(config);
 }

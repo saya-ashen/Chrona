@@ -1,15 +1,14 @@
-/**
- * OpenClaw gateway client.
- *
- * Implements the OpenClawRuntimeClient interface by invoking the provider's
- * gateway integration directly, without a local bridge server.
- */
-
+import type { RuntimeInput } from "@chrona/runtime-core";
+import type { PreparedAiFeatureSpec } from "@chrona/contracts";
 import type {
-  OpenClawRuntimeClient,
-  OpenClawWaitForRunInput,
-} from "../runtime/runtime-client";
-import type {
+  BridgeEnvironment,
+  BridgeExecutionTaskRequest,
+  BridgeFeature,
+  BridgeFeatureRequest,
+  BridgeLogger,
+  BridgeResponse,
+  NDJSONEvent,
+  OpenClawAdapterConfig,
   OpenClawApprovalDecision,
   OpenClawApprovalRequest,
   OpenClawApprovalRequestResult,
@@ -18,25 +17,57 @@ import type {
   OpenClawHello,
   OpenClawPendingApproval,
   OpenClawRunSnapshot,
+  OpenClawRuntimeClient,
   OpenClawSendInput,
   OpenClawSendInputResult,
+  OpenClawSessionStatus,
   OpenClawStructuredRunResult,
-} from "../protocol/types";
-import type {
-  BridgeExecutionTaskRequest,
-  BridgeFeatureRequest,
-  BridgeResponse,
-  NDJSONEvent,
-  BridgeFeature,
-} from "@chrona/openclaw/transport/bridge-types";
-import { normalizeGatewayHttpUrl } from "@chrona/openclaw/shared/constants";
-import type { BridgeEnvironment, BridgeLogger, RouteKind } from "@chrona/openclaw/shared/types";
+  OpenClawWaitForRunInput,
+  RouteKind,
+} from "./types";
 import {
   checkGatewayAvailable,
   executeGatewayRequest,
-} from "@chrona/openclaw/execution/gateway";
-import type { RuntimeInput } from "@chrona/runtime-core";
-import type { PreparedAiFeatureSpec } from "@chrona/contracts";
+  normalizeGatewayHttpUrl,
+} from "./gateway";
+
+export type OpenClawAdapter = {
+  createRun(input: {
+    prompt: string;
+    runtimeInput: RuntimeInput;
+    runtimeSessionKey?: string;
+  }): Promise<{
+    runtimeRunRef?: string;
+    runtimeSessionRef?: string;
+    runtimeSessionKey?: string;
+    runStarted: boolean;
+  }>;
+  sendOperatorMessage(input: {
+    runtimeSessionKey: string;
+    message: string;
+  }): Promise<OpenClawSendInputResult>;
+  getRunSnapshot(input: {
+    runtimeRunRef: string;
+    runtimeSessionKey?: string;
+    timeoutMs?: number;
+  }): Promise<OpenClawRunSnapshot>;
+  readHistory(input: {
+    runtimeSessionKey: string;
+  }): Promise<OpenClawChatHistory>;
+  listApprovals(input: {
+    runtimeSessionKey: string;
+  }): Promise<OpenClawPendingApproval[]>;
+  waitForApprovalDecision(
+    approvalId: string,
+  ): Promise<OpenClawApprovalDecision | null>;
+  resumeRun(input: {
+    runtimeSessionKey: string;
+    approvalId?: string;
+    decision?: "approve" | "reject";
+    inputText?: string;
+  }): Promise<OpenClawSendInputResult | { accepted: boolean }>;
+  getSessionStatus(runtimeSessionKey: string): Promise<OpenClawSessionStatus>;
+};
 
 type OpenClawBridgeClientOptions = {
   baseUrl: string;
@@ -112,9 +143,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     };
   }
 
-  close(): void {
-    // no-op for gateway client
-  }
+  close(): void {}
 
   async createRun(input: {
     prompt: string;
@@ -255,8 +284,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
 
     return {
       accepted: !response.error,
-      runtimeRunRef:
-        response.responseId ?? response.runId ?? response.sessionId,
+      runtimeRunRef: response.responseId ?? response.runId ?? response.sessionId,
       runtimeSessionKey: input.runtimeSessionKey,
       runStarted: true,
     };
@@ -276,6 +304,29 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     _input: OpenClawApprovalResolution,
   ): Promise<{ accepted: boolean }> {
     return { accepted: true };
+  }
+
+  async getSessionStatus(
+    runtimeSessionKey: string,
+  ): Promise<OpenClawSessionStatus> {
+    const [history, approvals] = await Promise.all([
+      this.readOutputs(runtimeSessionKey),
+      this.listApprovals(),
+    ]);
+    const session = this.sessions.get(runtimeSessionKey);
+    const pendingApprovals = approvals.filter(
+      (approval) => approval.sessionKey === runtimeSessionKey,
+    );
+    const exists = history.messages.length > 0 || pendingApprovals.length > 0;
+
+    return {
+      runtimeSessionKey,
+      exists,
+      activeRunRef: session?.lastRunRef ?? undefined,
+      activeRunStatus: session?.lastRunStatus ?? undefined,
+      pendingApprovals,
+      lastMessage: session?.lastOutput || undefined,
+    };
   }
 
   private getOrCreateSession(sessionKey: string): SessionState {
@@ -342,4 +393,241 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
     }
     return result.response;
   }
+}
+
+function createLiveOpenClawAdapter(client: OpenClawRuntimeClient): OpenClawAdapter {
+  return {
+    createRun(input) {
+      return client.createRun(input);
+    },
+    sendOperatorMessage(input) {
+      return client.sendInput(input);
+    },
+    getRunSnapshot(input) {
+      return client.waitForRun(input);
+    },
+    readHistory(input) {
+      return client.readOutputs(input.runtimeSessionKey);
+    },
+    async listApprovals(input) {
+      const approvals = await client.listApprovals();
+      return approvals.filter(
+        (approval) => approval.sessionKey === input.runtimeSessionKey,
+      );
+    },
+    async waitForApprovalDecision(approvalId) {
+      try {
+        return await client.waitForApprovalDecision(approvalId);
+      } catch {
+        return null;
+      }
+    },
+    async resumeRun(input) {
+      if (input.approvalId && input.decision) {
+        return client.resolveApproval({
+          approvalId: input.approvalId,
+          decision: input.decision,
+        });
+      }
+      if (input.inputText?.trim()) {
+        return client.sendInput({
+          runtimeSessionKey: input.runtimeSessionKey,
+          message: input.inputText,
+        });
+      }
+      return { accepted: true };
+    },
+    getSessionStatus(runtimeSessionKey) {
+      return client.getSessionStatus(runtimeSessionKey);
+    },
+  };
+}
+
+type OpenClawMockFixtureName = "run-waiting-approval" | "run-completed";
+
+type OpenClawMockFixture = {
+  snapshot: OpenClawRunSnapshot;
+  history: OpenClawChatHistory;
+  approvals: OpenClawPendingApproval[];
+  approvalDecisions?: Record<string, OpenClawApprovalDecision | null>;
+};
+
+const OPENCLAW_MOCK_FIXTURES: Record<
+  OpenClawMockFixtureName,
+  OpenClawMockFixture
+> = {
+  "run-waiting-approval": {
+    snapshot: {
+      runtimeRunRef: "runtime_waiting_1",
+      runtimeSessionKey: "agent:main:dashboard:session_waiting_1",
+      status: "WaitingForApproval",
+      rawStatus: "waiting_for_approval",
+      lastMessage: "Approval required before applying the patch.",
+    },
+    history: {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Read package.json and prepare a patch." },
+          ],
+          timestamp: 1737264000000,
+          __openclaw: { id: "msg_waiting_1", seq: 1 },
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "tool_read_1",
+              name: "read",
+              arguments: { path: "package.json", offset: 1, limit: 20 },
+            },
+          ],
+          timestamp: 1737264001000,
+          __openclaw: { id: "msg_waiting_2", seq: 2 },
+        },
+        {
+          role: "toolResult",
+          toolCallId: "tool_read_1",
+          toolName: "read",
+          content: [{ type: "text", text: '{"name":"chrona"}' }],
+          isError: false,
+          timestamp: 1737264002000,
+          __openclaw: { id: "msg_waiting_3", seq: 3 },
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "I found the package name and I am waiting for approval to continue.",
+            },
+          ],
+          timestamp: 1737264003000,
+          __openclaw: { id: "msg_waiting_4", seq: 4 },
+        },
+      ],
+    },
+    approvals: [
+      {
+        approvalId: "approval_waiting_1",
+        sessionKey: "agent:main:dashboard:session_waiting_1",
+        host: "gateway",
+        command: "apply_patch",
+        ask: "Approve patch",
+        createdAtMs: 1737264004000,
+        expiresAtMs: 1737267600000,
+      },
+    ],
+  },
+  "run-completed": {
+    snapshot: {
+      runtimeRunRef: "runtime_completed_1",
+      runtimeSessionKey: "agent:main:dashboard:session_completed_1",
+      status: "Completed",
+      rawStatus: "completed",
+    },
+    history: {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Summarize the current project status." },
+          ],
+          timestamp: 1737265000000,
+          __openclaw: { id: "msg_completed_1", seq: 1 },
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "The project bootstrap, runtime probe, schema, and projections are in place.",
+            },
+          ],
+          timestamp: 1737265001000,
+          __openclaw: { id: "msg_completed_2", seq: 2 },
+        },
+      ],
+    },
+    approvals: [],
+  },
+};
+
+export function createMockOpenClawAdapter(options?: {
+  fixtureName?: OpenClawMockFixtureName;
+  fixture?: OpenClawMockFixture;
+}): OpenClawAdapter {
+  const fixture =
+    options?.fixture ??
+    OPENCLAW_MOCK_FIXTURES[options?.fixtureName ?? "run-waiting-approval"];
+
+  return {
+    async createRun(input) {
+      return {
+        runtimeRunRef: fixture.snapshot.runtimeRunRef,
+        runtimeSessionRef: fixture.snapshot.runtimeSessionRef,
+        runtimeSessionKey:
+          input.runtimeSessionKey ?? fixture.snapshot.runtimeSessionKey,
+        runStarted: true,
+      };
+    },
+    async sendOperatorMessage(input) {
+      return {
+        accepted: true,
+        runtimeRunRef: fixture.snapshot.runtimeRunRef,
+        runtimeSessionKey: input.runtimeSessionKey,
+        runStarted: false,
+      };
+    },
+    async getRunSnapshot() {
+      return fixture.snapshot;
+    },
+    async readHistory() {
+      return fixture.history;
+    },
+    async listApprovals(input) {
+      return fixture.approvals.filter(
+        (approval) => approval.sessionKey === input.runtimeSessionKey,
+      );
+    },
+    async waitForApprovalDecision(approvalId) {
+      return fixture.approvalDecisions?.[approvalId] ?? null;
+    },
+    async resumeRun() {
+      return { accepted: true };
+    },
+    async getSessionStatus(runtimeSessionKey) {
+      const approvals = fixture.approvals.filter(
+        (approval) => approval.sessionKey === runtimeSessionKey,
+      );
+      return {
+        runtimeSessionKey,
+        exists: true,
+        activeRunRef: fixture.snapshot.runtimeRunRef,
+        activeRunStatus: fixture.snapshot.status,
+        pendingApprovals: approvals,
+        lastMessage: fixture.snapshot.lastMessage,
+      };
+    },
+  };
+}
+
+export async function createOpenClawAdapter(
+  config?: OpenClawAdapterConfig,
+): Promise<OpenClawAdapter> {
+  if (config?.mode === "mock") {
+    return createMockOpenClawAdapter();
+  }
+  if (!config?.bridgeUrl?.trim()) {
+    throw new Error("OpenClaw bridgeUrl is required for the live runtime adapter");
+  }
+
+  const client = new OpenClawBridgeClient({
+    baseUrl: config.bridgeUrl,
+    authToken: config.bridgeToken,
+    timeoutSeconds: config.timeoutSeconds,
+  });
+  return createLiveOpenClawAdapter(client);
 }
