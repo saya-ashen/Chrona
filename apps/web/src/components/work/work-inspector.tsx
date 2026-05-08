@@ -2,15 +2,14 @@
 
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
-
-const sections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
-
-type InspectorSection = (typeof sections)[number];
+import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import {
+  renderWorkInspectorSectionPanel,
+  workInspectorSections as sections,
+  type InspectorSection,
+} from "./work-inspector-sections";
 
 type WorkInspectorProps = {
   plan: TaskPlanGraphPlan;
@@ -70,31 +69,6 @@ type WorkInspectorProps = {
     stopReason: string;
   };
 };
-
-function formatDateTime(value: string | null | undefined, emptyValue: string) {
-  return value ? value.slice(0, 16).replace("T", " ") : emptyValue;
-}
-
-function formatScheduleWindow(start: string | null | undefined, end: string | null | undefined, emptyScheduleWindow: string) {
-  if (start && end) {
-    return `${formatDateTime(start, emptyScheduleWindow)} - ${formatDateTime(end, emptyScheduleWindow)}`;
-  }
-
-  return emptyScheduleWindow;
-}
-
-function isSafeExternalHref(href: string) {
-  try {
-    const protocol = new URL(href).protocol;
-    return protocol === "http:" || protocol === "https:" || protocol === "mailto:" || protocol === "tel:";
-  } catch {
-    return false;
-  }
-}
-
-function isInternalAppHref(href: string) {
-  return href.startsWith("/") && !href.startsWith("//");
-}
 
 export function WorkInspector({
   plan,
@@ -191,7 +165,7 @@ export function WorkInspector({
             hidden={activeSection !== section}
             className="mt-4 rounded-[24px] border border-border/60 bg-background/60 p-4 text-sm"
           >
-            {renderSectionPanel(section, {
+            {renderWorkInspectorSectionPanel(section, {
               plan,
               currentAction,
               currentException,
@@ -207,145 +181,3 @@ export function WorkInspector({
     </aside>
   );
 }
-
-function renderSectionPanel(
-  section: InspectorSection,
-  {
-    plan,
-    currentAction,
-    currentException,
-    approvals,
-    artifacts,
-    toolCalls,
-    context,
-    labels,
-  }: {
-    plan: WorkInspectorProps["plan"];
-    currentAction: WorkInspectorProps["currentAction"];
-    currentException: WorkInspectorProps["currentException"];
-    approvals: WorkInspectorProps["approvals"];
-    artifacts: WorkInspectorProps["artifacts"];
-    toolCalls: WorkInspectorProps["toolCalls"];
-    context: WorkInspectorProps["context"];
-    labels: WorkInspectorProps["labels"];
-  },
-) {
-  if (section === "plan") {
-    return (
-      <div className="space-y-4">
-        <div>
-          <p className="text-base font-semibold text-foreground">{labels.planTitle}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {plan.state === "ready" ? plan.graphSummary ?? labels.planReadySummary : labels.planEmptySummary}
-          </p>
-        </div>
-
-        {currentException ? <p className="text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
-        {currentAction ? (
-          isInternalAppHref(currentAction.href) ? (
-            <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </LocalizedLink>
-          ) : currentAction.href.startsWith("#") ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </a>
-          ) : isSafeExternalHref(currentAction.href) ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </a>
-          ) : null
-        ) : null}
-
-        {plan.state === "empty" ? (
-          <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4">
-            <p className="font-medium text-foreground">{labels.planEmptyTitle}</p>
-          </div>
-        ) : (
-          <TaskPlanGraph plan={plan} />
-        )}
-      </div>
-    );
-  }
-
-    if (section === "approvals") {
-      return (
-        <div className="space-y-3">
-          <p className="text-base font-semibold text-foreground">{labels.approvalsTitle}</p>
-          {approvals.length === 0 ? <p className="text-muted-foreground">{labels.noApprovals}</p> : approvals.map((approval) => (
-            <div key={approval.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-foreground">{approval.title}</p>
-                <StatusBadge tone="warning">{approval.status}</StatusBadge>
-              </div>
-              {approval.summary ? <p className="mt-2 text-muted-foreground">{approval.summary}</p> : null}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (section === "artifacts") {
-      return (
-        <div className="space-y-3">
-          <p className="text-base font-semibold text-foreground">{labels.artifactsTitle}</p>
-          {artifacts.length === 0 ? <p className="text-muted-foreground">{labels.noArtifacts}</p> : artifacts.map((artifact) => (
-            <div key={artifact.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-              {artifact.uri && isInternalAppHref(artifact.uri) ? (
-                <LocalizedLink href={artifact.uri} className="font-medium text-foreground underline decoration-border underline-offset-4 hover:text-primary">
-                  {artifact.title}
-                </LocalizedLink>
-              ) : artifact.uri && isSafeExternalHref(artifact.uri) ? (
-                <a href={artifact.uri} className="font-medium text-foreground underline decoration-border underline-offset-4 hover:text-primary">
-                  {artifact.title}
-                </a>
-              ) : (
-                <p className="font-medium text-foreground">{artifact.title}</p>
-              )}
-              <p className="mt-1 text-muted-foreground">{artifact.type}</p>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (section === "tools") {
-      return (
-        <div className="space-y-3">
-          <p className="text-base font-semibold text-foreground">{labels.toolsTitle}</p>
-          {toolCalls.length === 0 ? <p className="text-muted-foreground">{labels.noTools}</p> : toolCalls.map((tool) => (
-            <div key={tool.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-foreground">{tool.toolName}</p>
-                <StatusBadge>{tool.status}</StatusBadge>
-              </div>
-              {tool.argumentsSummary ? <p className="mt-2 text-muted-foreground">{labels.toolArguments}：{tool.argumentsSummary}</p> : null}
-              {tool.resultSummary ? <p className="mt-1 text-muted-foreground">{labels.toolResult}：{tool.resultSummary}</p> : null}
-              {tool.errorSummary ? <p className="mt-1 text-red-700">{labels.toolError}：{tool.errorSummary}</p> : null}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-3 text-muted-foreground">
-        <p className="text-base font-semibold text-foreground">{labels.contextTitle}</p>
-        <div className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-          <p><span className="text-foreground">{labels.priority}：</span>{context.priority}</p>
-          <p className="mt-1"><span className="text-foreground">{labels.dueAt}：</span>{formatDateTime(context.dueAt, labels.emptyValue)}</p>
-          <p className="mt-1"><span className="text-foreground">{labels.scheduledWindow}：</span>{formatScheduleWindow(context.scheduledStartAt, context.scheduledEndAt, labels.emptyScheduleWindow)}</p>
-          <p className="mt-1"><span className="text-foreground">{labels.scheduleStatus}：</span>{context.scheduleStatus}</p>
-          <p className="mt-2 text-xs">{context.scheduleSummary}</p>
-        </div>
-        <div className="rounded-[22px] border border-border/60 bg-background/70 p-4">
-          <p><span className="text-foreground">{labels.runStatus}：</span>{context.runStatus}</p>
-          <p className="mt-1"><span className="text-foreground">{labels.syncStatus}：</span>{context.isStale ? labels.staleSync : (context.syncStatus ?? labels.healthySync)}</p>
-          <p className="mt-1"><span className="text-foreground">{labels.lastUpdated}：</span>{formatDateTime(context.lastUpdatedAt, labels.emptyValue)}</p>
-          {context.lastSyncedAt ? <p className="mt-1"><span className="text-foreground">{labels.lastSynced}：</span>{formatDateTime(context.lastSyncedAt, labels.emptyValue)}</p> : null}
-          {context.stopReason ? <p className="mt-1"><span className="text-foreground">{labels.stopReason}：</span>{context.stopReason}</p> : null}
-          <p className="mt-2 text-xs">{context.blockerSummary}</p>
-        </div>
-      </div>
-    );
-  }

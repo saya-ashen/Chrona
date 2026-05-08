@@ -49,19 +49,8 @@ export function TaskPlanGraphPanel({
         return;
       }
 
-      const availableHeight = Math.floor(panelHeight - headerHeight - 28);
-      if (availableHeight <= 0) {
-        setResolvedViewportHeight(maxViewportHeight);
-        return;
-      }
-
-      const nextHeight = maxViewportHeight
-        ? Math.min(maxViewportHeight, availableHeight)
-        : availableHeight;
-
-      setResolvedViewportHeight((current) => (
-        current !== undefined && Math.abs(current - nextHeight) < 2 ? current : nextHeight
-      ));
+      const nextHeight = Math.floor(panelHeight - headerHeight - 8);
+      setResolvedViewportHeight((current) => (current !== undefined && Math.abs(current - nextHeight) < 2 ? current : nextHeight));
     };
 
     measure();
@@ -77,7 +66,7 @@ export function TaskPlanGraphPanel({
   }, [maxViewportHeight]);
 
   return (
-    <div ref={panelRef} className={cn("min-w-0", className)}>
+    <div ref={panelRef} className={cn("min-w-0 h-full", className)}>
       <SurfaceCard
         as="div"
         variant="inset"

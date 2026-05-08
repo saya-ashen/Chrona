@@ -1,0 +1,51 @@
+import { api } from "@/lib/rpc-client";
+import type { TaskData, TaskPlanGenerationStatus } from "./task-workspace-types";
+
+export type TaskPlanState = {
+  taskId: string;
+  aiPlanGenerationStatus: TaskPlanGenerationStatus;
+  savedPlan: TaskData["savedPlan"] | null;
+};
+
+export const taskWorkspaceQueryKeys = {
+  all: ["task-workspace"] as const,
+  detail: (taskId: string) => [...taskWorkspaceQueryKeys.all, "detail", taskId] as const,
+  planState: (taskId: string) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId] as const,
+};
+
+export async function fetchTaskWorkspaceTask(taskId: string) {
+  const response = await api.tasks[":taskId"].detail.$get({
+    param: { taskId },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to load task detail" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load task detail");
+  }
+
+  const payload = await response.json() as { task: TaskData };
+  return payload.task;
+}
+
+export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState> {
+  const response = await api.tasks[":taskId"].plan.state.$get({
+    param: { taskId },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to load task plan state" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load task plan state");
+  }
+
+  const payload = await response.json() as {
+    taskId: string;
+    aiPlanGenerationStatus?: string;
+    savedPlan?: TaskData["savedPlan"] | null;
+  };
+
+  return {
+    taskId: payload.taskId,
+    aiPlanGenerationStatus: (payload.aiPlanGenerationStatus ?? "idle") as TaskPlanState["aiPlanGenerationStatus"],
+    savedPlan: payload.savedPlan ?? null,
+  };
+}

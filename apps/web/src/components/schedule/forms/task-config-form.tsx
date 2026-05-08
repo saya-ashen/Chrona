@@ -2,6 +2,7 @@
 
 import type { JSX, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { useI18n } from "@/i18n/client";
@@ -642,11 +643,25 @@ export function TaskConfigForm({
       initialRuntimeConfig,
     ],
   );
-  const [formState, setFormState] = useState<TaskConfigFormState>(initialState);
+  const {
+    control,
+    reset,
+    handleSubmit,
+    setValue,
+    getValues,
+    formState: { isDirty },
+  } = useForm<TaskConfigFormState>({
+    defaultValues: initialState,
+  });
+  const formState = (useWatch({ control }) as TaskConfigFormState | undefined) ?? initialState;
+
+  function replaceFormState(next: TaskConfigFormState) {
+    reset(next, { keepDefaultValues: true });
+  }
 
   useEffect(() => {
-    setFormState(initialState);
-  }, [initialState]);
+    reset(initialState);
+  }, [initialState, reset]);
 
   useEffect(() => {
     if (!onDraftStateChange) {
@@ -659,10 +674,10 @@ export function TaskConfigForm({
     }
 
     onDraftStateChange({
-      isDirty: JSON.stringify(formState) !== JSON.stringify(initialState),
+      isDirty,
       values,
     });
-  }, [copy, formState, initialState, onDraftStateChange, runtimeAdapters]);
+  }, [copy, formState, initialState, isDirty, onDraftStateChange, runtimeAdapters]);
 
   const selectedRuntimeAdapter = useMemo(
     () => resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, defaultRuntimeAdapterKey),
@@ -678,7 +693,7 @@ export function TaskConfigForm({
         }
 
         return accumulator;
-      }, cloneRuntimeInput(formState.fieldRuntimeInput)),
+      }, cloneRuntimeInput(formState.fieldRuntimeInput ?? {})),
     [formState.fieldRuntimeInput, selectedRuntimeAdapter.spec.fields],
   );
   const visibleStandardFields = selectedRuntimeAdapter.spec.fields.filter(
@@ -698,28 +713,22 @@ export function TaskConfigForm({
   );
 
   function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
-    setFormState((current) => {
-      const nextRuntimeInput = cloneRuntimeInput(current.fieldRuntimeInput);
+    const nextRuntimeInput = cloneRuntimeInput(getValues("fieldRuntimeInput") ?? {});
 
-      if (nextValue === undefined) {
-        deleteValueAtPath(nextRuntimeInput, field.path);
-      } else {
-        setValueAtPath(nextRuntimeInput, field.path, nextValue);
-      }
+    if (nextValue === undefined) {
+      deleteValueAtPath(nextRuntimeInput, field.path);
+    } else {
+      setValueAtPath(nextRuntimeInput, field.path, nextValue);
+    }
 
-      return {
-        ...current,
-        fieldRuntimeInput: nextRuntimeInput,
-      };
-    });
+    setValue("fieldRuntimeInput", nextRuntimeInput, { shouldDirty: true });
   }
 
-  async function handleSubmit(event: Parameters<NonNullable<JSX.IntrinsicElements["form"]["onSubmit"]>>[0]) {
-    event.preventDefault();
+  async function submitForm(values: TaskConfigFormState) {
     setLocalErrorMessage(null);
 
     try {
-      const input = buildTaskConfigFormInput(formState, runtimeAdapters, copy, { throwOnInvalidJson: true });
+      const input = buildTaskConfigFormInput(values, runtimeAdapters, copy, { throwOnInvalidJson: true });
       if (input) {
         await onSubmitAction(input);
       }
@@ -744,8 +753,8 @@ export function TaskConfigForm({
                 type="button"
                 disabled={isPending}
                 onClick={() =>
-                  setFormState((current) =>
-                    applyPresetValues(current, preset.values, runtimeAdapters, defaultRuntimeAdapterKey),
+                  replaceFormState(
+                    applyPresetValues(getValues(), preset.values, runtimeAdapters, defaultRuntimeAdapterKey),
                   )
                 }
                 className={compact ? "rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60" : "rounded-2xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"}
@@ -758,13 +767,13 @@ export function TaskConfigForm({
         </div>
       ) : null}
 
-      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-3">
+      <form onSubmit={(event) => void handleSubmit(submitForm)(event)} className="space-y-3">
         <Field label={copy.title} className="text-xs text-muted-foreground">
           <input
             name="title"
             required
             value={formState.title}
-            onChange={(event) => setFormState((current) => ({ ...current, title: event.target.value }))}
+            onChange={(event) => setValue("title", event.target.value, { shouldDirty: true })}
             placeholder={copy.titlePlaceholder}
             className={inputClassName}
           />
@@ -778,7 +787,7 @@ export function TaskConfigForm({
                   name="description"
                   rows={5}
                   value={formState.description}
-                  onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                  onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
                   placeholder={copy.descriptionPlaceholder}
                   className={textareaClassName}
                 />
@@ -791,10 +800,7 @@ export function TaskConfigForm({
                   name="priority"
                   value={formState.priority}
                   onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      priority: event.target.value as TaskConfigFormInput["priority"],
-                    }))
+                    setValue("priority", event.target.value as TaskConfigFormInput["priority"], { shouldDirty: true })
                   }
                   className={selectClassName}
                 >
@@ -825,7 +831,7 @@ export function TaskConfigForm({
                       name="scheduledDate"
                       type="date"
                       value={formState.scheduledDate}
-                      onChange={(event) => setFormState((current) => ({ ...current, scheduledDate: event.target.value }))}
+                      onChange={(event) => setValue("scheduledDate", event.target.value, { shouldDirty: true })}
                       className={inputClassName}
                     />
                   </Field>
@@ -834,7 +840,7 @@ export function TaskConfigForm({
                     <select
                       name="scheduledStartTime"
                       value={formState.scheduledStartTime}
-                      onChange={(event) => setFormState((current) => ({ ...current, scheduledStartTime: event.target.value }))}
+                      onChange={(event) => setValue("scheduledStartTime", event.target.value, { shouldDirty: true })}
                       className={selectClassName}
                     >
                       <option value="">--</option>
@@ -850,7 +856,7 @@ export function TaskConfigForm({
                     <select
                       name="scheduledEndTime"
                       value={formState.scheduledEndTime}
-                      onChange={(event) => setFormState((current) => ({ ...current, scheduledEndTime: event.target.value }))}
+                      onChange={(event) => setValue("scheduledEndTime", event.target.value, { shouldDirty: true })}
                       className={selectClassName}
                     >
                       <option value="">--</option>
@@ -979,10 +985,7 @@ export function TaskConfigForm({
                     name="priority"
                     value={formState.priority}
                     onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        priority: event.target.value as TaskConfigFormInput["priority"],
-                      }))
+                      setValue("priority", event.target.value as TaskConfigFormInput["priority"], { shouldDirty: true })
                     }
                     className={selectClassName}
                   >
@@ -1000,9 +1003,9 @@ export function TaskConfigForm({
                       name="runtimeAdapterKey"
                       value={formState.runtimeAdapterKey}
                       onChange={(event) =>
-                        setFormState((current) =>
+                        replaceFormState(
                           applyRuntimeAdapterChange(
-                            current,
+                            getValues(),
                             resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
                           ),
                         )
@@ -1023,7 +1026,7 @@ export function TaskConfigForm({
                     name="description"
                     rows={3}
                     value={formState.description}
-                    onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                    onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
                     placeholder={copy.descriptionPlaceholder}
                     className={textareaClassName}
                   />
@@ -1037,9 +1040,9 @@ export function TaskConfigForm({
                       name="runtimeAdapterKey"
                       value={formState.runtimeAdapterKey}
                       onChange={(event) =>
-                        setFormState((current) =>
+                        replaceFormState(
                           applyRuntimeAdapterChange(
-                            current,
+                            getValues(),
                             resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
                           ),
                         )
@@ -1159,7 +1162,7 @@ export function TaskConfigForm({
                 name="runtimeConfig"
                 rows={6}
                 value={formState.extraRuntimeConfig}
-                onChange={(event) => setFormState((current) => ({ ...current, extraRuntimeConfig: event.target.value }))}
+                onChange={(event) => setValue("extraRuntimeConfig", event.target.value, { shouldDirty: true })}
                 placeholder={copy.runtimeParamsPlaceholder}
                 className={textareaClassName}
               />

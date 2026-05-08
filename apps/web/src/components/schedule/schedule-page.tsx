@@ -1,51 +1,27 @@
 "use client";
 
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-} from "react";
+import { useMemo } from "react";
 import type {
-  SchedulePageData,
   SchedulePageProps,
-  SecondaryPlanningView,
-  ScheduledItem,
-  TimelineCreateInput,
-  UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-// Note: SecondaryPlanningView still used by view model
 import {
   buildScheduleHref,
   buildScheduleViewHref,
-  hydrateSchedulePageData,
-  normalizeScheduleView,
 } from "@/components/schedule/schedule-page-utils";
-import {
-  getQuickCreateDefaults,
-  handleCreateTaskBlockAction,
-  handleScheduleDropAction,
-  handleTaskConfigSaveAction,
-  refreshScheduleProjection,
-  runSchedulePageAction,
-  buildDraggedItem,
-} from "@/components/schedule/schedule-page-actions";
+import { getQuickCreateDefaults } from "@/components/schedule/schedule-page-actions";
 import { buildSchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageDialogs } from "@/components/schedule/dialogs/schedule-page-dialogs";
 import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
 
-import { api } from "@/lib/rpc-client";
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 import { useI18n, useLocale } from "@/i18n/client";
 import { localizeHref } from "@/i18n/routing";
 import { useAppRouter } from "@/lib/router";
+import { useSchedulePageActions } from "./use-schedule-page-actions";
+import { useSchedulePageState } from "./use-schedule-page-state";
 
 type SchedulePageRouteProps = SchedulePageProps & {
   selectedDay?: string;
@@ -68,95 +44,46 @@ export function SchedulePage({
     () => getSchedulePageCopy(messages.components?.schedulePage),
     [messages.components?.schedulePage],
   );
-  const hydratedData = useMemo(() => hydrateSchedulePageData(data), [data]);
-  const [viewData, setViewData] = useState<SchedulePageData>(() => hydratedData);
-  const [draggedTask, setDraggedTask] = useState<{
-    kind: "queue" | "scheduled";
-    taskId: string;
-  } | null>(null);
-  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>(
-    [],
-  );
-  const [localSelectedTaskId, setLocalSelectedTaskId] = useState<
-    string | undefined
-  >(selectedTaskId);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState("");
-  const [isPending, setIsPending] = useState(false);
-  const [secondaryView, setSecondaryView] =
-    useState<SecondaryPlanningView>("queue");
-  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false);
-  const refreshRequestIdRef = useRef(0);
-  const activeView = normalizeScheduleView(selectedView);
 
   const actionFailedMessage =
     messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
-
-  const refreshProjection = useCallback(async () => {
-    await refreshScheduleProjection({
-      workspaceId,
-      setViewData: (next) => startTransition(() => setViewData(next)),
-      routerRefresh: router.refresh,
-      actionFailedMessage,
-      requestIdRef: refreshRequestIdRef,
-    });
-  }, [actionFailedMessage, router, workspaceId]);
-
-  useEffect(() => {
-    setViewData(hydratedData);
-  }, [hydratedData]);
-
-  useEffect(() => {
-    setLocalSelectedTaskId(selectedTaskId);
-  }, [selectedTaskId]);
-
-  useEffect(() => {
-    setSecondaryView((current) => {
-      if (current === "queue" && viewData.unscheduled.length > 0) {
-        return current;
-      }
-      if (current === "risks" && viewData.risks.length > 0) {
-        return current;
-      }
-      if (current === "proposals" && viewData.proposals.length > 0) {
-        return current;
-      }
-      if (current === "conflicts" && viewData.conflicts.length > 0) {
-        return current;
-      }
-      if (viewData.risks.length > 0) {
-        return "risks";
-      }
-      if (viewData.unscheduled.length > 0) {
-        return "queue";
-      }
-      if (viewData.proposals.length > 0) {
-        return "proposals";
-      }
-      if (viewData.conflicts.length > 0) {
-        return "conflicts";
-      }
-      return "queue";
-    });
-  }, [
-    viewData.conflicts.length,
-    viewData.proposals.length,
-    viewData.risks.length,
-    viewData.unscheduled.length,
-  ]);
-
-  useEffect(() => {
-    if (showNewTask) {
-      setShowNewTaskDialog(true);
-    }
-  }, [showNewTask]);
+  const {
+    hydratedData,
+    viewData,
+    setViewData,
+    draggedTask,
+    setDraggedTask,
+    expandedQueueTaskIds,
+    setExpandedQueueTaskIds,
+    localSelectedTaskId,
+    setLocalSelectedTaskId,
+    errorMessage,
+    setErrorMessage,
+    announcement,
+    setAnnouncement,
+    isPending,
+    setIsPending,
+    secondaryView,
+    showNewTaskDialog,
+    setShowNewTaskDialog,
+    activeView,
+    refreshProjection,
+  } = useSchedulePageState({
+    workspaceId,
+    data,
+    selectedTaskId,
+    selectedView,
+    showNewTask,
+    actionFailedMessage,
+    routerRefresh: router.refresh,
+  });
 
   const viewModel = useMemo(
     () =>
       buildSchedulePageViewModel({
-        viewData,
-        selectedDay,
-        selectedTaskId,
+      viewData,
+      selectedDay,
+      selectedTaskId,
         localSelectedTaskId,
         activeView,
         secondaryView,
@@ -174,143 +101,40 @@ export function SchedulePage({
       viewData,
     ],
   );
-
-  const draggedQueueItem =
-    draggedTask?.kind === "queue"
-      ? (viewData.unscheduled.find(
-          (item) => item.taskId === draggedTask.taskId,
-        ) ?? null)
-      : null;
-  const draggedItem = useMemo(
-    () =>
-      buildDraggedItem({
-        draggedTask,
-        unscheduled: viewData.unscheduled,
-        activeGroupItems: viewModel.activeGroup?.items ?? [],
-      }),
-    [draggedTask, viewData.unscheduled, viewModel.activeGroup?.items],
-  );
-
-  function handleQueueDragStart(
-    item: UnscheduledItem,
-    event: DragEvent<HTMLElement>,
-  ) {
-    if (isPending) {
-      event.preventDefault();
-      return;
-    }
-
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", item.taskId);
-    event.dataTransfer.setDragImage(document.createElement("img"), 0, 0);
-    setDraggedTask({ kind: "queue", taskId: item.taskId });
-    setErrorMessage(null);
-    setAnnouncement(
-      `Picked up ${item.title}. Move it to the timeline to create a block.`,
-    );
-  }
-
-  function handleQueueDragEnd() {
-    setDraggedTask(null);
-  }
-
-  function handleScheduledDragStart(item: ScheduledItem) {
-    setDraggedTask({ kind: "scheduled", taskId: item.taskId });
-    setErrorMessage(null);
-    setAnnouncement(
-      `Picked up scheduled block ${item.title}. Drop it on a new slot to move the block.`,
-    );
-  }
-
-  async function handleScheduleDrop(
-    item: NonNullable<typeof draggedItem>,
-    startAt: Date,
-    endAt: Date,
-  ) {
-    await handleScheduleDropAction({
-      item,
-      startAt,
-      endAt,
-      draggedQueueItem,
-      locale,
-      copy,
-      applyOptimisticViewData: (updater) => setViewData(updater),
-      removeExpandedQueueTask: (taskId) =>
-        setExpandedQueueTaskIds((current) =>
-          current.filter((value) => value !== taskId),
-        ),
-      _setLocalSelectedTaskId: setLocalSelectedTaskId,
-      setAnnouncement,
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      resetViewData: () => setViewData(hydratedData),
-      clearDraggedTask: () => setDraggedTask(null),
-      actionFailedMessage,
-    });
-  }
-
-  async function handleCreateTaskBlock(input: TimelineCreateInput) {
-    await handleCreateTaskBlockAction({
-      input,
-      workspaceId,
-      data,
-      activeDay: viewModel.activeDay,
-      activeView,
-      locale,
-      copy,
-      applyOptimisticViewData: (updater) => setViewData(updater),
-      setLocalSelectedTaskId,
-      pushRoute: router.push,
-      localizeHref,
-      buildScheduleViewHref,
-      setAnnouncement,
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      resetViewData: () => setViewData(hydratedData),
-      actionFailedMessage,
-    });
-  }
-
-  function toggleQueueCard(taskId: string) {
-    setExpandedQueueTaskIds((current) =>
-      current.includes(taskId)
-        ? current.filter((id) => id !== taskId)
-        : [...current, taskId],
-    );
-  }
-
-  async function handleTaskConfigSave(
-    taskId: string,
-    input: TaskConfigFormInput,
-  ) {
-    await handleTaskConfigSaveAction({
-      taskId,
-      input,
-      applyOptimisticViewData: (updater) => setViewData(updater),
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      resetViewData: () => setViewData(hydratedData),
-      actionFailedMessage,
-    });
-  }
-
-  async function handleDeleteTask(taskId: string) {
-    await runSchedulePageAction({
-      action: async () => {
-        const res = await api.tasks[":taskId"].$delete({ param: { taskId }, query: {} });
-        if (!res.ok) {
-          throw new Error(actionFailedMessage);
-        }
-      },
-      setIsPending,
-      setErrorMessage,
-      refreshProjection,
-      actionFailedMessage,
-    });
-  }
+  const {
+    draggedItem,
+    handleQueueDragStart,
+    handleQueueDragEnd,
+    handleScheduledDragStart,
+    handleScheduleDrop,
+    handleCreateTaskBlock,
+    toggleQueueCard,
+    handleTaskConfigSave,
+    handleDeleteTask,
+  } = useSchedulePageActions({
+    workspaceId,
+    data,
+    hydratedData,
+    viewData,
+    activeView,
+    activeDay: viewModel.activeDay,
+    locale,
+    copy,
+    draggedTask,
+    setDraggedTask,
+    setViewData,
+    setExpandedQueueTaskIds,
+    setLocalSelectedTaskId,
+    setErrorMessage,
+    setAnnouncement,
+    setIsPending,
+    refreshProjection,
+    pushRoute: router.push,
+    localizeHref,
+    actionFailedMessage,
+    isPending,
+    activeGroupItems: viewModel.activeGroup?.items ?? [],
+  });
 
   const dialogDefaults = getQuickCreateDefaults(data);
 
