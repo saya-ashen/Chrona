@@ -29,7 +29,7 @@ export function TaskEditPanel({
         className,
       )}
     >
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         <div className="px-1">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">

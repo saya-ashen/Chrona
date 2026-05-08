@@ -22,9 +22,11 @@ const DEFAULT_COPY = {
   backToSchedule: "Back to Schedule",
   openWorkbench: "Open Workbench",
   taskEditorTitle: "Task Information",
-  taskEditorDescription: "Edit the core task fields. Changes are saved manually.",
+  taskEditorDescription:
+    "Edit the core task fields. Changes are saved manually.",
   planPanelTitle: "Plan",
-  planPanelDescription: "Task execution plan with nodes, dependencies, and status.",
+  planPanelDescription:
+    "Task execution plan with nodes, dependencies, and status.",
   latestRunTitle: "Latest Run",
   status: "Status",
   started: "Started",
@@ -96,21 +98,17 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     setSaveError,
     fetchPlan,
   });
-  const {
-    showDeleteConfirm,
-    setShowDeleteConfirm,
-    isDeleting,
-    handleDelete,
-  } = useTaskWorkspaceDeleteFlow({
-    taskId: task.id,
-    setSaveError,
-  });
+  const { showDeleteConfirm, setShowDeleteConfirm, isDeleting, handleDelete } =
+    useTaskWorkspaceDeleteFlow({
+      taskId: task.id,
+      setSaveError,
+    });
   return (
     <>
-      <div className="h-full min-h-0 space-y-4 overflow-visible rounded-[1.75rem] border border-border/40 bg-[linear-gradient(180deg,hsl(var(--muted)/0.18),transparent_20%),hsl(var(--background))] p-3 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-4 xl:overflow-hidden">
+      <div className="h-full min-h-0 space-y-3 overflow-visible rounded-[1.75rem] border border-border/40 bg-[linear-gradient(180deg,hsl(var(--muted)/0.18),transparent_20%),hsl(var(--background))] p-2.5 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-3 xl:overflow-hidden">
         <TaskWorkspacePlanSection
           label={copy.planPanelTitle ?? "Plan"}
-          topContent={(
+          topContent={
             <TaskWorkspaceHeaderCard
               task={task}
               backToScheduleLabel={copy.backToSchedule}
@@ -128,19 +126,20 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
                 saveSuccess={saveSuccess}
                 saveError={saveError}
                 editSummary={editSummary}
-                draftEditableTask={draftEditableTask}
                 hasUnsavedConfigChanges={hasUnsavedConfigChanges}
                 isEditExpanded={isEditExpanded}
                 currentProposal={currentProposal}
                 isApplying={isApplying}
-                onToggleExpanded={() => setIsEditExpanded((current) => !current)}
+                onToggleExpanded={() =>
+                  setIsEditExpanded((current) => !current)
+                }
                 onDraftStateChange={handleTaskConfigDraftStateChange}
                 onSubmitAction={persistTaskConfig}
                 onApplyProposal={handleApplyProposal}
                 onCancelProposal={handleCancelProposal}
               />
             </TaskWorkspaceHeaderCard>
-          )}
+          }
           graphPlan={graphPlan}
           plan={plan}
           planGenerationStatus={planGenerationStatus}
@@ -150,38 +149,38 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onAcceptPlan={handleAcceptPlan}
           onGeneratePlan={handleGeneratePlanFromHeader}
         />
-    </div>
+      </div>
 
-    <TaskWorkspaceAiSection
-      isOpen={isAiWorkspaceOpen}
-      onOpen={handleOpenAiWorkspace}
-      onClose={() => setIsAiWorkspaceOpen(false)}
-      taskId={task.id}
-      planningTaskDraft={planningTaskDraft}
-      savedPlan={plan}
-      generationStatus={planGenerationStatus}
-      acceptedPlanId={plan?.status === "accepted" ? plan.id : null}
-      hasUnsavedConfigChanges={hasUnsavedConfigChanges}
-      unsavedConfigDraft={planningTaskDraft}
-      onPlanLoaded={setPlan}
-      onApplyPlan={async (result) => {
-        if (!result.id) return;
-        setAcceptPlanError(null);
-        await acceptPlanById(result.id);
-      }}
-      onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
-      buildCurrentTask={assistantBuildCurrentTask}
-      buildCurrentPlan={assistantBuildCurrentPlan}
-      onProposal={handleProposal}
-      onApplyProposal={handleApplyProposal}
-      onDismissProposal={() => {
-        setCurrentProposal(null);
-      }}
-      isApplying={isApplying}
-      requestGenerationKey={requestGenerationKey}
-      showInlineGenerateButton={false}
-      emptyPlanDescription="Use the plan button in the graph header when you want a new task plan."
-    />
+      <TaskWorkspaceAiSection
+        isOpen={isAiWorkspaceOpen}
+        onOpen={handleOpenAiWorkspace}
+        onClose={() => setIsAiWorkspaceOpen(false)}
+        taskId={task.id}
+        planningTaskDraft={planningTaskDraft}
+        savedPlan={plan}
+        generationStatus={planGenerationStatus}
+        acceptedPlanId={plan?.status === "accepted" ? plan.id : null}
+        hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+        unsavedConfigDraft={planningTaskDraft}
+        onPlanLoaded={setPlan}
+        onApplyPlan={async (result) => {
+          if (!result.id) return;
+          setAcceptPlanError(null);
+          await acceptPlanById(result.id);
+        }}
+        onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
+        buildCurrentTask={assistantBuildCurrentTask}
+        buildCurrentPlan={assistantBuildCurrentPlan}
+        onProposal={handleProposal}
+        onApplyProposal={handleApplyProposal}
+        onDismissProposal={() => {
+          setCurrentProposal(null);
+        }}
+        isApplying={isApplying}
+        requestGenerationKey={requestGenerationKey}
+        showInlineGenerateButton={false}
+        emptyPlanDescription="Use the plan button in the graph header when you want a new task plan."
+      />
     </>
   );
 }
