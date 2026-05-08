@@ -81,7 +81,7 @@ function GraphShell({
   }, [onDismissOverlay, selectedNodeId]);
 
   return (
-    <div ref={shellRef} className="relative">
+    <div ref={shellRef} className="relative min-w-0 max-w-full">
       <TaskPlanGraphFrame
         graphCopy={graphCopy}
         layout={layout}
@@ -96,12 +96,12 @@ function GraphShell({
         testId={testId}
       />
       {inspectorPlacement === "overlay" && selectedNode ? (
-        <div className="pointer-events-none absolute inset-x-4 top-4 z-[8] flex justify-end">
+        <div className="pointer-events-none absolute inset-x-4 top-4 z-[8] flex min-w-0 justify-end">
           <div
-            className="pointer-events-auto w-full max-w-[min(340px,calc(100%-32px))]"
+            className="pointer-events-auto w-full min-w-0 max-w-[min(340px,calc(100%-32px))]"
             data-testid="task-plan-node-overlay"
           >
-            <div className="max-h-[70vh] overflow-auto rounded-[24px]">
+            <div className="min-w-0 rounded-[24px]">
               <TaskPlanGraphInspector node={selectedNode} graphCopy={graphCopy} nodes={planNodes} />
             </div>
           </div>
@@ -259,7 +259,7 @@ export function TaskPlanGraph({
         <div ref={(node) => {
           containerRef(node);
           graphRef.current = node;
-        }} className="w-full">
+        }} className="min-w-0 w-full max-w-full">
           <div className="rounded-[24px] border border-border/50 bg-muted/[0.16] p-4" data-graph-mode="compact" data-testid="task-plan-graph">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -350,7 +350,7 @@ export function TaskPlanGraph({
     <div ref={(node) => {
       containerRef(node);
       graphRef.current = node;
-    }} className="w-full space-y-3">
+    }} className="min-w-0 w-full max-w-full space-y-3">
       <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
         {overviewItems.map((item) => (
           <div key={item.label} className="rounded-[14px] border border-border/50 bg-background/75 px-2.5 py-1.5 shadow-sm">

@@ -33,7 +33,7 @@ export function TaskPlanGraphFrame({
   return (
     <div
       aria-label={graphCopy.ariaLabel}
-      className="relative overflow-hidden rounded-[24px] border border-border/50 bg-muted/[0.16]"
+      className="relative min-w-0 max-w-full overflow-hidden rounded-[24px] border border-border/50 bg-muted/[0.16]"
       data-canvas-pan="true"
       data-edge-style="orthogonal"
       data-graph-editable="false"
@@ -44,9 +44,9 @@ export function TaskPlanGraphFrame({
       data-renderer="react-flow"
       data-testid={testId}
     >
-      <div className="relative min-w-0">
-        <div className="w-full min-w-0 overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
-          <div className="min-w-full" data-testid="task-plan-graph-canvas" style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px` }}>
+      <div className="relative min-w-0 max-w-full">
+        <div className="h-full w-full min-w-0 max-w-full overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
+          <div className="min-w-full" data-testid="task-plan-graph-canvas" style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px`, width: "max-content" }}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
