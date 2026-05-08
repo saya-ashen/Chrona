@@ -2,8 +2,7 @@ import { aiDispatchTask } from "@/modules/ai/ai-service";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { db } from "@/lib/db";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { getLayers } from "@/modules/plan-execution/plan-run-store";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
 import type { DispatchTaskOutput, TaskDispatchPolicy } from "@chrona/contracts";
 
 const DEFAULT_DISPATCH_POLICY = {
@@ -29,9 +28,7 @@ export async function dispatchNextTaskAction(input: {
     throw new Error(`No accepted plan found for task ${input.taskId}`);
   }
 
-  const planId = accepted.compiledPlan.editablePlanId;
-  const layers = await getLayers(input.taskId, planId);
-  const effective = resolveEffectivePlanGraph(accepted.compiledPlan, layers);
+  const effective = await resolveSavedPlanEffectiveGraph(accepted);
 
   const linkedTasks = effective.nodes
     .filter((n) => n.linkedTaskId)

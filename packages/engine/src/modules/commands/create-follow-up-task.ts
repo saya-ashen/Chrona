@@ -60,7 +60,6 @@ export async function createFollowUpTask(input: {
       priority: input.priority ?? parentTask.priority,
       ownerType: parentTask.ownerType,
       dueAt: input.dueAt ?? null,
-      scheduleStatus: "Unscheduled",
     },
   });
 

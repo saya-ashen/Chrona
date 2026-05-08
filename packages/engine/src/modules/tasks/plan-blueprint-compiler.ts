@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import type {
   CompiledPlan,
-  RuntimeLayer,
   LayerSource,
   PlanBlueprint,
   PlanBlueprintEdge
@@ -186,8 +185,7 @@ function validateBlueprint(input: { blueprint: PlanBlueprint }) {
 }
 
 /**
- * Compiles a loose AI blueprint (AIPlanOutput) into a CompiledPlan + initial RuntimeLayer.
- * The RuntimeLayer sets entry nodes to "ready"; all others default to "pending".
+ * Compiles a loose AI blueprint (AIPlanOutput) into a CompiledPlan.
  */
 export function compilePlanBlueprint(input: {
   taskId: string;
@@ -195,31 +193,14 @@ export function compilePlanBlueprint(input: {
   planId?: string;
   generatedBy?: string | null;
   source?: LayerSource;
-}): { compiledPlan: CompiledPlan; initialLayer: RuntimeLayer; planId: string } {
+}): { compiledPlan: CompiledPlan; planId: string } {
   validateBlueprint({ blueprint: input.blueprint });
 
   const planId = input.planId ?? `plan_${randomUUID().slice(0, 8)}`;
   const editable = upgradeBlueprintToEditable(input.blueprint, planId, 1);
   const compiledPlan = compileEditablePlan(editable);
 
-  // Initial RuntimeLayer: mark entry nodes as ready
-  const nodeStates: Record<string, { status: "ready" }> = {};
-  for (const entryId of compiledPlan.entryNodeIds) {
-    nodeStates[entryId] = { status: "ready" };
-  }
-
-  const initialLayer: RuntimeLayer = {
-    type: "runtime",
-    planId,
-    timestamp: new Date().toISOString(),
-    layerId: `layer_${randomUUID().slice(0, 12)}`,
-    version: 1,
-    active: true,
-    source: input.source ?? "ai",
-    nodeStates,
-  };
-
-  return { compiledPlan, initialLayer, planId };
+  return { compiledPlan, planId };
 }
 
 /**

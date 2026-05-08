@@ -90,7 +90,7 @@ describe("auto-start-scheduled-plan", () => {
 
   afterAll(async () => {
     await resetDb();
-    await db.$disconnect();
+    mock.restore();
   });
 
   it("starts due scheduled parent task and materializes automatic child-task nodes into separate sessions", async () => {

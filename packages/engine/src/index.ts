@@ -48,6 +48,7 @@ export { updateTask } from "./modules/commands/update-task";
 
 export {
   continuePlanExecution,
+  dispatchExecutionAction,
   executePlanNode,
   startPlanExecution,
   createPlanRunFromCompiledPlan,
@@ -57,11 +58,6 @@ export {
   savePlanRun,
   getPlanRun,
   getLatestPlanRun,
-} from "./modules/plan-execution/plan-run-store";
-
-export {
-  appendLayer,
-  getLayers,
 } from "./modules/plan-execution/plan-run-store";
 
 export {
@@ -99,14 +95,14 @@ export {
   compileBlueprintToCompiledPlan,
 } from "./modules/tasks/plan-blueprint-compiler";
 
+export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
+
 export {
   getLatestTaskPlanGraph,
   getAcceptedTaskPlanGraph,
   enrichPlanGraphNodes,
   getReadyAutoRunnableNodes,
 } from "./modules/plan-execution/compat";
-
-export { getDefaultWorkspace } from "./modules/workspaces/get-default-workspace";
 
 export {
   getTaskOrThrow,
@@ -117,7 +113,10 @@ export { listTasksByWorkspace } from "./modules/queries/list-tasks";
 export { listAiClients } from "./modules/queries/list-ai-clients";
 export { getRecentTasksForAutoComplete } from "./modules/queries/recent-tasks-for-auto-complete";
 export { ensurePlanInWorkspace } from "./modules/queries/plan-in-workspace";
-export { applyPlanPatchCommand } from "./modules/commands/apply-plan-patch-command";
+export {
+  applyPlanPatchCommand,
+  applyPlanMutationCommand,
+} from "./modules/commands/apply-plan-patch-command";
 export { deleteTask } from "./modules/commands/delete-task";
 export { createAiClient } from "./modules/commands/create-ai-client";
 export { updateAiClient } from "./modules/commands/update-ai-client";

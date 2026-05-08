@@ -11,6 +11,10 @@ import {
 } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getWorkPage, WorkPageTaskNotFoundError } from "@/modules/queries/get-work-page";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -35,7 +39,7 @@ describe("getWorkPage", () => {
   });
 
   afterAll(async () => {
-    await db.$disconnect();
+    await resetDb();
   });
 
   it("returns only pending approvals for the pending approvals panel", async () => {
@@ -170,7 +174,7 @@ describe("getWorkPage", () => {
     });
   });
 
-  it("derives a ready task plan from the accepted graph memory and live run state", async () => {
+  it("derives a ready task plan from the accepted compiled plan and native run state", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work Plan",
@@ -183,7 +187,7 @@ describe("getWorkPage", () => {
       data: {
         workspaceId: workspace.id,
         title: "Prepare task plan",
-        status: TaskStatus.Blocked,
+        status: TaskStatus.WaitingForInput,
         priority: TaskPriority.High,
         ownerType: "human",
       },
@@ -203,92 +207,136 @@ describe("getWorkPage", () => {
       data: { latestRunId: run.id },
     });
 
-    await db.memory.create({
-      data: {
-        workspaceId: workspace.id,
+    const compiledPlan: CompiledPlan = {
+      id: "compiled_work_page_plan",
+      editablePlanId: "graph_work_page_plan",
+      sourceVersion: 1,
+      title: "Work page plan",
+      goal: "先澄清目标与背景，再推进首轮产出。",
+      assumptions: [],
+      nodes: [
+        {
+          id: "understand-task",
+          localId: "understand-task",
+          type: "task",
+          title: "梳理目标与约束",
+          config: { expectedOutput: "确认目标。" },
+          dependencies: [],
+          dependents: ["gather-context"],
+          priority: "High",
+          estimatedMinutes: 15,
+        },
+        {
+          id: "gather-context",
+          localId: "gather-context",
+          type: "task",
+          title: "补齐上下文",
+          config: { expectedOutput: "整理背景。" },
+          dependencies: ["understand-task"],
+          dependents: ["execute-task"],
+          priority: "High",
+          estimatedMinutes: 15,
+        },
+        {
+          id: "execute-task",
+          localId: "execute-task",
+          type: "checkpoint",
+          title: "推进首轮产出",
+          config: { checkpointType: "confirm", prompt: "推进当前执行。", required: true },
+          dependencies: ["gather-context"],
+          dependents: ["confirm-next-step"],
+          priority: "High",
+          estimatedMinutes: 30,
+        },
+        {
+          id: "confirm-next-step",
+          localId: "confirm-next-step",
+          type: "checkpoint",
+          title: "确认结果与下一步",
+          config: { checkpointType: "confirm", prompt: "等待结果后确认后续动作。", required: true },
+          dependencies: ["execute-task"],
+          dependents: [],
+          priority: "Medium",
+          estimatedMinutes: 10,
+        },
+      ],
+      edges: [
+        { id: "edge-1", from: "understand-task", to: "gather-context" },
+        { id: "edge-2", from: "gather-context", to: "execute-task" },
+        { id: "edge-3", from: "execute-task", to: "confirm-next-step" },
+      ],
+      entryNodeIds: ["understand-task"],
+      terminalNodeIds: ["confirm-next-step"],
+      topologicalOrder: [
+        "understand-task",
+        "gather-context",
+        "execute-task",
+        "confirm-next-step",
+      ],
+      completionPolicy: { type: "all_tasks_completed" },
+      validationWarnings: [],
+    };
+
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: "graph only",
+      summary: "先澄清目标与背景，再推进首轮产出。",
+      generatedBy: "graph-planner",
+    });
+
+    const graph = createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan });
+    const currentLayerId = (nodeId: string) => {
+      const layerId = graph.nodes
+        .find((node) => node.id === nodeId)
+        ?.layers.find((layer) => layer.type === "definition")?.id;
+      if (!layerId) {
+        throw new Error(`Missing definition layer for ${nodeId}`);
+      }
+      return layerId;
+    };
+    const results: NodeResult[] = [
+      {
+        id: "result_understand_task",
         taskId: task.id,
-        scope: MemoryScope.task,
-        sourceType: MemorySourceType.agent_inferred,
-        status: MemoryStatus.Active,
-        confidence: 1,
-        content: JSON.stringify({
-          type: "task_plan_graph_v1",
-          status: "accepted",
-          revision: 1,
-          source: "ai",
-          generatedBy: "graph-planner",
-          prompt: "graph only",
-          summary: "先澄清目标与背景，再推进首轮产出。",
-          changeSummary: "已生成初始图计划。",
-          nodes: [
-            {
-              id: "understand-task",
-              type: "task",
-              title: "梳理目标与约束",
-              objective: "确认目标。",
-              description: null,
-              status: "done",
-              phase: "理解",
-              estimatedMinutes: 15,
-              priority: "High",
-              executionMode: "none",
-              linkedTaskId: null,
-              requiresHumanInput: false,
-              metadata: { order: 1 },
-            },
-            {
-              id: "gather-context",
-              type: "task",
-              title: "补齐上下文",
-              objective: "整理背景。",
-              description: null,
-              status: "done",
-              phase: "准备",
-              estimatedMinutes: 15,
-              priority: "High",
-              executionMode: "none",
-              linkedTaskId: null,
-              requiresHumanInput: false,
-              metadata: { order: 2 },
-            },
-            {
-              id: "execute-task",
-              type: "checkpoint",
-              title: "推进首轮产出",
-              objective: "推进当前执行。",
-              description: null,
-              status: "waiting_for_user",
-              phase: "执行",
-              estimatedMinutes: 30,
-              priority: "High",
-              executionMode: "none",
-              linkedTaskId: null,
-              requiresHumanInput: true,
-              metadata: { order: 3 },
-            },
-            {
-              id: "confirm-next-step",
-              type: "checkpoint",
-              title: "确认结果与下一步",
-              objective: "等待结果后确认后续动作。",
-              description: null,
-              status: "pending",
-              phase: "确认",
-              estimatedMinutes: 10,
-              priority: "Medium",
-              executionMode: "none",
-              linkedTaskId: null,
-              requiresHumanInput: false,
-              metadata: { order: 4 },
-            },
-          ],
-          edges: [
-            { id: "edge-1", fromNodeId: "understand-task", toNodeId: "gather-context", type: "sequential", metadata: null },
-            { id: "edge-2", fromNodeId: "gather-context", toNodeId: "execute-task", type: "sequential", metadata: null },
-            { id: "edge-3", fromNodeId: "execute-task", toNodeId: "confirm-next-step", type: "sequential", metadata: null },
-          ],
-        }),
+        graphId: graph.id,
+        nodeId: "understand-task",
+        nodeLayerId: currentLayerId("understand-task"),
+        status: "current",
+        outputSummary: "梳理完成",
       },
+      {
+        id: "result_gather_context",
+        taskId: task.id,
+        graphId: graph.id,
+        nodeId: "gather-context",
+        nodeLayerId: currentLayerId("gather-context"),
+        status: "current",
+        outputSummary: "上下文已补齐",
+      },
+      {
+        id: "result_execute_task",
+        taskId: task.id,
+        graphId: graph.id,
+        nodeId: "execute-task",
+        nodeLayerId: currentLayerId("execute-task"),
+        status: "current",
+        waitKind: "user_input",
+      },
+    ];
+
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      run: createPlanRunFromCompiledPlan(compiledPlan),
+      compiledPlan,
+      graph,
+      attempts: [],
+      results,
+      executionContextSnapshots: [],
     });
 
     const page = await getWorkPage(task.id);
@@ -299,12 +347,12 @@ describe("getWorkPage", () => {
       generatedBy: "graph-planner",
       isMock: false,
       summary: "先澄清目标与背景，再推进首轮产出。",
-      changeSummary: "已生成初始图计划。",
+      changeSummary: null,
       currentStepId: "execute-task",
     });
     expect(page.taskPlan.steps).toEqual([
-      expect.objectContaining({ id: "understand-task", status: "done", requiresHumanInput: false, type: "task" }),
-      expect.objectContaining({ id: "gather-context", status: "done", requiresHumanInput: false, type: "task" }),
+      expect.objectContaining({ id: "understand-task", status: "completed", requiresHumanInput: false, type: "task" }),
+      expect.objectContaining({ id: "gather-context", status: "completed", requiresHumanInput: false, type: "task" }),
       expect.objectContaining({ id: "execute-task", status: "waiting_for_user", requiresHumanInput: true, type: "checkpoint" }),
       expect.objectContaining({ id: "confirm-next-step", status: "pending", requiresHumanInput: false, type: "checkpoint" }),
     ]);
@@ -462,6 +510,15 @@ describe("getWorkPage", () => {
         status: TaskStatus.Draft,
         priority: TaskPriority.Medium,
         ownerType: "human",
+      },
+    });
+
+    await db.taskProjection.create({
+      data: {
+        taskId: followUp.id,
+        workspaceId: workspace.id,
+        persistedStatus: TaskStatus.Draft,
+        displayState: TaskStatus.Draft,
         scheduleStatus: "Unscheduled",
       },
     });

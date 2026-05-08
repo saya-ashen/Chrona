@@ -14,6 +14,7 @@ import { describe, expect, it } from "bun:test";
 
 import { extractJSON, llmCall } from "@/modules/ai/providers";
 import { SYSTEM_PROMPTS } from "@/modules/ai/prompts";
+import { createPlanGraphFromCompiledPlan } from "@/modules/plan-execution/plan-run-store";
 import type {
   PlanBlueprintNode,
   PlanBlueprintEdge,
@@ -21,9 +22,9 @@ import type {
   CompiledNode,
   CompiledEdge,
   NodeConfig,
-  PlanOverlayLayer,
-  RuntimeLayer,
+  NodeResult,
 } from "@chrona/contracts/ai";
+import { resolveEffectivePlanGraph } from "@chrona/domain";
 import { getReadyAutoRunnableNodes } from "@/modules/plan-execution/compat";
 
 // -- Config --
@@ -231,7 +232,7 @@ Return JSON.`;
 
 describe("getReadyAutoRunnableNodes", () => {
   it("returns root auto nodes when nothing is completed", () => {
-    const { compiledPlan, layers } = makeCompiledPlan(
+    const effectivePlan = makeEffectivePlan(
       [
         makeCompiledNode("n1", { mode: "auto" }),
         makeCompiledNode("n2", { mode: "manual" }),
@@ -243,13 +244,13 @@ describe("getReadyAutoRunnableNodes", () => {
       ],
     );
 
-    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    const ready = getReadyAutoRunnableNodes(effectivePlan);
     // n1 has no deps → ready. n3 depends on n2 (pending) → not ready.
     expect(ready.map((n) => n.nodeId)).toEqual(["n1"]);
   });
 
   it("unblocks auto node after manual predecessor completes", () => {
-    const { compiledPlan, layers } = makeCompiledPlan(
+    const effectivePlan = makeEffectivePlan(
       [
         makeCompiledNode("n1", { mode: "manual" }),
         makeCompiledNode("n2", { mode: "auto" }),
@@ -262,13 +263,13 @@ describe("getReadyAutoRunnableNodes", () => {
       { n1: "completed" },
     );
 
-    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    const ready = getReadyAutoRunnableNodes(effectivePlan);
     // n1 done → n2, n3 both ready (parallel)
     expect(ready.map((n) => n.nodeId).sort()).toEqual(["n2", "n3"]);
   });
 
   it("blocks auto node when manual predecessor is pending", () => {
-    const { compiledPlan, layers } = makeCompiledPlan(
+    const effectivePlan = makeEffectivePlan(
       [
         makeCompiledNode("n1", { mode: "auto" }),
         makeCompiledNode("n2", { mode: "manual" }),
@@ -281,13 +282,13 @@ describe("getReadyAutoRunnableNodes", () => {
       { n1: "completed" },
     );
 
-    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    const ready = getReadyAutoRunnableNodes(effectivePlan);
     // n2 is pending manual → n3 is blocked
     expect(ready).toEqual([]);
   });
 
   it("auto nodes with no edges are immediately ready", () => {
-    const { compiledPlan, layers } = makeCompiledPlan(
+    const effectivePlan = makeEffectivePlan(
       [
         makeCompiledNode("n1", { mode: "auto" }),
         makeCompiledNode("n2", { mode: "auto" }),
@@ -295,12 +296,12 @@ describe("getReadyAutoRunnableNodes", () => {
       [],
     );
 
-    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    const ready = getReadyAutoRunnableNodes(effectivePlan);
     expect(ready.map((n) => n.nodeId).sort()).toEqual(["n1", "n2"]);
   });
 
   it("does not return already completed nodes", () => {
-    const { compiledPlan, layers } = makeCompiledPlan(
+    const effectivePlan = makeEffectivePlan(
       [
         makeCompiledNode("n1", { mode: "auto" }),
       ],
@@ -308,7 +309,7 @@ describe("getReadyAutoRunnableNodes", () => {
       { n1: "completed" },
     );
 
-    const ready = getReadyAutoRunnableNodes(compiledPlan, layers);
+    const ready = getReadyAutoRunnableNodes(effectivePlan);
     expect(ready).toEqual([]);
   });
 
@@ -353,11 +354,11 @@ function makeCompiledEdge(
   return { id, from, to };
 }
 
-function makeCompiledPlan(
+function makeEffectivePlan(
   nodes: CompiledNode[],
   edges: CompiledEdge[],
   runtimeStatuses?: Record<string, "pending" | "completed" | "skipped">,
-): { compiledPlan: CompiledPlan; layers: PlanOverlayLayer[] } {
+ ) {
   const planId = "ep-test";
   const compiledPlan: CompiledPlan = {
     id: "plan-test",
@@ -375,21 +376,31 @@ function makeCompiledPlan(
     validationWarnings: [],
   };
 
-  const layers: PlanOverlayLayer[] = [];
-  if (runtimeStatuses && Object.keys(runtimeStatuses).length > 0) {
-    const layer: RuntimeLayer = {
-      type: "runtime",
-      planId,
-      layerId: "rl-test",
-      version: 1,
-      active: true,
-      timestamp: new Date().toISOString(),
-      nodeStates: Object.fromEntries(
-        Object.entries(runtimeStatuses).map(([nodeId, status]) => [nodeId, { status }]),
-      ),
-    };
-    layers.push(layer);
+  const graph = createPlanGraphFromCompiledPlan({
+    taskId: "task-test",
+    compiledPlan,
+  });
+  const results: NodeResult[] = [];
+
+  for (const [nodeId, status] of Object.entries(runtimeStatuses ?? {})) {
+    if (status !== "completed" && status !== "skipped") {
+      continue;
+    }
+    const node = graph.nodes.find((candidate) => candidate.id === nodeId);
+    const activeLayer = node?.layers.find((layer) => layer.type === "definition");
+    if (!node || !activeLayer || activeLayer.type !== "definition") {
+      continue;
+    }
+    results.push({
+      id: `result_${planId}_${nodeId}`,
+      taskId: "task-test",
+      graphId: graph.id,
+      nodeId,
+      nodeLayerId: activeLayer.id,
+      status: "current",
+      outputSummary: `${nodeId} ${status}`,
+    });
   }
 
-  return { compiledPlan, layers };
+  return resolveEffectivePlanGraph({ graph, results });
 }

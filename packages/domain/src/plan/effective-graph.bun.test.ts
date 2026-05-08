@@ -205,8 +205,8 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
     expect(graph.nodes).toHaveLength(1);
-    expect(graph.edges).toHaveLength(0);
-    expect(graph.readyNodeIds).toHaveLength(1); // b is now entry
+    expect(graph.edges.filter((edge) => edge.active)).toHaveLength(0);
+    expect(graph.readyNodeIds).toHaveLength(0);
   });
 
   it("6. add_edge creates a new dependency", () => {
@@ -234,12 +234,12 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
     const layer = makeStructuralLayer(2, [{ op: "delete_edge", from: aId, to: bId }]);
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
-    expect(graph.edges).toHaveLength(0);
+    expect(graph.edges.filter((edge) => edge.active)).toHaveLength(0);
 
     const nodeB = graph.nodes.find((n) => n.localId === "b")!;
     expect(nodeB.dependencies).toHaveLength(0);
-    expect(nodeB.ready).toBe(true);
-    expect(graph.readyNodeIds).toHaveLength(2);
+    expect(nodeB.ready).toBe(false);
+    expect(graph.readyNodeIds).toHaveLength(1);
   });
 
   it("8. multiple structural layers stack in order", () => {

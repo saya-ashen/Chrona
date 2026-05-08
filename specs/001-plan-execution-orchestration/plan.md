@@ -94,9 +94,10 @@ Phase 1 translates the research into brownfield design documentation without imp
 Design outputs:
 
 1. `data-model.md`: current entities, relationships, state transitions, and target-model gaps for `Plan`, `PlanStep`, `WorkBlock`, `ExecutionSession`, and `ExecutionResult`.
-2. `contracts/current-api-surfaces.md`: current plan/schedule/execution API contract inventory and where the public surface does not yet represent the target execution-layer concepts cleanly.
-3. `quickstart.md`: repeatable repo-reading workflow, validation commands, and a checklist for future implementation discovery.
-4. `AGENTS.md`: update the Speckit marker so future work reads this plan directly.
+2. `execution-architecture.md`: target execution-layer design, source-of-truth boundaries, unified orchestration model, and replan carry-forward design.
+3. `contracts/current-api-surfaces.md`: current plan/schedule/execution API contract inventory and where the public surface does not yet represent the target execution-layer concepts cleanly.
+4. `quickstart.md`: repeatable repo-reading workflow, validation commands, and a checklist for future implementation discovery.
+5. `AGENTS.md`: update the Speckit marker so future work reads this plan directly.
 
 ## Phase 2 Prioritized Improvement Plan
 
@@ -130,6 +131,7 @@ specs/001-plan-execution-orchestration/
 |-- plan.md
 |-- research.md
 |-- data-model.md
+|-- execution-architecture.md
 |-- quickstart.md
 |-- contracts/
 |   `-- current-api-surfaces.md
@@ -193,8 +195,125 @@ prisma/
 
 - `research.md` documents the brownfield architecture decisions discovered in the current codebase.
 - `data-model.md` maps the current persistence model to the target execution-layer entities from the spec.
+- `execution-architecture.md` records the recommended target execution design independent of current implementation constraints.
 - `contracts/current-api-surfaces.md` captures the current external API surface for planning, scheduling, and execution.
 - `quickstart.md` provides a repeatable discovery workflow for future planning and implementation work.
+
+## Implementation Progress
+
+**Status**: Phase 2 core implementation done. Remaining work is test-coverage rounding and older route/schedule test migrations.
+
+### Completed
+
+#### 1. Contracts — Layered Mutable Plan Graph (`packages/contracts/src/ai-plan-runtime.ts`)
+
+- Added canonical types: `PlanGraph`, `PlanNode`, `NodeLayer` (union of `definition | invalidation | cancellation`), `PlanEdge`, `GraphMutation`, `GraphMutationOperation`, `NodeDefinition`, `NodeAttempt`, `NodeResult`, `ExecutionContextSnapshot`, `EffectivePlanGraph` (enriched), `EffectivePlanNode` (enriched), `WaitKind`, `ResolveEffectivePlanGraphInput`, `ExecutionActionType`, `ExecutionActionInput`, `GraphMutationRequest`.
+- Legacy types (`CompiledPlan`, `PlanRun`, overlay layers) preserved as compatibility surface but no longer drive runtime.
+
+#### 2. Contracts — Unified Execution API Schemas (`packages/contracts/src/api/execution.schema.ts`)
+
+- Added `executionActionBodySchema` (discriminated union for `start_manual | start_scheduled | resume_with_input | resume_with_approval | resume_after_unblock | retry_node | cancel_session`).
+- Added `planMutationBodySchema` for graph mutation requests.
+
+#### 3. Domain — Effective Graph Resolution (`packages/domain/src/plan/effective-graph.ts`)
+
+- Added new mutable-graph resolver path: `resolveEffectivePlanGraph({ graph, attempts, results })`.
+- Legacy overload `resolveEffectivePlanGraph(compiledPlan, layers)` retained for existing overlay-based tests.
+- New resolver builds effective nodes from `PlanNode.layers` + `NodeResult[]` + `NodeAttempt[]`, computes reachability, and handles wait-kinds.
+
+#### 4. Domain — Legacy Cleanup
+
+- Deleted `packages/domain/src/plan/run.ts` (old `createPlanRun`, `applyRuntimeCommand`).
+- Removed `nodeStateToRuntimeLayer`, `nodeResultToResultLayer`, `planRunToLayers` from `effective-graph.ts` exports.
+- Removed old helper re-exports from `packages/domain/src/plan/index.ts`.
+
+#### 5. Engine — Native Persistence (`packages/engine/src/modules/plan-execution/plan-run-store.ts`)
+
+- `savePlanRun(...)` / `getPlanRun(...)` now persist and read `{ graph: PlanGraph, attempts: NodeAttempt[], results: NodeResult[], executionContextSnapshots: ExecutionContextSnapshot[] }`.
+- Lazy migration from legacy overlay rows supported when old persisted data is encountered.
+- `createPlanGraphFromCompiledPlan(...)` builds native `PlanGraph` from `CompiledPlan`.
+
+#### 6. Engine — Native Orchestrator (`packages/engine/src/modules/plan-execution/plan-runner.ts`)
+
+- Fully rewritten: no overlay layers, no legacy runtime/result layer construction.
+- `advancePlanExecution(...)` resolves effective graph via `resolveEffectivePlanGraph({ graph, attempts, results })`, creates `ExecutionContextSnapshot` + `NodeAttempt`, runs executor, and persists results/attempts.
+- `dispatchExecutionAction(...)` implements all action types:
+  - `start_manual` / `start_scheduled` → `startPlanExecution(...)`
+  - `resume_with_input` / `resume_with_approval` / `resume_after_unblock` → `continuePlanExecution(...)`
+  - `retry_node` → cancels active attempt, marks results obsolete, re-executes
+  - `cancel_session` → cancels attempt, marks session `Abandoned`, sets task `Cancelled`
+
+#### 7. Engine — Native Plan Mutations (`packages/engine/src/modules/commands/apply-plan-patch-command.ts`)
+
+- `applyPlanMutationCommand(...)` operates directly on persisted `PlanGraph` state: `add_node`, `push_node_layer`, `add_edge`, `remove_edge`, `update_edge`, `delete_node`.
+- Computes downstream invalidation via `hard_dependency` edge traversal.
+- Cancels running attempts for affected nodes, marks stale/obsolete/invalidated on results, appends invalidation layers.
+
+#### 8. Engine — Blueprint Compiler (`packages/engine/src/modules/tasks/plan-blueprint-compiler.ts`)
+
+- No longer returns `initialLayer`. Returns only `{ compiledPlan, planId }`.
+
+#### 9. Engine — Read Models (`packages/engine/src/modules/queries/task-plan-read-model.ts`)
+
+- `resolveSavedPlanEffectiveGraph(...)` prefers native graph state, falls back to synthesizing from compiled plan when no run exists.
+- `buildSavedTaskPlanReadModel(...)` and `getLatestTaskPlanReadModel(...)` use the new resolution path.
+
+#### 10. Engine — Command Migration
+
+- `progress-accepted-task-plan.ts`: uses `resolveSavedPlanEffectiveGraph` for all effective graph access.
+- `materialize-generated-task-plan.ts`: seeds native graph via `savePlanRun({ graph, attempts, results, ... })`.
+- `materialize-task-plan.ts`: pushes immutable definition layers for linked-task materialization.
+- `sync-accepted-plan.ts`: writes `NodeResult`s directly; seeds native graph from compiled plan when no run exists yet.
+- `dispatch-next-task-action.ts`: uses `resolveSavedPlanEffectiveGraph`.
+
+#### 11. Engine — Compat (`packages/engine/src/modules/plan-execution/compat.ts`)
+
+- Rewritten with native implementations. `getReadyAutoRunnableNodes` now accepts `EffectivePlanGraph` only. No legacy resolver path.
+
+#### 12. Engine — Schedule Commands
+
+- `apply-schedule.ts` / `clear-schedule.ts`: removed writes to nonexistent `Task.schedule*` fields. Schedule state lives in `WorkBlock` + `TaskProjection`.
+
+#### 13. Routes
+
+- `apps/server/src/routes/execution.routes.ts`: added `POST /tasks/:taskId/execution/actions`. Legacy endpoints (`/run`, `/retry`, `/input`, `/message`) now dispatch through unified `dispatchExecutionAction(...)`.
+- `apps/server/src/routes/plans.routes.ts`: added `POST /tasks/:taskId/plan/mutations` and `POST /tasks/:taskId/plan/materialize`.
+- `apps/server/src/routes/tasks.routes.ts`: added `POST /tasks/:taskId/schedule/proposals` and `POST /schedule/proposals/decision`.
+
+#### 14. New Tests
+
+- `packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts` — 4 tests: `start_manual`, `resume_with_input`, `cancel_session`, `retry_node` (condition-only deterministic plans).
+- `packages/engine/src/modules/plan-execution/plan-runner.task-executor.bun.test.ts` — 3 tests: approval-wait, resume-approval, replan_required (mocked task executor).
+
+#### 15. Test Migrations
+
+- `plan-operations.bun.test.ts`: rewritten for `/plan/mutations` + `/plan/materialize` with persisted compiled plans.
+- `plan-lifecycle-workflow.bun.test.ts`: migrated from memory-based `seedDraftPlan`/`seedAcceptedPlan` to `saveCompiledPlan(...)`.
+- `get-work-page.bun.test.ts`: migrated from old graph memory to native compiled plan + plan run.
+- `get-schedule-page.bun.test.ts`, `get-schedule-page-runnable-state.bun.test.ts`: schedule fields moved from `Task` to `TaskProjection`.
+- `task-execution-closure.bun.test.ts`: `scheduleStatus` now read from projection.
+- `schedule-commands.bun.test.ts`: schedule state assertions moved to projection.
+- Real smoke tests, execution-output tests, effective-graph tests updated for new model behavior.
+
+#### 16. Frontend Preservation
+
+- Graph display contract unchanged. Backend adapters (`buildTaskPlanFromGraph`, `buildTaskPlanReadModel`) keep `effectivePlan.nodes/edges` sufficiently compatible for the existing UI graph model.
+
+### Remaining
+
+- Legacy overlay/compiled types still exported from `packages/contracts/src/ai-plan-runtime.ts` (used by legacy test fixtures and migration bridge only; not on active runtime path).
+- `layer-store.ts` still present for lazy migration of old persisted rows.
+- Legacy resolver overload (`resolveEffectivePlanGraph(compiledPlan, layers)`) still used by domain unit tests.
+- Some older query/route tests in unrelated areas (e.g., `get-schedule-page`, `real-router-smoke`) are still migrating to the split `Task + WorkBlock + TaskProjection` schedule model and may show Prisma validation errors from stale field references.
+- Official `bun run test:bun` exit code not yet verified to be clean — last run showed many expected Prisma error logs for negative-path tests; real failure count needs precise extraction.
+
+### Verification Commands
+
+```bash
+bunx tsc --noEmit                     # full typecheck (pre-existing errors outside changed files)
+bun test <file>                       # individual Bun test suites
+bun run test:bun                      # official serial Bun test runner
+```
 
 ## Complexity Tracking
 

@@ -5,7 +5,10 @@ import {
   saveCompiledPlan,
   getLatestCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
-import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import {
+  createPlanGraphFromCompiledPlan,
+  savePlanRun,
+} from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
 import { buildTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
 import { upgradeBlueprintToEditable } from "@chrona/contracts";
@@ -22,7 +25,7 @@ export async function materializeGeneratedTaskPlan(input: {
   planningPrompt?: string | null;
   generatedBy?: string | null;
 }): Promise<TaskPlanReadModel> {
-  const { compiledPlan, initialLayer, planId } = compilePlanBlueprint({
+  const { compiledPlan, planId } = compilePlanBlueprint({
     taskId: input.taskId,
     blueprint: input.blueprint,
     generatedBy: input.generatedBy ?? "ai",
@@ -40,18 +43,28 @@ export async function materializeGeneratedTaskPlan(input: {
     generatedBy: input.generatedBy ?? "ai",
   });
 
-  const run = createPlanRunFromCompiledPlan(compiledPlan, [initialLayer]);
+  const run = createPlanRunFromCompiledPlan(compiledPlan);
   await savePlanRun({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
     planId,
     run,
-    layers: [initialLayer],
+    compiledPlan,
+    graph: createPlanGraphFromCompiledPlan({
+      taskId: input.taskId,
+      compiledPlan,
+    }),
+    attempts: [],
+    results: [],
+    executionContextSnapshots: [],
   });
 
-  const effectivePlanGraph = resolveEffectivePlanGraph(compiledPlan, [
-    initialLayer,
-  ]);
+  const effectivePlanGraph = resolveEffectivePlanGraph({
+    graph: createPlanGraphFromCompiledPlan({
+      taskId: input.taskId,
+      compiledPlan,
+    }),
+  });
 
   // Fetch the just-saved record for accurate timestamps
   const saved = await getLatestCompiledPlan(input.taskId);

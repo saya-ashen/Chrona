@@ -2,13 +2,16 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 
 import {
+  decideScheduleProposal,
   createTask,
   deleteTask,
   ensureTaskInWorkspace,
   getTaskPage,
   listTasksByWorkspace,
+  proposeSchedule,
   updateTask,
 } from "@chrona/engine";
+import type { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import {
   listTasksQuerySchema,
   createTaskBodySchema,
@@ -66,11 +69,11 @@ export function createTasksRoutes() {
           scheduledStartAt,
           scheduledEndAt,
           runtimeAdapterKey: body.runtimeAdapterKey,
-          runtimeInput: body.runtimeInput,
+          runtimeInput: body.runtimeInput as Parameters<typeof createTask>[0]["runtimeInput"],
           runtimeInputVersion: body.runtimeInputVersion,
           runtimeModel: body.runtimeModel,
           prompt: body.prompt,
-          runtimeConfig: body.runtimeConfig,
+          runtimeConfig: body.runtimeConfig as Parameters<typeof createTask>[0]["runtimeConfig"],
         });
 
         return json(c, result, 201);
@@ -89,6 +92,66 @@ export function createTasksRoutes() {
           return error(c, message, 400);
         }
         return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
+      }
+    })
+    .post("/tasks/:taskId/schedule/proposals", async (c) => {
+      try {
+        const taskId = c.req.param("taskId");
+        const body = await c.req.json();
+        return json(
+          c,
+          await proposeSchedule({
+            taskId,
+            source: body.source as ScheduleSource,
+            proposedBy: body.proposedBy ?? "test",
+            summary: body.summary ?? "",
+            dueAt: toDateOrNull(body.dueAt),
+            scheduledStartAt: toDateOrNull(body.scheduledStartAt),
+            scheduledEndAt: toDateOrNull(body.scheduledEndAt),
+            assigneeAgentId:
+              typeof body.assigneeAgentId === "string" ? body.assigneeAgentId : null,
+          }),
+          201,
+        );
+      } catch (cause) {
+        const message =
+          cause instanceof Error ? cause.message : "Failed to create schedule proposal";
+        return error(c, message, message.includes("not found") ? 404 : 500);
+      }
+    })
+    .post("/schedule/proposals/decision", async (c) => {
+      try {
+        const body = await c.req.json();
+        const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
+        const decision = body.decision;
+
+        if (!proposalId) {
+          return error(c, "proposalId is required", 400);
+        }
+
+        if (decision !== "Accepted" && decision !== "Rejected") {
+          return error(c, 'decision must be "Accepted" or "Rejected"', 400);
+        }
+
+        return json(
+          c,
+          await decideScheduleProposal({
+            proposalId,
+            decision,
+            resolutionNote:
+              typeof body.resolutionNote === "string" ? body.resolutionNote : undefined,
+          }),
+        );
+      } catch (cause) {
+        const message =
+          cause instanceof Error ? cause.message : "Failed to resolve schedule proposal";
+        return error(
+          c,
+          message,
+          message.includes("not found") || message.includes("No 'ScheduleProposal' record")
+            ? 404
+            : 400,
+        );
       }
     })
     .get("/tasks/:taskId/detail", zValidator("param", taskDetailParamSchema), async (c) => {
@@ -123,16 +186,16 @@ export function createTasksRoutes() {
             title: body.title,
             description: body.description,
             priority: body.priority,
-            status: body.status,
+            status: body.status as Parameters<typeof updateTask>[0]["status"],
             dueAt,
             scheduledStartAt,
             scheduledEndAt,
             runtimeAdapterKey: body.runtimeAdapterKey,
-            runtimeInput: body.runtimeInput,
+            runtimeInput: body.runtimeInput as Parameters<typeof updateTask>[0]["runtimeInput"],
             runtimeInputVersion: body.runtimeInputVersion,
             runtimeModel: body.runtimeModel,
             prompt: body.prompt,
-            runtimeConfig: body.runtimeConfig,
+            runtimeConfig: body.runtimeConfig as Parameters<typeof updateTask>[0]["runtimeConfig"],
           });
 
           return json(c, result);

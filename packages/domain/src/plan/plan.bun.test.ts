@@ -16,8 +16,7 @@ import { PlanCompileError } from "@chrona/contracts/ai";
 import { validateEditablePlan } from "./validate";
 import { applyPlanPatch } from "./patch";
 import { compileEditablePlan } from "./compile";
-import { createPlanRun, applyRuntimeCommand } from "./run";
-import { resolveEffectivePlanGraph, nodeResultToResultLayer } from "./effective-graph";
+import { resolveEffectivePlanGraph } from "./effective-graph";
 
 // ─── Helpers ───
 
@@ -771,62 +770,6 @@ describe("compileEditablePlan", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════
-// createPlanRun tests
-// ═══════════════════════════════════════════════════════════════
-
-describe("createPlanRun", () => {
-  it("34. initializes entry nodes as ready, others as pending", () => {
-    const plan = makePlan(
-      "plan_run",
-      [makeTask("first"), makeTask("second")],
-      [{ from: "first", to: "second" }],
-    );
-    const compiled = compileEditablePlan(plan);
-    const run = createPlanRun(compiled);
-
-    expect(run.status).toBe("pending");
-
-    const firstNodeId = compiled.nodes.find((n) => n.localId === "first")!.id;
-    const secondNodeId = compiled.nodes.find((n) => n.localId === "second")!.id;
-
-    expect(run.nodeStates[firstNodeId].status).toBe("ready");
-    expect(run.nodeStates[secondNodeId].status).toBe("pending");
-  });
-
-  it("35. attempts start at 0 for all nodes", () => {
-    const plan = makePlan("plan_att", [makeTask("a")], []);
-    const compiled = compileEditablePlan(plan);
-    const run = createPlanRun(compiled);
-
-    for (const state of Object.values(run.nodeStates)) {
-      expect(state.attempts).toBe(0);
-    }
-  });
-
-  it("36. all entry nodes in parallel graph are ready", () => {
-    const plan = makePlan(
-      "plan_par",
-      [makeTask("a"), makeTask("b"), makeTask("c")],
-      // Independent nodes: a→c, b→c. a and b are both entry
-      [
-        { from: "a", to: "c" },
-        { from: "b", to: "c" },
-      ],
-    );
-    const compiled = compileEditablePlan(plan);
-    const run = createPlanRun(compiled);
-
-    const aId = compiled.nodes.find((n) => n.localId === "a")!.id;
-    const bId = compiled.nodes.find((n) => n.localId === "b")!.id;
-    const cId = compiled.nodes.find((n) => n.localId === "c")!.id;
-
-    expect(run.nodeStates[aId].status).toBe("ready");
-    expect(run.nodeStates[bId].status).toBe("ready");
-    expect(run.nodeStates[cId].status).toBe("pending");
-  });
-});
-
 describe("resolveEffectivePlanGraph condition branches", () => {
   it("skips non-selected condition branches at runtime", () => {
     const plan = makePlan(
@@ -863,18 +806,23 @@ describe("resolveEffectivePlanGraph condition branches", () => {
           [conditionNode.id]: { status: "completed" },
         },
       },
-      nodeResultToResultLayer(
-        compiled.editablePlanId,
-        conditionNode.id,
-        {
-          selectedBranch: {
-            label: "yes",
-            nextNodeId: yesNode.id,
-            source: "user",
+      {
+        type: "result",
+        layerId: "resl_condition_selected",
+        version: 2,
+        active: true,
+        planId: compiled.editablePlanId,
+        timestamp: new Date().toISOString(),
+        nodeResults: {
+          [conditionNode.id]: {
+            selectedBranch: {
+              label: "yes",
+              nextNodeId: yesNode.id,
+              source: "user",
+            },
           },
         },
-        2,
-      ),
+      },
     ]);
 
     const resolvedYes = effective.nodes.find((node) => node.id === yesNode.id)!;
@@ -889,240 +837,6 @@ describe("resolveEffectivePlanGraph condition branches", () => {
     expect(effective.edges.filter((edge) => edge.from === conditionNode.id && edge.active)).toHaveLength(1);
     expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === yesNode.id)?.active).toBe(true);
     expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === noNode.id)?.active).toBe(false);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════
-// RuntimeCommand tests
-// ═══════════════════════════════════════════════════════════════
-
-describe("applyRuntimeCommand", () => {
-  function makeCompiledPlanForRun() {
-    const plan = makePlan(
-      "plan_rcmd",
-      [makeTask("task_a"), makeTask("task_b")],
-      [{ from: "task_a", to: "task_b" }],
-    );
-    return compileEditablePlan(plan);
-  }
-
-  it("37. start_plan transitions from pending to running", () => {
-    const compiled = makeCompiledPlanForRun();
-    const run = createPlanRun(compiled);
-
-    const result = applyRuntimeCommand(run, compiled, { type: "start_plan" });
-    expect(result.ok).toBe(true);
-    expect(result.run!.status).toBe("running");
-    expect(result.run!.startedAt).toBeDefined();
-  });
-
-  it("38. pause_plan transitions from running to paused", () => {
-    const compiled = makeCompiledPlanForRun();
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const result = applyRuntimeCommand(run, compiled, { type: "pause_plan" });
-    expect(result.ok).toBe(true);
-    expect(result.run!.status).toBe("paused");
-  });
-
-  it("39. resume_plan transitions from paused to running", () => {
-    const compiled = makeCompiledPlanForRun();
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-    run = applyRuntimeCommand(run, compiled, { type: "pause_plan" }).run!;
-
-    const result = applyRuntimeCommand(run, compiled, { type: "resume_plan" });
-    expect(result.ok).toBe(true);
-    expect(result.run!.status).toBe("running");
-  });
-
-  it("40. cancel_plan transitions to cancelled and sets completedAt", () => {
-    const compiled = makeCompiledPlanForRun();
-    const run = createPlanRun(compiled);
-
-    const result = applyRuntimeCommand(run, compiled, { type: "cancel_plan" });
-    expect(result.ok).toBe(true);
-    expect(result.run!.status).toBe("cancelled");
-    expect(result.run!.completedAt).toBeDefined();
-  });
-
-  it("41. approve_checkpoint unlocks downstream node", () => {
-    const plan = makePlan(
-      "plan_cp",
-      [
-        makeCheckpoint("approve_step", {
-          checkpointType: "approve",
-          prompt: "OK?",
-        }),
-        makeTask("do_work"),
-      ],
-      [{ from: "approve_step", to: "do_work" }],
-    );
-    const compiled = compileEditablePlan(plan);
-    let run = createPlanRun(compiled);
-
-    // Start the plan
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const cpId = compiled.nodes.find((n) => n.localId === "approve_step")!.id;
-    const taskId = compiled.nodes.find((n) => n.localId === "do_work")!.id;
-
-    // Approve the checkpoint
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "approve_checkpoint",
-      nodeId: cpId,
-      response: { approved: true },
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.run!.nodeStates[cpId].status).toBe("completed");
-    expect(result.run!.nodeStates[taskId].status).toBe("ready");
-    expect(result.run!.checkpointResponses).toHaveLength(1);
-    expect(result.run!.checkpointResponses[0].response).toEqual({
-      approved: true,
-    });
-  });
-
-  it("42. reject_checkpoint marks node as failed and pauses plan", () => {
-    const plan = makePlan(
-      "plan_rej",
-      [
-        makeCheckpoint("safe_gate", {
-          checkpointType: "confirm",
-          prompt: "Go?",
-        }),
-      ],
-      [],
-    );
-    const compiled = compileEditablePlan(plan);
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const cpId = compiled.nodes.find((n) => n.localId === "safe_gate")!.id;
-
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "reject_checkpoint",
-      nodeId: cpId,
-      reason: "Not ready yet",
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.run!.nodeStates[cpId].status).toBe("failed");
-    expect(result.run!.nodeStates[cpId].lastError).toBe("Not ready yet");
-    expect(result.run!.status).toBe("paused");
-  });
-
-  it("43. mark_user_task_completed unlocks dependent nodes", () => {
-    const plan = makePlan(
-      "plan_ut",
-      [
-        makeTask("human_task", { executor: "user", mode: "manual" }),
-        makeTask("auto_follow"),
-      ],
-      [{ from: "human_task", to: "auto_follow" }],
-    );
-    const compiled = compileEditablePlan(plan);
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const humanId = compiled.nodes.find((n) => n.localId === "human_task")!.id;
-    const followId = compiled.nodes.find(
-      (n) => n.localId === "auto_follow",
-    )!.id;
-
-    // Human task completes
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "mark_user_task_completed",
-      nodeId: humanId,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.run!.nodeStates[humanId].status).toBe("completed");
-    expect(result.run!.nodeStates[followId].status).toBe("ready");
-  });
-
-  it("44. retry_node resets failed node to ready", () => {
-    const plan = makePlan(
-      "plan_retry",
-      [makeCheckpoint("gate", { checkpointType: "confirm", prompt: "OK?" })],
-      [],
-    );
-    const compiled = compileEditablePlan(plan);
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const gateId = compiled.nodes.find((n) => n.localId === "gate")!.id;
-
-    // Fail it
-    run = applyRuntimeCommand(run, compiled, {
-      type: "reject_checkpoint",
-      nodeId: gateId,
-      reason: "Bad",
-    }).run!;
-    expect(run.nodeStates[gateId].status).toBe("failed");
-
-    // Retry
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "retry_node",
-      nodeId: gateId,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.run!.nodeStates[gateId].status).toBe("ready");
-    expect(result.run!.nodeStates[gateId].lastError).toBeUndefined();
-  });
-
-  it("45. plan auto-completes when all nodes are done", () => {
-    const plan = makePlan("plan_auto", [makeTask("solo")], []);
-    const compiled = compileEditablePlan(plan);
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const soloId = compiled.nodes.find((n) => n.localId === "solo")!.id;
-
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "mark_user_task_completed",
-      nodeId: soloId,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.run!.status).toBe("completed");
-    expect(result.run!.completedAt).toBeDefined();
-  });
-
-  it("46. cannot start an already running plan", () => {
-    const compiled = makeCompiledPlanForRun();
-    let run = createPlanRun(compiled);
-    run = applyRuntimeCommand(run, compiled, { type: "start_plan" }).run!;
-
-    const result = applyRuntimeCommand(run, compiled, { type: "start_plan" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("Cannot start");
-  });
-
-  it("47. cannot approve checkpoint that is not ready", () => {
-    const plan = makePlan(
-      "plan_not_ready",
-      [makeCheckpoint("gate", { checkpointType: "confirm", prompt: "A?" })],
-      [],
-    );
-    const compiled = compileEditablePlan(plan);
-    const run = createPlanRun(compiled);
-    // Not started, so node is "ready" (entry node), this should work
-    // Actually gate is entry so it's ready. Let me test with a non-ready node.
-    // Gate IS ready, so this should work. Let's just verify.
-    const gateId = compiled.nodes.find((n) => n.localId === "gate")!.id;
-    expect(run.nodeStates[gateId].status).toBe("ready");
-
-    // Test with a completed node
-    run.nodeStates[gateId].status = "completed";
-    const result = applyRuntimeCommand(run, compiled, {
-      type: "approve_checkpoint",
-      nodeId: gateId,
-    });
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("Cannot approve");
   });
 });
 

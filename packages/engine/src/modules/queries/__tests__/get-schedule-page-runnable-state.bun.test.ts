@@ -24,7 +24,7 @@ describe("getSchedulePage runnable state", () => {
   });
 
   afterAll(async () => {
-    await db.$disconnect();
+    await resetDb();
   });
 
   it("exposes runnable summaries for scheduled and unscheduled tasks", async () => {
@@ -54,10 +54,6 @@ describe("getSchedulePage runnable state", () => {
         runtimeModel: "gpt-5.4",
         prompt: "Execute the configured task",
         runtimeConfig: { temperature: 0.2, sessionStrategy: "per_subtask" },
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
-        scheduledStartAt: futureStart,
-        scheduledEndAt: futureEnd,
       },
     });
 
@@ -75,7 +71,6 @@ describe("getSchedulePage runnable state", () => {
         runtimeModel: "gpt-5.4",
         prompt: null,
         runtimeConfig: {},
-        scheduleStatus: "Unscheduled",
       },
     });
 
@@ -94,7 +89,6 @@ describe("getSchedulePage runnable state", () => {
         runtimeModel: "gpt-5.4",
         prompt: null,
         runtimeConfig: {},
-        scheduleStatus: "Unscheduled",
       },
     });
 

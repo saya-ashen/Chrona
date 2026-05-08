@@ -8,9 +8,10 @@ Use this guide to repeat the brownfield discovery work for Chrona's plan-executi
 
 1. Read `specs/001-plan-execution-orchestration/spec.md`.
 2. Read `specs/001-plan-execution-orchestration/plan.md`.
-3. Read `specs/001-plan-execution-orchestration/research.md`.
-4. Read `specs/001-plan-execution-orchestration/data-model.md`.
-5. Read `specs/001-plan-execution-orchestration/contracts/current-api-surfaces.md`.
+3. Read `specs/001-plan-execution-orchestration/execution-architecture.md`.
+4. Read `specs/001-plan-execution-orchestration/research.md`.
+5. Read `specs/001-plan-execution-orchestration/data-model.md`.
+6. Read `specs/001-plan-execution-orchestration/contracts/current-api-surfaces.md`.
 
 ## Key Source Files
 
@@ -64,7 +65,7 @@ bun run test:bun
 ## What To Preserve In Future Implementation
 
 1. Existing plan generation and review value.
-2. Task-level scheduling behavior already used by the schedule page.
+2. The target design boundary in `execution-architecture.md`, especially source-of-truth ownership.
 3. Accepted-plan execution behavior that already advances ready nodes.
 4. Current waiting-for-input and waiting-for-approval intervention flows.
 5. Projection-backed task and work visibility for the UI.

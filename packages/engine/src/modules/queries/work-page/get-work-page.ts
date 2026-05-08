@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { getLayers } from "@/modules/plan-execution/plan-run-store";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";
 import { isMissingRecordError, toIsoString, classifyWorkstreamItem, formatEventTitle, summarizePayload } from "./helpers";
@@ -87,10 +86,21 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
   const latestFollowUp = await db.task.findFirst({
     where: { parentTaskId: task.id },
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      createdAt: true,
+      projection: {
+        select: {
+          scheduleStatus: true,
+        },
+      },
+    },
   });
   const savedPlan = (await getAcceptedCompiledPlan(task.id)) ?? (await getLatestCompiledPlan(task.id));
   const effectivePlanGraph = savedPlan && savedPlan.status === "accepted"
-    ? resolveEffectivePlanGraph(savedPlan.compiledPlan, await getLayers(task.id, savedPlan.compiledPlan.editablePlanId))
+    ? await resolveSavedPlanEffectiveGraph(savedPlan)
     : null;
   const blockReason = readBlockReason(task);
   const approvals =
@@ -313,7 +323,15 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       runId: event.runId,
       createdAt: event.createdAt,
     })),
-    latestFollowUp,
+    latestFollowUp: latestFollowUp
+      ? {
+          id: latestFollowUp.id,
+          title: latestFollowUp.title,
+          status: latestFollowUp.status,
+          scheduleStatus: latestFollowUp.projection?.scheduleStatus ?? "Unscheduled",
+          createdAt: latestFollowUp.createdAt,
+        }
+      : null,
   });
   const taskPlan = buildTaskPlanFromGraph({ savedPlan, effectivePlanGraph }) ?? {
     state: "empty" as const,
