@@ -37,8 +37,6 @@ describe("compilePlanBlueprint", () => {
     expect(result.compiledPlan.terminalNodeIds).toHaveLength(1);
     expect(result.compiledPlan.nodes).toHaveLength(2);
     expect(result.planId).toBeDefined();
-    expect(result.initialLayer.nodeStates[result.compiledPlan.entryNodeIds[0]].status).toBe("ready");
-
     const checkpoint = result.compiledPlan.nodes.find((node) => node.localId === "review_budget");
     const task = result.compiledPlan.nodes.find((node) => node.localId === "book_trip");
 

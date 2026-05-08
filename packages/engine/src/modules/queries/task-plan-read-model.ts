@@ -23,7 +23,10 @@ import {
   getLatestCompiledPlan,
   type SavedCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
-import { getLayers } from "@/modules/plan-execution/plan-run-store";
+import {
+  createPlanGraphFromCompiledPlan,
+  getPlanRun,
+} from "@/modules/plan-execution/plan-run-store";
 
 /**
  * Builds the canonical frontend-facing read model from persisted plan data.
@@ -205,17 +208,34 @@ function compiledPlanToBlueprint(compiledPlan: CompiledPlan): PlanBlueprint {
   };
 }
 
-export async function buildSavedTaskPlanReadModel(
+export async function resolveSavedPlanEffectiveGraph(
   savedPlan: SavedCompiledPlan,
-): Promise<TaskPlanReadModel> {
-  const layers = await getLayers(
+): Promise<EffectivePlanGraph> {
+  const persistedRun = await getPlanRun(
     savedPlan.taskId,
     savedPlan.compiledPlan.editablePlanId,
   );
-  const effectivePlanGraph = resolveEffectivePlanGraph(
-    savedPlan.compiledPlan,
-    layers,
-  );
+
+  if (persistedRun?.graph) {
+    return resolveEffectivePlanGraph({
+      graph: persistedRun.graph,
+      attempts: persistedRun.attempts,
+      results: persistedRun.results,
+    });
+  }
+
+  return resolveEffectivePlanGraph({
+    graph: createPlanGraphFromCompiledPlan({
+      taskId: savedPlan.taskId,
+      compiledPlan: savedPlan.compiledPlan,
+    }),
+  });
+}
+
+export async function buildSavedTaskPlanReadModel(
+  savedPlan: SavedCompiledPlan,
+): Promise<TaskPlanReadModel> {
+  const effectivePlanGraph = await resolveSavedPlanEffectiveGraph(savedPlan);
 
   return buildTaskPlanReadModel({
     compiledPlan: savedPlan.compiledPlan,

@@ -24,7 +24,7 @@ describe("getSchedulePage", () => {
   });
 
   afterAll(async () => {
-    await db.$disconnect();
+    await resetDb();
   });
 
   it("groups scheduled work, unscheduled work, pending AI proposals, and risks", async () => {
@@ -68,10 +68,6 @@ describe("getSchedulePage", () => {
         priority: "High",
         ownerType: "human",
         dueAt: dayAfterTomorrowEighteen,
-        scheduledStartAt: tomorrowNine,
-        scheduledEndAt: tomorrowEleven,
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
       },
     });
 
@@ -83,7 +79,6 @@ describe("getSchedulePage", () => {
         priority: "Medium",
         ownerType: "human",
         dueAt: todayTwenty,
-        scheduleStatus: "Unscheduled",
       },
     });
 
@@ -95,7 +90,6 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Low",
         ownerType: "human",
-        scheduleStatus: "Unscheduled",
       },
     });
 
@@ -115,10 +109,6 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Low",
         ownerType: "human",
-        scheduledStartAt: todayThirteen,
-        scheduledEndAt: todayFourteen,
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
       },
     });
 
@@ -130,10 +120,6 @@ describe("getSchedulePage", () => {
         priority: "Urgent",
         ownerType: "human",
         dueAt: todayEighteen,
-        scheduledStartAt: todayNine,
-        scheduledEndAt: todayEleven,
-        scheduleStatus: "Overdue",
-        scheduleSource: "human",
       },
     });
 
@@ -222,10 +208,6 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Low",
         ownerType: "human",
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
-        scheduledStartAt: new Date("2026-04-18T09:00:00.000Z"),
-        scheduledEndAt: new Date("2026-04-18T10:00:00.000Z"),
       },
     });
 

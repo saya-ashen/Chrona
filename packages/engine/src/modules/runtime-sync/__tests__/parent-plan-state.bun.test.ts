@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
@@ -128,6 +128,10 @@ describe("parent task accepted-plan derived states", () => {
   beforeEach(async () => {
     progressAcceptedTaskPlanMock.mockClear();
     await resetDb();
+  });
+
+  afterAll(() => {
+    mock.restore();
   });
 
   it("moves parent task to WaitingForApproval when a linked child run waits for approval", async () => {

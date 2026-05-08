@@ -96,6 +96,162 @@ export interface CompiledPlan {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Layered Mutable Plan Graph
+// ═══════════════════════════════════════════════════════════════
+
+export type PlanGraphStatus =
+  | "draft"
+  | "active"
+  | "paused"
+  | "completed"
+  | "cancelled"
+  | "superseded"
+  | "archived";
+
+export type PlanEdgeType =
+  | "hard_dependency"
+  | "ordering"
+  | "context"
+  | "review_gate"
+  | "branch";
+
+export type NodeLayerType = "definition" | "invalidation" | "cancellation";
+
+export type WaitKind =
+  | "user_input"
+  | "approval"
+  | "review"
+  | "manual_action"
+  | "external_dependency"
+  | "capability_unavailable";
+
+export interface NodeDefinition {
+  title: string;
+  objective: string;
+  description?: string;
+  semantics: {
+    type: "task" | "checkpoint" | "condition" | "wait";
+    priority?: TaskPriority;
+    mode?: TaskMode;
+    linkedTaskId?: string;
+    metadata?: Record<string, unknown>;
+  };
+  executor?: TaskExecutor;
+  inputContract?: Record<string, unknown> | null;
+  outputContract?: Record<string, unknown> | null;
+  reviewRequired?: boolean;
+  estimatedMinutes?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface NodeDefinitionLayer {
+  id: string;
+  nodeId: string;
+  type: "definition";
+  createdAt: string;
+  createdBy: LayerSource;
+  reason?: string;
+  definition: NodeDefinition;
+}
+
+export interface NodeInvalidationLayer {
+  id: string;
+  nodeId: string;
+  type: "invalidation";
+  createdAt: string;
+  createdBy: LayerSource;
+  reason: string;
+  invalidatedByNodeId?: string;
+  invalidatedByMutationId?: string;
+}
+
+export interface NodeCancellationLayer {
+  id: string;
+  nodeId: string;
+  type: "cancellation";
+  createdAt: string;
+  createdBy: LayerSource;
+  reason: string;
+  cancelledAttemptId?: string;
+}
+
+export type NodeLayer =
+  | NodeDefinitionLayer
+  | NodeInvalidationLayer
+  | NodeCancellationLayer;
+
+export interface PlanNode {
+  id: string;
+  semanticKey: string;
+  layers: NodeLayer[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  type: PlanEdgeType;
+  active: boolean;
+  label?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type GraphMutationOperation =
+  | {
+      type: "add_node";
+      nodeId: string;
+      semanticKey: string;
+      definitionLayer: NodeDefinitionLayer;
+    }
+  | {
+      type: "push_node_layer";
+      nodeId: string;
+      layer: NodeLayer;
+    }
+  | {
+      type: "add_edge";
+      edge: PlanEdge;
+    }
+  | {
+      type: "remove_edge";
+      edgeId: string;
+    }
+  | {
+      type: "update_edge";
+      edgeId: string;
+      patch: Partial<Pick<PlanEdge, "active" | "label" | "type">>;
+    }
+  | {
+      type: "delete_node";
+      nodeId: string;
+    };
+
+export interface GraphMutation {
+  id: string;
+  graphId: string;
+  createdAt: string;
+  createdBy: LayerSource;
+  reason: string;
+  operations: GraphMutationOperation[];
+  affectedNodeIds: string[];
+  invalidatedNodeIds: string[];
+}
+
+export interface PlanGraph {
+  id: string;
+  taskId: string;
+  status: PlanGraphStatus;
+  nodes: PlanNode[];
+  edges: PlanEdge[];
+  mutations: GraphMutation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Layer 4: PlanRun (execution runtime state)
 // ═══════════════════════════════════════════════════════════════
 
@@ -105,12 +261,14 @@ export type NodeRuntimeStatus =
   | "pending"
   | "ready"
   | "running"
+  | "waiting"
   | "blocked"
   | "waiting_for_user"
   | "waiting_for_approval"
   | "completed"
   | "failed"
   | "cancelled"
+  | "invalidated"
   | "skipped";
 
 export interface NodeRuntimeState {
@@ -140,10 +298,26 @@ export interface ArtifactRef {
   metadata?: unknown;
 }
 
+export interface ExecutionContextSnapshot {
+  id: string;
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  graphSignature: string;
+  refs?: Record<string, unknown>;
+  promptSnapshot?: Record<string, unknown>;
+  modelSnapshot?: Record<string, unknown>;
+  runtimeSnapshot?: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface NodeExecutionAttempt {
   id: string;
   planRunId: string;
   nodeId: string;
+  nodeLayerId?: string;
+  executionContextSnapshotId?: string;
+  idempotencyKey?: string;
   attemptNumber: number;
   status: "running" | "succeeded" | "failed" | "cancelled";
   inputSnapshot?: unknown;
@@ -156,6 +330,25 @@ export interface NodeExecutionAttempt {
   };
   startedAt: string;
   finishedAt?: string;
+}
+
+export interface NodeAttempt {
+  id: string;
+  taskId: string;
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  executionContextSnapshotId: string;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  idempotencyKey: string;
+  attemptNumber: number;
+  startedAt: string;
+  finishedAt?: string;
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
 }
 
 export interface PlanRun {
@@ -245,10 +438,25 @@ export interface RuntimeLayer {
 // ─── Result Layer (execution output) ───
 
 export interface NodeResult {
+  id?: string;
+  taskId?: string;
+  graphId?: string;
+  nodeId?: string;
+  nodeLayerId?: string;
+  attemptId?: string;
+  status?: "current" | "stale" | "obsolete" | "invalidated" | "rejected";
   outputSummary?: string;
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
+  waitKind?: WaitKind;
+  review?: {
+    required: boolean;
+    status: "pending" | "accepted" | "rejected" | "request_changes";
+    feedback?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+  };
   selectedBranch?: {
     label: string;
     nextNodeId: string;
@@ -273,8 +481,16 @@ export type PlanOverlayLayer = StructuralLayer | RuntimeLayer | ResultLayer;
 // ─── Effective Plan Graph (resolved view) ───
 
 export interface EffectivePlanNode {
-  /** Stable compiled node ID */
+  /** Stable plan node ID. Preserved as `id` for existing UI consumers. */
   id: string;
+  nodeId: string;
+  activeLayerId: string | null;
+  semanticKey: string;
+  definition: NodeDefinition;
+  invalidated: boolean;
+  invalidationReason?: string;
+  waitKind?: WaitKind;
+  reviewRequired?: boolean;
   /** Original editable plan node ID */
   localId: string;
   type: "task" | "checkpoint" | "condition" | "wait";
@@ -319,9 +535,11 @@ export interface EffectivePlanEdge {
 }
 
 export interface EffectivePlanGraph {
+  graphId: string;
+  /** Compatibility alias until callers are migrated. */
   planId: string;
   basePlanId: string;
-  /** max(activeLayers.version) */
+  resolvedAt: string;
   resolvedVersion: number;
   nodes: EffectivePlanNode[];
   edges: EffectivePlanEdge[];
@@ -334,9 +552,82 @@ export interface EffectivePlanGraph {
   blockedNodeIds: string[];
   completedNodeIds: string[];
   runningNodeIds: string[];
+  invalidatedNodeIds: string[];
   failedNodeIds: string[];
   pendingNodeIds: string[];
 }
+
+export interface ResolveEffectivePlanGraphInput {
+  graph: PlanGraph;
+  attempts?: NodeAttempt[];
+  results?: NodeResult[];
+}
+
+export type ExecutionActionType =
+  | "start_manual"
+  | "start_scheduled"
+  | "resume_with_input"
+  | "resume_with_approval"
+  | "resume_after_unblock"
+  | "retry_node"
+  | "cancel_session";
+
+export type ExecutionActionInput =
+  | {
+      action: "start_manual";
+      prompt?: string;
+      workBlockId?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "start_scheduled";
+      workBlockId?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "resume_with_input";
+      sessionId?: string;
+      nodeId?: string;
+      inputText: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "resume_with_approval";
+      sessionId?: string;
+      nodeId?: string;
+      decision: "approve" | "reject" | "request_changes";
+      feedback?: string;
+      editedContent?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "resume_after_unblock";
+      sessionId?: string;
+      nodeId?: string;
+      note?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "retry_node";
+      sessionId?: string;
+      nodeId: string;
+      prompt?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "cancel_session";
+      sessionId?: string;
+      reason?: string;
+      idempotencyKey?: string;
+    };
+
+export type GraphMutationRequest = {
+  expectedGraphId?: string;
+  expectedRevision?: number;
+  reason: string;
+  operations: GraphMutationOperation[];
+  scope?: "future_only" | "from_node" | "entire_graph";
+};
 
 export interface GenerateTaskPlanRequest {
   taskId?: string;
@@ -518,21 +809,30 @@ export interface TaskWorkspaceChatResponse {
   proposal?: TaskWorkspaceUpdateProposal;
 }
 
-export type ExecutionSessionStatus = "Active" | "Paused" | "Completed" | "Abandoned";
-export type ExecutionSessionPauseReason =
-  | "needs_user_input"
-  | "needs_approval"
-  | "external_dependency"
-  | "provider_unavailable"
-  | null;
+export type ExecutionSessionStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "waiting"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type ExecutionSessionTrigger = "manual" | "scheduled" | "system" | "retry";
+
+export type ExecutionSessionPauseReason = WaitKind | "work_block_exhausted" | "replan_confirmation" | null;
 
 export interface ExecutionSession {
   id: string;
   workspaceId: string;
   taskId: string;
   workBlockId: string | null;
+  graphId: string;
+  /** Compatibility alias until callers migrate from planId. */
   planId: string;
   status: ExecutionSessionStatus;
+  trigger: ExecutionSessionTrigger;
   currentNodeId: string | null;
   pauseReason: ExecutionSessionPauseReason;
   completedNodeIds: string[];

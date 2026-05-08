@@ -10,11 +10,12 @@ import { deriveTaskRunnability } from "@chrona/shared";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
 import type { ScheduledTaskInfo, TaskPlanReadModel } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { getLayers } from "@/modules/plan-execution/plan-run-store";
-import { getLatestTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
+import {
+  getLatestTaskPlanReadModel,
+  resolveSavedPlanEffectiveGraph,
+} from "@/modules/queries/task-plan-read-model";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import type { ScheduleConflict, ScheduleSuggestion } from "@/components/schedule/schedule-page-types";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
 
 function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & { task: {
   id: string;
@@ -109,8 +110,7 @@ async function getReadyNodeIds(taskId: string) {
     return [] as string[];
   }
 
-  const layers = await getLayers(taskId, acceptedPlan.compiledPlan.editablePlanId);
-  const effective = resolveEffectivePlanGraph(acceptedPlan.compiledPlan, layers);
+  const effective = await resolveSavedPlanEffectiveGraph(acceptedPlan);
   return effective.readyNodeIds;
 }
 

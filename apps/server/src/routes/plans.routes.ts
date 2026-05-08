@@ -7,12 +7,19 @@ import {
   ensureTaskInWorkspace,
   ensurePlanInWorkspace,
   applyPlanPatchCommand,
+  applyPlanMutationCommand,
+  materializeTaskPlan,
   saveCompiledPlan,
   getLatestCompiledPlan,
   isTaskPlanGenerationRunning,
   generateTaskPlanManualStream,
   getLatestTaskPlanReadModel,
+  compilePlanBlueprint,
+  createPlanRunFromCompiledPlan,
+  savePlanRun,
 } from "@chrona/engine";
+import { db } from "@chrona/db";
+import type { CompiledPlan } from "@chrona/contracts/ai";
 import {
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
@@ -27,7 +34,10 @@ import {
   planGenerateStopParamSchema,
   planPatchParamSchema,
   planPatchBodySchema,
+  planMutationParamSchema,
+  planMutationBodySchema,
 } from "@chrona/contracts/api";
+import type { GraphMutationRequest } from "@chrona/contracts";
 import { planGenerationConflictBody, logger } from "./helpers";
 import { error, internalServerError, json } from "../lib/http";
 
@@ -268,6 +278,130 @@ export function createPlansRoutes() {
         }
       },
     )
+    .post("/tasks/:taskId/plan/materialize", async (c) => {
+      try {
+        const taskId = c.req.param("taskId");
+        const body = await c.req.json();
+        const { nodes: providedNodes, edges: providedEdges } = body as {
+          nodes?: Record<string, unknown>[];
+          edges?: Record<string, unknown>[];
+        };
+
+        const task = await db.task.findUnique({ where: { id: taskId } });
+        if (!task) {
+          return error(c, "Task not found", 404);
+        }
+
+        let compiledPlan: CompiledPlan;
+
+        if (providedNodes && Array.isArray(providedNodes) && providedNodes.length > 0) {
+          const blueprint = {
+            title: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
+            goal: `${providedNodes.length} planned step${providedNodes.length === 1 ? "" : "s"}`,
+            nodes: providedNodes.map((node) => ({
+              id:
+                typeof node.id === "string"
+                  ? node.id
+                  : `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              type:
+                typeof node.type === "string" &&
+                ["task", "checkpoint", "condition", "wait"].includes(node.type)
+                  ? node.type
+                  : "task",
+              title: typeof node.title === "string" ? node.title : "Untitled",
+            })) as Parameters<typeof compilePlanBlueprint>[0]["blueprint"]["nodes"],
+            edges: (providedEdges ?? []).map((edge) => ({
+              from: typeof edge.fromNodeId === "string" ? edge.fromNodeId : "",
+              to: typeof edge.toNodeId === "string" ? edge.toNodeId : "",
+            })),
+          };
+
+          const compResult = compilePlanBlueprint({
+            taskId: task.id,
+            blueprint,
+            generatedBy: "batch-apply",
+            source: "ai",
+          });
+          compiledPlan = compResult.compiledPlan;
+
+          await saveCompiledPlan({
+            workspaceId: task.workspaceId,
+            taskId: task.id,
+            compiledPlan,
+            status: "draft",
+            generatedBy: "batch-apply",
+            summary: blueprint.title,
+          });
+
+          await savePlanRun({
+            workspaceId: task.workspaceId,
+            taskId: task.id,
+            planId: compResult.planId,
+            run: createPlanRunFromCompiledPlan(compiledPlan),
+            compiledPlan,
+          });
+        } else {
+          const latest = await getLatestCompiledPlan(taskId);
+          if (!latest) {
+            return error(c, "No plan found for task", 404);
+          }
+          compiledPlan = latest.compiledPlan;
+        }
+
+        const materialized = await materializeTaskPlan({ taskId: task.id });
+        const childTasks = await db.task.findMany({
+          where: { id: { in: materialized.createdTaskIds } },
+          include: { projection: true },
+          orderBy: { createdAt: "asc" },
+        });
+
+        return json(
+          c,
+          {
+            parentTaskId: taskId,
+            childTasks,
+            planGraph: compiledPlan,
+          },
+          201,
+        );
+      } catch (cause) {
+        return internalServerError(
+          c,
+          "POST /api/tasks/:taskId/plan/materialize",
+          cause,
+          "Failed to apply task plan",
+        );
+      }
+    })
+    .post(
+      "/tasks/:taskId/plan/mutations",
+      zValidator("param", planMutationParamSchema),
+      zValidator("json", planMutationBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const mutation = c.req.valid("json");
+          const result = await applyPlanMutationCommand({
+            taskId,
+            mutation: mutation as GraphMutationRequest,
+          });
+
+          return json(c, result, 200);
+        } catch (cause) {
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to apply plan mutation";
+          const normalizedMessage = message.toLowerCase();
+          const status = normalizedMessage.includes("not found") || normalizedMessage.includes("no plan found")
+            ? 404
+            : normalizedMessage.includes("unsupported") || normalizedMessage.includes("unknown")
+              ? 400
+              : 500;
+          return error(c, message, status);
+        }
+      },
+    )
     .post(
       "/tasks/:taskId/plan",
       zValidator("param", planPatchParamSchema),
@@ -304,9 +438,13 @@ export function createPlansRoutes() {
             cause instanceof Error
               ? cause.message
               : "Failed to apply plan patch";
-          const status = message.includes("not found")
+          const normalizedMessage = message.toLowerCase();
+          const status =
+            normalizedMessage.includes("not found") || normalizedMessage.includes("no plan found")
             ? 404
-            : message.includes("requires")
+            : normalizedMessage.includes("requires") ||
+                normalizedMessage.includes("unsupported") ||
+                normalizedMessage.includes("unknown")
               ? 400
               : 500;
           return error(c, message, status);

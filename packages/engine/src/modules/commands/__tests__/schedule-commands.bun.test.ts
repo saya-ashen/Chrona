@@ -28,7 +28,6 @@ describe("applySchedule", () => {
 
   afterAll(async () => {
     await resetDb();
-    await db.$disconnect();
   });
 
   it("updates the task schedule, records a canonical event, and rebuilds the projection", async () => {
@@ -77,12 +76,10 @@ describe("applySchedule", () => {
       workspaceId: workspace.id,
     });
     expect(storedTask.dueAt?.toISOString()).toBe(futureDue.toISOString());
-    expect(storedTask.scheduledStartAt?.toISOString()).toBe(futureStart.toISOString());
-    expect(storedTask.scheduledEndAt?.toISOString()).toBe(futureEnd.toISOString());
-    expect(storedTask.scheduleStatus).toBe("Scheduled");
-    expect(storedTask.scheduleSource).toBe("human");
     expect(storedTask.projection?.scheduleStatus).toBe("Scheduled");
     expect(storedTask.projection?.scheduleSource).toBe("human");
+    expect(storedTask.projection?.scheduledStartAt?.toISOString()).toBe(futureStart.toISOString());
+    expect(storedTask.projection?.scheduledEndAt?.toISOString()).toBe(futureEnd.toISOString());
     expect(scheduleEvents).toHaveLength(1);
     expect(scheduleEvents[0]?.payload).toEqual(
       expect.objectContaining({
@@ -141,10 +138,18 @@ describe("applySchedule", () => {
         priority: "High",
         ownerType: "human",
         dueAt: new Date("2026-04-12T18:00:00.000Z"),
+      },
+    });
+
+    await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
         scheduledStartAt: new Date("2026-04-12T09:00:00.000Z"),
         scheduledEndAt: new Date("2026-04-12T11:00:00.000Z"),
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
+        trigger: "manual",
       },
     });
 
@@ -164,12 +169,10 @@ describe("applySchedule", () => {
       workspaceId: workspace.id,
     });
     expect(storedTask.dueAt).toBeNull();
-    expect(storedTask.scheduledStartAt).toBeNull();
-    expect(storedTask.scheduledEndAt).toBeNull();
-    expect(storedTask.scheduleStatus).toBe("Unscheduled");
-    expect(storedTask.scheduleSource).toBeNull();
     expect(storedTask.projection?.scheduleStatus).toBe("Unscheduled");
     expect(storedTask.projection?.scheduleSource).toBeNull();
+    expect(storedTask.projection?.scheduledStartAt).toBeNull();
+    expect(storedTask.projection?.scheduledEndAt).toBeNull();
     expect(unscheduledEvents).toHaveLength(1);
     expect(unscheduledEvents[0]?.payload).toEqual(
       expect.objectContaining({
@@ -294,9 +297,11 @@ describe("applySchedule", () => {
     });
     expect(storedProposal.status).toBe("Accepted");
     expect(storedProposal.resolutionNote).toBe("Looks good");
-    expect(storedTask.scheduleStatus).toBe("Scheduled");
-    expect(storedTask.scheduleSource).toBe("ai");
     expect(storedTask.dueAt?.toISOString()).toBe(futureDue.toISOString());
+    expect(storedTask.projection?.scheduleStatus).toBe("Scheduled");
+    expect(storedTask.projection?.scheduleSource).toBe("ai");
+    expect(storedTask.projection?.scheduledStartAt?.toISOString()).toBe(futureStart.toISOString());
+    expect(storedTask.projection?.scheduledEndAt?.toISOString()).toBe(futureEnd.toISOString());
     expect(storedTask.projection?.scheduleProposalCount).toBe(0);
   });
 
@@ -317,10 +322,18 @@ describe("applySchedule", () => {
         priority: "Medium",
         ownerType: "human",
         dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      },
+    });
+
+    await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
         scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
         scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
-        scheduleStatus: "Scheduled",
-        scheduleSource: "human",
+        trigger: "manual",
       },
     });
 
@@ -355,7 +368,8 @@ describe("applySchedule", () => {
     expect(storedProposal.status).toBe("Rejected");
     expect(storedProposal.resolutionNote).toBe("Keep the original slot");
     expect(storedTask.dueAt?.toISOString()).toBe("2026-04-15T18:00:00.000Z");
-    expect(storedTask.scheduleSource).toBe("human");
+    expect(storedTask.projection?.scheduleSource).toBe("human");
+    expect(storedTask.projection?.scheduleStatus).toBe("Overdue");
     expect(storedTask.projection?.scheduleProposalCount).toBe(0);
   });
 });

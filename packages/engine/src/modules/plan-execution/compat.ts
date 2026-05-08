@@ -1,25 +1,23 @@
-/**
- * Compatibility re-exports for transitional consumers during the task-plan
- * graph migration. Current engine code should prefer direct compiled-plan,
- * effective-graph, and saved-plan snapshot modules instead of importing here.
- */
-import type { CompiledPlan, PlanOverlayLayer } from "@chrona/contracts/ai";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan, type SavedCompiledPlan } from "./compiled-plan-store";
+import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
+
 type CompatPlan = SavedCompiledPlan & {
   id: string;
   planId: string;
   revision: number;
-  plan: CompiledPlan;
+  plan: SavedCompiledPlan["compiledPlan"];
+  effectivePlan: EffectivePlanGraph;
 };
 
-function toCompatPlan(sp: SavedCompiledPlan): CompatPlan {
+async function toCompatPlan(savedPlan: SavedCompiledPlan): Promise<CompatPlan> {
   return {
-    ...sp,
-    id: sp.recordId,
-    planId: sp.compiledPlan.editablePlanId,
-    revision: sp.compiledPlan.sourceVersion,
-    plan: sp.compiledPlan,
+    ...savedPlan,
+    id: savedPlan.recordId,
+    planId: savedPlan.compiledPlan.editablePlanId,
+    revision: savedPlan.compiledPlan.sourceVersion,
+    plan: savedPlan.compiledPlan,
+    effectivePlan: await resolveSavedPlanEffectiveGraph(savedPlan),
   };
 }
 
@@ -35,57 +33,47 @@ export async function getLatestTaskPlanGraph(taskId: string): Promise<CompatPlan
   return toCompatPlan(result);
 }
 
-export function enrichPlanGraphNodes(
-  compiledPlan: { nodes: Array<{ id: string; title: string; type: string; config: Record<string, unknown> }>; edges: Array<{ from: string; to: string }> },
-  _nodeStates?: Record<string, { status: string }>,
-) {
-  return compiledPlan.nodes.map((node) => ({
+export function enrichPlanGraphNodes(effectivePlan: EffectivePlanGraph) {
+  return effectivePlan.nodes.map((node) => ({
     ...node,
-    status: _nodeStates?.[node.id]?.status ?? "pending",
-    isReady: _nodeStates?.[node.id]?.status === "ready",
-    isDone: ["completed", "skipped"].includes(_nodeStates?.[node.id]?.status ?? ""),
-    isBlocked: _nodeStates?.[node.id]?.status === "blocked",
-    dependencies: compiledPlan.edges.filter((edge) => edge.to === node.id).map((edge) => edge.from),
+    isReady: node.ready,
+    isDone: ["completed", "skipped"].includes(node.status),
+    isBlocked:
+      node.status === "blocked" ||
+      node.status === "waiting" ||
+      node.status === "waiting_for_user" ||
+      node.status === "waiting_for_approval",
     executionClassification:
-      node.config?.checkpointType === "approve"
+      node.waitKind === "approval" || node.waitKind === "review"
         ? "review_gate"
-        : node.config?.checkpointType === "input"
+        : node.waitKind === "user_input"
           ? "human_dependent"
-          : _nodeStates?.[node.id]?.status === "waiting_for_approval"
-            ? "review_gate"
-            : _nodeStates?.[node.id]?.status === "waiting_for_user"
-              ? "human_dependent"
-              : "automatic_standalone",
+          : "automatic_standalone",
     readiness:
-      _nodeStates?.[node.id]?.status === "ready"
+      node.ready
         ? "ready"
-        : _nodeStates?.[node.id]?.status === "waiting_for_approval" || _nodeStates?.[node.id]?.status === "waiting_for_user"
+        : node.status === "waiting" ||
+            node.status === "waiting_for_user" ||
+            node.status === "waiting_for_approval"
           ? "waiting"
-          : compiledPlan.edges.some((edge) => edge.to === node.id)
+          : node.dependencies.length > 0
             ? "blocked"
             : "ready",
     nextAction:
-      node.config?.checkpointType === "approve" || _nodeStates?.[node.id]?.status === "waiting_for_approval"
+      node.waitKind === "approval" || node.waitKind === "review"
         ? "Review and approve this step's output before continuing"
-        : node.config?.checkpointType === "input" || _nodeStates?.[node.id]?.status === "waiting_for_user"
+        : node.waitKind === "user_input"
           ? "Provide required information to proceed"
-          : compiledPlan.edges.some((edge) => edge.to === node.id)
+          : node.dependencies.length > 0 && !node.ready
             ? "Blocked: resolve dependencies first"
             : "Ready to auto-start",
   }));
 }
 
 export function getReadyAutoRunnableNodes(
-  compiledPlan: CompiledPlan,
-  layers: PlanOverlayLayer[],
-) {
-  const effective = resolveEffectivePlanGraph(compiledPlan, layers);
-  const autoReadyNodeIds = effective.readyNodeIds.filter((nodeId) => {
-    const node = effective.nodes.find((n) => n.id === nodeId);
-    return node && node.mode !== "manual";
-  });
-  return autoReadyNodeIds.map((nodeId) => {
-    const node = effective.nodes.find((n) => n.id === nodeId)!;
-    return { nodeId, title: node.title, type: node.type, isReady: true };
-  });
+  effectivePlan: EffectivePlanGraph,
+): Array<{ nodeId: string; title: string; type: string; isReady: true }> {
+  return effectivePlan.nodes
+    .filter((node) => node.ready && node.mode !== "manual")
+    .map((node) => ({ nodeId: node.id, title: node.title, type: node.type, isReady: true }));
 }

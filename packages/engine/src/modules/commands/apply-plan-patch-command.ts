@@ -1,21 +1,23 @@
 import { db } from "@/lib/db";
+import { getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import {
-  getLatestCompiledPlan,
-  saveCompiledPlan,
-  getEditablePlan,
-} from "@/modules/plan-execution/compiled-plan-store";
-import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
+  createPlanGraphFromCompiledPlan,
+  getPlanRun,
+  savePlanRun,
+} from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
-import { applyPlanPatch, compileEditablePlan } from "@chrona/domain";
-import { upgradeBlueprintToEditable } from "@chrona/contracts/ai";
 import type {
-  PlanPatch,
-  PlanPatchOperation,
+  EditableCheckpointNode,
+  EditableConditionNode,
   EditableNode,
   EditableTaskNode,
-  EditableEdge,
-  StructuralLayer,
-  PlanOverlayLayer,
+  EditableWaitNode,
+  GraphMutationOperation,
+  GraphMutationRequest,
+  NodeDefinition,
+  NodeResult,
+  PlanEdge,
+  PlanGraph,
 } from "@chrona/contracts/ai";
 
 type PlanPatchInput = {
@@ -38,210 +40,464 @@ function rawToTaskNode(raw: Record<string, unknown>, id: string): EditableTaskNo
     mode: (typeof raw.executionMode === "string" && raw.executionMode === "manual"
       ? "manual"
       : typeof raw.executionMode === "string" && raw.executionMode === "hybrid"
-      ? "assist"
-      : "auto") as "auto" | "assist" | "manual",
+        ? "assist"
+        : "auto") as "auto" | "assist" | "manual",
     ...(typeof raw.estimatedMinutes === "number" ? { estimatedMinutes: raw.estimatedMinutes } : {}),
     ...(typeof raw.objective === "string" ? { expectedOutput: raw.objective } : {}),
   };
 }
 
-function _rawToEdge(raw: Record<string, unknown>, _id: string): EditableEdge {
-  return {
-    from: raw.fromNodeId as string,
-    to: raw.toNodeId as string,
-  };
+function editableNodeToDefinition(node: EditableNode): NodeDefinition {
+  switch (node.type) {
+    case "checkpoint":
+      return {
+        title: node.title,
+        objective: node.prompt,
+        semantics: {
+          type: "checkpoint",
+          metadata: {
+            checkpointType: node.checkpointType,
+            required: node.required,
+            options: node.options,
+            inputFields: node.inputFields,
+          },
+        },
+      };
+    case "condition":
+      return {
+        title: node.title,
+        objective: node.condition,
+        semantics: {
+          type: "condition",
+          metadata: {
+            evaluationBy: node.evaluationBy,
+            branches: node.branches,
+            defaultNextNodeId: node.defaultNextNodeId,
+          },
+        },
+      };
+    case "wait":
+      return {
+        title: node.title,
+        objective: node.waitFor,
+        estimatedMinutes: node.estimatedMinutes,
+        semantics: {
+          type: "wait",
+          metadata: {
+            timeout: node.timeout,
+          },
+        },
+      };
+    case "task":
+    default:
+      return {
+        title: node.title,
+        objective: node.expectedOutput ?? node.title,
+        estimatedMinutes: node.estimatedMinutes,
+        executor: node.executor,
+        semantics: {
+          type: "task",
+          mode: node.mode,
+          metadata: {
+            completionCriteria: node.completionCriteria,
+          },
+        },
+      };
+  }
 }
 
-export async function applyPlanPatchCommand(input: PlanPatchInput) {
-  const { taskId } = input;
+function nodeDefinitionToEditablePatch(definition: NodeDefinition): Partial<EditableNode> {
+  return {
+    title: definition.title,
+    description: definition.description,
+    estimatedMinutes: definition.estimatedMinutes,
+    ...(definition.semantics.type === "task"
+      ? { expectedOutput: definition.objective }
+      : {}),
+  } as Partial<EditableNode>;
+}
 
+function collectDownstreamNodeIds(graph: PlanGraph, startNodeIds: string[]): string[] {
+  const activeEdges = graph.edges.filter(
+    (edge) => edge.active && (edge.type === "hard_dependency" || edge.type === "ordering"),
+  );
+  const queue = [...startNodeIds];
+  const seen = new Set(startNodeIds);
+  const descendants = new Set<string>();
+
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    for (const edge of activeEdges) {
+      if (edge.fromNodeId !== nodeId || seen.has(edge.toNodeId)) {
+        continue;
+      }
+      seen.add(edge.toNodeId);
+      descendants.add(edge.toNodeId);
+      queue.push(edge.toNodeId);
+    }
+  }
+
+  return [...descendants];
+}
+
+function markCurrentResults(
+  results: NodeResult[],
+  nodeIds: string[],
+  nextStatus: NonNullable<NodeResult["status"]>,
+): NodeResult[] {
+  const targetIds = new Set(nodeIds);
+  return results.map((result) =>
+    result.nodeId && targetIds.has(result.nodeId) && result.status === "current"
+      ? { ...result, status: nextStatus }
+      : result,
+  );
+}
+
+function cancelRunningAttempts(attempts: Awaited<ReturnType<typeof getPlanRun>> extends infer T ? T extends { attempts: infer A } ? A : never : never, nodeIds: string[], reason: string) {
+  const targetIds = new Set(nodeIds);
+  const finishedAt = new Date().toISOString();
+  return attempts.map((attempt) =>
+    targetIds.has(attempt.nodeId) && attempt.status === "running"
+      ? {
+          ...attempt,
+          status: "cancelled" as const,
+          finishedAt,
+          error: { code: "MUTATION_CANCELLED", message: reason },
+        }
+      : attempt,
+  );
+}
+
+function pushInvalidationLayer(graph: PlanGraph, nodeId: string, reason: string, mutationId: string) {
+  const timestamp = new Date().toISOString();
+  graph.nodes = graph.nodes.map((node) =>
+    node.id !== nodeId
+      ? node
+      : {
+          ...node,
+          updatedAt: timestamp,
+          layers: [
+            ...node.layers,
+            {
+              id: `invalidate_${mutationId}_${nodeId}`,
+              nodeId,
+              type: "invalidation",
+              createdAt: timestamp,
+              createdBy: "system",
+              reason,
+              invalidatedByMutationId: mutationId,
+            },
+          ],
+        },
+  );
+}
+
+function pushDefinitionLayer(graph: PlanGraph, nodeId: string, definition: NodeDefinition, reason: string) {
+  const timestamp = new Date().toISOString();
+  graph.nodes = graph.nodes.map((node) => {
+    if (node.id !== nodeId) {
+      return node;
+    }
+    return {
+      ...node,
+      updatedAt: timestamp,
+      layers: [
+        ...node.layers,
+        {
+          id: `definition_${graph.id}_${nodeId}_${Date.now()}`,
+          nodeId,
+          type: "definition",
+          createdAt: timestamp,
+          createdBy: "user",
+          reason,
+          definition,
+        },
+      ],
+    };
+  });
+}
+
+function getActiveDefinition(node: PlanGraph["nodes"][number]): NodeDefinition {
+  const layer = [...node.layers].reverse().find((candidate) => candidate.type === "definition");
+  if (!layer || layer.type !== "definition") {
+    throw new Error(`Node ${node.id} has no definition layer`);
+  }
+  return structuredClone(layer.definition);
+}
+
+function updateEdge(graph: PlanGraph, edgeId: string, patch: Partial<Pick<PlanEdge, "active" | "label" | "type">>) {
+  const timestamp = new Date().toISOString();
+  let found = false;
+  graph.edges = graph.edges.map((edge) => {
+    if (edge.id !== edgeId) {
+      return edge;
+    }
+    found = true;
+    return { ...edge, ...patch, updatedAt: timestamp };
+  });
+  if (!found) {
+    throw new Error(`Unknown edge id: ${edgeId}`);
+  }
+}
+
+async function ensureGraphRuntime(taskId: string) {
   const task = await db.task.findUnique({ where: { id: taskId } });
   if (!task) {
     throw new Error("Task not found");
   }
-
-  // Load current editable plan
-  let editablePlan = await getEditablePlan(taskId);
-  const currentCompiled = await getLatestCompiledPlan(taskId);
-
-  if (!editablePlan && !currentCompiled) {
+  const saved = await getLatestCompiledPlan(taskId);
+  if (!saved) {
     throw new Error("No plan found for this task");
   }
-
-  // If we have a compiled plan but no editable plan, derive one from an empty blueprint
-  if (!editablePlan) {
-    editablePlan = upgradeBlueprintToEditable(
-      { nodes: [{ id: "placeholder", type: "task", title: "Placeholder" }], edges: [], title: "Plan", goal: "" },
-      currentCompiled!.compiledPlan.editablePlanId,
-      1,
-    );
-  }
-
-  // Build PlanPatch from command input
-  const operations: PlanPatchOperation[] = [];
-  const existingIds = new Set(editablePlan.nodes.map((n) => n.id));
-
-  switch (input.operation) {
-    case "add_node": {
-      if (!input.nodes || input.nodes.length === 0) {
-        throw new Error("add_node requires nodes[]");
-      }
-      for (let i = 0; i < input.nodes.length; i++) {
-        const raw = input.nodes[i];
-        const nodeId = typeof raw.id === "string" && raw.id.trim()
-          ? raw.id
-          : `node-${Date.now()}-${i}`;
-        const node = rawToTaskNode(raw, nodeId);
-        operations.push({ op: "add_node", node });
-        if (input.edges && input.edges.length > 0) {
-          for (const rawEdge of input.edges) {
-            const fromId = rawEdge.fromNodeId as string;
-            const toId = rawEdge.toNodeId as string;
-            if (existingIds.has(fromId) || fromId === nodeId) {
-              if (existingIds.has(toId) || toId === nodeId) {
-                operations.push({ op: "add_edge", edge: { from: fromId, to: toId } });
-              }
-            }
-          }
-        }
-      }
-      break;
-    }
-    case "update_node": {
-      if (!input.nodePatches || input.nodePatches.length === 0) {
-        throw new Error("update_node requires nodePatches[]");
-      }
-      const unknownIds = input.nodePatches
-        .map((p) => p.id)
-        .filter((id) => !existingIds.has(id));
-      if (unknownIds.length > 0) {
-        throw new Error(`Unknown node id(s): ${unknownIds.join(", ")}`);
-      }
-      for (const p of input.nodePatches) {
-        const patch: Record<string, unknown> = {};
-        if (typeof p.title === "string") patch.title = p.title;
-        if (typeof p.objective === "string") patch.expectedOutput = p.objective;
-        if (typeof p.description === "string") patch.description = p.description;
-        if (typeof p.estimatedMinutes === "number") patch.estimatedMinutes = p.estimatedMinutes;
-        if (Object.keys(patch).length > 0) {
-          operations.push({ op: "update_node", nodeId: p.id, patch: patch as unknown as EditableNode });
-        }
-      }
-      break;
-    }
-    case "delete_node": {
-      if (!input.deletedNodeIds || input.deletedNodeIds.length === 0) {
-        throw new Error("delete_node requires deletedNodeIds[]");
-      }
-      for (const id of input.deletedNodeIds) {
-        if (!existingIds.has(id)) {
-          throw new Error(`Unknown node id: ${id}`);
-        }
-        operations.push({ op: "delete_node", nodeId: id });
-      }
-      break;
-    }
-    case "update_dependencies": {
-      if (!input.edges || input.edges.length === 0) {
-        throw new Error("update_dependencies requires edges[]");
-      }
-      // Replace all edges: delete old, add new
-      for (const edge of editablePlan.edges) {
-        operations.push({ op: "delete_edge", from: edge.from, to: edge.to });
-      }
-      for (const rawEdge of input.edges) {
-        const fromId = rawEdge.fromNodeId as string;
-        const toId = rawEdge.toNodeId as string;
-        if (!existingIds.has(fromId) && !(input.nodes?.some((n) => n.id === fromId))) {
-          throw new Error(`Unknown fromNodeId: ${fromId}`);
-        }
-        if (!existingIds.has(toId) && !(input.nodes?.some((n) => n.id === toId))) {
-          throw new Error(`Unknown toNodeId: ${toId}`);
-        }
-        operations.push({ op: "add_edge", edge: { from: fromId, to: toId } });
-      }
-      break;
-    }
-    case "update_plan_summary": {
-      if (input.summary !== undefined) {
-        operations.push({ op: "update_plan", patch: { title: editablePlan.title, goal: input.summary } });
-      }
-      break;
-    }
-    default:
-      throw new Error(`Unsupported plan operation: ${input.operation}`);
-  }
-
-  if (operations.length === 0) {
-    return { taskId, operation: input.operation, compiledPlan: currentCompiled?.compiledPlan ?? null };
-  }
-
-  // Apply patch to editable plan (immutable)
-  const patch: PlanPatch = {
-    basePlanId: editablePlan.id,
-    baseVersion: editablePlan.version,
-    rationale: `Applied plan patch: ${input.operation}`,
-    operations,
+  const persisted = await getPlanRun(taskId, saved.compiledPlan.editablePlanId);
+  return {
+    task,
+    saved,
+    persisted,
+    graph:
+      structuredClone(
+        persisted?.graph ??
+          createPlanGraphFromCompiledPlan({ taskId, compiledPlan: saved.compiledPlan }),
+      ),
+    attempts: structuredClone(persisted?.attempts ?? []),
+    results: structuredClone(persisted?.results ?? []),
+    executionContextSnapshots: structuredClone(persisted?.executionContextSnapshots ?? []),
   };
+}
 
-  const result = applyPlanPatch(editablePlan, patch);
-  if (!result.ok) {
-    throw new Error(result.error ?? "Failed to apply plan patch");
+export async function applyPlanMutationCommand(input: {
+  taskId: string;
+  mutation: GraphMutationRequest;
+}) {
+  const state = await ensureGraphRuntime(input.taskId);
+  const { graph } = state;
+  const mutationId = `mutation_${graph.id}_${Date.now()}`;
+  const affectedNodeIds = new Set<string>();
+  const invalidationRoots = new Set<string>();
+
+  if (input.mutation.expectedGraphId && input.mutation.expectedGraphId !== graph.id) {
+    throw new Error(`Graph mismatch: expected ${input.mutation.expectedGraphId}, got ${graph.id}`);
+  }
+  if (
+    input.mutation.expectedRevision !== undefined &&
+    input.mutation.expectedRevision !== graph.mutations.length
+  ) {
+    throw new Error(`Graph revision mismatch: expected ${input.mutation.expectedRevision}, got ${graph.mutations.length}`);
   }
 
-  // Recompile
-  const newCompiledPlan = compileEditablePlan(result.plan!);
+  for (const operation of input.mutation.operations) {
+    switch (operation.type) {
+      case "add_node": {
+        if (graph.nodes.some((node) => node.id === operation.nodeId)) {
+          throw new Error(`Node ${operation.nodeId} already exists`);
+        }
+        graph.nodes.push({
+          id: operation.nodeId,
+          semanticKey: operation.semanticKey,
+          layers: [structuredClone(operation.definitionLayer)],
+          createdAt: operation.definitionLayer.createdAt,
+          updatedAt: operation.definitionLayer.createdAt,
+        });
+        affectedNodeIds.add(operation.nodeId);
+        break;
+      }
+      case "push_node_layer": {
+        const node = graph.nodes.find((candidate) => candidate.id === operation.nodeId);
+        if (!node) {
+          throw new Error(`Unknown node id: ${operation.nodeId}`);
+        }
+        node.layers.push(structuredClone(operation.layer));
+        node.updatedAt = new Date().toISOString();
+        affectedNodeIds.add(operation.nodeId);
+        if (operation.layer.type === "definition") {
+          invalidationRoots.add(operation.nodeId);
+        }
+        break;
+      }
+      case "add_edge":
+        graph.edges.push(structuredClone(operation.edge));
+        affectedNodeIds.add(operation.edge.fromNodeId);
+        affectedNodeIds.add(operation.edge.toNodeId);
+        invalidationRoots.add(operation.edge.fromNodeId);
+        break;
+      case "remove_edge": {
+        const edge = graph.edges.find((candidate) => candidate.id === operation.edgeId);
+        if (!edge) {
+          throw new Error(`Unknown edge id: ${operation.edgeId}`);
+        }
+        updateEdge(graph, operation.edgeId, { active: false });
+        affectedNodeIds.add(edge.fromNodeId);
+        affectedNodeIds.add(edge.toNodeId);
+        invalidationRoots.add(edge.fromNodeId);
+        break;
+      }
+      case "update_edge": {
+        const edge = graph.edges.find((candidate) => candidate.id === operation.edgeId);
+        if (!edge) {
+          throw new Error(`Unknown edge id: ${operation.edgeId}`);
+        }
+        updateEdge(graph, operation.edgeId, operation.patch);
+        affectedNodeIds.add(edge.fromNodeId);
+        affectedNodeIds.add(edge.toNodeId);
+        invalidationRoots.add(edge.fromNodeId);
+        break;
+      }
+      case "delete_node": {
+        if (!graph.nodes.some((node) => node.id === operation.nodeId)) {
+          throw new Error(`Unknown node id: ${operation.nodeId}`);
+        }
+        graph.edges = graph.edges.map((edge) =>
+          edge.fromNodeId === operation.nodeId || edge.toNodeId === operation.nodeId
+            ? { ...edge, active: false, updatedAt: new Date().toISOString() }
+            : edge,
+        );
+        graph.nodes = graph.nodes.filter((node) => node.id !== operation.nodeId);
+        affectedNodeIds.add(operation.nodeId);
+        invalidationRoots.add(operation.nodeId);
+        break;
+      }
+    }
+  }
 
-  // Save compiled plan
-  await saveCompiledPlan({
-    workspaceId: task.workspaceId,
-    taskId,
-    compiledPlan: newCompiledPlan,
-    editablePlan: result.plan!,
-    status: "draft",
-    prompt: currentCompiled?.prompt ?? null,
-    summary: result.plan!.goal ?? currentCompiled?.summary ?? null,
-    generatedBy: currentCompiled?.generatedBy ?? null,
+  const invalidatedNodeIds = collectDownstreamNodeIds(graph, [...invalidationRoots]);
+  state.attempts = cancelRunningAttempts(
+    state.attempts,
+    [...new Set([...affectedNodeIds, ...invalidatedNodeIds])],
+    input.mutation.reason,
+  );
+  state.results = markCurrentResults(state.results, [...affectedNodeIds], "obsolete");
+  state.results = markCurrentResults(state.results, invalidatedNodeIds, "invalidated");
+
+  for (const nodeId of invalidatedNodeIds) {
+    pushInvalidationLayer(graph, nodeId, input.mutation.reason, mutationId);
+  }
+
+  graph.updatedAt = new Date().toISOString();
+  graph.mutations.push({
+    id: mutationId,
+    graphId: graph.id,
+    createdAt: new Date().toISOString(),
+    createdBy: "user",
+    reason: input.mutation.reason,
+    operations: input.mutation.operations,
+    affectedNodeIds: [...affectedNodeIds],
+    invalidatedNodeIds,
   });
 
-  // Create structural layer + PlanRun
-  const structuralLayer: StructuralLayer = {
-    type: "structural",
-    planId: newCompiledPlan.editablePlanId,
-    timestamp: new Date().toISOString(),
-    layerId: `struct_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    version: 1,
-    active: true,
-    source: "user",
-    operations: operations.map((op) => {
-      const structuralOp: Record<string, unknown> = { op: op.op };
-      if ("nodeId" in op) structuralOp.nodeId = op.nodeId;
-      if ("from" in op) structuralOp.from = op.from;
-      if ("to" in op) structuralOp.to = op.to;
-      if ("node" in op) structuralOp.data = op.node;
-      if ("patch" in op) structuralOp.data = op.patch;
-      if ("edge" in op) {
-        structuralOp.from = op.edge.from;
-        structuralOp.to = op.edge.to;
-      }
-      return structuralOp as never;
-    }) as StructuralLayer["operations"],
-  };
-
-  // Create new run with structural layer
-  const structuralLayers: PlanOverlayLayer[] = [structuralLayer];
-  const run = createPlanRunFromCompiledPlan(newCompiledPlan, structuralLayers);
   await savePlanRun({
-    workspaceId: task.workspaceId,
-    taskId,
-    planId: newCompiledPlan.editablePlanId,
-    run,
-    layers: structuralLayers,
+    workspaceId: state.task.workspaceId,
+    taskId: input.taskId,
+    planId: state.saved.compiledPlan.editablePlanId,
+    run: state.persisted?.planRun ?? createPlanRunFromCompiledPlan(state.saved.compiledPlan),
+    compiledPlan: state.saved.compiledPlan,
+    graph,
+    attempts: state.attempts,
+    results: state.results,
+    executionContextSnapshots: state.executionContextSnapshots,
   });
 
   return {
-    taskId,
+    taskId: input.taskId,
+    graphId: graph.id,
+    revision: graph.mutations.length,
+    affectedNodeIds: [...affectedNodeIds],
+    invalidatedNodeIds,
+  };
+}
+
+function toGraphMutationOperation(input: {
+  operation: PlanPatchInput["operation"];
+  taskId: string;
+  nodes?: PlanPatchInput["nodes"];
+  edges?: PlanPatchInput["edges"];
+  nodePatches?: PlanPatchInput["nodePatches"];
+  deletedNodeIds?: PlanPatchInput["deletedNodeIds"];
+}): GraphMutationOperation[] {
+  switch (input.operation) {
+    case "add_node":
+      return (input.nodes ?? []).map((raw, index) => {
+        const nodeId = typeof raw.id === "string" && raw.id.trim() ? raw.id : `node-${Date.now()}-${index}`;
+        const editableNode = rawToTaskNode(raw, nodeId);
+        return {
+          type: "add_node",
+          nodeId,
+          semanticKey: nodeId,
+          definitionLayer: {
+            id: `definition_${nodeId}_${Date.now()}`,
+            nodeId,
+            type: "definition",
+            createdAt: new Date().toISOString(),
+            createdBy: "user",
+            definition: editableNodeToDefinition(editableNode),
+          },
+        } satisfies GraphMutationOperation;
+      });
+    case "update_node":
+      return (input.nodePatches ?? []).map((patch) => ({
+        type: "push_node_layer",
+        nodeId: patch.id,
+        layer: {
+          id: `definition_${patch.id}_${Date.now()}`,
+          nodeId: patch.id,
+          type: "definition",
+          createdAt: new Date().toISOString(),
+          createdBy: "user",
+          definition: {
+            title: typeof patch.title === "string" ? patch.title : patch.id,
+            objective: typeof patch.objective === "string" ? patch.objective : patch.id,
+            description: typeof patch.description === "string" ? patch.description : undefined,
+            estimatedMinutes: typeof patch.estimatedMinutes === "number" ? patch.estimatedMinutes : undefined,
+            semantics: {
+              type: "task",
+            },
+          },
+        },
+      }));
+    case "delete_node":
+      return (input.deletedNodeIds ?? []).map((nodeId) => ({ type: "delete_node", nodeId }));
+    case "update_dependencies":
+      return (input.edges ?? []).map((edge, index) => ({
+        type: "add_edge",
+        edge: {
+          id: `edge_${Date.now()}_${index}`,
+          fromNodeId: edge.fromNodeId as string,
+          toNodeId: edge.toNodeId as string,
+          type: "hard_dependency",
+          active: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      }));
+    default:
+      return [];
+  }
+}
+
+export async function applyPlanPatchCommand(input: PlanPatchInput) {
+  const operations = toGraphMutationOperation({
     operation: input.operation,
-    compiledPlan: newCompiledPlan,
+    taskId: input.taskId,
+    nodes: input.nodes,
+    edges: input.edges,
+    nodePatches: input.nodePatches,
+    deletedNodeIds: input.deletedNodeIds,
+  });
+
+  if (operations.length === 0 && input.operation !== "update_plan_summary") {
+    throw new Error(`Unsupported plan operation: ${input.operation}`);
+  }
+
+  const result = await applyPlanMutationCommand({
+    taskId: input.taskId,
+    mutation: {
+      reason: input.summary ?? `Applied plan operation: ${input.operation}`,
+      operations,
+      scope: "future_only",
+    },
+  });
+
+  return {
+    operation: input.operation,
+    ...result,
   };
 }

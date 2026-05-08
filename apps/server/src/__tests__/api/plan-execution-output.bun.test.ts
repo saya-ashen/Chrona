@@ -189,7 +189,10 @@ describe("executePlanNode output persistence", () => {
     expect(entries[1].content).toBe(outputContent);
 
     // Verify the run status was set to Completed (output was produced)
-    const run = await db.run.findUniqueOrThrow({ where: { id: result.evidence!.runId! } });
+    const run = await db.run.findFirstOrThrow({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+    });
     expect(run.status).toBe(RunStatus.Completed);
     expect(run.runtimeRunRef).not.toBeNull();
   });
@@ -211,18 +214,22 @@ describe("executePlanNode output persistence", () => {
       runtimeName: "openclaw",
     });
 
-    expect(result.status).toBe("done");
+    expect(result.status).toBe("failed");
 
     // The user prompt (instructions) is saved, but the assistant message
     // has empty content and is filtered out — so only 1 entry.
+    const failedResult = result as Extract<typeof result, { status: "failed" }>;
     const entries = await db.conversationEntry.findMany({
-      where: { runId: result.evidence?.runId },
+      where: { runId: failedResult.evidence?.runId },
     });
     expect(entries.length).toBe(1);
     expect(entries[0].role).toBe("user");
 
     // Run should be marked as Failed because there's no assistant output
-    const run = await db.run.findUniqueOrThrow({ where: { id: result.evidence!.runId! } });
+    const run = await db.run.findFirstOrThrow({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+    });
     expect(run.status).toBe(RunStatus.Failed);
   });
 

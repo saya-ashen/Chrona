@@ -577,12 +577,15 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
 
     expect(res.status).toBe(201);
     const body = await json<{ followUpTaskId: string }>(res);
-    const followUp = await db.task.findUniqueOrThrow({ where: { id: body.followUpTaskId } });
+    const followUp = await db.task.findUniqueOrThrow({
+      where: { id: body.followUpTaskId },
+      include: { projection: true },
+    });
     expect(followUp.parentTaskId).toBe(taskId);
     expect(followUp.prompt).toBe("Parent prompt");
     expect(followUp.runtimeAdapterKey).toBe("openclaw");
     expect(followUp.status).toBe(TaskStatus.Ready);
-    expect(followUp.scheduleStatus).toBe("Unscheduled");
+    expect(followUp.projection?.scheduleStatus).toBe("Unscheduled");
   });
 
   it("returns 400 when title is missing", async () => {

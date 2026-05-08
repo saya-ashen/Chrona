@@ -53,8 +53,25 @@ function buildInstructions(input: NodeExecutorInput): string {
     .filter((n) => n.status === "completed" || n.status === "skipped")
     .map((n) => n.title);
 
-  const nodeConfig = input.node.config as Record<string, unknown>;
-  const objective = typeof nodeConfig.objective === "string" ? nodeConfig.objective : input.node.title;
+  const nodeConfig =
+    input.node.config && typeof input.node.config === "object"
+      ? (input.node.config as Record<string, unknown>)
+      : {};
+  const definitionObjective =
+    input.node.definition && typeof input.node.definition === "object"
+      ? input.node.definition.objective
+      : undefined;
+  const legacyNode = input.node as unknown as Record<string, unknown>;
+  const legacyObjective =
+    typeof legacyNode.objective === "string" ? legacyNode.objective : undefined;
+  const objective =
+    typeof nodeConfig.objective === "string"
+      ? nodeConfig.objective
+      : typeof definitionObjective === "string"
+        ? definitionObjective
+        : typeof legacyObjective === "string"
+          ? legacyObjective
+        : input.node.title;
 
   return [
     `Task: ${input.plan.planId}`,

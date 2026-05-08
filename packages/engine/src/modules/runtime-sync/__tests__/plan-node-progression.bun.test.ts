@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
@@ -43,6 +43,10 @@ describe("runtime sync triggers plan progression", () => {
   beforeEach(async () => {
     progressAcceptedTaskPlanMock.mockClear();
     await resetDb();
+  });
+
+  afterAll(() => {
+    mock.restore();
   });
 
   it("calls plan progression after child completion and preserves updated accepted plan node state", async () => {

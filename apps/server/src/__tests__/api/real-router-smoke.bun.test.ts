@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
+import { saveCompiledPlan } from "@chrona/engine";
+import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 import { createApiRouter } from "../../routes/api";
 import {
   expectApiError,
   json,
   resetTestDb,
-  seedAcceptedPlan,
   seedTask,
   seedWorkspace,
 } from "../bun-test-helpers";
@@ -16,6 +17,76 @@ function app() {
   const server = new Hono();
   server.route("/api", createApiRouter());
   return server;
+}
+
+function makeSmokeCompiledPlan(planId: string): CompiledPlan {
+  const reviewConfig: ConditionConfig = {
+    condition: "Choose execution path",
+    evaluationBy: "user",
+    branches: [{ label: "continue", nextNodeId: "draft_summary" }],
+  };
+
+  return {
+    id: `compiled_${planId}`,
+    editablePlanId: planId,
+    sourceVersion: 1,
+    title: "Smoke plan",
+    goal: "Materialize child tasks through production router",
+    assumptions: [],
+    nodes: [
+      {
+        id: "collect_inputs",
+        localId: "collect_inputs",
+        type: "task",
+        title: "Collect inputs",
+        description: "Gather the necessary context",
+        config: { expectedOutput: "Collected inputs" },
+        dependencies: [],
+        dependents: ["draft_summary"],
+        mode: "auto",
+        executor: "ai",
+        priority: "High",
+      },
+      {
+        id: "draft_summary",
+        localId: "draft_summary",
+        type: "task",
+        title: "Draft summary",
+        description: "Prepare the final summary",
+        config: { expectedOutput: "Draft summary" },
+        dependencies: ["collect_inputs"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+        priority: "Medium",
+      },
+      {
+        id: "review_gate",
+        localId: "review_gate",
+        type: "condition",
+        title: "Review gate",
+        description: "Keep one non-materialized node in the graph",
+        config: reviewConfig,
+        dependencies: [],
+        dependents: [],
+        mode: "manual",
+        executor: "user",
+        priority: "Medium",
+      },
+    ],
+    edges: [
+      {
+        id: "edge_collect_to_draft",
+        from: "collect_inputs",
+        to: "draft_summary",
+      },
+    ],
+    entryNodeIds: ["collect_inputs", "review_gate"],
+    terminalNodeIds: ["draft_summary", "review_gate"],
+    topologicalOrder: ["collect_inputs", "draft_summary", "review_gate"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
 }
 
 describe("Real router smoke", () => {
@@ -86,12 +157,22 @@ describe("Real router smoke", () => {
   it("runs plan accept and materialize through the production router", async () => {
     const { workspaceId } = await seedWorkspace("Real Router Plan");
     const { taskId } = await seedTask(workspaceId, { title: "Plan parent" });
-    const { planId } = await seedAcceptedPlan(taskId, workspaceId);
+    const compiledPlan = makeSmokeCompiledPlan("real-router-plan");
+
+    await saveCompiledPlan({
+      workspaceId,
+      taskId,
+      compiledPlan,
+      status: "draft",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "real-router-smoke",
+    });
 
     const acceptRes = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, workspaceId }),
+      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId }),
     });
     expect(acceptRes.status).toBe(200);
 
@@ -102,7 +183,7 @@ describe("Real router smoke", () => {
       savedPlan: { id: string; status: string; compiledPlan: { nodes: unknown[] } } | null;
     }>(stateRes);
     expect(stateBody.aiPlanGenerationStatus).toBe("accepted");
-    expect(stateBody.savedPlan?.id).toBe(planId);
+    expect(stateBody.savedPlan?.id).toBe(compiledPlan.editablePlanId);
     expect(stateBody.savedPlan?.compiledPlan.nodes.length).toBeGreaterThan(0);
 
     const applyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
@@ -114,12 +195,12 @@ describe("Real router smoke", () => {
     const applyBody = await json<{
       parentTaskId: string;
       childTasks: Array<{ parentTaskId: string }>;
-      materialization: { createdTaskIds: string[]; updatedNodeIds: string[]; skippedNodeIds: string[] };
+      planGraph: { nodes: Array<{ linkedTaskId?: string | null }> };
     }>(applyRes);
     expect(applyBody.parentTaskId).toBe(taskId);
     expect(applyBody.childTasks.length).toBe(2);
     expect(applyBody.childTasks.every((task) => task.parentTaskId === taskId)).toBe(true);
-    expect(applyBody.materialization.createdTaskIds.length).toBe(2);
+    expect(applyBody.planGraph.nodes.filter((node) => node.linkedTaskId).length).toBe(0);
 
     const reapplyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
       method: "POST",
@@ -127,11 +208,12 @@ describe("Real router smoke", () => {
       body: JSON.stringify({ workspaceId }),
     });
     expect(reapplyRes.status).toBe(201);
-    const reapplyBody = await json<{
-      materialization: { createdTaskIds: string[]; updatedNodeIds: string[]; skippedNodeIds: string[] };
-    }>(reapplyRes);
-    expect(reapplyBody.materialization.createdTaskIds).toHaveLength(0);
-    expect(reapplyBody.materialization.updatedNodeIds.length).toBeGreaterThan(0);
+
+    const childTasks = await db.task.findMany({
+      where: { parentTaskId: taskId },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(childTasks).toHaveLength(2);
   });
 
   it("runs schedule proposal create, accept, and reject through the production router", async () => {

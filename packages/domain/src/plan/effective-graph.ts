@@ -1,6 +1,10 @@
 import type {
   CompiledPlan,
   CompiledNode,
+  PlanGraph,
+  PlanNode,
+  PlanEdge,
+  NodeLayer,
   PlanOverlayLayer,
   StructuralLayer,
   RuntimeLayer,
@@ -10,8 +14,9 @@ import type {
   EffectivePlanNode,
   EffectivePlanEdge,
   NodeResult,
-  NodeRuntimeState,
-  PlanRun,
+  NodeAttempt,
+  ResolveEffectivePlanGraphInput,
+  WaitKind,
 } from "@chrona/contracts/ai";
 
 // ─── Resolve ───
@@ -39,6 +44,24 @@ import type {
  * Pure function — no I/O, no mutation of inputs.
  */
 export function resolveEffectivePlanGraph(
+  basePlan: CompiledPlan,
+  layers: PlanOverlayLayer[],
+): EffectivePlanGraph;
+export function resolveEffectivePlanGraph(
+  input: ResolveEffectivePlanGraphInput,
+): EffectivePlanGraph;
+export function resolveEffectivePlanGraph(
+  basePlanOrInput: CompiledPlan | ResolveEffectivePlanGraphInput,
+  layers: PlanOverlayLayer[] = [],
+): EffectivePlanGraph {
+  if (isResolveInput(basePlanOrInput)) {
+    return resolveMutableEffectivePlanGraph(basePlanOrInput);
+  }
+
+  return resolveLegacyEffectivePlanGraph(basePlanOrInput, layers);
+}
+
+function resolveLegacyEffectivePlanGraph(
   basePlan: CompiledPlan,
   layers: PlanOverlayLayer[],
 ): EffectivePlanGraph {
@@ -171,8 +194,10 @@ export function resolveEffectivePlanGraph(
       : basePlan.sourceVersion;
 
   return {
+    graphId: basePlan.editablePlanId,
     planId: basePlan.editablePlanId,
     basePlanId: basePlan.id,
+    resolvedAt: new Date().toISOString(),
     resolvedVersion,
     nodes: [...nodeMap.values()],
     edges: [...edgeMap.values()],
@@ -182,6 +207,125 @@ export function resolveEffectivePlanGraph(
     blockedNodeIds,
     completedNodeIds,
     runningNodeIds,
+    invalidatedNodeIds: [],
+    failedNodeIds,
+    pendingNodeIds,
+  };
+}
+
+function resolveMutableEffectivePlanGraph(
+  input: ResolveEffectivePlanGraphInput,
+): EffectivePlanGraph {
+  const { graph, attempts = [], results = [] } = input;
+  const edgeMap = new Map<string, EffectivePlanEdge>();
+  const nodeMap = new Map<string, EffectivePlanNode>();
+
+  for (const edge of graph.edges) {
+    edgeMap.set(edge.id, {
+      id: edge.id,
+      from: edge.fromNodeId,
+      to: edge.toNodeId,
+      label: edge.label,
+      active: edge.active,
+    });
+  }
+
+  for (const node of graph.nodes) {
+    const effectiveNode = buildEffectiveNodeFromGraphNode(node, attempts, results);
+    if (effectiveNode) {
+      nodeMap.set(node.id, effectiveNode);
+    }
+  }
+
+  const entryNodeIds = computeGraphEntryNodeIds(nodeMap, edgeMap);
+  const reachableNodeIds = computeReachableNodeIds(entryNodeIds, edgeMap);
+  rebuildDependencies(nodeMap, edgeMap, reachableNodeIds);
+
+  const terminalNodeIds: string[] = [];
+  const readyNodeIds: string[] = [];
+  const blockedNodeIds: string[] = [];
+  const completedNodeIds: string[] = [];
+  const runningNodeIds: string[] = [];
+  const invalidatedNodeIds: string[] = [];
+  const failedNodeIds: string[] = [];
+  const pendingNodeIds: string[] = [];
+
+  for (const [nodeId, node] of nodeMap) {
+    const hasOutgoingEdges = [...edgeMap.values()].some(
+      (edge) => edge.active && edge.from === nodeId,
+    );
+    node.reachable = reachableNodeIds.has(nodeId);
+
+    if (node.reachable && !hasOutgoingEdges) {
+      terminalNodeIds.push(nodeId);
+    }
+
+    const allDepsSatisfied = node.dependencies.every((depId) => {
+      const dep = nodeMap.get(depId);
+      return (
+        dep?.status === "completed" ||
+        dep?.status === "skipped" ||
+        dep?.status === "invalidated"
+      );
+    });
+
+    node.dependenciesSatisfied = allDepsSatisfied;
+    node.ready =
+      node.reachable &&
+      allDepsSatisfied &&
+      (node.status === "pending" || node.status === "ready");
+
+    if (node.ready) {
+      readyNodeIds.push(nodeId);
+    }
+
+    switch (node.status) {
+      case "completed":
+      case "skipped":
+        completedNodeIds.push(nodeId);
+        break;
+      case "running":
+        runningNodeIds.push(nodeId);
+        break;
+      case "invalidated":
+        invalidatedNodeIds.push(nodeId);
+        break;
+      case "waiting":
+      case "waiting_for_user":
+      case "waiting_for_approval":
+      case "blocked":
+        blockedNodeIds.push(nodeId);
+        break;
+      case "failed":
+        failedNodeIds.push(nodeId);
+        break;
+      default:
+        if (!node.ready) {
+          pendingNodeIds.push(nodeId);
+        }
+        break;
+    }
+
+    if (node.ready) {
+      node.status = "ready";
+    }
+  }
+
+  return {
+    graphId: graph.id,
+    planId: graph.id,
+    basePlanId: graph.id,
+    resolvedAt: new Date().toISOString(),
+    resolvedVersion: graph.mutations.length,
+    nodes: [...nodeMap.values()],
+    edges: [...edgeMap.values()],
+    entryNodeIds,
+    terminalNodeIds,
+    readyNodeIds,
+    blockedNodeIds,
+    completedNodeIds,
+    runningNodeIds,
+    invalidatedNodeIds,
     failedNodeIds,
     pendingNodeIds,
   };
@@ -192,6 +336,23 @@ export function resolveEffectivePlanGraph(
 function cloneBaseNode(n: CompiledNode): EffectivePlanNode {
   return {
     id: n.id,
+    nodeId: n.id,
+    activeLayerId: null,
+    semanticKey: n.localId,
+    definition: {
+      title: n.title,
+      objective: n.description ?? n.title,
+      description: n.description,
+      semantics: {
+        type: n.type,
+        priority: n.priority,
+        mode: n.mode,
+        linkedTaskId: n.linkedTaskId,
+      },
+      executor: n.executor,
+      estimatedMinutes: n.estimatedMinutes,
+    },
+    invalidated: false,
     localId: n.localId,
     type: n.type,
     title: n.title,
@@ -210,7 +371,166 @@ function cloneBaseNode(n: CompiledNode): EffectivePlanNode {
     dependenciesSatisfied: false,
     ready: false,
     reachable: true,
+    reviewRequired: false,
   };
+}
+
+function isResolveInput(
+  value: CompiledPlan | ResolveEffectivePlanGraphInput,
+): value is ResolveEffectivePlanGraphInput {
+  return "graph" in value;
+}
+
+function buildEffectiveNodeFromGraphNode(
+  node: PlanNode,
+  attempts: NodeAttempt[],
+  results: NodeResult[],
+): EffectivePlanNode | null {
+  const activeDefinitionLayer = getActiveDefinitionLayer(node.layers);
+  if (!activeDefinitionLayer) {
+    return null;
+  }
+
+  const latestInvalidation = getLatestLayer(node.layers, "invalidation");
+  const latestCancellation = getLatestLayer(node.layers, "cancellation");
+  const nodeResults = results.filter((result) => result.nodeId === node.id);
+  const currentResult =
+    nodeResults.find(
+      (result) =>
+        result.nodeLayerId === activeDefinitionLayer.id &&
+        result.status === "current",
+    ) ??
+    [...nodeResults]
+      .filter((result) => result.nodeLayerId === activeDefinitionLayer.id)
+      .at(-1);
+  const activeAttempt = [...attempts]
+    .filter(
+      (attempt) =>
+        attempt.nodeId === node.id && attempt.nodeLayerId === activeDefinitionLayer.id,
+    )
+    .sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+  const semantics = activeDefinitionLayer.definition.semantics;
+  const status = deriveNodeStatus({
+    invalidated: Boolean(latestInvalidation),
+    cancelled: Boolean(latestCancellation),
+    activeAttempt,
+    result: currentResult,
+  });
+
+  return {
+    id: node.id,
+    nodeId: node.id,
+    activeLayerId: activeDefinitionLayer.id,
+    semanticKey: node.semanticKey,
+    definition: activeDefinitionLayer.definition,
+    invalidated: Boolean(latestInvalidation),
+    invalidationReason: latestInvalidation?.reason,
+    waitKind: currentResult?.waitKind,
+    reviewRequired: activeDefinitionLayer.definition.reviewRequired ?? false,
+    localId: node.semanticKey,
+    type: semantics.type,
+    title: activeDefinitionLayer.definition.title,
+    description: activeDefinitionLayer.definition.description,
+    priority: semantics.priority,
+    linkedTaskId: semantics.linkedTaskId,
+    config: (activeDefinitionLayer.definition.metadata ?? {}) as EffectivePlanNode["config"],
+    executor: activeDefinitionLayer.definition.executor,
+    mode: semantics.mode,
+    estimatedMinutes: activeDefinitionLayer.definition.estimatedMinutes,
+    dependencies: [],
+    dependents: [],
+    status,
+    attempts: activeAttempt?.attemptNumber ?? 0,
+    lastError: currentResult?.error ?? activeAttempt?.error?.message,
+    startedAt: activeAttempt?.startedAt,
+    completedAt: activeAttempt?.finishedAt,
+    result: currentResult,
+    blockedReason: currentResult?.error ?? latestInvalidation?.reason,
+    metadata: {
+      ...(semantics.metadata ?? {}),
+      ...(activeDefinitionLayer.definition.metadata ?? {}),
+    },
+    dependenciesSatisfied: false,
+    ready: false,
+    reachable: true,
+  };
+}
+
+function getActiveDefinitionLayer(layers: NodeLayer[]) {
+  return [...layers]
+    .reverse()
+    .find((layer): layer is Extract<NodeLayer, { type: "definition" }> => layer.type === "definition");
+}
+
+function getLatestLayer<TType extends NodeLayer["type"]>(
+  layers: NodeLayer[],
+  type: TType,
+): Extract<NodeLayer, { type: TType }> | undefined {
+  return [...layers]
+    .reverse()
+    .find((layer): layer is Extract<NodeLayer, { type: TType }> => layer.type === type);
+}
+
+function deriveNodeStatus(input: {
+  invalidated: boolean;
+  cancelled: boolean;
+  activeAttempt?: NodeAttempt;
+  result?: NodeResult;
+}): EffectivePlanNode["status"] {
+  if (input.invalidated || input.result?.status === "invalidated") {
+    return "invalidated";
+  }
+  if (input.cancelled) {
+    return "cancelled";
+  }
+  if (input.activeAttempt?.status === "running") {
+    return "running";
+  }
+  if (input.result?.waitKind) {
+    return mapWaitKindToNodeStatus(input.result.waitKind);
+  }
+  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
+    return "failed";
+  }
+  if (
+    input.result?.outputSummary !== undefined ||
+    input.result?.checkpointResponse !== undefined ||
+    input.result?.artifactRefs?.length ||
+    input.result?.selectedBranch !== undefined ||
+    input.result?.status === "current" ||
+    input.activeAttempt?.status === "succeeded"
+  ) {
+    return "completed";
+  }
+  return "pending";
+}
+
+function mapWaitKindToNodeStatus(waitKind: WaitKind): EffectivePlanNode["status"] {
+  switch (waitKind) {
+    case "user_input":
+      return "waiting_for_user";
+    case "approval":
+    case "review":
+      return "waiting_for_approval";
+    default:
+      return "waiting";
+  }
+}
+
+function computeGraphEntryNodeIds(
+  nodeMap: Map<string, EffectivePlanNode>,
+  edgeMap: Map<string, EffectivePlanEdge>,
+): string[] {
+  const entryNodeIds: string[] = [];
+  for (const nodeId of nodeMap.keys()) {
+    const hasIncomingEdges = [...edgeMap.values()].some(
+      (edge) => edge.active && edge.to === nodeId,
+    );
+    if (!hasIncomingEdges) {
+      entryNodeIds.push(nodeId);
+    }
+  }
+  return entryNodeIds;
 }
 
 function edgeKey(from: string, to: string): string {
@@ -225,8 +545,28 @@ function applyStructuralLayer(
   for (const op of operations) {
     switch (op.op) {
       case "add_node": {
+        const description = (op as { description?: string }).description;
+        const priority = (op as { priority?: string }).priority as import("@chrona/contracts/ai").TaskPriority | undefined;
+        const linkedTaskId = (op as { linkedTaskId?: string }).linkedTaskId;
         nodeMap.set(op.nodeId, {
           id: op.nodeId,
+          nodeId: op.nodeId,
+          activeLayerId: null,
+          semanticKey: op.localId,
+          definition: {
+            title: op.title,
+            objective: description ?? op.title,
+            description,
+            semantics: {
+              type: op.type,
+              priority,
+              mode: op.mode,
+              linkedTaskId,
+            },
+            executor: op.executor,
+            estimatedMinutes: op.estimatedMinutes,
+          },
+          invalidated: false,
           localId: op.localId,
           type: op.type,
           title: op.title,
@@ -241,22 +581,38 @@ function applyStructuralLayer(
           dependenciesSatisfied: false,
           ready: false,
           reachable: true,
+          reviewRequired: false,
           metadata: {},
-          description: (op as { description?: string }).description,
-          priority: (op as { priority?: string }).priority as import("@chrona/contracts/ai").TaskPriority | undefined,
-          linkedTaskId: (op as { linkedTaskId?: string }).linkedTaskId,
+          description,
+          priority,
+          linkedTaskId,
         });
         break;
       }
       case "update_node": {
         const node = nodeMap.get(op.nodeId);
         if (!node) break;
-        if (op.patch.title !== undefined) node.title = op.patch.title;
-        if (op.patch.type !== undefined) node.type = op.patch.type;
+        if (op.patch.title !== undefined) {
+          node.title = op.patch.title;
+          node.definition.title = op.patch.title;
+        }
+        if (op.patch.type !== undefined) {
+          node.type = op.patch.type;
+          node.definition.semantics.type = op.patch.type;
+        }
         if (op.patch.config !== undefined) Object.assign(node.config, op.patch.config);
-        if (op.patch.executor !== undefined) node.executor = op.patch.executor;
-        if (op.patch.mode !== undefined) node.mode = op.patch.mode;
-        if (op.patch.estimatedMinutes !== undefined) node.estimatedMinutes = op.patch.estimatedMinutes;
+        if (op.patch.executor !== undefined) {
+          node.executor = op.patch.executor;
+          node.definition.executor = op.patch.executor;
+        }
+        if (op.patch.mode !== undefined) {
+          node.mode = op.patch.mode;
+          node.definition.semantics.mode = op.patch.mode;
+        }
+        if (op.patch.estimatedMinutes !== undefined) {
+          node.estimatedMinutes = op.patch.estimatedMinutes;
+          node.definition.estimatedMinutes = op.patch.estimatedMinutes;
+        }
         break;
       }
       case "delete_node": {
@@ -371,124 +727,4 @@ function markPrunedNodesSkipped(
       node.ready = false;
     }
   }
-}
-
-// ─── Layer Constructors ───
-
-function layerId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function nodeStateToRuntimeLayer(
-  planId: string,
-  nodeId: string,
-  state: NodeRuntimeState,
-  version: number,
-): RuntimeLayer {
-  return {
-    type: "runtime",
-    layerId: layerId("rl"),
-    version,
-    active: true,
-    planId,
-    timestamp: new Date().toISOString(),
-    nodeStates: {
-      [nodeId]: {
-        status: state.status,
-        attempts: state.attempts,
-        lastError: state.lastError,
-        startedAt: state.startedAt,
-        completedAt: state.completedAt,
-      },
-    },
-  };
-}
-
-export function nodeResultToResultLayer(
-  planId: string,
-  nodeId: string,
-  result: NodeResult,
-  version: number,
-): ResultLayer {
-  return {
-    type: "result",
-    layerId: layerId("resl"),
-    version,
-    active: true,
-    planId,
-    timestamp: new Date().toISOString(),
-    nodeResults: {
-      [nodeId]: result,
-    },
-  };
-}
-
-/**
- * Converts a PlanRun's current state into a sequence of versioned layers.
- * Produces one RuntimeLayer covering all node states, followed by
- * ResultLayers for nodes with checkpoint responses or artifacts.
- *
- * This is a bridge function — it snapshots existing PlanRun state
- * (which predates the append-only layer model) into layered form.
- */
-export function planRunToLayers(
-  run: PlanRun,
-  compiled: CompiledPlan,
-): PlanOverlayLayer[] {
-  const layers: PlanOverlayLayer[] = [];
-  let version = 1;
-
-  if (Object.keys(run.nodeStates).length > 0) {
-    layers.push({
-      type: "runtime",
-      layerId: `rl_bridge_${run.id}`,
-      version: version++,
-      active: true,
-      planId: compiled.editablePlanId,
-      timestamp: run.createdAt,
-      nodeStates: Object.fromEntries(
-        Object.entries(run.nodeStates).map(([id, s]) => [
-          id,
-          {
-            status: s.status,
-            attempts: s.attempts,
-            lastError: s.lastError,
-            startedAt: s.startedAt,
-            completedAt: s.completedAt,
-          },
-        ]),
-      ),
-    });
-  }
-
-  const nodeResults = new Map<string, NodeResult>();
-
-  for (const cr of run.checkpointResponses) {
-    const existing = nodeResults.get(cr.nodeId) ?? {};
-    existing.checkpointResponse = cr.response;
-    nodeResults.set(cr.nodeId, existing);
-  }
-
-  for (const ar of run.artifactRefs) {
-    const existing = nodeResults.get(ar.nodeId) ?? {};
-    if (!existing.artifactRefs) existing.artifactRefs = [];
-    existing.artifactRefs.push(ar);
-    nodeResults.set(ar.nodeId, existing);
-  }
-
-  for (const [nodeId, result] of nodeResults) {
-    layers.push({
-      type: "result",
-      layerId: `resl_bridge_${run.id}_${nodeId}`,
-      version: version++,
-      active: true,
-      planId: compiled.editablePlanId,
-      timestamp: run.completedAt ?? run.createdAt,
-      nodeResults: {
-        [nodeId]: result,
-      },
-    });
-  }
-
-  return layers;
 }

@@ -39,7 +39,7 @@ describe("progress-accepted-task-plan", () => {
 
   afterAll(async () => {
     await resetDb();
-    await db.$disconnect();
+    mock.restore();
   });
 
   it("materializes and starts only newly ready downstream nodes", async () => {
@@ -198,7 +198,7 @@ describe("progress-accepted-task-plan", () => {
       workspaceId: workspace.id,
       taskId: parentTask.id,
       planId: parentCompiledPlan.editablePlanId,
-      run: createPlanRunFromCompiledPlan(parentCompiledPlan, []),
+      run: createPlanRunFromCompiledPlan(parentCompiledPlan),
       layers: [
         {
           type: "runtime",
@@ -311,7 +311,7 @@ describe("progress-accepted-task-plan", () => {
       workspaceId: workspace.id,
       taskId: parentTask.id,
       planId: parentCompiledPlan.editablePlanId,
-      run: createPlanRunFromCompiledPlan(parentCompiledPlan, []),
+      run: createPlanRunFromCompiledPlan(parentCompiledPlan),
       layers: [
         {
           type: "runtime",
