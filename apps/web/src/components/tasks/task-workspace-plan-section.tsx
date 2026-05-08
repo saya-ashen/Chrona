@@ -35,20 +35,15 @@ export function TaskWorkspacePlanSection({
   onGeneratePlan,
 }: TaskWorkspacePlanSectionProps) {
   const {
-    graphPanelHeight,
-    topSectionHeight,
     selectedPlanNode,
     selectedPlanNodes,
-    leftColumnRef,
-    topSectionRef,
-    planAreaRef,
     handleSelectedPlanNodeChange,
-  } = useTaskWorkspacePlanSectionState(acceptPlanError, graphPlan);
+  } = useTaskWorkspacePlanSectionState(graphPlan);
 
   return (
     <>
-      <div ref={leftColumnRef} className="space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-4">
-        <div ref={topSectionRef} className="relative xl:shrink-0">
+      <div className="space-y-3 xl:grid xl:min-h-0 xl:grid-rows-[auto_minmax(0,1fr)] xl:gap-3 xl:space-y-0">
+        <div className="relative xl:shrink-0">
           {topContent}
         </div>
 
@@ -56,22 +51,17 @@ export function TaskWorkspacePlanSection({
           label={label}
           graphPlan={graphPlan}
           plan={plan}
-          graphPanelHeight={graphPanelHeight}
           canAcceptPlan={canAcceptPlan}
           isAcceptingPlan={isAcceptingPlan}
           acceptPlanError={acceptPlanError}
           planGenerationStatus={planGenerationStatus}
-          planAreaRef={planAreaRef}
           onAcceptPlan={onAcceptPlan}
           onGeneratePlan={onGeneratePlan}
           onSelectedNodeChange={handleSelectedPlanNodeChange}
         />
       </div>
 
-      <aside
-        className="min-w-0 space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:self-stretch xl:overflow-hidden"
-        style={topSectionHeight > 0 ? { paddingTop: `${topSectionHeight + 16}px` } : undefined}
-      >
+      <aside className="min-w-0 space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:self-stretch xl:overflow-hidden">
         <TaskPlanGraphInspector node={selectedPlanNode} graphCopy={DEFAULT_GRAPH_COPY} nodes={selectedPlanNodes} />
       </aside>
     </>

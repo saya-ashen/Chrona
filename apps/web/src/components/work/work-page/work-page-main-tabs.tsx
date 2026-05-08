@@ -118,7 +118,7 @@ export function WorkPageMainTabs({
               Current Plan - {completedCount}/{nodeCount} completed
             </summary>
             <div className="h-[420px] overflow-hidden px-4 pb-4 xl:h-[520px]">
-              <TaskPlanGraph mode="full" maxViewportHeight={520} plan={data.taskPlan} />
+              <TaskPlanGraph mode="full" fillHeight plan={data.taskPlan} />
             </div>
           </details>
           <WorkPageSectionFrame title="Plan Nodes" className="min-h-0" bodyClassName="overflow-auto">

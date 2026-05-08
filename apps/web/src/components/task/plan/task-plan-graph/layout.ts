@@ -6,6 +6,7 @@ import {
   LAYOUT_NODE_SEP,
   LAYOUT_PADDING,
   LAYOUT_RANK_SEP,
+  MAX_VIEWPORT_HEIGHT,
   MIN_VIEWPORT_HEIGHT,
   NODE_HEIGHT,
   NODE_WIDTH,
@@ -43,7 +44,6 @@ export function buildFlowLayout(input: {
   selectedNodeId: string | null;
   graphCopy: GraphCopy;
   onSelect: (nodeId: string) => void;
-  maxViewportHeight: number;
 }) {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
@@ -93,9 +93,7 @@ export function buildFlowLayout(input: {
 
   const contentWidth = Math.max(Math.ceil(maxRight - minLeft + LAYOUT_PADDING * 2), NODE_WIDTH + LAYOUT_PADDING * 2);
   const contentHeight = Math.max(Math.ceil(maxBottom - minTop + LAYOUT_PADDING * 2), NODE_HEIGHT + LAYOUT_PADDING * 2);
-  const viewportHeight = input.maxViewportHeight <= MIN_VIEWPORT_HEIGHT
-    ? Math.max(input.maxViewportHeight, 0)
-    : Math.max(Math.min(contentHeight, input.maxViewportHeight), MIN_VIEWPORT_HEIGHT);
+  const viewportHeight = Math.max(Math.min(contentHeight, MAX_VIEWPORT_HEIGHT), MIN_VIEWPORT_HEIGHT);
 
   const focusSet = new Set(input.plan.analytics.reachableFromActiveIds);
   const nodeById = new Map(input.plan.nodes.map((node) => [node.id, node]));

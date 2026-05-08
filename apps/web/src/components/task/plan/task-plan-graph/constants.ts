@@ -9,7 +9,7 @@ export const LAYOUT_NODE_SEP = 34;
 export const LAYOUT_RANK_SEP = 88;
 export const EDGE_OFFSET = 24;
 export const MAX_VIEWPORT_HEIGHT = 620;
-export const MIN_VIEWPORT_HEIGHT = 320;
+export const MIN_VIEWPORT_HEIGHT = 520;
 export const SELECTED_NODE_Z_INDEX = 1000;
 
 export const DEFAULT_GRAPH_COPY: GraphCopy = {

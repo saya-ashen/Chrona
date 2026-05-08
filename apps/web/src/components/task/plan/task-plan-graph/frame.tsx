@@ -1,15 +1,23 @@
 import type { MouseEvent } from "react";
 import { ReactFlow, type NodeMouseHandler } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 import { LAYOUT_DIRECTION } from "./constants";
 import { EdgeLegend } from "./legend";
 import { nodeTypes } from "./node-card";
-import type { EdgeLegendItem, FlowGraphEdge, FlowGraphNode, GraphCopy, NodeLegendItem } from "./types";
+import type {
+  EdgeLegendItem,
+  FlowGraphEdge,
+  FlowGraphNode,
+  GraphCopy,
+  NodeLegendItem,
+} from "./types";
 
 export function TaskPlanGraphFrame({
   graphCopy,
   layout,
   nodes,
   edges,
+  fillHeight = false,
   edgeLegend,
   nodeLegend,
   handleNodeClick,
@@ -19,9 +27,14 @@ export function TaskPlanGraphFrame({
   testId = "task-plan-graph",
 }: {
   graphCopy: GraphCopy;
-  layout: { contentWidth: number; contentHeight: number; viewportHeight: number };
+  layout: {
+    contentWidth: number;
+    contentHeight: number;
+    viewportHeight: number;
+  };
   nodes: FlowGraphNode[];
   edges: FlowGraphEdge[];
+  fillHeight?: boolean;
   edgeLegend: EdgeLegendItem[];
   nodeLegend: NodeLegendItem[];
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
@@ -33,7 +46,10 @@ export function TaskPlanGraphFrame({
   return (
     <div
       aria-label={graphCopy.ariaLabel}
-      className="relative min-w-0 max-w-full overflow-hidden rounded-[24px] border border-border/50 bg-muted/[0.16]"
+      className={cn(
+        "relative min-w-0 max-w-full overflow-hidden rounded-[24px] border border-border/50 bg-white",
+        fillHeight && "flex h-full min-h-0 flex-col",
+      )}
       data-canvas-pan="true"
       data-edge-style="orthogonal"
       data-graph-editable="false"
@@ -44,9 +60,24 @@ export function TaskPlanGraphFrame({
       data-renderer="react-flow"
       data-testid={testId}
     >
-      <div className="relative min-w-0 max-w-full">
-        <div className="h-full w-full min-w-0 max-w-full overflow-auto" data-testid="task-plan-graph-scroll" style={{ height: `${layout.viewportHeight}px` }}>
-          <div className="min-w-full" data-testid="task-plan-graph-canvas" style={{ height: `${layout.contentHeight}px`, minWidth: `${layout.contentWidth}px`, width: "max-content" }}>
+      <div className={cn("relative min-w-0 max-w-full", fillHeight && "flex min-h-0 flex-1 flex-col")}>
+        <div
+          className={cn(
+            "w-full min-w-0 max-w-full overflow-auto",
+            fillHeight && "h-full min-h-0 flex-1",
+          )}
+          data-testid="task-plan-graph-scroll"
+          style={fillHeight ? undefined : { height: `${layout.viewportHeight}px` }}
+        >
+          <div
+            className="min-w-full"
+            data-testid="task-plan-graph-canvas"
+            style={{
+              height: `${layout.contentHeight}px`,
+              minWidth: `${layout.contentWidth}px`,
+              width: "max-content",
+            }}
+          >
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -70,11 +101,18 @@ export function TaskPlanGraphFrame({
               proOptions={{ hideAttribution: true }}
               defaultEdgeOptions={{ zIndex: 0 }}
               className="bg-transparent"
-              translateExtent={[[0, 0], [layout.contentWidth, layout.contentHeight]]}
+              translateExtent={[
+                [0, 0],
+                [layout.contentWidth, layout.contentHeight],
+              ]}
             />
           </div>
         </div>
-        <EdgeLegend edgeItems={edgeLegend} nodeItems={nodeLegend} graphCopy={graphCopy} />
+        <EdgeLegend
+          edgeItems={edgeLegend}
+          nodeItems={nodeLegend}
+          graphCopy={graphCopy}
+        />
       </div>
     </div>
   );

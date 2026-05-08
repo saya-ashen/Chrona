@@ -127,7 +127,8 @@ export type TaskPlanGraphMode = "full" | "compact" | "auto";
 
 export type TaskPlanGraphProps = {
   mode?: TaskPlanGraphMode;
-  maxViewportHeight?: number;
+  fillHeight?: boolean;
+  className?: string;
   plan: TaskPlanGraphPlan;
   inspectorPlacement?: "overlay" | "none";
   onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;

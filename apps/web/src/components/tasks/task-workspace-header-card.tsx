@@ -14,8 +14,10 @@ function priorityTone(priority: string) {
 
 function statusTone(status: string) {
   if (["Completed", "Done"].includes(status)) return "success" as const;
-  if (["Running", "Ready", "Queued", "Scheduled"].includes(status)) return "info" as const;
-  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "warning" as const;
+  if (["Running", "Ready", "Queued", "Scheduled"].includes(status))
+    return "info" as const;
+  if (["WaitingForInput", "WaitingForApproval"].includes(status))
+    return "warning" as const;
   if (["Failed", "Blocked"].includes(status)) return "critical" as const;
   return "neutral" as const;
 }
@@ -46,27 +48,43 @@ export function TaskWorkspaceHeaderCard({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+      if (
+        moreMenuRef.current &&
+        !moreMenuRef.current.contains(e.target as Node)
+      ) {
         setShowMoreMenu(false);
       }
     }
 
     if (showMoreMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMoreMenu]);
 
   return (
-    <SurfaceCard className="relative space-y-4 overflow-visible rounded-[1.45rem] border-border/50 bg-background/55 shadow-none backdrop-blur-[2px]" variant="inset" padding="lg">
-      <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-4">
-        <div className="max-w-3xl space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-balance xl:text-[1.65rem]">{task.title}</h1>
+    <SurfaceCard
+      className="relative z-30 space-y-3 overflow-visible rounded-[1.45rem] border-border/50 bg-background/55 shadow-none backdrop-blur-[2px]"
+      variant="inset"
+      padding="sm"
+    >
+      <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-2">
+        <div className="max-w-3xl space-y-1.5">
+          <h1 className="text-xl font-semibold tracking-tight text-balance xl:text-base">
+            {task.title}
+          </h1>
           <div className="flex flex-wrap items-center gap-1.5">
-            <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge>
-            <StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge>
+            <StatusBadge tone={statusTone(task.status)}>
+              {task.status}
+            </StatusBadge>
+            <StatusBadge tone={priorityTone(task.priority)}>
+              {task.priority}
+            </StatusBadge>
             {task.runnabilityState ? (
-              <StatusBadge tone={task.isRunnable ? "success" : "warning"}>{task.runnabilitySummary}</StatusBadge>
+              <StatusBadge tone={task.isRunnable ? "success" : "warning"}>
+                {task.runnabilitySummary}
+              </StatusBadge>
             ) : null}
           </div>
         </div>
@@ -74,7 +92,10 @@ export function TaskWorkspaceHeaderCard({
         <div className="flex flex-wrap gap-1.5">
           <LocalizedLink
             href="/schedule"
-            className={buttonVariants({ variant: "outline", className: "h-9 rounded-xl px-3" })}
+            className={buttonVariants({
+              variant: "outline",
+              className: "h-9 rounded-xl px-3",
+            })}
           >
             {backToScheduleLabel}
           </LocalizedLink>
@@ -82,7 +103,10 @@ export function TaskWorkspaceHeaderCard({
             <button
               type="button"
               onClick={() => setShowMoreMenu((current) => !current)}
-              className={buttonVariants({ variant: "ghost", className: "size-9 rounded-xl" })}
+              className={buttonVariants({
+                variant: "ghost",
+                className: "size-9 rounded-xl",
+              })}
             >
               <Ellipsis className="size-4" />
             </button>
@@ -112,13 +136,18 @@ export function TaskWorkspaceHeaderCard({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-0.5">
               <p className="font-medium">Delete &ldquo;{task.title}&rdquo;?</p>
-              <p className="text-xs text-destructive/80">This cannot be undone.</p>
+              <p className="text-xs text-destructive/80">
+                This cannot be undone.
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={onDelete}
-                className={buttonVariants({ variant: "destructive", size: "sm" })}
+                className={buttonVariants({
+                  variant: "destructive",
+                  size: "sm",
+                })}
                 disabled={isDeleting}
               >
                 {isDeleting ? "Deleting..." : "Confirm delete"}
