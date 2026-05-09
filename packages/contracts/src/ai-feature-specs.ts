@@ -1,7 +1,9 @@
 import type { GenerateTaskPlanRequest } from "./ai-plan-runtime";
 import {
   planBlueprintSchema,
+  planPatchSchema,
 } from "./ai-plan-blueprint";
+import { taskDispatchDecisionSchema } from "./ai-dispatch-types";
 import { z } from "zod";
 
 export type AiFeatureToolSpec = {
@@ -312,26 +314,7 @@ export const dispatchNextTaskActionToolSpec: AiFeatureToolSpec = {
   type: "function",
   name: DISPATCH_NEXT_TASK_ACTION_TOOL_NAME,
   description: DISPATCH_NEXT_TASK_ACTION_TOOL_DESCRIPTION,
-  parameters: {
-    type: "object",
-    additionalProperties: true,
-    properties: {
-      schemaName: { const: "task_dispatch_decision" },
-      schemaVersion: { const: "1.0.0" },
-      action: { type: "string" },
-      safety: { type: "object" },
-      confidence: { type: "number" },
-      reason: { type: "string" },
-    },
-    required: [
-      "schemaName",
-      "schemaVersion",
-      "action",
-      "safety",
-      "confidence",
-      "reason",
-    ],
-  },
+  parameters: toProviderJsonSchema(taskDispatchDecisionSchema),
 };
 
 export const generatePlanBlueprintToolSpec: AiFeatureToolSpec = {
@@ -345,45 +328,7 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
   type: "function",
   name: EDIT_PLAN_PATCH_TOOL_NAME,
   description: EDIT_PLAN_PATCH_TOOL_DESCRIPTION,
-  parameters: {
-    type: "object",
-    additionalProperties: true,
-    properties: {
-      basePlanId: {
-        type: "string",
-        description: "ID of the plan being edited",
-      },
-      baseVersion: {
-        type: "number",
-        description: "Current version for optimistic locking",
-      },
-      rationale: { type: "string", description: "Why this change is needed" },
-      operations: {
-        type: "array",
-        minItems: 1,
-        items: {
-          type: "object",
-          additionalProperties: true,
-          properties: {
-            op: {
-              type: "string",
-              enum: [
-                "update_plan",
-                "add_node",
-                "update_node",
-                "delete_node",
-                "add_edge",
-                "delete_edge",
-                "replace_subgraph",
-              ],
-            },
-          },
-          required: ["op"],
-        },
-      },
-    },
-    required: ["basePlanId", "baseVersion", "operations"],
-  },
+  parameters: toProviderJsonSchema(planPatchSchema),
 };
 
 export function buildGeneratePlanFeatureInputText(
@@ -577,67 +522,6 @@ function validateTimeslotsPayload(payload: Record<string, unknown>) {
   return { ok: true as const };
 }
 
-function validateDispatchTaskPayload(payload: Record<string, unknown>) {
-  if (payload.schemaName !== "task_dispatch_decision") {
-    return {
-      ok: false as const,
-      error:
-        "Feature 'dispatch_task' schemaName must be task_dispatch_decision",
-    };
-  }
-  if (payload.schemaVersion !== "1.0.0") {
-    return {
-      ok: false as const,
-      error: "Feature 'dispatch_task' schemaVersion must be 1.0.0",
-    };
-  }
-  if (typeof payload.action !== "string" || !payload.action.trim()) {
-    return {
-      ok: false as const,
-      error: "Feature 'dispatch_task' action must be a non-empty string",
-    };
-  }
-  const safety = payload.safety;
-  if (!isRecord(safety)) {
-    return {
-      ok: false as const,
-      error: "Feature 'dispatch_task' safety must be an object",
-    };
-  }
-  if (typeof safety.requiresHumanApproval !== "boolean") {
-    return {
-      ok: false as const,
-      error:
-        "Feature 'dispatch_task' safety.requiresHumanApproval must be boolean",
-    };
-  }
-  if (!["low", "medium", "high"].includes(String(safety.riskLevel))) {
-    return {
-      ok: false as const,
-      error:
-        "Feature 'dispatch_task' safety.riskLevel must be low, medium, or high",
-    };
-  }
-  if (
-    typeof payload.confidence !== "number" ||
-    payload.confidence < 0 ||
-    payload.confidence > 1
-  ) {
-    return {
-      ok: false as const,
-      error:
-        "Feature 'dispatch_task' confidence must be a number between 0 and 1",
-    };
-  }
-  if (typeof payload.reason !== "string" || !payload.reason.trim()) {
-    return {
-      ok: false as const,
-      error: "Feature 'dispatch_task' reason must be a non-empty string",
-    };
-  }
-  return { ok: true as const };
-}
-
 export function validatePreparedFeaturePayload(
   spec: PreparedAiFeatureSpec,
   payload: unknown,
@@ -662,14 +546,36 @@ export function validatePreparedFeaturePayload(
       }
       return { ok: true };
     }
+    case "edit_plan": {
+      const validation = planPatchSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'edit_plan' returned an invalid patch payload",
+        };
+      }
+      return { ok: true };
+    }
     case "suggest":
       return validateSuggestPayload(payload);
     case "conflicts":
       return validateConflictsPayload(payload);
     case "timeslots":
       return validateTimeslotsPayload(payload);
-    case "dispatch_task":
-      return validateDispatchTaskPayload(payload);
+    case "dispatch_task": {
+      const validation = taskDispatchDecisionSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'dispatch_task' returned an invalid decision payload",
+        };
+      }
+      return { ok: true };
+    }
     default:
       return {
         ok: false,

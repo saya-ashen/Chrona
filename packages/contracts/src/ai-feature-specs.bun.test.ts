@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  buildDispatchTaskFeatureSpec,
+  buildEditPlanPatchFeatureSpec,
   SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
   buildSuggestFeatureSpec,
   GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
@@ -130,6 +132,66 @@ describe("structured feature specs", () => {
     expect(
       validatePreparedFeaturePayload(spec, {
         suggestions: [{}],
+      }),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("validates edit_plan payloads through the shared PlanPatch schema", () => {
+    const spec = buildEditPlanPatchFeatureSpec({
+      planId: "plan-1",
+      version: 1,
+      title: "Plan",
+      goal: "Goal",
+      nodes: [{ id: "task_one", type: "task", title: "Task one" }],
+      edges: [],
+      userInstruction: "Rename the plan",
+    });
+
+    expect(
+      validatePreparedFeaturePayload(spec, {
+        basePlanId: "plan-1",
+        baseVersion: 1,
+        operations: [
+          {
+            op: "update_plan",
+            patch: { title: "Updated plan" },
+          },
+        ],
+      }),
+    ).toEqual({ ok: true });
+
+    expect(
+      validatePreparedFeaturePayload(spec, {
+        basePlanId: "plan-1",
+        baseVersion: 1,
+        operations: [],
+      }),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("validates dispatch_task payloads through the shared decision schema", () => {
+    const spec = buildDispatchTaskFeatureSpec();
+
+    expect(
+      validatePreparedFeaturePayload(spec, {
+        schemaName: "task_dispatch_decision",
+        schemaVersion: "1.0.0",
+        action: "run_node",
+        targetNodeId: "node-1",
+        safety: { requiresHumanApproval: false, riskLevel: "low" },
+        confidence: 0.9,
+        reason: "Node is ready",
+      }),
+    ).toEqual({ ok: true });
+
+    expect(
+      validatePreparedFeaturePayload(spec, {
+        schemaName: "task_dispatch_decision",
+        schemaVersion: "1.0.0",
+        action: "run_node",
+        safety: { requiresHumanApproval: false, riskLevel: "low" },
+        confidence: 0.9,
+        reason: "Node is ready",
       }),
     ).toMatchObject({ ok: false });
   });

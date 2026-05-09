@@ -28,7 +28,7 @@ export const workspaceId = z.string().min(1, "workspaceId is required");
 export const taskIdParam = z.string().min(1, "taskId is required");
 
 /** Response wrapper used by `c.json()` in most routes — loose shape for engine results */
-export const successResponse = <T extends z.ZodTypeAny>(data: T) =>
-  z.object({ success: z.literal(true).optional(), ...(data.shape ?? {}) }).passthrough();
+export const successResponse = <T extends z.ZodRawShape>(data: z.ZodObject<T>) =>
+  data.extend({ success: z.literal(true).optional() }).passthrough();
 
 export const errorResponse = z.object({ error: z.string() });

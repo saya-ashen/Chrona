@@ -13,11 +13,7 @@ import { resolveEffectivePlanGraph } from "./effective-graph";
 
 // ─── Helpers (reuse from plan.bun.test.ts pattern) ───
 
-import type {
-  EditablePlan,
-  EditableTaskNode,
-  EditableCheckpointNode,
-} from "@chrona/contracts/ai";
+import type { EditablePlan, EditableTaskNode } from "@chrona/contracts/ai";
 
 function makeTask(
   id: string,
@@ -29,21 +25,6 @@ function makeTask(
     title: `Task ${id}`,
     executor: "ai",
     mode: "auto",
-    ...overrides,
-  };
-}
-
-function _makeCheckpoint(
-  id: string,
-  overrides?: Partial<EditableCheckpointNode>,
-): EditableCheckpointNode {
-  return {
-    id,
-    type: "checkpoint",
-    title: `Checkpoint ${id}`,
-    checkpointType: "confirm",
-    prompt: "Are you sure?",
-    required: true,
     ...overrides,
   };
 }
@@ -141,7 +122,7 @@ describe("resolveEffectivePlanGraph — base only", () => {
     const nodeA = graph.nodes.find((n) => n.localId === "a")!;
     const nodeB = graph.nodes.find((n) => n.localId === "b")!;
     expect(nodeA.status).toBe("pending");
-    expect(nodeA.ready).toBe(true);  // entry, no deps
+    expect(nodeA.ready).toBe(true); // entry, no deps
     expect(nodeA.dependenciesSatisfied).toBe(true);
     expect(nodeB.status).toBe("pending");
     expect(nodeB.ready).toBe(false); // waiting for a
@@ -201,7 +182,9 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
       [{ from: "a", to: "b" }],
     );
     const nodeAId = base.nodes.find((n) => n.localId === "a")!.id;
-    const layer = makeStructuralLayer(2, [{ op: "delete_node", nodeId: nodeAId }]);
+    const layer = makeStructuralLayer(2, [
+      { op: "delete_node", nodeId: nodeAId },
+    ]);
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
     expect(graph.nodes).toHaveLength(1);
@@ -213,7 +196,9 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
     const base = makeCompiled([makeTask("a"), makeTask("b")], []);
     const aId = base.nodes.find((n) => n.localId === "a")!.id;
     const bId = base.nodes.find((n) => n.localId === "b")!.id;
-    const layer = makeStructuralLayer(2, [{ op: "add_edge", from: aId, to: bId }]);
+    const layer = makeStructuralLayer(2, [
+      { op: "add_edge", from: aId, to: bId },
+    ]);
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
     expect(graph.edges).toHaveLength(1);
@@ -231,7 +216,9 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
     );
     const aId = base.nodes.find((n) => n.localId === "a")!.id;
     const bId = base.nodes.find((n) => n.localId === "b")!.id;
-    const layer = makeStructuralLayer(2, [{ op: "delete_edge", from: aId, to: bId }]);
+    const layer = makeStructuralLayer(2, [
+      { op: "delete_edge", from: aId, to: bId },
+    ]);
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
     expect(graph.edges.filter((edge) => edge.active)).toHaveLength(0);
@@ -247,7 +234,16 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
     const nodeAId = base.nodes[0].id;
 
     const layer1 = makeStructuralLayer(2, [
-      { op: "add_node", nodeId: "cn_b", localId: "b", type: "task", title: "B", config: {}, executor: "ai", mode: "auto" },
+      {
+        op: "add_node",
+        nodeId: "cn_b",
+        localId: "b",
+        type: "task",
+        title: "B",
+        config: {},
+        executor: "ai",
+        mode: "auto",
+      },
     ]);
     const layer2 = makeStructuralLayer(3, [
       { op: "add_edge", from: nodeAId, to: "cn_b" },
@@ -263,9 +259,22 @@ describe("resolveEffectivePlanGraph — structural layers", () => {
 
   it("9. inactive structural layer is ignored", () => {
     const base = makeCompiled([makeTask("a")], []);
-    const layer = makeStructuralLayer(2, [
-      { op: "add_node", nodeId: "cn_b", localId: "b", type: "task", title: "B", config: {}, executor: "ai", mode: "auto" },
-    ], false);
+    const layer = makeStructuralLayer(
+      2,
+      [
+        {
+          op: "add_node",
+          nodeId: "cn_b",
+          localId: "b",
+          type: "task",
+          title: "B",
+          config: {},
+          executor: "ai",
+          mode: "auto",
+        },
+      ],
+      false,
+    );
 
     const graph = resolveEffectivePlanGraph(base, [layer]);
     expect(graph.nodes).toHaveLength(1);
@@ -281,7 +290,11 @@ describe("resolveEffectivePlanGraph — runtime layers", () => {
     const aId = base.nodes.find((n) => n.localId === "a")!.id;
 
     const runtimeLayer = makeRuntimeLayer(2, {
-      [aId]: { status: "completed", attempts: 1, completedAt: "2026-01-01T00:00:00Z" },
+      [aId]: {
+        status: "completed",
+        attempts: 1,
+        completedAt: "2026-01-01T00:00:00Z",
+      },
     });
 
     const graph = resolveEffectivePlanGraph(base, [runtimeLayer]);
@@ -300,8 +313,12 @@ describe("resolveEffectivePlanGraph — runtime layers", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const layer1 = makeRuntimeLayer(2, { [aId]: { status: "running", attempts: 1 } });
-    const layer2 = makeRuntimeLayer(3, { [aId]: { status: "completed", attempts: 1 } });
+    const layer1 = makeRuntimeLayer(2, {
+      [aId]: { status: "running", attempts: 1 },
+    });
+    const layer2 = makeRuntimeLayer(3, {
+      [aId]: { status: "completed", attempts: 1 },
+    });
 
     const graph = resolveEffectivePlanGraph(base, [layer1, layer2]);
     const nodeA = graph.nodes[0];
@@ -312,8 +329,14 @@ describe("resolveEffectivePlanGraph — runtime layers", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const layer1 = makeRuntimeLayer(2, { [aId]: { status: "running", attempts: 1 } });
-    const layer2 = makeRuntimeLayer(3, { [aId]: { status: "failed", attempts: 2 } }, false);
+    const layer1 = makeRuntimeLayer(2, {
+      [aId]: { status: "running", attempts: 1 },
+    });
+    const layer2 = makeRuntimeLayer(
+      3,
+      { [aId]: { status: "failed", attempts: 2 } },
+      false,
+    );
 
     const graph = resolveEffectivePlanGraph(base, [layer1, layer2]);
     const nodeA = graph.nodes[0];
@@ -326,7 +349,9 @@ describe("resolveEffectivePlanGraph — result layers", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const runtime = makeRuntimeLayer(2, { [aId]: { status: "completed", attempts: 1 } });
+    const runtime = makeRuntimeLayer(2, {
+      [aId]: { status: "completed", attempts: 1 },
+    });
     const result = makeResultLayer(3, {
       [aId]: { outputSummary: "All done", artifactRefs: [] },
     });
@@ -352,7 +377,9 @@ describe("resolveEffectivePlanGraph — result layers", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const runtime = makeRuntimeLayer(2, { [aId]: { status: "completed", attempts: 1 } });
+    const runtime = makeRuntimeLayer(2, {
+      [aId]: { status: "completed", attempts: 1 },
+    });
     const result = makeResultLayer(3, {
       [aId]: { outputSummary: "Done", error: undefined },
     });
@@ -386,12 +413,18 @@ describe("resolveEffectivePlanGraph — full integration", () => {
     ]);
 
     // Execute a
-    const runtime1 = makeRuntimeLayer(3, { [aId]: { status: "completed", attempts: 1 } });
+    const runtime1 = makeRuntimeLayer(3, {
+      [aId]: { status: "completed", attempts: 1 },
+    });
     const result1 = makeResultLayer(4, { [aId]: { outputSummary: "A done" } });
 
     // Execute b
-    const runtime2 = makeRuntimeLayer(5, { ["cn_b"]: { status: "running", attempts: 1 } });
-    const result2 = makeResultLayer(6, { ["cn_b"]: { outputSummary: "B done" } });
+    const runtime2 = makeRuntimeLayer(5, {
+      ["cn_b"]: { status: "running", attempts: 1 },
+    });
+    const result2 = makeResultLayer(6, {
+      ["cn_b"]: { outputSummary: "B done" },
+    });
 
     const graph = resolveEffectivePlanGraph(base, [
       structural,
@@ -431,7 +464,9 @@ describe("resolveEffectivePlanGraph — full integration", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const runtime = makeRuntimeLayer(2, { [aId]: { status: "blocked", attempts: 1 } });
+    const runtime = makeRuntimeLayer(2, {
+      [aId]: { status: "blocked", attempts: 1 },
+    });
 
     const graph = resolveEffectivePlanGraph(base, [runtime]);
     const nodeA = graph.nodes[0];
@@ -444,7 +479,9 @@ describe("resolveEffectivePlanGraph — full integration", () => {
     const base = makeCompiled([makeTask("a")], []);
     const aId = base.nodes[0].id;
 
-    const runtime = makeRuntimeLayer(2, { [aId]: { status: "failed", lastError: "Something broke" } });
+    const runtime = makeRuntimeLayer(2, {
+      [aId]: { status: "failed", lastError: "Something broke" },
+    });
 
     const graph = resolveEffectivePlanGraph(base, [runtime]);
     const nodeA = graph.nodes[0];

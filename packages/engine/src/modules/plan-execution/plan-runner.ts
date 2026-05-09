@@ -9,7 +9,11 @@ import {
   savePlanRun,
 } from "./plan-run-store";
 import { getAcceptedCompiledPlan } from "./compiled-plan-store";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import {
+  resolveEffectivePlanGraph,
+  createGraphRuntime,
+} from "@chrona/graph-runtime";
+import type { GraphDispatchOutcome, GraphExecutionEvent, GraphExecutionState } from "@chrona/graph-runtime";
 import type {
   CompiledPlan,
   EffectivePlanGraph,
@@ -62,10 +66,6 @@ const executors: NodeExecutor[] = [
   new ConditionNodeExecutor(),
   new WaitNodeExecutor(),
 ];
-
-function dispatchExecutor(node: EffectivePlanNode): NodeExecutor | null {
-  return executors.find((executor) => executor.canExecute(node)) ?? null;
-}
 
 export function createPlanRunFromCompiledPlan(
   compiled: CompiledPlan,
@@ -120,123 +120,6 @@ function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecution
   }
   if (effective.completedNodeIds.length === effective.nodes.length) return "completed";
   return "blocked";
-}
-
-function pickNextNodeId(
-  effective: EffectivePlanGraph,
-  forcedNodeId?: string,
-): string | null {
-  if (forcedNodeId) {
-    const forced = effective.nodes.find((node) => node.id === forcedNodeId);
-    if (forced && forced.reachable) {
-      return forcedNodeId;
-    }
-  }
-  return effective.readyNodeIds.length > 0 ? effective.readyNodeIds[0] : null;
-}
-
-function getCurrentResult(
-  results: NodeResult[],
-  nodeId: string,
-  nodeLayerId?: string | null,
-): NodeResult | null {
-  return (
-    [...results]
-      .reverse()
-      .find(
-        (result) =>
-          result.nodeId === nodeId &&
-          result.status === "current" &&
-          (nodeLayerId ? result.nodeLayerId === nodeLayerId : true),
-      ) ?? null
-  );
-}
-
-function markNodeResults(
-  results: NodeResult[],
-  nodeId: string,
-  nextStatus: NonNullable<NodeResult["status"]>,
-): NodeResult[] {
-  return results.map((result) =>
-    result.nodeId === nodeId && result.status === "current"
-      ? { ...result, status: nextStatus }
-      : result,
-  );
-}
-
-function appendCurrentResult(input: {
-  results: NodeResult[];
-  result: NodeResult;
-  replaceStatus?: NonNullable<NodeResult["status"]>;
-}): NodeResult[] {
-  const nextResults = markNodeResults(
-    input.results,
-    input.result.nodeId ?? "",
-    input.replaceStatus ?? "obsolete",
-  );
-  nextResults.push(input.result);
-  return nextResults;
-}
-
-function updateAttemptStatus(input: {
-  attempts: NodeAttempt[];
-  attemptId: string;
-  status: NodeAttempt["status"];
-  finishedAt?: string;
-  error?: NodeAttempt["error"];
-}): NodeAttempt[] {
-  return input.attempts.map((attempt) =>
-    attempt.id === input.attemptId
-      ? {
-          ...attempt,
-          status: input.status,
-          finishedAt: input.finishedAt ?? attempt.finishedAt,
-          ...(input.error ? { error: input.error } : {}),
-        }
-      : attempt,
-  );
-}
-
-function cancelActiveAttempt(
-  attempts: NodeAttempt[],
-  nodeId: string,
-  reason: string,
-): NodeAttempt[] {
-  const finishedAt = new Date().toISOString();
-  return attempts.map((attempt) =>
-    attempt.nodeId === nodeId && attempt.status === "running"
-      ? {
-          ...attempt,
-          status: "cancelled",
-          finishedAt,
-          error: {
-            code: "EXECUTION_CANCELLED",
-            message: reason,
-          },
-        }
-      : attempt,
-  );
-}
-
-function createExecutionContextSnapshot(input: {
-  graphId: string;
-  nodeId: string;
-  nodeLayerId: string;
-  graphVersion: number;
-  runtimeName: string;
-  userInput?: string;
-}): ExecutionContextSnapshot {
-  const createdAt = new Date().toISOString();
-  return {
-    id: `ctx_${input.graphId}_${input.nodeId}_${Date.now()}`,
-    graphId: input.graphId,
-    nodeId: input.nodeId,
-    nodeLayerId: input.nodeLayerId,
-    graphSignature: `${input.graphId}:${input.graphVersion}:${input.nodeLayerId}`,
-    refs: input.userInput ? { userInput: input.userInput } : undefined,
-    runtimeSnapshot: { runtimeName: input.runtimeName },
-    createdAt,
-  };
 }
 
 async function getRuntimeName(taskId: string): Promise<string> {
@@ -358,7 +241,7 @@ async function ensureNativePlanRun(taskId: string) {
       planId,
       run: persisted?.planRun ?? createPlanRunFromCompiledPlan(compiledPlan),
       compiledPlan,
-      graph: createPlanGraphFromCompiledPlan({ taskId, compiledPlan }),
+      graph: createPlanGraphFromCompiledPlan({ taskId, compiledPlan }) as unknown as PlanGraph,
       attempts: persisted?.attempts ?? [],
       results: persisted?.results ?? [],
       executionContextSnapshots: persisted?.executionContextSnapshots ?? [],
@@ -559,6 +442,187 @@ async function completeExecution(input: {
   });
 }
 
+type EngineRuntimeContext = {
+  taskId: string;
+  planId: string;
+  mainSession: { id: string; taskId: string; sessionKey: string };
+};
+
+type AdvanceRuntimeCommand =
+  | { type: "start" }
+  | {
+      type: "resume_with_input";
+      nodeId: string;
+      value: string;
+      replaceStatus?: NonNullable<NodeResult["status"]>;
+    }
+  | { type: "resume_after_unblock"; nodeId?: string }
+  | { type: "resume_with_approval"; nodeId: string; approved: boolean; feedback?: string }
+  | { type: "retry_node"; nodeId: string; reason?: string; userInput?: string }
+  | { type: "cancel_session"; reason?: string };
+
+function toGraphExecutionState(persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>): GraphExecutionState {
+  if (!persisted.graph) {
+    throw new Error("Plan runtime graph missing");
+  }
+
+  return {
+    graph: structuredClone(persisted.graph),
+    attempts: structuredClone(persisted.attempts),
+    results: structuredClone(persisted.results),
+    executionContextSnapshots: structuredClone(persisted.executionContextSnapshots),
+  } as GraphExecutionState;
+}
+
+function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
+  if (outcome.waitKind) return outcome.waitKind;
+  if (outcome.status === "waiting_for_user") return "user_input";
+  if (outcome.status === "waiting_for_approval") return "approval";
+  return "manual_action";
+}
+
+function currentNodeFromOutcome(outcome: GraphDispatchOutcome): string | null {
+  return (
+    outcome.currentNodeId ??
+    outcome.effective.nodes.find(
+      (node) =>
+        node.status === "waiting_for_user" ||
+        node.status === "waiting_for_approval" ||
+        node.status === "blocked" ||
+        node.status === "failed",
+    )?.id ??
+    null
+  );
+}
+
+async function appendGraphRuntimeEvents(input: {
+  taskId: string;
+  planId: string;
+  sessionId: string;
+  events: GraphExecutionEvent[];
+}) {
+  for (const event of input.events) {
+    switch (event.type) {
+      case "command_received":
+      case "command_unsupported":
+      case "command_validation_failed":
+        break;
+      case "executable_path_computed":
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "executable_path_computed",
+          payload: {
+            readyCount: event.effective.readyNodeIds.length,
+            blockedCount: event.effective.blockedNodeIds.length,
+            completedCount: event.effective.completedNodeIds.length,
+            runningCount: event.effective.runningNodeIds.length,
+            failedCount: event.effective.failedNodeIds.length,
+            pendingCount: event.effective.pendingNodeIds.length,
+          },
+        });
+        break;
+      case "node_started":
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "node_started",
+          payload: {
+            nodeId: event.node.id,
+            nodeTitle: event.node.title,
+            nodeType: event.node.type,
+          },
+        });
+        break;
+      case "node_completed":
+        if (event.result.status !== "done") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "node_completed",
+          payload: { nodeId: event.node.id, summary: event.result.summary },
+        });
+        break;
+      case "node_waiting_for_user":
+        if (event.result.status !== "waiting_for_user") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "node_waiting_for_user",
+          payload: { nodeId: event.node.id, prompt: event.result.prompt },
+        });
+        break;
+      case "node_waiting_for_approval":
+        if (event.result.status !== "waiting_for_approval") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "node_waiting_for_approval",
+          payload: { nodeId: event.node.id, prompt: event.result.prompt },
+        });
+        break;
+      case "child_run_started":
+        if (event.result.status !== "child_running") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "child_run_started",
+          payload: {
+            nodeId: event.node.id,
+            childSessionId: event.result.evidence.childSessionId,
+            childRunId: event.result.evidence.runId,
+            childTaskId: event.result.evidence.childTaskId,
+          },
+        });
+        break;
+      case "node_blocked":
+        if (event.result.status !== "blocked") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "node_blocked",
+          payload: { nodeId: event.node.id, reason: event.result.reason },
+        });
+        break;
+      case "replan_proposed":
+        if (event.result.status !== "replan_required") break;
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "replan_proposed",
+          payload: { nodeId: event.node.id, reason: event.result.reason },
+        });
+        break;
+      case "graph_mutation_applied":
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "graph_mutation_applied",
+          payload: { mutationId: event.mutationId, affectedNodeIds: event.affectedNodeIds },
+        });
+        break;
+      case "external_result_synced":
+        await appendMainSessionEvent({
+          taskId: input.taskId,
+          planId: input.planId,
+          sessionId: input.sessionId,
+          eventType: "external_result_synced",
+          payload: { nodeId: event.nodeId, status: event.status },
+        });
+        break;
+    }
+  }
+}
+
 async function advancePlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
@@ -568,6 +632,7 @@ async function advancePlanExecution(input: {
   forcedNodeId?: string;
   userInput?: string;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
+  command?: AdvanceRuntimeCommand;
 }): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -584,580 +649,204 @@ async function advancePlanExecution(input: {
     };
   }
 
-  const maxSteps = input.maxSteps ?? DEFAULT_MAX_STEPS;
   const runtimeName = await getRuntimeName(input.taskId);
-  const executedNodeIds: string[] = [];
-  let graph = structuredClone(runtime.persisted.graph!);
-  let attempts = structuredClone(runtime.persisted.attempts);
-  let results = structuredClone(runtime.persisted.results);
-  let executionContextSnapshots = structuredClone(
-    runtime.persisted.executionContextSnapshots,
-  );
-  let forcedNodeId = input.forcedNodeId;
+  const state = toGraphExecutionState(runtime.persisted);
+  const context: EngineRuntimeContext = {
+    taskId: input.taskId,
+    planId: runtime.planId,
+    mainSession: input.mainSession,
+  };
+  const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
+    taskId: input.taskId,
+    runtimeName,
+    policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS, validateGraph: false },
+    callbacks: {
+      executeNode: async (executorInput) => {
+        const engineNode = executorInput.node as unknown as EffectivePlanNode;
+        const enginePlan = executorInput.plan as unknown as EffectivePlanGraph;
+        const executor = executors.find((candidate) => candidate.canExecute(engineNode));
+        if (!executor) return null;
+        return executor.execute({
+          taskId: input.taskId,
+          planId: runtime.planId,
+          mainSession: input.mainSession,
+          node: engineNode,
+          plan: enginePlan,
+          trigger: executorInput.trigger,
+          runtimeName,
+          userInput: executorInput.userInput,
+        }) as ReturnType<typeof executor.execute>;
+      },
+    },
+  });
+  const command = input.command;
+  const dispatchCommand = command
+    ? command.type === "resume_with_input"
+      ? {
+          type: "resume_with_input" as const,
+          state,
+          trigger: input.trigger,
+          context,
+          input: {
+            nodeId: command.nodeId,
+            value: command.value,
+            replaceStatus: command.replaceStatus,
+          },
+        }
+      : command.type === "resume_after_unblock"
+        ? {
+            type: "resume_after_unblock" as const,
+            state,
+            trigger: input.trigger,
+            context,
+            nodeId: command.nodeId,
+          }
+        : command.type === "resume_with_approval"
+          ? {
+              type: "resume_with_approval" as const,
+              state,
+              trigger: input.trigger,
+              context,
+              input: {
+                nodeId: command.nodeId,
+                approved: command.approved,
+                feedback: command.feedback,
+              },
+            }
+          : command.type === "retry_node"
+            ? {
+                type: "retry_node" as const,
+                state,
+                trigger: input.trigger,
+                context,
+                nodeId: command.nodeId,
+                reason: command.reason,
+                userInput: command.reason,
+              }
+            : command.type === "cancel_session"
+              ? {
+                  type: "cancel_session" as const,
+                  state,
+                  trigger: input.trigger,
+                  context,
+                  reason: command.reason,
+                }
+              : { type: "start" as const, state, trigger: input.trigger, context }
+    : input.forcedNodeId && input.userInput
+      ? {
+          type: "resume_with_input" as const,
+          state,
+          trigger: input.trigger,
+          context,
+          input: {
+            nodeId: input.forcedNodeId,
+            value: input.userInput,
+            replaceStatus: input.forcedReplaceStatus ?? "obsolete",
+          },
+        }
+      : input.forcedNodeId
+        ? {
+            type: "resume_after_unblock" as const,
+            state,
+            trigger: input.trigger,
+            context,
+            nodeId: input.forcedNodeId,
+          }
+        : { type: "start" as const, state, trigger: input.trigger, context };
+  const outcome = await graphRuntime.dispatch(dispatchCommand);
 
-  for (let step = 0; step < maxSteps; step++) {
-    const effective = resolveEffectivePlanGraph({ graph, attempts, results });
+  await persistRuntimeState({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    compiledPlan: runtime.compiledPlan,
+    graph: outcome.state.graph as unknown as PlanGraph,
+    attempts: outcome.state.attempts as unknown as NodeAttempt[],
+    results: outcome.state.results as unknown as NodeResult[],
+    executionContextSnapshots:
+      outcome.state.executionContextSnapshots as unknown as ExecutionContextSnapshot[],
+    existingRun: runtime.persisted.planRun,
+  });
+  await appendGraphRuntimeEvents({
+    taskId: input.taskId,
+    planId: runtime.planId,
+    sessionId: input.mainSession.id,
+    events: outcome.events,
+  });
 
-    await appendMainSessionEvent({
+  if (outcome.status === "cancelled") {
+    await setExecutionSessionState({
+      sessionId: input.executionSession.id,
+      status: "Abandoned",
+      currentNodeId: null,
+      pauseReason: outcome.message,
+      completedNodeIds: outcome.effective.completedNodeIds,
+    });
+    await cancelWorkBlock(input.taskId, input.executionSession.workBlockId);
+    await db.task.update({
+      where: { id: input.taskId },
+      data: { status: TaskStatus.Cancelled, blockReason: Prisma.DbNull },
+    });
+    await rebuildTaskProjection(input.taskId);
+    return buildExecutionResponse({
       taskId: input.taskId,
       planId: runtime.planId,
-      sessionId: input.mainSession.id,
-      eventType: "executable_path_computed",
-      payload: {
-        readyCount: effective.readyNodeIds.length,
-        blockedCount: effective.blockedNodeIds.length,
-        completedCount: effective.completedNodeIds.length,
-        runningCount: effective.runningNodeIds.length,
-        failedCount: effective.failedNodeIds.length,
-        pendingCount: effective.pendingNodeIds.length,
-      },
+      mainSessionId: input.executionSession.id,
+      status: "cancelled",
+      effective: outcome.effective as unknown as EffectivePlanGraph,
+      currentNodeId: null,
+      executedNodeIds: outcome.executedNodeIds,
+      message: outcome.message,
     });
+  }
 
-    if (effective.readyNodeIds.length === 0 && !forcedNodeId) {
-      return completeExecution({
-        taskId: input.taskId,
-        planId: runtime.planId,
-        session: input.executionSession,
-        mainSessionId: input.mainSession.id,
-        effective,
-        executedNodeIds,
-        message: `Execution ${mapTerminalReasonToStatus(effective)}: no ready nodes`,
-      });
-    }
-
-    const nextNodeId = pickNextNodeId(effective, forcedNodeId);
-    if (!nextNodeId) {
-      return completeExecution({
-        taskId: input.taskId,
-        planId: runtime.planId,
-        session: input.executionSession,
-        mainSessionId: input.mainSession.id,
-        effective,
-        executedNodeIds,
-        message: "Execution paused: no eligible node found",
-      });
-    }
-
-    const effectiveNode = effective.nodes.find((node) => node.id === nextNodeId);
-    if (!effectiveNode || !effectiveNode.activeLayerId) {
-      throw new Error(`Effective node ${nextNodeId} is missing active layer`);
-    }
-    forcedNodeId = undefined;
-
-    if (input.userInput) {
-      results = markNodeResults(
-        results,
-        nextNodeId,
-        input.forcedReplaceStatus ?? "obsolete",
-      );
-    }
-
-    const executor = dispatchExecutor(effectiveNode);
-    if (!executor) {
-      results = appendCurrentResult({
-        results,
-        result: {
-          id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-          taskId: input.taskId,
-          graphId: graph.id,
-          nodeId: nextNodeId,
-          nodeLayerId: effectiveNode.activeLayerId,
-          status: "current",
-          waitKind: "capability_unavailable",
-          error: `No executor for node type: ${effectiveNode.type}`,
-        },
-      });
-      await persistRuntimeState({
-        workspaceId: runtime.workspaceId,
-        taskId: input.taskId,
-        planId: runtime.planId,
-        compiledPlan: runtime.compiledPlan,
-        graph,
-        attempts,
-        results,
-        executionContextSnapshots,
-        existingRun: runtime.persisted.planRun,
-      });
-      const blockedEffective = resolveEffectivePlanGraph({ graph, attempts, results });
-      return pauseExecution({
-        taskId: input.taskId,
-        planId: runtime.planId,
-        mainSessionId: input.mainSession.id,
-        session: input.executionSession,
-        effective: blockedEffective,
-        waitKind: "capability_unavailable",
-        currentNodeId: nextNodeId,
-        executedNodeIds,
-        message: `No executor for node type: ${effectiveNode.type}`,
-      });
-    }
-
-    const snapshot = createExecutionContextSnapshot({
-      graphId: graph.id,
-      nodeId: nextNodeId,
-      nodeLayerId: effectiveNode.activeLayerId,
-      graphVersion: graph.mutations.length,
-      runtimeName,
-      userInput: input.userInput,
-    });
-    executionContextSnapshots.push(snapshot);
-
-    const runningAttempt: NodeAttempt = {
-      id: `attempt_${graph.id}_${nextNodeId}_${Date.now()}`,
+  if (outcome.status === "completed") {
+    return completeExecution({
       taskId: input.taskId,
-      graphId: graph.id,
-      nodeId: nextNodeId,
-      nodeLayerId: effectiveNode.activeLayerId,
-      executionContextSnapshotId: snapshot.id,
-      status: "running",
-      idempotencyKey: `${graph.id}:${nextNodeId}:${Date.now()}`,
-      attemptNumber:
-        attempts.filter((attempt) => attempt.nodeId === nextNodeId).length + 1,
-      startedAt: snapshot.createdAt,
-    };
-    attempts.push(runningAttempt);
+      planId: runtime.planId,
+      session: input.executionSession,
+      mainSessionId: input.mainSession.id,
+      effective: outcome.effective as unknown as EffectivePlanGraph,
+      executedNodeIds: outcome.executedNodeIds,
+      message: outcome.message,
+    });
+  }
 
+  if (outcome.status === "running") {
     await setExecutionSessionState({
       sessionId: input.executionSession.id,
       status: "Active",
-      currentNodeId: nextNodeId,
+      currentNodeId: currentNodeFromOutcome(outcome),
       pauseReason: null,
-      completedNodeIds: effective.completedNodeIds,
+      completedNodeIds: outcome.effective.completedNodeIds,
     });
-
     await db.task.update({
       where: { id: input.taskId },
       data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
     });
-
-    await appendMainSessionEvent({
+    await rebuildTaskProjection(input.taskId);
+    return buildExecutionResponse({
       taskId: input.taskId,
       planId: runtime.planId,
-      sessionId: input.mainSession.id,
-      eventType: "node_started",
-      payload: {
-        nodeId: nextNodeId,
-        nodeTitle: effectiveNode.title,
-        nodeType: effectiveNode.type,
-      },
+      mainSessionId: input.mainSession.id,
+      status: "running",
+      effective: outcome.effective as unknown as EffectivePlanGraph,
+      currentNodeId: currentNodeFromOutcome(outcome),
+      executedNodeIds: outcome.executedNodeIds,
+      message: outcome.message,
     });
-
-    await persistRuntimeState({
-      workspaceId: runtime.workspaceId,
-      taskId: input.taskId,
-      planId: runtime.planId,
-      compiledPlan: runtime.compiledPlan,
-      graph,
-      attempts,
-      results,
-      executionContextSnapshots,
-      existingRun: runtime.persisted.planRun,
-    });
-
-    const result = await executor.execute({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      mainSession: input.mainSession,
-      node: effectiveNode,
-      plan: effective,
-      trigger: input.trigger,
-      runtimeName,
-      userInput: input.userInput,
-    });
-
-    const finishedAt = new Date().toISOString();
-    switch (result.status) {
-      case "done": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "succeeded",
-          finishedAt,
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            outputSummary: result.summary,
-            selectedBranch: result.selectedBranch,
-          },
-        });
-        executedNodeIds.push(nextNodeId);
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "node_completed",
-          payload: { nodeId: nextNodeId, summary: result.summary },
-        });
-        break;
-      }
-      case "waiting_for_user": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "succeeded",
-          finishedAt,
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            waitKind: "user_input",
-            error: result.reason,
-          },
-        });
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "node_waiting_for_user",
-          payload: { nodeId: nextNodeId, prompt: result.prompt },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        return pauseExecution({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          session: input.executionSession,
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          waitKind: "user_input",
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.prompt,
-        });
-      }
-      case "waiting_for_approval": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "succeeded",
-          finishedAt,
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            waitKind: "approval",
-            error: result.reason,
-            review: {
-              required: true,
-              status: "pending",
-            },
-          },
-        });
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "node_waiting_for_approval",
-          payload: { nodeId: nextNodeId, prompt: result.prompt },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        return pauseExecution({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          session: input.executionSession,
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          waitKind: "approval",
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.prompt,
-        });
-      }
-      case "child_running": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "succeeded",
-          finishedAt,
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            waitKind: "external_dependency",
-            outputSummary: result.summary,
-          },
-        });
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "child_run_started",
-          payload: {
-            nodeId: nextNodeId,
-            childSessionId: result.evidence.childSessionId,
-            childRunId: result.evidence.runId,
-            childTaskId: result.evidence.childTaskId,
-          },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        return pauseExecution({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          session: input.executionSession,
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          waitKind: "external_dependency",
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.summary,
-        });
-      }
-      case "blocked": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "failed",
-          finishedAt,
-          error: { code: "NODE_BLOCKED", message: result.reason },
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            waitKind: "manual_action",
-            error: result.reason,
-          },
-        });
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "node_blocked",
-          payload: { nodeId: nextNodeId, reason: result.reason },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        return pauseExecution({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          session: input.executionSession,
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          waitKind: "manual_action",
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.reason,
-        });
-      }
-      case "failed": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "failed",
-          finishedAt,
-          error: { code: "NODE_FAILED", message: result.error },
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "rejected",
-            error: result.error,
-          },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        await setExecutionSessionState({
-          sessionId: input.executionSession.id,
-          status: "Abandoned",
-          currentNodeId: nextNodeId,
-          pauseReason: "manual_action",
-          completedNodeIds: resolveEffectivePlanGraph({ graph, attempts, results }).completedNodeIds,
-        });
-        await db.task.update({
-          where: { id: input.taskId },
-          data: {
-            status: TaskStatus.Failed,
-            blockReason: {
-              blockType: "node_failed",
-              scope: "plan_node",
-              actionRequired: result.error,
-              nodeId: nextNodeId,
-            },
-          },
-        });
-        await rebuildTaskProjection(input.taskId);
-        return buildExecutionResponse({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          status: "blocked",
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.error,
-        });
-      }
-      case "replan_required": {
-        attempts = updateAttemptStatus({
-          attempts,
-          attemptId: runningAttempt.id,
-          status: "succeeded",
-          finishedAt,
-        });
-        results = appendCurrentResult({
-          results,
-          result: {
-            id: `result_${graph.id}_${nextNodeId}_${Date.now()}`,
-            taskId: input.taskId,
-            graphId: graph.id,
-            nodeId: nextNodeId,
-            nodeLayerId: effectiveNode.activeLayerId,
-            attemptId: runningAttempt.id,
-            status: "current",
-            waitKind: "approval",
-            error: result.reason,
-            review: {
-              required: true,
-              status: "request_changes",
-              feedback: result.reason,
-            },
-          },
-        });
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          sessionId: input.mainSession.id,
-          eventType: "replan_proposed",
-          payload: { nodeId: nextNodeId, reason: result.reason },
-        });
-        await persistRuntimeState({
-          workspaceId: runtime.workspaceId,
-          taskId: input.taskId,
-          planId: runtime.planId,
-          compiledPlan: runtime.compiledPlan,
-          graph,
-          attempts,
-          results,
-          executionContextSnapshots,
-          existingRun: runtime.persisted.planRun,
-        });
-        return pauseExecution({
-          taskId: input.taskId,
-          planId: runtime.planId,
-          mainSessionId: input.mainSession.id,
-          session: input.executionSession,
-          effective: resolveEffectivePlanGraph({ graph, attempts, results }),
-          waitKind: "approval",
-          currentNodeId: nextNodeId,
-          executedNodeIds,
-          message: result.reason,
-        });
-      }
-    }
-
-    await persistRuntimeState({
-      workspaceId: runtime.workspaceId,
-      taskId: input.taskId,
-      planId: runtime.planId,
-      compiledPlan: runtime.compiledPlan,
-      graph,
-      attempts,
-      results,
-      executionContextSnapshots,
-      existingRun: runtime.persisted.planRun,
-    });
-    input.userInput = undefined;
   }
 
-  await rebuildTaskProjection(input.taskId);
-  const effective = resolveEffectivePlanGraph({ graph, attempts, results });
-  return buildExecutionResponse({
+  return pauseExecution({
     taskId: input.taskId,
     planId: runtime.planId,
     mainSessionId: input.mainSession.id,
-    status: "running",
-    effective,
-    currentNodeId: input.executionSession.currentNodeId,
-    executedNodeIds,
-    message: "Max steps reached. Call advancePlanExecution again to continue.",
+    session: input.executionSession,
+    effective: outcome.effective as unknown as EffectivePlanGraph,
+    waitKind: waitKindFromOutcome(outcome),
+    currentNodeId: currentNodeFromOutcome(outcome) ?? input.executionSession.currentNodeId ?? "",
+    executedNodeIds: outcome.executedNodeIds,
+    message: outcome.message,
   });
 }
 
@@ -1337,32 +1026,17 @@ export async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         planId: runtime.planId,
       });
-      const attempts = cancelActiveAttempt(
-        runtime.persisted.attempts,
-        input.action.nodeId,
-        input.action.prompt ?? "Node retry requested",
-      );
-      const results = markNodeResults(runtime.persisted.results, input.action.nodeId, "obsolete");
-      await persistRuntimeState({
-        workspaceId: runtime.workspaceId,
-        taskId: input.taskId,
-        planId: runtime.planId,
-        compiledPlan: runtime.compiledPlan,
-        graph: runtime.persisted.graph!,
-        attempts,
-        results,
-        executionContextSnapshots: runtime.persisted.executionContextSnapshots,
-        existingRun: runtime.persisted.planRun,
-      });
-
       return advancePlanExecution({
         taskId: input.taskId,
         trigger: "manual",
         mainSession,
         executionSession,
-        userInput: input.action.prompt,
-        forcedNodeId: input.action.nodeId,
-        forcedReplaceStatus: "obsolete",
+        command: {
+          type: "retry_node",
+          nodeId: input.action.nodeId,
+          reason: input.action.prompt ?? "Node retry requested",
+          userInput: input.action.prompt,
+        },
       });
     }
     case "cancel_session": {
@@ -1388,57 +1062,20 @@ export async function dispatchExecutionAction(input: {
         trigger: "manual",
         sessionId: input.action.sessionId,
       });
-      const attempts = cancelActiveAttempt(
-        runtime.persisted.attempts,
-        executionSession.currentNodeId ?? "",
-        input.action.reason ?? "Execution cancelled",
-      );
-      await persistRuntimeState({
-        workspaceId: runtime.workspaceId,
+      const mainSession = await ensurePlanMainSession({
         taskId: input.taskId,
         planId: runtime.planId,
-        compiledPlan: runtime.compiledPlan,
-        graph: runtime.persisted.graph!,
-        attempts,
-        results: runtime.persisted.results,
-        executionContextSnapshots: runtime.persisted.executionContextSnapshots,
-        existingRun: runtime.persisted.planRun,
       });
-      await setExecutionSessionState({
-        sessionId: executionSession.id,
-        status: "Abandoned",
-        currentNodeId: null,
-        pauseReason: input.action.reason ?? "cancelled",
-        completedNodeIds: resolveEffectivePlanGraph({
-          graph: runtime.persisted.graph!,
-          attempts,
-          results: runtime.persisted.results,
-        }).completedNodeIds,
-      });
-      await cancelWorkBlock(input.taskId, executionSession.workBlockId);
-      await db.task.update({
-        where: { id: input.taskId },
-        data: {
-          status: TaskStatus.Cancelled,
-          blockReason: {
-            blockType: "execution_cancelled",
-            scope: "plan_execution",
-            actionRequired: input.action.reason ?? "Execution cancelled",
-          },
+      return advancePlanExecution({
+        taskId: input.taskId,
+        trigger: "manual",
+        mainSession,
+        executionSession,
+        command: {
+          type: "cancel_session",
+          reason: input.action.reason ?? "Execution cancelled",
         },
       });
-      await rebuildTaskProjection(input.taskId);
-      return {
-        taskId: input.taskId,
-        planId: runtime.planId,
-        mainSessionId: executionSession.id,
-        status: "cancelled",
-        currentNodeId: null,
-        executedNodeIds: [],
-        waitingNodeIds: [],
-        blockedNodeIds: [],
-        message: input.action.reason ?? "Execution cancelled",
-      };
     }
     default: {
       const exhaustiveCheck: never = input.action;

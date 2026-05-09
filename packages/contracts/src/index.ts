@@ -32,6 +32,12 @@ export type {
 
 export {
   PlanCompileError,
+  editableEdgeSchema,
+  editableNodeSchema,
+  editablePlanSchema,
+  planBlueprintSchema,
+  planPatchOperationSchema,
+  planPatchSchema,
   upgradeBlueprintToEditable,
 } from "./ai-plan-blueprint";
 
@@ -199,6 +205,10 @@ export type {
 } from "./ai-dispatch-types";
 
 export {
+  TASK_DISPATCH_ACTIONS,
   isAutoExecutableDispatchDecision,
   parseTaskDispatchDecision,
+  taskDispatchActionSchema,
+  taskDispatchDecisionSchema,
+  taskPlanPatchSchema,
 } from "./ai-dispatch-types";

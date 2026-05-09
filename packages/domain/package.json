@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chrona/contracts": "workspace:*"
+    "@chrona/contracts": "workspace:*",
+    "@chrona/graph-runtime": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",

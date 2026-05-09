@@ -149,30 +149,6 @@ export class PlanCompileError extends Error {
 // PlanPatch (AI/user editing protocol)
 // ═══════════════════════════════════════════════════════════════
 
-export type PlanPatchOperation =
-  | {
-      op: "update_plan";
-      patch: Partial<Pick<EditablePlan, "title" | "goal" | "assumptions">>;
-    }
-  | { op: "add_node"; node: EditableNode }
-  | { op: "update_node"; nodeId: string; patch: Partial<EditableNode> }
-  | { op: "delete_node"; nodeId: string }
-  | { op: "add_edge"; edge: EditableEdge }
-  | { op: "delete_edge"; from: string; to: string }
-  | {
-      op: "replace_subgraph";
-      removeNodeIds: string[];
-      addNodes: EditableNode[];
-      addEdges: EditableEdge[];
-    };
-
-export interface PlanPatch {
-  basePlanId: string;
-  baseVersion: number;
-  rationale?: string;
-  operations: PlanPatchOperation[];
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Zod schemas — for AI output validation (PlanBlueprint, loose)
 // ═══════════════════════════════════════════════════════════════
@@ -394,6 +370,77 @@ export const editablePlanSchema = z
   })
   .strict();
 
+// ─── PlanPatch schema (AI/user editing protocol) ───
+
+const editablePlanMetadataPatchSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    goal: z.string().min(1).optional(),
+    assumptions: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
+export const planPatchOperationSchema = z.discriminatedUnion("op", [
+  z
+    .object({
+      op: z.literal("update_plan"),
+      patch: editablePlanMetadataPatchSchema,
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("add_node"),
+      node: editableNodeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("update_node"),
+      nodeId: z.string().min(1),
+      patch: z.record(z.string(), z.unknown()).refine(
+        (patch) => patch.type === undefined,
+        "node type cannot be changed by update_node",
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("delete_node"),
+      nodeId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("add_edge"),
+      edge: editableEdgeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("delete_edge"),
+      from: z.string().min(1),
+      to: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("replace_subgraph"),
+      removeNodeIds: z.array(z.string().min(1)),
+      addNodes: z.array(editableNodeSchema),
+      addEdges: z.array(editableEdgeSchema),
+    })
+    .strict(),
+]);
+
+export const planPatchSchema = z
+  .object({
+    basePlanId: z.string().min(1),
+    baseVersion: z.number().int().positive(),
+    rationale: z.string().optional(),
+    operations: z.array(planPatchOperationSchema).min(1),
+  })
+  .strict();
+
 // ═══════════════════════════════════════════════════════════════
 // Schema-derived types
 // ═══════════════════════════════════════════════════════════════
@@ -413,3 +460,5 @@ export type EditableWaitNode = z.infer<typeof editableWaitNodeSchema>;
 export type EditableNode = z.infer<typeof editableNodeSchema>;
 export type EditableEdge = z.infer<typeof editableEdgeSchema>;
 export type EditablePlan = z.infer<typeof editablePlanSchema>;
+export type PlanPatchOperation = z.infer<typeof planPatchOperationSchema>;
+export type PlanPatch = z.infer<typeof planPatchSchema>;
