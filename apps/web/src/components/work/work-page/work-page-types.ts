@@ -8,10 +8,10 @@ export type WorkPageClientProps = {
       id: string;
       workspaceId: string;
       title: string;
-      runtimeModel: string | null;
-      prompt: string | null;
+      executionRuntime: string;
+      executionConfig: unknown;
       status: string;
-      priority: string;
+        priority: string | { toString(): string };
       dueAt: string | null;
       scheduledStartAt: string | null;
       scheduledEndAt: string | null;

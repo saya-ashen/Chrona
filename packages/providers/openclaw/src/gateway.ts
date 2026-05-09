@@ -87,7 +87,7 @@ function summarizeBridgeRequest(
     taskId: request.taskId ?? null,
     workspaceId: request.workspaceId ?? null,
     taskTitle: request.taskTitle ?? null,
-    runtimeAdapterKey: request.runtimeAdapterKey ?? null,
+    executionRuntime: request.executionRuntime ?? null,
     runtimeInputKeys: request.runtimeInput
       ? Object.keys(request.runtimeInput).sort()
       : [],
@@ -501,8 +501,8 @@ function stringifyExecutionInput(
   if (execution.workspaceId?.trim()) {
     parts.push(`Workspace id: ${execution.workspaceId.trim()}`);
   }
-  if (execution.runtimeAdapterKey?.trim()) {
-    parts.push(`Runtime adapter: ${execution.runtimeAdapterKey.trim()}`);
+  if (execution.executionRuntime?.trim()) {
+    parts.push(`Execution runtime: ${execution.executionRuntime.trim()}`);
   }
 
   const runtimeInput = execution.runtimeInput ?? {};

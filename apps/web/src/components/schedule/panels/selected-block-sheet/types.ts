@@ -1,14 +1,14 @@
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import type {
+  TaskConfigExecutionRuntime,
   TaskConfigFormInput,
-  TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
 
 export interface SelectedBlockSheetProps {
   item: ScheduledItem;
   selectedDay: string;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onClose: () => void;
   onSaveTaskConfigAction: (

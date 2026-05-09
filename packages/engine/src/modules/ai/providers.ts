@@ -12,8 +12,18 @@ import { AiClientError } from "@chrona/contracts";
 
 const clientCache = new Map<string, OpenClawClient>();
 
+function getOpenClawGatewayUrl(config: OpenClawClientConfig): string | undefined {
+  return typeof config.gatewayUrl === "string" && config.gatewayUrl
+    ? config.gatewayUrl
+    : config.bridgeUrl;
+}
+
 function getClientKey(config: OpenClawClientConfig): string {
-  return [config.gatewayUrl, config.gatewayToken, config.model].join(":");
+  return [
+    getOpenClawGatewayUrl(config),
+    config.gatewayToken ?? config.bridgeToken,
+    config.model,
+  ].join(":");
 }
 
 export function getOrCreateClient(
@@ -22,9 +32,8 @@ export function getOrCreateClient(
   const key = getClientKey(config);
   const cached = clientCache.get(key);
   if (cached) return cached;
-  const gatewayUrl = config.gatewayUrl || config.bridgeUrl;
   const client = new OpenClawClient({
-    gatewayUrl,
+    gatewayUrl: getOpenClawGatewayUrl(config) ?? "",
     gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
     model: config.model,
     timeoutSeconds: config.timeoutSeconds,
@@ -39,8 +48,13 @@ export async function checkClientHealth(
   try {
     if (client.type === "openclaw") {
       const config = client.config as OpenClawClientConfig;
+      const gatewayUrl = getOpenClawGatewayUrl(config);
+      if (!gatewayUrl) {
+        return { available: false, reason: "Gateway URL is required" };
+      }
+
       const openClawClient = new OpenClawClient({
-        gatewayUrl: config.gatewayUrl || config.bridgeUrl,
+        gatewayUrl,
         gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
         model: config.model,
         timeoutSeconds: config.timeoutSeconds,
@@ -83,6 +97,20 @@ export async function checkClientHealth(
         error instanceof Error ? error.message : "Client health check failed",
     };
   }
+}
+
+export async function testAiClientAvailability(input: {
+  type: AiClientRecord["type"];
+  config?: Record<string, unknown>;
+}): Promise<{ available: boolean; reason: string }> {
+  return checkClientHealth({
+    id: "test-client",
+    name: "Test Client",
+    type: input.type,
+    config: (input.config ?? {}) as unknown as AiClientRecord["config"],
+    isDefault: false,
+    enabled: true,
+  });
 }
 
 export function extractJSON(text: string): Record<string, unknown> | null {

@@ -14,8 +14,8 @@ import { useSelectedBlockPlanState } from "@/components/schedule/panels/selected
 export function SelectedBlockSheet({
   item,
   selectedDay: _selectedDay,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   onClose,
   onSaveTaskConfigAction,
@@ -78,8 +78,8 @@ export function SelectedBlockSheet({
               <SelectedBlockMainColumn
                 item={item}
                 copy={copy}
-                runtimeAdapters={runtimeAdapters}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                executionRuntimes={executionRuntimes}
+                defaultExecutionRuntime={defaultExecutionRuntime}
                 isPending={isPending}
                 acceptedPlan={acceptedPlan}
                 onTaskConfigDraftStateChange={handleTaskConfigDraftStateChange}

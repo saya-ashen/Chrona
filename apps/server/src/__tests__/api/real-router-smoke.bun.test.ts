@@ -115,7 +115,7 @@ describe("Real router smoke", () => {
     expect(created.workspaceId).toBe(workspaceId);
 
     const getRes = await app().request(
-      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
     );
     expect(getRes.status).toBe(200);
     const getBody = await json<{ task: { title: string; description: string | null } }>(getRes);
@@ -136,7 +136,7 @@ describe("Real router smoke", () => {
     expect(patchRes.status).toBe(200);
 
     const verifyRes = await app().request(
-      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
     );
     const verifyBody = await json<{ task: { title: string; status: string } }>(verifyRes);
     expect(verifyBody.task.title).toBe("Router-updated task");
@@ -149,7 +149,7 @@ describe("Real router smoke", () => {
     expect(deleteRes.status).toBe(200);
 
     const missingRes = await app().request(
-      `http://local/api/tasks/${created.taskId}/detail?workspaceId=${workspaceId}`,
+      `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
     );
     await expectApiError(missingRes, 404);
   });
@@ -176,7 +176,7 @@ describe("Real router smoke", () => {
     });
     expect(acceptRes.status).toBe(200);
 
-    const stateRes = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
+    const stateRes = await app().request(`http://local/api/tasks/${taskId}/plan`);
     expect(stateRes.status).toBe(200);
     const stateBody = await json<{
       aiPlanGenerationStatus: string;
@@ -240,7 +240,7 @@ describe("Real router smoke", () => {
     expect(createAcceptedRes.status).toBe(201);
     const acceptedProposal = await json<{ proposalId: string }>(createAcceptedRes);
 
-    const acceptRes = await app().request("http://local/api/schedule/proposals/decision", {
+    const acceptRes = await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId: acceptedProposal.proposalId, decision: "Accepted", workspaceId }),
@@ -275,7 +275,7 @@ describe("Real router smoke", () => {
     expect(createRejectedRes.status).toBe(201);
     const rejectedProposal = await json<{ proposalId: string }>(createRejectedRes);
 
-    const rejectRes = await app().request("http://local/api/schedule/proposals/decision", {
+    const rejectRes = await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId: rejectedProposal.proposalId, decision: "Rejected", workspaceId }),

@@ -3,24 +3,16 @@ interface CreateTaskInput {
   title: string;
   description?: string;
   priority?: string;
-  dueAt?: string;
-  runtimeAdapterKey?: string;
-  runtimeModel?: string;
-  prompt?: string;
-  runtimeConfig?: Record<string, unknown>;
+  executionRuntime?: "openclaw" | "research";
+  executionConfig?: Record<string, unknown>;
 }
 
 interface UpdateTaskInput {
   title?: string;
   description?: string;
   priority?: string;
-  dueAt?: string | null;
-  scheduledStartAt?: string | null;
-  scheduledEndAt?: string | null;
-  runtimeAdapterKey?: string;
-  runtimeModel?: string;
-  prompt?: string;
-  runtimeConfig?: Record<string, unknown>;
+  executionRuntime?: "openclaw" | "research";
+  executionConfig?: Record<string, unknown>;
 }
 
 interface AutoCompleteInput {
@@ -75,7 +67,7 @@ export class ApiClient {
   }
 
   private async request<T>(
-    method: "GET" | "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
   ): Promise<T> {
@@ -115,7 +107,7 @@ export class ApiClient {
   getTaskDetail(taskId: string) {
     return this.request<unknown>(
       "GET",
-      `/api/tasks/${encodeURIComponent(taskId)}/detail`,
+      `/api/tasks/${encodeURIComponent(taskId)}`,
     );
   }
 
@@ -141,7 +133,7 @@ export class ApiClient {
   markDone(taskId: string) {
     return this.request<unknown>(
       "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/done`,
+      `/api/tasks/${encodeURIComponent(taskId)}/complete`,
     );
   }
 
@@ -155,18 +147,19 @@ export class ApiClient {
   startExecution(taskId: string, prompt?: string) {
     return this.request<unknown>(
       "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/run`,
-      prompt ? { prompt } : {},
+      `/api/tasks/${encodeURIComponent(taskId)}/execution/actions`,
+      { action: "start_manual", prompt },
     );
   }
 
   sendMessage(taskId: string, message: string, runId?: string) {
     return this.request<unknown>(
       "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/message`,
+      `/api/tasks/${encodeURIComponent(taskId)}/execution/actions`,
       {
-        message,
-        runId,
+        action: "resume_after_unblock",
+        note: message,
+        sessionId: runId,
       },
     );
   }
@@ -174,8 +167,9 @@ export class ApiClient {
   submitExecutionInput(taskId: string, inputText: string) {
     return this.request<unknown>(
       "POST",
-      `/api/tasks/${encodeURIComponent(taskId)}/input`,
+      `/api/tasks/${encodeURIComponent(taskId)}/execution/actions`,
       {
+        action: "resume_with_input",
         inputText,
       },
     );
@@ -187,30 +181,27 @@ export class ApiClient {
     scheduledEndAt: string,
   ) {
     return this.request<unknown>(
-      "PATCH",
-      `/api/tasks/${encodeURIComponent(taskId)}`,
+      "PUT",
+      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
       {
         scheduledStartAt,
         scheduledEndAt,
+        scheduleSource: "human",
       },
     );
   }
 
   clearSchedule(taskId: string) {
     return this.request<unknown>(
-      "PATCH",
-      `/api/tasks/${encodeURIComponent(taskId)}`,
-      {
-        scheduledStartAt: null,
-        scheduledEndAt: null,
-      },
+      "DELETE",
+      `/api/tasks/${encodeURIComponent(taskId)}/schedule`,
     );
   }
 
   getScheduleProjection(workspaceId: string) {
     return this.request<unknown>(
       "GET",
-      `/api/schedule/projection${buildQuery({ workspaceId })}`,
+      `/api/schedule${buildQuery({ workspaceId })}`,
     );
   }
 
@@ -220,7 +211,7 @@ export class ApiClient {
 
   async generateTaskPlan(input: GenerateTaskPlanInput) {
     const response = await fetch(
-      `${this.baseUrl}/api/tasks/${encodeURIComponent(input.taskId)}/plan/generate`,
+      `${this.baseUrl}/api/tasks/${encodeURIComponent(input.taskId)}/plan/generations`,
       {
         method: "POST",
         headers: {
@@ -241,7 +232,7 @@ export class ApiClient {
       }
 
       throw new Error(
-        `POST /api/tasks/${encodeURIComponent(input.taskId)}/plan/generate failed (${response.status}): ${message}`,
+        `POST /api/tasks/${encodeURIComponent(input.taskId)}/plan/generations failed (${response.status}): ${message}`,
       );
     }
 

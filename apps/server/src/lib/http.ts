@@ -8,21 +8,22 @@ export function error(c: Context, message: string, status: number = 400) {
   return json(c, { error: message }, status);
 }
 
-export function internalServerError(c: Context, route: string, cause: unknown, fallback: string) {
+export function internalServerError(
+  c: Context,
+  route: string,
+  cause: unknown,
+  fallback: string,
+) {
   const message = cause instanceof Error ? cause.message : fallback;
   console.error(`${route} error:`, cause);
   return error(c, message, 500);
 }
 
-export function requireQuery(c: Context, key: string) {
-  const value = c.req.query(key);
-  if (!value) {
-    throw new HttpError(400, `${key} is required`);
-  }
-  return value;
-}
-
-export function parseLimit(value: string | undefined, defaultValue: number, max: number) {
+export function parseLimit(
+  value: string | undefined,
+  defaultValue: number,
+  max: number,
+) {
   if (!value) {
     return defaultValue;
   }

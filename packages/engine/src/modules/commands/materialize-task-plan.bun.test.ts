@@ -47,7 +47,6 @@ describe("materialize-task-plan", () => {
         title: "Parent graph task",
         status: "Ready",
         priority: "High",
-        ownerType: "human",
       },
     });
 
@@ -79,7 +78,6 @@ describe("materialize-task-plan", () => {
             executor: "ai",
             priority: "High",
             estimatedMinutes: 20,
-            metadata: { order: 1 },
           },
           {
             id: "node-2",
@@ -94,21 +92,19 @@ describe("materialize-task-plan", () => {
             executor: "ai",
             priority: "Medium",
             estimatedMinutes: 40,
-            metadata: { order: 2 },
           },
           {
             id: "node-3",
             localId: "node-3",
             type: "checkpoint",
             title: "Review result",
-            config: { checkpointType: "approve" },
+            config: { checkpointType: "approve" } as NodeConfig,
             dependencies: [],
             dependents: [],
             mode: "manual",
             executor: "user",
             priority: "Medium",
             estimatedMinutes: 10,
-            metadata: { order: 3 },
           },
         ],
         edges: [

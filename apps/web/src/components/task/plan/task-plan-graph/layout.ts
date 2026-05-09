@@ -61,7 +61,10 @@ export function buildFlowLayout(input: {
   }
 
   for (const edge of input.plan.edges) {
-    graph.setEdge(edge.from, edge.to);
+    const from = edge.from ?? edge.fromNodeId;
+    const to = edge.to ?? edge.toNodeId;
+    if (!from || !to) continue;
+    graph.setEdge(from, to);
   }
 
   dagre.layout(graph);
@@ -124,7 +127,7 @@ export function buildFlowLayout(input: {
       data: {
         node,
         tone: getNodeTone(node),
-        shape: nodeShapeForKind(node.kind),
+        shape: nodeShapeForKind(node.kind === "step" || node.kind === "user_input" ? "task" : (node.kind ?? node.type ?? "task")),
         isSelected,
         isFocus: focusSet.size === 0 || focusSet.has(node.id) || node.status === "blocked",
         graphCopy: input.graphCopy,
@@ -134,8 +137,10 @@ export function buildFlowLayout(input: {
   });
 
   const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => {
-    const baseStyle = buildEdgeStyle(edge.kind, edge.emphasis);
-    const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(edge.from), nodeById.get(edge.to));
+    const from = edge.from ?? edge.fromNodeId ?? "";
+    const to = edge.to ?? edge.toNodeId ?? "";
+    const baseStyle = buildEdgeStyle(edge.kind ?? "sequential", edge.emphasis ?? "normal");
+    const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(from), nodeById.get(to));
 
     const runtimeStyle = runtimeEdgeState === "active"
       ? { stroke: "rgba(14, 165, 233, 0.96)", strokeWidth: 3.1, strokeDasharray: undefined }
@@ -149,8 +154,8 @@ export function buildFlowLayout(input: {
 
     return {
       id: edge.id,
-      source: edge.from,
-      target: edge.to,
+      source: from,
+      target: to,
       type: "smoothstep",
       selectable: false,
       reconnectable: false,
@@ -162,9 +167,9 @@ export function buildFlowLayout(input: {
       },
       style: {
         ...(runtimeStyle ?? baseStyle),
-        opacity: runtimeStyle || edge.emphasis !== "normal"
+        opacity: runtimeStyle || (edge.emphasis ?? "normal") !== "normal"
           ? 1
-          : focusSet.size > 0 && !focusSet.has(edge.from) && !focusSet.has(edge.to)
+          : focusSet.size > 0 && !focusSet.has(from) && !focusSet.has(to)
             ? 0.35
             : 1,
       },

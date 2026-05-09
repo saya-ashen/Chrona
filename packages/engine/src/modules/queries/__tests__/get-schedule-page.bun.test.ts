@@ -66,7 +66,6 @@ describe("getSchedulePage", () => {
         title: "Ship projection cleanup",
         status: "Ready",
         priority: "High",
-        ownerType: "human",
         dueAt: dayAfterTomorrowEighteen,
       },
     });
@@ -77,7 +76,6 @@ describe("getSchedulePage", () => {
         title: "Queue follow-up docs",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
         dueAt: todayTwenty,
       },
     });
@@ -89,7 +87,6 @@ describe("getSchedulePage", () => {
         title: "Draft the follow-up outline",
         status: "Ready",
         priority: "Low",
-        ownerType: "human",
       },
     });
 
@@ -108,7 +105,6 @@ describe("getSchedulePage", () => {
         title: "Review launch checklist",
         status: "Ready",
         priority: "Low",
-        ownerType: "human",
       },
     });
 
@@ -118,7 +114,6 @@ describe("getSchedulePage", () => {
         title: "Recover overdue adapter run",
         status: "Blocked",
         priority: "Urgent",
-        ownerType: "human",
         dueAt: todayEighteen,
       },
     });
@@ -207,7 +202,6 @@ describe("getSchedulePage", () => {
         title: "Hidden schedule item",
         status: "Ready",
         priority: "Low",
-        ownerType: "human",
       },
     });
 

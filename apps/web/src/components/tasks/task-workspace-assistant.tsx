@@ -25,9 +25,8 @@ type CurrentTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
   status: string;
 };
 
@@ -144,7 +143,7 @@ async function markMessageApplied(taskId: string, messageId: string): Promise<bo
 const SUGGESTIONS = [
   "Change the due date to tomorrow",
   "Add a testing step to the plan",
-  "Make the prompt more creative",
+  "Tune the execution config",
   "Increase priority to High",
 ];
 

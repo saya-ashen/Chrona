@@ -4,7 +4,7 @@ import {
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
 import { startRuntimeRun } from "@/modules/task-execution/start-runtime-run";
-import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
+import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
 
 type EnsureNodeChildSessionInput = {
   taskId: string;
@@ -50,7 +50,7 @@ function buildNodeChildSessionKey(input: {
 export async function ensureNodeChildSession(
   input: EnsureNodeChildSessionInput,
 ): Promise<EnsureNodeChildSessionResult> {
-  const runtimeName = input.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
+  const runtimeName = input.runtimeName ?? OPENCLAW_EXECUTION_RUNTIME;
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
@@ -99,13 +99,13 @@ export async function ensureNodeChildSession(
 export async function startNodeChildRun(
   input: StartNodeChildRunInput,
 ): Promise<StartNodeChildRunResult> {
-  const runtimeName = input.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
+  const runtimeName = input.runtimeName ?? OPENCLAW_EXECUTION_RUNTIME;
 
   const { RunStatus } = await import("@/generated/prisma/client");
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { workspaceId: true, runtimeInput: true },
+    select: { workspaceId: true, executionConfig: true },
   });
 
   let runtimeRunRef: string | null = null;
@@ -116,7 +116,7 @@ export async function startNodeChildRun(
       taskSessionId: input.childSessionId,
       runtimeName,
       runtimeSessionKey: input.childSessionKey,
-      runtimeInput: (task.runtimeInput as Record<string, unknown> | undefined) ?? {},
+      runtimeInput: (task.executionConfig as Record<string, unknown> | undefined) ?? {},
       prompt: input.prompt,
       triggeredBy: "system",
       mode: "allow_async",

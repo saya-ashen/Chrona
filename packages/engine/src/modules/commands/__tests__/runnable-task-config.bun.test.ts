@@ -128,7 +128,6 @@ describe("runnable task config commands", () => {
         title: "Update runnable config",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 
@@ -173,7 +172,6 @@ describe("runnable task config commands", () => {
         title: "Clear runtime config",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
         runtimeModel: "gpt-5.4",
         prompt: "Keep the prompt",
         runtimeConfig: { temperature: 0.7 },
@@ -207,7 +205,6 @@ describe("runnable task config commands", () => {
         title: "Promote to ready",
         status: "Draft",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 
@@ -237,7 +234,6 @@ describe("runnable task config commands", () => {
         title: "Explicit runtime input wins",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: {
           model: "gpt-5.4",
@@ -282,7 +278,6 @@ describe("runnable task config commands", () => {
         title: "Switch adapters",
         status: "Draft",
         priority: "Medium",
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: {
           model: "gpt-5.4",
@@ -333,7 +328,6 @@ describe("runnable task config commands", () => {
         title: "Switch adapters by key only",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: {
           model: "gpt-5.4",
@@ -382,7 +376,6 @@ describe("runnable task config commands", () => {
         title: "Demote to draft",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
         runtimeModel: "gpt-5.4",
         prompt: "Run the task",
       },
@@ -422,7 +415,6 @@ describe("runnable task config commands", () => {
         title: "Reject empty prompt",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 

@@ -3,8 +3,8 @@ import { ChevronDown, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   TaskConfigForm,
+  type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
-  type TaskConfigRuntimeAdapter,
   type TaskConfigDraftState,
 } from "@/components/schedule/task-config-form";
 import { TaskWorkspaceDiffPreview } from "@/components/tasks/task-workspace-diff-preview";
@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
 type TaskWorkspaceEditSectionProps = {
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isSaving: boolean;
   taskConfigInitialValues: ComponentProps<
     typeof TaskConfigForm
@@ -37,8 +37,8 @@ type TaskWorkspaceEditSectionProps = {
 };
 
 export function TaskWorkspaceEditSection({
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isSaving,
   taskConfigInitialValues,
   saveSuccess,
@@ -183,8 +183,8 @@ export function TaskWorkspaceEditSection({
 
                   <div className="min-h-0 flex-1 overflow-y-auto pt-3">
                     <TaskConfigForm
-                      runtimeAdapters={runtimeAdapters}
-                      defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                      executionRuntimes={executionRuntimes}
+                      defaultExecutionRuntime={defaultExecutionRuntime}
                       isPending={isSaving}
                       initialValues={taskConfigInitialValues}
                       submitLabel="Save changes"

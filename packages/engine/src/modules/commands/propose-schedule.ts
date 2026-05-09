@@ -11,7 +11,6 @@ export async function proposeSchedule(input: {
   dueAt: Date | null;
   scheduledStartAt: Date | null;
   scheduledEndAt: Date | null;
-  assigneeAgentId?: string | null;
 }) {
   const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId } });
 
@@ -26,7 +25,6 @@ export async function proposeSchedule(input: {
       dueAt: input.dueAt,
       scheduledStartAt: input.scheduledStartAt,
       scheduledEndAt: input.scheduledEndAt,
-      assigneeAgentId: input.assigneeAgentId ?? null,
     },
   });
 
@@ -45,7 +43,6 @@ export async function proposeSchedule(input: {
       due_at: input.dueAt?.toISOString() ?? null,
       scheduled_start_at: input.scheduledStartAt?.toISOString() ?? null,
       scheduled_end_at: input.scheduledEndAt?.toISOString() ?? null,
-      assignee_agent_id: input.assigneeAgentId ?? null,
     },
     dedupeKey: `task.schedule_proposed:${proposal.id}`,
   });

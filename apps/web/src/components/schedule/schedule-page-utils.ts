@@ -30,7 +30,6 @@ export {
   formatTime,
   formatDayHeading,
   formatWeekdayShort,
-  describeOwner,
   formatTimeRange,
   formatShortDay,
   formatDurationMinutes,

@@ -12,7 +12,6 @@ export async function getRecentTasksForAutoComplete(workspaceId: string) {
           status: true,
           priority: true,
           defaultSessionId: true,
-          runtimeAdapterKey: true,
         },
       },
     },

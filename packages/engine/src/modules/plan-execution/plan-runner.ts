@@ -2,7 +2,7 @@ import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-store";
-import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
+import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
 import {
   createPlanGraphFromCompiledPlan,
   getPlanRun,
@@ -125,9 +125,9 @@ function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecution
 async function getRuntimeName(taskId: string): Promise<string> {
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
-    select: { runtimeAdapterKey: true },
+    select: { executionRuntime: true },
   });
-  return task.runtimeAdapterKey ?? DEFAULT_RUNTIME_ADAPTER_KEY;
+  return task.executionRuntime ?? OPENCLAW_EXECUTION_RUNTIME;
 }
 
 async function activateWorkBlock(taskId: string, workBlockId?: string | null) {

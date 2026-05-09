@@ -20,9 +20,8 @@ type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
 };
 
 type Props = {
@@ -117,28 +116,20 @@ function computeTaskDiff(taskPatch: NonNullable<TaskWorkspaceUpdateProposal["tas
       proposed: taskPatch.scheduleStatus ?? "-",
     });
   }
-  if (taskPatch.runtimeModel !== undefined && taskPatch.runtimeModel !== originalTask.runtimeModel) {
+  if (taskPatch.executionRuntime !== undefined && taskPatch.executionRuntime !== originalTask.executionRuntime) {
     diffs.push({
-      label: "Model",
-      key: "runtimeModel",
-      original: originalTask.runtimeModel ?? "-",
-      proposed: taskPatch.runtimeModel ?? "-",
+      label: "Execution Runtime",
+      key: "executionRuntime",
+      original: originalTask.executionRuntime || "-",
+      proposed: taskPatch.executionRuntime ?? "-",
     });
   }
-  if (taskPatch.prompt !== undefined && taskPatch.prompt !== originalTask.prompt) {
+  if (taskPatch.executionConfig !== undefined && JSON.stringify(taskPatch.executionConfig) !== JSON.stringify(originalTask.executionConfig)) {
     diffs.push({
-      label: "Prompt",
-      key: "prompt",
-      original: formatText(originalTask.prompt),
-      proposed: formatText(taskPatch.prompt),
-    });
-  }
-  if (taskPatch.runtimeConfig !== undefined && JSON.stringify(taskPatch.runtimeConfig) !== JSON.stringify(originalTask.runtimeConfig)) {
-    diffs.push({
-      label: "Runtime Config",
-      key: "runtimeConfig",
-      original: formatText(originalTask.runtimeConfig),
-      proposed: formatText(taskPatch.runtimeConfig),
+      label: "Execution Config",
+      key: "executionConfig",
+      original: formatText(originalTask.executionConfig),
+      proposed: formatText(taskPatch.executionConfig),
     });
   }
   return diffs;
@@ -187,9 +178,8 @@ function isHighRisk(
   const pp = proposal.planPatch;
 
   if (tp) {
-    if (tp.prompt === null || tp.prompt === "") risks.push("Clearing/nullifying the prompt");
     if (tp.description === null || tp.description === "") risks.push("Clearing the description");
-    if (tp.runtimeConfig !== undefined) risks.push("Modifying runtime configuration");
+    if (tp.executionConfig !== undefined) risks.push("Modifying execution configuration");
     if (tp.dueAt !== undefined || tp.scheduledStartAt !== undefined || tp.scheduledEndAt !== undefined) {
       risks.push("Adjusting schedule dates");
     }

@@ -63,11 +63,12 @@ export async function syncAcceptedTaskPlanForTask(input: {
       where: { id: { in: linkedTaskIds } },
       select: {
         id: true,
+        status: true,
         runs: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
       },
     });
     for (const task of linkedTasks) {
-      childRunStatuses.set(task.id, task.runs[0]?.status ?? null);
+      childRunStatuses.set(task.id, task.runs[0]?.status ?? task.status ?? null);
     }
   }
 

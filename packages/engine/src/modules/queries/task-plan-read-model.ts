@@ -155,10 +155,9 @@ function compiledPlanToBlueprint(compiledPlan: CompiledPlan): PlanBlueprint {
           inputFields: config.inputFields?.map((field) => ({
             key: field.name,
             label: field.label,
-            inputType:
-              (field.type ?? "text") as NonNullable<
-                PlanBlueprintCheckpointNode["inputFields"]
-              >[number]["inputType"],
+            inputType: (field.type ?? "text") as NonNullable<
+              PlanBlueprintCheckpointNode["inputFields"]
+            >[number]["inputType"],
             required: field.required,
             options: field.options,
           })),
@@ -232,7 +231,7 @@ export async function resolveSavedPlanEffectiveGraph(
   });
 }
 
-export async function buildSavedTaskPlanReadModel(
+async function buildSavedTaskPlanReadModel(
   savedPlan: SavedCompiledPlan,
 ): Promise<TaskPlanReadModel> {
   const effectivePlanGraph = await resolveSavedPlanEffectiveGraph(savedPlan);

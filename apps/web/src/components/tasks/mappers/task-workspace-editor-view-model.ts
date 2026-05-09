@@ -10,12 +10,8 @@ export function taskToEditableTask(task: TaskData): EditableTask {
     scheduledStartAt: task.scheduledStartAt,
     scheduledEndAt: task.scheduledEndAt,
     scheduleStatus: task.scheduleStatus,
-    runtimeAdapterKey: task.runtimeAdapterKey,
-    runtimeInput: task.runtimeInput,
-    runtimeInputVersion: task.runtimeInputVersion,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionRuntime: task.executionRuntime,
+    executionConfig: task.executionConfig,
   };
 }
 
@@ -31,12 +27,8 @@ export function taskToTaskConfigInitialValues(task: TaskData) {
     dueAt: task.dueAt ? new Date(task.dueAt) : null,
     scheduledStartAt: task.scheduledStartAt ? new Date(task.scheduledStartAt) : null,
     scheduledEndAt: task.scheduledEndAt ? new Date(task.scheduledEndAt) : null,
-    runtimeAdapterKey: task.runtimeAdapterKey,
-    runtimeInput: task.runtimeInput,
-    runtimeInputVersion: task.runtimeInputVersion,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionRuntime: task.executionRuntime,
+    executionConfig: task.executionConfig,
   };
 }
 
@@ -49,12 +41,8 @@ export function taskConfigInputToEditableTask(input: TaskConfigFormInput, schedu
     scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
     scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
     scheduleStatus,
-    runtimeAdapterKey: input.runtimeAdapterKey,
-    runtimeInput: input.runtimeInput,
-    runtimeInputVersion: input.runtimeInputVersion,
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig: input.runtimeConfig ?? null,
+    executionRuntime: input.executionRuntime,
+    executionConfig: input.executionConfig,
   };
 }
 
@@ -88,7 +76,7 @@ export function editableTaskToEditSummary(task: EditableTask) {
   const startTime = formatTaskTime(task.scheduledStartAt);
   const endTime = formatTaskTime(task.scheduledEndAt);
   const schedule = scheduleDate && startTime && endTime ? `${scheduleDate} ${startTime}-${endTime}` : "Unscheduled";
-  const model = task.runtimeModel?.trim() || task.runtimeAdapterKey?.trim() || "Default runtime";
+  const model = task.executionRuntime?.trim() || "Default runtime";
   const description = task.description?.trim()
     ? task.description.trim().length > 140
       ? `${task.description.trim().slice(0, 137)}...`

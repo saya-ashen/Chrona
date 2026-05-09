@@ -41,7 +41,6 @@ describe("syncRunFromRuntime", () => {
         title: "Sync waiting approval run",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -117,7 +116,6 @@ describe("syncRunFromRuntime", () => {
         title: "Sync completed run",
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
-        ownerType: "human",
       },
     });
 
@@ -169,7 +167,6 @@ describe("syncRunFromRuntime", () => {
         title: "Sync externally resolved approval",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 

@@ -165,7 +165,7 @@ export function TaskPlanGenerationPanel({
     setStopGenerationError(null);
     stopGeneration();
     try {
-      const response = await fetch(`/api/tasks/${taskId}/plan/generate/stop`, {
+      const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop`, {
         method: "POST",
       });
       if (!response.ok) {

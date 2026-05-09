@@ -30,12 +30,9 @@ export async function createFollowUpTask(input: {
   });
   const title = normalizeTitle(input.title);
   const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: parentTask.runtimeAdapterKey,
+    executionRuntime: parentTask.executionRuntime,
     workspaceDefaultRuntime: parentTask.workspace.defaultRuntime,
-    runtimeInput: parentTask.runtimeInput,
-    runtimeModel: parentTask.runtimeModel,
-    prompt: parentTask.prompt,
-    runtimeConfig: parentTask.runtimeConfig,
+    executionConfig: parentTask.executionConfig,
   });
 
   const status = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
@@ -44,21 +41,10 @@ export async function createFollowUpTask(input: {
       workspaceId: parentTask.workspaceId,
       parentTaskId: parentTask.id,
       title,
-      runtimeAdapterKey: parentTask.runtimeAdapterKey,
-      runtimeInput:
-        parentTask.runtimeInput === null
-          ? Prisma.DbNull
-          : (parentTask.runtimeInput as Prisma.InputJsonValue),
-      runtimeInputVersion: parentTask.runtimeInputVersion,
-      runtimeModel: parentTask.runtimeModel,
-      prompt: parentTask.prompt,
-      runtimeConfig:
-        parentTask.runtimeConfig === null
-          ? Prisma.DbNull
-          : (parentTask.runtimeConfig as Prisma.InputJsonValue),
+      executionRuntime: parentTask.executionRuntime,
+      executionConfig: parentTask.executionConfig as Prisma.InputJsonValue,
       status,
       priority: input.priority ?? parentTask.priority,
-      ownerType: parentTask.ownerType,
       dueAt: input.dueAt ?? null,
     },
   });

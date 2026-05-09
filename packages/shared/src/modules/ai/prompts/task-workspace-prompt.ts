@@ -73,7 +73,7 @@ When: "materialize", "create subtasks", "sync to child tasks"
 2. Use the exact field names from the schemas above.
 3. All time fields must be ISO 8601 (e.g. "2026-04-26T15:00:00.000Z").
 4. Do NOT modify system fields (id, workspaceId, createdAt, updatedAt).
-5. requiresConfirmation: true for: replacing plan, deleting nodes, materializing, clearing prompt/description, modifying runtimeConfig, schedule adjustments.
+5. requiresConfirmation: true for: replacing plan, deleting nodes, materializing, clearing description, modifying executionConfig, schedule adjustments.
 6. Priority: "Low"|"Medium"|"High"|"Urgent".
 7. Edge fromNodeId/toNodeId MUST match EXISTING node IDs from the current plan.
 8. For add_node edges, reference nodes by their real IDs from the plan snapshot.

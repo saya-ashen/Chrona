@@ -128,7 +128,6 @@ function createTaskRouter() {
         title,
         description: body.description,
         priority: body.priority,
-        dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
         runtimeAdapterKey: body.runtimeAdapterKey,
         runtimeInput: body.runtimeInput,
         runtimeInputVersion: body.runtimeInputVersion,
@@ -143,7 +142,7 @@ function createTaskRouter() {
     }
   });
 
-  api.get("/tasks/:taskId/detail", async (c) => {
+  api.get("/tasks/:taskId", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const task = await db.task.findUnique({
@@ -153,7 +152,7 @@ function createTaskRouter() {
       if (!task) return error(c, "Task not found", 404);
       return json(c, { task });
     } catch (cause) {
-      return internalServerError(c, "GET /api/tasks/:taskId/detail", cause, "Failed to get task");
+      return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
     }
   });
 
@@ -167,13 +166,6 @@ function createTaskRouter() {
         description: body.description,
         priority: body.priority,
         status: body.status,
-        dueAt: body.dueAt !== undefined ? (body.dueAt ? new Date(body.dueAt) : null) : undefined,
-        scheduledStartAt: body.scheduledStartAt !== undefined
-          ? (body.scheduledStartAt ? new Date(body.scheduledStartAt) : null)
-          : undefined,
-        scheduledEndAt: body.scheduledEndAt !== undefined
-          ? (body.scheduledEndAt ? new Date(body.scheduledEndAt) : null)
-          : undefined,
         runtimeAdapterKey: body.runtimeAdapterKey,
         runtimeInput: body.runtimeInput,
         runtimeInputVersion: body.runtimeInputVersion,
@@ -280,7 +272,7 @@ describe("Task CRUD workflow", () => {
   it("gets task detail by ID", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Single Task" });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
+    const res = await app().request(`http://local/api/tasks/${taskId}`);
 
     expect(res.status).toBe(200);
     const body = await res.json() as any;
@@ -309,7 +301,7 @@ describe("Task CRUD workflow", () => {
     expect(body.workspaceId).toBe(workspaceId);
   });
 
-  it("updates task status and scheduled window", async () => {
+  it("updates task status", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Status Task", status: "Ready" });
 
     const res = await app().request(`http://local/api/tasks/${taskId}`, {
@@ -317,23 +309,12 @@ describe("Task CRUD workflow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         status: "Blocked",
-        scheduledStartAt: "2026-05-10T09:00:00.000Z",
-        scheduledEndAt: "2026-05-10T10:00:00.000Z",
       }),
     });
 
     expect(res.status).toBe(200);
     const task = await expectTaskExists(taskId);
-    const workBlock = await db.workBlock.findFirst({
-      where: { taskId, status: { in: ["Scheduled", "Active"] } },
-      orderBy: { scheduledStartAt: "asc" },
-    });
-    const projection = await db.taskProjection.findUnique({ where: { taskId } });
     expect(task.status).toBe("Blocked");
-    expect(new Date(String(workBlock?.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
-    expect(new Date(String(workBlock?.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
-    expect(new Date(String(projection?.scheduledStartAt)).toISOString()).toBe("2026-05-10T09:00:00.000Z");
-    expect(new Date(String(projection?.scheduledEndAt)).toISOString()).toBe("2026-05-10T10:00:00.000Z");
   });
 
   it("detail-after-update reflects changes", async () => {
@@ -345,7 +326,7 @@ describe("Task CRUD workflow", () => {
       body: JSON.stringify({ title: "After Update", priority: "High" }),
     });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
+    const res = await app().request(`http://local/api/tasks/${taskId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.task.title).toBe("After Update");
@@ -370,7 +351,7 @@ describe("Task CRUD workflow", () => {
 
     await app().request(`http://local/api/tasks/${taskId}`, { method: "DELETE" });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/detail`);
+    const res = await app().request(`http://local/api/tasks/${taskId}`);
     expect(res.status).toBe(404);
   });
 
@@ -469,7 +450,7 @@ describe("Task CRUD workflow", () => {
     const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
 
     const res = await app().request(
-      `http://local/api/tasks/${taskId}/detail?workspaceId=${other.workspaceId}`,
+      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
     );
 
     expect(res.status).toBe(200);
@@ -488,7 +469,7 @@ describe("Task CRUD workflow", () => {
   });
 
   it("returns 404 when getting detail for a nonexistent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent-task-id/detail");
+    const res = await app().request("http://local/api/tasks/nonexistent-task-id");
 
     expect(res.status).toBe(404);
     const body = await res.json() as any;

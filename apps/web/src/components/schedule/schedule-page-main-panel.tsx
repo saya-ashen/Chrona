@@ -140,8 +140,8 @@ export function SchedulePageMainPanel({
   activeSelectedTaskId,
   conflictTaskIds,
   listItems,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
@@ -156,8 +156,8 @@ export function SchedulePageMainPanel({
   activeSelectedTaskId: string | undefined;
   conflictTaskIds: Set<string>;
   listItems: SchedulePageData["listItems"];
-  runtimeAdapters: SchedulePageData["runtimeAdapters"];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: SchedulePageData["executionRuntimes"];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onScheduleDrop: (
     item: TimelineDragItem,
@@ -200,8 +200,8 @@ export function SchedulePageMainPanel({
                 selectedTaskId={activeSelectedTaskId}
                 conflictTaskIds={conflictTaskIds}
                 draggedItem={draggedItem}
-                runtimeAdapters={runtimeAdapters}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                executionRuntimes={executionRuntimes}
+                defaultExecutionRuntime={defaultExecutionRuntime}
                 isPending={isPending}
                 onScheduleDrop={onScheduleDrop}
                 onCreateTaskBlock={onCreateTaskBlock}
@@ -215,8 +215,8 @@ export function SchedulePageMainPanel({
             <div className="min-h-0 flex-1 overflow-y-auto">
               <ScheduleTaskList
                 items={listItems}
-                runtimeAdapters={runtimeAdapters}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                executionRuntimes={executionRuntimes}
+                defaultExecutionRuntime={defaultExecutionRuntime}
                 onSaveTaskConfigAction={onSaveTaskConfigAction}
                 isPending={isPending}
               />

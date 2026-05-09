@@ -77,7 +77,7 @@ export function ScheduleEditorForm({
     const nextScheduledStartAt = parseDateTime(formData.get("scheduledStartAt"));
     const nextScheduledEndAt = parseDateTime(formData.get("scheduledEndAt"));
 
-    if (!nextDueAt && !nextScheduledStartAt && !nextScheduledEndAt) {
+    if (!nextScheduledStartAt || !nextScheduledEndAt) {
       setErrorMessage(copy.fieldRequired);
       return;
     }

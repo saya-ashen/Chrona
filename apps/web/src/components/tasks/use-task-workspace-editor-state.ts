@@ -43,12 +43,8 @@ export function useTaskWorkspaceEditorState(initialTask: TaskData) {
     task.dueAt,
     task.scheduledStartAt,
     task.scheduledEndAt,
-    task.runtimeAdapterKey,
-    task.runtimeInput,
-    task.runtimeInputVersion,
-    task.runtimeModel,
-    task.prompt,
-    task.runtimeConfig,
+    task.executionRuntime,
+    task.executionConfig,
   ]);
   const originalEditableTask = useMemo(() => taskToEditableTask(task), [task]);
   const draftEditableTask = useMemo(
@@ -79,9 +75,8 @@ export function useTaskWorkspaceEditorState(initialTask: TaskData) {
     scheduledStartAt: draftEditableTask.scheduledStartAt,
     scheduledEndAt: draftEditableTask.scheduledEndAt,
     scheduleStatus: draftEditableTask.scheduleStatus,
-    runtimeModel: draftEditableTask.runtimeModel,
-    prompt: draftEditableTask.prompt,
-    runtimeConfig: draftEditableTask.runtimeConfig,
+    executionRuntime: draftEditableTask.executionRuntime,
+    executionConfig: draftEditableTask.executionConfig,
     status: task.status,
   }), [draftEditableTask, task.status]);
 
@@ -93,24 +88,17 @@ export function useTaskWorkspaceEditorState(initialTask: TaskData) {
 
   const saveTaskMutation = useMutation({
     mutationFn: async (input: TaskConfigFormInput) => {
-      const body: Record<string, unknown> = {
+      const taskBody: Record<string, unknown> = {
         title: input.title,
         description: input.description || undefined,
         priority: input.priority,
-        dueAt: input.dueAt?.toISOString() ?? undefined,
-        scheduledStartAt: input.scheduledStartAt?.toISOString() ?? undefined,
-        scheduledEndAt: input.scheduledEndAt?.toISOString() ?? undefined,
-        runtimeAdapterKey: input.runtimeAdapterKey,
-        runtimeInput: input.runtimeInput,
-        runtimeInputVersion: input.runtimeInputVersion,
-        runtimeModel: input.runtimeModel ?? undefined,
-        prompt: input.prompt ?? undefined,
-        runtimeConfig: input.runtimeConfig ?? undefined,
+        executionRuntime: input.executionRuntime,
+        executionConfig: input.executionConfig,
       };
 
       const response = await api.tasks[":taskId"].$patch({
         param: { taskId: task.id },
-        json: body,
+        json: taskBody,
       });
 
       if (!response.ok) {
@@ -119,6 +107,26 @@ export function useTaskWorkspaceEditorState(initialTask: TaskData) {
       }
 
       await response.json();
+
+      if (input.scheduledStartAt && input.scheduledEndAt) {
+        const scheduleResponse = await api.tasks[":taskId"].schedule.$put({
+          param: { taskId: task.id },
+          json: {
+            dueAt: input.dueAt?.toISOString() ?? null,
+            scheduledStartAt: input.scheduledStartAt.toISOString(),
+            scheduledEndAt: input.scheduledEndAt.toISOString(),
+            scheduleSource: "human",
+          },
+        });
+
+        if (!scheduleResponse.ok) {
+          const err = await scheduleResponse.json().catch(() => ({ error: "Failed to save schedule" }));
+          throw new Error((err as { error?: string }).error ?? "Failed to save schedule");
+        }
+
+        await scheduleResponse.json();
+      }
+
       return input;
     },
   });
@@ -138,12 +146,8 @@ export function useTaskWorkspaceEditorState(initialTask: TaskData) {
           scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
           scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
         scheduleStatus: prev.scheduleStatus,
-        runtimeAdapterKey: input.runtimeAdapterKey,
-        runtimeInput: input.runtimeInput,
-        runtimeInputVersion: input.runtimeInputVersion,
-        runtimeModel: input.runtimeModel,
-        prompt: input.prompt,
-        runtimeConfig: input.runtimeConfig ?? null,
+        executionRuntime: input.executionRuntime,
+        executionConfig: input.executionConfig,
       }));
       setTaskConfigDraft(input);
       setHasUnsavedConfigChanges(false);

@@ -1,5 +1,18 @@
 // AI plan contracts — new architecture
 export type {
+  CreateTaskInput,
+  TaskCore,
+  TaskPriority,
+  TaskReadModel,
+  TaskRuntimeFields,
+  TaskScheduleFields,
+  TaskStatus,
+  UpdateTaskInput,
+} from "./task";
+
+export { TASK_PRIORITIES, TASK_STATUSES } from "./task";
+
+export type {
   EditablePlan,
   EditableNode,
   EditableTaskNode,

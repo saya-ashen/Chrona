@@ -39,7 +39,7 @@ import {
   getTodayKey,
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
-import { type TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+import { type TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";
@@ -48,15 +48,13 @@ const TIMELINE_HOUR_HEIGHT_MIN = 44;
 const TIMELINE_HOUR_HEIGHT_MAX = 62;
 function TimelineComposer({
   draft,
-  defaultRuntimeAdapterKey,
-  defaultRuntimeInputVersion,
+  defaultExecutionRuntime,
   isPending,
   onClose,
   onCreate,
 }: {
   draft: { top: number; height: number; startAt: Date; endAt: Date; startMinute: number; endMinute: number };
-  defaultRuntimeAdapterKey: string;
-  defaultRuntimeInputVersion: string;
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onClose: () => void;
   onCreate: (input: TimelineCreateInput) => Promise<void>;
@@ -74,12 +72,8 @@ function TimelineComposer({
           description: input.description,
           priority: input.priority,
           dueAt: input.dueAt,
-          runtimeAdapterKey: defaultRuntimeAdapterKey,
-          runtimeInput: {},
-          runtimeInputVersion: defaultRuntimeInputVersion,
-          runtimeModel: null,
-          prompt: null,
-          runtimeConfig: null,
+          executionRuntime: defaultExecutionRuntime,
+          executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,
         });
@@ -95,8 +89,8 @@ export function DayTimeline({
   selectedTaskId,
   conflictTaskIds,
   draggedItem,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
@@ -109,8 +103,8 @@ export function DayTimeline({
   selectedTaskId?: string;
   conflictTaskIds?: Set<string>;
   draggedItem: TimelineDragItem | null;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onScheduleDrop: (
     item: TimelineDragItem,
@@ -128,9 +122,6 @@ export function DayTimeline({
     () => buildCompressedTimeline(items),
     [items],
   );
-  const defaultRuntimeInputVersion =
-    runtimeAdapters.find((adapter) => adapter.key === defaultRuntimeAdapterKey)?.spec.version ??
-    `${defaultRuntimeAdapterKey}-v1`;
   const [hourHeight, setHourHeight] = useState(52);
   const timelineHeight = hourHeight * 24;
   const [viewportMinHeight, setViewportMinHeight] = useState(0);
@@ -675,8 +666,7 @@ export function DayTimeline({
             {composerDraft ? (
               <TimelineComposer
                 draft={composerDraft}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
-                defaultRuntimeInputVersion={defaultRuntimeInputVersion}
+                defaultExecutionRuntime={defaultExecutionRuntime}
                 isPending={isPending}
                 onClose={closeComposer}
                 onCreate={async (input) => {

@@ -19,6 +19,27 @@ vi.mock("@/lib/utils", () => ({
 
 import { WorkInspector } from "@/components/work/work-inspector";
 import { DEFAULT_WORK_PAGE_COPY } from "@/components/work/work-page/work-page-copy";
+import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+
+function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
+  return {
+    ...input,
+    nodes: input.steps,
+    analytics: {
+      entryNodeIds: input.steps.slice(0, 1).map((node) => node.id),
+      terminalNodeIds: input.steps.slice(-1).map((node) => node.id),
+      activeNodeIds: input.steps.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+      reachableFromActiveIds: input.steps.map((node) => node.id),
+      criticalPathNodeIds: input.steps.map((node) => node.id),
+      attentionNodeIds: input.steps.filter((node) => node.status === "waiting" || node.status === "waiting_for_user").map((node) => node.id),
+      blockedNodeIds: input.steps.filter((node) => node.status === "blocked").map((node) => node.id),
+      rankByNodeId: Object.fromEntries(input.steps.map((node, index) => [node.id, index])),
+      laneByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, 0])),
+      upstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+      downstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+    },
+  };
+}
 
 beforeAll(() => {
   class ResizeObserverMock {
@@ -92,7 +113,7 @@ describe("WorkInspector", () => {
   it("surfaces graph-native plan groupings in the plan tab", () => {
     render(
       <WorkInspector
-        plan={{
+        plan={testPlan({
           state: "ready",
           revision: "r4",
           generatedBy: "graph-planner",
@@ -148,7 +169,7 @@ describe("WorkInspector", () => {
             { id: "edge-1", fromNodeId: "current-node", toNodeId: "linked-node", type: "sequential" },
             { id: "edge-2", fromNodeId: "linked-node", toNodeId: "checkpoint-node", type: "sequential" },
           ],
-        }}
+        })}
         currentAction={{ label: "补充执行要求", href: "/work/input" }}
         currentException={null}
         isPending={false}

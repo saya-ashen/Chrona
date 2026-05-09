@@ -14,12 +14,9 @@ export async function reopenTask(input: { taskId: string }) {
     },
   });
   const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: task.runtimeAdapterKey,
+    executionRuntime: task.executionRuntime,
     workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    runtimeInput: task.runtimeInput,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionConfig: task.executionConfig,
   });
   const nextStatus = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
 

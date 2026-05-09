@@ -1,77 +1,34 @@
-import { OwnerType, Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
+import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
-import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { deriveTaskRunnability } from "@chrona/shared";
-import { validateScheduleWindow } from "@chrona/domain";
+import type { CreateTaskInput } from "@chrona/contracts";
 
-function normalizeOptionalTextField(value: string | null | undefined, field: string) {
+function normalizeExecutionConfig(value: Prisma.InputJsonObject | null | undefined) {
   if (value === undefined) {
     return undefined;
   }
 
-  if (value === null) {
-    return null;
-  }
-
-  const normalized = value.trim();
-
-  if (!normalized) {
-    throw new Error(`${field} cannot be empty`);
-  }
-
-  return normalized;
-}
-
-function normalizeRuntimeConfig(value: Prisma.InputJsonObject | null | undefined) {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value === null) {
-    return Prisma.DbNull;
-  }
-
-  if (Array.isArray(value)) {
-    throw new Error("runtimeConfig must be an object");
+  if (value === null || Array.isArray(value)) {
+    throw new Error("executionConfig must be an object");
   }
 
   return value;
 }
 
-export async function createTask(input: {
-  workspaceId: string;
-  title: string;
-  description?: string | null;
-  priority?: "Low" | "Medium" | "High" | "Urgent";
-  parentTaskId?: string | null;
-  dueAt?: Date | null;
-  scheduledStartAt?: Date | null;
-  scheduledEndAt?: Date | null;
-  runtimeAdapterKey?: string | null;
-  runtimeInput?: Prisma.InputJsonObject | null;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: Prisma.InputJsonObject | null;
-}) {
+export async function createTask(input: CreateTaskInput) {
   const title = input.title.trim();
   const description = input.description?.trim() || null;
-  const runtimeModel = normalizeOptionalTextField(input.runtimeModel, "runtimeModel");
-  const prompt = normalizeOptionalTextField(input.prompt, "prompt");
-  const runtimeConfig = normalizeRuntimeConfig(input.runtimeConfig);
+  const executionConfig = normalizeExecutionConfig(
+    input.executionConfig as Prisma.InputJsonObject | null | undefined,
+  );
 
   if (!title) {
     throw new Error("title is required");
   }
-
-  validateScheduleWindow({
-    scheduledStartAt: input.scheduledStartAt,
-    scheduledEndAt: input.scheduledEndAt,
-  });
 
   const workspace = await db.workspace.findUnique({
     where: { id: input.workspaceId },
@@ -93,22 +50,14 @@ export async function createTask(input: {
   }
 
   const validatedRuntimeConfig = validateTaskRuntimeConfig({
-    runtimeAdapterKey: input.runtimeAdapterKey,
+    executionRuntime: input.executionRuntime,
     workspaceDefaultRuntime: workspace.defaultRuntime,
-    runtimeInput: input.runtimeInput,
-    runtimeInputIsAuthoritative: input.runtimeInput !== undefined,
-    runtimeInputVersion: input.runtimeInputVersion,
-    runtimeModel,
-    prompt,
-    runtimeConfig,
+    executionConfig,
   });
 
   const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
-    runtimeInput: validatedRuntimeConfig.runtimeInput,
-    runtimeModel: validatedRuntimeConfig.runtimeModel,
-    prompt: validatedRuntimeConfig.prompt,
-    runtimeConfig: validatedRuntimeConfig.runtimeConfig,
+    executionRuntime: validatedRuntimeConfig.executionRuntime,
+    executionConfig: validatedRuntimeConfig.executionConfig,
   });
   const status = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
 
@@ -117,37 +66,13 @@ export async function createTask(input: {
       workspaceId: input.workspaceId,
       title,
       description,
-      runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
-      runtimeInput: validatedRuntimeConfig.runtimeInput as Prisma.InputJsonObject,
-      runtimeInputVersion: validatedRuntimeConfig.runtimeInputVersion,
-      runtimeModel: validatedRuntimeConfig.runtimeModel,
-      prompt: validatedRuntimeConfig.prompt,
-      runtimeConfig:
-        validatedRuntimeConfig.runtimeConfig === null
-          ? Prisma.DbNull
-          : (validatedRuntimeConfig.runtimeConfig as Prisma.InputJsonObject),
+      executionRuntime: validatedRuntimeConfig.executionRuntime,
+      executionConfig: validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject,
       priority: input.priority ? TaskPriority[input.priority] : TaskPriority.Medium,
       status,
-      ownerType: OwnerType.human,
       parentTaskId: input.parentTaskId ?? null,
-      dueAt: input.dueAt ?? null,
     },
   });
-
-  if (input.scheduledStartAt && input.scheduledEndAt) {
-    const acceptedPlan = await getAcceptedCompiledPlan(task.id);
-    await db.workBlock.create({
-      data: {
-        workspaceId: task.workspaceId,
-        taskId: task.id,
-        planId: acceptedPlan?.compiledPlan.editablePlanId ?? null,
-        title: task.title,
-        scheduledStartAt: input.scheduledStartAt,
-        scheduledEndAt: input.scheduledEndAt,
-        trigger: "manual",
-      },
-    });
-  }
 
   if (input.parentTaskId) {
     await db.taskDependency.upsert({
@@ -172,7 +97,7 @@ export async function createTask(input: {
   await ensureDefaultTaskSession({
     taskId: task.id,
     taskTitle: task.title,
-    runtimeName: validatedRuntimeConfig.runtimeAdapterKey,
+    runtimeName: validatedRuntimeConfig.executionRuntime,
     defaultSessionId: task.defaultSessionId,
   });
 

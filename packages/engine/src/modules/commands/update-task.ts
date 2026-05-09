@@ -2,29 +2,9 @@ import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { getRuntimeTaskConfigSpec, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { deriveTaskRunnability } from "@chrona/shared";
-import { validateScheduleWindow } from "@chrona/domain";
-
-function normalizeOptionalTextField(value: string | null | undefined, field: string) {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value === null) {
-    return null;
-  }
-
-  const normalized = value.trim();
-
-  if (!normalized) {
-    throw new Error(`${field} cannot be empty`);
-  }
-
-  return normalized;
-}
+import type { UpdateTaskInput } from "@chrona/contracts";
 
 function normalizeRequiredUpdateTextField(value: string | undefined, field: string) {
   if (value === undefined) {
@@ -40,55 +20,27 @@ function normalizeRequiredUpdateTextField(value: string | undefined, field: stri
   return normalized;
 }
 
-function normalizeRuntimeConfig(value: Prisma.InputJsonObject | null | undefined) {
+function normalizeExecutionConfig(value: Prisma.InputJsonObject | null | undefined) {
   if (value === undefined) {
     return undefined;
   }
 
-  if (value === null) {
-    return Prisma.DbNull;
-  }
-
-  if (Array.isArray(value)) {
-    throw new Error("runtimeConfig must be an object");
+  if (value === null || Array.isArray(value)) {
+    throw new Error("executionConfig must be an object");
   }
 
   return value;
 }
 
-function isRuntimeObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function stripSyncedRuntimeConfigKeys(runtimeInput: unknown, previousRuntimeConfig: unknown) {
-  if (!isRuntimeObject(runtimeInput)) {
-    return runtimeInput;
-  }
-
-  const nextRuntimeInput = { ...runtimeInput };
-
-  if (isRuntimeObject(previousRuntimeConfig)) {
-    for (const key of Object.keys(previousRuntimeConfig)) {
-      delete nextRuntimeInput[key];
-    }
-  }
-
-  return nextRuntimeInput;
-}
-
-function adapterSpecHasFieldPath(adapterKey: string, path: string) {
-  return getRuntimeTaskConfigSpec(adapterKey).fields.some((field) => field.path === path);
-}
-
-function mergeSessionStrategyIntoRuntimeConfig(
-  runtimeConfig: Prisma.InputJsonObject | null | undefined,
+function mergeSessionStrategyIntoExecutionConfig(
+  executionConfig: Prisma.InputJsonObject | null | undefined,
   sessionStrategy: "shared" | "per_subtask" | null | undefined,
 ) {
   if (sessionStrategy === undefined) {
-    return runtimeConfig;
+    return executionConfig;
   }
 
-  const nextConfig = runtimeConfig ? { ...runtimeConfig } : {};
+  const nextConfig = executionConfig ? { ...executionConfig } : {};
   if (sessionStrategy === null) {
     delete nextConfig.sessionStrategy;
   } else {
@@ -98,103 +50,35 @@ function mergeSessionStrategyIntoRuntimeConfig(
   return Object.keys(nextConfig).length > 0 ? nextConfig : null;
 }
 
-export async function updateTask(input: {
-  taskId: string;
-  title?: string;
-  description?: string | null;
-  priority?: "Low" | "Medium" | "High" | "Urgent";
-  status?: "Draft" | "Ready" | "Running" | "Blocked" | "Completed" | "Done";
-  dueAt?: Date | null;
-  scheduledStartAt?: Date | null;
-  scheduledEndAt?: Date | null;
-  runtimeAdapterKey?: string | null;
-  runtimeInput?: Prisma.InputJsonObject | null;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: Prisma.InputJsonObject | null;
+export async function updateTask(input: UpdateTaskInput & {
   sessionStrategy?: "shared" | "per_subtask" | null;
 }) {
   const title = normalizeRequiredUpdateTextField(input.title, "title");
   const description =
     input.description === undefined ? undefined : input.description?.trim() || null;
-  const runtimeModel = normalizeOptionalTextField(input.runtimeModel, "runtimeModel");
-  const prompt = normalizeOptionalTextField(input.prompt, "prompt");
-  const runtimeConfig = normalizeRuntimeConfig(input.runtimeConfig);
+  const executionConfig = normalizeExecutionConfig(
+    input.executionConfig as Prisma.InputJsonObject | null | undefined,
+  );
   const currentTask = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     include: {
       workspace: {
         select: { defaultRuntime: true },
       },
-      workBlocks: {
-        where: { status: { in: ["Scheduled", "Active"] } },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
     },
   });
-  const currentWorkBlock = currentTask.workBlocks[0] ?? null;
-  validateScheduleWindow({
-    scheduledStartAt:
-      input.scheduledStartAt === undefined ? currentWorkBlock?.scheduledStartAt ?? null : input.scheduledStartAt,
-    scheduledEndAt:
-      input.scheduledEndAt === undefined ? currentWorkBlock?.scheduledEndAt ?? null : input.scheduledEndAt,
-  });
-  const nextRuntimeModel = runtimeModel === undefined ? currentTask.runtimeModel : runtimeModel;
-  const nextPrompt = prompt === undefined ? currentTask.prompt : prompt;
-  const baseRuntimeConfig =
-    input.runtimeConfig === undefined ? currentTask.runtimeConfig : input.runtimeConfig;
-  const nextRuntimeConfig = mergeSessionStrategyIntoRuntimeConfig(
-    baseRuntimeConfig as Prisma.InputJsonObject | null | undefined,
+  const baseExecutionConfig =
+    input.executionConfig === undefined ? currentTask.executionConfig : input.executionConfig;
+  const nextExecutionConfig = mergeSessionStrategyIntoExecutionConfig(
+    baseExecutionConfig as Prisma.InputJsonObject | null | undefined,
     input.sessionStrategy,
   );
-  const nextRuntimeAdapterKeyInput =
-    input.runtimeAdapterKey === undefined ? currentTask.runtimeAdapterKey : input.runtimeAdapterKey;
-  const currentResolvedRuntimeAdapterKey = resolveRuntimeAdapterKey({
-    runtimeAdapterKey: currentTask.runtimeAdapterKey,
-    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
-  });
-  const nextResolvedRuntimeAdapterKey = resolveRuntimeAdapterKey({
-    runtimeAdapterKey: nextRuntimeAdapterKeyInput,
-    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
-  });
-  const adapterChanged = nextResolvedRuntimeAdapterKey !== currentResolvedRuntimeAdapterKey;
-  const nextAdapterSupportsModel = adapterSpecHasFieldPath(nextResolvedRuntimeAdapterKey, "model");
-  const nextAdapterSupportsPrompt = adapterSpecHasFieldPath(nextResolvedRuntimeAdapterKey, "prompt");
-  const nextRuntimeInputBase =
-    input.runtimeInput !== undefined
-      ? input.runtimeInput
-      : adapterChanged
-        ? undefined
-      : input.runtimeConfig === undefined
-        ? currentTask.runtimeInput
-        : stripSyncedRuntimeConfigKeys(currentTask.runtimeInput, currentTask.runtimeConfig);
-  const nextRuntimeInputVersion =
-    input.runtimeInputVersion !== undefined
-      ? input.runtimeInputVersion
-      : input.runtimeAdapterKey !== undefined && input.runtimeAdapterKey !== currentTask.runtimeAdapterKey
-        ? undefined
-        : currentTask.runtimeInputVersion;
   const validatedRuntimeConfig = validateTaskRuntimeConfig({
-    runtimeAdapterKey: nextRuntimeAdapterKeyInput,
+    executionRuntime: input.executionRuntime === undefined
+      ? currentTask.executionRuntime
+      : input.executionRuntime,
     workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
-    runtimeInput: nextRuntimeInputBase,
-    runtimeInputIsAuthoritative: input.runtimeInput !== undefined,
-    runtimeInputVersion: nextRuntimeInputVersion,
-    runtimeModel:
-      input.runtimeInput !== undefined
-        ? runtimeModel
-        : adapterChanged && !nextAdapterSupportsModel
-          ? runtimeModel
-          : nextRuntimeModel,
-    prompt:
-      input.runtimeInput !== undefined
-        ? prompt
-        : adapterChanged && !nextAdapterSupportsPrompt
-          ? prompt
-          : nextPrompt,
-    runtimeConfig: input.runtimeInput !== undefined || adapterChanged ? runtimeConfig : nextRuntimeConfig,
+    executionConfig: nextExecutionConfig,
   });
   const nextStatus = (() => {
     if (input.status) {
@@ -209,37 +93,25 @@ export async function updateTask(input: {
     }
 
     const runnability = deriveTaskRunnability({
-      runtimeAdapterKey: validatedRuntimeConfig.runtimeAdapterKey,
-      runtimeInput: validatedRuntimeConfig.runtimeInput,
-      runtimeModel: validatedRuntimeConfig.runtimeModel,
-      prompt: validatedRuntimeConfig.prompt,
-      runtimeConfig: validatedRuntimeConfig.runtimeConfig,
+      executionRuntime: validatedRuntimeConfig.executionRuntime,
+      executionConfig: validatedRuntimeConfig.executionConfig,
     });
 
     return runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
   })();
   const shouldPersistResolvedRuntimeConfig =
-    input.runtimeInput !== undefined ||
-    input.runtimeAdapterKey !== undefined ||
-    input.runtimeInputVersion !== undefined ||
-    input.runtimeModel !== undefined ||
-    input.prompt !== undefined ||
-    input.runtimeConfig !== undefined;
+    input.executionRuntime !== undefined ||
+    input.executionConfig !== undefined ||
+    input.sessionStrategy !== undefined;
 
   const changedFields = [
     input.title !== undefined ? "title" : null,
     input.description !== undefined ? "description" : null,
     input.priority !== undefined ? "priority" : null,
     input.status !== undefined ? "status" : null,
-    input.dueAt !== undefined ? "dueAt" : null,
-    input.scheduledStartAt !== undefined ? "scheduledStartAt" : null,
-    input.scheduledEndAt !== undefined ? "scheduledEndAt" : null,
-    input.runtimeAdapterKey !== undefined ? "runtimeAdapterKey" : null,
-    input.runtimeInput !== undefined ? "runtimeInput" : null,
-    input.runtimeInputVersion !== undefined ? "runtimeInputVersion" : null,
-    input.runtimeModel !== undefined ? "runtimeModel" : null,
-    input.prompt !== undefined ? "prompt" : null,
-    input.runtimeConfig !== undefined ? "runtimeConfig" : null,
+    input.executionRuntime !== undefined ? "executionRuntime" : null,
+    input.executionConfig !== undefined ? "executionConfig" : null,
+    input.sessionStrategy !== undefined ? "executionConfig" : null,
   ].filter((field): field is string => field !== null);
 
   const task = await db.task.update({
@@ -248,65 +120,15 @@ export async function updateTask(input: {
       title,
       description,
       priority: input.priority ? TaskPriority[input.priority] : undefined,
-      dueAt: input.dueAt,
-      runtimeAdapterKey: shouldPersistResolvedRuntimeConfig
-        ? validatedRuntimeConfig.runtimeAdapterKey
+      executionRuntime: shouldPersistResolvedRuntimeConfig
+        ? validatedRuntimeConfig.executionRuntime
         : undefined,
-      runtimeInput:
-        !shouldPersistResolvedRuntimeConfig
-          ? undefined
-          : (validatedRuntimeConfig.runtimeInput as Prisma.InputJsonObject),
-      runtimeInputVersion: shouldPersistResolvedRuntimeConfig
-        ? validatedRuntimeConfig.runtimeInputVersion
-        : undefined,
-      runtimeModel: shouldPersistResolvedRuntimeConfig ? validatedRuntimeConfig.runtimeModel : runtimeModel,
-      prompt: shouldPersistResolvedRuntimeConfig ? validatedRuntimeConfig.prompt : prompt,
-      runtimeConfig: shouldPersistResolvedRuntimeConfig
-        ? validatedRuntimeConfig.runtimeConfig === null
-          ? Prisma.DbNull
-          : (validatedRuntimeConfig.runtimeConfig as Prisma.InputJsonObject)
-        : runtimeConfig,
+      executionConfig: shouldPersistResolvedRuntimeConfig
+        ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
+        : executionConfig,
       status: nextStatus,
     },
   });
-
-  if (input.scheduledStartAt !== undefined || input.scheduledEndAt !== undefined) {
-    const nextScheduledStartAt =
-      input.scheduledStartAt === undefined ? currentWorkBlock?.scheduledStartAt ?? null : input.scheduledStartAt;
-    const nextScheduledEndAt =
-      input.scheduledEndAt === undefined ? currentWorkBlock?.scheduledEndAt ?? null : input.scheduledEndAt;
-
-    if (!nextScheduledStartAt || !nextScheduledEndAt) {
-      if (currentWorkBlock?.status === "Active") {
-        throw new Error("Cannot clear schedule while a work block is active");
-      }
-      if (currentWorkBlock) {
-        await db.workBlock.delete({ where: { id: currentWorkBlock.id } });
-      }
-    } else if (currentWorkBlock) {
-      await db.workBlock.update({
-        where: { id: currentWorkBlock.id },
-        data: {
-          title: title ?? currentTask.title,
-          scheduledStartAt: nextScheduledStartAt,
-          scheduledEndAt: nextScheduledEndAt,
-        },
-      });
-    } else {
-      const acceptedPlan = await getAcceptedCompiledPlan(task.id);
-      await db.workBlock.create({
-        data: {
-          workspaceId: task.workspaceId,
-          taskId: task.id,
-          planId: acceptedPlan?.compiledPlan.editablePlanId ?? null,
-          title: title ?? currentTask.title,
-          scheduledStartAt: nextScheduledStartAt,
-          scheduledEndAt: nextScheduledEndAt,
-          trigger: "manual",
-        },
-      });
-    }
-  }
 
   await appendCanonicalEvent({
     eventType: "task.updated",

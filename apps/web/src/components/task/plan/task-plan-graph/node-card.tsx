@@ -39,9 +39,9 @@ function resolveInteractionFrame(node: FlowGraphNode["data"]["node"]) {
     case "confirm":
       return { accent: "before:bg-indigo-500", footer: "Manual confirmation" };
     case "choose":
-      return { accent: "before:bg-amber-500", footer: `${Math.max(node.options.length, 1)} option flow` };
+      return { accent: "before:bg-amber-500", footer: `${Math.max((node.options ?? []).length, 1)} option flow` };
     case "input":
-      return { accent: "before:bg-amber-500", footer: `${Math.max(node.interactiveFields.length, 1)} field input` };
+      return { accent: "before:bg-amber-500", footer: `${Math.max((node.interactiveFields ?? []).length, 1)} field input` };
     case "edit":
       return { accent: "before:bg-emerald-500", footer: "Revision checkpoint" };
     case "approve":
@@ -137,8 +137,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const runtimeSpotlight = resolveRuntimeSpotlight(node);
   const interactionBadge = resolveInteractionBadge(node);
   const interactionFrame = resolveInteractionFrame(node);
-  const primaryActionLabel = node.availableActions[0]?.label ?? null;
-  const durationLabel = formatEstimatedMinutes(node.estimatedMinutes);
+  const primaryActionLabel = node.availableActions?.[0]?.label ?? null;
+  const durationLabel = formatEstimatedMinutes(node.estimatedMinutes ?? null);
 
   const Icon =
     node.kind === "checkpoint"
@@ -208,9 +208,9 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              <span>{nodeKindLabel(node.kind, graphCopy)}</span>
+              <span>{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
               <span aria-hidden="true">•</span>
-              <span>{node.statusLabel}</span>
+              <span>{node.statusLabel ?? node.status}</span>
             </div>
 
             <p className="mt-1 line-clamp-2 text-[14px] font-semibold leading-snug text-foreground">{node.title}</p>

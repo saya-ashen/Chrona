@@ -3,8 +3,21 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import type { GenerateTaskPlanResponse } from "@chrona/contracts";
 
-import { generateTaskPlanForTask } from "@/modules/commands/generate-task-plan-for-task";
+import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
 import { getLatestTaskPlanGraph } from "@/modules/plan-execution/compat";
+
+async function generateTaskPlanForTask(input: { taskId: string; forceRefresh?: boolean }) {
+  let result: Awaited<ReturnType<typeof getLatestTaskPlanGraph>> | null = null;
+  for await (const event of generateTaskPlanManualStream(input)) {
+    if (event.type === "result") {
+      result = await getLatestTaskPlanGraph(input.taskId);
+    }
+    if (event.type === "error") {
+      return null;
+    }
+  }
+  return result;
+}
 
 const aiGeneratePlanMock = mock(async (request: { title: string; description?: string }): Promise<GenerateTaskPlanResponse> => ({
   source: "test-ai",
@@ -23,8 +36,15 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   },
 }));
 
+async function* aiGeneratePlanStreamMock(request: { title: string; description?: string }) {
+  const plan = await aiGeneratePlanMock(request);
+  yield { type: "tool_call" as const, tool: "generate_task_plan_graph", input: plan.blueprint };
+  yield { type: "result" as const, plan };
+  yield { type: "done" as const, text: "done" };
+}
+
 mock.module("@/modules/ai/ai-service", () => ({
-  aiGeneratePlan: aiGeneratePlanMock,
+  aiGeneratePlanStream: aiGeneratePlanStreamMock,
 }));
 
 async function resetDb() {
@@ -66,7 +86,6 @@ describe("generateTaskPlanForTask", () => {
         description: "Updated description from DB",
         status: "Ready",
         priority: "High",
-        ownerType: "human",
       },
     });
     await db.workBlock.create({
@@ -99,7 +118,7 @@ describe("generateTaskPlanForTask", () => {
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
   });
 
-  it("returns a saved plan without calling AI unless forceRefresh is requested", async () => {
+  it("always regenerates plans through the manual stream", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Cached Plan", status: "Active", defaultRuntime: "openclaw" },
     });
@@ -109,7 +128,6 @@ describe("generateTaskPlanForTask", () => {
         title: "Cached title",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 
@@ -120,7 +138,7 @@ describe("generateTaskPlanForTask", () => {
 
     expect(result).not.toBeNull();
     expect(result?.planId).toBeTruthy();
-    expect(aiGeneratePlanMock).not.toHaveBeenCalled();
+    expect(aiGeneratePlanMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not save an empty generated blueprint", async () => {
@@ -143,7 +161,6 @@ describe("generateTaskPlanForTask", () => {
         title: "Broken planner output",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 
@@ -198,7 +215,6 @@ describe("generateTaskPlanForTask", () => {
         title: "Enriched test task",
         status: "Ready",
         priority: "Medium",
-        ownerType: "human",
       },
     });
 

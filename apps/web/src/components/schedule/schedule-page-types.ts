@@ -1,7 +1,6 @@
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
-import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+import type { TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import type { RuntimeInput } from "@chrona/runtime-core";
 
 type SchedulePageSummary = {
   scheduledCount: number;
@@ -49,12 +48,8 @@ type ScheduleAutomationCandidate = {
 
 type ScheduleRuntimeFields = {
   parentTaskId: string | null;
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
   isRunnable: boolean;
   runnabilityState: string;
   runnabilitySummary: string;
@@ -73,8 +68,6 @@ export type ScheduleRecord = {
   title: string;
   description: string | null;
   priority: string;
-  ownerType: string;
-  assigneeAgentId: string | null;
   persistedStatus: string;
   displayState: string | null;
   actionRequired: string | null;
@@ -97,8 +90,6 @@ type ScheduleProposal = {
   workspaceId: string;
   title: string;
   priority: string;
-  ownerType: string;
-  assigneeAgentId: string | null;
   source: string;
   proposedBy: string;
   summary: string;
@@ -120,8 +111,8 @@ type WorkBlockInfo = {
 };
 
 export type SchedulePageData = {
-  defaultRuntimeAdapterKey: string;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultExecutionRuntime: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
   summary: SchedulePageSummary;
   planningSummary: SchedulePlanningSummary;
   focusZones: ScheduleFocusZone[];
@@ -148,8 +139,6 @@ export type ScheduleCardItem = {
   title: string;
   description?: string | null;
   priority: string;
-  ownerType: string;
-  assigneeAgentId: string | null;
   persistedStatus?: string;
   scheduleStatus?: string | null;
   scheduleSource?: string | null;
@@ -159,12 +148,8 @@ export type ScheduleCardItem = {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
-  runtimeAdapterKey?: string | null;
-  runtimeInput?: unknown;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: unknown;
+  executionRuntime?: string;
+  executionConfig?: unknown;
   isRunnable?: boolean;
   runnabilityState?: string;
   runnabilitySummary?: string;
@@ -306,13 +291,9 @@ export type TimelineCreateInput = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
-  runtimeAdapterKey: string;
-  runtimeInput: RuntimeInput;
-  runtimeInputVersion: string;
-  runtimeModel: string | null;
-  prompt: string | null;
+  executionRuntime: string;
+  executionConfig: RuntimeInput;
   dueAt: Date | null;
-  runtimeConfig?: RuntimeInput | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
 };
@@ -330,6 +311,4 @@ export type QuickCreateDraft = {
 
 
 
-
-
-
+import type { RuntimeInput } from "@chrona/runtime-core";

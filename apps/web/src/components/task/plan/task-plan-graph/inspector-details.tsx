@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import type { GraphCopy, PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
 function buildDependencyLabelMap(node: PlanNodeDataModel) {
-  const metadataDependencies = node.metadata.dependencies;
+  const metadataDependencies = node.metadata?.dependencies;
   if (!Array.isArray(metadataDependencies)) {
     return new Map<string, string>();
   }
@@ -25,7 +25,7 @@ function buildDependencyLabelMap(node: PlanNodeDataModel) {
 function resolveDependencyNames(node: PlanNodeDataModel, nodes: PlanNodeDataModel[]) {
   const dependencyLabels = buildDependencyLabelMap(node);
   const nodeTitleById = new Map(nodes.map((item) => [item.id, item.title]));
-  return node.dependencies
+  return (node.dependencies ?? [])
     .map((dependencyId) => dependencyLabels.get(dependencyId) ?? nodeTitleById.get(dependencyId) ?? null)
     .filter((value): value is string => Boolean(value));
 }
@@ -94,8 +94,8 @@ export function TaskPlanGraphInspectorDetails({
       <section className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorWhy}</p>
         <InfoRow label={graphCopy.detailObjective} value={node.objective} />
-        <InfoRow label={graphCopy.detailNextAction} value={node.nextAction} />
-        <InfoRow label={graphCopy.detailReadiness} value={node.readiness} />
+        <InfoRow label={graphCopy.detailNextAction} value={node.nextAction ?? null} />
+        <InfoRow label={graphCopy.detailReadiness} value={node.readiness ?? null} />
       </section>
 
       <section className="space-y-2">
@@ -110,39 +110,39 @@ export function TaskPlanGraphInspectorDetails({
             </div>
           </div>
         ) : null}
-        <InfoRow label={graphCopy.detailRequiredInfo} value={node.requiredInfo.join(", ") || null} />
+        <InfoRow label={graphCopy.detailRequiredInfo} value={(node.requiredInfo ?? []).join(", ") || null} />
       </section>
 
       <section className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorExecution}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           <InfoRow label={graphCopy.detailPhase} value={node.phase} />
-          <InfoRow label={graphCopy.detailExecutionMode} value={node.executionMode} />
-          <InfoRow label={graphCopy.detailPriority} value={node.priority} />
+          <InfoRow label={graphCopy.detailExecutionMode} value={node.executionMode ?? null} />
+          <InfoRow label={graphCopy.detailPriority} value={node.priority ?? null} />
           <InfoRow label={graphCopy.detailEstimatedDuration} value={typeof node.estimatedMinutes === "number" ? `${node.estimatedMinutes} min` : null} />
-          <InfoRow label={graphCopy.detailLinkedTask} value={node.linkedTaskId} />
+          <InfoRow label={graphCopy.detailLinkedTask} value={node.linkedTaskId ?? null} />
         </div>
       </section>
 
       <section className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorOutcomes}</p>
-        <InfoRow label={graphCopy.detailCompletionSummary} value={node.completionSummary} />
-        <InfoRow label="Branches" value={node.branchLabels.join(", ") || null} />
-        <InfoRow label="Options" value={node.options.join(", ") || null} />
-        {node.availableActions.length > 0 ? (
+        <InfoRow label={graphCopy.detailCompletionSummary} value={node.completionSummary ?? null} />
+        <InfoRow label="Branches" value={(node.branchLabels ?? []).join(", ") || null} />
+        <InfoRow label="Options" value={(node.options ?? []).join(", ") || null} />
+        {(node.availableActions ?? []).length > 0 ? (
           <div className="flex flex-wrap gap-2 pt-1">
-            {node.availableActions.map((action) => (
+            {(node.availableActions ?? []).map((action) => (
               <ActionChip key={action.id} action={action} />
             ))}
           </div>
         ) : null}
       </section>
 
-      {node.interactiveFields.length > 0 ? (
+      {(node.interactiveFields ?? []).length > 0 ? (
         <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorFields}</p>
           <div className="space-y-2">
-            {node.interactiveFields.map((field) => (
+            {(node.interactiveFields ?? []).map((field) => (
               <FieldCard key={field.key} field={field} />
             ))}
           </div>

@@ -151,11 +151,6 @@ function generatePreparationSteps(task: TaskAutomationInput): string[] {
     steps.push(`Review related context for tags: ${task.tags.join(", ")}`);
   }
 
-  // If owner type is specified, suggest coordination
-  if (task.ownerType === "team") {
-    steps.push("Coordinate with team members before starting");
-  }
-
   // Fallback: always have at least one step
   if (steps.length === 0) {
     steps.push("Review task details before starting");
@@ -209,14 +204,6 @@ function generateContextSources(
     sources.push({
       type: "deadline",
       description: "Deadline tracking and milestone information",
-    });
-  }
-
-  // Owner context
-  if (task.ownerType) {
-    sources.push({
-      type: "ownership",
-      description: `Task ownership context (${task.ownerType})`,
     });
   }
 
@@ -304,7 +291,6 @@ async function suggestAutomationWithAI(
       ? `Scheduled Start: ${task.scheduledStartAt instanceof Date ? task.scheduledStartAt.toISOString() : task.scheduledStartAt}`
       : null,
     `Runnable: ${task.isRunnable}`,
-    `Owner Type: ${task.ownerType}`,
     task.tags?.length ? `Tags: ${task.tags.join(", ")}` : null,
   ]
     .filter(Boolean)

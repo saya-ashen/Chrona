@@ -328,7 +328,7 @@ export function AiClientsManager() {
   const fetchClients = useCallback(async () => {
     const res = await api.ai.clients.$get();
     const data = await res.json();
-    setClients(data.clients ?? []);
+    setClients("clients" in data ? (data.clients as AiClientInfo[]) : []);
     setLoading(false);
   }, []);
 

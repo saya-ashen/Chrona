@@ -35,7 +35,6 @@ export type ScheduleProposalMinAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
-  assigneeAgentId: string | null
   createdAt: Date | null
   resolvedAt: Date | null
   resolutionNote: string | null
@@ -52,7 +51,6 @@ export type ScheduleProposalMaxAggregateOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
-  assigneeAgentId: string | null
   createdAt: Date | null
   resolvedAt: Date | null
   resolutionNote: string | null
@@ -69,7 +67,6 @@ export type ScheduleProposalCountAggregateOutputType = {
   dueAt: number
   scheduledStartAt: number
   scheduledEndAt: number
-  assigneeAgentId: number
   createdAt: number
   resolvedAt: number
   resolutionNote: number
@@ -88,7 +85,6 @@ export type ScheduleProposalMinAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
-  assigneeAgentId?: true
   createdAt?: true
   resolvedAt?: true
   resolutionNote?: true
@@ -105,7 +101,6 @@ export type ScheduleProposalMaxAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
-  assigneeAgentId?: true
   createdAt?: true
   resolvedAt?: true
   resolutionNote?: true
@@ -122,7 +117,6 @@ export type ScheduleProposalCountAggregateInputType = {
   dueAt?: true
   scheduledStartAt?: true
   scheduledEndAt?: true
-  assigneeAgentId?: true
   createdAt?: true
   resolvedAt?: true
   resolutionNote?: true
@@ -212,7 +206,6 @@ export type ScheduleProposalGroupByOutputType = {
   dueAt: Date | null
   scheduledStartAt: Date | null
   scheduledEndAt: Date | null
-  assigneeAgentId: string | null
   createdAt: Date
   resolvedAt: Date | null
   resolutionNote: string | null
@@ -250,7 +243,6 @@ export type ScheduleProposalWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
-  assigneeAgentId?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ScheduleProposal"> | Date | string
   resolvedAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   resolutionNote?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
@@ -269,7 +261,6 @@ export type ScheduleProposalOrderByWithRelationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resolutionNote?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -291,7 +282,6 @@ export type ScheduleProposalWhereUniqueInput = Prisma.AtLeast<{
   dueAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
-  assigneeAgentId?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ScheduleProposal"> | Date | string
   resolvedAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   resolutionNote?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
@@ -310,7 +300,6 @@ export type ScheduleProposalOrderByWithAggregationInput = {
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resolutionNote?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -333,7 +322,6 @@ export type ScheduleProposalScalarWhereWithAggregatesInput = {
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ScheduleProposal"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ScheduleProposal"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ScheduleProposal"> | Date | string | null
-  assigneeAgentId?: Prisma.StringNullableWithAggregatesFilter<"ScheduleProposal"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ScheduleProposal"> | Date | string
   resolvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ScheduleProposal"> | Date | string | null
   resolutionNote?: Prisma.StringNullableWithAggregatesFilter<"ScheduleProposal"> | string | null
@@ -348,7 +336,6 @@ export type ScheduleProposalCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -367,7 +354,6 @@ export type ScheduleProposalUncheckedCreateInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -382,7 +368,6 @@ export type ScheduleProposalUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -401,7 +386,6 @@ export type ScheduleProposalUncheckedUpdateInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -418,7 +402,6 @@ export type ScheduleProposalCreateManyInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -433,7 +416,6 @@ export type ScheduleProposalUpdateManyMutationInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -450,7 +432,6 @@ export type ScheduleProposalUncheckedUpdateManyInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -477,7 +458,6 @@ export type ScheduleProposalCountOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolutionNote?: Prisma.SortOrder
@@ -494,7 +474,6 @@ export type ScheduleProposalMaxOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolutionNote?: Prisma.SortOrder
@@ -511,7 +490,6 @@ export type ScheduleProposalMinOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   scheduledStartAt?: Prisma.SortOrder
   scheduledEndAt?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolutionNote?: Prisma.SortOrder
@@ -618,7 +596,6 @@ export type ScheduleProposalCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -635,7 +612,6 @@ export type ScheduleProposalUncheckedCreateWithoutWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -680,7 +656,6 @@ export type ScheduleProposalScalarWhereInput = {
   dueAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledStartAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   scheduledEndAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
-  assigneeAgentId?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ScheduleProposal"> | Date | string
   resolvedAt?: Prisma.DateTimeNullableFilter<"ScheduleProposal"> | Date | string | null
   resolutionNote?: Prisma.StringNullableFilter<"ScheduleProposal"> | string | null
@@ -695,7 +670,6 @@ export type ScheduleProposalCreateWithoutTaskInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -712,7 +686,6 @@ export type ScheduleProposalUncheckedCreateWithoutTaskInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -753,7 +726,6 @@ export type ScheduleProposalCreateManyWorkspaceInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -768,7 +740,6 @@ export type ScheduleProposalUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -785,7 +756,6 @@ export type ScheduleProposalUncheckedUpdateWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -801,7 +771,6 @@ export type ScheduleProposalUncheckedUpdateManyWithoutWorkspaceInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -817,7 +786,6 @@ export type ScheduleProposalCreateManyTaskInput = {
   dueAt?: Date | string | null
   scheduledStartAt?: Date | string | null
   scheduledEndAt?: Date | string | null
-  assigneeAgentId?: string | null
   createdAt?: Date | string
   resolvedAt?: Date | string | null
   resolutionNote?: string | null
@@ -832,7 +800,6 @@ export type ScheduleProposalUpdateWithoutTaskInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -849,7 +816,6 @@ export type ScheduleProposalUncheckedUpdateWithoutTaskInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -865,7 +831,6 @@ export type ScheduleProposalUncheckedUpdateManyWithoutTaskInput = {
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolutionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -884,7 +849,6 @@ export type ScheduleProposalSelect<ExtArgs extends runtime.Types.Extensions.Inte
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
-  assigneeAgentId?: boolean
   createdAt?: boolean
   resolvedAt?: boolean
   resolutionNote?: boolean
@@ -903,7 +867,6 @@ export type ScheduleProposalSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
-  assigneeAgentId?: boolean
   createdAt?: boolean
   resolvedAt?: boolean
   resolutionNote?: boolean
@@ -922,7 +885,6 @@ export type ScheduleProposalSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
-  assigneeAgentId?: boolean
   createdAt?: boolean
   resolvedAt?: boolean
   resolutionNote?: boolean
@@ -941,13 +903,12 @@ export type ScheduleProposalSelectScalar = {
   dueAt?: boolean
   scheduledStartAt?: boolean
   scheduledEndAt?: boolean
-  assigneeAgentId?: boolean
   createdAt?: boolean
   resolvedAt?: boolean
   resolutionNote?: boolean
 }
 
-export type ScheduleProposalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "source" | "status" | "proposedBy" | "summary" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "assigneeAgentId" | "createdAt" | "resolvedAt" | "resolutionNote", ExtArgs["result"]["scheduleProposal"]>
+export type ScheduleProposalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "source" | "status" | "proposedBy" | "summary" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "createdAt" | "resolvedAt" | "resolutionNote", ExtArgs["result"]["scheduleProposal"]>
 export type ScheduleProposalInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -978,7 +939,6 @@ export type $ScheduleProposalPayload<ExtArgs extends runtime.Types.Extensions.In
     dueAt: Date | null
     scheduledStartAt: Date | null
     scheduledEndAt: Date | null
-    assigneeAgentId: string | null
     createdAt: Date
     resolvedAt: Date | null
     resolutionNote: string | null
@@ -1417,7 +1377,6 @@ export interface ScheduleProposalFieldRefs {
   readonly dueAt: Prisma.FieldRef<"ScheduleProposal", 'DateTime'>
   readonly scheduledStartAt: Prisma.FieldRef<"ScheduleProposal", 'DateTime'>
   readonly scheduledEndAt: Prisma.FieldRef<"ScheduleProposal", 'DateTime'>
-  readonly assigneeAgentId: Prisma.FieldRef<"ScheduleProposal", 'String'>
   readonly createdAt: Prisma.FieldRef<"ScheduleProposal", 'DateTime'>
   readonly resolvedAt: Prisma.FieldRef<"ScheduleProposal", 'DateTime'>
   readonly resolutionNote: Prisma.FieldRef<"ScheduleProposal", 'String'>

@@ -57,7 +57,6 @@ describe("getWorkPage", () => {
         title: "Execution surface",
         status: TaskStatus.Blocked,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -189,7 +188,6 @@ describe("getWorkPage", () => {
         title: "Prepare task plan",
         status: TaskStatus.WaitingForInput,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -373,7 +371,6 @@ describe("getWorkPage", () => {
         title: "Show full conversation history",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -452,7 +449,6 @@ describe("getWorkPage", () => {
         title: "Close the loop",
         status: TaskStatus.Completed,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -509,7 +505,6 @@ describe("getWorkPage", () => {
         title: "Follow up the loop",
         status: TaskStatus.Draft,
         priority: TaskPriority.Medium,
-        ownerType: "human",
       },
     });
 

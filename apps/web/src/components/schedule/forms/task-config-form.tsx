@@ -24,16 +24,11 @@ export type TaskConfigFormDraft = {
 };
 
 export type TaskConfigFormInput = TaskConfigFormDraft & {
-  runtimeAdapterKey: string;
-  runtimeInput: RuntimeInput;
-  runtimeInputVersion: string;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig?: RuntimeInput | null;
-  sessionStrategy?: "shared" | "per_subtask";
+  executionRuntime: string;
+  executionConfig: RuntimeInput;
 };
 
-export type TaskConfigRuntimeAdapter = {
+export type TaskConfigExecutionRuntime = {
   key: string;
   label: string;
   spec: RuntimeTaskConfigSpec;
@@ -54,10 +49,9 @@ type TaskConfigFormState = {
   scheduledDate: string;
   scheduledStartTime: string;
   scheduledEndTime: string;
-  runtimeAdapterKey: string;
-  runtimeInputVersion: string;
-  fieldRuntimeInput: RuntimeInput;
-  extraRuntimeConfig: string;
+  executionRuntime: string;
+  fieldExecutionConfig: RuntimeInput;
+  extraExecutionConfig: string;
 };
 
 export type TaskConfigDraftState = {
@@ -66,8 +60,8 @@ export type TaskConfigDraftState = {
 };
 
 type TaskConfigFormProps = {
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   compact?: boolean;
   initialValues?: {
     title?: string;
@@ -76,12 +70,8 @@ type TaskConfigFormProps = {
     dueAt?: Date | null;
     scheduledStartAt?: Date | null;
     scheduledEndAt?: Date | null;
-    runtimeAdapterKey?: string | null;
-    runtimeInput?: unknown;
-    runtimeInputVersion?: string | null;
-    runtimeModel?: string | null;
-    prompt?: string | null;
-    runtimeConfig?: unknown;
+    executionRuntime?: string | null;
+    executionConfig?: unknown;
   };
   submitLabel: string;
   pendingLabel: string;
@@ -209,39 +199,21 @@ function cloneRuntimeInput(input: RuntimeInput) {
   return structuredClone(input);
 }
 
-function buildCompatRuntimeInput(initialValues?: TaskConfigFormProps["initialValues"]) {
-  const runtimeInput: RuntimeInput = isRuntimeInputObject(initialValues?.runtimeInput)
-    ? cloneRuntimeInput(initialValues.runtimeInput)
-    : isRuntimeInputObject(initialValues?.runtimeConfig)
-      ? cloneRuntimeInput(initialValues.runtimeConfig)
-      : {};
-
-  if (typeof initialValues?.runtimeModel === "string" && initialValues.runtimeModel.trim()) {
-    runtimeInput.model = initialValues.runtimeModel.trim();
-  }
-
-  if (typeof initialValues?.prompt === "string" && initialValues.prompt.trim()) {
-    runtimeInput.prompt = initialValues.prompt.trim();
-  }
-
-  return runtimeInput;
-}
-
-function resolveRuntimeAdapter(
-  runtimeAdapters: TaskConfigRuntimeAdapter[],
-  runtimeAdapterKey: string | null | undefined,
-  defaultRuntimeAdapterKey: string,
+function resolveExecutionRuntime(
+  executionRuntimes: TaskConfigExecutionRuntime[],
+  executionRuntime: string | null | undefined,
+  defaultExecutionRuntime: string,
 ) {
-  const normalizedKey = runtimeAdapterKey?.trim() || defaultRuntimeAdapterKey;
+  const normalizedKey = executionRuntime?.trim() || defaultExecutionRuntime;
 
   return (
-    runtimeAdapters.find((adapter) => adapter.key === normalizedKey) ??
-    runtimeAdapters[0] ?? {
-      key: defaultRuntimeAdapterKey,
-      label: defaultRuntimeAdapterKey,
+    executionRuntimes.find((runtime) => runtime.key === normalizedKey) ??
+    executionRuntimes[0] ?? {
+      key: defaultExecutionRuntime,
+      label: defaultExecutionRuntime,
       spec: {
-        adapterKey: defaultRuntimeAdapterKey,
-        version: `${defaultRuntimeAdapterKey}-v1`,
+        runtime: defaultExecutionRuntime,
+        version: `${defaultExecutionRuntime}-v1`,
         fields: [],
         runnability: { requiredPaths: [] },
       },
@@ -296,54 +268,39 @@ function stripDefaultRuntimeFieldValues(spec: RuntimeTaskConfigSpec, runtimeInpu
 }
 
 function buildInitialRuntimeState(input: {
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
-  runtimeAdapterKey?: string | null;
-  runtimeInput?: unknown;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: unknown;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
+  executionRuntime?: string | null;
+  executionConfig?: unknown;
 }) {
-  const runtimeAdapter = resolveRuntimeAdapter(
-    input.runtimeAdapters,
-    input.runtimeAdapterKey,
-    input.defaultRuntimeAdapterKey,
+  const runtime = resolveExecutionRuntime(
+    input.executionRuntimes,
+    input.executionRuntime,
+    input.defaultExecutionRuntime,
   );
-  const rawRuntimeInput = isRuntimeInputObject(input.runtimeInput)
-    ? input.runtimeInput
-    : buildCompatRuntimeInput({
-        runtimeModel: input.runtimeModel,
-        prompt: input.prompt,
-        runtimeConfig: input.runtimeConfig,
-      });
-  const explicitRuntimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, rawRuntimeInput, {
+  const rawExecutionConfig = isRuntimeInputObject(input.executionConfig) ? input.executionConfig : {};
+  const explicitExecutionConfig = validateTaskConfigAgainstSpec(runtime.spec, rawExecutionConfig, {
     applyDefaults: false,
   });
-  const hydratedRuntimeInput = stripDefaultRuntimeFieldValues(runtimeAdapter.spec, explicitRuntimeInput);
+  const hydratedExecutionConfig = stripDefaultRuntimeFieldValues(runtime.spec, explicitExecutionConfig);
 
   return {
-    runtimeAdapterKey: runtimeAdapter.key,
-    runtimeInputVersion: input.runtimeInputVersion?.trim() || runtimeAdapter.spec.version,
-    fieldRuntimeInput: pickSpecFieldRuntimeInput(runtimeAdapter.spec, hydratedRuntimeInput),
-    extraRuntimeConfig: formatRuntimeConfig(pickExtraRuntimeInput(runtimeAdapter.spec, hydratedRuntimeInput)),
+    executionRuntime: runtime.key,
+    fieldExecutionConfig: pickSpecFieldRuntimeInput(runtime.spec, hydratedExecutionConfig),
+    extraExecutionConfig: formatRuntimeConfig(pickExtraRuntimeInput(runtime.spec, hydratedExecutionConfig)),
   };
 }
 
 function toFormState(
   initialValues: TaskConfigFormProps["initialValues"] | undefined,
-  runtimeAdapters: TaskConfigRuntimeAdapter[],
-  defaultRuntimeAdapterKey: string,
+  executionRuntimes: TaskConfigExecutionRuntime[],
+  defaultExecutionRuntime: string,
 ): TaskConfigFormState {
   const runtimeState = buildInitialRuntimeState({
-    runtimeAdapters,
-    defaultRuntimeAdapterKey,
-    runtimeAdapterKey: initialValues?.runtimeAdapterKey,
-    runtimeInput: initialValues?.runtimeInput,
-    runtimeInputVersion: initialValues?.runtimeInputVersion,
-    runtimeModel: initialValues?.runtimeModel,
-    prompt: initialValues?.prompt,
-    runtimeConfig: initialValues?.runtimeConfig,
+    executionRuntimes,
+    defaultExecutionRuntime,
+    executionRuntime: initialValues?.executionRuntime,
+    executionConfig: initialValues?.executionConfig,
   });
 
   return {
@@ -358,31 +315,16 @@ function toFormState(
   };
 }
 
-function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
-  const runtimeModel = typeof runtimeInput.model === "string" && runtimeInput.model.trim() ? runtimeInput.model.trim() : null;
-  const prompt = typeof runtimeInput.prompt === "string" && runtimeInput.prompt.trim() ? runtimeInput.prompt.trim() : null;
-  const runtimeConfig = cloneRuntimeInput(runtimeInput);
-
-  delete runtimeConfig.model;
-  delete runtimeConfig.prompt;
-
-  return {
-    runtimeModel,
-    prompt,
-    runtimeConfig: Object.keys(runtimeConfig).length > 0 ? (runtimeConfig as RuntimeInput) : null,
-  };
-}
-
 function buildTaskConfigFormInput(
   formState: TaskConfigFormState,
-  runtimeAdapters: TaskConfigRuntimeAdapter[],
+  executionRuntimes: TaskConfigExecutionRuntime[],
   copy: { errorInvalidJson: string; errorJsonObject: string },
   options?: { throwOnInvalidJson?: boolean },
 ): TaskConfigFormInput | null {
-  const runtimeAdapter = resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, formState.runtimeAdapterKey);
+  const executionRuntime = resolveExecutionRuntime(executionRuntimes, formState.executionRuntime, formState.executionRuntime);
   let extraRuntimeInput: RuntimeInput | null;
   try {
-    extraRuntimeInput = parseRuntimeConfig(formState.extraRuntimeConfig, copy);
+    extraRuntimeInput = parseRuntimeConfig(formState.extraExecutionConfig, copy);
   } catch (error) {
     if (options?.throwOnInvalidJson) {
       throw error;
@@ -390,19 +332,10 @@ function buildTaskConfigFormInput(
     return null;
   }
   const mergedRuntimeInput = {
-    ...cloneRuntimeInput(formState.fieldRuntimeInput),
+    ...cloneRuntimeInput(formState.fieldExecutionConfig),
     ...(extraRuntimeInput ?? {}),
   };
-  const runtimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput) as RuntimeInput;
-  const runtimeInputWithoutDefaults = validateTaskConfigAgainstSpec(runtimeAdapter.spec, mergedRuntimeInput, {
-    applyDefaults: false,
-  });
-  const legacyRuntimeFields = extractLegacyRuntimeFields(runtimeInputWithoutDefaults);
-
-  const sessionStrategy =
-    runtimeInput.sessionStrategy === "shared" || runtimeInput.sessionStrategy === "per_subtask"
-      ? (runtimeInput.sessionStrategy as "shared" | "per_subtask")
-      : undefined;
+  const executionConfig = validateTaskConfigAgainstSpec(executionRuntime.spec, mergedRuntimeInput) as RuntimeInput;
 
   const hasPartialSchedule =
     !!formState.scheduledDate || !!formState.scheduledStartTime || !!formState.scheduledEndTime;
@@ -430,48 +363,42 @@ function buildTaskConfigFormInput(
     dueAt: formState.dueAt ? new Date(formState.dueAt) : null,
     scheduledStartAt,
     scheduledEndAt,
-    runtimeAdapterKey: runtimeAdapter.key,
-    runtimeInputVersion: runtimeAdapter.spec.version,
-    runtimeInput,
-    runtimeModel: legacyRuntimeFields.runtimeModel,
-    prompt: legacyRuntimeFields.prompt,
-    runtimeConfig: legacyRuntimeFields.runtimeConfig,
-    sessionStrategy,
+    executionRuntime: executionRuntime.key,
+    executionConfig,
   };
 }
 
 function applyRuntimeAdapterChange(
   current: TaskConfigFormState,
-  runtimeAdapter: TaskConfigRuntimeAdapter,
+  runtime: TaskConfigExecutionRuntime,
 ): TaskConfigFormState {
   const remappedRuntimeInput: RuntimeInput = {};
 
-  for (const field of runtimeAdapter.spec.fields) {
-    const value = getValueAtPath(current.fieldRuntimeInput, field.path);
+  for (const field of runtime.spec.fields) {
+    const value = getValueAtPath(current.fieldExecutionConfig, field.path);
 
     if (value !== undefined) {
       setValueAtPath(remappedRuntimeInput, field.path, structuredClone(value));
     }
   }
 
-  const normalizedRuntimeInput = validateTaskConfigAgainstSpec(runtimeAdapter.spec, remappedRuntimeInput, {
+  const normalizedRuntimeInput = validateTaskConfigAgainstSpec(runtime.spec, remappedRuntimeInput, {
     applyDefaults: false,
   });
 
   return {
     ...current,
-    runtimeAdapterKey: runtimeAdapter.key,
-    runtimeInputVersion: runtimeAdapter.spec.version,
-    fieldRuntimeInput: pickSpecFieldRuntimeInput(runtimeAdapter.spec, normalizedRuntimeInput),
-    extraRuntimeConfig: "",
+    executionRuntime: runtime.key,
+    fieldExecutionConfig: pickSpecFieldRuntimeInput(runtime.spec, normalizedRuntimeInput),
+    extraExecutionConfig: "",
   };
 }
 
 function applyPresetValues(
   current: TaskConfigFormState,
   values: TaskConfigPreset["values"],
-  runtimeAdapters: TaskConfigRuntimeAdapter[],
-  defaultRuntimeAdapterKey: string,
+  executionRuntimes: TaskConfigExecutionRuntime[],
+  defaultExecutionRuntime: string,
 ) {
   let next = { ...current };
 
@@ -498,22 +425,14 @@ function applyPresetValues(
   }
 
   if (
-    "runtimeAdapterKey" in values ||
-    "runtimeInput" in values ||
-    "runtimeInputVersion" in values ||
-    "runtimeModel" in values ||
-    "prompt" in values ||
-    "runtimeConfig" in values
+    "executionRuntime" in values ||
+    "executionConfig" in values
   ) {
     const runtimeState = buildInitialRuntimeState({
-      runtimeAdapters,
-      defaultRuntimeAdapterKey,
-      runtimeAdapterKey: values.runtimeAdapterKey ?? next.runtimeAdapterKey,
-      runtimeInput: values.runtimeInput,
-      runtimeInputVersion: values.runtimeInputVersion,
-      runtimeModel: values.runtimeModel,
-      prompt: values.prompt,
-      runtimeConfig: values.runtimeConfig,
+      executionRuntimes,
+      defaultExecutionRuntime,
+      executionRuntime: values.executionRuntime ?? next.executionRuntime,
+      executionConfig: values.executionConfig,
     });
 
     next = {
@@ -571,8 +490,8 @@ function renderFieldValue(value: unknown) {
 }
 
 export function TaskConfigForm({
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   compact = false,
   initialValues,
   submitLabel,
@@ -600,12 +519,8 @@ export function TaskConfigForm({
   const initialDueAt = initialValues?.dueAt;
   const initialScheduledStartAt = initialValues?.scheduledStartAt;
   const initialScheduledEndAt = initialValues?.scheduledEndAt;
-  const initialRuntimeAdapterKey = initialValues?.runtimeAdapterKey;
-  const initialRuntimeInput = initialValues?.runtimeInput;
-  const initialRuntimeInputVersion = initialValues?.runtimeInputVersion;
-  const initialRuntimeModel = initialValues?.runtimeModel;
-  const initialPrompt = initialValues?.prompt;
-  const initialRuntimeConfig = initialValues?.runtimeConfig;
+  const initialExecutionRuntime = initialValues?.executionRuntime;
+  const initialExecutionConfig = initialValues?.executionConfig;
   const initialState = useMemo(
     () =>
       toFormState(
@@ -616,31 +531,23 @@ export function TaskConfigForm({
           dueAt: initialDueAt,
           scheduledStartAt: initialScheduledStartAt,
           scheduledEndAt: initialScheduledEndAt,
-          runtimeAdapterKey: initialRuntimeAdapterKey,
-          runtimeInput: initialRuntimeInput,
-          runtimeInputVersion: initialRuntimeInputVersion,
-          runtimeModel: initialRuntimeModel,
-          prompt: initialPrompt,
-          runtimeConfig: initialRuntimeConfig,
+          executionRuntime: initialExecutionRuntime,
+          executionConfig: initialExecutionConfig,
         },
-        runtimeAdapters,
-        defaultRuntimeAdapterKey,
+        executionRuntimes,
+        defaultExecutionRuntime,
       ),
     [
-      defaultRuntimeAdapterKey,
-      runtimeAdapters,
+      defaultExecutionRuntime,
+      executionRuntimes,
       initialTitle,
       initialDescription,
       initialPriority,
       initialDueAt,
       initialScheduledStartAt,
       initialScheduledEndAt,
-      initialRuntimeAdapterKey,
-      initialRuntimeInput,
-      initialRuntimeInputVersion,
-      initialRuntimeModel,
-      initialPrompt,
-      initialRuntimeConfig,
+      initialExecutionRuntime,
+      initialExecutionConfig,
     ],
   );
   const {
@@ -668,7 +575,7 @@ export function TaskConfigForm({
       return;
     }
 
-    const values = buildTaskConfigFormInput(formState, runtimeAdapters, copy);
+    const values = buildTaskConfigFormInput(formState, executionRuntimes, copy);
     if (!values) {
       return;
     }
@@ -677,43 +584,43 @@ export function TaskConfigForm({
       isDirty,
       values,
     });
-  }, [copy, formState, initialState, isDirty, onDraftStateChange, runtimeAdapters]);
+  }, [copy, executionRuntimes, formState, initialState, isDirty, onDraftStateChange]);
 
-  const selectedRuntimeAdapter = useMemo(
-    () => resolveRuntimeAdapter(runtimeAdapters, formState.runtimeAdapterKey, defaultRuntimeAdapterKey),
-    [defaultRuntimeAdapterKey, formState.runtimeAdapterKey, runtimeAdapters],
+  const selectedExecutionRuntime = useMemo(
+    () => resolveExecutionRuntime(executionRuntimes, formState.executionRuntime, defaultExecutionRuntime),
+    [defaultExecutionRuntime, executionRuntimes, formState.executionRuntime],
   );
-  const visibleRuntimeInput = useMemo(
+  const visibleExecutionConfig = useMemo(
     () =>
-      selectedRuntimeAdapter.spec.fields.reduce<RuntimeInput>((accumulator, field) => {
-        const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+      selectedExecutionRuntime.spec.fields.reduce<RuntimeInput>((accumulator, field) => {
+        const value = readDisplayedFieldValue(field, formState.fieldExecutionConfig);
 
         if (value !== undefined) {
           setValueAtPath(accumulator, field.path, value);
         }
 
         return accumulator;
-      }, cloneRuntimeInput(formState.fieldRuntimeInput ?? {})),
-    [formState.fieldRuntimeInput, selectedRuntimeAdapter.spec.fields],
+      }, cloneRuntimeInput(formState.fieldExecutionConfig ?? {})),
+    [formState.fieldExecutionConfig, selectedExecutionRuntime.spec.fields],
   );
-  const visibleStandardFields = selectedRuntimeAdapter.spec.fields.filter(
-    (field) => !field.advanced && isFieldVisible(field, visibleRuntimeInput),
+  const visibleStandardFields = selectedExecutionRuntime.spec.fields.filter(
+    (field) => !field.advanced && isFieldVisible(field, visibleExecutionConfig),
   );
-  const visibleAdvancedFields = selectedRuntimeAdapter.spec.fields.filter(
-    (field) => field.advanced && isFieldVisible(field, visibleRuntimeInput),
+  const visibleAdvancedFields = selectedExecutionRuntime.spec.fields.filter(
+    (field) => field.advanced && isFieldVisible(field, visibleExecutionConfig),
   );
   const scheduledStartAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledStartTime);
   const scheduledEndAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledEndTime);
   const scheduleDurationLabel = formatDurationLabel(scheduledStartAtPreview, scheduledEndAtPreview);
   const requiredRuntimeFields = visibleStandardFields.filter((field) =>
-    selectedRuntimeAdapter.spec.runnability.requiredPaths.includes(field.path),
+    selectedExecutionRuntime.spec.runnability.requiredPaths.includes(field.path),
   );
   const optionalRuntimeFields = visibleStandardFields.filter(
-    (field) => !selectedRuntimeAdapter.spec.runnability.requiredPaths.includes(field.path),
+    (field) => !selectedExecutionRuntime.spec.runnability.requiredPaths.includes(field.path),
   );
 
   function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
-    const nextRuntimeInput = cloneRuntimeInput(getValues("fieldRuntimeInput") ?? {});
+    const nextRuntimeInput = cloneRuntimeInput(getValues("fieldExecutionConfig") ?? {});
 
     if (nextValue === undefined) {
       deleteValueAtPath(nextRuntimeInput, field.path);
@@ -721,14 +628,14 @@ export function TaskConfigForm({
       setValueAtPath(nextRuntimeInput, field.path, nextValue);
     }
 
-    setValue("fieldRuntimeInput", nextRuntimeInput, { shouldDirty: true });
+    setValue("fieldExecutionConfig", nextRuntimeInput, { shouldDirty: true });
   }
 
   async function submitForm(values: TaskConfigFormState) {
     setLocalErrorMessage(null);
 
     try {
-      const input = buildTaskConfigFormInput(values, runtimeAdapters, copy, { throwOnInvalidJson: true });
+      const input = buildTaskConfigFormInput(values, executionRuntimes, copy, { throwOnInvalidJson: true });
       if (input) {
         await onSubmitAction(input);
       }
@@ -754,7 +661,7 @@ export function TaskConfigForm({
                 disabled={isPending}
                 onClick={() =>
                   replaceFormState(
-                    applyPresetValues(getValues(), preset.values, runtimeAdapters, defaultRuntimeAdapterKey),
+                    applyPresetValues(getValues(), preset.values, executionRuntimes, defaultExecutionRuntime),
                   )
                 }
                 className={compact ? "rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60" : "rounded-2xl border border-border/60 bg-background px-3 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-60"}
@@ -875,7 +782,7 @@ export function TaskConfigForm({
 
 
         {(compact ? requiredRuntimeFields : visibleStandardFields).map((field) => {
-          const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+          const value = readDisplayedFieldValue(field, formState.fieldExecutionConfig);
 
           if (field.kind === "textarea") {
             return (
@@ -997,24 +904,24 @@ export function TaskConfigForm({
                   </select>
                 </Field>
 
-                {runtimeAdapters.length > 1 ? (
+                {executionRuntimes.length > 1 ? (
                   <Field label={copy.adapter} className="text-xs text-muted-foreground">
                     <select
-                      name="runtimeAdapterKey"
-                      value={formState.runtimeAdapterKey}
+                      name="executionRuntime"
+                      value={formState.executionRuntime}
                       onChange={(event) =>
                         replaceFormState(
                           applyRuntimeAdapterChange(
                             getValues(),
-                            resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
+                            resolveExecutionRuntime(executionRuntimes, event.target.value, defaultExecutionRuntime),
                           ),
                         )
                       }
                       className={selectClassName}
                     >
-                      {runtimeAdapters.map((adapter) => (
-                        <option key={adapter.key} value={adapter.key}>
-                          {adapter.label}
+                      {executionRuntimes.map((runtime) => (
+                        <option key={runtime.key} value={runtime.key}>
+                          {runtime.label}
                         </option>
                       ))}
                     </select>
@@ -1034,24 +941,24 @@ export function TaskConfigForm({
               </>
             ) : (
               <>
-                {runtimeAdapters.length > 1 ? (
+                {executionRuntimes.length > 1 ? (
                   <Field label={copy.adapter} className="text-xs text-muted-foreground">
                     <select
-                      name="runtimeAdapterKey"
-                      value={formState.runtimeAdapterKey}
+                      name="executionRuntime"
+                      value={formState.executionRuntime}
                       onChange={(event) =>
                         replaceFormState(
                           applyRuntimeAdapterChange(
                             getValues(),
-                            resolveRuntimeAdapter(runtimeAdapters, event.target.value, defaultRuntimeAdapterKey),
+                            resolveExecutionRuntime(executionRuntimes, event.target.value, defaultExecutionRuntime),
                           ),
                         )
                       }
                       className={selectClassName}
                     >
-                      {runtimeAdapters.map((adapter) => (
-                        <option key={adapter.key} value={adapter.key}>
-                          {adapter.label}
+                      {executionRuntimes.map((runtime) => (
+                        <option key={runtime.key} value={runtime.key}>
+                          {runtime.label}
                         </option>
                       ))}
                     </select>
@@ -1061,7 +968,7 @@ export function TaskConfigForm({
             )}
 
             {(compact ? [...optionalRuntimeFields, ...visibleAdvancedFields] : visibleAdvancedFields).map((field) => {
-              const value = readDisplayedFieldValue(field, formState.fieldRuntimeInput);
+              const value = readDisplayedFieldValue(field, formState.fieldExecutionConfig);
 
               if (field.kind === "textarea") {
                 return (
@@ -1159,10 +1066,10 @@ export function TaskConfigForm({
 
             <Field label={copy.runtimeParams} className="text-xs text-muted-foreground">
               <textarea
-                name="runtimeConfig"
+                name="executionConfig"
                 rows={6}
-                value={formState.extraRuntimeConfig}
-                onChange={(event) => setValue("extraRuntimeConfig", event.target.value, { shouldDirty: true })}
+                value={formState.extraExecutionConfig}
+                onChange={(event) => setValue("extraExecutionConfig", event.target.value, { shouldDirty: true })}
                 placeholder={copy.runtimeParamsPlaceholder}
                 className={textareaClassName}
               />

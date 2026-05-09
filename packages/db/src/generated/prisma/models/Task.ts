@@ -20,18 +20,8 @@ export type TaskModel = runtime.Types.Result.DefaultSelection<Prisma.$TaskPayloa
 
 export type AggregateTask = {
   _count: TaskCountAggregateOutputType | null
-  _avg: TaskAvgAggregateOutputType | null
-  _sum: TaskSumAggregateOutputType | null
   _min: TaskMinAggregateOutputType | null
   _max: TaskMaxAggregateOutputType | null
-}
-
-export type TaskAvgAggregateOutputType = {
-  budgetLimit: number | null
-}
-
-export type TaskSumAggregateOutputType = {
-  budgetLimit: number | null
 }
 
 export type TaskMinAggregateOutputType = {
@@ -39,18 +29,11 @@ export type TaskMinAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
-  runtimeAdapterKey: string | null
-  runtimeInputVersion: string | null
-  runtimeModel: string | null
-  prompt: string | null
+  executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
-  ownerType: $Enums.OwnerType | null
-  assigneeAgentId: string | null
-  sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  budgetLimit: number | null
   defaultSessionId: string | null
   latestRunId: string | null
   createdAt: Date | null
@@ -63,18 +46,11 @@ export type TaskMaxAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
-  runtimeAdapterKey: string | null
-  runtimeInputVersion: string | null
-  runtimeModel: string | null
-  prompt: string | null
+  executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
-  ownerType: $Enums.OwnerType | null
-  assigneeAgentId: string | null
-  sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  budgetLimit: number | null
   defaultSessionId: string | null
   latestRunId: string | null
   createdAt: Date | null
@@ -87,20 +63,12 @@ export type TaskCountAggregateOutputType = {
   workspaceId: number
   title: number
   description: number
-  runtimeAdapterKey: number
-  runtimeInput: number
-  runtimeInputVersion: number
-  runtimeModel: number
-  prompt: number
-  runtimeConfig: number
+  executionRuntime: number
+  executionConfig: number
   status: number
   priority: number
-  ownerType: number
-  assigneeAgentId: number
-  sourceSessionId: number
   parentTaskId: number
   dueAt: number
-  budgetLimit: number
   blockReason: number
   defaultSessionId: number
   latestRunId: number
@@ -111,31 +79,16 @@ export type TaskCountAggregateOutputType = {
 }
 
 
-export type TaskAvgAggregateInputType = {
-  budgetLimit?: true
-}
-
-export type TaskSumAggregateInputType = {
-  budgetLimit?: true
-}
-
 export type TaskMinAggregateInputType = {
   id?: true
   workspaceId?: true
   title?: true
   description?: true
-  runtimeAdapterKey?: true
-  runtimeInputVersion?: true
-  runtimeModel?: true
-  prompt?: true
+  executionRuntime?: true
   status?: true
   priority?: true
-  ownerType?: true
-  assigneeAgentId?: true
-  sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  budgetLimit?: true
   defaultSessionId?: true
   latestRunId?: true
   createdAt?: true
@@ -148,18 +101,11 @@ export type TaskMaxAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
-  runtimeAdapterKey?: true
-  runtimeInputVersion?: true
-  runtimeModel?: true
-  prompt?: true
+  executionRuntime?: true
   status?: true
   priority?: true
-  ownerType?: true
-  assigneeAgentId?: true
-  sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  budgetLimit?: true
   defaultSessionId?: true
   latestRunId?: true
   createdAt?: true
@@ -172,20 +118,12 @@ export type TaskCountAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
-  runtimeAdapterKey?: true
-  runtimeInput?: true
-  runtimeInputVersion?: true
-  runtimeModel?: true
-  prompt?: true
-  runtimeConfig?: true
+  executionRuntime?: true
+  executionConfig?: true
   status?: true
   priority?: true
-  ownerType?: true
-  assigneeAgentId?: true
-  sourceSessionId?: true
   parentTaskId?: true
   dueAt?: true
-  budgetLimit?: true
   blockReason?: true
   defaultSessionId?: true
   latestRunId?: true
@@ -233,18 +171,6 @@ export type TaskAggregateArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
-   * Select which fields to average
-  **/
-  _avg?: TaskAvgAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
-   * Select which fields to sum
-  **/
-  _sum?: TaskSumAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
    * Select which fields to find the minimum value
   **/
   _min?: TaskMinAggregateInputType
@@ -275,8 +201,6 @@ export type TaskGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   _count?: TaskCountAggregateInputType | true
-  _avg?: TaskAvgAggregateInputType
-  _sum?: TaskSumAggregateInputType
   _min?: TaskMinAggregateInputType
   _max?: TaskMaxAggregateInputType
 }
@@ -286,20 +210,12 @@ export type TaskGroupByOutputType = {
   workspaceId: string
   title: string
   description: string | null
-  runtimeAdapterKey: string | null
-  runtimeInput: runtime.JsonValue | null
-  runtimeInputVersion: string | null
-  runtimeModel: string | null
-  prompt: string | null
-  runtimeConfig: runtime.JsonValue | null
+  executionRuntime: string
+  executionConfig: runtime.JsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId: string | null
-  sourceSessionId: string | null
   parentTaskId: string | null
   dueAt: Date | null
-  budgetLimit: number | null
   blockReason: runtime.JsonValue | null
   defaultSessionId: string | null
   latestRunId: string | null
@@ -307,8 +223,6 @@ export type TaskGroupByOutputType = {
   updatedAt: Date
   completedAt: Date | null
   _count: TaskCountAggregateOutputType | null
-  _avg: TaskAvgAggregateOutputType | null
-  _sum: TaskSumAggregateOutputType | null
   _min: TaskMinAggregateOutputType | null
   _max: TaskMaxAggregateOutputType | null
 }
@@ -336,20 +250,12 @@ export type TaskWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeInput?: Prisma.JsonNullableFilter<"Task">
-  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
-  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
+  executionRuntime?: Prisma.StringFilter<"Task"> | string
+  executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
-  assigneeAgentId?: Prisma.StringNullableFilter<"Task"> | string | null
-  sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -380,20 +286,12 @@ export type TaskOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeAdapterKey?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeInput?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeInputVersion?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  prompt?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
+  executionRuntime?: Prisma.SortOrder
+  executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  ownerType?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
-  sourceSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -427,20 +325,12 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeInput?: Prisma.JsonNullableFilter<"Task">
-  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
-  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
+  executionRuntime?: Prisma.StringFilter<"Task"> | string
+  executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
-  assigneeAgentId?: Prisma.StringNullableFilter<"Task"> | string | null
-  sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -471,20 +361,12 @@ export type TaskOrderByWithAggregationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeAdapterKey?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeInput?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeInputVersion?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  prompt?: Prisma.SortOrderInput | Prisma.SortOrder
-  runtimeConfig?: Prisma.SortOrderInput | Prisma.SortOrder
+  executionRuntime?: Prisma.SortOrder
+  executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  ownerType?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
-  sourceSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  budgetLimit?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -492,10 +374,8 @@ export type TaskOrderByWithAggregationInput = {
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.TaskCountOrderByAggregateInput
-  _avg?: Prisma.TaskAvgOrderByAggregateInput
   _max?: Prisma.TaskMaxOrderByAggregateInput
   _min?: Prisma.TaskMinOrderByAggregateInput
-  _sum?: Prisma.TaskSumOrderByAggregateInput
 }
 
 export type TaskScalarWhereWithAggregatesInput = {
@@ -506,20 +386,12 @@ export type TaskScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"Task"> | string
   title?: Prisma.StringWithAggregatesFilter<"Task"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  runtimeAdapterKey?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  runtimeInput?: Prisma.JsonNullableWithAggregatesFilter<"Task">
-  runtimeInputVersion?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  runtimeModel?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  prompt?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  runtimeConfig?: Prisma.JsonNullableWithAggregatesFilter<"Task">
+  executionRuntime?: Prisma.StringWithAggregatesFilter<"Task"> | string
+  executionConfig?: Prisma.JsonWithAggregatesFilter<"Task">
   status?: Prisma.EnumTaskStatusWithAggregatesFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityWithAggregatesFilter<"Task"> | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeWithAggregatesFilter<"Task"> | $Enums.OwnerType
-  assigneeAgentId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
-  sourceSessionId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
-  budgetLimit?: Prisma.IntNullableWithAggregatesFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
   defaultSessionId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
@@ -532,20 +404,12 @@ export type TaskCreateInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -576,20 +440,12 @@ export type TaskUncheckedCreateInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -618,20 +474,12 @@ export type TaskUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -662,20 +510,12 @@ export type TaskUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -705,20 +545,12 @@ export type TaskCreateManyInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -731,20 +563,12 @@ export type TaskUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -758,20 +582,12 @@ export type TaskUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -795,20 +611,12 @@ export type TaskCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
-  runtimeAdapterKey?: Prisma.SortOrder
-  runtimeInput?: Prisma.SortOrder
-  runtimeInputVersion?: Prisma.SortOrder
-  runtimeModel?: Prisma.SortOrder
-  prompt?: Prisma.SortOrder
-  runtimeConfig?: Prisma.SortOrder
+  executionRuntime?: Prisma.SortOrder
+  executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  ownerType?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
-  sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  budgetLimit?: Prisma.SortOrder
   blockReason?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
@@ -817,27 +625,16 @@ export type TaskCountOrderByAggregateInput = {
   completedAt?: Prisma.SortOrder
 }
 
-export type TaskAvgOrderByAggregateInput = {
-  budgetLimit?: Prisma.SortOrder
-}
-
 export type TaskMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
-  runtimeAdapterKey?: Prisma.SortOrder
-  runtimeInputVersion?: Prisma.SortOrder
-  runtimeModel?: Prisma.SortOrder
-  prompt?: Prisma.SortOrder
+  executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  ownerType?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
-  sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  budgetLimit?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -850,27 +647,16 @@ export type TaskMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
-  runtimeAdapterKey?: Prisma.SortOrder
-  runtimeInputVersion?: Prisma.SortOrder
-  runtimeModel?: Prisma.SortOrder
-  prompt?: Prisma.SortOrder
+  executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  ownerType?: Prisma.SortOrder
-  assigneeAgentId?: Prisma.SortOrder
-  sourceSessionId?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
-  budgetLimit?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
-}
-
-export type TaskSumOrderByAggregateInput = {
-  budgetLimit?: Prisma.SortOrder
 }
 
 export type TaskScalarRelationFilter = {
@@ -933,20 +719,8 @@ export type EnumTaskPriorityFieldUpdateOperationsInput = {
   set?: $Enums.TaskPriority
 }
 
-export type EnumOwnerTypeFieldUpdateOperationsInput = {
-  set?: $Enums.OwnerType
-}
-
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
-}
-
-export type NullableIntFieldUpdateOperationsInput = {
-  set?: number | null
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
 }
 
 export type TaskCreateNestedOneWithoutSessionsInput = {
@@ -1179,20 +953,12 @@ export type TaskCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1221,20 +987,12 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1292,20 +1050,12 @@ export type TaskScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeAdapterKey?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeInput?: Prisma.JsonNullableFilter<"Task">
-  runtimeInputVersion?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeModel?: Prisma.StringNullableFilter<"Task"> | string | null
-  prompt?: Prisma.StringNullableFilter<"Task"> | string | null
-  runtimeConfig?: Prisma.JsonNullableFilter<"Task">
+  executionRuntime?: Prisma.StringFilter<"Task"> | string
+  executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFilter<"Task"> | $Enums.OwnerType
-  assigneeAgentId?: Prisma.StringNullableFilter<"Task"> | string | null
-  sourceSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
-  budgetLimit?: Prisma.IntNullableFilter<"Task"> | number | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
@@ -1318,20 +1068,12 @@ export type TaskCreateWithoutSessionsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1361,20 +1103,12 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1418,20 +1152,12 @@ export type TaskUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1461,20 +1187,12 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1502,20 +1220,12 @@ export type TaskCreateWithoutDependenciesInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1545,20 +1255,12 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1591,20 +1293,12 @@ export type TaskCreateWithoutDependentTasksInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1634,20 +1328,12 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1691,20 +1377,12 @@ export type TaskUpdateWithoutDependenciesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1734,20 +1412,12 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1786,20 +1456,12 @@ export type TaskUpdateWithoutDependentTasksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1829,20 +1491,12 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1870,20 +1524,12 @@ export type TaskCreateWithoutTaskPlansInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1913,20 +1559,12 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -1970,20 +1608,12 @@ export type TaskUpdateWithoutTaskPlansInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2013,20 +1643,12 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2054,20 +1676,12 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2097,20 +1711,12 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2154,20 +1760,12 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2197,20 +1795,12 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2238,20 +1828,12 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2281,20 +1863,12 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2338,20 +1912,12 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2381,20 +1947,12 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2422,20 +1980,12 @@ export type TaskCreateWithoutRunsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2465,20 +2015,12 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2522,20 +2064,12 @@ export type TaskUpdateWithoutRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2565,20 +2099,12 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2606,20 +2132,12 @@ export type TaskCreateWithoutApprovalsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2649,20 +2167,12 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2706,20 +2216,12 @@ export type TaskUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2749,20 +2251,12 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2790,20 +2284,12 @@ export type TaskCreateWithoutArtifactsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2833,20 +2319,12 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -2890,20 +2368,12 @@ export type TaskUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2933,20 +2403,12 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2974,20 +2436,12 @@ export type TaskCreateWithoutMemoriesInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3017,20 +2471,12 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3074,20 +2520,12 @@ export type TaskUpdateWithoutMemoriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3117,20 +2555,12 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3158,20 +2588,12 @@ export type TaskCreateWithoutEventsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3201,20 +2623,12 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3258,20 +2672,12 @@ export type TaskUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3301,20 +2707,12 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3342,20 +2740,12 @@ export type TaskCreateWithoutProjectionInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3385,20 +2775,12 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3442,20 +2824,12 @@ export type TaskUpdateWithoutProjectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3485,20 +2859,12 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3526,20 +2892,12 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3569,20 +2927,12 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3626,20 +2976,12 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3669,20 +3011,12 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3710,20 +3044,12 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3753,20 +3079,12 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3810,20 +3128,12 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3853,20 +3163,12 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3894,20 +3196,12 @@ export type TaskCreateWithoutWorkBlocksInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3937,20 +3231,12 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -3994,20 +3280,12 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4037,20 +3315,12 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4078,20 +3348,12 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -4121,20 +3383,12 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   workspaceId: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -4178,20 +3432,12 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4221,20 +3467,12 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4262,20 +3500,12 @@ export type TaskCreateManyWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
-  runtimeAdapterKey?: string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: string | null
-  runtimeModel?: string | null
-  prompt?: string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
-  ownerType: $Enums.OwnerType
-  assigneeAgentId?: string | null
-  sourceSessionId?: string | null
   parentTaskId?: string | null
   dueAt?: Date | string | null
-  budgetLimit?: number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
@@ -4288,20 +3518,12 @@ export type TaskUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4330,20 +3552,12 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4372,20 +3586,12 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeAdapterKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  runtimeInputVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  runtimeConfig?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
-  ownerType?: Prisma.EnumOwnerTypeFieldUpdateOperationsInput | $Enums.OwnerType
-  assigneeAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sourceSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budgetLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4556,20 +3762,12 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   workspaceId?: boolean
   title?: boolean
   description?: boolean
-  runtimeAdapterKey?: boolean
-  runtimeInput?: boolean
-  runtimeInputVersion?: boolean
-  runtimeModel?: boolean
-  prompt?: boolean
-  runtimeConfig?: boolean
+  executionRuntime?: boolean
+  executionConfig?: boolean
   status?: boolean
   priority?: boolean
-  ownerType?: boolean
-  assigneeAgentId?: boolean
-  sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
@@ -4601,20 +3799,12 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
-  runtimeAdapterKey?: boolean
-  runtimeInput?: boolean
-  runtimeInputVersion?: boolean
-  runtimeModel?: boolean
-  prompt?: boolean
-  runtimeConfig?: boolean
+  executionRuntime?: boolean
+  executionConfig?: boolean
   status?: boolean
   priority?: boolean
-  ownerType?: boolean
-  assigneeAgentId?: boolean
-  sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
@@ -4629,20 +3819,12 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
-  runtimeAdapterKey?: boolean
-  runtimeInput?: boolean
-  runtimeInputVersion?: boolean
-  runtimeModel?: boolean
-  prompt?: boolean
-  runtimeConfig?: boolean
+  executionRuntime?: boolean
+  executionConfig?: boolean
   status?: boolean
   priority?: boolean
-  ownerType?: boolean
-  assigneeAgentId?: boolean
-  sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
@@ -4657,20 +3839,12 @@ export type TaskSelectScalar = {
   workspaceId?: boolean
   title?: boolean
   description?: boolean
-  runtimeAdapterKey?: boolean
-  runtimeInput?: boolean
-  runtimeInputVersion?: boolean
-  runtimeModel?: boolean
-  prompt?: boolean
-  runtimeConfig?: boolean
+  executionRuntime?: boolean
+  executionConfig?: boolean
   status?: boolean
   priority?: boolean
-  ownerType?: boolean
-  assigneeAgentId?: boolean
-  sourceSessionId?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
-  budgetLimit?: boolean
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
@@ -4679,7 +3853,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "runtimeAdapterKey" | "runtimeInput" | "runtimeInputVersion" | "runtimeModel" | "prompt" | "runtimeConfig" | "status" | "priority" | "ownerType" | "assigneeAgentId" | "sourceSessionId" | "parentTaskId" | "dueAt" | "budgetLimit" | "blockReason" | "defaultSessionId" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -4733,20 +3907,12 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     workspaceId: string
     title: string
     description: string | null
-    runtimeAdapterKey: string | null
-    runtimeInput: runtime.JsonValue | null
-    runtimeInputVersion: string | null
-    runtimeModel: string | null
-    prompt: string | null
-    runtimeConfig: runtime.JsonValue | null
+    executionRuntime: string
+    executionConfig: runtime.JsonValue
     status: $Enums.TaskStatus
     priority: $Enums.TaskPriority
-    ownerType: $Enums.OwnerType
-    assigneeAgentId: string | null
-    sourceSessionId: string | null
     parentTaskId: string | null
     dueAt: Date | null
-    budgetLimit: number | null
     blockReason: runtime.JsonValue | null
     defaultSessionId: string | null
     latestRunId: string | null
@@ -5197,20 +4363,12 @@ export interface TaskFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"Task", 'String'>
   readonly title: Prisma.FieldRef<"Task", 'String'>
   readonly description: Prisma.FieldRef<"Task", 'String'>
-  readonly runtimeAdapterKey: Prisma.FieldRef<"Task", 'String'>
-  readonly runtimeInput: Prisma.FieldRef<"Task", 'Json'>
-  readonly runtimeInputVersion: Prisma.FieldRef<"Task", 'String'>
-  readonly runtimeModel: Prisma.FieldRef<"Task", 'String'>
-  readonly prompt: Prisma.FieldRef<"Task", 'String'>
-  readonly runtimeConfig: Prisma.FieldRef<"Task", 'Json'>
+  readonly executionRuntime: Prisma.FieldRef<"Task", 'String'>
+  readonly executionConfig: Prisma.FieldRef<"Task", 'Json'>
   readonly status: Prisma.FieldRef<"Task", 'TaskStatus'>
   readonly priority: Prisma.FieldRef<"Task", 'TaskPriority'>
-  readonly ownerType: Prisma.FieldRef<"Task", 'OwnerType'>
-  readonly assigneeAgentId: Prisma.FieldRef<"Task", 'String'>
-  readonly sourceSessionId: Prisma.FieldRef<"Task", 'String'>
   readonly parentTaskId: Prisma.FieldRef<"Task", 'String'>
   readonly dueAt: Prisma.FieldRef<"Task", 'DateTime'>
-  readonly budgetLimit: Prisma.FieldRef<"Task", 'Int'>
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>
   readonly defaultSessionId: Prisma.FieldRef<"Task", 'String'>
   readonly latestRunId: Prisma.FieldRef<"Task", 'String'>

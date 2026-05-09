@@ -20,12 +20,16 @@ function normalizePriority(value: string): TaskConfigFormDraft["priority"] {
   }
 }
 
-function toPlanningTaskDraft(item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt">): TaskConfigFormDraft {
+function toPlanningTaskDraft(
+  item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt" | "scheduledStartAt" | "scheduledEndAt">,
+): TaskConfigFormDraft {
   return {
     title: item.title,
     description: item.description ?? "",
     priority: normalizePriority(item.priority),
     dueAt: item.dueAt,
+    scheduledStartAt: item.scheduledStartAt,
+    scheduledEndAt: item.scheduledEndAt,
   };
 }
 
@@ -74,6 +78,8 @@ export function useSelectedBlockConfigState({
       description: input.description,
       priority: input.priority,
       dueAt: input.dueAt,
+      scheduledStartAt: input.scheduledStartAt,
+      scheduledEndAt: input.scheduledEndAt,
     });
     setTaskConfigDraftState({ isDirty: false, values: input });
   }, [item.taskId, onSaveTaskConfigAction]);

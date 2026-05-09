@@ -32,8 +32,6 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     workspaceId: "ws-1",
     description: null,
     priority: "Medium",
-    ownerType: "human",
-    assigneeAgentId: null,
     persistedStatus: "Open",
     displayState: null,
     actionRequired: null,

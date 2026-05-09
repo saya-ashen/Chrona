@@ -1,9 +1,6 @@
 "use client";
 
-import { startTransition, useCallback, useState } from "react";
-import { invalidateMemory } from "@/lib/task-actions-client";
 import { MemoryConsole } from "@/components/memory/memory-console";
-import { api } from "@/lib/rpc-client";
 
 type MemoryPageClientProps = {
   workspaceId: string;
@@ -11,29 +8,12 @@ type MemoryPageClientProps = {
   copy: Parameters<typeof MemoryConsole>[0]["copy"];
 };
 
-export function MemoryPageClient({ workspaceId, initialData, copy }: MemoryPageClientProps) {
-  const [items, setItems] = useState(initialData);
-
-  const refresh = useCallback(async () => {
-    const response = await api.memory.projection.$get({
-      query: { workspaceId },
-    });
-    if (!response.ok) return;
-    const next = await response.json();
-    startTransition(() => setItems(next));
-  }, [workspaceId]);
-
+export function MemoryPageClient({ initialData, copy }: MemoryPageClientProps) {
   return (
     <MemoryConsole
-      items={items.map((item) => ({
+      items={initialData.map((item) => ({
         ...item,
-        actions: (
-          <form onSubmit={async (event) => { event.preventDefault(); await invalidateMemory(item.id); await refresh(); }}>
-            <button type="submit" className="rounded-md border px-3 py-2 text-sm text-foreground">
-              {copy?.invalidate ?? "Invalidate"}
-            </button>
-          </form>
-        ),
+        actions: null,
       }))}
       copy={copy}
     />

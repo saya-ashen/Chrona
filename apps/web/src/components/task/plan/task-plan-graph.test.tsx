@@ -2,6 +2,27 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+
+function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
+  return {
+    ...input,
+    nodes: input.steps,
+    analytics: {
+      entryNodeIds: input.steps.slice(0, 1).map((node) => node.id),
+      terminalNodeIds: input.steps.slice(-1).map((node) => node.id),
+      activeNodeIds: input.steps.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+      reachableFromActiveIds: input.steps.map((node) => node.id),
+      criticalPathNodeIds: input.steps.map((node) => node.id),
+      attentionNodeIds: input.steps.filter((node) => node.status === "waiting" || node.status === "waiting_for_user").map((node) => node.id),
+      blockedNodeIds: input.steps.filter((node) => node.status === "blocked").map((node) => node.id),
+      rankByNodeId: Object.fromEntries(input.steps.map((node, index) => [node.id, index])),
+      laneByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, 0])),
+      upstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+      downstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+    },
+  };
+}
 
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),
@@ -34,7 +55,7 @@ describe("TaskPlanGraph", () => {
     render(
       <TaskPlanGraph
         mode="full"
-        plan={{
+        plan={testPlan({
           state: "ready",
           currentStepId: "node-current",
           steps: [
@@ -71,7 +92,7 @@ describe("TaskPlanGraph", () => {
           edges: [
             { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
           ],
-        }}
+        })}
       />,
     );
 
@@ -133,7 +154,7 @@ describe("TaskPlanGraph", () => {
     render(
       <TaskPlanGraph
         mode="full"
-        plan={{
+        plan={testPlan({
           state: "ready",
           currentStepId: "node-current",
           steps: [
@@ -180,7 +201,7 @@ describe("TaskPlanGraph", () => {
             { id: "edge-1", fromNodeId: "node-top", toNodeId: "node-current", type: "sequential" },
             { id: "edge-2", fromNodeId: "node-current", toNodeId: "node-deliverable", type: "sequential" },
           ],
-        }}
+        })}
       />
     );
 
@@ -213,7 +234,7 @@ describe("TaskPlanGraph", () => {
     render(
       <TaskPlanGraph
         mode="full"
-        plan={{
+        plan={testPlan({
           state: "ready",
           currentStepId: "node-task",
           steps: [
@@ -260,7 +281,7 @@ describe("TaskPlanGraph", () => {
             { id: "edge-1", fromNodeId: "node-condition", toNodeId: "node-task", type: "depends_on" },
             { id: "edge-2", fromNodeId: "node-task", toNodeId: "node-checkpoint", type: "sequential" },
           ],
-        }}
+        })}
       />,
     );
 
@@ -274,7 +295,7 @@ describe("TaskPlanGraph", () => {
       <div style={{ width: "960px" }} data-testid="wide-graph-host">
         <TaskPlanGraph
           mode="auto"
-          plan={{
+            plan={testPlan({
             state: "ready",
             currentStepId: "node-current",
             steps: [
@@ -306,7 +327,7 @@ describe("TaskPlanGraph", () => {
             edges: [
               { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
             ],
-          }}
+            })}
         />
       </div>
     );
@@ -323,7 +344,7 @@ describe("TaskPlanGraph", () => {
     render(
       <TaskPlanGraph
         mode="compact"
-        plan={{
+        plan={testPlan({
           state: "ready",
           currentStepId: "node-current",
           steps: [
@@ -381,7 +402,7 @@ describe("TaskPlanGraph", () => {
             { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
             { id: "edge-2", fromNodeId: "node-child", toNodeId: "node-deliverable", type: "sequential" },
           ],
-        }}
+        })}
       />
     );
 

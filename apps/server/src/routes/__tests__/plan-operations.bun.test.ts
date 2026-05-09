@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { saveCompiledPlan, getLatestTaskPlanReadModel } from "@chrona/engine";
-import { createPlansRoutes } from "../plans.routes";
+import { createPlansRoutes } from "../tasks/plan.routes";
 import type { CompiledPlan, GraphMutationRequest, NodeDefinitionLayer } from "@chrona/contracts/ai";
 
 function app() {
@@ -41,7 +41,6 @@ async function seedPlan() {
       title: "Test flow graph task",
       status: "Ready",
       priority: "High",
-      ownerType: "human",
     },
   });
 
@@ -293,7 +292,12 @@ describe("plan mutation routes", () => {
       data: { name: "No Plan", status: "Active", defaultRuntime: "openclaw" },
     });
     const task = await db.task.create({
-      data: { workspaceId: workspace.id, title: "No plan", status: "Ready", ownerType: "human", priority: "Medium" },
+      data: {
+        workspaceId: workspace.id,
+        title: "Task without plan",
+        status: "Ready",
+        priority: "Medium",
+      },
     });
 
     const res = await mutate(task.id, {

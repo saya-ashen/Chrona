@@ -65,7 +65,6 @@ export async function seedTask(workspaceId: string, overrides?: {
       title: overrides?.title ?? "Test Task",
       status: (overrides?.status ?? "Ready") as any,
       priority: (overrides?.priority ?? "Medium") as any,
-      ownerType: "human",
       parentTaskId: overrides?.parentTaskId ?? null,
       dueAt: overrides?.dueAt ?? null,
     },

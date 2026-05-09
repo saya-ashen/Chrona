@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { aiGeneratePlanStream } from "@/modules/ai/ai-service";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
+import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
 import { materializeGeneratedTaskPlan } from "@/modules/commands/materialize-generated-task-plan";
 import type { GeneratePlanSSEEvent, PlanBlueprint } from "@chrona/contracts";
 import { createLogger } from "@/lib/logger";
@@ -65,8 +65,8 @@ export async function* generateTaskPlanManualStream(input: {
     await ensureDefaultTaskSession({
       taskId: task.id,
       taskTitle: task.title,
-      runtimeName: resolveRuntimeAdapterKey({
-        runtimeAdapterKey: task.runtimeAdapterKey,
+      runtimeName: resolveExecutionRuntime({
+        executionRuntime: task.executionRuntime,
       }),
       defaultSessionId: task.defaultSessionId,
     })
@@ -82,6 +82,12 @@ export async function* generateTaskPlanManualStream(input: {
         )
       : undefined;
 
+  const executionConfig =
+    task.executionConfig && typeof task.executionConfig === "object" && !Array.isArray(task.executionConfig)
+      ? task.executionConfig as Record<string, unknown>
+      : {};
+  const planningPrompt = typeof executionConfig.prompt === "string" ? executionConfig.prompt : null;
+
   yield {
     type: "status",
     phase: "requesting_provider",
@@ -95,7 +101,7 @@ export async function* generateTaskPlanManualStream(input: {
     title: task.title,
     description: task.description ?? undefined,
     estimatedMinutes,
-    planningPrompt: task.prompt,
+    planningPrompt,
     sessionKey: taskSessionKey,
   })) {
     switch (event.type) {
@@ -152,7 +158,7 @@ export async function* generateTaskPlanManualStream(input: {
               taskId: task.id,
               workspaceId: task.workspaceId,
               blueprint: plan.blueprint,
-              planningPrompt: task.prompt,
+              planningPrompt,
               generatedBy: plan.source,
             });
 

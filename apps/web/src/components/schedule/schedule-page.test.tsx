@@ -162,7 +162,7 @@ Object.defineProperty(globalThis, "fetch", {
 });
 
 fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
-  if (typeof input === "string" && input.endsWith("/run")) {
+  if (typeof input === "string" && input.endsWith("/execution/actions")) {
     return Promise.resolve({
       ok: true,
       json: async () => ({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" }),
@@ -179,7 +179,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
-    if (typeof input === "string" && input.endsWith("/run")) {
+    if (typeof input === "string" && input.endsWith("/execution/actions")) {
       return Promise.resolve({
         ok: true,
         json: async () => ({ taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" }),
@@ -256,8 +256,6 @@ function createData(): SchedulePageData {
         title: "Existing block",
         description: null,
         priority: "Medium",
-        ownerType: "human",
-        assigneeAgentId: null,
         persistedStatus: "Ready",
         displayState: null,
         actionRequired: null,
@@ -424,8 +422,6 @@ describe("SchedulePage data display", () => {
         workspaceId: "workspace-1",
         title: "Proposal task",
         priority: "High",
-        ownerType: "human",
-        assigneeAgentId: null,
         source: "ai",
         proposedBy: "system",
         summary: "AI suggests scheduling",
@@ -460,8 +456,6 @@ describe("SchedulePage data display", () => {
         title: "At-risk task",
         description: null,
         priority: "High",
-        ownerType: "human",
-        assigneeAgentId: null,
         persistedStatus: "Ready",
         displayState: null,
         actionRequired: null,
@@ -511,8 +505,6 @@ describe("SchedulePage data display", () => {
         title: "Unscheduled task",
         description: null,
         priority: "Medium",
-        ownerType: "human",
-        assigneeAgentId: null,
         persistedStatus: "Ready",
         displayState: null,
         actionRequired: null,

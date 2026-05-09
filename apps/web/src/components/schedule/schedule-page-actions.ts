@@ -31,17 +31,15 @@ import { api } from "@/lib/rpc-client";
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
 
 export function getQuickCreateDefaults(data: SchedulePageData) {
-  const selectedAdapter =
-    data.runtimeAdapters.find(
-      (adapter) => adapter.key === data.defaultRuntimeAdapterKey,
+  const selectedRuntime =
+    data.executionRuntimes.find(
+      (runtime) => runtime.key === data.defaultExecutionRuntime,
     ) ??
-    data.runtimeAdapters[0] ??
+    data.executionRuntimes[0] ??
     null;
 
   return {
-    runtimeAdapterKey: selectedAdapter?.key ?? data.defaultRuntimeAdapterKey,
-    runtimeInputVersion:
-      selectedAdapter?.spec.version ?? `${data.defaultRuntimeAdapterKey}-v1`,
+    executionRuntime: selectedRuntime?.key ?? data.defaultExecutionRuntime,
   };
 }
 
@@ -83,7 +81,7 @@ export function buildDraggedItem({
       dueAt: draggedQueueItem.dueAt,
       durationMinutes: getSuggestedDurationMinutes(
         (
-          draggedQueueItem.runtimeConfig as {
+          draggedQueueItem.executionConfig as {
             suggestedDurationMinutes?: unknown;
           } | null
         )?.suggestedDurationMinutes,
@@ -151,7 +149,7 @@ export async function refreshScheduleProjection({
   const requestId = ++requestIdRef.current;
 
   try {
-    const response = await api.schedule.projection.$get({
+    const response = await api.schedule.$get({
       query: { workspaceId },
     });
 
@@ -160,7 +158,7 @@ export async function refreshScheduleProjection({
     }
 
     const next = hydrateSchedulePageData(
-      (await response.json()) as SchedulePageData,
+      (await response.json()) as unknown as SchedulePageData,
     );
 
     if (requestId !== requestIdRef.current) {
@@ -352,19 +350,14 @@ export async function handleCreateTaskBlockAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
-      dueAt: input.dueAt,
-      runtimeAdapterKey: input.runtimeAdapterKey,
-      runtimeInput: input.runtimeInput,
-      runtimeInputVersion: input.runtimeInputVersion,
-      runtimeModel: input.runtimeModel,
-      prompt: input.prompt,
-      runtimeConfig: input.runtimeConfig ?? null,
-    });
+      executionRuntime: input.executionRuntime as "openclaw" | "research",
+      executionConfig: input.executionConfig,
+    }) as { taskId: string };
 
     const createdItem = createScheduledItemFromCreateInput(
       created.taskId,
       workspaceId,
-      data.defaultRuntimeAdapterKey,
+      data.defaultExecutionRuntime,
       input,
     );
 
@@ -452,16 +445,19 @@ export async function handleTaskConfigSaveAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
-      dueAt: input.dueAt,
-      scheduledStartAt: input.scheduledStartAt,
-      scheduledEndAt: input.scheduledEndAt,
-      runtimeAdapterKey: input.runtimeAdapterKey,
-      runtimeInput: input.runtimeInput,
-      runtimeInputVersion: input.runtimeInputVersion,
-      runtimeModel: input.runtimeModel,
-      prompt: input.prompt,
-      runtimeConfig: input.runtimeConfig ?? null,
+      executionRuntime: input.executionRuntime as "openclaw" | "research",
+      executionConfig: input.executionConfig,
     });
+
+    if (input.scheduledStartAt && input.scheduledEndAt) {
+      await applySchedule({
+        taskId,
+        dueAt: input.dueAt ?? null,
+        scheduledStartAt: input.scheduledStartAt,
+        scheduledEndAt: input.scheduledEndAt,
+        scheduleSource: "human",
+      });
+    }
 
     await refreshProjection();
   } catch (error) {

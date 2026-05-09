@@ -1,22 +1,22 @@
 import { z } from "zod";
 import { workspaceId } from "./common";
 
-// ── GET /schedule/projection ──
+// ── GET /schedule ──
 export const scheduleProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-// ── GET /inbox/projection ──
+// ── GET /inbox ──
 export const inboxProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-// ── GET /memory/projection ──
+// ── GET /memory ──
 export const memoryProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-// ── GET /work/:taskId/projection ──
+// ── GET /work/:taskId ──
 export const workProjectionParamSchema = z.object({
   taskId: z.string().min(1),
 });

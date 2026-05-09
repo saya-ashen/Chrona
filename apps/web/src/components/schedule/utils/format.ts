@@ -49,23 +49,6 @@ export function formatWeekdayShort(value: Date, locale: string) {
   }).format(value);
 }
 
-export function describeOwner(
-  ownerType: string,
-  assigneeAgentId: string | null,
-  copy: Pick<
-    SchedulePageCopy,
-    "agentPrefix" | "agentAssigned" | "humanOwned"
-  >,
-) {
-  if (ownerType === "agent") {
-    return assigneeAgentId
-      ? `${copy.agentPrefix} · ${assigneeAgentId}`
-      : copy.agentAssigned;
-  }
-
-  return copy.humanOwned;
-}
-
 export function formatTimeRange(
   start: Date | null | undefined,
   end: Date | null | undefined,

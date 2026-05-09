@@ -45,14 +45,6 @@ export const TaskPriority = {
 export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority]
 
 
-export const OwnerType = {
-  human: 'human',
-  agent: 'agent'
-} as const
-
-export type OwnerType = (typeof OwnerType)[keyof typeof OwnerType]
-
-
 export const ScheduleStatus = {
   Unscheduled: 'Unscheduled',
   Scheduled: 'Scheduled',

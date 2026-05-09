@@ -1,7 +1,7 @@
 import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 import {
   createOpenClawAdapter,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_EXECUTION_RUNTIME,
   type OpenClawAdapterConfig,
 } from "@chrona/openclaw";
 import { getRuntimeAdapterDefinition } from "@/modules/task-execution/registry";
@@ -12,7 +12,7 @@ type RuntimeAdapterFactory = (
 ) => Promise<RuntimeExecutionAdapter>;
 
 const runtimeAdapterFactories = new Map<string, RuntimeAdapterFactory>([
-  [OPENCLAW_RUNTIME_ADAPTER_KEY, createOpenClawAdapter],
+  [OPENCLAW_EXECUTION_RUNTIME, createOpenClawAdapter],
   [
     "research",
     async (config) =>
@@ -49,7 +49,7 @@ export async function createRuntimeExecutionAdapter(key: string): Promise<Runtim
     throw new Error(`No runtime adapter factory registered for key: ${definition.key}`);
   }
   const config =
-    definition.key === OPENCLAW_RUNTIME_ADAPTER_KEY || definition.key === "research"
+    definition.key === OPENCLAW_EXECUTION_RUNTIME || definition.key === "research"
       ? await loadAdapterConfig()
       : undefined;
   return factory(config);

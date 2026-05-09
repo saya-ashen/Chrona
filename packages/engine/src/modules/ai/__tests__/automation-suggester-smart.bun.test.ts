@@ -21,7 +21,6 @@ function makeTask(
     scheduledEndAt: null,
     isRunnable: false,
     runnabilityState: "idle",
-    ownerType: "user",
     tags: [],
     ...overrides,
   };
@@ -302,7 +301,6 @@ describe("suggestAutomationSmart", () => {
     it("includes team coordination step for team-owned tasks", async () => {
       const task = makeTask({
         title: "Code review",
-        ownerType: "team",
       });
 
       const result = await suggestAutomationSmart(task);

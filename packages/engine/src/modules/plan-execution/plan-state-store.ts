@@ -4,7 +4,7 @@ import {
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY } from "@chrona/openclaw";
+import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
 
 type MainSessionEventType =
   | "execution_started"
@@ -35,7 +35,7 @@ export async function ensurePlanMainSession(input: {
     select: { title: true, workspaceId: true, defaultSessionId: true },
   });
 
-  const runtimeName = input.runtimeName ?? DEFAULT_RUNTIME_ADAPTER_KEY;
+  const runtimeName = input.runtimeName ?? OPENCLAW_EXECUTION_RUNTIME;
 
   const session = await ensureDefaultTaskSession({
     taskId: input.taskId,
@@ -61,7 +61,7 @@ async function _findPlanMainSession(input: {
   taskId: string;
   planId: string;
 }) {
-  const runtimeName = DEFAULT_RUNTIME_ADAPTER_KEY;
+  const runtimeName = OPENCLAW_EXECUTION_RUNTIME;
   const expectedKey = buildDefaultTaskSessionKey({
     taskId: input.taskId,
     runtimeName,

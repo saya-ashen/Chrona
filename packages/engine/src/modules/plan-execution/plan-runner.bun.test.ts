@@ -41,7 +41,6 @@ async function seedWorkspaceAndTask(title: string) {
       title,
       status: TaskStatus.Ready,
       priority: "Medium",
-      ownerType: "human",
     },
   });
 

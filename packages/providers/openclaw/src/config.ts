@@ -1,12 +1,11 @@
 import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
 import type { RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 
-export const OPENCLAW_RUNTIME_ADAPTER_KEY = "openclaw";
-export const OPENCLAW_RUNTIME_INPUT_VERSION = "openclaw-legacy-v1";
+export const OPENCLAW_EXECUTION_RUNTIME = "openclaw";
 
 const OPENCLAW_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
-  adapterKey: OPENCLAW_RUNTIME_ADAPTER_KEY,
-  version: OPENCLAW_RUNTIME_INPUT_VERSION,
+  runtime: OPENCLAW_EXECUTION_RUNTIME,
+  version: "openclaw-v1",
   fields: [
     {
       key: "prompt",

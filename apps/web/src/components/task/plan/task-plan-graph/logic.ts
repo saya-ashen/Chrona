@@ -18,7 +18,10 @@ export function getNodeTone(node: PlanNodeDataModel): NodeTone {
   return "idle";
 }
 
-export const TONE_STYLES: Record<NodeTone, { border: string; bg: string; ring: string; dot: string; text: string }> = {
+export const TONE_STYLES: Record<
+  NodeTone,
+  { border: string; bg: string; ring: string; dot: string; text: string }
+> = {
   active: {
     border: "border-sky-500/70",
     bg: "bg-sky-100/90 dark:bg-sky-950/40",
@@ -70,7 +73,10 @@ export function nodeShapeForKind(kind: PlanNodeDataModel["kind"]): NodeShape {
   return "rounded";
 }
 
-export function nodeKindLabel(kind: PlanNodeDataModel["kind"], graphCopy: GraphCopy) {
+export function nodeKindLabel(
+  kind: PlanNodeDataModel["kind"],
+  graphCopy: GraphCopy,
+) {
   switch (kind) {
     case "condition":
       return graphCopy.nodeTypeCondition;
@@ -83,22 +89,9 @@ export function nodeKindLabel(kind: PlanNodeDataModel["kind"], graphCopy: GraphC
   }
 }
 
-export function intentLabel(intent: PlanNodeDataModel["intent"], graphCopy: GraphCopy) {
-  switch (intent) {
-    case "approval":
-      return graphCopy.intentApproval;
-    case "input":
-      return graphCopy.intentInput;
-    case "decision":
-      return graphCopy.intentDecision;
-    case "pause":
-      return graphCopy.intentPause;
-    default:
-      return graphCopy.intentExecution;
-  }
-}
-
-export function interactionLabel(interactionType: PlanNodeDataModel["interactionType"]) {
+export function interactionLabel(
+  interactionType: PlanNodeDataModel["interactionType"],
+) {
   switch (interactionType) {
     case "execute":
       return "Execute";
@@ -121,26 +114,10 @@ export function interactionLabel(interactionType: PlanNodeDataModel["interaction
   }
 }
 
-export function statusLabel(status: PlanNodeDataModel["status"], graphCopy: GraphCopy) {
-  switch (status) {
-    case "ready":
-      return graphCopy.statusReady;
-    case "active":
-      return graphCopy.statusActive;
-    case "waiting":
-      return graphCopy.statusWaiting;
-    case "blocked":
-      return graphCopy.statusBlocked;
-    case "done":
-      return graphCopy.statusDone;
-    case "skipped":
-      return graphCopy.statusSkipped;
-    default:
-      return graphCopy.statusIdle;
-  }
-}
-
-export function edgeStroke(kind: PlanEdgeKind, emphasis: "normal" | "active" | "blocked") {
+function edgeStroke(
+  kind: PlanEdgeKind,
+  emphasis: "normal" | "active" | "blocked",
+) {
   if (emphasis === "blocked") return "rgba(225, 29, 72, 0.72)";
   if (emphasis === "active") return "rgba(14, 165, 233, 0.82)";
   switch (kind) {
@@ -165,13 +142,19 @@ export function edgeDash(kind: PlanEdgeKind) {
   return undefined;
 }
 
-export function edgeWidth(kind: PlanEdgeKind, emphasis: "normal" | "active" | "blocked") {
+export function edgeWidth(
+  kind: PlanEdgeKind,
+  emphasis: "normal" | "active" | "blocked",
+) {
   if (emphasis !== "normal") return 2.6;
   if (kind === "sequential") return 2;
   return 1.8;
 }
 
-export function buildEdgeStyle(kind: PlanEdgeKind, emphasis: "normal" | "active" | "blocked") {
+export function buildEdgeStyle(
+  kind: PlanEdgeKind,
+  emphasis: "normal" | "active" | "blocked",
+) {
   return {
     stroke: edgeStroke(kind, emphasis),
     strokeWidth: edgeWidth(kind, emphasis),
@@ -181,19 +164,49 @@ export function buildEdgeStyle(kind: PlanEdgeKind, emphasis: "normal" | "active"
 
 export function buildEdgeLegend(graphCopy: GraphCopy): EdgeLegendItem[] {
   return [
-    { label: graphCopy.statusActive, stroke: edgeStroke("sequential", "active"), width: 2.6 },
-    { label: graphCopy.edgeSequential, stroke: edgeStroke("sequential", "normal"), width: 2 },
-    { label: graphCopy.edgeDependency, stroke: edgeStroke("dependency", "normal"), dash: edgeDash("dependency"), width: 1.8 },
-    { label: graphCopy.edgeBranch, stroke: edgeStroke("branch_option", "normal"), width: 1.8 },
-    { label: graphCopy.statusBlocked, stroke: edgeStroke("sequential", "blocked"), width: 2.6 },
-    { label: graphCopy.edgeResume, stroke: edgeStroke("resume", "normal"), dash: edgeDash("resume"), width: 1.8 },
+    {
+      label: graphCopy.statusActive,
+      stroke: edgeStroke("sequential", "active"),
+      width: 2.6,
+    },
+    {
+      label: graphCopy.edgeSequential,
+      stroke: edgeStroke("sequential", "normal"),
+      width: 2,
+    },
+    {
+      label: graphCopy.edgeDependency,
+      stroke: edgeStroke("dependency", "normal"),
+      dash: edgeDash("dependency"),
+      width: 1.8,
+    },
+    {
+      label: graphCopy.edgeBranch,
+      stroke: edgeStroke("branch_option", "normal"),
+      width: 1.8,
+    },
+    {
+      label: graphCopy.statusBlocked,
+      stroke: edgeStroke("sequential", "blocked"),
+      width: 2.6,
+    },
+    {
+      label: graphCopy.edgeResume,
+      stroke: edgeStroke("resume", "normal"),
+      dash: edgeDash("resume"),
+      width: 1.8,
+    },
   ];
 }
 
 export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
   return [
     { label: graphCopy.statusActive, shape: "rounded", tone: "active" },
-    { label: graphCopy.statusWaiting, shape: "parallelogram", tone: "attention" },
+    {
+      label: graphCopy.statusWaiting,
+      shape: "parallelogram",
+      tone: "attention",
+    },
     { label: graphCopy.statusReady, shape: "rounded", tone: "upcoming" },
     { label: graphCopy.statusBlocked, shape: "diamond", tone: "blocked" },
     { label: graphCopy.statusDone, shape: "pill", tone: "done" },
@@ -208,12 +221,26 @@ export function getShapeClassName(shape: NodeShape) {
 }
 
 export function getShapeStyle(shape: NodeShape) {
-  if (shape === "diamond") return { clipPath: "polygon(16% 0%, 84% 0%, 100% 50%, 84% 100%, 16% 100%, 0% 50%)" };
-  if (shape === "parallelogram") return { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" };
+  if (shape === "diamond")
+    return {
+      clipPath: "polygon(16% 0%, 84% 0%, 100% 50%, 84% 100%, 16% 100%, 0% 50%)",
+    };
+  if (shape === "parallelogram")
+    return { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" };
   return undefined;
 }
 
-export function shapeChipClassName(shape: NodeShape, tone: NodeTone, className?: string) {
+export function shapeChipClassName(
+  shape: NodeShape,
+  tone: NodeTone,
+  className?: string,
+) {
   const toneStyle = TONE_STYLES[tone];
-  return cn("block h-4 w-7 border shadow-sm", toneStyle.border, toneStyle.bg, className, getShapeClassName(shape));
+  return cn(
+    "block h-4 w-7 border shadow-sm",
+    toneStyle.border,
+    toneStyle.bg,
+    className,
+    getShapeClassName(shape),
+  );
 }

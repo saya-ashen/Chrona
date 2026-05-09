@@ -177,31 +177,7 @@ export const planMutationBodySchema = z.object({
   operations: z.array(graphMutationOperationSchema).min(1, "operations are required"),
 });
 
-// ── POST /tasks/:taskId/run ──
-export const runTaskParamSchema = z.object({ taskId: taskIdParam });
-export const runTaskBodySchema = z.object({
-  prompt: z.string().optional(),
-});
-
-// ── POST /tasks/:taskId/retry ──
-export const retryTaskParamSchema = z.object({ taskId: taskIdParam });
-export const retryTaskBodySchema = z.object({
-  prompt: z.string().optional(),
-});
-
-// ── POST /tasks/:taskId/input ──
-export const taskInputParamSchema = z.object({ taskId: taskIdParam });
-export const taskInputBodySchema = z.object({
-  inputText: z.string().min(1, "inputText is required"),
-});
-
-// ── POST /tasks/:taskId/message ──
-export const taskMessageParamSchema = z.object({ taskId: taskIdParam });
-export const taskMessageBodySchema = z.object({
-  message: z.string().min(1, "message is required"),
-});
-
-// ── POST /tasks/:taskId/done ──
+// ── POST /tasks/:taskId/complete ──
 export const taskDoneParamSchema = z.object({ taskId: taskIdParam });
 
 // ── POST /tasks/:taskId/reopen ──
@@ -210,15 +186,7 @@ export const taskReopenParamSchema = z.object({ taskId: taskIdParam });
 // ── POST /tasks/:taskId/result/accept ──
 export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
 
-// ── POST /tasks/:taskId/follow-up ──
-export const followUpParamSchema = z.object({ taskId: taskIdParam });
-export const followUpBodySchema = z.object({
-  title: z.string().min(1, "title is required"),
-  dueAt: isoDateOrNull,
-  priority: taskPriorityEnum.optional(),
-});
-
-// ── POST /tasks/:taskId/schedule ──
+// ── PUT /tasks/:taskId/schedule ──
 export const scheduleParamSchema = z.object({ taskId: taskIdParam });
 export const scheduleBodySchema = z.object({
   scheduledStartAt: z.string().min(1, "scheduledStartAt is required"),
@@ -240,10 +208,9 @@ export const scheduleProposalBodySchema = z.object({
   dueAt: isoDateOrNull,
   scheduledStartAt: isoDateOrNull,
   scheduledEndAt: isoDateOrNull,
-  assigneeAgentId: z.string().optional(),
 });
 
-// ── POST /schedule/proposals/decision ──
+// ── POST /tasks/schedule-proposals/decision ──
 export const scheduleProposalDecisionBodySchema = z.object({
   proposalId: z.string().min(1, "proposalId is required"),
   decision: z.enum(["Accepted", "Rejected"]),

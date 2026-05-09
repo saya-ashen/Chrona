@@ -6,6 +6,15 @@ function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): Effec
   const { id, ...rest } = overrides;
   return {
     id,
+    nodeId: id,
+    activeLayerId: null,
+    semanticKey: id,
+    definition: {
+      title: `Node ${id}`,
+      objective: `Node ${id}`,
+      semantics: { type: "task" },
+    },
+    invalidated: false,
     localId: id,
     type: "task",
     title: `Node ${id}`,
@@ -24,8 +33,10 @@ function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): Effec
 
 function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   return {
+    graphId: "graph-1",
     planId: "plan-1",
     basePlanId: "bp-1",
+    resolvedAt: "2026-04-20T09:00:00.000Z",
     resolvedVersion: 1,
     nodes,
     edges: [],
@@ -35,6 +46,7 @@ function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
     blockedNodeIds: [],
     completedNodeIds: [],
     runningNodeIds: [],
+    invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: nodes.map((n) => n.id),
   };

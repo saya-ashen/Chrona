@@ -43,7 +43,7 @@ export type RuntimeTaskConfigField = {
 };
 
 export type RuntimeTaskConfigSpec = {
-  adapterKey: string;
+  runtime: string;
   version: string;
   fields: RuntimeTaskConfigField[];
   runnability: {

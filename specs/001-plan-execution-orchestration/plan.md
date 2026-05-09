@@ -201,7 +201,7 @@ prisma/
 
 ## Implementation Progress
 
-**Status**: Phase 2 core implementation done. Remaining work is test-coverage rounding and older route/schedule test migrations.
+**Status**: Phase 2 core implementation done and verified. Remaining work is targeted cleanup of legacy compatibility surfaces and migration bridges that are no longer on the active runtime path.
 
 ### Completed
 
@@ -299,21 +299,31 @@ prisma/
 
 - Graph display contract unchanged. Backend adapters (`buildTaskPlanFromGraph`, `buildTaskPlanReadModel`) keep `effectivePlan.nodes/edges` sufficiently compatible for the existing UI graph model.
 
+#### 17. Verification Cleanup
+
+- Updated older graph, work-page, schedule, seed, and command fixtures for the native effective-graph contract and split `Task + WorkBlock + TaskProjection` schedule model.
+- Updated manual plan-generation tests to mock `aiGeneratePlanStream`, matching the current OpenClaw tool-call streaming path.
+- Kept the plan materialization route compatible with existing API smoke coverage by returning the expected response envelope while preserving native materialization IDs.
+
 ### Remaining
 
 - Legacy overlay/compiled types still exported from `packages/contracts/src/ai-plan-runtime.ts` (used by legacy test fixtures and migration bridge only; not on active runtime path).
 - `layer-store.ts` still present for lazy migration of old persisted rows.
 - Legacy resolver overload (`resolveEffectivePlanGraph(compiledPlan, layers)`) still used by domain unit tests.
-- Some older query/route tests in unrelated areas (e.g., `get-schedule-page`, `real-router-smoke`) are still migrating to the split `Task + WorkBlock + TaskProjection` schedule model and may show Prisma validation errors from stale field references.
-- Official `bun run test:bun` exit code not yet verified to be clean — last run showed many expected Prisma error logs for negative-path tests; real failure count needs precise extraction.
+- Negative-path API tests intentionally log Prisma/command errors while asserting 4xx/5xx responses; these logs are expected when `bun run test:bun` exits successfully.
 
 ### Verification Commands
 
 ```bash
-bunx tsc --noEmit                     # full typecheck (pre-existing errors outside changed files)
+bun run typecheck                     # full typecheck
 bun test <file>                       # individual Bun test suites
 bun run test:bun                      # official serial Bun test runner
 ```
+
+Latest verification (2026-05-09):
+
+- `bun run typecheck` passes with 0 TypeScript errors.
+- `bun run test:bun` passes. Output still includes expected logged errors from negative-path tests, including missing-workspace task creation.
 
 ## Complexity Tracking
 

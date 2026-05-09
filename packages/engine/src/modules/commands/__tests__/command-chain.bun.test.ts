@@ -80,7 +80,6 @@ describe("createTask", () => {
     expect(storedTask.runtimeModel).toBe("gpt-5.4");
     expect(storedTask.prompt).toBe("Add the first real create flow");
     expect(storedTask.runtimeConfig).toBeNull();
-    expect(storedTask.ownerType).toBe("human");
     expect(storedTask.priority).toBe("High");
     expect(storedTask.defaultSessionId).toBeTruthy();
     expect(storedTask.sessions).toHaveLength(1);
@@ -151,7 +150,6 @@ describe("updateTask", () => {
         runtimeConfig: { temperature: 0.2 },
         status: "Ready",
         priority: "High",
-        ownerType: "human",
       },
     });
 
@@ -198,7 +196,6 @@ describe("invalidateMemory", () => {
         title: "Remember projection rules",
         status: "Running",
         priority: "High",
-        ownerType: "human",
       },
     });
     const memory = await db.memory.create({
@@ -252,7 +249,6 @@ describe("resolveApproval", () => {
         title: "Review generated patch",
         status: "WaitingForApproval",
         priority: "High",
-        ownerType: "human",
       },
     });
     const run = await db.run.create({
@@ -347,7 +343,6 @@ describe("resolveApproval", () => {
         title: "Reject dangerous command",
         status: "WaitingForApproval",
         priority: "Urgent",
-        ownerType: "human",
       },
     });
     const run = await db.run.create({
@@ -446,7 +441,6 @@ describe("closure commands", () => {
         prompt: "Ship the change",
         status: "Completed",
         priority: "High",
-        ownerType: "human",
       },
     });
     const run = await db.run.create({
@@ -478,7 +472,10 @@ describe("closure commands", () => {
       where: { id: task.id },
       include: { projection: true },
     });
-    const storedFollowUp = await db.task.findUniqueOrThrow({ where: { id: followUp.followUpTaskId } });
+    const storedFollowUp = await db.task.findUniqueOrThrow({
+      where: { id: followUp.followUpTaskId },
+      include: { projection: true },
+    });
     const events = await db.event.findMany({
       where: { taskId: task.id },
       orderBy: { ingestSequence: "asc" },
@@ -488,7 +485,7 @@ describe("closure commands", () => {
     expect(storedTask.completedAt).toBeNull();
     expect(storedTask.projection?.persistedStatus).toBe("Ready");
     expect(storedFollowUp.parentTaskId).toBe(task.id);
-    expect(storedFollowUp.scheduleStatus).toBe("Unscheduled");
+    expect(storedFollowUp.projection?.scheduleStatus).toBe("Unscheduled");
     expect(events.map((event) => event.eventType)).toEqual([
       "task.result_accepted",
       "task.done",
