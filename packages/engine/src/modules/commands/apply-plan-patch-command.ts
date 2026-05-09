@@ -6,19 +6,21 @@ import {
   savePlanRun,
 } from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import {
+  analyzeStructuralChangeImpact,
+  applyDownstreamInvalidation,
+  applyGraphMutation,
+} from "@chrona/graph-runtime";
 import type {
-  EditableCheckpointNode,
-  EditableConditionNode,
   EditableNode,
   EditableTaskNode,
-  EditableWaitNode,
   GraphMutationOperation,
   GraphMutationRequest,
   NodeDefinition,
   NodeResult,
-  PlanEdge,
   PlanGraph,
 } from "@chrona/contracts/ai";
+import type { GraphExecutionState, GraphMutationOperation as RuntimeGraphMutationOperation } from "@chrona/graph-runtime";
 
 type PlanPatchInput = {
   taskId: string;
@@ -106,40 +108,6 @@ function editableNodeToDefinition(node: EditableNode): NodeDefinition {
   }
 }
 
-function nodeDefinitionToEditablePatch(definition: NodeDefinition): Partial<EditableNode> {
-  return {
-    title: definition.title,
-    description: definition.description,
-    estimatedMinutes: definition.estimatedMinutes,
-    ...(definition.semantics.type === "task"
-      ? { expectedOutput: definition.objective }
-      : {}),
-  } as Partial<EditableNode>;
-}
-
-function collectDownstreamNodeIds(graph: PlanGraph, startNodeIds: string[]): string[] {
-  const activeEdges = graph.edges.filter(
-    (edge) => edge.active && (edge.type === "hard_dependency" || edge.type === "ordering"),
-  );
-  const queue = [...startNodeIds];
-  const seen = new Set(startNodeIds);
-  const descendants = new Set<string>();
-
-  while (queue.length > 0) {
-    const nodeId = queue.shift()!;
-    for (const edge of activeEdges) {
-      if (edge.fromNodeId !== nodeId || seen.has(edge.toNodeId)) {
-        continue;
-      }
-      seen.add(edge.toNodeId);
-      descendants.add(edge.toNodeId);
-      queue.push(edge.toNodeId);
-    }
-  }
-
-  return [...descendants];
-}
-
 function markCurrentResults(
   results: NodeResult[],
   nodeIds: string[],
@@ -151,93 +119,6 @@ function markCurrentResults(
       ? { ...result, status: nextStatus }
       : result,
   );
-}
-
-function cancelRunningAttempts(attempts: Awaited<ReturnType<typeof getPlanRun>> extends infer T ? T extends { attempts: infer A } ? A : never : never, nodeIds: string[], reason: string) {
-  const targetIds = new Set(nodeIds);
-  const finishedAt = new Date().toISOString();
-  return attempts.map((attempt) =>
-    targetIds.has(attempt.nodeId) && attempt.status === "running"
-      ? {
-          ...attempt,
-          status: "cancelled" as const,
-          finishedAt,
-          error: { code: "MUTATION_CANCELLED", message: reason },
-        }
-      : attempt,
-  );
-}
-
-function pushInvalidationLayer(graph: PlanGraph, nodeId: string, reason: string, mutationId: string) {
-  const timestamp = new Date().toISOString();
-  graph.nodes = graph.nodes.map((node) =>
-    node.id !== nodeId
-      ? node
-      : {
-          ...node,
-          updatedAt: timestamp,
-          layers: [
-            ...node.layers,
-            {
-              id: `invalidate_${mutationId}_${nodeId}`,
-              nodeId,
-              type: "invalidation",
-              createdAt: timestamp,
-              createdBy: "system",
-              reason,
-              invalidatedByMutationId: mutationId,
-            },
-          ],
-        },
-  );
-}
-
-function pushDefinitionLayer(graph: PlanGraph, nodeId: string, definition: NodeDefinition, reason: string) {
-  const timestamp = new Date().toISOString();
-  graph.nodes = graph.nodes.map((node) => {
-    if (node.id !== nodeId) {
-      return node;
-    }
-    return {
-      ...node,
-      updatedAt: timestamp,
-      layers: [
-        ...node.layers,
-        {
-          id: `definition_${graph.id}_${nodeId}_${Date.now()}`,
-          nodeId,
-          type: "definition",
-          createdAt: timestamp,
-          createdBy: "user",
-          reason,
-          definition,
-        },
-      ],
-    };
-  });
-}
-
-function getActiveDefinition(node: PlanGraph["nodes"][number]): NodeDefinition {
-  const layer = [...node.layers].reverse().find((candidate) => candidate.type === "definition");
-  if (!layer || layer.type !== "definition") {
-    throw new Error(`Node ${node.id} has no definition layer`);
-  }
-  return structuredClone(layer.definition);
-}
-
-function updateEdge(graph: PlanGraph, edgeId: string, patch: Partial<Pick<PlanEdge, "active" | "label" | "type">>) {
-  const timestamp = new Date().toISOString();
-  let found = false;
-  graph.edges = graph.edges.map((edge) => {
-    if (edge.id !== edgeId) {
-      return edge;
-    }
-    found = true;
-    return { ...edge, ...patch, updatedAt: timestamp };
-  });
-  if (!found) {
-    throw new Error(`Unknown edge id: ${edgeId}`);
-  }
 }
 
 async function ensureGraphRuntime(taskId: string) {
@@ -270,10 +151,9 @@ export async function applyPlanMutationCommand(input: {
   mutation: GraphMutationRequest;
 }) {
   const state = await ensureGraphRuntime(input.taskId);
-  const { graph } = state;
+  const graph = state.graph as unknown as GraphExecutionState["graph"];
+  const operations = input.mutation.operations as unknown as RuntimeGraphMutationOperation[];
   const mutationId = `mutation_${graph.id}_${Date.now()}`;
-  const affectedNodeIds = new Set<string>();
-  const invalidationRoots = new Set<string>();
 
   if (input.mutation.expectedGraphId && input.mutation.expectedGraphId !== graph.id) {
     throw new Error(`Graph mismatch: expected ${input.mutation.expectedGraphId}, got ${graph.id}`);
@@ -285,104 +165,40 @@ export async function applyPlanMutationCommand(input: {
     throw new Error(`Graph revision mismatch: expected ${input.mutation.expectedRevision}, got ${graph.mutations.length}`);
   }
 
-  for (const operation of input.mutation.operations) {
-    switch (operation.type) {
-      case "add_node": {
-        if (graph.nodes.some((node) => node.id === operation.nodeId)) {
-          throw new Error(`Node ${operation.nodeId} already exists`);
-        }
-        graph.nodes.push({
-          id: operation.nodeId,
-          semanticKey: operation.semanticKey,
-          layers: [structuredClone(operation.definitionLayer)],
-          createdAt: operation.definitionLayer.createdAt,
-          updatedAt: operation.definitionLayer.createdAt,
-        });
-        affectedNodeIds.add(operation.nodeId);
-        break;
-      }
-      case "push_node_layer": {
-        const node = graph.nodes.find((candidate) => candidate.id === operation.nodeId);
-        if (!node) {
-          throw new Error(`Unknown node id: ${operation.nodeId}`);
-        }
-        node.layers.push(structuredClone(operation.layer));
-        node.updatedAt = new Date().toISOString();
-        affectedNodeIds.add(operation.nodeId);
-        if (operation.layer.type === "definition") {
-          invalidationRoots.add(operation.nodeId);
-        }
-        break;
-      }
-      case "add_edge":
-        graph.edges.push(structuredClone(operation.edge));
-        affectedNodeIds.add(operation.edge.fromNodeId);
-        affectedNodeIds.add(operation.edge.toNodeId);
-        invalidationRoots.add(operation.edge.fromNodeId);
-        break;
-      case "remove_edge": {
-        const edge = graph.edges.find((candidate) => candidate.id === operation.edgeId);
-        if (!edge) {
-          throw new Error(`Unknown edge id: ${operation.edgeId}`);
-        }
-        updateEdge(graph, operation.edgeId, { active: false });
-        affectedNodeIds.add(edge.fromNodeId);
-        affectedNodeIds.add(edge.toNodeId);
-        invalidationRoots.add(edge.fromNodeId);
-        break;
-      }
-      case "update_edge": {
-        const edge = graph.edges.find((candidate) => candidate.id === operation.edgeId);
-        if (!edge) {
-          throw new Error(`Unknown edge id: ${operation.edgeId}`);
-        }
-        updateEdge(graph, operation.edgeId, operation.patch);
-        affectedNodeIds.add(edge.fromNodeId);
-        affectedNodeIds.add(edge.toNodeId);
-        invalidationRoots.add(edge.fromNodeId);
-        break;
-      }
-      case "delete_node": {
-        if (!graph.nodes.some((node) => node.id === operation.nodeId)) {
-          throw new Error(`Unknown node id: ${operation.nodeId}`);
-        }
-        graph.edges = graph.edges.map((edge) =>
-          edge.fromNodeId === operation.nodeId || edge.toNodeId === operation.nodeId
-            ? { ...edge, active: false, updatedAt: new Date().toISOString() }
-            : edge,
-        );
-        graph.nodes = graph.nodes.filter((node) => node.id !== operation.nodeId);
-        affectedNodeIds.add(operation.nodeId);
-        invalidationRoots.add(operation.nodeId);
-        break;
-      }
-    }
-  }
-
-  const invalidatedNodeIds = collectDownstreamNodeIds(graph, [...invalidationRoots]);
-  state.attempts = cancelRunningAttempts(
-    state.attempts,
-    [...new Set([...affectedNodeIds, ...invalidatedNodeIds])],
-    input.mutation.reason,
-  );
-  state.results = markCurrentResults(state.results, [...affectedNodeIds], "obsolete");
-  state.results = markCurrentResults(state.results, invalidatedNodeIds, "invalidated");
-
-  for (const nodeId of invalidatedNodeIds) {
-    pushInvalidationLayer(graph, nodeId, input.mutation.reason, mutationId);
-  }
-
-  graph.updatedAt = new Date().toISOString();
-  graph.mutations.push({
-    id: mutationId,
-    graphId: graph.id,
-    createdAt: new Date().toISOString(),
-    createdBy: "user",
+  const impact = analyzeStructuralChangeImpact({ graph, operations });
+  const mutationResult = applyGraphMutation({
+    graph,
+    operations,
     reason: input.mutation.reason,
-    operations: input.mutation.operations,
-    affectedNodeIds: [...affectedNodeIds],
-    invalidatedNodeIds,
+    createdBy: "user",
+    mutationId,
   });
+  const invalidationPlan = {
+    rootNodeIds: impact.affectedNodeIds,
+    invalidatedNodeIds: impact.invalidatedNodeIds,
+    reason: input.mutation.reason,
+  };
+  let runtimeState: GraphExecutionState = {
+    graph: mutationResult.graph,
+    attempts: state.attempts as unknown as GraphExecutionState["attempts"],
+    results: markCurrentResults(state.results, impact.affectedNodeIds, "obsolete") as unknown as GraphExecutionState["results"],
+    executionContextSnapshots: state.executionContextSnapshots as unknown as GraphExecutionState["executionContextSnapshots"],
+  };
+  runtimeState = applyDownstreamInvalidation({
+    state: runtimeState,
+    plan: invalidationPlan,
+    mutationId,
+    now: mutationResult.mutation.createdAt,
+  });
+
+  const graphWithInvalidation = {
+    ...runtimeState.graph,
+    mutations: runtimeState.graph.mutations.map((mutation) =>
+      mutation.id === mutationId
+        ? { ...mutation, invalidatedNodeIds: invalidationPlan.invalidatedNodeIds }
+        : mutation,
+    ),
+  };
 
   await savePlanRun({
     workspaceId: state.task.workspaceId,
@@ -390,18 +206,18 @@ export async function applyPlanMutationCommand(input: {
     planId: state.saved.compiledPlan.editablePlanId,
     run: state.persisted?.planRun ?? createPlanRunFromCompiledPlan(state.saved.compiledPlan),
     compiledPlan: state.saved.compiledPlan,
-    graph,
-    attempts: state.attempts,
-    results: state.results,
-    executionContextSnapshots: state.executionContextSnapshots,
+    graph: graphWithInvalidation as unknown as PlanGraph,
+    attempts: runtimeState.attempts as unknown as typeof state.attempts,
+    results: runtimeState.results as unknown as typeof state.results,
+    executionContextSnapshots: runtimeState.executionContextSnapshots as unknown as typeof state.executionContextSnapshots,
   });
 
   return {
     taskId: input.taskId,
     graphId: graph.id,
-    revision: graph.mutations.length,
-    affectedNodeIds: [...affectedNodeIds],
-    invalidatedNodeIds,
+    revision: graphWithInvalidation.mutations.length,
+    affectedNodeIds: impact.affectedNodeIds,
+    invalidatedNodeIds: invalidationPlan.invalidatedNodeIds,
   };
 }
 

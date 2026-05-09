@@ -80,8 +80,8 @@ function makeSingleUserConditionPlan(): CompiledPlan {
         config: makeConditionConfig({
           condition: "Choose the next step",
           evaluationBy: "user",
-          branches: [{ label: "yes", nextNodeId: "done" }],
-          defaultNextNodeId: "done",
+          branches: [{ label: "yes", nextNodeId: "cond_user" }],
+          defaultNextNodeId: "cond_user",
         }),
         dependencies: [],
         dependents: [],
@@ -128,7 +128,7 @@ function makeUserThenSystemConditionPlan(): CompiledPlan {
         config: makeConditionConfig({
           condition: "System-evaluated gate",
           evaluationBy: "system",
-          branches: [{ label: "continue", nextNodeId: "complete" }],
+          branches: [{ label: "continue", nextNodeId: "cond_system" }],
         }),
         dependencies: ["cond_user"],
         dependents: [],
@@ -168,7 +168,7 @@ function makeSingleBlockedConditionPlan(): CompiledPlan {
         config: makeConditionConfig({
           condition: "Blocked gate",
           evaluationBy: "system",
-          branches: [{ label: "continue", nextNodeId: "complete" }],
+          branches: [{ label: "continue", nextNodeId: "cond_blocked" }],
         }),
         dependencies: [],
         dependents: [],

@@ -659,7 +659,7 @@ async function advancePlanExecution(input: {
   const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
     taskId: input.taskId,
     runtimeName,
-    policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS, validateGraph: false },
+    policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS },
     callbacks: {
       executeNode: async (executorInput) => {
         const engineNode = executorInput.node as unknown as EffectivePlanNode;
