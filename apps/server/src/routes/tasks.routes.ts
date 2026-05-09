@@ -20,6 +20,9 @@ import {
   updateTaskBodySchema,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
+  scheduleProposalParamSchema,
+  scheduleProposalBodySchema,
+  scheduleProposalDecisionBodySchema,
 } from "@chrona/contracts/api";
 
 import { toDateOrNull, ensureValidDateFields } from "./helpers";
@@ -94,66 +97,64 @@ export function createTasksRoutes() {
         return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
       }
     })
-    .post("/tasks/:taskId/schedule/proposals", async (c) => {
-      try {
-        const taskId = c.req.param("taskId");
-        const body = await c.req.json();
-        return json(
-          c,
-          await proposeSchedule({
-            taskId,
-            source: body.source as ScheduleSource,
-            proposedBy: body.proposedBy ?? "test",
-            summary: body.summary ?? "",
-            dueAt: toDateOrNull(body.dueAt),
-            scheduledStartAt: toDateOrNull(body.scheduledStartAt),
-            scheduledEndAt: toDateOrNull(body.scheduledEndAt),
-            assigneeAgentId:
-              typeof body.assigneeAgentId === "string" ? body.assigneeAgentId : null,
-          }),
-          201,
-        );
-      } catch (cause) {
-        const message =
-          cause instanceof Error ? cause.message : "Failed to create schedule proposal";
-        return error(c, message, message.includes("not found") ? 404 : 500);
-      }
-    })
-    .post("/schedule/proposals/decision", async (c) => {
-      try {
-        const body = await c.req.json();
-        const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
-        const decision = body.decision;
-
-        if (!proposalId) {
-          return error(c, "proposalId is required", 400);
+    .post(
+      "/tasks/:taskId/schedule/proposals",
+      zValidator("param", scheduleProposalParamSchema),
+      zValidator("json", scheduleProposalBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const body = c.req.valid("json");
+          return json(
+            c,
+            await proposeSchedule({
+              taskId,
+              source: body.source as ScheduleSource,
+              proposedBy: body.proposedBy ?? "test",
+              summary: body.summary ?? "",
+              dueAt: toDateOrNull(body.dueAt),
+              scheduledStartAt: toDateOrNull(body.scheduledStartAt),
+              scheduledEndAt: toDateOrNull(body.scheduledEndAt),
+              assigneeAgentId:
+                typeof body.assigneeAgentId === "string" ? body.assigneeAgentId : null,
+            }),
+            201,
+          );
+        } catch (cause) {
+          const message =
+            cause instanceof Error ? cause.message : "Failed to create schedule proposal";
+          return error(c, message, message.includes("not found") ? 404 : 500);
         }
+      },
+    )
+    .post(
+      "/schedule/proposals/decision",
+      zValidator("json", scheduleProposalDecisionBodySchema),
+      async (c) => {
+        try {
+          const { proposalId, decision, resolutionNote } = c.req.valid("json");
 
-        if (decision !== "Accepted" && decision !== "Rejected") {
-          return error(c, 'decision must be "Accepted" or "Rejected"', 400);
+          return json(
+            c,
+            await decideScheduleProposal({
+              proposalId,
+              decision,
+              resolutionNote,
+            }),
+          );
+        } catch (cause) {
+          const message =
+            cause instanceof Error ? cause.message : "Failed to resolve schedule proposal";
+          return error(
+            c,
+            message,
+            message.includes("not found") || message.includes("No 'ScheduleProposal' record")
+              ? 404
+              : 400,
+          );
         }
-
-        return json(
-          c,
-          await decideScheduleProposal({
-            proposalId,
-            decision,
-            resolutionNote:
-              typeof body.resolutionNote === "string" ? body.resolutionNote : undefined,
-          }),
-        );
-      } catch (cause) {
-        const message =
-          cause instanceof Error ? cause.message : "Failed to resolve schedule proposal";
-        return error(
-          c,
-          message,
-          message.includes("not found") || message.includes("No 'ScheduleProposal' record")
-            ? 404
-            : 400,
-        );
-      }
-    })
+      },
+    )
     .get("/tasks/:taskId/detail", zValidator("param", taskDetailParamSchema), async (c) => {
       try {
         const { taskId } = c.req.valid("param");
