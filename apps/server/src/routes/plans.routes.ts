@@ -2,11 +2,14 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
+import { db } from "@chrona/db";
 
 import {
   ensureTaskInWorkspace,
   ensurePlanInWorkspace,
   applyPlanPatchCommand,
+  applyPlanMutationCommand,
+  materializeTaskPlan,
   saveCompiledPlan,
   getLatestCompiledPlan,
   isTaskPlanGenerationRunning,
@@ -25,9 +28,14 @@ import {
   planGenerateParamSchema,
   planGenerateBodySchema,
   planGenerateStopParamSchema,
+  planMaterializeBodySchema,
+  planMaterializeParamSchema,
+  planMutationBodySchema,
+  planMutationParamSchema,
   planPatchParamSchema,
   planPatchBodySchema,
 } from "@chrona/contracts/api";
+import type { GraphMutationRequest } from "@chrona/contracts/ai";
 import { planGenerationConflictBody, logger } from "./helpers";
 import { error, internalServerError, json } from "../lib/http";
 
@@ -265,6 +273,57 @@ export function createPlansRoutes() {
             message,
             message.includes("Task not found") ? 404 : 500,
           );
+        }
+      },
+    )
+    .post(
+      "/tasks/:taskId/plan/materialize",
+      zValidator("param", planMaterializeParamSchema),
+      zValidator("json", planMaterializeBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const result = await materializeTaskPlan({ taskId });
+          const childTasks = await db.task.findMany({
+            where: { id: { in: result.createdTaskIds } },
+            select: { id: true, parentTaskId: true },
+          });
+          return json(c, { ...result, parentTaskId: result.taskId, childTasks }, 201);
+        } catch (cause) {
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to materialize task plan";
+          return error(c, message, message.toLowerCase().includes("not found") ? 404 : 500);
+        }
+      },
+    )
+    .post(
+      "/tasks/:taskId/plan/mutations",
+      zValidator("param", planMutationParamSchema),
+      zValidator("json", planMutationBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const mutation = c.req.valid("json") as GraphMutationRequest;
+          return json(c, await applyPlanMutationCommand({ taskId, mutation }), 200);
+        } catch (cause) {
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to apply plan mutation";
+          const normalizedMessage = message.toLowerCase();
+          const status =
+            normalizedMessage.includes("not found") ||
+            normalizedMessage.includes("no plan found")
+              ? 404
+              : normalizedMessage.includes("requires") ||
+                  normalizedMessage.includes("unsupported") ||
+                  normalizedMessage.includes("unknown") ||
+                  normalizedMessage.includes("mismatch")
+                ? 400
+                : 500;
+          return error(c, message, status);
         }
       },
     )

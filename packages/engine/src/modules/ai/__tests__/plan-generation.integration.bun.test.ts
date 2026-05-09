@@ -24,7 +24,7 @@ import type {
   NodeConfig,
   NodeResult,
 } from "@chrona/contracts/ai";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { getReadyAutoRunnableNodes } from "@/modules/plan-execution/compat";
 
 // -- Config --

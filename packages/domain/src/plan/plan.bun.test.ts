@@ -16,7 +16,6 @@ import { PlanCompileError } from "@chrona/contracts/ai";
 import { validateEditablePlan } from "./validate";
 import { applyPlanPatch } from "./patch";
 import { compileEditablePlan } from "./compile";
-import { resolveEffectivePlanGraph } from "./effective-graph";
 
 // ─── Helpers ───
 
@@ -767,76 +766,6 @@ describe("compileEditablePlan", () => {
     expect(cNode.config).toHaveProperty("checkpointType", "approve");
     expect(wNode.config).toHaveProperty("waitFor", "signal");
     expect(condNode.config).toHaveProperty("condition", "Check something");
-  });
-});
-
-describe("resolveEffectivePlanGraph condition branches", () => {
-  it("skips non-selected condition branches at runtime", () => {
-    const plan = makePlan(
-      "plan_cond_runtime",
-      [
-        makeCondition("check", [{ label: "yes", nextNodeId: "do_yes" }], {
-          defaultNextNodeId: "do_no",
-        }),
-        makeTask("do_yes"),
-        makeTask("do_no"),
-        makeTask("wrap_up"),
-      ],
-      [
-        { from: "do_yes", to: "wrap_up" },
-        { from: "do_no", to: "wrap_up" },
-      ],
-    );
-
-    const compiled = compileEditablePlan(plan);
-    const conditionNode = compiled.nodes.find((node) => node.localId === "check")!;
-    const yesNode = compiled.nodes.find((node) => node.localId === "do_yes")!;
-    const noNode = compiled.nodes.find((node) => node.localId === "do_no")!;
-    const wrapNode = compiled.nodes.find((node) => node.localId === "wrap_up")!;
-
-    const effective = resolveEffectivePlanGraph(compiled, [
-      {
-        type: "runtime",
-        layerId: "runtime-condition-complete",
-        planId: compiled.editablePlanId,
-        version: 1,
-        active: true,
-        timestamp: new Date().toISOString(),
-        nodeStates: {
-          [conditionNode.id]: { status: "completed" },
-        },
-      },
-      {
-        type: "result",
-        layerId: "resl_condition_selected",
-        version: 2,
-        active: true,
-        planId: compiled.editablePlanId,
-        timestamp: new Date().toISOString(),
-        nodeResults: {
-          [conditionNode.id]: {
-            selectedBranch: {
-              label: "yes",
-              nextNodeId: yesNode.id,
-              source: "user",
-            },
-          },
-        },
-      },
-    ]);
-
-    const resolvedYes = effective.nodes.find((node) => node.id === yesNode.id)!;
-    const resolvedNo = effective.nodes.find((node) => node.id === noNode.id)!;
-    const resolvedWrap = effective.nodes.find((node) => node.id === wrapNode.id)!;
-
-    expect(resolvedYes.ready).toBe(true);
-    expect(resolvedNo.status).toBe("skipped");
-    expect(resolvedNo.reachable).toBe(false);
-    expect(resolvedWrap.ready).toBe(false);
-    expect(resolvedWrap.dependencies).toEqual([yesNode.id]);
-    expect(effective.edges.filter((edge) => edge.from === conditionNode.id && edge.active)).toHaveLength(1);
-    expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === yesNode.id)?.active).toBe(true);
-    expect(effective.edges.find((edge) => edge.from === conditionNode.id && edge.to === noNode.id)?.active).toBe(false);
   });
 });
 

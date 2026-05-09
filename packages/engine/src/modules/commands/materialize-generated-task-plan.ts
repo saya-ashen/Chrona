@@ -1,5 +1,5 @@
 import type { PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { compilePlanBlueprint } from "@/modules/tasks/plan-blueprint-compiler";
 import {
   saveCompiledPlan,

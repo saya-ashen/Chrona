@@ -68,7 +68,8 @@ export {
   getEditablePlan,
 } from "./modules/plan-execution/compiled-plan-store";
 
-export { resolveEffectivePlanGraph, compileEditablePlan } from "@chrona/domain";
+export { compileEditablePlan } from "@chrona/domain";
+export { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 
 export { getInbox } from "./modules/queries/get-inbox";
 export { getMemoryConsole } from "./modules/queries/get-memory-console";

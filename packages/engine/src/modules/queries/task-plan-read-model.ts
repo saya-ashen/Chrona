@@ -17,7 +17,7 @@ import type {
   ConditionEvaluator,
   WaitTimeoutAction,
 } from "@chrona/contracts";
-import { resolveEffectivePlanGraph } from "@chrona/domain";
+import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import {
   getAcceptedCompiledPlan,
   getLatestCompiledPlan,
