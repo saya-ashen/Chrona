@@ -469,8 +469,11 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
   }
 
   for (const edge of edges) {
-    incoming.get(edge.to)?.push(edge.from);
-    outgoing.get(edge.from)?.push(edge.to);
+    const from = edge.from ?? edge.fromNodeId;
+    const to = edge.to ?? edge.toNodeId;
+    if (!from || !to) continue;
+    incoming.get(to)?.push(from);
+    outgoing.get(from)?.push(to);
   }
 
   const entryNodeIds = nodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
@@ -511,7 +514,7 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
     group.push(node.id);
     rankGroups.set(rank, group);
   }
-  for (const [rank, ids] of rankGroups.entries()) {
+  for (const ids of rankGroups.values()) {
     ids.sort((left, right) => {
       const leftNode = nodeMap.get(left);
       const rightNode = nodeMap.get(right);
@@ -619,6 +622,8 @@ function buildGraphPlan(input: {
     updatedAt: input.updatedAt ?? null,
     nodes: input.nodes,
     edges,
+    currentStepId: null,
+    steps: input.nodes,
     analytics,
   };
 }

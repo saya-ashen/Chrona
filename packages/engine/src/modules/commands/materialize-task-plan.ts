@@ -11,7 +11,7 @@ import {
   savePlanRun,
 } from "@/modules/plan-execution/plan-run-store";
 import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
-import { getRuntimeAdapterDefinition, resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
+import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
 import type {
   EffectivePlanNode,
   PlanGraph,
@@ -127,9 +127,7 @@ export async function materializeTaskPlan(input: { taskId: string }) {
     select: {
       id: true,
       workspaceId: true,
-      runtimeAdapterKey: true,
-      runtimeInputVersion: true,
-      runtimeModel: true,
+      executionRuntime: true,
       dueAt: true,
       workspace: {
         select: {
@@ -145,11 +143,10 @@ export async function materializeTaskPlan(input: { taskId: string }) {
   const createdTaskIds: string[] = [];
   const materializedNodeIds = new Set<string>();
   const resolvedLinkedTaskIds = new Map<string, string>();
-  const runtimeAdapterKey = resolveRuntimeAdapterKey({
-    runtimeAdapterKey: parentTask.runtimeAdapterKey,
+  const executionRuntime = resolveExecutionRuntime({
+    executionRuntime: parentTask.executionRuntime,
     workspaceDefaultRuntime: parentTask.workspace.defaultRuntime,
   });
-  const runtimeDefinition = getRuntimeAdapterDefinition(runtimeAdapterKey);
 
   for (const node of effective.nodes) {
     if (!isMaterializableNode(node)) {
@@ -168,18 +165,12 @@ export async function materializeTaskPlan(input: { taskId: string }) {
           description: node.description ?? null,
           status: deriveTaskStatus(node.status),
           priority: normalizePriority(node.priority),
-          ownerType: "human",
           parentTaskId: parentTask.id,
           dueAt: parentTask.dueAt,
-          runtimeAdapterKey,
-          runtimeInput: {
+          executionRuntime,
+          executionConfig: {
             model: "gpt-5.4",
             prompt: objective,
-          },
-          runtimeInputVersion: parentTask.runtimeInputVersion ?? runtimeDefinition.inputVersion,
-          runtimeModel: parentTask.runtimeModel ?? "gpt-5.4",
-          prompt: objective,
-          runtimeConfig: {
             sessionStrategy:
               node.metadata && typeof node.metadata === "object"
                 ? (node.metadata as Record<string, unknown>).sessionStrategy ?? "per_subtask"

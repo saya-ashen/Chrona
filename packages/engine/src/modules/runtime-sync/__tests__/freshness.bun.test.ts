@@ -41,7 +41,6 @@ describe("syncTaskRunForRead", () => {
         title: "Force sync current run",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 

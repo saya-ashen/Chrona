@@ -210,7 +210,6 @@ export function getWorkbenchComposer(
           submitLabel: copy.sendAndContinue,
           defaultValue:
             currentIntervention?.defaultMessage ??
-            taskShell.prompt ??
             getComposerDefaultValue(taskShell.title, currentRun, copy),
           statusHint: "Plan node requires your input",
           submitVariant: "default",
@@ -231,7 +230,7 @@ export function getWorkbenchComposer(
           description: planExecution.message ?? "The plan stopped before finishing",
           inputLabel: copy.taskArrangement,
           submitLabel: copy.retryRun,
-          defaultValue: taskShell.prompt ?? `${copy.recoverTaskPrefix}${taskShell.title}`,
+          defaultValue: `${copy.recoverTaskPrefix}${taskShell.title}`,
           statusHint: "Plan execution blocked",
           submitVariant: "default",
         };
@@ -258,7 +257,7 @@ export function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.sendAndContinue,
       defaultValue:
-        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title, copy),
+        getStartRunDefaultValue(taskShell.title, copy),
       statusHint: copy.noActiveRunYet,
       submitVariant: "default",
     };
@@ -314,7 +313,7 @@ export function getWorkbenchComposer(
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
       defaultValue:
-        taskShell.prompt ?? getStartRunDefaultValue(taskShell.title, copy),
+        getStartRunDefaultValue(taskShell.title, copy),
       statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };
@@ -331,7 +330,7 @@ export function getWorkbenchComposer(
         currentIntervention?.description ?? copy.workbenchDescription,
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
-      defaultValue: taskShell.prompt ?? `${copy.recoverTaskPrefix}${taskShell.title}`,
+      defaultValue: `${copy.recoverTaskPrefix}${taskShell.title}`,
       statusHint: `${copy.currentRun}: ${getRunStatusLabel(currentRun.status)}`,
       submitVariant: "default",
     };

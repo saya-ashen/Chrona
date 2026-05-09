@@ -1,14 +1,18 @@
 import type { Edge, Node } from "@xyflow/react";
 
-export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait";
+export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
 export type PlanNodeStatus =
   | "idle"
+  | "pending"
   | "ready"
   | "active"
+  | "in_progress"
   | "waiting"
+  | "waiting_for_user"
   | "blocked"
   | "done"
+  | "completed"
   | "skipped";
 
 export type PlanNodeIntent =
@@ -58,43 +62,49 @@ export type PlanNodeAction = {
 export type PlanNodeDataModel = {
   id: string;
   title: string;
-  summary: string;
+  summary?: string;
   objective: string;
   phase: string;
-  kind: PlanNodeKind;
+  type?: PlanNodeKind;
+  displayType?: PlanNodeKind;
+  kind?: PlanNodeKind;
   status: PlanNodeStatus;
-  intent: PlanNodeIntent;
-  interactionType: PlanNodeInteractionType;
-  group: PlanNodeGroup;
-  statusLabel: string;
-  badges: string[];
-  executionMode: string | null;
-  executor: string | null;
-  estimatedMinutes: number | null;
-  priority: string | null;
-  linkedTaskId: string | null;
-  readiness: "ready" | "blocked" | "waiting";
-  dependencies: string[];
-  requiredInfo: string[];
-  nextAction: string | null;
-  completionSummary: string | null;
-  branchLabels: string[];
-  options: string[];
-  active: boolean;
-  blocked: boolean;
-  actionable: boolean;
-  interactiveFields: PlanNodeField[];
-  availableActions: PlanNodeAction[];
-  metadata: Record<string, unknown>;
+  intent?: PlanNodeIntent;
+  interactionType?: PlanNodeInteractionType;
+  group?: PlanNodeGroup;
+  statusLabel?: string;
+  badges?: string[];
+  executionMode?: string | null;
+  executor?: string | null;
+  estimatedMinutes?: number | null;
+  priority?: string | null;
+  linkedTaskId?: string | null;
+  readiness?: "ready" | "blocked" | "waiting";
+  requiresHumanInput?: boolean;
+  dependencies?: string[];
+  requiredInfo?: string[];
+  nextAction?: string | null;
+  completionSummary?: string | null;
+  branchLabels?: string[];
+  options?: string[];
+  active?: boolean;
+  blocked?: boolean;
+  actionable?: boolean;
+  interactiveFields?: PlanNodeField[];
+  availableActions?: PlanNodeAction[];
+  metadata?: Record<string, unknown>;
 };
 
 export type PlanEdgeDataModel = {
   id: string;
-  from: string;
-  to: string;
-  kind: PlanEdgeKind;
-  label: string | null;
-  emphasis: "normal" | "active" | "blocked";
+  from?: string;
+  to?: string;
+  fromNodeId?: string;
+  toNodeId?: string;
+  type?: string;
+  kind?: PlanEdgeKind;
+  label?: string | null;
+  emphasis?: "normal" | "active" | "blocked";
 };
 
 export type PlanGraphAnalytics = {
@@ -113,14 +123,19 @@ export type PlanGraphAnalytics = {
 
 export type TaskPlanGraphPlan = {
   state: "empty" | "ready";
-  graphTitle: string | null;
-  graphSummary: string | null;
-  revision: string | null;
-  generatedBy: string | null;
-  updatedAt: string | null;
+  graphTitle?: string | null;
+  graphSummary?: string | null;
+  revision?: string | null;
+  generatedBy?: string | null;
+  updatedAt?: string | null;
   nodes: PlanNodeDataModel[];
   edges: PlanEdgeDataModel[];
+  currentStepId?: string | null;
+  steps: PlanNodeDataModel[];
   analytics: PlanGraphAnalytics;
+  summary?: string | null;
+  changeSummary?: string | null;
+  isMock?: boolean;
 };
 
 export type TaskPlanGraphMode = "full" | "compact" | "auto";

@@ -27,7 +27,6 @@ export { clearSchedule } from "./modules/commands/clear-schedule";
 export { createFollowUpTask } from "./modules/commands/create-follow-up-task";
 export { createTask } from "./modules/commands/create-task";
 export { decideScheduleProposal } from "./modules/commands/decide-schedule-proposal";
-export { dispatchNextTaskAction } from "./modules/commands/dispatch-next-task-action";
 export { invalidateMemory } from "./modules/commands/invalidate-memory";
 export { markTaskDone } from "./modules/commands/mark-task-done";
 export { materializeTaskPlan } from "./modules/commands/materialize-task-plan";
@@ -141,8 +140,11 @@ export {
   chat,
 } from "./modules/ai/feature-normalizers";
 
-export { SYSTEM_PROMPTS } from "./modules/ai/prompts";
-
 export { extractJSON } from "./modules/ai/providers";
 
-export { llmCall, checkClientHealth, dispatch } from "./modules/ai/providers";
+export {
+  llmCall,
+  checkClientHealth,
+  testAiClientAvailability,
+  dispatch,
+} from "./modules/ai/providers";

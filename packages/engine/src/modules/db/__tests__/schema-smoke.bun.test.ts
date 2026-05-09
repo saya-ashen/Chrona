@@ -36,7 +36,6 @@ describe("schema smoke", () => {
         title: "Draft adapter sync",
         status: TaskStatus.Ready,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -46,7 +45,6 @@ describe("schema smoke", () => {
         title: "Prepare runtime adapter",
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
-        ownerType: "human",
       },
     });
 

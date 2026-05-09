@@ -227,6 +227,16 @@ export type GraphMutationOperation =
   | {
       type: "delete_node";
       nodeId: string;
+    }
+  | {
+      type: "replace_subgraph";
+      removeNodeIds: string[];
+      nodes: Array<{
+        nodeId: string;
+        semanticKey: string;
+        definitionLayer: NodeDefinitionLayer;
+      }>;
+      edges: PlanEdge[];
     };
 
 export interface GraphMutation {
@@ -746,10 +756,8 @@ export type TaskUpdatePatch = {
   scheduledStartAt?: string | null;
   scheduledEndAt?: string | null;
   scheduleStatus?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: Record<string, unknown> | null;
-  runtimeInput?: unknown;
+  executionRuntime?: "openclaw" | "research" | null;
+  executionConfig?: Record<string, unknown> | null;
 };
 
 export type TaskWorkspaceUpdateProposal = {
@@ -772,9 +780,8 @@ export interface TaskWorkspaceChatRequest {
     scheduledStartAt: string | null;
     scheduledEndAt: string | null;
     scheduleStatus: string;
-    runtimeModel: string | null;
-    prompt: string | null;
-    runtimeConfig: unknown;
+    executionRuntime: "openclaw" | "research";
+    executionConfig: unknown;
     status: string;
   };
   currentPlan?: {

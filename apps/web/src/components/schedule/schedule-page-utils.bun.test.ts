@@ -16,7 +16,6 @@ import {
   buildWeekGroups,
   clampScheduledEndMinute,
   clampScheduledStartMinute,
-  describeOwner,
   detectScheduleConflicts,
   formatDateKey,
   formatDateTime,
@@ -55,8 +54,6 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     title: overrides.title ?? "Task",
     description: overrides.description ?? null,
     priority: overrides.priority ?? "Medium",
-    ownerType: overrides.ownerType ?? "human",
-    assigneeAgentId: overrides.assigneeAgentId ?? null,
     persistedStatus: overrides.persistedStatus ?? "Ready",
     displayState: overrides.displayState ?? null,
     actionRequired: overrides.actionRequired ?? null,
@@ -374,22 +371,6 @@ describe("formatting functions", () => {
     it("returns abbreviated weekday", () => {
       const d = new Date(2026, 3, 13); // Monday
       expect(formatWeekdayShort(d, "en")).toBe("Mon");
-    });
-  });
-
-  describe("describeOwner", () => {
-    const copy = { agentPrefix: "Agent", agentAssigned: "Agent-assigned", humanOwned: "Human-owned" };
-
-    it("returns humanOwned for human owner", () => {
-      expect(describeOwner("human", null, copy)).toBe("Human-owned");
-    });
-
-    it("returns agent prefix with id", () => {
-      expect(describeOwner("agent", "bot-1", copy)).toBe("Agent · bot-1");
-    });
-
-    it("returns agentAssigned when no assigneeAgentId", () => {
-      expect(describeOwner("agent", null, copy)).toBe("Agent-assigned");
     });
   });
 
@@ -883,7 +864,7 @@ describe("buildPlanningSummary", () => {
     const summary = buildPlanningSummary({
       scheduled: [],
       unscheduled: [],
-      proposals: [{ proposalId: "p1", taskId: "t1", workspaceId: "w1", title: "P", priority: "Medium", ownerType: "human", assigneeAgentId: null, source: "ai", proposedBy: "planner", summary: "s", dueAt: null, scheduledStartAt: null, scheduledEndAt: null }],
+      proposals: [],
       risks: [createScheduledItem({ taskId: "r1" })],
     });
     expect(summary.proposalCount).toBe(1);
@@ -907,8 +888,6 @@ describe("buildTodayFocusItems", () => {
       title: overrides.title ?? "Risk Task",
       description: null,
       priority: overrides.priority ?? "High",
-      ownerType: "human",
-      assigneeAgentId: null,
       persistedStatus: "Ready",
       displayState: overrides.displayState ?? null,
       actionRequired: null,

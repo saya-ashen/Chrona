@@ -1,5 +1,5 @@
 /**
- * API tests: POST /done, /reopen, /result/accept, /follow-up, /approvals/resolve
+ * API tests: POST /complete, /reopen, /result/accept, /follow-ups, /approvals/resolve
  *
  * Inline route handlers to avoid the full createApiRouter() cascade import.
  */
@@ -86,7 +86,7 @@ function fakeAdapterForApprove(sessionKey: string) {
 function createClosureRouter() {
   const api = new Hono();
 
-  api.post("/tasks/:taskId/done", async (c) => {
+  api.post("/tasks/:taskId/complete", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const result = await markTaskDone({ taskId });
@@ -122,7 +122,7 @@ function createClosureRouter() {
     }
   });
 
-  api.post("/tasks/:taskId/follow-up", async (c) => {
+  api.post("/tasks/:taskId/follow-ups", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const body = await c.req.json();
@@ -191,9 +191,9 @@ function app() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /done
+// POST /complete
 // ---------------------------------------------------------------------------
-describe("POST /api/tasks/:taskId/done", () => {
+describe("POST /api/tasks/:taskId/complete", () => {
   beforeEach(async () => {
     await resetTestDb();
   });
@@ -219,7 +219,7 @@ describe("POST /api/tasks/:taskId/done", () => {
 
     await db.task.update({ where: { id: taskId }, data: { latestRunId: run.id } });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/done", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -252,7 +252,7 @@ describe("POST /api/tasks/:taskId/done", () => {
 
     await db.task.update({ where: { id: taskId }, data: { latestRunId: run.id } });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/done", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -285,7 +285,7 @@ describe("POST /api/tasks/:taskId/done", () => {
 
     await db.task.update({ where: { id: taskId }, data: { latestRunId: run.id } });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/done", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -306,7 +306,7 @@ describe("POST /api/tasks/:taskId/done", () => {
       status: "Ready",
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/done", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -316,7 +316,7 @@ describe("POST /api/tasks/:taskId/done", () => {
   });
 
   it("returns 404 for non-existent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent/done", {
+    const res = await app().request("http://local/api/tasks/nonexistent/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -504,9 +504,9 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /follow-up
+// POST /follow-ups
 // ---------------------------------------------------------------------------
-describe("POST /api/tasks/:taskId/follow-up", () => {
+describe("POST /api/tasks/:taskId/follow-ups", () => {
   beforeEach(async () => {
     await resetTestDb();
   });
@@ -537,7 +537,7 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
       },
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-up", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-ups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -569,7 +569,7 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
       },
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-up", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-ups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "Inherited follow-up" }),
@@ -595,7 +595,7 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
       status: TaskStatus.Completed,
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-up", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-ups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -611,7 +611,7 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
       status: TaskStatus.Completed,
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-up", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-ups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "   " }),
@@ -627,7 +627,7 @@ describe("POST /api/tasks/:taskId/follow-up", () => {
       status: TaskStatus.Completed,
     });
 
-    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-up", {
+    const res = await app().request("http://local/api/tasks/" + taskId + "/follow-ups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "Follow-up with events" }),

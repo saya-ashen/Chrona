@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 type SurfaceCardProps = HTMLAttributes<HTMLElement> & {
   as?: "section" | "div" | "aside" | "header";
   variant?: "default" | "inset" | "highlight";
-  padding?: "sm" | "md" | "lg";
+  padding?: "none" | "sm" | "md" | "lg";
 };
 
 const variantClasses = {
@@ -14,6 +14,7 @@ const variantClasses = {
 } as const;
 
 const paddingClasses = {
+  none: "p-0",
   sm: "p-4",
   md: "p-5",
   lg: "p-6",

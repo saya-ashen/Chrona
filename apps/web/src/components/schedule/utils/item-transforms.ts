@@ -53,8 +53,6 @@ export function createScheduledItemFromQueueItem(
     workspaceId: item.workspaceId,
     title: item.title,
     priority: item.priority,
-    ownerType: item.ownerType,
-    assigneeAgentId: item.assigneeAgentId,
     persistedStatus: item.persistedStatus,
     displayState: item.displayState,
     actionRequired: item.isRunnable ? null : item.runnabilitySummary,
@@ -68,12 +66,8 @@ export function createScheduledItemFromQueueItem(
     scheduleProposalCount: item.scheduleProposalCount,
     lastActivityAt: item.lastActivityAt,
     description: item.description,
-    runtimeAdapterKey: item.runtimeAdapterKey,
-    runtimeInput: item.runtimeInput,
-    runtimeInputVersion: item.runtimeInputVersion,
-    runtimeModel: item.runtimeModel,
-    prompt: item.prompt,
-    runtimeConfig: item.runtimeConfig,
+    executionRuntime: item.executionRuntime,
+    executionConfig: item.executionConfig,
     isRunnable: item.isRunnable,
     runnabilityState: item.runnabilityState,
     runnabilitySummary: item.runnabilitySummary,
@@ -89,11 +83,8 @@ export function createScheduledItemFromCreateInput(
 ): ScheduledItem {
   const runnability = deriveTaskRunnability({
     workspaceDefaultRuntime,
-    runtimeAdapterKey: input.runtimeAdapterKey,
-    runtimeInput: input.runtimeInput,
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig: input.runtimeConfig,
+    executionRuntime: input.executionRuntime,
+    executionConfig: input.executionConfig,
   });
 
   return {
@@ -102,8 +93,6 @@ export function createScheduledItemFromCreateInput(
     title: input.title,
     description: input.description || null,
     priority: input.priority,
-    ownerType: "human",
-    assigneeAgentId: null,
     persistedStatus: runnability.isRunnable ? "Ready" : "Draft",
     displayState: null,
     actionRequired: runnability.isRunnable ? null : runnability.summary,
@@ -116,12 +105,8 @@ export function createScheduledItemFromCreateInput(
     latestRunStatus: null,
     scheduleProposalCount: 0,
     lastActivityAt: new Date(),
-    runtimeAdapterKey: input.runtimeAdapterKey,
-    runtimeInput: input.runtimeInput,
-    runtimeInputVersion: input.runtimeInputVersion,
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig: input.runtimeConfig,
+    executionRuntime: input.executionRuntime,
+    executionConfig: input.executionConfig,
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
     runnabilitySummary: runnability.summary,
@@ -157,13 +142,9 @@ export function applyScheduleToListItem(
 export function applyTaskConfigToItem<
   T extends ScheduledItem | UnscheduledItem | ListItem | ScheduleRecord,
 >(item: T, input: TaskConfigFormInput): T {
-  const runtimeConfig = input.runtimeConfig ?? null;
   const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: input.runtimeAdapterKey,
-    runtimeInput: input.runtimeInput,
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig,
+    executionRuntime: input.executionRuntime,
+    executionConfig: input.executionConfig,
   });
 
   return {
@@ -174,12 +155,8 @@ export function applyTaskConfigToItem<
     dueAt: input.dueAt,
     scheduledStartAt: input.scheduledStartAt,
     scheduledEndAt: input.scheduledEndAt,
-    runtimeAdapterKey: input.runtimeAdapterKey,
-    runtimeInput: input.runtimeInput,
-    runtimeInputVersion: input.runtimeInputVersion,
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig,
+    executionRuntime: input.executionRuntime,
+    executionConfig: input.executionConfig,
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
     runnabilitySummary: runnability.summary,
@@ -197,13 +174,11 @@ export function toTaskConfigInitialValues(item: {
   title: string;
   description?: string | null;
   priority: string;
-  runtimeAdapterKey?: string | null;
-  runtimeInput?: unknown;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
+  executionRuntime?: string | null;
+  executionConfig?: unknown;
   dueAt?: Date | null;
-  runtimeConfig?: unknown;
+  scheduledStartAt?: Date | null;
+  scheduledEndAt?: Date | null;
 }) {
   return {
     title: item.title,
@@ -211,13 +186,9 @@ export function toTaskConfigInitialValues(item: {
     priority: item.priority as TaskConfigFormInput["priority"],
     scheduledStartAt: item.scheduledStartAt ?? null,
     scheduledEndAt: item.scheduledEndAt ?? null,
-    runtimeAdapterKey: item.runtimeAdapterKey ?? null,
-    runtimeInput: item.runtimeInput,
-    runtimeInputVersion: item.runtimeInputVersion ?? null,
-    runtimeModel: item.runtimeModel ?? null,
-    prompt: item.prompt ?? null,
+    executionRuntime: item.executionRuntime ?? null,
+    executionConfig: item.executionConfig,
     dueAt: item.dueAt ?? null,
-    runtimeConfig: item.runtimeConfig,
   };
 }
 

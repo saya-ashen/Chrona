@@ -110,8 +110,10 @@ const sampleReadModel: TaskPlanReadModel = {
   },
   compiledPlan: sampleCompiledPlan,
   effectivePlan: {
+    graphId: "graph-1",
     planId: "plan-1",
     basePlanId: "compiled-plan-1",
+    resolvedAt: "2026-04-20T09:05:00.000Z",
     resolvedVersion: 1,
     nodes: [],
     edges: [],
@@ -121,6 +123,7 @@ const sampleReadModel: TaskPlanReadModel = {
     blockedNodeIds: [],
     completedNodeIds: [],
     runningNodeIds: [],
+    invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: ["node-1", "node-2", "node-3"],
   },
@@ -218,7 +221,7 @@ describe("TaskPlanGenerationPanel", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/tasks/task_1/plan/generate",
+        "/api/tasks/task_1/plan/generations",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({ Accept: "text/event-stream" }),
@@ -247,7 +250,7 @@ describe("TaskPlanGenerationPanel", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/tasks/task_1/plan/generate/stop",
+        "/api/tasks/task_1/plan/generations/stop",
         expect.objectContaining({ method: "POST" }),
       );
     });

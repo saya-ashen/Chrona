@@ -119,8 +119,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
               onDelete={() => void handleDelete()}
             >
               <TaskWorkspaceEditSection
-                runtimeAdapters={data.runtimeAdapters}
-                defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                executionRuntimes={data.executionRuntimes}
+                defaultExecutionRuntime={data.defaultExecutionRuntime}
                 isSaving={isSaving}
                 taskConfigInitialValues={taskConfigInitialValues}
                 saveSuccess={saveSuccess}

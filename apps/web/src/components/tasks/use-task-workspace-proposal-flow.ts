@@ -46,9 +46,8 @@ export function useTaskWorkspaceProposalFlow({
           if (patch.dueAt !== undefined) body.dueAt = patch.dueAt ?? undefined;
           if (patch.scheduledStartAt !== undefined) body.scheduledStartAt = patch.scheduledStartAt ?? undefined;
           if (patch.scheduledEndAt !== undefined) body.scheduledEndAt = patch.scheduledEndAt ?? undefined;
-          if (patch.runtimeModel !== undefined) body.runtimeModel = patch.runtimeModel ?? undefined;
-          if (patch.prompt !== undefined) body.prompt = patch.prompt ?? undefined;
-          if (patch.runtimeConfig !== undefined) body.runtimeConfig = patch.runtimeConfig ?? undefined;
+          if (patch.executionRuntime !== undefined) body.executionRuntime = patch.executionRuntime ?? undefined;
+          if (patch.executionConfig !== undefined) body.executionConfig = patch.executionConfig ?? undefined;
 
           const response = await api.tasks[":taskId"].$patch({
             param: { taskId: task.id },
@@ -66,9 +65,8 @@ export function useTaskWorkspaceProposalFlow({
             if (patch.dueAt !== undefined) patchedFields.dueAt = patch.dueAt;
             if (patch.scheduledStartAt !== undefined) patchedFields.scheduledStartAt = patch.scheduledStartAt;
             if (patch.scheduledEndAt !== undefined) patchedFields.scheduledEndAt = patch.scheduledEndAt;
-            if (patch.runtimeModel !== undefined) patchedFields.runtimeModel = patch.runtimeModel;
-            if (patch.prompt !== undefined) patchedFields.prompt = patch.prompt;
-            if (patch.runtimeConfig !== undefined) patchedFields.runtimeConfig = patch.runtimeConfig;
+            if (patch.executionRuntime !== undefined) patchedFields.executionRuntime = patch.executionRuntime ?? undefined;
+            if (patch.executionConfig !== undefined) patchedFields.executionConfig = patch.executionConfig;
             setTask((prev) => ({ ...prev, ...patchedFields }));
           }
         } catch (cause) {

@@ -178,8 +178,8 @@ export function SchedulePage({
           activeSelectedTaskId={viewModel.activeSelectedTaskId}
           conflictTaskIds={viewModel.conflictTaskIds}
           listItems={viewData.listItems}
-          runtimeAdapters={data.runtimeAdapters}
-          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+          executionRuntimes={data.executionRuntimes}
+          defaultExecutionRuntime={data.defaultExecutionRuntime}
           isPending={isPending}
           onScheduleDrop={handleScheduleDrop}
           onCreateTaskBlock={handleCreateTaskBlock}
@@ -210,8 +210,8 @@ export function SchedulePage({
         <SelectedBlockSheet
           item={viewModel.selectedItem}
           selectedDay={viewModel.activeDay}
-          runtimeAdapters={data.runtimeAdapters}
-          defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+          executionRuntimes={data.executionRuntimes}
+          defaultExecutionRuntime={data.defaultExecutionRuntime}
           isPending={isPending}
           onClose={() => {
             setLocalSelectedTaskId(undefined);

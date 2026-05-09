@@ -29,9 +29,9 @@ export async function loadAppBootData({ params, request }: LoaderFunctionArgs): 
   const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
 
   const [schedule, inbox, memory, workspaces] = await Promise.all([
-    apiJson<AppBootData["schedule"]>(`${origin}/api/schedule/projection?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
-    apiJson<AppBootData["inbox"]>(`${origin}/api/inbox/projection?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
-    apiJson<AppBootData["memory"]>(`${origin}/api/memory/projection?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
+    apiJson<AppBootData["schedule"]>(`${origin}/api/schedule?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
+    apiJson<AppBootData["inbox"]>(`${origin}/api/inbox?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
+    apiJson<AppBootData["memory"]>(`${origin}/api/memory?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
     apiJson<AppBootData["workspaces"]>(`${origin}/api/workspaces`),
   ]);
 
@@ -102,7 +102,7 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   return {
     locale,
     dictionary,
-    task: await apiJson<TaskPageRouteData["task"]>(`${origin}/api/tasks/${params.taskId}/detail`),
+    task: await apiJson<TaskPageRouteData["task"]>(`${origin}/api/tasks/${params.taskId}`),
   };
 }
 
@@ -119,7 +119,7 @@ export async function loadWorkPageData({ params, request }: LoaderFunctionArgs):
     return {
       locale,
       dictionary,
-      work: await apiJson<WorkPageRouteData["work"]>(`${origin}/api/work/${params.taskId}/projection`),
+      work: await apiJson<WorkPageRouteData["work"]>(`${origin}/api/work/${params.taskId}`),
     };
   } catch (error) {
     if (error instanceof Response && error.status === 404) {

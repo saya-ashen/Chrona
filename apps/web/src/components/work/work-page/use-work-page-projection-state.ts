@@ -42,7 +42,7 @@ export function useWorkPageProjectionState(initialData: WorkPageData, copy: Work
   const refresh = useCallback(
     async ({ silent = false, epoch = refreshEpochRef.current }: RefreshOptions = {}) => {
       try {
-        const response = await api.work[":taskId"].projection.$get({
+        const response = await api.work[":taskId"].$get({
           param: { taskId: data.taskShell.id },
         });
 

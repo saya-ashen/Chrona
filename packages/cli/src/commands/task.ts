@@ -9,6 +9,16 @@ import {
 import { formatRunResult } from "../output/run.js";
 import { formatTaskDetail, formatTaskList } from "../output/task.js";
 
+function buildExecutionConfig(prompt?: string): Record<string, unknown> | undefined {
+  return prompt ? { prompt } : undefined;
+}
+
+function parseExecutionRuntime(value?: string): "openclaw" | "research" | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (value === "openclaw" || value === "research") return value;
+  throw new Error(`--runtime must be one of: openclaw, research`);
+}
+
 export function registerTaskCommands(program: Command, getClient: ClientResolver): void {
   const task = program.command("task").description("Task management");
 
@@ -49,18 +59,14 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       .requiredOption("--title <title>", "Task title")
       .option("--description <text>", "Task description")
       .option("--priority <priority>", "Task priority")
-      .option("--due <datetime>", "Due date as ISO-8601")
-      .option("--adapter <key>", "Runtime adapter key")
-      .option("--model <model>", "Runtime model")
-      .option("--prompt <text>", "Task prompt")
+      .option("--runtime <runtime>", "Execution runtime: openclaw or research")
+      .option("--prompt <text>", "Execution prompt")
       .action(async (options: CommonCommandOptions & {
         workspaceId: string;
         title: string;
         description?: string;
         priority?: string;
-        due?: string;
-        adapter?: string;
-        model?: string;
+        runtime?: string;
         prompt?: string;
       }) => {
         await runCommand(
@@ -70,10 +76,8 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
               title: options.title,
               description: options.description,
               priority: options.priority,
-              dueAt: options.due,
-              runtimeAdapterKey: options.adapter,
-              runtimeModel: options.model,
-              prompt: options.prompt,
+              executionRuntime: parseExecutionRuntime(options.runtime),
+              executionConfig: buildExecutionConfig(options.prompt),
             }),
           options,
           formatTaskDetail,
@@ -89,18 +93,14 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       .option("--title <title>", "Task title")
       .option("--description <text>", "Task description")
       .option("--priority <priority>", "Task priority")
-      .option("--due <datetime>", "Due date as ISO-8601")
-      .option("--model <model>", "Runtime model")
-      .option("--adapter <key>", "Runtime adapter key")
-      .option("--prompt <text>", "Task prompt")
+      .option("--runtime <runtime>", "Execution runtime: openclaw or research")
+      .option("--prompt <text>", "Execution prompt")
       .action(async (options: CommonCommandOptions & {
         taskId: string;
         title?: string;
         description?: string;
         priority?: string;
-        due?: string;
-        model?: string;
-        adapter?: string;
+        runtime?: string;
         prompt?: string;
       }) => {
         await runCommand(
@@ -109,10 +109,8 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
               title: options.title,
               description: options.description,
               priority: options.priority,
-              dueAt: options.due,
-              runtimeModel: options.model,
-              runtimeAdapterKey: options.adapter,
-              prompt: options.prompt,
+              executionRuntime: parseExecutionRuntime(options.runtime),
+              executionConfig: buildExecutionConfig(options.prompt),
             }),
           options,
           formatTaskDetail,

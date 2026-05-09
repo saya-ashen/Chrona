@@ -61,8 +61,8 @@ function buildDefaultFieldValues(fields: PlanNodeField[]) {
 }
 
 function defaultActionForNode(node: PlanNodeDataModel) {
-  return node.availableActions.find((action) => action.emphasis === "primary")?.id
-    ?? node.availableActions[0]?.id
+  return node.availableActions?.find((action) => action.emphasis === "primary")?.id
+    ?? node.availableActions?.[0]?.id
     ?? null;
 }
 
@@ -178,10 +178,10 @@ function resolvePrimarySubmitLabel(node: PlanNodeDataModel, mode: RunPanelMode, 
 function extractRunResult(node: PlanNodeDataModel) {
   const candidates = [
     node.completionSummary,
-    typeof node.metadata.output === "string" ? node.metadata.output : null,
-    typeof node.metadata.result === "string" ? node.metadata.result : null,
-    typeof node.metadata.lastResult === "string" ? node.metadata.lastResult : null,
-    typeof node.metadata.summary === "string" ? node.metadata.summary : null,
+    typeof node.metadata?.output === "string" ? node.metadata.output : null,
+    typeof node.metadata?.result === "string" ? node.metadata.result : null,
+    typeof node.metadata?.lastResult === "string" ? node.metadata.lastResult : null,
+    typeof node.metadata?.summary === "string" ? node.metadata.summary : null,
   ].filter((value): value is string => Boolean(value && value.trim()));
 
   return candidates[0] ?? null;
@@ -189,28 +189,31 @@ function extractRunResult(node: PlanNodeDataModel) {
 
 export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataModel }) {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() => defaultActionForNode(node));
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => buildDefaultFieldValues(node.interactiveFields));
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => buildDefaultFieldValues(node.interactiveFields ?? []));
   const [runLog, setRunLog] = useState<Array<{ id: string; title: string; detail: string }>>([]);
 
   useEffect(() => {
     setSelectedActionId(defaultActionForNode(node));
-    setFieldValues(buildDefaultFieldValues(node.interactiveFields));
+    setFieldValues(buildDefaultFieldValues(node.interactiveFields ?? []));
     setRunLog([]);
   }, [node]);
 
-  const selectedAction = useMemo(() => node.availableActions.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
+  const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
   const runResult = useMemo(() => extractRunResult(node), [node]);
   const runPanelMode = useMemo(() => node.interactionType, [node]);
-  const runPanelCopy = useMemo(() => getRunPanelCopy(runPanelMode), [runPanelMode]);
-  const runPanelTheme = useMemo(() => getRunPanelTheme(runPanelMode), [runPanelMode]);
-  const runPanelHints = useMemo(() => getRunPanelHints(runPanelMode), [runPanelMode]);
+  const resolvedRunPanelMode = runPanelMode ?? "observe";
+  const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode), [resolvedRunPanelMode]);
+  const runPanelTheme = useMemo(() => getRunPanelTheme(resolvedRunPanelMode), [resolvedRunPanelMode]);
+  const runPanelHints = useMemo(() => getRunPanelHints(resolvedRunPanelMode), [resolvedRunPanelMode]);
   const showRunControls = node.status === "ready" || node.status === "active" || node.status === "waiting" || node.status === "blocked";
   const SubmitIcon = runPanelCopy.submitIcon;
-  const primarySubmitLabel = resolvePrimarySubmitLabel(node, runPanelMode, runPanelCopy.submitLabel);
-  const canSubmitRunAction = node.interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
+  const primarySubmitLabel = resolvePrimarySubmitLabel(node, resolvedRunPanelMode, runPanelCopy.submitLabel);
+  const interactiveFields = node.interactiveFields ?? [];
+  const availableActions = node.availableActions ?? [];
+  const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
 
   function handleRunAction() {
-    const payload = node.interactiveFields.map((field) => `${field.label}: ${fieldValues[field.key] || "-"}`).join(" · ");
+    const payload = interactiveFields.map((field) => `${field.label}: ${fieldValues[field.key] || "-"}`).join(" · ");
     const label = selectedAction?.label ?? node.nextAction ?? "Run action";
     setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "UI-only preview. No backend action sent." }, ...current].slice(0, 4));
   }
@@ -224,7 +227,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{runPanelCopy.eyebrow}</p>
               <p className="mt-1 text-sm font-semibold text-foreground">{runPanelCopy.title}</p>
             </div>
-            <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium", runPanelTheme.badge)}>{interactionLabel(node.interactionType)}</span>
+            <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium", runPanelTheme.badge)}>{interactionLabel(resolvedRunPanelMode)}</span>
           </div>
 
           <div className={cn("rounded-2xl border p-3", runPanelTheme.card)}>
@@ -241,29 +244,29 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
 
             {node.nextAction ? <p className="mt-3 text-xs text-muted-foreground">Next UI step: {node.nextAction}</p> : null}
 
-            {node.availableActions.length > 0 ? (
+            {availableActions.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                {node.availableActions.map((action) => (
+                {availableActions.map((action) => (
                   <ActionButton key={action.id} action={action} isActive={selectedActionId === action.id} onClick={() => setSelectedActionId(action.id)} />
                 ))}
               </div>
             ) : null}
 
-            {node.interactiveFields.length > 0 ? (
+            {interactiveFields.length > 0 ? (
               <div className="mt-3 space-y-3">
-                {node.interactiveFields.map((field) => (
+                {interactiveFields.map((field) => (
                   <RunField key={field.key} field={field} value={fieldValues[field.key] ?? ""} onChange={(value) => setFieldValues((current) => ({ ...current, [field.key]: value }))} />
                 ))}
               </div>
             ) : null}
 
-            {node.interactiveFields.length === 0 && ["confirm", "approve", "execute", "observe", "wait", "retry"].includes(runPanelMode) ? (
+            {interactiveFields.length === 0 && ["confirm", "approve", "execute", "observe", "wait", "retry"].includes(resolvedRunPanelMode) ? (
               <div className="mt-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-                {runPanelMode === "wait"
+                {resolvedRunPanelMode === "wait"
                   ? "This node is waiting on an external event, so there is no manual form to fill here."
-                  : runPanelMode === "execute"
+                  : resolvedRunPanelMode === "execute"
                     ? "This node can be started directly. No extra manual fields are required first."
-                    : runPanelMode === "retry"
+                    : resolvedRunPanelMode === "retry"
                       ? "This node is blocked. Use retry once the failure cause is understood."
                       : "This node does not require free-form input. The action here is a direct decision or execution step."}
               </div>
@@ -272,7 +275,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={!selectedAction && node.interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(runPanelMode) : !canSubmitRunAction}
+                disabled={!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction}
                 className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
                 onClick={handleRunAction}
               >
@@ -288,12 +291,12 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
                 {selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
               </button>
 
-              {!["observe", "wait"].includes(runPanelMode) ? (
+              {!["observe", "wait"].includes(resolvedRunPanelMode) ? (
                 <button
                   type="button"
                   className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
                   onClick={() => {
-                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Observe only", detail: `Simulated switch to passive observation for \"${node.title}\".` }, ...current].slice(0, 4));
+                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Observe only", detail: `Simulated switch to passive observation for "${node.title}".` }, ...current].slice(0, 4));
                   }}
                 >
                   <Sparkles className="size-4" />
@@ -306,7 +309,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
                   type="button"
                   className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
                   onClick={() => {
-                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Mark done", detail: `Simulated completion for \"${node.title}\".` }, ...current].slice(0, 4));
+                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Mark done", detail: `Simulated completion for "${node.title}".` }, ...current].slice(0, 4));
                   }}
                 >
                   <Check className="size-4" />

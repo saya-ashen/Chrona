@@ -26,7 +26,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           id: true,
           workspaceId: true,
           status: true,
-          runtimeAdapterKey: true,
+          executionRuntime: true,
         },
       },
     },
@@ -54,7 +54,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         const eligibility = deriveAutoStartEligibility({
           task: {
             status: task.status,
-            runtimeAdapterKey: task.runtimeAdapterKey,
+            executionRuntime: task.executionRuntime,
           },
           workBlock: { scheduledStartAt: block.scheduledStartAt },
           now,

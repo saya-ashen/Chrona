@@ -3,12 +3,9 @@ import { getRuntimeTaskConfigSpec } from "../task-execution/registry";
 import { resolveTaskRuntimeConfig } from "../task-execution/task-config";
 
 type DeriveTaskRunnabilityInput = {
-  runtimeAdapterKey?: string | null;
+  executionRuntime?: string | null;
   workspaceDefaultRuntime?: string | null;
-  runtimeInput?: unknown;
-  runtimeModel: string | null | undefined;
-  prompt: string | null | undefined;
-  runtimeConfig?: unknown;
+  executionConfig?: unknown;
 };
 
 export type TaskRunnabilityState =
@@ -45,8 +42,8 @@ export function deriveTaskRunnability(
   input: DeriveTaskRunnabilityInput,
 ): TaskRunnabilityResult {
   const resolvedRuntimeConfig = resolveTaskRuntimeConfig(input);
-  const spec = getRuntimeTaskConfigSpec(resolvedRuntimeConfig.runtimeAdapterKey);
-  const missingFields = readMissingRequiredPaths(spec, resolvedRuntimeConfig.runtimeInput);
+  const spec = getRuntimeTaskConfigSpec(resolvedRuntimeConfig.executionRuntime);
+  const missingFields = readMissingRequiredPaths(spec, resolvedRuntimeConfig.executionConfig);
   const missingLabels = missingFields.map((path) => readRequiredFieldLabel(spec, path));
 
   if (missingFields.length === 0) {

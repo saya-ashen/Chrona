@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { taskIdParam, workspaceId } from "./common";
 
-// ── GET /tasks/:taskId/plan/state ──
+// ── GET /tasks/:taskId/plan ──
 export const planStateParamSchema = z.object({
   taskId: taskIdParam,
 });
@@ -15,7 +15,7 @@ export const planAcceptBodySchema = z.object({
   workspaceId: z.string().optional(),
 });
 
-// ── POST /tasks/:taskId/plan/generate ──
+// ── POST /tasks/:taskId/plan/generations ──
 export const planGenerateParamSchema = z.object({
   taskId: taskIdParam,
 });
@@ -24,7 +24,7 @@ export const planGenerateBodySchema = z.object({
   planningPrompt: z.string().optional(),
 });
 
-// ── POST /tasks/:taskId/plan/generate/stop ──
+// ── POST /tasks/:taskId/plan/generations/stop ──
 export const planGenerateStopParamSchema = z.object({
   taskId: taskIdParam,
 });

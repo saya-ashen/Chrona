@@ -5,7 +5,6 @@ import {
   RunStatus,
   ScheduleProposalStatus,
   ScheduleSource,
-  ScheduleStatus,
   TaskPriority,
   TaskStatus,
   WorkspaceStatus,
@@ -44,7 +43,6 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      ownerType: "human",
     },
     create: {
       id: "task_projection",
@@ -53,7 +51,6 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      ownerType: "human",
     },
   });
 
@@ -65,7 +62,6 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      ownerType: "human",
     },
     create: {
       id: "task_adapter",
@@ -74,7 +70,6 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      ownerType: "human",
     },
   });
 
@@ -86,12 +81,7 @@ async function main() {
       description: "Lock the next release block and due date.",
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
-      ownerType: "human",
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
-      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
-      scheduleStatus: ScheduleStatus.Scheduled,
-      scheduleSource: ScheduleSource.human,
     },
     create: {
       id: "task_scheduled",
@@ -100,12 +90,7 @@ async function main() {
       description: "Lock the next release block and due date.",
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
-      ownerType: "human",
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      scheduledStartAt: new Date("2026-04-17T09:00:00.000Z"),
-      scheduledEndAt: new Date("2026-04-17T11:00:00.000Z"),
-      scheduleStatus: ScheduleStatus.Scheduled,
-      scheduleSource: ScheduleSource.human,
     },
   });
 
@@ -117,12 +102,7 @@ async function main() {
       description: "Needs a planned slot before AI starts drafting.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
-      ownerType: "human",
       dueAt: null,
-      scheduledStartAt: null,
-      scheduledEndAt: null,
-      scheduleStatus: ScheduleStatus.Unscheduled,
-      scheduleSource: null,
     },
     create: {
       id: "task_unscheduled",
@@ -131,8 +111,6 @@ async function main() {
       description: "Needs a planned slot before AI starts drafting.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
-      ownerType: "human",
-      scheduleStatus: ScheduleStatus.Unscheduled,
     },
   });
 
@@ -144,12 +122,7 @@ async function main() {
       description: "Execution slipped past the planned window and needs replanning.",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      ownerType: "human",
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
-      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
-      scheduleStatus: ScheduleStatus.Overdue,
-      scheduleSource: ScheduleSource.human,
     },
     create: {
       id: "task_overdue",
@@ -158,12 +131,7 @@ async function main() {
       description: "Execution slipped past the planned window and needs replanning.",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      ownerType: "human",
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
-      scheduledEndAt: new Date("2026-04-15T11:00:00.000Z"),
-      scheduleStatus: ScheduleStatus.Overdue,
-      scheduleSource: ScheduleSource.human,
     },
   });
 
@@ -442,7 +410,6 @@ async function main() {
       dueAt: new Date("2026-04-18T18:00:00.000Z"),
       scheduledStartAt: new Date("2026-04-18T09:00:00.000Z"),
       scheduledEndAt: new Date("2026-04-18T10:30:00.000Z"),
-      assigneeAgentId: "planner-agent",
       resolvedAt: null,
       resolutionNote: null,
     },
@@ -457,7 +424,6 @@ async function main() {
       dueAt: new Date("2026-04-18T18:00:00.000Z"),
       scheduledStartAt: new Date("2026-04-18T09:00:00.000Z"),
       scheduledEndAt: new Date("2026-04-18T10:30:00.000Z"),
-      assigneeAgentId: "planner-agent",
     },
   });
 

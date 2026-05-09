@@ -24,8 +24,6 @@ const mockItem: ScheduledItem = {
   title: "Test task",
   description: "A test task",
   priority: "Medium",
-  ownerType: "human",
-  assigneeAgentId: null,
   persistedStatus: "Ready",
   displayState: null,
   actionRequired: null,

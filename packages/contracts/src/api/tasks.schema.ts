@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EXECUTION_RUNTIMES } from "../task";
 import {
   isoDateOrNull,
   isoDateOptional,
@@ -29,15 +30,8 @@ export const createTaskBodySchema = z.object({
   title: z.string().min(1, "title is required"),
   description: z.string().optional(),
   priority: taskPriorityEnum.optional(),
-  dueAt: isoDateOrNull,
-  scheduledStartAt: isoDateOrNull,
-  scheduledEndAt: isoDateOrNull,
-  runtimeAdapterKey: z.string().optional(),
-  runtimeInput: z.unknown().optional(),
-  runtimeInputVersion: z.string().optional(),
-  runtimeModel: z.string().nullable().optional(),
-  prompt: z.string().nullable().optional(),
-  runtimeConfig: z.unknown().optional(),
+  executionRuntime: z.enum(EXECUTION_RUNTIMES).optional(),
+  executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
 });
 
@@ -51,18 +45,11 @@ export const updateTaskBodySchema = z.object({
   description: z.string().optional(),
   priority: taskPriorityEnum.optional(),
   status: taskStatusEnum.optional(),
-  dueAt: isoDateOrNull,
-  scheduledStartAt: isoDateOrNull,
-  scheduledEndAt: isoDateOrNull,
-  runtimeAdapterKey: z.string().optional(),
-  runtimeInput: z.unknown().optional(),
-  runtimeInputVersion: z.string().optional(),
-  runtimeModel: z.string().nullable().optional(),
-  prompt: z.string().nullable().optional(),
-  runtimeConfig: z.unknown().optional(),
+  executionRuntime: z.enum(EXECUTION_RUNTIMES).optional(),
+  executionConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
-// ── GET /tasks/:taskId/detail ──
+// ── GET /tasks/:taskId ──
 export const taskDetailParamSchema = z.object({
   taskId: taskIdParam,
 });

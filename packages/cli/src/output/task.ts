@@ -34,9 +34,8 @@ export function formatTaskDetail(value: unknown): string {
     ["Due", task.dueAt],
     ["Scheduled start", task.scheduledStartAt],
     ["Scheduled end", task.scheduledEndAt],
-    ["Runtime adapter", task.runtimeAdapterKey],
-    ["Runtime model", task.runtimeModel],
-    ["Prompt", task.prompt],
+    ["Execution runtime", task.executionRuntime],
+    ["Execution config", task.executionConfig ? JSON.stringify(task.executionConfig) : undefined],
     ["Created", task.createdAt],
     ["Updated", task.updatedAt],
   ]);

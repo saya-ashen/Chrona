@@ -16,7 +16,6 @@ function makeInput(overrides: Partial<TaskAutomationInput> = {}): TaskAutomation
     scheduledEndAt: null,
     isRunnable: false,
     runnabilityState: "",
-    ownerType: "individual",
     ...overrides,
   };
 }
@@ -500,7 +499,6 @@ describe("automation-suggester", () => {
         taskId: "task-team",
         title: "Team project update",
         priority: "Medium",
-        ownerType: "team",
       });
 
       const result = suggestAutomation(input);
@@ -539,7 +537,6 @@ describe("automation-suggester", () => {
         scheduledEndAt: new Date("2026-04-16T12:00:00Z"),
         dueAt: new Date("2026-04-17T17:00:00Z"),
         tags: ["deploy", "prod"],
-        ownerType: "team",
       });
 
       const result = suggestAutomation(input);
@@ -675,18 +672,6 @@ describe("automation-suggester", () => {
       expect(result.contextSources.some((s) => s.type === "deadline")).toBe(true);
     });
 
-    test("task with ownerType includes ownership source", () => {
-      const input = makeInput({
-        taskId: "task-ctx-owner",
-        title: "Team task",
-        ownerType: "team",
-      });
-
-      const result = suggestAutomation(input);
-
-      expect(result.contextSources.some((s) => s.type === "ownership")).toBe(true);
-    });
-
     test("minimal task has no context sources", () => {
       const input = makeInput({
         taskId: "task-ctx-min",
@@ -695,7 +680,6 @@ describe("automation-suggester", () => {
         isRunnable: false,
         scheduledStartAt: null,
         dueAt: null,
-        ownerType: "",
       });
 
       const result = suggestAutomation(input);

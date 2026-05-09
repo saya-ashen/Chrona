@@ -18,9 +18,8 @@ type AssistantCurrentTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
   status: string;
 };
 

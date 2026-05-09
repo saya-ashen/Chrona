@@ -153,8 +153,6 @@ const mockItem: ScheduledItem = {
   title: "Test task",
   description: "A description",
   priority: "Medium",
-  ownerType: "human",
-  assigneeAgentId: null,
   persistedStatus: "Ready",
   displayState: null,
   actionRequired: null,
@@ -211,8 +209,10 @@ function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {})
       validationWarnings: [],
     },
     effectivePlan: overrides.effectivePlan ?? {
+      graphId: overrides.id ?? "graph-stub",
       planId: overrides.id ?? "plan-stub",
       basePlanId: overrides.id ?? "plan-stub",
+      resolvedAt: "2026-04-20T09:00:00.000Z",
       resolvedVersion: 1,
       nodes: [],
       edges: [],
@@ -222,6 +222,7 @@ function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {})
       blockedNodeIds: [],
       completedNodeIds: [],
       runningNodeIds: [],
+      invalidatedNodeIds: [],
       failedNodeIds: [],
       pendingNodeIds: [],
     },
@@ -261,7 +262,7 @@ beforeEach(() => {
         ? input.toString()
         : input.url;
 
-    if (url.includes("/api/tasks/") && url.includes("/plan/state")) {
+    if (url.includes("/api/tasks/") && url.endsWith("/plan")) {
       return Promise.resolve(createJsonResponse({
         taskId: "task-1",
         aiPlanGenerationStatus: "idle",
@@ -490,7 +491,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan/state")) {
+      if (url.includes("/api/tasks/task-1/plan")) {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "waiting_acceptance",
@@ -504,7 +505,7 @@ describe("SelectedBlockSheet – layout order", () => {
         }));
       }
 
-      if (url.includes("/api/schedule/projection")) {
+      if (url.includes("/api/schedule")) {
         throw new Error("schedule projection should not be fetched during plan polling");
       }
 
@@ -525,7 +526,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-polled");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -537,7 +538,7 @@ describe("SelectedBlockSheet – layout order", () => {
       await Promise.resolve();
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -549,7 +550,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan/state")) {
+      if (url.includes("/api/tasks/task-1/plan")) {
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
           aiPlanGenerationStatus: "idle",
@@ -576,7 +577,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan/state", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
   });
 
   it("keeps polling while generation remains unchanged across responses", async () => {
@@ -588,7 +589,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan/state")) {
+      if (url.includes("/api/tasks/task-1/plan")) {
         pollCount += 1;
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",
@@ -631,7 +632,7 @@ describe("SelectedBlockSheet – layout order", () => {
           ? input.toString()
           : input.url;
 
-      if (url.includes("/api/tasks/task-1/plan/state")) {
+      if (url.includes("/api/tasks/task-1/plan")) {
         pollCount += 1;
         return Promise.resolve(createJsonResponse({
           taskId: "task-1",

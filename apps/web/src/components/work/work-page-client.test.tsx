@@ -29,6 +29,27 @@ import { WorkPageClient } from "@/components/work/work-page-client";
 import { useWorkPageController } from "@/components/work/work-page/use-work-page-controller";
 
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
+import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+
+function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
+  return {
+    ...input,
+    nodes: input.steps,
+    analytics: {
+      entryNodeIds: input.steps.slice(0, 1).map((node) => node.id),
+      terminalNodeIds: input.steps.slice(-1).map((node) => node.id),
+      activeNodeIds: input.steps.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+      reachableFromActiveIds: input.steps.map((node) => node.id),
+      criticalPathNodeIds: input.steps.map((node) => node.id),
+      attentionNodeIds: input.steps.filter((node) => node.status === "waiting" || node.status === "waiting_for_user").map((node) => node.id),
+      blockedNodeIds: input.steps.filter((node) => node.status === "blocked").map((node) => node.id),
+      rankByNodeId: Object.fromEntries(input.steps.map((node, index) => [node.id, index])),
+      laneByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, 0])),
+      upstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+      downstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+    },
+  };
+}
 
 const baseData: WorkPageData = {
   taskShell: {
@@ -108,7 +129,7 @@ const baseData: WorkPageData = {
     canReopen: false,
     latestFollowUp: null,
   },
-  taskPlan: {
+  taskPlan: testPlan({
     state: "ready",
     revision: "r2",
     generatedBy: "agent",
@@ -147,7 +168,7 @@ const baseData: WorkPageData = {
       { id: "edge-1", fromNodeId: "step_1", toNodeId: "step_2", type: "sequential" },
       { id: "edge-2", fromNodeId: "step_2", toNodeId: "step_3", type: "sequential" },
     ],
-  },
+  }),
   workspaceRail: {
     sections: [],
   },
@@ -201,10 +222,6 @@ describe("WorkPageClient", () => {
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
-        createFollowUpTask: vi.fn(),
-        approveApproval: vi.fn(),
-        rejectApproval: vi.fn(),
-        editAndApproveApproval: vi.fn(),
       },
     });
 
@@ -236,10 +253,6 @@ describe("WorkPageClient", () => {
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
-        createFollowUpTask: vi.fn(),
-        approveApproval: vi.fn(),
-        rejectApproval: vi.fn(),
-        editAndApproveApproval: vi.fn(),
       },
     });
 
@@ -313,10 +326,6 @@ describe("WorkPageClient", () => {
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
-        createFollowUpTask: vi.fn(),
-        approveApproval: vi.fn(),
-        rejectApproval: vi.fn(),
-        editAndApproveApproval: vi.fn(),
       },
     });
 
@@ -478,10 +487,6 @@ describe("WorkPageClient", () => {
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
-        createFollowUpTask: vi.fn(),
-        approveApproval: vi.fn(),
-        rejectApproval: vi.fn(),
-        editAndApproveApproval: vi.fn(),
       },
     });
 
@@ -550,10 +555,6 @@ describe("WorkPageClient", () => {
         retryResult: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
-        createFollowUpTask: vi.fn(),
-        approveApproval: vi.fn(),
-        rejectApproval: vi.fn(),
-        editAndApproveApproval: vi.fn(),
       },
     });
 

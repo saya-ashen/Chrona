@@ -24,8 +24,6 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     title: overrides.title ?? "Task",
     description: overrides.description ?? null,
     priority: overrides.priority ?? "Medium",
-    ownerType: overrides.ownerType ?? "human",
-    assigneeAgentId: overrides.assigneeAgentId ?? null,
     persistedStatus: overrides.persistedStatus ?? "Ready",
     displayState: overrides.displayState ?? null,
     actionRequired: overrides.actionRequired ?? null,

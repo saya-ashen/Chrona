@@ -1,13 +1,11 @@
 import {
-  OPENCLAW_RUNTIME_ADAPTER_KEY as DEFAULT_RUNTIME_ADAPTER_KEY,
+  OPENCLAW_EXECUTION_RUNTIME,
   getOpenClawTaskConfigSpec,
-  OPENCLAW_RUNTIME_INPUT_VERSION,
   validateOpenClawTaskConfig,
 } from "@chrona/openclaw";
 import {
   getResearchTaskConfigSpec,
-  RESEARCH_RUNTIME_ADAPTER_KEY,
-  RESEARCH_RUNTIME_INPUT_VERSION,
+  RESEARCH_EXECUTION_RUNTIME,
   validateResearchTaskConfig,
 } from "../research-execution/config";
 import type {
@@ -18,10 +16,10 @@ import type {
 
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
   [
-    DEFAULT_RUNTIME_ADAPTER_KEY,
+    OPENCLAW_EXECUTION_RUNTIME,
     {
-      key: DEFAULT_RUNTIME_ADAPTER_KEY,
-      inputVersion: OPENCLAW_RUNTIME_INPUT_VERSION,
+      key: OPENCLAW_EXECUTION_RUNTIME,
+      inputVersion: getOpenClawTaskConfigSpec().version,
       getTaskConfigSpec: getOpenClawTaskConfigSpec,
       validateTaskConfig: validateOpenClawTaskConfig,
       createExecutionAdapter: async () => {
@@ -30,10 +28,10 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
     },
   ],
   [
-    RESEARCH_RUNTIME_ADAPTER_KEY,
+    RESEARCH_EXECUTION_RUNTIME,
     {
-      key: RESEARCH_RUNTIME_ADAPTER_KEY,
-      inputVersion: RESEARCH_RUNTIME_INPUT_VERSION,
+      key: RESEARCH_EXECUTION_RUNTIME,
+      inputVersion: getResearchTaskConfigSpec().version,
       getTaskConfigSpec: getResearchTaskConfigSpec,
       validateTaskConfig: validateResearchTaskConfig,
       createExecutionAdapter: async () => {
@@ -59,14 +57,14 @@ export function getRuntimeAdapterDefinition(key: string) {
   return definition;
 }
 
-export function resolveRuntimeAdapterKey(input: {
-  runtimeAdapterKey?: string | null;
+export function resolveExecutionRuntime(input: {
+  executionRuntime?: string | null;
   workspaceDefaultRuntime?: string | null;
 }) {
   return (
-    input.runtimeAdapterKey?.trim() ||
+    input.executionRuntime?.trim() ||
     input.workspaceDefaultRuntime?.trim() ||
-    DEFAULT_RUNTIME_ADAPTER_KEY
+    OPENCLAW_EXECUTION_RUNTIME
   );
 }
 
@@ -78,6 +76,6 @@ export function validateRuntimeTaskConfig(key: string, input: unknown): RuntimeI
   return getRuntimeAdapterDefinition(key).validateTaskConfig(input);
 }
 
-function _listRuntimeAdapterKeys() {
+export function listExecutionRuntimes() {
   return [...runtimeRegistry.keys()];
 }

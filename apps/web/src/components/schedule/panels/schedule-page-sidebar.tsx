@@ -134,8 +134,8 @@ export function ScheduleRightSidebar({
               <QueueCard
                 key={item.taskId}
                 item={item}
-                runtimeAdapters={data.runtimeAdapters}
-                defaultRuntimeAdapterKey={data.defaultRuntimeAdapterKey}
+                executionRuntimes={data.executionRuntimes}
+                defaultExecutionRuntime={data.defaultExecutionRuntime}
                 isPending={isPending}
                 isDragging={
                   draggedTask?.kind === "queue" &&

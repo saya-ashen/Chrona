@@ -85,36 +85,12 @@ async function getClientForFeature(
 // Public API
 // ────────────────────────────────────────────────────────────────────
 
-export async function aiAnalyzeConflicts(
-  request: AnalyzeConflictsRequest,
-): Promise<AnalyzeConflictsResponse | null> {
-  const client = await getClientForFeature("conflicts");
-  if (!client) return null;
-  return analyzeConflicts(client, request);
-}
-
-export async function aiSuggestTimeslots(
-  request: SuggestTimeslotRequest,
-): Promise<SuggestTimeslotResponse | null> {
-  const client = await getClientForFeature("timeslots");
-  if (!client) return null;
-  return suggestTimeslots(client, request);
-}
-
 export async function aiChat(
   request: ChatRequest,
 ): Promise<ChatResponse | null> {
   const client = await getClientForFeature("chat");
   if (!client) return null;
   return chat(client, request);
-}
-
-export async function aiDispatchTask(
-  request: DispatchTaskInput,
-): Promise<DispatchTaskOutput | null> {
-  const client = await getClientForFeature("dispatch_task");
-  if (!client) return null;
-  return dispatchTask(client, request);
 }
 
 export async function* aiSuggestStream(

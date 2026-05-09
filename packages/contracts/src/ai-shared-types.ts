@@ -97,7 +97,6 @@ export interface TaskAutomationInput {
   scheduledEndAt: Date | null;
   isRunnable: boolean;
   runnabilityState: string;
-  ownerType: string;
   tags?: string[];
 }
 

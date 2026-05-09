@@ -155,26 +155,21 @@ export function buildTaskPlanFromGraph({
     }
   }
 
-  const legacyStatuses = savedPlan.legacyNodeStatuses;
-
   const steps: TaskPlanProjectionStep[] = savedPlan.compiledPlan.nodes.map((node) => {
     const config = node.config as Record<string, unknown> | undefined;
     const effectiveNode = effectiveNodesById.get(node.id);
-    const legacyStatus = legacyStatuses?.[node.id];
     const status: TaskPlanStepStatus = effectiveNode && effectiveNode.status !== "pending"
       ? (effectiveNode.status as TaskPlanStepStatus)
-      : legacyStatus
-        ? (legacyStatus as TaskPlanStepStatus)
-        : effectiveNode
-          ? (effectiveNode.status as TaskPlanStepStatus)
-          : "pending";
+      : effectiveNode
+        ? (effectiveNode.status as TaskPlanStepStatus)
+        : "pending";
     return {
       id: node.id,
       title: node.title,
       objective: (config?.objective as string) ?? (config?.expectedOutput as string) ?? "",
       phase: node.type,
       status,
-      requiresHumanInput: status === "waiting_for_user" || (effectiveNode?.status === "waiting_for_user") || legacyStatus === "waiting_for_user",
+      requiresHumanInput: status === "waiting_for_user" || effectiveNode?.status === "waiting_for_user",
       type: node.type,
       linkedTaskId: node.linkedTaskId,
       executionMode: (node.mode as string) ?? undefined,

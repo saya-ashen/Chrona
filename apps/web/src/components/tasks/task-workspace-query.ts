@@ -14,7 +14,7 @@ export const taskWorkspaceQueryKeys = {
 };
 
 export async function fetchTaskWorkspaceTask(taskId: string) {
-  const response = await api.tasks[":taskId"].detail.$get({
+  const response = await api.tasks[":taskId"].$get({
     param: { taskId },
   });
 
@@ -28,7 +28,7 @@ export async function fetchTaskWorkspaceTask(taskId: string) {
 }
 
 export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState> {
-  const response = await api.tasks[":taskId"].plan.state.$get({
+  const response = await api.tasks[":taskId"].plan.$get({
     param: { taskId },
   });
 

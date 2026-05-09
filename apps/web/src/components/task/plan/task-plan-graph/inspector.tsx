@@ -27,8 +27,8 @@ export function TaskPlanGraphInspector({
     <aside className="flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background/96 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.16)] backdrop-blur xl:max-h-[calc(100dvh-2rem)]">
       <div className="shrink-0 border-b border-border/60 pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-foreground/6 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{nodeKindLabel(node.kind, graphCopy)}</span>
-          <span className="rounded-full bg-foreground/6 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{node.statusLabel}</span>
+          <span className="rounded-full bg-foreground/6 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
+          <span className="rounded-full bg-foreground/6 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{node.statusLabel ?? node.status}</span>
           <span className="rounded-full bg-foreground/6 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{interactionLabel(node.interactionType)}</span>
         </div>
         <h3 className="mt-3 text-lg font-semibold text-foreground">{node.title}</h3>

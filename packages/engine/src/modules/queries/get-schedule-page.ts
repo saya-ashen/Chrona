@@ -4,7 +4,7 @@ import {
   formatDateKey,
   startOfDay,
 } from "@/components/schedule/schedule-page-utils";
-import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task-execution/registry";
+import { getRuntimeTaskConfigSpec, listExecutionRuntimes } from "@/modules/task-execution/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { analyzeConflicts } from "@/modules/ai/conflict-analyzer";
@@ -25,14 +25,8 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
   description: string | null;
   workspace: { defaultRuntime: string };
   priority: string;
-  ownerType: string;
-  assigneeAgentId: string | null;
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
 } }) {
   return {
     taskId: item.taskId,
@@ -41,8 +35,6 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
     title: item.task.title,
     description: item.task.description,
     priority: item.task.priority,
-    ownerType: item.task.ownerType,
-    assigneeAgentId: item.task.assigneeAgentId,
     persistedStatus: item.persistedStatus,
     displayState: item.displayState,
     actionRequired: item.actionRequired,
@@ -61,29 +53,18 @@ function mapProjectionItem(item: Awaited<ReturnType<typeof db.taskProjection.fin
 
 function mapTaskRunnability(task: {
   workspace: { defaultRuntime: string };
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
 }) {
   const runnability = deriveTaskRunnability({
     workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    runtimeAdapterKey: task.runtimeAdapterKey,
-    runtimeInput: task.runtimeInput,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionRuntime: task.executionRuntime,
+    executionConfig: task.executionConfig,
   });
 
   return {
-    runtimeAdapterKey: task.runtimeAdapterKey,
-    runtimeInput: task.runtimeInput,
-    runtimeInputVersion: task.runtimeInputVersion,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionRuntime: task.executionRuntime,
+    executionConfig: task.executionConfig,
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
     runnabilitySummary: runnability.summary,
@@ -199,7 +180,7 @@ async function buildAutomationCandidates(input: {
       continue;
     }
 
-    if (!item.isRunnable && (!item.prompt || item.runnabilityState !== "ready_to_run")) {
+    if (!item.isRunnable && item.runnabilityState !== "ready_to_run") {
       candidates.push({
         taskId: item.taskId,
         kind: "generate_plan",
@@ -242,10 +223,10 @@ async function buildAutomationCandidates(input: {
     if (item.isRunnable && !blockedByApproval && !blockedByUser && !riskTaskIds.has(item.taskId)) {
       const readyNodeIds = await getReadyNodeIds(item.taskId);
       const sessionStrategy =
-        item.runtimeConfig &&
-        typeof item.runtimeConfig === "object" &&
-        !Array.isArray(item.runtimeConfig) &&
-        (item.runtimeConfig as Record<string, unknown>).sessionStrategy === "shared"
+        item.executionConfig &&
+        typeof item.executionConfig === "object" &&
+        !Array.isArray(item.executionConfig) &&
+        (item.executionConfig as Record<string, unknown>).sessionStrategy === "shared"
           ? "shared"
           : "per_subtask";
 
@@ -293,7 +274,7 @@ export async function getSchedulePage(workspaceId: string) {
       orderBy: [{ scheduledStartAt: "asc" }, { dueAt: "asc" }, { createdAt: "asc" }],
     }),
   ]);
-  const runtimeAdapters = listRuntimeAdapterKeys().map((key) => ({
+  const executionRuntimes = listExecutionRuntimes().map((key) => ({
     key,
     label: key,
     spec: getRuntimeTaskConfigSpec(key),
@@ -347,8 +328,6 @@ export async function getSchedulePage(workspaceId: string) {
     workspaceId: proposal.workspaceId,
     title: proposal.task.title,
     priority: proposal.task.priority,
-    ownerType: proposal.task.ownerType,
-    assigneeAgentId: proposal.assigneeAgentId,
     source: proposal.source,
     proposedBy: proposal.proposedBy,
     summary: proposal.summary,
@@ -407,8 +386,8 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   return {
-    defaultRuntimeAdapterKey: workspace.defaultRuntime,
-    runtimeAdapters,
+    defaultExecutionRuntime: workspace.defaultRuntime,
+    executionRuntimes,
     summary: {
       scheduledCount: scheduled.length,
       unscheduledCount: unscheduled.length,

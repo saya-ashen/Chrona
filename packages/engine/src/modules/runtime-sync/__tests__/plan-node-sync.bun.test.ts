@@ -44,7 +44,6 @@ describe("plan node sync on run completion", () => {
         title: "Parent task",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -54,7 +53,6 @@ describe("plan node sync on run completion", () => {
         title: "Child node task",
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
-        ownerType: "human",
         parentTaskId: parentTask.id,
       },
     });

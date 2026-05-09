@@ -19,7 +19,7 @@ type AutoStartEligibility =
 
 export type TaskLike = {
   status: string;
-  runtimeAdapterKey?: string | null;
+  executionRuntime?: string | null;
 };
 
 export type WorkBlockLike = {
@@ -63,7 +63,7 @@ export function deriveAutoStartEligibility(input: {
     return { ok: false, reason: "already_running" };
   }
 
-  if (!input.task.runtimeAdapterKey) {
+  if (!input.task.executionRuntime) {
     return { ok: false, reason: "no_runtime_config" };
   }
 

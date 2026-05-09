@@ -5,7 +5,7 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
-  type TaskConfigRuntimeAdapter,
+  type TaskConfigExecutionRuntime,
 } from "@/components/schedule/task-config-form";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -26,8 +26,6 @@ export type ScheduleTaskListItem = {
   title: string;
   description: string | null;
   priority: string;
-  ownerType: string;
-  assigneeAgentId: string | null;
   persistedStatus: string;
   displayState: string | null;
   actionRequired: string | null;
@@ -40,12 +38,8 @@ export type ScheduleTaskListItem = {
   scheduleSource: string | null;
   scheduleProposalCount: number;
   lastActivityAt: Date | null;
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
   isRunnable: boolean;
   runnabilityState: string;
   runnabilitySummary: string;
@@ -53,8 +47,8 @@ export type ScheduleTaskListItem = {
 
 type ScheduleTaskListProps = {
   items: ScheduleTaskListItem[];
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 };
@@ -80,14 +74,6 @@ function formatDateTime(locale: string, value: Date | null | undefined) {
     hour: "numeric",
     minute: "2-digit",
   }).format(value);
-}
-
-function describeOwner(ownerType: string, assigneeAgentId: string | null, copy: { agentAssigned: string; agentPrefix: string; humanOwned: string }) {
-  if (ownerType === "agent") {
-    return assigneeAgentId ? `${copy.agentPrefix} · ${assigneeAgentId}` : copy.agentAssigned;
-  }
-
-  return copy.humanOwned;
 }
 
 function getPriorityTone(priority: string) {
@@ -176,20 +162,16 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     title: item.title,
     description: item.description,
     priority: item.priority as TaskConfigFormInput["priority"],
-    runtimeAdapterKey: item.runtimeAdapterKey,
-    runtimeInput: item.runtimeInput,
-    runtimeInputVersion: item.runtimeInputVersion,
-    runtimeModel: item.runtimeModel,
-    prompt: item.prompt,
+    executionRuntime: item.executionRuntime,
+    executionConfig: item.executionConfig,
     dueAt: item.dueAt,
-    runtimeConfig: item.runtimeConfig,
   };
 }
 
 export function ScheduleTaskList({
   items,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   onSaveTaskConfigAction,
 }: ScheduleTaskListProps) {
@@ -204,13 +186,9 @@ export function ScheduleTaskList({
     triageBadge: t("components.scheduleTaskList.triageBadge"),
     showingPrefix: t("components.scheduleTaskList.showingPrefix"),
     showingSuffix: t("components.scheduleTaskList.showingSuffix"),
-    agentAssigned: t("components.scheduleTaskList.agentAssigned"),
-    agentPrefix: t("components.scheduleTaskList.agentPrefix"),
-    humanOwned: t("components.scheduleTaskList.humanOwned"),
     noSchedule: t("components.scheduleTaskList.noSchedule"),
     noDescription: t("components.scheduleTaskList.noDescription"),
     state: t("components.scheduleTaskList.state"),
-    owner: t("components.scheduleTaskList.owner"),
     due: t("components.scheduleTaskList.due"),
     scheduled: t("components.scheduleTaskList.scheduled"),
     notPlaced: t("components.scheduleTaskList.notPlaced"),
@@ -327,14 +305,10 @@ export function ScheduleTaskList({
                       </p>
                     </div>
 
-                    <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                    <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.state}</dt>
                         <dd className="mt-1 text-foreground">{item.displayState ?? item.persistedStatus}</dd>
-                      </div>
-                      <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
-                        <dt className="text-xs uppercase tracking-[0.16em]">{copy.owner}</dt>
-                        <dd className="mt-1 text-foreground">{describeOwner(item.ownerType, item.assigneeAgentId, copy)}</dd>
                       </div>
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.due}</dt>
@@ -358,7 +332,7 @@ export function ScheduleTaskList({
                       {item.scheduleProposalCount > 0 ? (
                         <StatusBadge tone="info">{copy.proposals}: {item.scheduleProposalCount}</StatusBadge>
                       ) : null}
-                      <StatusBadge>{item.runtimeModel ?? item.runtimeAdapterKey ?? copy.noModel}</StatusBadge>
+                      <StatusBadge>{item.executionRuntime || copy.noModel}</StatusBadge>
                     </div>
                   </div>
 
@@ -377,9 +351,9 @@ export function ScheduleTaskList({
 
                 {isExpanded ? (
                   <div className="mt-4 rounded-2xl border border-border/60 bg-background/75 p-4">
-                    <TaskConfigForm
-                      runtimeAdapters={runtimeAdapters}
-                      defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                      <TaskConfigForm
+                      executionRuntimes={executionRuntimes}
+                      defaultExecutionRuntime={defaultExecutionRuntime}
                       initialValues={toTaskConfigInitialValues(item)}
                       isPending={isPending}
                       submitLabel={copy.saveTaskConfig}

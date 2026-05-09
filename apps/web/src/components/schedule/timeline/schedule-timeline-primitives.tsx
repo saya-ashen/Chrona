@@ -9,7 +9,6 @@ import type {
 } from "@/components/schedule/schedule-page-types";
 import {
   buildScheduleHref,
-  describeOwner,
   formatTimeRange,
   getPriorityAccent,
   getPriorityTone,
@@ -177,9 +176,6 @@ export function ScheduledTimelineBlock({
           </div>
           <p className="text-xs text-muted-foreground">
             {formatTimeRange(item.scheduledStartAt, item.scheduledEndAt, locale, copy)}
-          </p>
-          <p className="line-clamp-1 text-xs text-muted-foreground">
-            {describeOwner(item.ownerType, item.assigneeAgentId, copy)}
           </p>
           {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
             <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">

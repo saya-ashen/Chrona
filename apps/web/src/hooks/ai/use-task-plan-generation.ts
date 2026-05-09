@@ -201,7 +201,7 @@ export function useTaskPlanGeneration({
     const run = async () => {
       try {
         await fetchJsonEventSource(
-          `/api/tasks/${activeRequest.taskId}/plan/generate`,
+          `/api/tasks/${activeRequest.taskId}/plan/generations`,
           {
             method: "POST",
             headers: {

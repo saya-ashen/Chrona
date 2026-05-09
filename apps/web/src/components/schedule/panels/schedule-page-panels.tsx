@@ -22,7 +22,7 @@ import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
-  type TaskConfigRuntimeAdapter,
+  type TaskConfigExecutionRuntime,
 } from "@/components/schedule/task-config-form";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskContextLinks } from "@/components/task/shared/task-context-links";
@@ -35,14 +35,14 @@ export { SelectedBlockSheet } from "./selected-block-sheet";
 
 function QueueTaskConfigEditor({
   item,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   onSaveTaskConfigAction,
 }: {
   item: UnscheduledItem;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   onSaveTaskConfigAction: (
     taskId: string,
@@ -54,8 +54,8 @@ function QueueTaskConfigEditor({
 
   return (
     <TaskConfigForm
-      runtimeAdapters={runtimeAdapters}
-      defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+      executionRuntimes={executionRuntimes}
+      defaultExecutionRuntime={defaultExecutionRuntime}
       isPending={isPending}
       initialValues={toTaskConfigInitialValues(item)}
       submitLabel={copy.saveTaskConfig}
@@ -67,7 +67,7 @@ function QueueTaskConfigEditor({
 
 function getQueueSuggestedDuration(item: UnscheduledItem) {
   const value = (
-    item.runtimeConfig as { suggestedDurationMinutes?: unknown } | null
+    item.executionConfig as { suggestedDurationMinutes?: unknown } | null
   )?.suggestedDurationMinutes;
 
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -79,8 +79,8 @@ function getQueueSuggestedDuration(item: UnscheduledItem) {
 
 export function QueueCard({
   item,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isDragging,
   isPending,
   isExpanded,
@@ -94,8 +94,8 @@ export function QueueCard({
   onDragEnd,
 }: {
   item: UnscheduledItem;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isDragging: boolean;
   isPending: boolean;
   isExpanded: boolean;
@@ -253,8 +253,8 @@ export function QueueCard({
             <div className="mt-2 space-y-2">
               <QueueTaskConfigEditor
                 item={item}
-                runtimeAdapters={runtimeAdapters}
-                defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+                executionRuntimes={executionRuntimes}
+                defaultExecutionRuntime={defaultExecutionRuntime}
                 isPending={isPending}
                 onSaveTaskConfigAction={onSaveTaskConfigAction}
               />

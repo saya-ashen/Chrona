@@ -1,8 +1,5 @@
-import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
 import {
-  getRuntimeAdapterDefinition,
-  getRuntimeTaskConfigSpec,
-  resolveRuntimeAdapterKey,
+  resolveExecutionRuntime,
   validateRuntimeTaskConfig,
 } from "./registry";
 import type { RuntimeInput } from "@chrona/runtime-core";
@@ -11,149 +8,38 @@ function isRuntimeInput(value: unknown): value is RuntimeInput {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeText(value: string | null | undefined) {
-  const normalized = value?.trim();
-  return normalized ? normalized : null;
-}
-
-function readRuntimeText(input: RuntimeInput, key: string) {
-  const value = input[key];
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : null;
-}
-
-function extractLegacyRuntimeFields(runtimeInput: RuntimeInput) {
-  // Backward-compat mapping for legacy task columns (`runtimeModel`/`prompt`/`runtimeConfig`).
-  // TODO(chrona-runtime): remove once all reads/writes use `runtimeInput` only.
-  const runtimeModel = readRuntimeText(runtimeInput, "model");
-  const prompt = readRuntimeText(runtimeInput, "prompt");
-  const runtimeConfig = { ...runtimeInput };
-
-  delete runtimeConfig.model;
-  delete runtimeConfig.prompt;
-
-  return {
-    runtimeModel,
-    prompt,
-    runtimeConfig: Object.keys(runtimeConfig).length > 0 ? runtimeConfig : null,
-  };
-}
-
-function buildCompatRuntimeInput(input: {
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: unknown;
-}) {
-  // Backward-compat for callers still passing split legacy runtime fields.
-  // TODO(chrona-runtime): delete after legacy task columns are fully retired.
-  const compatInput: RuntimeInput = isRuntimeInput(input.runtimeConfig)
-    ? { ...input.runtimeConfig }
-    : {};
-  const runtimeModel = normalizeText(input.runtimeModel);
-  const prompt = normalizeText(input.prompt);
-
-  if (runtimeModel) {
-    compatInput.model = runtimeModel;
-  }
-
-  if (prompt) {
-    compatInput.prompt = prompt;
-  }
-
-  return compatInput;
-}
-
 function resolveTaskRuntimeConfig(input: {
-  runtimeAdapterKey?: string | null;
+  executionRuntime?: string | null;
   workspaceDefaultRuntime?: string | null;
-  runtimeInput?: unknown;
-  runtimeInputIsAuthoritative?: boolean;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: unknown;
-  promptOverride?: string | null;
+  executionConfig?: unknown;
 }) {
-  const runtimeAdapterKey = resolveRuntimeAdapterKey({
-    runtimeAdapterKey: input.runtimeAdapterKey,
+  const executionRuntime = resolveExecutionRuntime({
+    executionRuntime: input.executionRuntime,
     workspaceDefaultRuntime: input.workspaceDefaultRuntime,
   });
-  const definition = getRuntimeAdapterDefinition(runtimeAdapterKey);
-  const compatRuntimeInput = buildCompatRuntimeInput({
-    runtimeModel: input.runtimeModel,
-    prompt: input.prompt,
-    runtimeConfig: input.runtimeConfig,
-  });
-  const runtimeInput: RuntimeInput = isRuntimeInput(input.runtimeInput)
-    ? input.runtimeInputIsAuthoritative
-      ? { ...compatRuntimeInput, ...input.runtimeInput }
-      : { ...input.runtimeInput, ...compatRuntimeInput }
-    : compatRuntimeInput;
-  const legacyRuntimeModel = normalizeText(input.runtimeModel);
-  const legacyPrompt = normalizeText(input.prompt);
-  const promptOverride = normalizeText(input.promptOverride);
-
-  if (!readRuntimeText(runtimeInput, "model") && legacyRuntimeModel) {
-    runtimeInput.model = legacyRuntimeModel;
-  }
-
-  if (!readRuntimeText(runtimeInput, "prompt") && legacyPrompt) {
-    runtimeInput.prompt = legacyPrompt;
-  }
-
-  if (promptOverride) {
-    runtimeInput.prompt = promptOverride;
-  }
+  const executionConfig: RuntimeInput = isRuntimeInput(input.executionConfig)
+    ? { ...input.executionConfig }
+    : {};
 
   return {
-    runtimeAdapterKey,
-    runtimeInput,
-    runtimeInputVersion:
-      input.runtimeInputVersion?.trim() || definition.inputVersion,
-    effectiveRuntimeModel:
-      readRuntimeText(runtimeInput, "model") ?? legacyRuntimeModel,
-    effectivePrompt:
-      readRuntimeText(runtimeInput, "prompt") ?? legacyPrompt ?? promptOverride,
+    executionRuntime,
+    executionConfig,
   };
 }
 
 export function validateTaskRuntimeConfig(input: {
-  runtimeAdapterKey?: string | null;
+  executionRuntime?: string | null;
   workspaceDefaultRuntime?: string | null;
-  runtimeInput?: unknown;
-  runtimeInputIsAuthoritative?: boolean;
-  runtimeInputVersion?: string | null;
-  runtimeModel?: string | null;
-  prompt?: string | null;
-  runtimeConfig?: unknown;
-  promptOverride?: string | null;
+  executionConfig?: unknown;
 }) {
   const resolved = resolveTaskRuntimeConfig(input);
-  const validatedRuntimeInput = validateRuntimeTaskConfig(
-    resolved.runtimeAdapterKey,
-    resolved.runtimeInput,
-  );
-  const definition = getRuntimeAdapterDefinition(resolved.runtimeAdapterKey);
-  const legacyNormalizedRuntimeInput = validateTaskConfigAgainstSpec(
-    getRuntimeTaskConfigSpec(resolved.runtimeAdapterKey),
-    resolved.runtimeInput,
-    { applyDefaults: false },
-  );
-  const legacyFields = extractLegacyRuntimeFields(legacyNormalizedRuntimeInput);
-  const normalizedLegacyFields = extractLegacyRuntimeFields(
-    validatedRuntimeInput,
+  const validatedExecutionConfig = validateRuntimeTaskConfig(
+    resolved.executionRuntime,
+    resolved.executionConfig,
   );
 
   return {
-    runtimeAdapterKey: resolved.runtimeAdapterKey,
-    runtimeInput: validatedRuntimeInput,
-    runtimeInputVersion:
-      input.runtimeInputVersion?.trim() || definition.inputVersion,
-    effectiveRuntimeModel: normalizedLegacyFields.runtimeModel,
-    effectivePrompt: normalizedLegacyFields.prompt,
-    runtimeModel: normalizedLegacyFields.runtimeModel,
-    prompt: normalizedLegacyFields.prompt,
-    runtimeConfig: legacyFields.runtimeConfig,
+    executionRuntime: resolved.executionRuntime,
+    executionConfig: validatedExecutionConfig,
   };
 }

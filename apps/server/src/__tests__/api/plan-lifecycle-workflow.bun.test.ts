@@ -27,7 +27,7 @@ function err500(c: Context, route: string, cause: unknown, fallback: string) {
 function createPlanLifecycleRouter() {
   const api = new Hono();
 
-  api.get("/tasks/:taskId/plan/state", async (c) => {
+  api.get("/tasks/:taskId/plan", async (c) => {
     try {
       const taskId = c.req.param("taskId");
       const savedPlan = await getLatestTaskPlanReadModel(taskId);
@@ -273,7 +273,7 @@ describe("Plan lifecycle workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan`);
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
@@ -286,7 +286,7 @@ describe("Plan lifecycle workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     await seedSavedCompiledPlan({ taskId, workspaceId: ws.workspaceId, status: "draft", planId: "draft-plan" });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan`);
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
@@ -323,7 +323,7 @@ describe("Plan lifecycle workflow", () => {
       body: JSON.stringify({ planId }),
     });
 
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan/state`);
+    const res = await app().request(`http://local/api/tasks/${taskId}/plan`);
     const body = (await res.json()) as any;
     expect(body.aiPlanGenerationStatus).toBe("accepted");
     expect(body.savedPlan.status).toBe("accepted");

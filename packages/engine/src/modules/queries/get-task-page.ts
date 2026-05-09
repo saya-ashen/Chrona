@@ -3,7 +3,7 @@ import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { isTaskPlanGenerationRunning } from "@/modules/commands/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/queries/task-plan-read-model";
-import { getRuntimeTaskConfigSpec, listRuntimeAdapterKeys } from "@/modules/task-execution/registry";
+import { getRuntimeTaskConfigSpec, listExecutionRuntimes } from "@/modules/task-execution/registry";
 
 type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -77,17 +77,14 @@ export async function getTaskPage(taskId: string) {
 
   const latestRun = task.runs[0] ?? null;
   const runnability = deriveTaskRunnability({
-    runtimeAdapterKey: task.runtimeAdapterKey,
+    executionRuntime: task.executionRuntime,
     workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    runtimeInput: task.runtimeInput,
-    runtimeModel: task.runtimeModel,
-    prompt: task.prompt,
-    runtimeConfig: task.runtimeConfig,
+    executionConfig: task.executionConfig,
   });
 
   return {
-    defaultRuntimeAdapterKey: task.workspace.defaultRuntime,
-    runtimeAdapters: listRuntimeAdapterKeys().map((key) => ({
+    defaultExecutionRuntime: task.workspace.defaultRuntime,
+    executionRuntimes: listExecutionRuntimes().map((key) => ({
       key,
       label: key,
       spec: getRuntimeTaskConfigSpec(key),
@@ -97,12 +94,8 @@ export async function getTaskPage(taskId: string) {
       workspaceId: task.workspaceId,
       title: task.title,
       description: task.description,
-      runtimeAdapterKey: task.runtimeAdapterKey,
-      runtimeInput: task.runtimeInput,
-      runtimeInputVersion: task.runtimeInputVersion,
-      runtimeModel: task.runtimeModel,
-      prompt: task.prompt,
-      runtimeConfig: task.runtimeConfig,
+      executionRuntime: task.executionRuntime,
+      executionConfig: task.executionConfig,
       status: task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
@@ -113,7 +106,6 @@ export async function getTaskPage(taskId: string) {
       isRunnable: runnability.isRunnable,
       runnabilitySummary: runnability.summary,
       runnabilityState: runnability.state,
-      ownerType: task.ownerType,
       savedPlan,
       aiPlanGenerationStatus,
       blockReason: readBlockReason(task),

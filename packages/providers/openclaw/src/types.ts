@@ -53,7 +53,7 @@ export interface BridgeExecutionTaskRequest {
   taskId?: string;
   workspaceId?: string;
   taskTitle?: string;
-  runtimeAdapterKey?: string;
+  executionRuntime?: string;
   runtimeInput?: Record<string, unknown>;
   timeout?: number;
 }

@@ -21,8 +21,7 @@ export {
 
 export {
   getOpenClawTaskConfigSpec,
-  OPENCLAW_RUNTIME_ADAPTER_KEY,
-  OPENCLAW_RUNTIME_INPUT_VERSION,
+  OPENCLAW_EXECUTION_RUNTIME,
   validateOpenClawTaskConfig,
 } from "./config";
 

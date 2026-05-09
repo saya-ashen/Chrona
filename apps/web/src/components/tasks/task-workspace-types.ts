@@ -1,4 +1,4 @@
-import type { TaskConfigRuntimeAdapter } from "@/components/schedule/task-config-form";
+import type { TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
@@ -8,12 +8,8 @@ export type TaskData = {
   workspaceId: string;
   title: string;
   description: string | null;
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
   status: string;
   priority: string;
   dueAt: string | null;
@@ -24,7 +20,6 @@ export type TaskData = {
   isRunnable: boolean;
   runnabilitySummary: string;
   runnabilityState?: string;
-  ownerType?: string;
   savedPlan?: TaskPlanReadModel | null;
   aiPlanGenerationStatus?: TaskPlanGenerationStatus;
   blockReason: {
@@ -45,8 +40,8 @@ export type TaskData = {
 };
 
 export type TaskPageData = {
-  defaultRuntimeAdapterKey: string;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
+  defaultExecutionRuntime: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
   task: TaskData;
   latestRunSummary: {
     id: string;
@@ -87,12 +82,8 @@ export type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  runtimeAdapterKey: string | null;
-  runtimeInput: unknown;
-  runtimeInputVersion: string | null;
-  runtimeModel: string | null;
-  prompt: string | null;
-  runtimeConfig: unknown;
+  executionRuntime: string;
+  executionConfig: unknown;
 };
 
 export type CurrentProposalState = {

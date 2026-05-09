@@ -36,11 +36,6 @@ enum TaskPriority {
   Urgent
 }
 
-enum OwnerType {
-  human
-  agent
-}
-
 enum ScheduleStatus {
   Unscheduled
   Scheduled
@@ -153,20 +148,12 @@ model Task {
   workspaceId         String
   title               String
   description         String?
-  runtimeAdapterKey   String?
-  runtimeInput        Json?
-  runtimeInputVersion String?
-  runtimeModel        String?
-  prompt              String?
-  runtimeConfig       Json?
+  executionRuntime    String
+  executionConfig     Json
   status              TaskStatus
   priority            TaskPriority
-  ownerType           OwnerType
-  assigneeAgentId     String?
-  sourceSessionId     String?
   parentTaskId        String?
   dueAt               DateTime?
-  budgetLimit         Int?
   blockReason         Json?
   defaultSessionId    String?
   latestRunId         String?
@@ -482,7 +469,6 @@ model ScheduleProposal {
   dueAt            DateTime?
   scheduledStartAt DateTime?
   scheduledEndAt   DateTime?
-  assigneeAgentId  String?
   createdAt        DateTime               @default(now())
   resolvedAt       DateTime?
   resolutionNote   String?

@@ -25,8 +25,7 @@ export function SchedulePageDialogs({
   showQuickAddDialog: boolean;
   isPending: boolean;
   dialogDefaults: {
-    runtimeAdapterKey: string;
-    runtimeInputVersion: string;
+    executionRuntime: string;
   };
   data: SchedulePageData;
   viewModel: SchedulePageViewModel;
@@ -66,12 +65,8 @@ buildScheduleViewHref: (...args: any[]) => string;
           description: input.description,
           priority: input.priority,
           dueAt: input.dueAt,
-          runtimeAdapterKey: dialogDefaults.runtimeAdapterKey,
-          runtimeInput: {},
-          runtimeInputVersion: dialogDefaults.runtimeInputVersion,
-          runtimeModel: null,
-          prompt: null,
-          runtimeConfig: null,
+          executionRuntime: dialogDefaults.executionRuntime,
+          executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,
         });

@@ -106,20 +106,12 @@ export const TaskScalarFieldEnum = {
   workspaceId: 'workspaceId',
   title: 'title',
   description: 'description',
-  runtimeAdapterKey: 'runtimeAdapterKey',
-  runtimeInput: 'runtimeInput',
-  runtimeInputVersion: 'runtimeInputVersion',
-  runtimeModel: 'runtimeModel',
-  prompt: 'prompt',
-  runtimeConfig: 'runtimeConfig',
+  executionRuntime: 'executionRuntime',
+  executionConfig: 'executionConfig',
   status: 'status',
   priority: 'priority',
-  ownerType: 'ownerType',
-  assigneeAgentId: 'assigneeAgentId',
-  sourceSessionId: 'sourceSessionId',
   parentTaskId: 'parentTaskId',
   dueAt: 'dueAt',
-  budgetLimit: 'budgetLimit',
   blockReason: 'blockReason',
   defaultSessionId: 'defaultSessionId',
   latestRunId: 'latestRunId',
@@ -376,7 +368,6 @@ export const ScheduleProposalScalarFieldEnum = {
   dueAt: 'dueAt',
   scheduledStartAt: 'scheduledStartAt',
   scheduledEndAt: 'scheduledEndAt',
-  assigneeAgentId: 'assigneeAgentId',
   createdAt: 'createdAt',
   resolvedAt: 'resolvedAt',
   resolutionNote: 'resolutionNote'
@@ -484,19 +475,19 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
 export const NullableJsonNullValueInput = {
   DbNull: DbNull,
   JsonNull: JsonNull
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
-
-
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const NullsOrder = {

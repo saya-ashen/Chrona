@@ -10,6 +10,7 @@ import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
+import type { WorkPageData } from "@/components/work/work-page/work-page-types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { WorkspaceOverview } from "@/components/workspaces/workspace-overview";
 import type { Locale } from "@/i18n/config";
@@ -267,5 +268,5 @@ export function WorkRoutePage() {
     return <Navigate to={`/${work.taskShell.workspaceId}/work/${work.taskShell.id}`} replace />;
   }
 
-  return <WorkPageClient initialData={work} />;
+  return <WorkPageClient initialData={work as WorkPageData} />;
 }

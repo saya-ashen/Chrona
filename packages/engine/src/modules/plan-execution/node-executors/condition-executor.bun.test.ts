@@ -8,6 +8,15 @@ function makeConditionNode(
   const { id, ...rest } = overrides;
   return {
     id,
+    nodeId: id,
+    activeLayerId: null,
+    semanticKey: id,
+    definition: {
+      title: "检查库存",
+      objective: "检查库存",
+      semantics: { type: "condition" },
+    },
+    invalidated: false,
     localId: "check_inventory",
     type: "condition",
     title: "检查库存",
@@ -34,8 +43,10 @@ function makeConditionNode(
 
 function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   return {
+    graphId: "graph-1",
     planId: "plan-1",
     basePlanId: "base-1",
+    resolvedAt: "2026-04-20T09:00:00.000Z",
     resolvedVersion: 1,
     nodes,
     edges: [
@@ -48,6 +59,7 @@ function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
     blockedNodeIds: [],
     completedNodeIds: [],
     runningNodeIds: [],
+    invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: ["compiled-yes", "compiled-no"],
   };
@@ -81,6 +93,15 @@ describe("ConditionNodeExecutor", () => {
     const condition = makeConditionNode({ id: "condition-1" });
     const yesNode: EffectivePlanNode = {
       id: "compiled-yes",
+      nodeId: "compiled-yes",
+      activeLayerId: null,
+      semanticKey: "compiled-yes",
+      definition: {
+        title: "发货",
+        objective: "发货",
+        semantics: { type: "task" },
+      },
+      invalidated: false,
       localId: "ship_order",
       type: "task",
       title: "发货",
@@ -96,6 +117,15 @@ describe("ConditionNodeExecutor", () => {
     };
     const noNode: EffectivePlanNode = {
       id: "compiled-no",
+      nodeId: "compiled-no",
+      activeLayerId: null,
+      semanticKey: "compiled-no",
+      definition: {
+        title: "补货",
+        objective: "补货",
+        semantics: { type: "task" },
+      },
+      invalidated: false,
       localId: "restock",
       type: "task",
       title: "补货",

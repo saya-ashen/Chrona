@@ -2,8 +2,6 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
-import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import type { NodeConfig } from "@chrona/contracts/ai";
 
@@ -53,7 +51,6 @@ describe("progress-accepted-task-plan", () => {
         title: "Parent",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: { model: "gpt-5.4", prompt: "Parent" },
         runtimeInputVersion: "openclaw-legacy-v1",
@@ -70,7 +67,6 @@ describe("progress-accepted-task-plan", () => {
         title: "Step A",
         status: TaskStatus.Completed,
         priority: TaskPriority.Medium,
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: { model: "gpt-5.4", prompt: "A" },
         runtimeInputVersion: "openclaw-legacy-v1",
@@ -86,7 +82,6 @@ describe("progress-accepted-task-plan", () => {
         title: "Step B",
         status: TaskStatus.Ready,
         priority: TaskPriority.Medium,
-        ownerType: "human",
         runtimeAdapterKey: "openclaw",
         runtimeInput: { model: "gpt-5.4", prompt: "B" },
         runtimeInputVersion: "openclaw-legacy-v1",
@@ -194,27 +189,6 @@ describe("progress-accepted-task-plan", () => {
       compiledPlan: parentCompiledPlan,
     });
 
-    await savePlanRun({
-      workspaceId: workspace.id,
-      taskId: parentTask.id,
-      planId: parentCompiledPlan.editablePlanId,
-      run: createPlanRunFromCompiledPlan(parentCompiledPlan),
-      layers: [
-        {
-          type: "runtime",
-          planId: parentCompiledPlan.editablePlanId,
-          timestamp: new Date().toISOString(),
-          layerId: "seed-parent-ready",
-          version: 1,
-          active: true,
-          source: "system",
-          nodeStates: {
-            a: { status: "completed" },
-          },
-        },
-      ],
-    });
-
     startPlanExecutionMock.mockImplementation(async ({ taskId }: { taskId: string }) => ({
       taskId,
       planId: `plan-${taskId}`,
@@ -254,7 +228,6 @@ describe("progress-accepted-task-plan", () => {
         title: "Parent",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        ownerType: "human",
       },
     });
 
@@ -265,7 +238,6 @@ describe("progress-accepted-task-plan", () => {
         title: "Step A",
         status: TaskStatus.Completed,
         priority: TaskPriority.Medium,
-        ownerType: "human",
       },
     });
 
@@ -305,27 +277,6 @@ describe("progress-accepted-task-plan", () => {
       summary: "Finished plan",
       generatedBy: "planner",
       compiledPlan: parentCompiledPlan,
-    });
-
-    await savePlanRun({
-      workspaceId: workspace.id,
-      taskId: parentTask.id,
-      planId: parentCompiledPlan.editablePlanId,
-      run: createPlanRunFromCompiledPlan(parentCompiledPlan),
-      layers: [
-        {
-          type: "runtime",
-          planId: parentCompiledPlan.editablePlanId,
-          timestamp: new Date().toISOString(),
-          layerId: "seed-parent-complete",
-          version: 1,
-          active: true,
-          source: "system",
-          nodeStates: {
-            a: { status: "completed" },
-          },
-        },
-      ],
     });
 
     const result = await progressAcceptedTaskPlan({ parentTaskId: parentTask.id });

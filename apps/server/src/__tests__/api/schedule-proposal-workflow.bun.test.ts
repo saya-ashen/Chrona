@@ -51,7 +51,6 @@ function createScheduleProposalRouter() {
           dueAt: toDateOrNull(body.dueAt),
           scheduledStartAt: toDateOrNull(body.scheduledStartAt),
           scheduledEndAt: toDateOrNull(body.scheduledEndAt),
-          assigneeAgentId: typeof body.assigneeAgentId === "string" ? body.assigneeAgentId : null,
         }),
         201,
       );
@@ -61,7 +60,7 @@ function createScheduleProposalRouter() {
     }
   });
 
-  api.post("/schedule/proposals/decision", async (c) => {
+  api.post("/tasks/schedule-proposals/decision", async (c) => {
     try {
       const body = await c.req.json();
       const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
@@ -196,7 +195,7 @@ describe("Schedule proposal workflow", () => {
     const { proposalId } = await createRes.json() as any;
 
     const decisionRes = await app().request(
-      "http://local/api/schedule/proposals/decision",
+      "http://local/api/tasks/schedule-proposals/decision",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -240,7 +239,7 @@ describe("Schedule proposal workflow", () => {
     );
     const { proposalId } = await createRes.json() as any;
 
-    await app().request("http://local/api/schedule/proposals/decision", {
+    await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId, decision: "Accepted" }),
@@ -277,7 +276,7 @@ describe("Schedule proposal workflow", () => {
     );
     const { proposalId } = await createRes.json() as any;
 
-    await app().request("http://local/api/schedule/proposals/decision", {
+    await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId, decision: "Rejected", resolutionNote: "Too early" }),
@@ -313,7 +312,7 @@ describe("Schedule proposal workflow", () => {
     );
     const { proposalId } = await createRes.json() as any;
 
-    await app().request("http://local/api/schedule/proposals/decision", {
+    await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId, decision: "Rejected" }),
@@ -349,7 +348,7 @@ describe("Schedule proposal workflow", () => {
     const { proposalId } = await createRes.json() as any;
 
     // First decision
-    await app().request("http://local/api/schedule/proposals/decision", {
+    await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId, decision: "Accepted" }),
@@ -357,7 +356,7 @@ describe("Schedule proposal workflow", () => {
 
     // Second decision on same proposal — should fail
     const res = await app().request(
-      "http://local/api/schedule/proposals/decision",
+      "http://local/api/tasks/schedule-proposals/decision",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -389,7 +388,7 @@ describe("Schedule proposal workflow", () => {
     const { taskId } = await seedTask(ws.workspaceId);
     const { proposalId } = await seedScheduleProposal({ taskId, workspaceId: ws.workspaceId, status: "Accepted" });
 
-    const res = await app().request("http://local/api/schedule/proposals/decision", {
+    const res = await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ proposalId, decision: "Rejected" }),
@@ -439,7 +438,7 @@ describe("Schedule proposal workflow", () => {
 
   it("returns 400 when decision missing proposalId", async () => {
     const res = await app().request(
-      "http://local/api/schedule/proposals/decision",
+      "http://local/api/tasks/schedule-proposals/decision",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -454,7 +453,7 @@ describe("Schedule proposal workflow", () => {
 
   it("returns 400 for invalid decision value", async () => {
     const res = await app().request(
-      "http://local/api/schedule/proposals/decision",
+      "http://local/api/tasks/schedule-proposals/decision",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -469,7 +468,7 @@ describe("Schedule proposal workflow", () => {
 
   it("returns 404 for nonexistent proposalId", async () => {
     const res = await app().request(
-      "http://local/api/schedule/proposals/decision",
+      "http://local/api/tasks/schedule-proposals/decision",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

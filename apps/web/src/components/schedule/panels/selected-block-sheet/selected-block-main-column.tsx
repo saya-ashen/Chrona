@@ -8,8 +8,8 @@ import { toTaskConfigInitialValues } from "@/components/schedule/schedule-page-u
 import {
   TaskConfigForm,
   type TaskConfigDraftState,
+  type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
-  type TaskConfigRuntimeAdapter,
 } from "@/components/schedule/task-config-form";
 import { TaskEditPanel } from "@/components/task/panels/task-edit-panel";
 import { TaskPlanGraphPanel } from "@/components/task/panels/task-plan-graph-panel";
@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 export function SelectedBlockMainColumn({
   item,
   copy,
-  runtimeAdapters,
-  defaultRuntimeAdapterKey,
+  executionRuntimes,
+  defaultExecutionRuntime,
   isPending,
   acceptedPlan,
   onDeleteTask,
@@ -31,8 +31,8 @@ export function SelectedBlockMainColumn({
 }: {
   item: ScheduledItem;
   copy: SchedulePageCopy;
-  runtimeAdapters: TaskConfigRuntimeAdapter[];
-  defaultRuntimeAdapterKey: string;
+  executionRuntimes: TaskConfigExecutionRuntime[];
+  defaultExecutionRuntime: string;
   isPending: boolean;
   acceptedPlan: TaskPlanReadModel | null;
   onDeleteTask?: (taskId: string) => void;
@@ -50,8 +50,8 @@ export function SelectedBlockMainColumn({
       <div className="space-y-5">
         <TaskEditPanel>
           <TaskConfigForm
-            runtimeAdapters={runtimeAdapters}
-            defaultRuntimeAdapterKey={defaultRuntimeAdapterKey}
+            executionRuntimes={executionRuntimes}
+            defaultExecutionRuntime={defaultExecutionRuntime}
             isPending={isPending}
             initialValues={toTaskConfigInitialValues(item)}
             submitLabel={copy.saveTaskConfig}

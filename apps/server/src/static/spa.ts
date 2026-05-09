@@ -4,7 +4,7 @@ import type { MiddlewareHandler } from "hono";
 import { serveStatic } from "hono/bun";
 import { readEnv } from "../config/env";
 
-export function getSpaDistPath() {
+function getSpaDistPath() {
   const envDist = readEnv().CHRONA_WEB_DIST;
   if (envDist) return path.resolve(envDist);
   return path.resolve(process.cwd(), "apps/web/dist");

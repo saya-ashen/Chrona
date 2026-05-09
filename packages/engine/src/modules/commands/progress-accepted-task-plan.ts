@@ -4,8 +4,9 @@ import { materializeTaskPlan } from "@/modules/commands/materialize-task-plan";
 import { startPlanExecution } from "@/modules/plan-execution";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
-import { resolveRuntimeAdapterKey } from "@/modules/task-execution/registry";
+import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
+import { syncAcceptedTaskPlanForTask } from "@/modules/plan-execution/sync-accepted-plan";
 import {
   getAcceptedCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
@@ -84,6 +85,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
     };
   }
 
+  await syncAcceptedTaskPlanForTask({ taskId: input.parentTaskId });
   const effective = await resolveSavedPlanEffectiveGraph(accepted);
 
   // Find ready plan nodes, including nodes already linked to child tasks.
@@ -115,7 +117,7 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
         orderBy: { createdAt: "asc" },
       });
 
-      const strategy = readSessionStrategy(parentTask.runtimeConfig);
+      const strategy = readSessionStrategy(parentTask.executionConfig);
       for (const childTask of childTasks) {
         if (!readyTaskIds.has(childTask.id)) continue;
 
@@ -136,8 +138,8 @@ export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) 
           await ensureDefaultTaskSession({
             taskId: childTask.id,
             taskTitle: childTask.title,
-            runtimeName: resolveRuntimeAdapterKey({
-              runtimeAdapterKey: childTask.runtimeAdapterKey ?? parentTask.runtimeAdapterKey,
+            runtimeName: resolveExecutionRuntime({
+              executionRuntime: childTask.executionRuntime ?? parentTask.executionRuntime,
             }),
             defaultSessionId: childTask.defaultSessionId,
             suffix: "subtask",

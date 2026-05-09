@@ -96,7 +96,7 @@ export function useSelectedBlockPlanState({
   }, []);
 
   const fetchPlanState = useCallback(async () => {
-    const response = await api.tasks[":taskId"].plan.state.$get({
+    const response = await api.tasks[":taskId"].plan.$get({
       param: { taskId: item.taskId },
     });
 

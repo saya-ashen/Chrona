@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TASK_PRIORITIES, TASK_STATUSES } from "../task";
 
 /** ISO-8601 date-time string — validated, then converted to Date in handlers */
 export const isoDateString = z.string().datetime({ message: "must be a valid ISO-8601 date string" });
@@ -7,22 +8,9 @@ export const isoDateString = z.string().datetime({ message: "must be a valid ISO
 export const isoDateOrNull = isoDateString.nullable().optional();
 export const isoDateOptional = isoDateString.optional();
 
-export const taskStatusEnum = z.enum([
-  "Todo",
-  "InProgress",
-  "WaitingForInput",
-  "Blocked",
-  "InReview",
-  "Done",
-  "Archived",
-  "Cancelled",
-  "Planned",
-  "Scheduled",
-  "Overdue",
-  "Failed",
-]);
+export const taskStatusEnum = z.enum(TASK_STATUSES);
 
-export const taskPriorityEnum = z.enum(["Low", "Medium", "High", "Urgent"]);
+export const taskPriorityEnum = z.enum(TASK_PRIORITIES);
 
 export const workspaceId = z.string().min(1, "workspaceId is required");
 export const taskIdParam = z.string().min(1, "taskId is required");

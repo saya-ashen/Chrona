@@ -166,7 +166,7 @@ export class OpenClawBridgeClient implements OpenClawRuntimeClient {
       sessionKey,
       instructions: input.prompt,
       ...(taskTitle ? { taskTitle } : {}),
-      runtimeAdapterKey: "openclaw",
+      executionRuntime: "openclaw",
       runtimeInput: input.runtimeInput,
       timeout: this.timeoutSeconds,
     };
