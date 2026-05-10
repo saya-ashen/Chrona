@@ -1,7 +1,5 @@
 import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
-import {
-  DEFAULT_SCHEDULE_BLOCK_MINUTES,
-} from "@/components/schedule/schedule-page-copy";
+import { DEFAULT_SCHEDULE_BLOCK_MINUTES } from "@/components/schedule/schedule-page-copy";
 import type {
   ListItem,
   QuickCreateDraft,
@@ -10,8 +8,11 @@ import type {
   TimelineCreateInput,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-import { deriveTaskRunnability } from "@chrona/shared";
-import { formatDateKey, parseDayKey, startOfDay } from "@/components/schedule/utils/date";
+import {
+  formatDateKey,
+  parseDayKey,
+  startOfDay,
+} from "@/components/schedule/utils/date";
 
 function roundUpToQuarterHour(value: Date) {
   const next = new Date(value);
@@ -78,24 +79,17 @@ export function createScheduledItemFromQueueItem(
 export function createScheduledItemFromCreateInput(
   taskId: string,
   workspaceId: string,
-  workspaceDefaultRuntime: string,
   input: TimelineCreateInput,
 ): ScheduledItem {
-  const runnability = deriveTaskRunnability({
-    workspaceDefaultRuntime,
-    executionRuntime: input.executionRuntime,
-    executionConfig: input.executionConfig,
-  });
-
   return {
     taskId,
     workspaceId,
     title: input.title,
     description: input.description || null,
     priority: input.priority,
-    persistedStatus: runnability.isRunnable ? "Ready" : "Draft",
+    persistedStatus: "Ready",
     displayState: null,
-    actionRequired: runnability.isRunnable ? null : runnability.summary,
+    actionRequired: null,
     approvalPendingCount: 0,
     scheduleStatus: "Scheduled",
     scheduleSource: "human",
@@ -107,9 +101,7 @@ export function createScheduledItemFromCreateInput(
     lastActivityAt: new Date(),
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
-    isRunnable: runnability.isRunnable,
-    runnabilityState: runnability.state,
-    runnabilitySummary: runnability.summary,
+    isRunnable: false,
     parentTaskId: null,
   };
 }
@@ -166,7 +158,9 @@ export function applyTaskConfigToItem<
           ? "Ready"
           : "Draft"
         : item.persistedStatus,
-    actionRequired: runnability.isRunnable ? item.actionRequired : runnability.summary,
+    actionRequired: runnability.isRunnable
+      ? item.actionRequired
+      : runnability.summary,
   };
 }
 
@@ -215,7 +209,8 @@ export function buildQuickCreateDraft(args: {
       );
   const scheduledEndAt = new Date(scheduledStartAt.getTime());
   scheduledEndAt.setMinutes(
-    scheduledEndAt.getMinutes() + (args.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES),
+    scheduledEndAt.getMinutes() +
+      (args.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES),
   );
 
   return {

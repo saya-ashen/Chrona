@@ -29,6 +29,11 @@ export const planGenerateStopParamSchema = z.object({
   taskId: taskIdParam,
 });
 
+// ── GET /tasks/:taskId/plan/generations/active ──
+export const planGenerateActiveParamSchema = z.object({
+  taskId: taskIdParam,
+});
+
 // ── POST /tasks/:taskId/plan/materialize ──
 export const planMaterializeParamSchema = z.object({
   taskId: taskIdParam,

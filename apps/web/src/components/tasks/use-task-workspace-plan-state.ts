@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
+import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
 import { fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "./task-workspace-query";
 import {
@@ -16,8 +17,21 @@ import {
 } from "./task-workspace-plan-flow-machine";
 import type { TaskData } from "./task-workspace-types";
 
+function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
+  if (isGenerationRunning) {
+    return "generating" as const;
+  }
+
+  if (savedPlan?.status === "accepted") {
+    return "accepted" as const;
+  }
+
+  return savedPlan ? "waiting_acceptance" as const : "idle" as const;
+}
+
 export function useTaskWorkspacePlanState(task: TaskData) {
   const queryClient = useQueryClient();
+  const generationSession = useTaskPlanGenerationSession(task.id);
   const syncTaskDetailPlanFields = useCallback((nextPlanState: TaskPlanState) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.detail(task.id), (current: TaskData | undefined) => {
       if (!current) return current;
@@ -36,8 +50,8 @@ export function useTaskWorkspacePlanState(task: TaskData) {
       taskId: task.id,
       aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
       savedPlan: task.savedPlan ?? null,
+      generationSession: null,
     } satisfies TaskPlanState,
-    refetchInterval: (query) => query.state.data?.aiPlanGenerationStatus === "generating" ? 3000 : false,
   });
   const planState = planStateQuery.data;
   const [isAiWorkspaceOpen, setIsAiWorkspaceOpen] = useState(false);
@@ -48,6 +62,49 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     if (!planState) return;
     syncTaskDetailPlanFields(planState);
   }, [planState, syncTaskDetailPlanFields]);
+
+  useEffect(() => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+      const previous = current ?? {
+        taskId: task.id,
+        aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
+        savedPlan: task.savedPlan ?? null,
+        generationSession: null,
+      } satisfies TaskPlanState;
+
+      return {
+        ...previous,
+        aiPlanGenerationStatus: derivePlanStatus(previous.savedPlan, generationSession.sessionStatus === "running"),
+        generationSession:
+          generationSession.generationId
+            ? {
+                generationId: generationSession.generationId,
+                taskId: generationSession.taskId,
+                status: generationSession.sessionStatus === "idle" ? "cancelled" : generationSession.sessionStatus,
+                phase: generationSession.phase === "idle" || generationSession.phase === "connecting" || generationSession.phase === "done" || generationSession.phase === "error"
+                  ? null
+                  : generationSession.phase,
+                statusMessage: generationSession.statusMessage,
+                partialText: generationSession.partialText,
+                result: generationSession.result,
+                error: generationSession.error && generationSession.errorCode
+                  ? { code: generationSession.errorCode, message: generationSession.error }
+                  : null,
+                startedAt: generationSession.startedAt ?? new Date(0).toISOString(),
+                finishedAt: generationSession.finishedAt,
+              }
+            : null,
+      } satisfies TaskPlanState;
+    });
+  }, [generationSession, queryClient, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
+
+  useEffect(() => {
+    if (!generationSession.hydrated || generationSession.sessionStatus === "running") {
+      return;
+    }
+
+    void planStateQuery.refetch();
+  }, [generationSession.hydrated, generationSession.sessionStatus, planStateQuery]);
 
   useEffect(() => {
     if (!planState) return;
@@ -63,6 +120,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
         taskId: task.id,
         aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
         savedPlan: task.savedPlan ?? null,
+        generationSession: null,
       };
       const nextPlan = typeof value === "function"
         ? (value as (prevState: TaskData["savedPlan"] | null) => TaskData["savedPlan"] | null)(previous.savedPlan ?? null)
@@ -70,6 +128,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
       return {
         ...previous,
         savedPlan: nextPlan,
+        aiPlanGenerationStatus: derivePlanStatus(nextPlan, previous.generationSession?.status === "running"),
       } satisfies TaskPlanState;
     });
   }, [queryClient, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
@@ -85,6 +144,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
   }, [planGenerationStatus]);
 
   const graphPlan = useMemo(() => taskPlanReadModelToGraphPlan(plan), [plan]);
+
   const canAcceptPlan = canAcceptPlanFromFlow(planFlow);
   const acceptPlanError = getAcceptPlanErrorFromFlow(planFlow);
 
@@ -106,11 +166,18 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     setPlanFlow((current) => startPlanAccept(clearPlanFlowError(current), planId));
     try {
       const result = await acceptPlanMutation.mutateAsync(planId);
-      const nextPlanState = queryClient.setQueryData<TaskPlanState>(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => ({
-        taskId: task.id,
-        aiPlanGenerationStatus: "accepted",
-        savedPlan: result.savedPlan ?? current?.savedPlan ?? null,
-      } satisfies TaskPlanState));
+      const nextPlanState = queryClient.setQueryData<TaskPlanState>(
+        taskWorkspaceQueryKeys.planState(task.id),
+        (current: TaskPlanState | undefined) => {
+          const savedPlan = result.savedPlan ?? current?.savedPlan ?? null;
+          return {
+            taskId: task.id,
+            aiPlanGenerationStatus: derivePlanStatus(savedPlan, false),
+            savedPlan,
+            generationSession: current?.generationSession ?? null,
+          } satisfies TaskPlanState;
+        },
+      );
       setPlanFlow(completePlanAccept(result.savedPlan ?? nextPlanState?.savedPlan ?? null));
       if (nextPlanState) {
         syncTaskDetailPlanFields(nextPlanState);

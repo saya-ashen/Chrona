@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { OpenClawClient } from "./OpenClawClient";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const realFetch = globalThis.fetch;
+const realOpenClawDump = process.env.CHRONA_OPENCLAW_DUMP;
+const realOpenClawDumpDir = process.env.CHRONA_OPENCLAW_DUMP_DIR;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  if (realOpenClawDump === undefined) {
+    delete process.env.CHRONA_OPENCLAW_DUMP;
+  } else {
+    process.env.CHRONA_OPENCLAW_DUMP = realOpenClawDump;
+  }
+  if (realOpenClawDumpDir === undefined) {
+    delete process.env.CHRONA_OPENCLAW_DUMP_DIR;
+  } else {
+    process.env.CHRONA_OPENCLAW_DUMP_DIR = realOpenClawDumpDir;
+  }
 });
 
 describe("OpenClawClient", () => {
@@ -112,5 +127,50 @@ describe("OpenClawClient", () => {
         toolCall: { tool: "generate_task_plan_graph", callId: "call-2" },
       },
     ]);
+  });
+
+  it("dumps raw gateway stream events when enabled", async () => {
+    const dumpDir = await mkdtemp(join(tmpdir(), "chrona-openclaw-dump-"));
+    process.env.CHRONA_OPENCLAW_DUMP = "1";
+    process.env.CHRONA_OPENCLAW_DUMP_DIR = dumpDir;
+
+    globalThis.fetch = (async () => {
+      const sse = [
+        'event: response.output_text.delta\n',
+        'data: {"delta":"Planning","type":"response.output_text.delta"}\n\n',
+        'data: [DONE]\n\n',
+      ].join("");
+
+      return new Response(sse, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new OpenClawClient({
+      gatewayUrl: "http://gateway.local",
+      gatewayToken: "secret",
+    });
+
+    for await (const _event of client.executeFeatureStream("generate_plan", {
+      sessionKey: "sess-dump",
+      instructions: "plan this task",
+      task: { title: "Write docs" },
+      timeout: 5,
+    })) {
+      // Consume stream to completion so the dump file is closed.
+    }
+
+    const files = await readdir(dumpDir);
+    expect(files.length).toBe(1);
+
+    const content = await readFile(join(dumpDir, files[0]!), "utf8");
+    expect(content).toContain('"type":"meta"');
+    expect(content).toContain('"type":"response"');
+    expect(content).toContain('"type":"chunk"');
+    expect(content).toContain('"type":"event"');
+    expect(content).toContain('"type":"done_marker"');
+
+    await rm(dumpDir, { recursive: true, force: true });
   });
 });

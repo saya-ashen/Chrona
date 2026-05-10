@@ -60,7 +60,11 @@ export type ScheduledAiTaskPlan = TaskPlanReadModel;
 
 type ScheduleTaskPlanSnapshot = TaskPlanReadModel | null;
 
-export type ScheduleAiPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
+export type ScheduleAiPlanGenerationStatus =
+  | "idle"
+  | "generating"
+  | "waiting_acceptance"
+  | "accepted";
 
 export type ScheduleRecord = {
   taskId: string;
@@ -122,8 +126,6 @@ export type SchedulePageData = {
   proposals: ScheduleProposal[];
   risks: ScheduleRecord[];
   listItems: ScheduleTaskListItem[];
-  conflicts: ScheduleConflict[];
-  suggestions: ScheduleSuggestion[];
   workBlocks: WorkBlockInfo[];
 };
 
@@ -161,7 +163,11 @@ export type ScheduledItem = SchedulePageData["scheduled"][number];
 export type UnscheduledItem = SchedulePageData["unscheduled"][number];
 export type ListItem = SchedulePageData["listItems"][number];
 export type ScheduleViewMode = "timeline" | "list";
-export type SecondaryPlanningView = "queue" | "risks" | "proposals" | "conflicts";
+export type SecondaryPlanningView =
+  | "queue"
+  | "risks"
+  | "proposals"
+  | "conflicts";
 
 /**
  * 冲突类型
@@ -196,12 +202,7 @@ export type ScheduleConflict = {
 /**
  * 建议类型
  */
-type SuggestionType =
-  | "reschedule"
-  | "split"
-  | "merge"
-  | "defer"
-  | "reorder";
+type SuggestionType = "reschedule" | "split" | "merge" | "defer" | "reorder";
 
 /**
  * 任务变更
@@ -258,7 +259,11 @@ export type CompressedTimelineHour = {
   active: boolean;
 };
 
-export type TimelineInteractionMode = "idle" | "dragging" | "resizing" | "creating";
+export type TimelineInteractionMode =
+  | "idle"
+  | "dragging"
+  | "resizing"
+  | "creating";
 
 type TimelineResizeEdge = "end";
 
@@ -305,10 +310,5 @@ export type QuickCreateDraft = {
   scheduledEndAt: Date | null;
   priority: "Low" | "Medium" | "High" | "Urgent";
 };
-
-
-
-
-
 
 import type { RuntimeInput } from "@chrona/runtime-core";

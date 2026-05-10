@@ -648,6 +648,7 @@ export interface GenerateTaskPlanRequest {
   estimatedMinutes?: number;
   planningPrompt?: string | null;
   sessionKey?: string;
+  signal?: AbortSignal;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -704,6 +705,28 @@ export interface GeneratePlanResultEvent {
   taskSessionKey?: string;
 }
 
+export interface GeneratePlanCancelledEvent {
+  type: "cancelled";
+}
+
+export interface TaskPlanGenerationSessionReadModel {
+  generationId: string;
+  taskId: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  phase: GeneratePlanStatusPhase | null;
+  statusMessage: string | null;
+  partialText: string;
+  result: TaskPlanReadModel | null;
+  error: {
+    code: GeneratePlanErrorCode;
+    message: string;
+    rawText?: string;
+    diagnostics?: Record<string, unknown>;
+  } | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
 export type GeneratePlanErrorCode =
   | "TASK_NOT_FOUND"
   | "PLAN_GENERATION_IN_FLIGHT"
@@ -731,6 +754,7 @@ export type GeneratePlanSSEEvent =
   | GeneratePlanPartialEvent
   | GeneratePlanToolCallEvent
   | GeneratePlanResultEvent
+  | GeneratePlanCancelledEvent
   | GeneratePlanErrorEvent
   | GeneratePlanDoneEvent;
 

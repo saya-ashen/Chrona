@@ -9,7 +9,6 @@ import {
   listExecutionRuntimes,
 } from "@/modules/task-execution/registry";
 import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
-import { deriveTaskRunnability } from "@chrona/shared";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import {
@@ -61,18 +60,9 @@ function mapTaskRunnability(task: {
   executionRuntime: string;
   executionConfig: unknown;
 }) {
-  const runnability = deriveTaskRunnability({
-    workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    executionRuntime: task.executionRuntime,
-    executionConfig: task.executionConfig,
-  });
-
   return {
     executionRuntime: task.executionRuntime,
     executionConfig: task.executionConfig,
-    isRunnable: runnability.isRunnable,
-    runnabilityState: runnability.state,
-    runnabilitySummary: runnability.summary,
   };
 }
 

@@ -4,10 +4,11 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
-import { deriveTaskRunnability } from "@chrona/shared";
 import type { CreateTaskInput } from "@chrona/contracts";
 
-function normalizeExecutionConfig(value: Prisma.InputJsonObject | null | undefined) {
+function normalizeExecutionConfig(
+  value: Prisma.InputJsonObject | null | undefined,
+) {
   if (value === undefined) {
     return undefined;
   }
@@ -45,7 +46,9 @@ export async function createTask(input: CreateTaskInput) {
     });
 
     if (!parentTask || parentTask.workspaceId !== input.workspaceId) {
-      throw new Error("parentTaskId must reference a task in the same workspace");
+      throw new Error(
+        "parentTaskId must reference a task in the same workspace",
+      );
     }
   }
 
@@ -55,11 +58,8 @@ export async function createTask(input: CreateTaskInput) {
     executionConfig,
   });
 
-  const runnability = deriveTaskRunnability({
-    executionRuntime: validatedRuntimeConfig.executionRuntime,
-    executionConfig: validatedRuntimeConfig.executionConfig,
-  });
-  const status = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
+  // FIXME:
+  const status = TaskStatus.Blocked;
 
   const task = await db.task.create({
     data: {
@@ -67,8 +67,11 @@ export async function createTask(input: CreateTaskInput) {
       title,
       description,
       executionRuntime: validatedRuntimeConfig.executionRuntime,
-      executionConfig: validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject,
-      priority: input.priority ? TaskPriority[input.priority] : TaskPriority.Medium,
+      executionConfig:
+        validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject,
+      priority: input.priority
+        ? TaskPriority[input.priority]
+        : TaskPriority.Medium,
       status,
       parentTaskId: input.parentTaskId ?? null,
     },

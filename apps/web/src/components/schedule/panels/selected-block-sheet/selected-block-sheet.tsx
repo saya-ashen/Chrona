@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { useI18n, useLocale } from "@/i18n/client";
-import { SelectedBlockAiSidebar } from "@/components/schedule/panels/selected-block-sheet/selected-block-ai-sidebar";
 import { SelectedBlockMainColumn } from "@/components/schedule/panels/selected-block-sheet/selected-block-main-column";
 import { SelectedBlockSheetHeader } from "@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header";
 import type { SelectedBlockSheetProps } from "@/components/schedule/panels/selected-block-sheet/types";
@@ -74,27 +73,22 @@ export function SelectedBlockSheet({
           />
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
+            <div>
               <SelectedBlockMainColumn
                 item={item}
                 copy={copy}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}
                 isPending={isPending}
-                acceptedPlan={acceptedPlan}
-                onTaskConfigDraftStateChange={handleTaskConfigDraftStateChange}
-                onSaveTaskConfig={saveTaskConfig}
-                onDeleteTask={onDeleteTask}
-              />
-
-              <SelectedBlockAiSidebar
-                taskId={item.taskId}
                 planningTaskDraft={planningTaskDraft}
                 savedPlan={displayedSavedPlan}
                 generationStatus={generationStatus}
-                acceptedPlanId={acceptedPlan?.id ?? null}
+                acceptedPlan={acceptedPlan}
                 hasUnsavedConfigChanges={Boolean(taskConfigDraftState?.isDirty)}
                 unsavedConfigDraft={taskConfigDraftState?.values ?? null}
+                onTaskConfigDraftStateChange={handleTaskConfigDraftStateChange}
+                onSaveTaskConfig={saveTaskConfig}
+                onDeleteTask={onDeleteTask}
                 onPlanLoaded={handlePlanLoaded}
                 onApplyPlan={handleApplyPlan}
                 onSaveConfigBeforeRegenerate={saveConfigBeforeRegenerate}

@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./debug-dump": "./src/debug-dump.ts",
     "./logger": "./src/logger.ts"
   }
 }

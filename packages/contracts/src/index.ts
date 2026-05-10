@@ -102,6 +102,7 @@ export type {
   ExecutionActionInput,
   GraphMutationRequest,
   TaskPlanReadModel,
+  TaskPlanGenerationSessionReadModel,
   GeneratePlanStatusPhase,
   GeneratePlanStatusEvent,
   GeneratePlanPartialEvent,

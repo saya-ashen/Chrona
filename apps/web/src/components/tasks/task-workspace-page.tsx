@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
-import { TaskWorkspaceDiffPreview } from "@/components/tasks/task-workspace-diff-preview";
 import { TaskWorkspaceAiSection } from "@/components/tasks/task-workspace-ai-section";
+import { TaskAiPlanPanel } from "@/components/task/panels/task-ai-plan-panel";
+import { TaskWorkspacePlanSection } from "@/components/tasks/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "@/components/tasks/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "@/components/tasks/task-workspace-header-card";
-import { TaskWorkspacePlanSection } from "@/components/tasks/task-workspace-plan-section";
 import type { TaskPageData } from "@/components/tasks/task-workspace-types";
 import { useTaskWorkspaceDeleteFlow } from "@/components/tasks/use-task-workspace-delete-flow";
 import { useTaskWorkspaceEditorState } from "@/components/tasks/use-task-workspace-editor-state";

@@ -3,16 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScheduledItem, ScheduleAiPlanGenerationStatus } from "@/components/schedule/schedule-page-types";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
 
 /** Subset of TaskPlanReadModel used as the accepted-plan shape in UI state. */
 export type SavedTaskPlan = TaskPlanReadModel;
-
-type TaskPlanStateResponse = {
-  taskId: string;
-  aiPlanGenerationStatus: ScheduleAiPlanGenerationStatus;
-  savedPlan: SavedTaskPlan | null;
-};
 
 function savedPlanKey(saved: SavedTaskPlan | null) {
   return saved ? `${saved.id}:${saved.status}:${saved.revision}:${saved.updatedAt}` : null;
@@ -26,6 +21,36 @@ function acceptedResponseFromSavedPlan(saved: SavedTaskPlan | null): TaskPlanRea
   return saved;
 }
 
+function deriveGenerationStatus(
+  savedPlan: SavedTaskPlan | null,
+  sessionStatus: "idle" | "running" | "completed" | "failed" | "cancelled",
+): ScheduleAiPlanGenerationStatus {
+  if (sessionStatus === "running") {
+    return "generating";
+  }
+
+  if (savedPlan?.status === "accepted") {
+    return "accepted";
+  }
+
+  return savedPlan ? "waiting_acceptance" : "idle";
+}
+
+async function fetchPersistedPlanState(taskId: string) {
+  const response = await api.tasks[":taskId"].plan.$get({
+    param: { taskId },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load task plan state");
+  }
+
+  return await response.json() as {
+    savedPlan?: SavedTaskPlan | null;
+    aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
+  };
+}
+
 export function useSelectedBlockPlanState({
   item,
   onMutatedAction,
@@ -33,16 +58,12 @@ export function useSelectedBlockPlanState({
   item: ScheduledItem;
   onMutatedAction: () => Promise<void>;
 }) {
+  const generationSession = useTaskPlanGenerationSession(item.taskId);
   const [displayedSavedPlan, setDisplayedSavedPlan] = useState<SavedTaskPlan | null>(item.savedPlan ?? null);
   const [generationStatus, setGenerationStatus] = useState(item.aiPlanGenerationStatus ?? "idle");
   const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanReadModel | null>(() => acceptedResponseFromSavedPlan(item.savedPlan ?? null));
   const [isApplying, setIsApplying] = useState(false);
-  const [pollCycle, setPollCycle] = useState(0);
   const lastDisplayedSavedPlanKeyRef = useRef<string | null>(savedPlanKey(item.savedPlan ?? null));
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshInFlightRef = useRef(false);
-  const newTaskProbeCountRef = useRef(0);
-  const transientIdleWhileGeneratingCountRef = useRef(0);
   const generationStatusRef = useRef<ScheduleAiPlanGenerationStatus>(item.aiPlanGenerationStatus ?? "idle");
 
   const applyPlanStateSnapshot = useCallback((snapshot: {
@@ -53,22 +74,7 @@ export function useSelectedBlockPlanState({
     const nextKey = savedPlanKey(next);
     const nextStatus = snapshot.aiPlanGenerationStatus;
     const currentPlanKey = lastDisplayedSavedPlanKeyRef.current;
-    const currentGenerationStatus = generationStatusRef.current;
-    const shouldTreatAsTransientIdle = !currentPlanKey
-      && !next
-      && nextStatus === "idle"
-      && currentGenerationStatus === "generating";
-
-    if (nextStatus !== currentGenerationStatus) {
-      generationStatusRef.current = nextStatus;
-    }
-
-    if (shouldTreatAsTransientIdle && transientIdleWhileGeneratingCountRef.current < 4) {
-      transientIdleWhileGeneratingCountRef.current += 1;
-      return;
-    }
-
-    transientIdleWhileGeneratingCountRef.current = 0;
+    generationStatusRef.current = nextStatus;
     setGenerationStatus((current) => (current === nextStatus ? current : nextStatus));
 
     if (currentPlanKey === nextKey) {
@@ -93,21 +99,7 @@ export function useSelectedBlockPlanState({
         return accepted;
       });
     }
-  }, []);
-
-  const fetchPlanState = useCallback(async () => {
-    const response = await api.tasks[":taskId"].plan.$get({
-      param: { taskId: item.taskId },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch task plan state (${response.status})`);
-    }
-
-    const snapshot = await response.json() as TaskPlanStateResponse;
-    applyPlanStateSnapshot(snapshot);
-    return snapshot;
-  }, [applyPlanStateSnapshot, item.taskId]);
+  }, [generationSession.sessionStatus]);
 
   useEffect(() => {
     generationStatusRef.current = item.aiPlanGenerationStatus ?? "idle";
@@ -118,58 +110,53 @@ export function useSelectedBlockPlanState({
   }, [applyPlanStateSnapshot, item.aiPlanGenerationStatus, item.savedPlan]);
 
   useEffect(() => {
-    newTaskProbeCountRef.current = 0;
-    setPollCycle(0);
-  }, [item.taskId]);
+    lastDisplayedSavedPlanKeyRef.current = savedPlanKey(item.savedPlan ?? null);
+  }, [item.taskId, item.savedPlan]);
 
   useEffect(() => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
+    const nextSavedPlan = generationSession.result ?? displayedSavedPlan;
+    const nextStatus = deriveGenerationStatus(nextSavedPlan, generationSession.sessionStatus);
+
+    applyPlanStateSnapshot({
+      savedPlan: nextSavedPlan,
+      aiPlanGenerationStatus: nextStatus,
+    });
+  }, [applyPlanStateSnapshot, displayedSavedPlan, generationSession.result, generationSession.sessionStatus]);
+
+  useEffect(() => {
+    if (generationSession.sessionStatus === "running") {
+      return;
     }
 
-    const status = generationStatusRef.current;
-    const hasPlan = Boolean(displayedSavedPlan);
-    const shouldPollRunning = status === "generating";
-    const shouldProbeJustCreatedTask = status === "idle" && !hasPlan && newTaskProbeCountRef.current < 3;
+    let cancelled = false;
 
-    if (!shouldPollRunning && !shouldProbeJustCreatedTask) {
-      return undefined;
-    }
+    void fetchPersistedPlanState(item.taskId)
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
 
-    const delayMs = shouldPollRunning ? 1800 : newTaskProbeCountRef.current === 0 ? 450 : 1400;
-    refreshTimerRef.current = setTimeout(() => {
-      if (refreshInFlightRef.current) {
-        return;
-      }
-
-      if (shouldProbeJustCreatedTask) {
-        newTaskProbeCountRef.current += 1;
-      }
-
-      refreshInFlightRef.current = true;
-      void fetchPlanState().catch((error) => {
-        console.error("[TaskPlan] Poll failed:", error);
-      }).finally(() => {
-        refreshInFlightRef.current = false;
-        setPollCycle((current) => current + 1);
+        const persistedPlan = payload.savedPlan ?? null;
+        applyPlanStateSnapshot({
+          savedPlan: persistedPlan,
+          aiPlanGenerationStatus: deriveGenerationStatus(persistedPlan, generationSession.sessionStatus),
+        });
+      })
+      .catch(() => {
+        // Keep current optimistic session-backed state when refresh fails.
       });
-    }, delayMs);
 
     return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
+      cancelled = true;
     };
-  }, [displayedSavedPlan, fetchPlanState, generationStatus, pollCycle]);
+  }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.taskId]);
 
   const handlePlanLoaded = useCallback((saved: SavedTaskPlan | null) => {
     const nextKey = savedPlanKey(saved);
     if (lastDisplayedSavedPlanKeyRef.current !== nextKey) {
       lastDisplayedSavedPlanKeyRef.current = nextKey;
       setDisplayedSavedPlan(saved);
-      const nextStatus = saved?.status === "accepted" ? "accepted" : saved ? "waiting_acceptance" : "idle";
+      const nextStatus = deriveGenerationStatus(saved, generationSession.sessionStatus);
       generationStatusRef.current = nextStatus;
       setGenerationStatus(nextStatus);
     }
@@ -191,7 +178,7 @@ export function useSelectedBlockPlanState({
 
       return accepted;
     });
-  }, []);
+  }, [generationSession.sessionStatus]);
 
   const handleApplyPlan = useCallback(async (result: TaskPlanReadModel) => {
     if (!result.id) return;

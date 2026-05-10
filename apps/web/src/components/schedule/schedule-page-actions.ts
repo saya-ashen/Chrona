@@ -345,19 +345,18 @@ export async function handleCreateTaskBlockAction({
     setIsPending(true);
     setErrorMessage(null);
 
-    const created = await createTaskFromSchedule({
+    const created = (await createTaskFromSchedule({
       workspaceId,
       title: input.title,
       description: input.description || null,
       priority: input.priority,
       executionRuntime: input.executionRuntime as "openclaw" | "research",
       executionConfig: input.executionConfig,
-    }) as { taskId: string };
+    })) as { taskId: string };
 
     const createdItem = createScheduledItemFromCreateInput(
       created.taskId,
       workspaceId,
-      data.defaultExecutionRuntime,
       input,
     );
 

@@ -36,6 +36,9 @@ export async function* aiGeneratePlanStream(
 
   for await (const event of generatePlanStream(client, request)) {
     yield event;
+    if (request.signal?.aborted) {
+      return;
+    }
     if (event.type === "error" || event.type === "done") return;
   }
 }

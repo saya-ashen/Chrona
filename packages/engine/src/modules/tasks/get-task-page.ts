@@ -1,25 +1,27 @@
 import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
-import { deriveTaskRunnability } from "@chrona/shared";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
-import { getRuntimeTaskConfigSpec, listExecutionRuntimes } from "@/modules/task-execution/registry";
+import {
+  getRuntimeTaskConfigSpec,
+  listExecutionRuntimes,
+} from "@/modules/task-execution/registry";
 
-type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
+type TaskPlanGenerationStatus =
+  | "idle"
+  | "generating"
+  | "waiting_acceptance"
+  | "accepted";
 
-function readBlockReason(
-  task: {
-    blockReason: unknown;
-    projection:
-      | {
-          blockType: string | null;
-          actionRequired: string | null;
-          blockScope: string | null;
-          blockSince: Date | null;
-        }
-      | null;
-  },
-) {
+function readBlockReason(task: {
+  blockReason: unknown;
+  projection: {
+    blockType: string | null;
+    actionRequired: string | null;
+    blockScope: string | null;
+    blockSince: Date | null;
+  } | null;
+}) {
   return (
     (task.blockReason as {
       blockType?: string;
@@ -42,13 +44,14 @@ export async function getTaskPage(taskId: string) {
   await syncTaskRunForRead(taskId);
 
   const savedPlan = await getLatestTaskPlanReadModel(taskId);
-  const aiPlanGenerationStatus: TaskPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
-    ? "generating"
-    : savedPlan !== null && savedPlan.status === "accepted"
-      ? "accepted"
-      : savedPlan !== null
-        ? "waiting_acceptance"
-        : "idle";
+  const aiPlanGenerationStatus: TaskPlanGenerationStatus =
+    isTaskPlanGenerationRunning(taskId)
+      ? "generating"
+      : savedPlan !== null && savedPlan.status === "accepted"
+        ? "accepted"
+        : savedPlan !== null
+          ? "waiting_acceptance"
+          : "idle";
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -76,11 +79,6 @@ export async function getTaskPage(taskId: string) {
   });
 
   const latestRun = task.runs[0] ?? null;
-  const runnability = deriveTaskRunnability({
-    executionRuntime: task.executionRuntime,
-    workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    executionConfig: task.executionConfig,
-  });
 
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
@@ -99,13 +97,11 @@ export async function getTaskPage(taskId: string) {
       status: task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
-      scheduledStartAt: task.projection?.scheduledStartAt?.toISOString() ?? null,
+      scheduledStartAt:
+        task.projection?.scheduledStartAt?.toISOString() ?? null,
       scheduledEndAt: task.projection?.scheduledEndAt?.toISOString() ?? null,
       scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
       scheduleSource: task.projection?.scheduleSource ?? null,
-      isRunnable: runnability.isRunnable,
-      runnabilitySummary: runnability.summary,
-      runnabilityState: runnability.state,
       savedPlan,
       aiPlanGenerationStatus,
       blockReason: readBlockReason(task),
