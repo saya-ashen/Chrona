@@ -257,26 +257,4 @@ describe("plan mutation routes", () => {
     expect(res.status).toBe(404);
   });
 
-  it("materializes child tasks through the real route and writes linkedTaskId back into plan graph", async () => {
-    const { taskId } = await seedPlan();
-
-    const res = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as {
-      parentTaskId: string;
-      childTasks: Array<{ id: string; parentTaskId: string }>;
-    };
-    expect(body.parentTaskId).toBe(taskId);
-    expect(body.childTasks.length).toBeGreaterThan(0);
-    expect(body.childTasks.every((task) => task.parentTaskId === taskId)).toBe(true);
-
-    const savedPlan = await getLatestTaskPlanReadModel(taskId);
-    const linkedNodes = savedPlan?.effectivePlan.nodes.filter((node) => !!node.linkedTaskId) ?? [];
-    expect(linkedNodes.length).toBeGreaterThan(0);
-  });
 });

@@ -2,12 +2,8 @@ import type { EffectivePlanNode, EffectivePlanGraph } from "@chrona/contracts/ai
 
 export type NodeSessionDecision =
   | { kind: "main_session"; reason: string }
-  | {
-      kind: "child_session";
-      reason: string;
-      childTaskMode?: "materialize_task" | "session_only";
-    }
   | { kind: "wait_for_user"; reason: string }
+  | { kind: "wait_for_approval"; reason: string }
   | { kind: "manual_only"; reason: string };
 
 type SessionPolicyInput = {
@@ -15,27 +11,6 @@ type SessionPolicyInput = {
   plan: EffectivePlanGraph;
   parentTaskId: string;
 };
-
-const LONG_ESTIMATED_MINUTES = 20;
-const CHILD_SESSION_NODE_TYPES = new Set<string>(["task"]);
-
-function looksLikeMultiStep(node: EffectivePlanNode): boolean {
-  const config = node.config as Record<string, unknown>;
-  const objective = typeof config.objective === "string" ? config.objective : "";
-  const text = `${node.title} ${objective}`.toLowerCase();
-  const multiStepTerms = [
-    "implement", "refactor", "build", "create",
-    "develop", "migrate", "deploy", "integrate",
-    "rewrite", "restructure", "investigate", "audit", "review",
-  ];
-  return multiStepTerms.some((term) => text.includes(term));
-}
-
-function readSessionStrategy(node: EffectivePlanNode): string | undefined {
-  const config = node.config as Record<string, unknown>;
-  const strategy = config.sessionStrategy;
-  return typeof strategy === "string" ? strategy : undefined;
-}
 
 function isUserTask(node: EffectivePlanNode): boolean {
   return node.executor === "user";
@@ -61,7 +36,7 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
 
   if (needsApproval(node)) {
     return {
-      kind: "manual_only",
+      kind: "wait_for_approval",
       reason: `Node ${node.id} requires human approval`,
     };
   }
@@ -80,60 +55,8 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
     };
   }
 
-  const strategy = readSessionStrategy(node);
-  if (strategy === "per_subtask") {
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} session strategy is per_subtask`,
-      childTaskMode: "materialize_task",
-    };
-  }
-
-  if (typeof node.linkedTaskId === "string" && node.linkedTaskId.length > 0) {
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} already linked to child task`,
-      childTaskMode: "session_only",
-    };
-  }
-
-  if (
-    node.estimatedMinutes !== undefined &&
-    node.estimatedMinutes !== null &&
-    node.estimatedMinutes >= LONG_ESTIMATED_MINUTES
-  ) {
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} estimated at ${node.estimatedMinutes}min, qualifies for child session`,
-      childTaskMode: "materialize_task",
-    };
-  }
-
-  if (looksLikeMultiStep(node)) {
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} appears to be multi-step, using child session`,
-      childTaskMode: "materialize_task",
-    };
-  }
-
-  if (CHILD_SESSION_NODE_TYPES.has(node.type)) {
-    const isShort = (node.estimatedMinutes ?? 0) < LONG_ESTIMATED_MINUTES;
-    if (isShort) {
-      return {
-        kind: "main_session",
-        reason: `Node ${node.id} type ${node.type} is short and simple, running in main session`,
-      };
-    }
-    return {
-      kind: "child_session",
-      reason: `Node ${node.id} type ${node.type} qualifies for child session`,
-      childTaskMode: node.type === "task" ? "materialize_task" : "session_only",
-    };
-  }
-
   return {
     kind: "main_session",
-    reason: `Node ${node.id} is a short automatic step, using main session`,
+    reason: `Node ${node.id} is an automatic step, using main session`,
   };
 }

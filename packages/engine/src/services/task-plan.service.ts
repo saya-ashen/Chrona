@@ -1,6 +1,5 @@
 import { applyPlanPatchCommand } from "../modules/plans/apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "../modules/plans/generate-task-plan-manual-stream";
-import { materializeTaskPlan } from "../modules/plans/materialize-task-plan";
 import {
   getTaskPlanGenerationSession,
   getTaskPlanGenerationSessionById,
@@ -124,17 +123,6 @@ export function createTaskPlanService() {
         return await applyPlanPatchCommand(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to apply plan patch");
-      }
-    },
-    async materialize(input: { taskId: string; workspaceId?: string }) {
-      try {
-        if (input.workspaceId) {
-          await ensureTaskInWorkspace(input.taskId, input.workspaceId);
-        }
-
-        return await materializeTaskPlan({ taskId: input.taskId });
-      } catch (cause) {
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.PLAN_NOT_FOUND, "Failed to materialize task plan");
       }
     },
   };

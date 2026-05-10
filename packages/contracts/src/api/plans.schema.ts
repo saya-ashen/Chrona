@@ -34,25 +34,6 @@ export const planGenerateActiveParamSchema = z.object({
   taskId: taskIdParam,
 });
 
-// ── POST /tasks/:taskId/plan/materialize ──
-export const planMaterializeParamSchema = z.object({
-  taskId: taskIdParam,
-});
-export const planNodeSchema = z.object({
-  id: z.string().optional(),
-  type: z.enum(["task", "checkpoint", "condition", "wait"]).optional(),
-  title: z.string().optional(),
-}).passthrough();
-export const planEdgeSchema = z.object({
-  fromNodeId: z.string().optional(),
-  toNodeId: z.string().optional(),
-}).passthrough();
-export const planMaterializeBodySchema = z.object({
-  workspaceId: z.string().optional(),
-  nodes: z.array(planNodeSchema).optional(),
-  edges: z.array(planEdgeSchema).optional(),
-});
-
 // ── POST /tasks/:taskId/plan (patch command) ──
 export const planPatchParamSchema = z.object({
   taskId: taskIdParam,

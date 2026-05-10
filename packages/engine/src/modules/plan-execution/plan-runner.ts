@@ -130,7 +130,8 @@ function mapTerminalReasonToStatus(
   ) {
     return "blocked";
   }
-  if (effective.completedNodeIds.length === effective.nodes.length)
+  const reachableNodeIds = effective.nodes.filter((node) => node.reachable).map((node) => node.id);
+  if (reachableNodeIds.every((nodeId) => effective.completedNodeIds.includes(nodeId)))
     return "completed";
   return "blocked";
 }
@@ -591,21 +592,6 @@ async function appendGraphRuntimeEvents(input: {
           payload: { nodeId: event.node.id, prompt: event.result.prompt },
         });
         break;
-      case "child_run_started":
-        if (event.result.status !== "child_running") break;
-        await appendMainSessionEvent({
-          taskId: input.taskId,
-          planId: input.planId,
-          sessionId: input.sessionId,
-          eventType: "child_run_started",
-          payload: {
-            nodeId: event.node.id,
-            childSessionId: event.result.evidence.childSessionId,
-            childRunId: event.result.evidence.runId,
-            childTaskId: event.result.evidence.childTaskId,
-          },
-        });
-        break;
       case "node_blocked":
         if (event.result.status !== "blocked") break;
         await appendMainSessionEvent({
@@ -940,6 +926,8 @@ async function continuePlanExecution(input: {
   taskId: string;
   reason: string;
   userInput?: string;
+  sessionId?: string;
+  nodeId?: string;
 }): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -961,6 +949,7 @@ async function continuePlanExecution(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     trigger: "manual",
+    sessionId: input.sessionId,
   });
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
@@ -983,6 +972,9 @@ async function continuePlanExecution(input: {
     results: runtime.persisted.results,
   });
   const waitingNode =
+    (input.nodeId
+      ? effective.nodes.find((node) => node.id === input.nodeId)
+      : null) ??
     effective.nodes.find(
       (node) => node.id === executionSession.currentNodeId,
     ) ??
@@ -1002,6 +994,92 @@ async function continuePlanExecution(input: {
     userInput: input.userInput,
     forcedNodeId: waitingNode?.id,
     forcedReplaceStatus: "obsolete",
+  });
+}
+
+async function resumePlanExecutionWithApproval(input: {
+  taskId: string;
+  sessionId?: string;
+  nodeId?: string;
+  approved: boolean;
+  feedback?: string;
+}): Promise<PlanExecutionResult> {
+  const runtime = await ensureNativePlanRun(input.taskId);
+  if (!runtime) {
+    return {
+      taskId: input.taskId,
+      planId: null,
+      mainSessionId: input.sessionId ?? null,
+      status: "no_plan",
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "No accepted plan. Create or accept a plan before execution.",
+    };
+  }
+
+  const executionSession = await ensureExecutionSession({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    trigger: "manual",
+    sessionId: input.sessionId,
+  });
+  const mainSession = await ensurePlanMainSession({
+    taskId: input.taskId,
+    planId: runtime.planId,
+  });
+
+  const effective = resolveEffectivePlanGraph({
+    graph: runtime.persisted.graph!,
+    attempts: runtime.persisted.attempts,
+    results: runtime.persisted.results,
+  });
+  const waitingNode =
+    (input.nodeId
+      ? effective.nodes.find((node) => node.id === input.nodeId)
+      : null) ??
+    effective.nodes.find((node) => node.id === executionSession.currentNodeId) ??
+    effective.nodes.find((node) => node.status === "waiting_for_approval") ??
+    null;
+
+  if (!waitingNode) {
+    return buildExecutionResponse({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      mainSessionId: mainSession.id,
+      status: mapTerminalReasonToStatus(effective),
+      effective,
+      currentNodeId: null,
+      executedNodeIds: [],
+      message: "No approval-waiting node found.",
+    });
+  }
+
+  await appendMainSessionEvent({
+    taskId: input.taskId,
+    planId: runtime.planId,
+    sessionId: mainSession.id,
+    eventType: "user_input_received",
+    payload: {
+      reason: input.approved ? "approval:approve" : "approval:reject",
+      feedback: input.feedback,
+      nodeId: waitingNode.id,
+    },
+  });
+
+  return advancePlanExecution({
+    taskId: input.taskId,
+    trigger: "manual",
+    mainSession,
+    executionSession,
+    command: {
+      type: "resume_with_approval",
+      nodeId: waitingNode.id,
+      approved: input.approved,
+      feedback: input.feedback,
+    },
   });
 }
 
@@ -1026,18 +1104,24 @@ export async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         reason: "user_input",
         userInput: input.action.inputText,
+        sessionId: input.action.sessionId,
+        nodeId: input.action.nodeId,
       });
     case "resume_with_approval":
-      return continuePlanExecution({
+      return resumePlanExecutionWithApproval({
         taskId: input.taskId,
-        reason: `approval:${input.action.decision}`,
-        userInput: input.action.feedback ?? input.action.editedContent,
+        sessionId: input.action.sessionId,
+        nodeId: input.action.nodeId,
+        approved: input.action.decision === "approve",
+        feedback: input.action.feedback ?? input.action.editedContent,
       });
     case "resume_after_unblock":
       return continuePlanExecution({
         taskId: input.taskId,
         reason: "resume_after_unblock",
         userInput: input.action.note,
+        sessionId: input.action.sessionId,
+        nodeId: input.action.nodeId,
       });
     case "retry_node": {
       const runtime = await ensureNativePlanRun(input.taskId);

@@ -1,14 +1,10 @@
 import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
 import type { NodeSessionDecision } from "./session-policy";
-import { ensureNodeChildSession, startNodeChildRun } from "./node-child-session";
 import { startRuntimeRun } from "@/modules/task-execution/start-runtime-run";
-import { db } from "@/lib/db";
 
 type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
-  childTaskId?: string;
-  childSessionId?: string;
   artifactIds?: string[];
   conversationEntryIds?: string[];
   eventIds?: string[];
@@ -30,7 +26,6 @@ export type NodeExecutionResult =
   | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "blocked"; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "replan_required"; reason: string; evidence?: NodeExecutionEvidence; proposedPatch?: PlanPatch }
-  | { status: "child_running"; summary: string; evidence: NodeExecutionEvidence; output?: unknown }
   | { status: "failed"; error: string; evidence?: NodeExecutionEvidence };
 
 type NodeExecutorInput = {
@@ -106,86 +101,20 @@ export async function executePlanNode(
         evidence: { sessionId: input.mainSession.id },
       };
 
+    case "wait_for_approval":
+      return {
+        status: "waiting_for_approval",
+        prompt: `Please approve: ${node.title}`,
+        reason: sessionDecision.reason,
+        evidence: { sessionId: input.mainSession.id },
+      };
+
     case "manual_only":
       return {
         status: "blocked",
         reason: sessionDecision.reason,
         evidence: { sessionId: input.mainSession.id },
       };
-
-    case "child_session": {
-      const instructions = buildInstructions(input);
-
-      let childSessionId: string | undefined;
-      let childRunId: string | undefined;
-      let childTaskId: string | undefined;
-
-      try {
-        const childSession = await ensureNodeChildSession({
-          taskId: input.taskId,
-          planId: input.planId,
-          nodeId: node.id,
-          nodeTitle: node.title,
-          runtimeName,
-        });
-
-        childSessionId = childSession.sessionId;
-        childTaskId = childSession.childTaskId;
-
-        if (!childSession.runId) {
-          const childRun = await startNodeChildRun({
-            taskId: input.taskId,
-            childSessionId: childSession.sessionId,
-            childSessionKey: childSession.sessionKey,
-            prompt: instructions,
-            runtimeName,
-          });
-          childRunId = childRun.runId;
-        } else {
-          childRunId = childSession.runId;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to start child run";
-        return {
-          status: "failed",
-          error: `Failed to start child execution for node ${node.id}: ${message}`,
-          evidence: { sessionId: input.mainSession.id },
-        };
-      }
-
-      // Check if the child run completed synchronously
-      if (childRunId) {
-        const hasAssistant = await db.conversationEntry.findFirst({
-          where: { runId: childRunId, role: "assistant" },
-          select: { id: true },
-        });
-        if (hasAssistant) {
-          return {
-            status: "done",
-            summary: `Node ${node.id}: ${node.title} completed via child session`,
-            evidence: {
-              sessionId: input.mainSession.id,
-              childSessionId,
-              runId: childRunId,
-              childTaskId,
-            },
-            output: { instructions },
-          };
-        }
-      }
-
-      return {
-        status: "child_running",
-        summary: `Child execution started for node ${node.id}: ${node.title} (async)`,
-        evidence: {
-          sessionId: input.mainSession.id,
-          childSessionId,
-          runId: childRunId,
-          childTaskId,
-        },
-        output: { instructions, pendingChildExecution: true },
-      };
-    }
 
     case "main_session": {
       const instructions = buildInstructions(input);

@@ -37,6 +37,7 @@ export function resolveEffectivePlanGraph(
     }
   }
 
+  applyConditionBranchSelections(nodeMap, edgeMap);
   const entryNodeIds = computeGraphEntryNodeIds(nodeMap, edgeMap);
   const reachableNodeIds = computeReachableNodeIds(entryNodeIds, edgeMap);
   rebuildDependencies(nodeMap, edgeMap, reachableNodeIds);
@@ -290,7 +291,7 @@ function computeGraphEntryNodeIds(
   const entryNodeIds: string[] = [];
   for (const nodeId of nodeMap.keys()) {
     const hasIncomingEdges = [...edgeMap.values()].some(
-      (edge) => edge.active && edge.to === nodeId,
+      (edge) => edge.to === nodeId,
     );
     if (!hasIncomingEdges) {
       entryNodeIds.push(nodeId);

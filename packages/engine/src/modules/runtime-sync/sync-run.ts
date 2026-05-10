@@ -6,11 +6,6 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
 import {
-  progressAcceptedTaskPlan,
-  syncParentTaskStateFromAcceptedPlan,
-} from "@/modules/plans/progress-accepted-task-plan";
-import { syncAcceptedTaskPlanForTask } from "@/modules/plan-execution/sync-accepted-plan";
-import {
   decodeSyncCursor,
   encodeSyncCursor,
   mapApprovalDelta,
@@ -283,23 +278,6 @@ export async function syncRunFromRuntime(input: {
     runStatus: nextRunStatus,
     runtimeRunRef: snapshot.runtimeRunRef ?? run.runtimeRunRef,
   });
-
-  if (run.task.parentTaskId) {
-    await syncAcceptedTaskPlanForTask({
-      taskId: run.task.parentTaskId,
-    });
-    if (snapshot.status === "Completed") {
-      await progressAcceptedTaskPlan({ parentTaskId: run.task.parentTaskId });
-    } else if (snapshot.status === "WaitingForApproval") {
-      await db.task.update({
-        where: { id: run.task.parentTaskId },
-        data: { status: "WaitingForApproval", completedAt: null },
-      });
-      await rebuildTaskProjection(run.task.parentTaskId);
-    } else {
-      await syncParentTaskStateFromAcceptedPlan(run.task.parentTaskId);
-    }
-  }
 
   const nextCursor = encodeSyncCursor({
     sessionKey: runtimeSessionKey,

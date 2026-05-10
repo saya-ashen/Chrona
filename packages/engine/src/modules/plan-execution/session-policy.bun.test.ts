@@ -74,13 +74,13 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("manual_only");
   });
 
-  it("type checkpoint with approve config -> manual_only", () => {
+  it("type checkpoint with approve config -> wait_for_approval", () => {
     const d = decide({
       id: "a",
       type: "checkpoint",
       config: { checkpointType: "approve", prompt: "", required: true },
     });
-    expect(d.kind).toBe("manual_only");
+    expect(d.kind).toBe("wait_for_approval");
   });
 
   it("executor user -> manual_only", () => {
@@ -88,14 +88,14 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("manual_only");
   });
 
-  it("estimatedMinutes >= 20 -> child_session", () => {
+  it("estimatedMinutes >= 20 -> main_session", () => {
     const d = decide({ id: "a", estimatedMinutes: 20 });
-    expect(d.kind).toBe("child_session");
+    expect(d.kind).toBe("main_session");
   });
 
-  it("metadata sessionStrategy per_subtask -> child_session", () => {
+  it("metadata sessionStrategy per_subtask -> main_session", () => {
     const d = decide({ id: "a", metadata: { sessionStrategy: "per_subtask" }, config: { sessionStrategy: "per_subtask" } as unknown as EffectivePlanNode["config"] });
-    expect(d.kind).toBe("child_session");
+    expect(d.kind).toBe("main_session");
   });
 
   it("type task -> main_session when short (estimatedMinutes=0)", () => {
@@ -103,14 +103,14 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("main_session");
   });
 
-  it("type task -> child_session when long enough", () => {
+  it("type task -> main_session when long enough", () => {
     const d = decide({ id: "a", type: "task", estimatedMinutes: 20 });
-    expect(d.kind).toBe("child_session");
+    expect(d.kind).toBe("main_session");
   });
 
-  it("node with linkedTaskId -> child_session", () => {
+  it("node with linkedTaskId -> main_session", () => {
     const d = decide({ id: "a", linkedTaskId: "child-1" });
-    expect(d.kind).toBe("child_session");
+    expect(d.kind).toBe("main_session");
   });
 
   it("already done node -> main_session", () => {
@@ -123,8 +123,8 @@ describe("decideNodeExecutionSession", () => {
     expect(d.kind).toBe("main_session");
   });
 
-  it("multi-step looking node -> child_session", () => {
+  it("multi-step looking node -> main_session", () => {
     const d = decide({ id: "a", title: "Implement the new authentication system" });
-    expect(d.kind).toBe("child_session");
+    expect(d.kind).toBe("main_session");
   });
 });
