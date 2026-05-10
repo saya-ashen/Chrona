@@ -2,7 +2,6 @@ import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { deriveTaskRunnability } from "@chrona/shared";
 
 export async function reopenTask(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -13,12 +12,8 @@ export async function reopenTask(input: { taskId: string }) {
       },
     },
   });
-  const runnability = deriveTaskRunnability({
-    executionRuntime: task.executionRuntime,
-    workspaceDefaultRuntime: task.workspace.defaultRuntime,
-    executionConfig: task.executionConfig,
-  });
-  const nextStatus = runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
+  // FIXME:
+  const nextStatus = TaskStatus.Ready;
 
   await db.task.update({
     where: { id: task.id },

@@ -18,6 +18,7 @@ type TaskPlanResultPanelProps = {
   onRegenerate: () => void;
   onApply?: (result: TaskPlanReadModel) => Promise<void> | void;
   showGraph?: boolean;
+  showRegenerateButton?: boolean;
 };
 
 export function TaskPlanResultPanel({
@@ -28,22 +29,27 @@ export function TaskPlanResultPanel({
   onRegenerate,
   onApply,
   showGraph = true,
+  showRegenerateButton = true,
 }: TaskPlanResultPanelProps) {
+  const graphRenderKey = `${activeReadModel.id}:${activeReadModel.revision}:${activeReadModel.status}:${activeReadModel.updatedAt}`;
+
   return (
     <div className="space-y-3 rounded-xl border border-transparent bg-transparent p-0">
-      <div className="flex items-center justify-end gap-3">
-        <button
-          type="button"
-          onClick={onRegenerate}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10",
-          )}
-        >
-          <RotateCcw className="size-3.5" />
-          Regenerate plan
-        </button>
-      </div>
+      {showRegenerateButton ? (
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10",
+            )}
+          >
+            <RotateCcw className="size-3.5" />
+            Regenerate plan
+          </button>
+        </div>
+      ) : null}
 
       {graphSummary.warnings.length > 0 ? (
         <div className="space-y-1">
@@ -60,11 +66,21 @@ export function TaskPlanResultPanel({
       ) : null}
 
       {isAppliedPlan ? (
-        showGraph ? null : null
+        showGraph ? (
+          <div
+            key={graphRenderKey}
+            className="overflow-hidden rounded-lg border border-border/40 bg-background/60 p-3"
+          >
+            <TaskPlanGraph plan={planGraph} />
+          </div>
+        ) : null
       ) : (
         <>
           {showGraph ? (
-            <div className="overflow-hidden rounded-lg border border-border/40 bg-background/60 p-3">
+            <div
+              key={graphRenderKey}
+              className="overflow-hidden rounded-lg border border-border/40 bg-background/60 p-3"
+            >
               <TaskPlanGraph plan={planGraph} />
             </div>
           ) : null}

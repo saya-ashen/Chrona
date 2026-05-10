@@ -1,23 +1,15 @@
 "use client";
 
-import {
-  Calendar,
-  ChevronDown,
-  GripVertical,
-  Trash2,
-} from "lucide-react";
+import { Calendar, ChevronDown, GripVertical, Trash2 } from "lucide-react";
 import { type DragEvent, useState } from "react";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type {
-  UnscheduledItem,
-} from "@/components/schedule/schedule-page-types";
+import type { UnscheduledItem } from "@/components/schedule/schedule-page-types";
 import {
   formatDateTime,
   getPriorityAccent,
   getPriorityTone,
   toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
-import { TimeslotSuggestionPanel } from "@/components/schedule/timeslot-suggestion-panel";
 import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
 import {
   TaskConfigForm,
@@ -139,11 +131,19 @@ export function QueueCard({
       >
         <div className={`w-1 shrink-0 self-stretch rounded-full ${accent}`} />
 
-        <GripVertical className="size-3.5 text-muted-foreground/30 shrink-0" aria-hidden="true" />
+        <GripVertical
+          className="size-3.5 text-muted-foreground/30 shrink-0"
+          aria-hidden="true"
+        />
 
         <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-foreground">{item.title}</span>
-          <StatusBadge tone={getPriorityTone(item.priority)} className="text-[10px] px-1.5 py-0.5">
+          <span className="truncate text-[13px] font-medium text-foreground">
+            {item.title}
+          </span>
+          <StatusBadge
+            tone={getPriorityTone(item.priority)}
+            className="text-[10px] px-1.5 py-0.5"
+          >
             {item.priority}
           </StatusBadge>
           {item.dueAt ? (
@@ -157,10 +157,15 @@ export function QueueCard({
           {suggestedDurationMinutes ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setShowTimeslots((v) => !v); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTimeslots((v) => !v);
+              }}
               className={cn(
                 "rounded-md p-1 transition-colors",
-                showTimeslots ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
+                showTimeslots
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground/50 hover:text-foreground",
               )}
               title="Suggest time slot"
             >
@@ -170,10 +175,15 @@ export function QueueCard({
           {onDeleteTask ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm((v) => !v); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteConfirm((v) => !v);
+              }}
               className={cn(
                 "rounded-md p-1 transition-colors",
-                showDeleteConfirm ? "text-red-500 bg-red-50" : "text-muted-foreground/50 hover:text-red-500",
+                showDeleteConfirm
+                  ? "text-red-500 bg-red-50"
+                  : "text-muted-foreground/50 hover:text-red-500",
               )}
               title="Delete task"
             >
@@ -186,7 +196,12 @@ export function QueueCard({
             className="rounded-md p-1 text-muted-foreground/50 hover:text-foreground transition-colors"
             title={isExpanded ? "Collapse" : "Expand"}
           >
-            <ChevronDown className={cn("size-4 transition-transform", isExpanded && "rotate-180")} />
+            <ChevronDown
+              className={cn(
+                "size-4 transition-transform",
+                isExpanded && "rotate-180",
+              )}
+            />
           </button>
         </div>
       </div>
@@ -194,10 +209,15 @@ export function QueueCard({
       {showDeleteConfirm ? (
         <div className="border-t border-red-100 bg-red-50/50 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="flex-1 text-[11px] text-red-600">Delete "{item.title}"?</span>
+            <span className="flex-1 text-[11px] text-red-600">
+              Delete "{item.title}"?
+            </span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDeleteTask?.(item.taskId); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTask?.(item.taskId);
+              }}
               className="rounded-md bg-red-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-600 transition-colors"
             >
               Delete
@@ -219,18 +239,6 @@ export function QueueCard({
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               {item.actionRequired}
             </div>
-          ) : null}
-
-          {showTimeslots && suggestedDurationMinutes ? (
-            <TimeslotSuggestionPanel
-              taskId={item.taskId}
-              title={item.title}
-              priority={item.priority}
-              estimatedMinutes={suggestedDurationMinutes}
-              dueAt={item.dueAt}
-              currentSchedule={currentSchedule ?? []}
-              onSchedule={(startAt, endAt) => onScheduleSlot?.(item.taskId, startAt, endAt)}
-            />
           ) : null}
 
           <div className="space-y-1.5">
@@ -266,7 +274,7 @@ export function QueueCard({
               />
             </div>
           </details>
-         </div>
+        </div>
       ) : null}
     </div>
   );

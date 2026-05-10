@@ -2,8 +2,12 @@ import { applyPlanPatchCommand } from "../modules/plans/apply-plan-patch-command
 import { generateTaskPlanManualStream } from "../modules/plans/generate-task-plan-manual-stream";
 import { materializeTaskPlan } from "../modules/plans/materialize-task-plan";
 import {
+  getTaskPlanGenerationSession,
+  getTaskPlanGenerationSessionById,
   isTaskPlanGenerationRunning,
   startTaskPlanGeneration,
+  subscribeTaskPlanGeneration,
+  subscribeTaskPlanGenerationById,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
 } from "../modules/plans/task-plan-generation-registry";
@@ -18,12 +22,13 @@ export function createTaskPlanService() {
     async getState(input: { taskId: string }) {
       try {
         const savedPlan = await getLatestTaskPlanReadModel(input.taskId);
+        const generationSession = getTaskPlanGenerationSession(input.taskId);
         const planStatus = savedPlan?.status === "accepted"
           ? "accepted"
           : savedPlan
             ? "waiting_acceptance"
             : "no_plan";
-        const aiPlanGenerationStatus = isTaskPlanGenerationRunning(input.taskId)
+        const aiPlanGenerationStatus = generationSession?.status === "running"
           ? "generating"
           : planStatus === "accepted"
             ? "accepted"
@@ -31,10 +36,33 @@ export function createTaskPlanService() {
               ? "waiting_acceptance"
               : "idle";
 
-        return { taskId: input.taskId, aiPlanGenerationStatus, savedPlan };
+        return {
+          taskId: input.taskId,
+          aiPlanGenerationStatus,
+          savedPlan,
+          generationSession,
+        };
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task plan state");
       }
+    },
+    getActiveGeneration(input: { taskId: string }) {
+      return { generationSession: getTaskPlanGenerationSession(input.taskId) };
+    },
+    getGenerationSession(input: { generationId: string }) {
+      return { generationSession: getTaskPlanGenerationSessionById(input.generationId) };
+    },
+    subscribeToActiveGeneration(input: {
+      taskId: string;
+      onEvent: (event: import("@chrona/contracts").GeneratePlanSSEEvent) => void;
+    }) {
+      return subscribeTaskPlanGeneration(input.taskId, input.onEvent);
+    },
+    subscribeToGeneration(input: {
+      generationId: string;
+      onEvent: (event: import("@chrona/contracts").GeneratePlanSSEEvent) => void;
+    }) {
+      return subscribeTaskPlanGenerationById(input.generationId, input.onEvent);
     },
     async accept(input: { taskId: string; planId: string; workspaceId?: string }) {
       try {
@@ -67,8 +95,14 @@ export function createTaskPlanService() {
     generate(input: { taskId: string; forceRefresh?: boolean }) {
       try {
         const streamLock = startTaskPlanGeneration(input.taskId);
+        const events = generateTaskPlanManualStream({
+          ...input,
+          signal: streamLock.signal,
+        });
         return {
-          events: generateTaskPlanManualStream(input),
+          generationId: streamLock.generationId,
+          events,
+          emit: streamLock.emit,
           finish: streamLock.finish,
         };
       } catch (cause) {

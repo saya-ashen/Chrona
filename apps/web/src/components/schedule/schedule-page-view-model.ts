@@ -11,9 +11,7 @@ import {
   startOfDay,
   startOfWeek,
 } from "@/components/schedule/schedule-page-utils";
-import type {
-  SchedulePageCopy,
-} from "@/components/schedule/schedule-page-copy";
+import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type {
   SchedulePageData,
   ScheduleViewMode,
@@ -44,7 +42,6 @@ export type SchedulePageViewModel = {
   todayFocusItems: ReturnType<typeof buildTodayFocusItems>;
   calendarMonthLabel: string;
   calendarDays: ScheduleCalendarDay[];
-  conflictTaskIds: Set<string>;
   cockpitSummary: string;
   activeRailLabel: string;
 };
@@ -155,13 +152,6 @@ export function buildSchedulePageViewModel({
     },
   ).format(activeDayDate);
 
-  const conflictTaskIds = new Set<string>();
-  for (const conflict of viewData.conflicts) {
-    for (const taskId of conflict.taskIds) {
-      conflictTaskIds.add(taskId);
-    }
-  }
-
   const cockpitSummary = copy.cockpitSummaryTemplate
     .replace(
       "{scheduled}",
@@ -185,9 +175,7 @@ export function buildSchedulePageViewModel({
     todayFocusItems,
     calendarMonthLabel,
     calendarDays,
-    conflictTaskIds,
     cockpitSummary,
     activeRailLabel,
   };
 }
-

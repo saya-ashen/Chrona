@@ -1,10 +1,12 @@
 import { api } from "@/lib/rpc-client";
+import type { TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type { TaskData, TaskPlanGenerationStatus } from "./task-workspace-types";
 
 export type TaskPlanState = {
   taskId: string;
   aiPlanGenerationStatus: TaskPlanGenerationStatus;
   savedPlan: TaskData["savedPlan"] | null;
+  generationSession: TaskPlanGenerationSessionReadModel | null;
 };
 
 export const taskWorkspaceQueryKeys = {
@@ -23,7 +25,7 @@ export async function fetchTaskWorkspaceTask(taskId: string) {
     throw new Error((err as { error?: string }).error ?? "Failed to load task detail");
   }
 
-  const payload = await response.json() as { task: TaskData };
+  const payload = await response.json() as unknown as { task: TaskData };
   return payload.task;
 }
 
@@ -38,14 +40,16 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
   }
 
   const payload = await response.json() as {
-    taskId: string;
-    aiPlanGenerationStatus?: string;
-    savedPlan?: TaskData["savedPlan"] | null;
-  };
+      taskId: string;
+      aiPlanGenerationStatus?: string;
+      savedPlan?: TaskData["savedPlan"] | null;
+      generationSession?: TaskPlanGenerationSessionReadModel | null;
+    };
 
   return {
     taskId: payload.taskId,
     aiPlanGenerationStatus: (payload.aiPlanGenerationStatus ?? "idle") as TaskPlanState["aiPlanGenerationStatus"],
     savedPlan: payload.savedPlan ?? null,
+    generationSession: payload.generationSession ?? null,
   };
 }

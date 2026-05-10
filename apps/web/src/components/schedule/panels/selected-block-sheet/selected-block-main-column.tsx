@@ -8,15 +8,16 @@ import { toTaskConfigInitialValues } from "@/components/schedule/schedule-page-u
 import {
   TaskConfigForm,
   type TaskConfigDraftState,
+  type TaskConfigFormDraft,
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
 } from "@/components/schedule/task-config-form";
+import { TaskAiPlanPanel } from "@/components/task/panels/task-ai-plan-panel";
 import { TaskEditPanel } from "@/components/task/panels/task-edit-panel";
-import { TaskPlanGraphPanel } from "@/components/task/panels/task-plan-graph-panel";
-import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
 import { buttonVariants } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { cn } from "@/lib/utils";
+import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
 export function SelectedBlockMainColumn({
   item,
@@ -24,28 +25,43 @@ export function SelectedBlockMainColumn({
   executionRuntimes,
   defaultExecutionRuntime,
   isPending,
+  planningTaskDraft,
+  savedPlan,
+  generationStatus,
   acceptedPlan,
+  hasUnsavedConfigChanges,
+  unsavedConfigDraft,
   onDeleteTask,
   onTaskConfigDraftStateChange,
   onSaveTaskConfig,
+  onPlanLoaded,
+  onApplyPlan,
+  onSaveConfigBeforeRegenerate,
 }: {
   item: ScheduledItem;
   copy: SchedulePageCopy;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
   isPending: boolean;
+  planningTaskDraft: TaskConfigFormDraft;
+  savedPlan: SavedTaskPlan | null;
+  generationStatus: "idle" | "generating" | "waiting_acceptance" | "accepted";
   acceptedPlan: TaskPlanReadModel | null;
+  hasUnsavedConfigChanges: boolean;
+  unsavedConfigDraft: TaskConfigFormDraft | null;
   onDeleteTask?: (taskId: string) => void;
   onTaskConfigDraftStateChange: (state: TaskConfigDraftState) => void;
   onSaveTaskConfig: (input: TaskConfigFormInput) => Promise<void>;
+  onPlanLoaded: (savedPlan: SavedTaskPlan | null) => void;
+  onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
+  onSaveConfigBeforeRegenerate: () => Promise<void>;
 }) {
-  const acceptedGraphPlan = taskPlanReadModelToGraphPlan(acceptedPlan);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <div
       data-testid="selected-block-main-column"
-      className="min-w-0 border-b border-border/60 px-5 py-5 text-sm text-muted-foreground md:border-b-0 md:border-r md:px-6"
+      className="min-w-0 px-5 py-5 text-sm text-muted-foreground md:px-6"
     >
       <div className="space-y-5">
         <TaskEditPanel>
@@ -94,9 +110,18 @@ export function SelectedBlockMainColumn({
           />
         </TaskEditPanel>
 
-        {acceptedGraphPlan ? (
-          <TaskPlanGraphPanel label={copy.taskPlanLabel} plan={acceptedGraphPlan} />
-        ) : null}
+        <TaskAiPlanPanel
+          taskId={item.taskId}
+          planningTaskDraft={planningTaskDraft}
+          savedPlan={savedPlan}
+          generationStatus={generationStatus}
+          acceptedPlanId={acceptedPlan?.id ?? null}
+          hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+          unsavedConfigDraft={unsavedConfigDraft}
+          onPlanLoaded={onPlanLoaded}
+          onApplyPlan={onApplyPlan}
+          onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
+        />
       </div>
     </div>
   );

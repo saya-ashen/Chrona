@@ -37,6 +37,7 @@ interface TaskPlanGenerationPanelProps {
   requestGenerationKey?: number;
   showEmptyGenerateButton?: boolean;
   emptyStateDescription?: string;
+  showRegenerateButton?: boolean;
 }
 
 const DEFAULT_DECOMP_COPY = {
@@ -44,6 +45,32 @@ const DEFAULT_DECOMP_COPY = {
   aiPlanning: "AI is planning task...",
   applyPlan: "Apply Plan",
 };
+
+function toProgressPhase(
+  phase: ReturnType<typeof useTaskPlanGeneration>["phase"],
+): "idle" | "connecting" | "thinking" | "streaming" | "done" | "error" {
+  switch (phase) {
+    case "starting":
+    case "loading_task":
+    case "requesting_provider":
+      return "connecting";
+    case "streaming":
+      return "streaming";
+    case "extracting_tool_payload":
+    case "compiling":
+    case "saving":
+    case "completed":
+      return "thinking";
+    case "done":
+      return "done";
+    case "error":
+      return "error";
+    case "idle":
+    case "connecting":
+    default:
+      return phase;
+  }
+}
 
 function getDecompCopy(messages: Record<string, unknown>) {
   const raw =
@@ -73,6 +100,7 @@ export function TaskPlanGenerationPanel({
   requestGenerationKey,
   showEmptyGenerateButton = true,
   emptyStateDescription,
+  showRegenerateButton = true,
 }: TaskPlanGenerationPanelProps) {
   const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] =
     useState(false);
@@ -163,18 +191,8 @@ export function TaskPlanGenerationPanel({
     setIsStoppingGeneration(true);
     setHasRequestedStop(true);
     setStopGenerationError(null);
-    stopGeneration();
     try {
-      const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop`, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(
-          (errorBody as { error?: string }).error ??
-            `Failed to stop generation (${response.status})`,
-        );
-      }
+      await stopGeneration();
     } catch (stopError) {
       setHasRequestedStop(false);
       setStopGenerationError(
@@ -188,11 +206,12 @@ export function TaskPlanGenerationPanel({
   };
   const isGenerationRunning =
     !hasRequestedStop && (isLoading || generationStatus === "generating");
+  const progressPhase = toProgressPhase(phase);
 
   if (isGenerationRunning) {
     return (
       <TaskPlanGenerationProgress
-        phase={phase}
+        phase={progressPhase}
         statusMessage={statusMessage}
         partialText={partialText}
         toolCalls={toolCalls}
@@ -246,6 +265,7 @@ export function TaskPlanGenerationPanel({
         onRegenerate={handleRegenerate}
         onApply={onApply}
         showGraph={showGraph}
+        showRegenerateButton={showRegenerateButton}
       />
     </div>
   );

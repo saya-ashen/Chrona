@@ -25,12 +25,6 @@ interface GenerateTaskPlanInput {
   forceRefresh?: boolean;
 }
 
-interface BatchApplyPlanInput {
-  taskId: string;
-  nodes?: unknown[];
-  edges?: unknown[];
-}
-
 interface ApiErrorBody {
   error?: string;
   message?: string;

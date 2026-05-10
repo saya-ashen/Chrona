@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
-import { deriveTaskRunnability } from "@chrona/shared";
 import type { UpdateTaskInput } from "@chrona/contracts";
 
-function normalizeRequiredUpdateTextField(value: string | undefined, field: string) {
+function normalizeRequiredUpdateTextField(
+  value: string | undefined,
+  field: string,
+) {
   if (value === undefined) {
     return undefined;
   }
@@ -20,7 +22,9 @@ function normalizeRequiredUpdateTextField(value: string | undefined, field: stri
   return normalized;
 }
 
-function normalizeExecutionConfig(value: Prisma.InputJsonObject | null | undefined) {
+function normalizeExecutionConfig(
+  value: Prisma.InputJsonObject | null | undefined,
+) {
   if (value === undefined) {
     return undefined;
   }
@@ -50,12 +54,16 @@ function mergeSessionStrategyIntoExecutionConfig(
   return Object.keys(nextConfig).length > 0 ? nextConfig : null;
 }
 
-export async function updateTask(input: UpdateTaskInput & {
-  sessionStrategy?: "shared" | "per_subtask" | null;
-}) {
+export async function updateTask(
+  input: UpdateTaskInput & {
+    sessionStrategy?: "shared" | "per_subtask" | null;
+  },
+) {
   const title = normalizeRequiredUpdateTextField(input.title, "title");
   const description =
-    input.description === undefined ? undefined : input.description?.trim() || null;
+    input.description === undefined
+      ? undefined
+      : input.description?.trim() || null;
   const executionConfig = normalizeExecutionConfig(
     input.executionConfig as Prisma.InputJsonObject | null | undefined,
   );
@@ -68,15 +76,18 @@ export async function updateTask(input: UpdateTaskInput & {
     },
   });
   const baseExecutionConfig =
-    input.executionConfig === undefined ? currentTask.executionConfig : input.executionConfig;
+    input.executionConfig === undefined
+      ? currentTask.executionConfig
+      : input.executionConfig;
   const nextExecutionConfig = mergeSessionStrategyIntoExecutionConfig(
     baseExecutionConfig as Prisma.InputJsonObject | null | undefined,
     input.sessionStrategy,
   );
   const validatedRuntimeConfig = validateTaskRuntimeConfig({
-    executionRuntime: input.executionRuntime === undefined
-      ? currentTask.executionRuntime
-      : input.executionRuntime,
+    executionRuntime:
+      input.executionRuntime === undefined
+        ? currentTask.executionRuntime
+        : input.executionRuntime,
     workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
     executionConfig: nextExecutionConfig,
   });
@@ -86,18 +97,15 @@ export async function updateTask(input: UpdateTaskInput & {
     }
 
     const shouldManageStatus =
-      currentTask.status === TaskStatus.Draft || currentTask.status === TaskStatus.Ready;
+      currentTask.status === TaskStatus.Draft ||
+      currentTask.status === TaskStatus.Ready;
 
     if (!shouldManageStatus) {
       return undefined;
     }
 
-    const runnability = deriveTaskRunnability({
-      executionRuntime: validatedRuntimeConfig.executionRuntime,
-      executionConfig: validatedRuntimeConfig.executionConfig,
-    });
-
-    return runnability.isRunnable ? TaskStatus.Ready : TaskStatus.Draft;
+    // FIXME:
+    return TaskStatus.Ready;
   })();
   const shouldPersistResolvedRuntimeConfig =
     input.executionRuntime !== undefined ||

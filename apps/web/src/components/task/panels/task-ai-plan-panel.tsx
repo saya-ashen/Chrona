@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
 import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
+import { cn } from "@/lib/utils";
 
 type TaskAiPlanPanelProps = {
   taskId: string;
@@ -31,6 +34,7 @@ export function TaskAiPlanPanel({
   onApplyPlan,
   onSaveConfigBeforeRegenerate,
 }: TaskAiPlanPanelProps) {
+  const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const statusConfig = generationStatus === "generating"
     ? {
         icon: <Loader2 className="size-4 animate-spin" />,
@@ -54,6 +58,7 @@ export function TaskAiPlanPanel({
             label: "No plan",
             className: "border-border/70 bg-muted/35 text-muted-foreground",
           };
+  const actionLabel = savedPlan ? "Regenerate plan" : "Generate plan";
 
   return (
     <SurfaceCard
@@ -75,10 +80,24 @@ export function TaskAiPlanPanel({
               </p>
             </div>
           </div>
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm ${statusConfig.className}`}>
-            {statusConfig.icon}
-            {statusConfig.label}
-          </span>
+          <div className="flex items-center gap-2">
+            {generationStatus === "generating" ? null : (
+              <button
+                type="button"
+                onClick={() => setRequestGenerationKey((current) => current + 1)}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10",
+                )}
+              >
+                {actionLabel}
+              </button>
+            )}
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm ${statusConfig.className}`}>
+              {statusConfig.icon}
+              {statusConfig.label}
+            </span>
+          </div>
         </div>
       </div>
       <div className="p-3">
@@ -97,6 +116,9 @@ export function TaskAiPlanPanel({
           hasUnsavedConfigChanges={hasUnsavedConfigChanges}
           unsavedConfigDraft={unsavedConfigDraft}
           onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
+          requestGenerationKey={requestGenerationKey}
+          showRegenerateButton={false}
+          showEmptyGenerateButton={false}
         />
       </div>
     </SurfaceCard>

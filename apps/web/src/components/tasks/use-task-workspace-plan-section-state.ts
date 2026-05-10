@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph/types";
 
 export function useTaskWorkspacePlanSectionState(graphPlan: TaskPlanGraphPlan | null) {
   const [selectedPlanNode, setSelectedPlanNode] = useState<PlanNodeDataModel | null>(null);
   const [selectedPlanNodes, setSelectedPlanNodes] = useState<PlanNodeDataModel[]>([]);
-
-  const handleSelectedPlanNodeChange = useCallback((node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => {
-    setSelectedPlanNode((current) => (current?.id === node?.id ? current : node));
-    setSelectedPlanNodes((current) => (current === nodes ? current : nodes));
-  }, []);
 
   useEffect(() => {
     if (!graphPlan) {
@@ -16,6 +11,11 @@ export function useTaskWorkspacePlanSectionState(graphPlan: TaskPlanGraphPlan | 
       setSelectedPlanNodes([]);
     }
   }, [graphPlan]);
+
+  const handleSelectedPlanNodeChange = (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => {
+    setSelectedPlanNode(node);
+    setSelectedPlanNodes(nodes);
+  };
 
   return {
     selectedPlanNode,

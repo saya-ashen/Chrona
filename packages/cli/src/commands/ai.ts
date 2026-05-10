@@ -2,7 +2,6 @@ import { Command } from "commander";
 import type { ClientResolver } from "./shared.js";
 import {
   createOutputOption,
-  parseJsonOption,
   runCommand,
   type CommonCommandOptions,
 } from "./shared.js";

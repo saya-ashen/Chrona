@@ -22,6 +22,7 @@ import {
   buildGeneratePlanFeatureSpec,
   buildSuggestFeatureSpec,
 } from "@chrona/contracts";
+import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import { createLogger } from "@chrona/shared/logger";
 import type { OpenClawStreamEvent as ProviderStreamEvent } from "@chrona/openclaw";
 import {
@@ -49,6 +50,7 @@ type PreparedStreamInput = {
   input: Record<string, unknown>;
   featureSpec?: PreparedAiFeatureSpec;
   userMessage: string;
+  signal?: AbortSignal;
 };
 
 function prepareStreamInput(
@@ -63,6 +65,10 @@ function prepareStreamInput(
   featureSpec?: PreparedAiFeatureSpec,
 ): PreparedStreamInput {
   const prepared = buildPreparedFeatureRequest(input);
+  const signal =
+    input && typeof input === "object" && "signal" in input
+      ? (input.signal as AbortSignal | undefined)
+      : undefined;
   return {
     scope,
     instructions: featureSpec?.instructions ?? prepared.instructions,
@@ -70,6 +76,7 @@ function prepareStreamInput(
     featureSpec,
     input: prepared.input,
     userMessage: featureSpec?.inputText ?? prepared.inputText,
+    signal,
   };
 }
 
@@ -139,6 +146,28 @@ function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
   }
 }
 
+function summarizeStreamEvent(event: StreamEvent | null) {
+  if (!event) return null;
+  switch (event.type) {
+    case "partial":
+      return { type: event.type, textLength: event.text.length, text: previewDebugValue(event.text, 300) };
+    case "tool_call":
+      return { type: event.type, tool: event.tool, input: previewDebugValue(event.input, 800) };
+    case "tool_result":
+      return { type: event.type, tool: event.tool, result: previewDebugValue(event.result, 800) };
+    case "result":
+      return { type: event.type, value: previewDebugValue(event, 1200) };
+    case "done":
+      return {
+        type: event.type,
+        textLength: event.text?.length ?? 0,
+        structured: previewDebugValue(event.structured, 1200),
+      };
+    default:
+      return { ...event };
+  }
+}
+
 async function* openclawStream(
   config: OpenClawClientConfig,
   feature: AiFeature,
@@ -163,23 +192,44 @@ async function* openclawStream(
 
   const streamableFeatures: AiFeature[] = ["suggest", "generate_plan"];
   if (streamableFeatures.includes(feature)) {
+    const dump = await createDebugDump({
+      enabledEnv: "CHRONA_AI_STREAM_DUMP",
+      directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
+      kind: "ai-stream",
+      label: `${feature}-${input.scope}`,
+      meta: {
+        layer: "engine.openclawStream",
+        feature,
+        scope: input.scope,
+        sessionId,
+        sessionKey,
+      },
+    });
     try {
       const client = getOrCreateClient(config);
 
+      await dump?.write({ type: "yield", stage: "openclaw.status", event: { type: "status", message: "AI 正在思考..." } });
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
       for await (const event of client.executeFeatureStream(
         feature as "suggest" | "generate_plan",
-        { ...providerInput, sessionKey },
+        { ...providerInput, sessionKey, signal: input.signal },
       )) {
         const parsed = convertProviderEvent(event);
+        await dump?.write({
+          type: "provider_event",
+          providerEvent: previewDebugValue(event, 1200),
+          streamEvent: summarizeStreamEvent(parsed),
+        });
         if (!parsed) continue;
         if (parsed.type === "partial") {
           fullText += parsed.text;
         }
+        await dump?.write({ type: "yield", stage: "openclaw.converted", event: summarizeStreamEvent(parsed) });
         yield parsed;
         if (parsed.type === "error") {
+          await dump?.close();
           return;
         }
       }
@@ -192,9 +242,21 @@ async function* openclawStream(
         textLength: fullText.length,
       });
 
+      await dump?.write({
+        type: "yield",
+        stage: "openclaw.done",
+        event: { type: "done", textLength: fullText.length, structured: null },
+      });
       yield { type: "done", text: fullText, structured: null };
+      await dump?.close();
       return;
     } catch (error) {
+      await dump?.write({
+        type: "error",
+        stage: "openclaw.catch",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      await dump?.close();
       logger.warn("openclaw.stream.fallback_to_blocking", {
         feature,
         scope: input.scope,
@@ -230,6 +292,7 @@ async function* llmStream(
   config: LLMClientConfig,
   systemPrompt: string,
   userMessage: string,
+  signal?: AbortSignal,
   options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number },
 ): AsyncGenerator<StreamEvent> {
   const model = config.model ?? "gpt-4o-mini";
@@ -249,6 +312,10 @@ async function* llmStream(
   if (options?.maxTokens) body.max_tokens = options.maxTokens;
   if (options?.jsonMode) body.response_format = { type: "json_object" };
 
+  const requestSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(60_000)])
+    : AbortSignal.timeout(60_000);
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -256,7 +323,7 @@ async function* llmStream(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
+    signal: requestSignal,
   });
 
   if (!res.ok) {
@@ -329,6 +396,7 @@ function dispatchStream(
     client.config as LLMClientConfig,
     request.systemPrompt,
     request.userMessage,
+    input.signal,
     request.options,
   );
 }
@@ -696,23 +764,48 @@ export async function* generatePlanStream(
     featureSpec,
   );
   const generator = dispatchStream(client, "generate_plan", preparedInput);
+  const dump = await createDebugDump({
+    enabledEnv: "CHRONA_AI_STREAM_DUMP",
+    directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
+    kind: "ai-stream",
+    label: `generate-plan-${request.taskId ?? preparedInput.scope}`,
+    meta: {
+      layer: "engine.generatePlanStream",
+      clientType: client.type,
+      taskId: request.taskId ?? null,
+      scope: preparedInput.scope,
+    },
+  });
   const acc: GeneratePlanAccumulator = { finalText: "", latestToolInput: null };
   let latestStructured: NonNullable<
     Extract<StreamEvent, { type: "done" }>["structured"]
   > | null = null;
 
   for await (const event of generator) {
+    await dump?.write({ type: "input_event", event: summarizeStreamEvent(event) });
     if (
       event.type === "tool_call" &&
       event.tool === "generate_task_plan_graph"
     ) {
       acc.latestToolInput = event.input;
+      await dump?.write({
+        type: "accumulator",
+        field: "latestToolInput",
+        value: previewDebugValue(acc.latestToolInput, 1200),
+      });
+      await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
       yield event;
       continue;
     }
 
     if (event.type === "partial") {
       acc.finalText += event.text;
+      await dump?.write({
+        type: "accumulator",
+        field: "finalText",
+        textLength: acc.finalText.length,
+      });
+      await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
       yield event;
       continue;
     }
@@ -720,17 +813,30 @@ export async function* generatePlanStream(
     if (event.type === "done") {
       latestStructured = event.structured ?? null;
       const resolved = collectGeneratePlanResult(acc, event, client.type);
+      await dump?.write({
+        type: "resolved",
+        event: summarizeStreamEvent(resolved),
+        hasLatestToolInput: Boolean(acc.latestToolInput),
+        finalTextLength: acc.finalText.length,
+      });
       yield resolved;
       if (resolved.type === "result") {
-        yield {
+        const doneEvent: StreamEvent = {
           type: "done",
           text: event.text ?? acc.finalText,
           structured: latestStructured ?? null,
         };
+        await dump?.write({ type: "yield", event: summarizeStreamEvent(doneEvent) });
+        yield doneEvent;
       }
+      await dump?.close();
       return;
     }
 
+    await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
     yield event;
   }
+
+  await dump?.write({ type: "generator_exhausted" });
+  await dump?.close();
 }
