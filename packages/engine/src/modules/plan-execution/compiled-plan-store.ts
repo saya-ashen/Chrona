@@ -128,12 +128,12 @@ export async function saveCompiledPlan(input: {
   });
 }
 
-export async function getEditablePlan(taskId: string): Promise<EditablePlan | null> {
+async function getEditablePlan(taskId: string): Promise<EditablePlan | null> {
   const saved = await getLatestCompiledPlan(taskId);
   return saved?.editablePlan ?? null;
 }
 
-export async function getCompiledPlan(taskId: string): Promise<CompiledPlan | null> {
+async function getCompiledPlan(taskId: string): Promise<CompiledPlan | null> {
   const saved = await getLatestCompiledPlan(taskId);
   return saved?.compiledPlan ?? null;
 }

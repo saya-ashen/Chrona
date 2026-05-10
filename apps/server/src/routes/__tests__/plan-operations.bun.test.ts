@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
 import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
-import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/queries/task-plan-read-model";
+import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
 import { createPlansRoutes } from "../tasks/plan.routes";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 

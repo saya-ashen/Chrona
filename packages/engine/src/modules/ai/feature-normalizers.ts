@@ -29,16 +29,13 @@ import { parseTaskDispatchDecision } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
 import { buildGeneratePlanScope } from "./streaming";
-import {
-  type PlanBlueprint,
-  planBlueprintSchema,
-} from "@chrona/contracts/ai";
+import { type PlanBlueprint, planBlueprintSchema } from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/shared/logger";
 import type { ZodIssue } from "zod";
 
-const logger = createLogger("ai-features.features");
-
-function formatZodIssues(issues: ZodIssue[]): Array<{ path: string; message: string }> {
+function formatZodIssues(
+  issues: ZodIssue[],
+): Array<{ path: string; message: string }> {
   return issues.map((issue) => ({
     path: issue.path.join("."),
     message: issue.message,
@@ -57,15 +54,6 @@ function ensureObject(
     );
   }
   return value as Record<string, unknown>;
-}
-
-async function parseStructuredFeatureResult<T>(
-  client: AiClientRecord,
-  feature: Parameters<typeof dispatchFeaturePayload>[1],
-  input: Parameters<typeof dispatchFeaturePayload>[2],
-  scope = "default",
-): Promise<{ parsed: T; debug?: StructuredDebugInfo; rawText?: string }> {
-  return dispatchFeaturePayload<T>(client, feature, input, scope);
 }
 
 export function normalizeSuggestResponse(input: {
@@ -90,31 +78,6 @@ export function normalizeSuggestResponse(input: {
     source: input.source,
     requestId: randomUUID(),
     structured: input.structured ?? undefined,
-  };
-}
-
-export async function suggest(
-  client: AiClientRecord,
-  request: SmartSuggestRequest,
-): Promise<SmartSuggestResponse> {
-  const result = await parseStructuredFeatureResult<{
-    suggestions?: Array<Partial<SmartSuggestion>>;
-  }>(client, "suggest", request, request.workspaceId ?? "default");
-
-  return {
-    suggestions: (result.parsed.suggestions ?? [])
-      .filter((suggestion) => suggestion.title)
-      .map((suggestion) => ({
-        title: suggestion.title!,
-        description: suggestion.description ?? "",
-        priority: suggestion.priority ?? "Medium",
-        estimatedMinutes: suggestion.estimatedMinutes ?? 30,
-        tags: suggestion.tags ?? [],
-        suggestedSlot: suggestion.suggestedSlot,
-      })),
-    source: client.type,
-    requestId: randomUUID(),
-    structured: result.debug,
   };
 }
 
@@ -160,42 +123,6 @@ export function normalizeGeneratePlanResponse(input: {
     },
     validationErrors: [],
     validationWarnings: [],
-  };
-}
-
-export async function analyzeConflicts(
-  client: AiClientRecord,
-  request: AnalyzeConflictsRequest,
-): Promise<AnalyzeConflictsResponse> {
-  const result = await parseStructuredFeatureResult<{
-    conflicts?: ConflictInfo[];
-    resolutions?: ResolutionSuggestion[];
-    summary?: string;
-  }>(client, "conflicts", request, request.workspaceId ?? "default");
-
-  return {
-    conflicts: result.parsed.conflicts ?? [],
-    resolutions: result.parsed.resolutions ?? [],
-    summary: result.parsed.summary ?? "",
-    source: client.type,
-    structured: result.debug,
-  };
-}
-
-export async function suggestTimeslots(
-  client: AiClientRecord,
-  request: SuggestTimeslotRequest,
-): Promise<SuggestTimeslotResponse> {
-  const result = await parseStructuredFeatureResult<{
-    slots?: TimeslotOption[];
-    reasoning?: string;
-  }>(client, "timeslots", request, request.taskTitle);
-
-  return {
-    slots: result.parsed.slots ?? [],
-    reasoning: result.parsed.reasoning,
-    source: client.type,
-    structured: result.debug,
   };
 }
 
@@ -291,32 +218,4 @@ export async function chat(
     return { content, parsed, source: client.type };
   }
   return { content, source: client.type };
-}
-
-export async function dispatchTask(
-  client: AiClientRecord,
-  request: DispatchTaskInput,
-): Promise<DispatchTaskOutput> {
-  const result = await parseStructuredFeatureResult<unknown>(
-    client,
-    "dispatch_task",
-    request,
-    request.workspaceId,
-  );
-
-  const parsed = parseTaskDispatchDecision(result.parsed);
-  if (!parsed.ok) {
-    throw new AiClientError(
-      `Invalid dispatch decision: ${parsed.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`,
-      client.type,
-      "invalid_response",
-    );
-  }
-
-  return {
-    decision: parsed.value,
-    reliability: "structured_tool_call",
-    rawProviderResult: result.rawText,
-    structured: result.debug,
-  };
 }

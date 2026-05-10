@@ -1,4 +1,4 @@
-import { acceptTaskResult } from "../modules/commands/accept-task-result";
+import { acceptTaskResult } from "../modules/tasks/accept-task-result";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 export function createTaskResultService() {

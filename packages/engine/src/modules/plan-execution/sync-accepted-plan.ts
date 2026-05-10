@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resolveSavedPlanEffectiveGraph } from "@/modules/queries/task-plan-read-model";
+import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import type { NodeResult } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlan } from "./compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, getPlanRun, savePlanRun } from "./plan-run-store";

@@ -1,0 +1,197 @@
+import { Prisma, TaskStatus } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
+import { materializeTaskPlan } from "@/modules/plans/materialize-task-plan";
+import { startPlanExecution } from "@/modules/plan-execution";
+import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
+import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
+import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
+import { syncAcceptedTaskPlanForTask } from "@/modules/plan-execution/sync-accepted-plan";
+import {
+  getAcceptedCompiledPlan,
+} from "@/modules/plan-execution/compiled-plan-store";
+import type { EffectivePlanGraph } from "@chrona/contracts/ai";
+
+type SessionStrategy = "shared" | "per_subtask";
+
+function readSessionStrategy(value: unknown): SessionStrategy {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const raw = (value as { sessionStrategy?: unknown }).sessionStrategy;
+    if (raw === "shared") {
+      return "shared";
+    }
+  }
+  return "per_subtask";
+}
+
+function isTerminalStatus(status: string) {
+  return status === "Completed" || status === "Done" || status === "Cancelled" || status === "Failed";
+}
+
+function deriveParentTaskStatusFromEffectivePlan(effective: EffectivePlanGraph): TaskStatus | null {
+  if (effective.nodes.length === 0) return null;
+  const anyBlocked = effective.nodes.some((n) => n.status === "blocked");
+  if (anyBlocked) return TaskStatus.Blocked;
+  const anyWaiting = effective.nodes.some((n) => n.status === "waiting_for_user");
+  if (anyWaiting) return TaskStatus.WaitingForInput;
+  const allDone = effective.nodes.every((n) => n.status === "completed" || n.status === "skipped");
+  if (allDone) return TaskStatus.Completed;
+  const anyRunning = effective.nodes.some((n) => n.status === "running");
+  if (anyRunning) return TaskStatus.Running;
+  const anyPending = effective.nodes.some((n) => n.status === "pending" || n.status === "ready");
+  if (anyPending) return TaskStatus.Ready;
+  return null;
+}
+
+export async function syncParentTaskStateFromAcceptedPlan(parentTaskId: string) {
+  const accepted = await getAcceptedCompiledPlan(parentTaskId);
+  const parentTask = await db.task.findUniqueOrThrow({ where: { id: parentTaskId } });
+
+  if (!accepted) {
+    return { parentCompleted: false, status: parentTask.status };
+  }
+
+  const effective = await resolveSavedPlanEffectiveGraph(accepted);
+  const nextStatus = deriveParentTaskStatusFromEffectivePlan(effective);
+  if (!nextStatus) {
+    return { parentCompleted: false, status: parentTask.status };
+  }
+
+  const shouldComplete = nextStatus === TaskStatus.Completed;
+  await db.task.update({
+    where: { id: parentTaskId },
+    data: {
+      status: nextStatus,
+      completedAt: shouldComplete ? parentTask.completedAt ?? new Date() : null,
+      blockReason: nextStatus === TaskStatus.Blocked ? (parentTask.blockReason ?? Prisma.DbNull) : Prisma.DbNull,
+    },
+  });
+  await rebuildTaskProjection(parentTaskId);
+
+  return { parentCompleted: shouldComplete, status: nextStatus };
+}
+
+export async function progressAcceptedTaskPlan(input: { parentTaskId: string }) {
+  const parentTask = await db.task.findUniqueOrThrow({ where: { id: input.parentTaskId } });
+  const accepted = await getAcceptedCompiledPlan(input.parentTaskId);
+
+  if (!accepted) {
+    return {
+      parentTaskId: input.parentTaskId,
+      startedTaskIds: [],
+      materializedTaskIds: [],
+      readyNodeIds: [],
+      parentCompleted: false,
+    };
+  }
+
+  await syncAcceptedTaskPlanForTask({ taskId: input.parentTaskId });
+  const effective = await resolveSavedPlanEffectiveGraph(accepted);
+
+  // Find ready plan nodes, including nodes already linked to child tasks.
+  const readyAutoNodes = effective.nodes.filter(
+    (n) => n.ready,
+  );
+  const readyNodeIds = readyAutoNodes.map((n) => n.id);
+
+  let materializedTaskIds: string[] = [];
+  const startedTaskIds: string[] = [];
+
+  if (readyNodeIds.length > 0) {
+    const materialized = await materializeTaskPlan({ taskId: input.parentTaskId });
+    materializedTaskIds = materialized.createdTaskIds;
+
+    if (materialized.createdTaskIds.length > 0) {
+      const refreshedAccepted = await getAcceptedCompiledPlan(input.parentTaskId);
+      const refreshedEffective = refreshedAccepted
+        ? await resolveSavedPlanEffectiveGraph(refreshedAccepted)
+        : effective;
+      const readyTaskIds = new Set(
+        refreshedEffective.nodes
+          .filter((n) => readyNodeIds.includes(n.id) && n.linkedTaskId)
+          .map((n) => n.linkedTaskId as string),
+      );
+
+      const childTasks = await db.task.findMany({
+        where: { id: { in: [...readyTaskIds] } },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const strategy = readSessionStrategy(parentTask.executionConfig);
+      for (const childTask of childTasks) {
+        if (!readyTaskIds.has(childTask.id)) continue;
+
+        const existingRunning = await db.run.findFirst({
+          where: {
+            taskId: childTask.id,
+            status: { in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] },
+          },
+        });
+        if (existingRunning) continue;
+
+        if (strategy === "shared") {
+          await db.task.update({
+            where: { id: childTask.id },
+            data: { defaultSessionId: parentTask.defaultSessionId },
+          });
+        } else {
+          await ensureDefaultTaskSession({
+            taskId: childTask.id,
+            taskTitle: childTask.title,
+            runtimeName: resolveExecutionRuntime({
+              executionRuntime: childTask.executionRuntime ?? parentTask.executionRuntime,
+            }),
+            defaultSessionId: childTask.defaultSessionId,
+            suffix: "subtask",
+            label: `${childTask.title} · Subtask session`,
+          });
+        }
+
+        const acceptedChildPlan = await getAcceptedCompiledPlan(childTask.id);
+        if (!acceptedChildPlan) {
+          continue;
+        }
+
+        const execution = await startPlanExecution({ taskId: childTask.id, trigger: "auto" });
+        if (execution.status !== "no_plan") {
+          startedTaskIds.push(childTask.id);
+        }
+      }
+    }
+  }
+
+  // Re-check completion after progression
+  const finalAccepted = await getAcceptedCompiledPlan(input.parentTaskId);
+  const finalEffective = finalAccepted
+    ? await resolveSavedPlanEffectiveGraph(finalAccepted)
+    : effective;
+  const allDone = Boolean(
+    finalEffective.nodes.length > 0 &&
+    finalEffective.nodes.every((n) => n.status === "completed" || n.status === "skipped"),
+  );
+
+  let parentCompleted = false;
+  if (allDone && !isTerminalStatus(parentTask.status)) {
+    await db.task.update({
+      where: { id: input.parentTaskId },
+      data: {
+        status: TaskStatus.Completed,
+        completedAt: new Date(),
+        blockReason: Prisma.DbNull,
+      },
+    });
+    await rebuildTaskProjection(input.parentTaskId);
+    parentCompleted = true;
+  } else {
+    const synced = await syncParentTaskStateFromAcceptedPlan(input.parentTaskId);
+    parentCompleted = synced.parentCompleted;
+  }
+
+  return {
+    parentTaskId: input.parentTaskId,
+    startedTaskIds,
+    materializedTaskIds,
+    readyNodeIds,
+    parentCompleted,
+  };
+}

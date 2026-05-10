@@ -1,7 +1,10 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { ensurePlanMainSession, appendMainSessionEvent } from "./plan-state-store";
+import {
+  ensurePlanMainSession,
+  appendMainSessionEvent,
+} from "./plan-state-store";
 import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
 import {
   createPlanGraphFromCompiledPlan,
@@ -13,7 +16,11 @@ import {
   resolveEffectivePlanGraph,
   createGraphRuntime,
 } from "@chrona/graph-runtime";
-import type { GraphDispatchOutcome, GraphExecutionEvent, GraphExecutionState } from "@chrona/graph-runtime";
+import type {
+  GraphDispatchOutcome,
+  GraphExecutionEvent,
+  GraphExecutionState,
+} from "@chrona/graph-runtime";
 import type {
   CompiledPlan,
   EffectivePlanGraph,
@@ -26,7 +33,7 @@ import type {
   PlanRun,
   WaitKind,
 } from "@chrona/contracts/ai";
-import type { NodeExecutor, NodeExecutionResult } from "./node-executors/types";
+import type { NodeExecutor } from "./node-executors/types";
 import { TaskNodeExecutor } from "./node-executors/task-executor";
 import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
 import { ConditionNodeExecutor } from "./node-executors/condition-executor";
@@ -67,9 +74,7 @@ const executors: NodeExecutor[] = [
   new WaitNodeExecutor(),
 ];
 
-export function createPlanRunFromCompiledPlan(
-  compiled: CompiledPlan,
-): PlanRun {
+export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
   const createdAt = new Date().toISOString();
   return {
     id: `plan_run_${compiled.editablePlanId}`,
@@ -94,7 +99,9 @@ export function createPlanRunFromCompiledPlan(
   };
 }
 
-function mapWaitKindToExecutionStatus(waitKind: WaitKind | undefined): PlanExecutionStatus {
+function mapWaitKindToExecutionStatus(
+  waitKind: WaitKind | undefined,
+): PlanExecutionStatus {
   switch (waitKind) {
     case "user_input":
       return "waiting_for_user";
@@ -106,7 +113,9 @@ function mapWaitKindToExecutionStatus(waitKind: WaitKind | undefined): PlanExecu
   }
 }
 
-function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecutionStatus {
+function mapTerminalReasonToStatus(
+  effective: EffectivePlanGraph,
+): PlanExecutionStatus {
   if (effective.readyNodeIds.length > 0) return "running";
   if (effective.runningNodeIds.length > 0) return "running";
   if (effective.nodes.some((node) => node.status === "waiting_for_user")) {
@@ -115,10 +124,14 @@ function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecution
   if (effective.nodes.some((node) => node.status === "waiting_for_approval")) {
     return "waiting_for_approval";
   }
-  if (effective.blockedNodeIds.length > 0 || effective.failedNodeIds.length > 0) {
+  if (
+    effective.blockedNodeIds.length > 0 ||
+    effective.failedNodeIds.length > 0
+  ) {
     return "blocked";
   }
-  if (effective.completedNodeIds.length === effective.nodes.length) return "completed";
+  if (effective.completedNodeIds.length === effective.nodes.length)
+    return "completed";
   return "blocked";
 }
 
@@ -241,7 +254,10 @@ async function ensureNativePlanRun(taskId: string) {
       planId,
       run: persisted?.planRun ?? createPlanRunFromCompiledPlan(compiledPlan),
       compiledPlan,
-      graph: createPlanGraphFromCompiledPlan({ taskId, compiledPlan }) as unknown as PlanGraph,
+      graph: createPlanGraphFromCompiledPlan({
+        taskId,
+        compiledPlan,
+      }) as unknown as PlanGraph,
       attempts: persisted?.attempts ?? [],
       results: persisted?.results ?? [],
       executionContextSnapshots: persisted?.executionContextSnapshots ?? [],
@@ -457,11 +473,18 @@ type AdvanceRuntimeCommand =
       replaceStatus?: NonNullable<NodeResult["status"]>;
     }
   | { type: "resume_after_unblock"; nodeId?: string }
-  | { type: "resume_with_approval"; nodeId: string; approved: boolean; feedback?: string }
+  | {
+      type: "resume_with_approval";
+      nodeId: string;
+      approved: boolean;
+      feedback?: string;
+    }
   | { type: "retry_node"; nodeId: string; reason?: string; userInput?: string }
   | { type: "cancel_session"; reason?: string };
 
-function toGraphExecutionState(persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>): GraphExecutionState {
+function toGraphExecutionState(
+  persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>,
+): GraphExecutionState {
   if (!persisted.graph) {
     throw new Error("Plan runtime graph missing");
   }
@@ -470,7 +493,9 @@ function toGraphExecutionState(persisted: NonNullable<Awaited<ReturnType<typeof 
     graph: structuredClone(persisted.graph),
     attempts: structuredClone(persisted.attempts),
     results: structuredClone(persisted.results),
-    executionContextSnapshots: structuredClone(persisted.executionContextSnapshots),
+    executionContextSnapshots: structuredClone(
+      persisted.executionContextSnapshots,
+    ),
   } as GraphExecutionState;
 }
 
@@ -607,7 +632,10 @@ async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "graph_mutation_applied",
-          payload: { mutationId: event.mutationId, affectedNodeIds: event.affectedNodeIds },
+          payload: {
+            mutationId: event.mutationId,
+            affectedNodeIds: event.affectedNodeIds,
+          },
         });
         break;
       case "external_result_synced":
@@ -664,7 +692,9 @@ async function advancePlanExecution(input: {
       executeNode: async (executorInput) => {
         const engineNode = executorInput.node as unknown as EffectivePlanNode;
         const enginePlan = executorInput.plan as unknown as EffectivePlanGraph;
-        const executor = executors.find((candidate) => candidate.canExecute(engineNode));
+        const executor = executors.find((candidate) =>
+          candidate.canExecute(engineNode),
+        );
         if (!executor) return null;
         return executor.execute({
           taskId: input.taskId,
@@ -731,7 +761,12 @@ async function advancePlanExecution(input: {
                   context,
                   reason: command.reason,
                 }
-              : { type: "start" as const, state, trigger: input.trigger, context }
+              : {
+                  type: "start" as const,
+                  state,
+                  trigger: input.trigger,
+                  context,
+                }
     : input.forcedNodeId && input.userInput
       ? {
           type: "resume_with_input" as const,
@@ -763,8 +798,8 @@ async function advancePlanExecution(input: {
     graph: outcome.state.graph as unknown as PlanGraph,
     attempts: outcome.state.attempts as unknown as NodeAttempt[],
     results: outcome.state.results as unknown as NodeResult[],
-    executionContextSnapshots:
-      outcome.state.executionContextSnapshots as unknown as ExecutionContextSnapshot[],
+    executionContextSnapshots: outcome.state
+      .executionContextSnapshots as unknown as ExecutionContextSnapshot[],
     existingRun: runtime.persisted.planRun,
   });
   await appendGraphRuntimeEvents({
@@ -844,7 +879,10 @@ async function advancePlanExecution(input: {
     session: input.executionSession,
     effective: outcome.effective as unknown as EffectivePlanGraph,
     waitKind: waitKindFromOutcome(outcome),
-    currentNodeId: currentNodeFromOutcome(outcome) ?? input.executionSession.currentNodeId ?? "",
+    currentNodeId:
+      currentNodeFromOutcome(outcome) ??
+      input.executionSession.currentNodeId ??
+      "",
     executedNodeIds: outcome.executedNodeIds,
     message: outcome.message,
   });
@@ -898,7 +936,7 @@ export async function startPlanExecution(input: {
   });
 }
 
-export async function continuePlanExecution(input: {
+async function continuePlanExecution(input: {
   taskId: string;
   reason: string;
   userInput?: string;
@@ -940,12 +978,14 @@ export async function continuePlanExecution(input: {
   }
 
   const effective = resolveEffectivePlanGraph({
-      graph: runtime.persisted.graph!,
+    graph: runtime.persisted.graph!,
     attempts: runtime.persisted.attempts,
     results: runtime.persisted.results,
   });
   const waitingNode =
-    effective.nodes.find((node) => node.id === executionSession.currentNodeId) ??
+    effective.nodes.find(
+      (node) => node.id === executionSession.currentNodeId,
+    ) ??
     effective.nodes.find(
       (node) =>
         node.status === "waiting_for_user" ||
@@ -1011,7 +1051,8 @@ export async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
-          message: "No accepted plan. Create or accept a plan before execution.",
+          message:
+            "No accepted plan. Create or accept a plan before execution.",
         };
       }
 
@@ -1051,7 +1092,8 @@ export async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
-          message: "No accepted plan. Create or accept a plan before execution.",
+          message:
+            "No accepted plan. Create or accept a plan before execution.",
         };
       }
 
@@ -1079,7 +1121,9 @@ export async function dispatchExecutionAction(input: {
     }
     default: {
       const exhaustiveCheck: never = input.action;
-      throw new Error(`Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`);
+      throw new Error(
+        `Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`,
+      );
     }
   }
 }

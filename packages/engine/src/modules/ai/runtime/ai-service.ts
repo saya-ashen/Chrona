@@ -1,0 +1,41 @@
+/**
+ * AI runtime entry points.
+ * Resolves configured client per feature, then delegates to provider adapters.
+ */
+
+import type {
+  ChatRequest,
+  ChatResponse,
+  GenerateTaskPlanRequest,
+  StreamEvent,
+} from "@chrona/contracts";
+
+import { chat } from "@/modules/ai/feature-normalizers";
+import { generatePlanStream } from "@/modules/ai/streaming";
+import { getClientForFeature } from "./client-resolution";
+
+export async function aiChat(
+  request: ChatRequest,
+): Promise<ChatResponse | null> {
+  const client = await getClientForFeature("chat");
+  if (!client) return null;
+  return chat(client, request);
+}
+
+export async function* aiGeneratePlanStream(
+  request: GenerateTaskPlanRequest,
+): AsyncGenerator<StreamEvent> {
+  const client = await getClientForFeature("generate_plan");
+  if (!client) {
+    yield {
+      type: "error",
+      message: "No AI client configured for task planning",
+    };
+    return;
+  }
+
+  for await (const event of generatePlanStream(client, request)) {
+    yield event;
+    if (event.type === "error" || event.type === "done") return;
+  }
+}

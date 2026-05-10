@@ -1,5 +1,5 @@
-import { markTaskDone } from "../modules/commands/mark-task-done";
-import { reopenTask } from "../modules/commands/reopen-task";
+import { markTaskDone } from "../modules/tasks/mark-task-done";
+import { reopenTask } from "../modules/tasks/reopen-task";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 export function createTaskLifecycleService() {

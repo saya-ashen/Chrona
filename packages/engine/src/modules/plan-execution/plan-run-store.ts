@@ -36,7 +36,7 @@ type PersistedPlanRunRecord = {
   mutableGraph?: MutablePlanRuntimeRecord;
 };
 
-export type SavedPlanRunState = {
+type SavedPlanRunState = {
   planRun: PlanRun;
   graph: PlanGraph | null;
   attempts: NodeAttempt[];
@@ -252,7 +252,7 @@ export async function getPlanRun(
   };
 }
 
-export async function getLatestPlanRun(taskId: string): Promise<SavedPlanRunState | null> {
+async function getLatestPlanRun(taskId: string): Promise<SavedPlanRunState | null> {
   const row = await db.taskPlanRun.findFirst({
     where: { taskId },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
