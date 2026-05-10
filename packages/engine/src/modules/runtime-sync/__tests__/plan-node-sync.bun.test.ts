@@ -44,6 +44,8 @@ describe("plan node sync on run completion", () => {
         title: "Parent task",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -54,6 +56,8 @@ describe("plan node sync on run completion", () => {
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
         parentTaskId: parentTask.id,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

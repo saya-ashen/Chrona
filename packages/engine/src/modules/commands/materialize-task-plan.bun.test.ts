@@ -47,6 +47,8 @@ describe("materialize-task-plan", () => {
         title: "Parent graph task",
         status: "Ready",
         priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

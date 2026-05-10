@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createChronaEngine } from "@chrona/engine";
 
 import { defaultLocale, getPreferredLocale, hasLocale } from "@chrona/i18n";
 
@@ -40,7 +41,8 @@ function wantsHtml(acceptHeader: string | undefined) {
  */
 export async function createServerApp() {
   const app = new Hono();
-  const api = createApiRouter();
+  const engine = createChronaEngine({ logger: log });
+  const api = createApiRouter(engine);
   const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 

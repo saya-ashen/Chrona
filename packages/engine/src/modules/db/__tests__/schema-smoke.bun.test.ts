@@ -36,6 +36,8 @@ describe("schema smoke", () => {
         title: "Draft adapter sync",
         status: TaskStatus.Ready,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -45,6 +47,8 @@ describe("schema smoke", () => {
         title: "Prepare runtime adapter",
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

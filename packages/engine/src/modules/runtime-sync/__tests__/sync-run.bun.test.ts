@@ -41,6 +41,8 @@ describe("syncRunFromRuntime", () => {
         title: "Sync waiting approval run",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -116,6 +118,8 @@ describe("syncRunFromRuntime", () => {
         title: "Sync completed run",
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -167,6 +171,8 @@ describe("syncRunFromRuntime", () => {
         title: "Sync externally resolved approval",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

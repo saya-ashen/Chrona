@@ -195,13 +195,13 @@ afterEach(() => {
 
 function createData(): SchedulePageData {
   return {
-    defaultRuntimeAdapterKey: "openclaw",
-    runtimeAdapters: [
+    defaultExecutionRuntime: "openclaw",
+    executionRuntimes: [
       {
         key: "openclaw",
         label: "OpenClaw",
         spec: {
-          adapterKey: "openclaw",
+          runtime: "openclaw",
           version: "openclaw-v1",
           fields: [],
           runnability: { requiredPaths: [] },
@@ -268,19 +268,13 @@ function createData(): SchedulePageData {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: {
-          adapterKey: "openclaw",
-          model: "gpt-5.4",
+        executionRuntime: "openclaw",
+        executionConfig: {
           approvalPolicy: "never",
           toolMode: "workspace-write",
           temperature: 0.2,
           prompt: "Implement the automation flow",
         },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Implement the automation flow",
-        runtimeConfig: { approvalPolicy: "never", toolMode: "workspace-write", temperature: 0.2 },
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready to run",
@@ -468,12 +462,8 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        runtimeAdapterKey: "mock",
-        runtimeInput: {},
-        runtimeInputVersion: "mock-v1",
-        runtimeModel: null,
-        prompt: null,
-        runtimeConfig: null,
+        executionRuntime: "openclaw",
+        executionConfig: {},
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",
@@ -517,12 +507,8 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        runtimeAdapterKey: "mock",
-        runtimeInput: {},
-        runtimeInputVersion: "mock-v1",
-        runtimeModel: null,
-        prompt: null,
-        runtimeConfig: null,
+        executionRuntime: "openclaw",
+        executionConfig: {},
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",

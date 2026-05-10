@@ -67,6 +67,8 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "High",
         dueAt: dayAfterTomorrowEighteen,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -77,6 +79,8 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Medium",
         dueAt: todayTwenty,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -87,6 +91,8 @@ describe("getSchedulePage", () => {
         title: "Draft the follow-up outline",
         status: "Ready",
         priority: "Low",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -105,6 +111,8 @@ describe("getSchedulePage", () => {
         title: "Review launch checklist",
         status: "Ready",
         priority: "Low",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -115,6 +123,8 @@ describe("getSchedulePage", () => {
         status: "Blocked",
         priority: "Urgent",
         dueAt: todayEighteen,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -202,6 +212,8 @@ describe("getSchedulePage", () => {
         title: "Hidden schedule item",
         status: "Ready",
         priority: "Low",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

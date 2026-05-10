@@ -165,12 +165,8 @@ const mockItem: ScheduledItem = {
   latestRunStatus: null,
   scheduleProposalCount: 0,
   lastActivityAt: null,
-  runtimeAdapterKey: "openclaw",
-  runtimeInput: {},
-  runtimeInputVersion: "openclaw-v1",
-  runtimeModel: null,
-  prompt: null,
-  runtimeConfig: null,
+  executionRuntime: "openclaw",
+  executionConfig: {},
   isRunnable: true,
   runnabilityState: "ready",
   runnabilitySummary: "Ready",
@@ -232,19 +228,19 @@ function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {})
 const defaultSheetProps = {
   item: mockItem,
   selectedDay: "2026-04-15",
-  runtimeAdapters: [
+  executionRuntimes: [
     {
       key: "openclaw",
       label: "OpenClaw",
       spec: {
-        adapterKey: "openclaw",
+        runtime: "openclaw",
         version: "openclaw-v1",
         fields: [],
         runnability: { requiredPaths: [] },
       },
     },
   ],
-  defaultRuntimeAdapterKey: "openclaw",
+  defaultExecutionRuntime: "openclaw",
   isPending: false,
   onClose: vi.fn(),
   onSaveTaskConfigAction: vi.fn(),

@@ -67,6 +67,8 @@ export async function seedTask(workspaceId: string, overrides?: {
       priority: (overrides?.priority ?? "Medium") as any,
       parentTaskId: overrides?.parentTaskId ?? null,
       dueAt: overrides?.dueAt ?? null,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
   return { workspaceId, taskId: task.id };

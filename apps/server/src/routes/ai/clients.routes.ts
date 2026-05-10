@@ -1,14 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import {
-  createAiClient,
-  deleteAiClient,
-  listAiClients,
-  testAiClientAvailability,
-  updateAiClient,
-  updateAiClientBindings,
-} from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import {
   createAiClientSchema,
   testAiClientSchema,
@@ -20,9 +12,9 @@ import {
 } from "@chrona/contracts/api";
 
 import { VALID_AI_FEATURES } from "../helpers";
-import { error, internalServerError, json } from "../../lib/http";
+import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
-export function createClientsRoutes() {
+export function createClientsRoutes(engine: ChronaEngine) {
   // ──────────────────────────────────────────────
   // AI Client Management
   // ──────────────────────────────────────────────
@@ -30,7 +22,7 @@ export function createClientsRoutes() {
   return new Hono()
     .get("/ai/clients", async (c) => {
       try {
-        const clients = await listAiClients();
+        const clients = await engine.aiClients.list();
 
         return json(c, {
           clients: clients.map((client) => ({
@@ -40,7 +32,9 @@ export function createClientsRoutes() {
             config: client.config,
             isDefault: client.isDefault,
             enabled: client.enabled,
-            bindings: client.bindings.map((binding) => binding.feature),
+            bindings: client.bindings.map(
+              (binding: { feature: string }) => binding.feature,
+            ),
             createdAt: client.createdAt.toISOString(),
           })),
         });
@@ -60,7 +54,7 @@ export function createClientsRoutes() {
         try {
           const { name, type, config, isDefault } = c.req.valid("json");
 
-          const client = await createAiClient({
+          const client = await engine.aiClients.create({
             name,
             type,
             config: config as Record<string, unknown> | undefined,
@@ -85,7 +79,7 @@ export function createClientsRoutes() {
         try {
           const { type, config } = c.req.valid("json");
 
-          const result = await testAiClientAvailability({
+          const result = await engine.aiClients.test({
             type,
             config: (config ?? {}) as Record<string, unknown>,
           });
@@ -111,21 +105,21 @@ export function createClientsRoutes() {
           const { clientId } = c.req.valid("param");
           const { name, config, isDefault, enabled } = c.req.valid("json");
 
-          const updated = await updateAiClient(clientId, {
-            name,
-            config,
-            isDefault,
-            enabled,
+          const updated = await engine.aiClients.update({
+            clientId,
+            data: {
+              name,
+              config,
+              isDefault,
+              enabled,
+            },
           });
 
           return json(c, { client: updated });
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to update AI client";
-          if (message === "Client not found") {
-            return error(c, message, 404);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,
@@ -142,10 +136,18 @@ export function createClientsRoutes() {
       async (c) => {
         try {
           const { clientId } = c.req.valid("param");
-          await deleteAiClient(clientId);
-          return json(c, { success: true });
-        } catch {
-          return error(c, "Client not found", 404);
+          return json(c, await engine.aiClients.delete({ clientId }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(
+            c,
+            "DELETE /api/ai/clients/:clientId",
+            cause,
+            "Failed to delete AI client",
+          );
         }
       },
     )
@@ -158,7 +160,7 @@ export function createClientsRoutes() {
           const { clientId } = c.req.valid("param");
           const { features } = c.req.valid("json");
 
-          const bindings = await updateAiClientBindings({
+          const bindings = await engine.aiClients.updateBindings({
             clientId,
             features,
             validFeatureSet: new Set(VALID_AI_FEATURES as readonly string[]),
@@ -166,12 +168,9 @@ export function createClientsRoutes() {
 
           return json(c, { bindings });
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to update feature bindings";
-          if (message === "Client not found") {
-            return error(c, message, 404);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,

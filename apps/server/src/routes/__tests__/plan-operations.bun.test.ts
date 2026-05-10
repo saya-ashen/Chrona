@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
-import { saveCompiledPlan, getLatestTaskPlanReadModel } from "@chrona/engine";
+import { createChronaEngine } from "@chrona/engine";
+import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
+import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/queries/task-plan-read-model";
 import { createPlansRoutes } from "../tasks/plan.routes";
-import type { CompiledPlan, GraphMutationRequest, NodeDefinitionLayer } from "@chrona/contracts/ai";
+import type { CompiledPlan } from "@chrona/contracts/ai";
 
 function app() {
   const a = new Hono();
-  a.route("/api", createPlansRoutes());
+  a.route("/api", createPlansRoutes(createChronaEngine()));
   return a;
 }
 
@@ -41,6 +43,8 @@ async function seedPlan() {
       title: "Test flow graph task",
       status: "Ready",
       priority: "High",
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -130,37 +134,11 @@ async function seedPlan() {
   return { workspaceId: workspace.id, taskId: task.id, planId: compiledPlan.editablePlanId };
 }
 
-function definitionLayer(input: {
-  nodeId: string;
-  title: string;
-  objective: string;
-  type?: "task" | "checkpoint" | "condition" | "wait";
-  estimatedMinutes?: number;
-  priority?: "Low" | "Medium" | "High" | "Urgent";
-}): NodeDefinitionLayer {
-  return {
-    id: `definition_${input.nodeId}_${Date.now()}`,
-    nodeId: input.nodeId,
-    type: "definition",
-    createdAt: new Date().toISOString(),
-    createdBy: "user",
-    definition: {
-      title: input.title,
-      objective: input.objective,
-      estimatedMinutes: input.estimatedMinutes,
-      semantics: {
-        type: input.type ?? "task",
-        priority: input.priority,
-      },
-    },
-  };
-}
-
-async function mutate(taskId: string, mutation: GraphMutationRequest) {
-  return app().request(`http://local/api/tasks/${taskId}/plan/mutations`, {
+async function patchPlan(taskId: string, patch: Record<string, unknown>) {
+  return app().request(`http://local/api/tasks/${taskId}/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(mutation),
+    body: JSON.stringify(patch),
   });
 }
 
@@ -169,61 +147,47 @@ describe("plan mutation routes", () => {
     await resetDb();
   });
 
-  it("adds a node and edge through /plan/mutations", async () => {
+  it("adds a node and dependency through the plan patch route", async () => {
     const { taskId } = await seedPlan();
-    const res = await mutate(taskId, {
-      reason: "Add auto-fix node",
-      scope: "future_only",
-      operations: [
+    const addNodeRes = await patchPlan(taskId, {
+      operation: "add_node",
+      summary: "Add auto-fix node",
+      nodes: [
         {
-          type: "add_node",
-          nodeId: "node-x",
-          semanticKey: "node-x",
-          definitionLayer: definitionLayer({
-            nodeId: "node-x",
-            title: "Auto-fix",
-            objective: "Auto-fix lint issues",
-            priority: "Low",
-          }),
-        },
-        {
-          type: "add_edge",
-          edge: {
-            id: "edge-cx",
-            fromNodeId: "node-c",
-            toNodeId: "node-x",
-            type: "ordering",
-            active: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
+          id: "node-x",
+          localId: "node-x",
+          title: "Auto-fix",
+          objective: "Auto-fix lint issues",
+          type: "task",
+          estimatedMinutes: 20,
+          priority: "Low",
         },
       ],
     });
+    const addDependencyRes = await patchPlan(taskId, {
+      operation: "update_dependencies",
+      summary: "Link review to auto-fix",
+      edges: [{ fromNodeId: "node-c", toNodeId: "node-x" }],
+    });
 
-    expect(res.status).toBe(200);
+    expect(addNodeRes.status).toBe(200);
+    expect(addDependencyRes.status).toBe(200);
     const savedPlan = await getLatestTaskPlanReadModel(taskId);
     expect(savedPlan?.effectivePlan.nodes.some((node) => node.id === "node-x")).toBe(true);
-    expect(savedPlan?.effectivePlan.edges.some((edge) => edge.id === "edge-cx" && edge.active)).toBe(true);
+    expect(
+      savedPlan?.effectivePlan.edges.some(
+        (edge) => edge.from === "node-c" && edge.to === "node-x" && edge.active,
+      ),
+    ).toBe(true);
   });
 
   it("pushes a new definition layer and updates node fields", async () => {
     const { taskId } = await seedPlan();
-    const res = await mutate(taskId, {
-      reason: "Rename research node",
-      scope: "future_only",
-      operations: [
-        {
-          type: "push_node_layer",
-          nodeId: "node-a",
-          layer: definitionLayer({
-            nodeId: "node-a",
-            title: "Deep Research",
-            objective: "Comprehensive study",
-            estimatedMinutes: 45,
-            priority: "High",
-          }),
-        },
+    const res = await patchPlan(taskId, {
+      operation: "update_node",
+      summary: "Rename research node",
+      nodePatches: [
+        { id: "node-a", title: "Deep Research", objective: "Comprehensive study", estimatedMinutes: 45 },
       ],
     });
 
@@ -236,10 +200,10 @@ describe("plan mutation routes", () => {
 
   it("deletes a node and removes it from the effective graph", async () => {
     const { taskId } = await seedPlan();
-    const res = await mutate(taskId, {
-      reason: "Remove design node",
-      scope: "future_only",
-      operations: [{ type: "delete_node", nodeId: "node-b" }],
+    const res = await patchPlan(taskId, {
+      operation: "delete_node",
+      summary: "Remove design node",
+      deletedNodeIds: ["node-b"],
     });
 
     expect(res.status).toBe(200);
@@ -252,39 +216,21 @@ describe("plan mutation routes", () => {
     ).toBe(false);
   });
 
-  it("adds and removes dependencies through edge mutations", async () => {
+  it("adds dependencies through the plan patch route", async () => {
     const { taskId } = await seedPlan();
-    const addRes = await mutate(taskId, {
-      reason: "Add cross dependency",
-      scope: "future_only",
-      operations: [
-        {
-          type: "add_edge",
-          edge: {
-            id: "edge-ac",
-            fromNodeId: "node-a",
-            toNodeId: "node-c",
-            type: "hard_dependency",
-            active: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      ],
+    const addRes = await patchPlan(taskId, {
+      operation: "update_dependencies",
+      summary: "Add cross dependency",
+      edges: [{ fromNodeId: "node-a", toNodeId: "node-c" }],
     });
 
     expect(addRes.status).toBe(200);
-
-    const removeRes = await mutate(taskId, {
-      reason: "Remove original dependency",
-      scope: "future_only",
-      operations: [{ type: "remove_edge", edgeId: "edge-bc" }],
-    });
-
-    expect(removeRes.status).toBe(200);
     const savedPlan = await getLatestTaskPlanReadModel(taskId);
-    expect(savedPlan?.effectivePlan.edges.some((edge) => edge.id === "edge-ac" && edge.active)).toBe(true);
-    expect(savedPlan?.effectivePlan.edges.some((edge) => edge.id === "edge-bc" && edge.active)).toBe(false);
+    expect(
+      savedPlan?.effectivePlan.edges.some(
+        (edge) => edge.from === "node-a" && edge.to === "node-c" && edge.active,
+      ),
+    ).toBe(true);
   });
 
   it("returns 404 when task has no persisted plan", async () => {
@@ -297,13 +243,15 @@ describe("plan mutation routes", () => {
         title: "Task without plan",
         status: "Ready",
         priority: "Medium",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
-    const res = await mutate(task.id, {
-      reason: "No-op",
-      scope: "future_only",
-      operations: [{ type: "delete_node", nodeId: "ghost-node" }],
+    const res = await patchPlan(task.id, {
+      operation: "delete_node",
+      summary: "No-op",
+      deletedNodeIds: ["ghost-node"],
     });
 
     expect(res.status).toBe(404);

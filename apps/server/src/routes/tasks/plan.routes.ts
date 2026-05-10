@@ -2,22 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
-
-import {
-  ensureTaskInWorkspace,
-  ensurePlanInWorkspace,
-  applyPlanPatchCommand,
-  saveCompiledPlan,
-  getLatestCompiledPlan,
-  isTaskPlanGenerationRunning,
-  generateTaskPlanManualStream,
-  getLatestTaskPlanReadModel,
-} from "@chrona/engine";
-import {
-  startTaskPlanGeneration,
-  stopTaskPlanGeneration,
-  TaskPlanGenerationInFlightError,
-} from "@chrona/engine";
+import { ENGINE_ERROR_CODES, EngineError, type ChronaEngine } from "@chrona/engine";
 import {
   planStateParamSchema,
   planAcceptParamSchema,
@@ -25,13 +10,15 @@ import {
   planGenerateParamSchema,
   planGenerateBodySchema,
   planGenerateStopParamSchema,
+  planMaterializeBodySchema,
+  planMaterializeParamSchema,
   planPatchParamSchema,
   planPatchBodySchema,
 } from "@chrona/contracts/api";
 import { logger, planGenerationConflictBody } from "../helpers";
-import { error, internalServerError, json } from "../../lib/http";
+import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
-export function createPlansRoutes() {
+export function createPlansRoutes(engine: ChronaEngine) {
   return new Hono()
     .get(
       "/tasks/:taskId/plan",
@@ -39,34 +26,13 @@ export function createPlansRoutes() {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          const savedPlan = await getLatestTaskPlanReadModel(taskId);
-
-          const planStatus =
-            savedPlan?.status === "accepted"
-              ? "accepted"
-              : savedPlan
-                ? "waiting_acceptance"
-                : "no_plan";
-
-          const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
-            ? "generating"
-            : planStatus === "accepted"
-              ? "accepted"
-              : planStatus === "waiting_acceptance"
-                ? "waiting_acceptance"
-                : "idle";
-
-          return json(c, {
-            taskId,
-            aiPlanGenerationStatus,
-            savedPlan,
-          });
+          return json(c, await engine.tasks.plan.getState({ taskId }));
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to get task plan state";
-          return error(c, message, 500);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "GET /api/tasks/:taskId/plan", cause, "Failed to get task plan state");
         }
       },
     )
@@ -79,35 +45,43 @@ export function createPlansRoutes() {
           const { taskId } = c.req.valid("param");
           const { planId, workspaceId } = c.req.valid("json");
 
-          if (workspaceId) {
-            await ensureTaskInWorkspace(taskId, workspaceId);
-            await ensurePlanInWorkspace(planId, taskId, workspaceId);
-          }
-
-          const latest = await getLatestCompiledPlan(taskId);
-          if (!latest || latest.compiledPlan.editablePlanId !== planId) {
-            return error(c, "Plan not found", 404);
-          }
-          await saveCompiledPlan({
-            workspaceId: latest.workspaceId,
-            taskId,
-            compiledPlan: latest.compiledPlan,
-            editablePlan: latest.editablePlan,
-            status: "accepted",
-            prompt: latest.prompt,
-            summary: latest.summary,
-            generatedBy: latest.generatedBy,
-          });
-          const acceptedPlan = await getLatestTaskPlanReadModel(taskId);
-          return json(c, {
-            savedPlan: acceptedPlan,
-          });
+          return json(c, await engine.tasks.plan.accept({ taskId, planId, workspaceId }));
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to accept task AI plan";
-          return error(c, message, message.includes("not found") ? 404 : 500);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/plan/accept", cause, "Failed to accept task AI plan");
+        }
+      },
+    )
+    .post(
+      "/tasks/:taskId/plan/materialize",
+      zValidator("param", planMaterializeParamSchema),
+      zValidator("json", planMaterializeBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const { workspaceId } = c.req.valid("json");
+          const result = await engine.tasks.plan.materialize({ taskId, workspaceId });
+
+          const childTasks = result.createdTaskIds.map((id) => ({
+            id,
+            parentTaskId: result.taskId,
+          }));
+
+          return json(c, {
+            parentTaskId: result.taskId,
+            childTasks,
+            planGraph: { nodes: [] },
+            updatedNodeIds: result.updatedNodeIds,
+          }, 201);
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/plan/materialize", cause, "Failed to materialize task plan");
         }
       },
     )
@@ -117,7 +91,7 @@ export function createPlansRoutes() {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, { taskId, stopped: stopTaskPlanGeneration(taskId) });
+          return json(c, engine.tasks.plan.stopGeneration({ taskId }));
         } catch (cause) {
           return internalServerError(
             c,
@@ -145,17 +119,14 @@ export function createPlansRoutes() {
             forceRefresh,
           });
 
-          const streamLock = startTaskPlanGeneration(taskId);
+          const generation = engine.tasks.plan.generate({ taskId, forceRefresh });
 
           return streamSSE(c, async (stream) => {
             const eventCounts: Record<string, number> = {};
-            stream.onAbort(() => streamLock.finish());
+            stream.onAbort(() => generation.finish());
 
             try {
-              for await (const event of generateTaskPlanManualStream({
-                taskId,
-                forceRefresh,
-              })) {
+              for await (const event of generation.events) {
                 eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
                 logger.info("stream.event", {
                   requestId,
@@ -249,22 +220,21 @@ export function createPlansRoutes() {
                 /* stream may already be closed */
               }
             } finally {
-              streamLock.finish();
+              generation.finish();
             }
           });
         } catch (cause) {
-          if (cause instanceof TaskPlanGenerationInFlightError) {
+          if (
+            cause instanceof EngineError &&
+            cause.code === ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT
+          ) {
             return json(c, planGenerationConflictBody(taskId), 409);
           }
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to generate task plan";
-          return error(
-            c,
-            message,
-            message.includes("Task not found") ? 404 : 500,
-          );
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/plan/generations", cause, "Failed to generate task plan");
         }
       },
     )
@@ -285,7 +255,7 @@ export function createPlansRoutes() {
             summary,
           } = c.req.valid("json");
 
-          const result = await applyPlanPatchCommand({
+          const result = await engine.tasks.plan.patch({
             taskId,
             operation,
             nodes: nodes as Array<Record<string, unknown>> | undefined,
@@ -300,21 +270,11 @@ export function createPlansRoutes() {
 
           return json(c, result, 200);
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to apply plan patch";
-          const normalizedMessage = message.toLowerCase();
-          const status =
-            normalizedMessage.includes("not found") ||
-            normalizedMessage.includes("no plan found")
-              ? 404
-              : normalizedMessage.includes("requires") ||
-                  normalizedMessage.includes("unsupported") ||
-                  normalizedMessage.includes("unknown")
-                ? 400
-                : 500;
-          return error(c, message, status);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/plan", cause, "Failed to apply plan patch");
         }
       },
     );

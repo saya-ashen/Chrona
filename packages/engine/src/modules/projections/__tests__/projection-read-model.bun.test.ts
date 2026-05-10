@@ -52,6 +52,8 @@ describe("projection read models", () => {
         title: "Review adapter mapping",
         status: TaskStatus.Running,
         priority: TaskPriority.Urgent,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

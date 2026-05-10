@@ -51,12 +51,8 @@ describe("progress-accepted-task-plan", () => {
         title: "Parent",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: { model: "gpt-5.4", prompt: "Parent" },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Parent",
-        runtimeConfig: { sessionStrategy: "per_subtask" },
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Parent", sessionStrategy: "per_subtask" },
       },
     });
 
@@ -67,11 +63,8 @@ describe("progress-accepted-task-plan", () => {
         title: "Step A",
         status: TaskStatus.Completed,
         priority: TaskPriority.Medium,
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: { model: "gpt-5.4", prompt: "A" },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "A",
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "A" },
       },
     });
 
@@ -82,11 +75,8 @@ describe("progress-accepted-task-plan", () => {
         title: "Step B",
         status: TaskStatus.Ready,
         priority: TaskPriority.Medium,
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: { model: "gpt-5.4", prompt: "B" },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "B",
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "B" },
       },
     });
 
@@ -228,6 +218,8 @@ describe("progress-accepted-task-plan", () => {
         title: "Parent",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -238,6 +230,8 @@ describe("progress-accepted-task-plan", () => {
         title: "Step A",
         status: TaskStatus.Completed,
         priority: TaskPriority.Medium,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

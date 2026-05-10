@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { ENGINE_ERROR_CODES, EngineError } from "@chrona/engine";
 
 export function json<T>(c: Context, payload: T, status: number = 200) {
   return c.json(payload, status as never);
@@ -50,5 +51,26 @@ export function toHttpError(errorValue: unknown) {
   if (errorValue instanceof HttpError) {
     return errorValue;
   }
+  if (errorValue instanceof EngineError) {
+    return new HttpError(engineErrorStatus(errorValue.code), errorValue.message);
+  }
   return null;
+}
+
+function engineErrorStatus(code: string) {
+  switch (code) {
+    case ENGINE_ERROR_CODES.TASK_NOT_FOUND:
+    case ENGINE_ERROR_CODES.WORKSPACE_NOT_FOUND:
+    case ENGINE_ERROR_CODES.PLAN_NOT_FOUND:
+    case ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND:
+      return 404;
+    case ENGINE_ERROR_CODES.VALIDATION_FAILED:
+    case ENGINE_ERROR_CODES.INVALID_TASK_STATE:
+      return 400;
+    case ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT:
+    case ENGINE_ERROR_CODES.CONFLICT:
+      return 409;
+    default:
+      return 500;
+  }
 }

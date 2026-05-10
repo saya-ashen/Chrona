@@ -50,9 +50,8 @@ describe("createTask (no auto plan generation)", () => {
       workspaceId: workspace.id,
       title: "Create task without auto plan",
       description: "Plan generation must be explicitly requested via the SSE endpoint.",
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: { prompt: "Do it" },
-      prompt: "Do it",
+      executionRuntime: "openclaw",
+      executionConfig: { prompt: "Do it" },
     });
 
     expect(result.taskId).toBeDefined();

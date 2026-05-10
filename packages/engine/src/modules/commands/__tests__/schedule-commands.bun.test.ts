@@ -45,6 +45,8 @@ describe("applySchedule", () => {
         title: "Plan the adapter work",
         status: "Ready",
         priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -105,6 +107,8 @@ describe("applySchedule", () => {
         title: "Invalid window",
         status: "Ready",
         priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -135,6 +139,8 @@ describe("applySchedule", () => {
         status: "Ready",
         priority: "High",
         dueAt: new Date("2026-04-12T18:00:00.000Z"),
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -195,6 +201,8 @@ describe("applySchedule", () => {
         title: "Review the timeline",
         status: "Ready",
         priority: "Medium",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -249,6 +257,8 @@ describe("applySchedule", () => {
         title: "Adopt proposal",
         status: "Ready",
         priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -316,6 +326,8 @@ describe("applySchedule", () => {
         status: "Ready",
         priority: "Medium",
         dueAt: new Date("2026-04-15T18:00:00.000Z"),
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

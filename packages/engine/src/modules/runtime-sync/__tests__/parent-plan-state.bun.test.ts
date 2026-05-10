@@ -54,6 +54,8 @@ async function seedLinkedChildRun() {
       title: "Parent task",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -64,6 +66,8 @@ async function seedLinkedChildRun() {
       status: TaskStatus.Running,
       priority: TaskPriority.Medium,
       parentTaskId: parentTask.id,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 

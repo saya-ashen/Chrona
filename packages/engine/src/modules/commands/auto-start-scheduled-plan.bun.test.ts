@@ -56,12 +56,8 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
       title: "Due scheduled task",
       status: "Ready",
       priority: "High",
-      runtimeAdapterKey: "openclaw",
-      runtimeInput: { model: "gpt-5.4", prompt: "Run task" },
-      runtimeInputVersion: "openclaw-legacy-v1",
-      runtimeModel: "gpt-5.4",
-      prompt: "Run task",
-      runtimeConfig: { sessionStrategy: "per_subtask" },
+      executionRuntime: "openclaw",
+      executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
       ...taskOverrides,
     },
   });
@@ -256,21 +252,6 @@ describe("auto-start-scheduled-plan", () => {
     expect(startPlanExecutionMock).not.toHaveBeenCalled();
   });
 
-  it("skips tasks without a runtime adapter key", async () => {
-    const workspace = await createWorkspace();
-    const { task } = await createDueTask(workspace.id, {
-      runtimeAdapterKey: null,
-    });
-
-    const result = await autoStartScheduledPlanTasks({ now: new Date() });
-
-    expect(result.started).toEqual([]);
-    expect(result.skipped.length).toBe(1);
-    expect(result.skipped[0]?.taskId).toBe(task.id);
-    expect(result.skipped[0]?.reason).toBe("no_runtime_config");
-    expect(startPlanExecutionMock).not.toHaveBeenCalled();
-  });
-
   it("writes task.auto_start.skipped events for skipped tasks", async () => {
     const workspace = await createWorkspace();
     const { task } = await createDueTask(workspace.id);
@@ -406,12 +387,8 @@ describe("auto-start-scheduled-plan", () => {
         title: "No work block task",
         status: "Ready",
         priority: "Medium",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: { model: "gpt-5.4", prompt: "Run" },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Run",
-        runtimeConfig: { sessionStrategy: "per_subtask" },
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });
 
@@ -429,12 +406,8 @@ describe("auto-start-scheduled-plan", () => {
         title: "Running task",
         status: "Running",
         priority: "High",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: { model: "gpt-5.4", prompt: "Run" },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Run",
-        runtimeConfig: { sessionStrategy: "per_subtask" },
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });
 

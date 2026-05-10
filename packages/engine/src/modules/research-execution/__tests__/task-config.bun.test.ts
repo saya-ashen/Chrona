@@ -10,7 +10,7 @@ import type { RuntimeExecutionAdapter } from "@chrona/runtime-core";
 describe("research task config", () => {
   it("returns a spec with a different field set and required rule", () => {
     expect(getResearchTaskConfigSpec()).toMatchObject({
-      adapterKey: "research",
+      runtime: "research",
       version: "research-v1",
       runnability: {
         requiredPaths: ["prompt"],

@@ -7,13 +7,11 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { ApprovalStatus, RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import {
-  acceptTaskResult,
-  createFollowUpTask,
-  markTaskDone,
-  reopenTask,
-  resolveApproval,
-} from "@chrona/engine";
+import { acceptTaskResult } from "@chrona/engine/modules/commands/accept-task-result";
+import { createFollowUpTask } from "@chrona/engine/modules/commands/create-follow-up-task";
+import { markTaskDone } from "@chrona/engine/modules/commands/mark-task-done";
+import { reopenTask } from "@chrona/engine/modules/commands/reopen-task";
+import { resolveApproval } from "@chrona/engine/modules/commands/resolve-approval";
 import { resetTestDb, seedAcceptedPlan, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 // ---------------------------------------------------------------------------
@@ -343,7 +341,7 @@ describe("POST /api/tasks/:taskId/reopen", () => {
 
     await db.task.update({
       where: { id: taskId },
-      data: { runtimeModel: "gpt-5.4", prompt: "Prompt", completedAt: new Date() },
+      data: { completedAt: new Date() },
     });
 
     const res = await app().request("http://local/api/tasks/" + taskId + "/reopen", {
@@ -367,7 +365,7 @@ describe("POST /api/tasks/:taskId/reopen", () => {
 
     await db.task.update({
       where: { id: taskId },
-      data: { runtimeModel: "gpt-5.4", prompt: "Prompt", completedAt: new Date() },
+      data: { completedAt: new Date() },
     });
 
     const res = await app().request("http://local/api/tasks/" + taskId + "/reopen", {
@@ -391,7 +389,7 @@ describe("POST /api/tasks/:taskId/reopen", () => {
 
     await db.task.update({
       where: { id: taskId },
-      data: { runtimeModel: "gpt-5.4", prompt: "Prompt", completedAt: new Date() },
+      data: { completedAt: new Date() },
     });
 
     const res = await app().request("http://local/api/tasks/" + taskId + "/reopen", {
@@ -521,11 +519,8 @@ describe("POST /api/tasks/:taskId/follow-ups", () => {
     await db.task.update({
       where: { id: taskId },
       data: {
-        runtimeAdapterKey: "openclaw",
-        runtimeModel: "gpt-5.4",
-        prompt: "Parent prompt",
-        runtimeConfig: { temperature: 0.5 },
-        runtimeInput: {
+        executionRuntime: "openclaw",
+        executionConfig: {
           model: "gpt-5.4",
           prompt: "Parent prompt",
           temperature: 0.5,
@@ -533,7 +528,6 @@ describe("POST /api/tasks/:taskId/follow-ups", () => {
           toolMode: "workspace-write",
           approvalPolicy: "never",
         },
-        runtimeInputVersion: "openclaw-legacy-v1",
       },
     });
 
@@ -563,9 +557,8 @@ describe("POST /api/tasks/:taskId/follow-ups", () => {
     await db.task.update({
       where: { id: taskId },
       data: {
-        runtimeAdapterKey: "openclaw",
-        prompt: "Parent prompt",
-        runtimeConfig: { temperature: 0.7 },
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Parent prompt", temperature: 0.7 },
       },
     });
 
@@ -582,8 +575,8 @@ describe("POST /api/tasks/:taskId/follow-ups", () => {
       include: { projection: true },
     });
     expect(followUp.parentTaskId).toBe(taskId);
-    expect(followUp.prompt).toBe("Parent prompt");
-    expect(followUp.runtimeAdapterKey).toBe("openclaw");
+    expect((followUp.executionConfig as { prompt?: string }).prompt).toBe("Parent prompt");
+    expect(followUp.executionRuntime).toBe("openclaw");
     expect(followUp.status).toBe(TaskStatus.Ready);
     expect(followUp.projection?.scheduleStatus).toBe("Unscheduled");
   });

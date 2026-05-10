@@ -19,10 +19,10 @@ import { TaskConfigForm } from "@/components/schedule/task-config-form";
 
 const baseAdapter = {
   key: "openclaw",
-  label: "OpenClaw",
-  spec: {
-    adapterKey: "openclaw",
-    version: "openclaw-v1",
+      label: "OpenClaw",
+      spec: {
+        runtime: "openclaw",
+        version: "openclaw-v1",
     fields: [
       {
         key: "prompt",
@@ -49,8 +49,8 @@ const baseAdapter = {
 };
 
 const defaultProps = {
-  runtimeAdapters: [baseAdapter],
-  defaultRuntimeAdapterKey: "openclaw",
+  executionRuntimes: [baseAdapter],
+  defaultExecutionRuntime: "openclaw",
   submitLabel: "Save",
   pendingLabel: "Saving...",
   onSubmitAction: vi.fn(),

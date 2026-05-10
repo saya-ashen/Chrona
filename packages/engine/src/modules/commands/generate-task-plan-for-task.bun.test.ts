@@ -86,6 +86,8 @@ describe("generateTaskPlanForTask", () => {
         description: "Updated description from DB",
         status: "Ready",
         priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
     await db.workBlock.create({
@@ -128,6 +130,8 @@ describe("generateTaskPlanForTask", () => {
         title: "Cached title",
         status: "Ready",
         priority: "Medium",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -161,6 +165,8 @@ describe("generateTaskPlanForTask", () => {
         title: "Broken planner output",
         status: "Ready",
         priority: "Medium",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -215,6 +221,8 @@ describe("generateTaskPlanForTask", () => {
         title: "Enriched test task",
         status: "Ready",
         priority: "Medium",
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

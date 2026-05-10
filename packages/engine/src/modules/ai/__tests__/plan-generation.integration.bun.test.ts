@@ -13,7 +13,6 @@
 import { describe, expect, it } from "bun:test";
 
 import { extractJSON, llmCall } from "@/modules/ai/providers";
-import { SYSTEM_PROMPTS } from "@/modules/ai/prompts";
 import { createPlanGraphFromCompiledPlan } from "@/modules/plan-execution/plan-run-store";
 import type {
   PlanBlueprintNode,
@@ -36,6 +35,8 @@ const LLM_CONFIG = {
   temperature: 0.7,
 };
 const RUN_LLM_INTEGRATION = process.env.RUN_LLM_INTEGRATION === "1";
+const GENERATE_PLAN_SYSTEM_PROMPT =
+  "Generate a structured executable task plan graph as JSON for Chrona's task planner.";
 
 // Try to load API key from DB if not in env
 async function ensureApiKey() {
@@ -135,7 +136,7 @@ Estimated: 60 min
 
 Return JSON.`;
 
-    const raw = await llmCall(LLM_CONFIG, SYSTEM_PROMPTS.generate_plan, msg, {
+    const raw = await llmCall(LLM_CONFIG, GENERATE_PLAN_SYSTEM_PROMPT, msg, {
       jsonMode: true,
       temperature: 0.7,
     });
@@ -187,7 +188,7 @@ Estimated: 90 min
 
 Return JSON.`;
 
-    const raw = await llmCall(LLM_CONFIG, SYSTEM_PROMPTS.generate_plan, msg, {
+    const raw = await llmCall(LLM_CONFIG, GENERATE_PLAN_SYSTEM_PROMPT, msg, {
       jsonMode: true,
       temperature: 0.5,
     });
@@ -213,7 +214,7 @@ Estimated: 45 min
 
 Return JSON.`;
 
-    const raw = await llmCall(LLM_CONFIG, SYSTEM_PROMPTS.generate_plan, msg, {
+    const raw = await llmCall(LLM_CONFIG, GENERATE_PLAN_SYSTEM_PROMPT, msg, {
       jsonMode: true,
       temperature: 0.3,
     });

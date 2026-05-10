@@ -43,6 +43,8 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
     create: {
       id: "task_projection",
@@ -51,6 +53,8 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -62,6 +66,8 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
     create: {
       id: "task_adapter",
@@ -70,6 +76,8 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -82,6 +90,8 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
     create: {
       id: "task_scheduled",
@@ -91,6 +101,8 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -103,6 +115,8 @@ async function main() {
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
       dueAt: null,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
     create: {
       id: "task_unscheduled",
@@ -111,6 +125,8 @@ async function main() {
       description: "Needs a planned slot before AI starts drafting.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 
@@ -123,6 +139,8 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
     create: {
       id: "task_overdue",
@@ -132,6 +150,8 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
+      executionRuntime: "openclaw",
+      executionConfig: {},
     },
   });
 

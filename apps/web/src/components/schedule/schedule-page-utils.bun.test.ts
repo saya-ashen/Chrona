@@ -66,12 +66,8 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    runtimeAdapterKey: overrides.runtimeAdapterKey ?? "mock",
-    runtimeInput: overrides.runtimeInput ?? {},
-    runtimeInputVersion: overrides.runtimeInputVersion ?? "1",
-    runtimeModel: overrides.runtimeModel ?? null,
-    prompt: overrides.prompt ?? null,
-    runtimeConfig: overrides.runtimeConfig ?? null,
+    executionRuntime: overrides.executionRuntime ?? "openclaw",
+    executionConfig: overrides.executionConfig ?? {},
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
@@ -218,8 +214,8 @@ describe("sortScheduledItems – with string dates", () => {
 
   it("hydrates schedule page data so string scheduled dates become real Date objects", () => {
     const hydrated = hydrateSchedulePageData({
-      defaultRuntimeAdapterKey: "openclaw",
-      runtimeAdapters: [],
+      defaultExecutionRuntime: "openclaw",
+      executionRuntimes: [],
       summary: {
         scheduledCount: 1,
         unscheduledCount: 0,
@@ -802,9 +798,8 @@ describe("toTaskConfigInitialValues", () => {
     expect(result.title).toBe("My Task");
     expect(result.priority).toBe("High");
     expect(result.description).toBeNull();
-    expect(result.runtimeAdapterKey).toBeNull();
-    expect(result.runtimeModel).toBeNull();
-    expect(result.prompt).toBeNull();
+    expect(result.executionRuntime).toBeNull();
+    expect(result.executionConfig).toBeUndefined();
     expect(result.dueAt).toBeNull();
   });
 
@@ -814,18 +809,14 @@ describe("toTaskConfigInitialValues", () => {
       title: "Task",
       description: "Desc",
       priority: "Low",
-      runtimeAdapterKey: "openai",
-      runtimeModel: "gpt-4",
-      prompt: "Do stuff",
+      executionRuntime: "openclaw",
+      executionConfig: { prompt: "Do stuff" },
       dueAt: due,
-      runtimeInput: { key: "val" },
-      runtimeInputVersion: "2",
-      runtimeConfig: { temp: 0.5 },
     });
     expect(result.description).toBe("Desc");
-    expect(result.runtimeAdapterKey).toBe("openai");
+    expect(result.executionRuntime).toBe("openclaw");
     expect(result.dueAt).toBe(due);
-    expect(result.runtimeInput).toEqual({ key: "val" });
+    expect(result.executionConfig).toEqual({ prompt: "Do stuff" });
   });
 });
 
@@ -864,7 +855,7 @@ describe("buildPlanningSummary", () => {
     const summary = buildPlanningSummary({
       scheduled: [],
       unscheduled: [],
-      proposals: [],
+      proposals: [{ id: "proposal-1" } as never],
       risks: [createScheduledItem({ taskId: "r1" })],
     });
     expect(summary.proposalCount).toBe(1);
@@ -900,12 +891,8 @@ describe("buildTodayFocusItems", () => {
       latestRunStatus: overrides.latestRunStatus ?? null,
       scheduleProposalCount: 0,
       lastActivityAt: null,
-      runtimeAdapterKey: "mock",
-      runtimeInput: {},
-      runtimeInputVersion: "1",
-      runtimeModel: null,
-      prompt: null,
-      runtimeConfig: null,
+      executionRuntime: "openclaw",
+      executionConfig: {},
       isRunnable: true,
       runnabilityState: "ready_to_run",
     runnabilitySummary: "Ready",
@@ -914,14 +901,14 @@ describe("buildTodayFocusItems", () => {
   }
 
   it("returns empty for no risks and no group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items).toEqual([]);
   });
 
   it("includes overdue risks", () => {
     const risk = makeRisk({ taskId: "t1", scheduleStatus: "Overdue" });
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(1);
     expect(items[0].reason).toBe("Overdue");
@@ -929,7 +916,7 @@ describe("buildTodayFocusItems", () => {
   });
 
   it("includes high-priority unstarted items from active group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const group = {
       key: "2026-04-15",
       date: new Date(2026, 3, 15),
@@ -947,7 +934,7 @@ describe("buildTodayFocusItems", () => {
     const risks = Array.from({ length: 8 }, (_, i) =>
       makeRisk({ taskId: `risk-${i}`, scheduleStatus: "Overdue" }),
     );
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultRuntimeAdapterKey: "", runtimeAdapters: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(5);
   });
