@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 import { ReactFlow, type NodeMouseHandler } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { LAYOUT_DIRECTION } from "./constants";
+import { edgeTypes } from "./edge";
 import { EdgeLegend } from "./legend";
 import { nodeTypes } from "./node-card";
 import type {
@@ -82,6 +83,7 @@ export function TaskPlanGraphFrame({
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodeClick={handleNodeClick}
               onNodeDragStart={handleNodeDragStart}
               onNodeDrag={handleNodeDrag}

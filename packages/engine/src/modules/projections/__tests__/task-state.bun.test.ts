@@ -13,9 +13,25 @@ describe("deriveTaskState", () => {
       sync: { stale: false },
     });
 
-    expect(result.persistedStatus).toBe("Blocked");
-    expect(result.displayState).toBe("WaitingForApproval");
+    expect(result.persistedStatus).toBe("WaitingForApproval");
+    expect(result.displayState).toBeNull();
     expect(result.blockReason?.actionRequired).toBe("Approve / Reject / Edit and Approve");
+  });
+
+  it("promotes waiting-for-input to a first-class persisted status", () => {
+    const result = deriveTaskState({
+      task: { status: "Running", latestRunId: "run_2" },
+      runs: [
+        { id: "run_1", status: "Completed", updatedAt: new Date("2026-04-08T09:00:00Z") },
+        { id: "run_2", status: "WaitingForInput", updatedAt: new Date("2026-04-08T10:00:00Z") },
+      ],
+      approvals: [],
+      sync: { stale: false },
+    });
+
+    expect(result.persistedStatus).toBe("WaitingForInput");
+    expect(result.displayState).toBeNull();
+    expect(result.blockReason?.actionRequired).toBe("Provide Input");
   });
 
   it("keeps sync-stale as a display state instead of overwriting the stored task status", () => {

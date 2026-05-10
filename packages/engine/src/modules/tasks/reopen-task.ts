@@ -1,7 +1,10 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { deriveTaskStaticState } from "@chrona/domain";
 
 export async function reopenTask(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -12,8 +15,13 @@ export async function reopenTask(input: { taskId: string }) {
       },
     },
   });
-  // FIXME:
-  const nextStatus = TaskStatus.Ready;
+  const acceptedPlan = await getAcceptedCompiledPlan(task.id);
+  const staticState = deriveTaskStaticState({
+    runtimeSpec: getRuntimeTaskConfigSpec(task.executionRuntime),
+    executionConfig: task.executionConfig,
+    hasAcceptedPlan: acceptedPlan !== null,
+  });
+  const nextStatus = TaskStatus[staticState.persistedStatus];
 
   await db.task.update({
     where: { id: task.id },

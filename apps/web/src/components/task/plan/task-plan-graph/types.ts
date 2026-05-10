@@ -228,7 +228,11 @@ export type FlowNodeData = {
 };
 
 export type FlowGraphNode = Node<FlowNodeData, "taskPlanNode">;
-export type FlowGraphEdge = Edge;
+export type FlowEdgeData = {
+  stableLabel?: string;
+};
+
+export type FlowGraphEdge = Edge<FlowEdgeData, "taskPlanEdge">;
 
 export type EdgeLegendItem = {
   label: string;

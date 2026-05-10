@@ -17,7 +17,7 @@ export async function getWorkspaceOverview(workspaceId: string) {
         latestRunStatus: item.latestRunStatus,
       })),
     waitingForApproval: projections
-      .filter((item) => item.displayState === "WaitingForApproval")
+      .filter((item) => item.persistedStatus === "WaitingForApproval")
       .map((item) => ({
         taskId: item.taskId,
         workspaceId: item.workspaceId,

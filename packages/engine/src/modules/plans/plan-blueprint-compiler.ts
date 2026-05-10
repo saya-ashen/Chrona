@@ -4,7 +4,7 @@ import type {
   CompiledPlan,
   LayerSource,
   PlanBlueprint,
-  PlanBlueprintEdge
+  PlanBlueprintEdge,
 } from "@chrona/contracts/ai";
 import {
   PlanCompileError,
@@ -70,7 +70,10 @@ function assertDag(nodeIds: string[], edges: PlanBlueprintEdge[]) {
   return visited === nodeIds.length;
 }
 
-function checkHighRiskTasks(nodes: PlanBlueprint["nodes"], edges: PlanBlueprintEdge[]) {
+function checkHighRiskTasks(
+  nodes: PlanBlueprint["nodes"],
+  edges: PlanBlueprintEdge[],
+) {
   const issues: Array<{ path: string; message: string }> = [];
   const incoming = new Map<string, string[]>();
   for (const edge of edges) {
@@ -178,6 +181,7 @@ function validateBlueprint(input: { blueprint: PlanBlueprint }) {
   }
 
   issues.push(...checkHighRiskTasks(input.blueprint.nodes, allEdges));
+  console.log("Plan blueprint validation completed with", issues, "issues");
 
   if (issues.length > 0) {
     throw new PlanCompileError("Plan blueprint compilation failed", issues);
@@ -201,15 +205,4 @@ export function compilePlanBlueprint(input: {
   const compiledPlan = compileEditablePlan(editable);
 
   return { compiledPlan, planId };
-}
-
-/**
- * Compiles a loose AI blueprint (AIPlanOutput) into a new-architecture CompiledPlan.
- */
-function compileBlueprintToCompiledPlan(
-  blueprint: PlanBlueprint,
-): CompiledPlan {
-  const planId = `plan_${randomUUID().slice(0, 8)}`;
-  const editable = upgradeBlueprintToEditable(blueprint, planId, 1);
-  return compileEditablePlan(editable);
 }

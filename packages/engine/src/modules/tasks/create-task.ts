@@ -4,6 +4,8 @@ import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
+import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { deriveTaskStaticState } from "@chrona/domain";
 import type { CreateTaskInput } from "@chrona/contracts";
 
 function normalizeExecutionConfig(
@@ -58,8 +60,12 @@ export async function createTask(input: CreateTaskInput) {
     executionConfig,
   });
 
-  // FIXME:
-  const status = TaskStatus.Blocked;
+  const staticState = deriveTaskStaticState({
+    runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
+    executionConfig: validatedRuntimeConfig.executionConfig,
+    hasAcceptedPlan: false,
+  });
+  const status = TaskStatus[staticState.persistedStatus];
 
   const task = await db.task.create({
     data: {

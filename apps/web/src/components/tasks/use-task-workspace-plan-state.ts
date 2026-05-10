@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
@@ -32,6 +32,7 @@ function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationR
 export function useTaskWorkspacePlanState(task: TaskData) {
   const queryClient = useQueryClient();
   const generationSession = useTaskPlanGenerationSession(task.id);
+  const previousGenerationStatusRef = useRef(generationSession.sessionStatus);
   const syncTaskDetailPlanFields = useCallback((nextPlanState: TaskPlanState) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.detail(task.id), (current: TaskData | undefined) => {
       if (!current) return current;
@@ -99,12 +100,18 @@ export function useTaskWorkspacePlanState(task: TaskData) {
   }, [generationSession, queryClient, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
 
   useEffect(() => {
+    const previousStatus = previousGenerationStatusRef.current;
+    previousGenerationStatusRef.current = generationSession.sessionStatus;
+
     if (!generationSession.hydrated || generationSession.sessionStatus === "running") {
       return;
     }
 
-    void planStateQuery.refetch();
-  }, [generationSession.hydrated, generationSession.sessionStatus, planStateQuery]);
+    // Only refresh persisted plan state once when an active generation session settles.
+    if (previousStatus === "running") {
+      void planStateQuery.refetch();
+    }
+  }, [generationSession.hydrated, generationSession.sessionStatus, planStateQuery.refetch]);
 
   useEffect(() => {
     if (!planState) return;
