@@ -34,8 +34,6 @@ export type GraphExecutionTrigger = "manual" | "scheduler" | "system" | "auto";
 export type GraphNodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
-  childTaskId?: string;
-  childSessionId?: string;
   artifactIds?: string[];
   conversationEntryIds?: string[];
   eventIds?: string[];
@@ -67,12 +65,6 @@ export type GraphNodeExecutionResult =
       reason: string;
       evidence?: GraphNodeExecutionEvidence;
       proposedPatch?: unknown;
-    }
-  | {
-      status: "child_running";
-      summary: string;
-      evidence: GraphNodeExecutionEvidence;
-      output?: unknown;
     }
   | { status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence };
 
@@ -122,7 +114,6 @@ export type GraphExecutionEvent =
   | { type: "node_completed"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
   | { type: "node_waiting_for_user"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
   | { type: "node_waiting_for_approval"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
-  | { type: "child_run_started"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
   | { type: "node_blocked"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
   | { type: "replan_proposed"; node: EffectivePlanNode; result: GraphNodeExecutionResult };
 
@@ -288,7 +279,8 @@ export function mapTerminalReasonToGraphStatus(effective: EffectivePlanGraph): G
   if (effective.blockedNodeIds.length > 0 || effective.failedNodeIds.length > 0) {
     return "blocked";
   }
-  if (effective.completedNodeIds.length === effective.nodes.length) return "completed";
+  const reachableNodeIds = effective.nodes.filter((node) => node.reachable).map((node) => node.id);
+  if (reachableNodeIds.every((nodeId) => effective.completedNodeIds.includes(nodeId))) return "completed";
   return "blocked";
 }
 
@@ -362,16 +354,6 @@ function appendExecutionResult(input: {
           review: { required: true, status: "pending" },
         },
       });
-    case "child_running":
-      return appendCurrentResult({
-        results: input.state.results,
-        result: {
-          ...base,
-          status: "current",
-          waitKind: "external_dependency",
-          outputSummary: input.result.summary,
-        },
-      });
     case "blocked":
       return appendCurrentResult({
         results: input.state.results,
@@ -412,8 +394,6 @@ function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {
     case "waiting_for_approval":
     case "replan_required":
       return "approval";
-    case "child_running":
-      return "external_dependency";
     case "blocked":
       return "manual_action";
     default:
@@ -426,7 +406,6 @@ function getResultMessage(result: GraphNodeExecutionResult): string {
     case "waiting_for_user":
     case "waiting_for_approval":
       return result.prompt;
-    case "child_running":
     case "done":
       return result.summary;
     case "blocked":
@@ -445,8 +424,6 @@ function getEventType(result: GraphNodeExecutionResult): GraphExecutionEvent["ty
       return "node_waiting_for_user";
     case "waiting_for_approval":
       return "node_waiting_for_approval";
-    case "child_running":
-      return "child_run_started";
     case "blocked":
       return "node_blocked";
     case "replan_required":
@@ -732,23 +709,50 @@ function approveCurrentNodeResult(input: {
   feedback?: string;
   reviewedAt: string;
 }): GraphExecutionState {
+  const nextResults: NodeResult[] = [];
+  for (const result of input.state.results) {
+    if (result.nodeId !== input.nodeId || result.status !== "current") {
+      nextResults.push(result);
+      continue;
+    }
+    if (!result.review && !result.waitKind) {
+      nextResults.push(result);
+      continue;
+    }
+    const reviewedResult: NodeResult = {
+      ...result,
+      status: input.approved ? "obsolete" : "rejected",
+      waitKind: undefined,
+      review: {
+        required: true,
+        status: input.approved ? "accepted" : "rejected",
+        feedback: input.feedback,
+        reviewedAt: input.reviewedAt,
+      },
+    };
+    if (input.approved) {
+      nextResults.push(reviewedResult);
+    } else {
+      nextResults.push(reviewedResult, {
+        ...reviewedResult,
+        id: `${result.id ?? `result_${input.nodeId}`}_review_rejected`,
+        status: "current",
+        waitKind: "review",
+        error: input.feedback ?? "Approval rejected",
+      });
+    }
+  }
+
   return {
     ...input.state,
-    results: input.state.results.map((result) => {
-      if (result.nodeId !== input.nodeId || result.status !== "current") return result;
-      if (!result.review && !result.waitKind) return result;
-      return {
-        ...result,
-        status: input.approved ? "obsolete" : "rejected",
-        waitKind: undefined,
-        review: {
-          required: true,
-          status: input.approved ? "accepted" : "rejected",
-          feedback: input.feedback,
-          reviewedAt: input.reviewedAt,
-        },
-      };
-    }),
+    attempts: input.approved
+      ? input.state.attempts.map((attempt) =>
+          attempt.nodeId === input.nodeId && attempt.status === "succeeded"
+            ? { ...attempt, status: "cancelled" }
+            : attempt,
+        )
+      : input.state.attempts,
+    results: nextResults,
   };
 }
 
@@ -979,7 +983,6 @@ export function createGraphRuntime<TContext = unknown>(
             maxSteps: options.policies?.maxSteps,
             maxConcurrency: options.policies?.maxConcurrency,
             forcedNodeId: command.input.nodeId,
-            userInput: command.input.feedback,
             now: options.now,
             callbacks,
           });

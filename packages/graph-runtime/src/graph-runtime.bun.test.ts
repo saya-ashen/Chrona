@@ -225,29 +225,35 @@ describe("graph-runtime", () => {
       now: "2026-01-01T00:00:00.000Z",
     });
     let tick = 50;
+    const state: GraphExecutionState = {
+      graph,
+      attempts: [],
+      results: [
+        {
+          id: "result_pending_external",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          attemptId: "external_attempt_1",
+          status: "current",
+          waitKind: "external_dependency",
+          outputSummary: "External run started",
+        },
+      ],
+      executionContextSnapshots: [],
+    };
     const runtime = createGraphRuntime({
       taskId: "task_1",
       runtimeName: "test",
       now: () => tick++,
       executors: {
-        condition: async ({ node, plan, userInput }) => {
-          if (node.id === "choose") {
-            return { status: "child_running", summary: "External run started", evidence: { runId: "run_1" } };
-          }
-          return executeBuiltinGraphNode({ node, plan, userInput });
-        },
+        condition: async ({ node, plan, userInput }) => executeBuiltinGraphNode({ node, plan, userInput }),
       },
     });
 
-    const first = await runtime.dispatch({
-      type: "start",
-      state: { graph, attempts: [], results: [], executionContextSnapshots: [] },
-      trigger: "manual",
-      context: null,
-    });
     const second = await runtime.dispatch({
       type: "sync_external_result",
-      state: first.state,
+      state,
       context: null,
       externalResult: {
         nodeId: "choose",
@@ -258,8 +264,6 @@ describe("graph-runtime", () => {
       },
     });
 
-    expect(first.status).toBe("blocked");
-    expect(first.waitKind).toBe("external_dependency");
     expect(second.status).toBe("waiting_for_user");
     expect(second.currentNodeId).toBe("done");
     expect(second.state.results.map((result) => [result.nodeId, result.status])).toEqual([

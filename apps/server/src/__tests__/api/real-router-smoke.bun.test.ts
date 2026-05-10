@@ -32,7 +32,7 @@ function makeSmokeCompiledPlan(planId: string): CompiledPlan {
     editablePlanId: planId,
     sourceVersion: 1,
     title: "Smoke plan",
-    goal: "Materialize child tasks through production router",
+    goal: "Accept plan through production router",
     assumptions: [],
     nodes: [
       {
@@ -155,7 +155,7 @@ describe("Real router smoke", () => {
     await expectApiError(missingRes, 404);
   });
 
-  it("runs plan accept and materialize through the production router", async () => {
+  it("runs plan accept through the production router", async () => {
     const { workspaceId } = await seedWorkspace("Real Router Plan");
     const { taskId } = await seedTask(workspaceId, { title: "Plan parent" });
     const compiledPlan = makeSmokeCompiledPlan("real-router-plan");
@@ -186,35 +186,6 @@ describe("Real router smoke", () => {
     expect(stateBody.aiPlanGenerationStatus).toBe("accepted");
     expect(stateBody.savedPlan?.id).toBe(compiledPlan.editablePlanId);
     expect(stateBody.savedPlan?.compiledPlan.nodes.length).toBeGreaterThan(0);
-
-    const applyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId }),
-    });
-    expect(applyRes.status).toBe(201);
-    const applyBody = await json<{
-      parentTaskId: string;
-      childTasks: Array<{ parentTaskId: string }>;
-      planGraph: { nodes: Array<{ linkedTaskId?: string | null }> };
-    }>(applyRes);
-    expect(applyBody.parentTaskId).toBe(taskId);
-    expect(applyBody.childTasks.length).toBe(2);
-    expect(applyBody.childTasks.every((task) => task.parentTaskId === taskId)).toBe(true);
-    expect(applyBody.planGraph.nodes.filter((node) => node.linkedTaskId).length).toBe(0);
-
-    const reapplyRes = await app().request(`http://local/api/tasks/${taskId}/plan/materialize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId }),
-    });
-    expect(reapplyRes.status).toBe(201);
-
-    const childTasks = await db.task.findMany({
-      where: { parentTaskId: taskId },
-      orderBy: { createdAt: "asc" },
-    });
-    expect(childTasks).toHaveLength(2);
   });
 
   it("runs schedule proposal create, accept, and reject through the production router", async () => {

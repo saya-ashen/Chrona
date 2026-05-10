@@ -14,8 +14,6 @@ type MainSessionEventType =
   | "node_waiting_for_user"
   | "node_waiting_for_approval"
   | "node_blocked"
-  | "child_session_created"
-  | "child_run_started"
   | "graph_mutation_applied"
   | "external_result_synced"
   | "replan_proposed"

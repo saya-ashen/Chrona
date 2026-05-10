@@ -12,8 +12,6 @@ import {
   planGenerateParamSchema,
   planGenerateBodySchema,
   planGenerateStopParamSchema,
-  planMaterializeBodySchema,
-  planMaterializeParamSchema,
   planPatchParamSchema,
   planPatchBodySchema,
 } from "@chrona/contracts/api";
@@ -133,36 +131,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
             return error(c, httpError.message, httpError.status);
           }
           return internalServerError(c, "POST /api/tasks/:taskId/plan/accept", cause, "Failed to accept task AI plan");
-        }
-      },
-    )
-    .post(
-      "/tasks/:taskId/plan/materialize",
-      zValidator("param", planMaterializeParamSchema),
-      zValidator("json", planMaterializeBodySchema),
-      async (c) => {
-        try {
-          const { taskId } = c.req.valid("param");
-          const { workspaceId } = c.req.valid("json");
-          const result = await engine.tasks.plan.materialize({ taskId, workspaceId });
-
-          const childTasks = result.createdTaskIds.map((id) => ({
-            id,
-            parentTaskId: result.taskId,
-          }));
-
-          return json(c, {
-            parentTaskId: result.taskId,
-            childTasks,
-            planGraph: { nodes: [] },
-            updatedNodeIds: result.updatedNodeIds,
-          }, 201);
-        } catch (cause) {
-          const httpError = toHttpError(cause);
-          if (httpError) {
-            return error(c, httpError.message, httpError.status);
-          }
-          return internalServerError(c, "POST /api/tasks/:taskId/plan/materialize", cause, "Failed to materialize task plan");
         }
       },
     )
