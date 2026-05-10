@@ -1,8 +1,11 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
+import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { deriveTaskStaticState } from "@chrona/domain";
 import type { UpdateTaskInput } from "@chrona/contracts";
 
 function normalizeRequiredUpdateTextField(
@@ -91,6 +94,7 @@ export async function updateTask(
     workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
     executionConfig: nextExecutionConfig,
   });
+  const acceptedPlan = await getAcceptedCompiledPlan(currentTask.id);
   const nextStatus = (() => {
     if (input.status) {
       return TaskStatus[input.status];
@@ -104,8 +108,13 @@ export async function updateTask(
       return undefined;
     }
 
-    // FIXME:
-    return TaskStatus.Ready;
+    const staticState = deriveTaskStaticState({
+      runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
+      executionConfig: validatedRuntimeConfig.executionConfig,
+      hasAcceptedPlan: acceptedPlan !== null,
+    });
+
+    return TaskStatus[staticState.persistedStatus];
   })();
   const shouldPersistResolvedRuntimeConfig =
     input.executionRuntime !== undefined ||

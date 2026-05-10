@@ -138,7 +138,7 @@ Pause execution for a time duration or external event.
 ## CRITICAL RULES
 
 1. Plan describes WHAT to do and the flow. Do NOT generate AI actions, tool_action, or integration nodes.
-2. id MUST be stable, readable, snake_case (e.g. task_find_time, checkpoint_confirm_plan).
+2. id MUST be stable, readable, English ASCII snake_case using only lowercase letters, numbers, and underscores (e.g. task_find_time, checkpoint_confirm_plan).
 3. Every checkpoint with checkpointType "approve" or "confirm" should directly precede the risky task it gates.
 4. Start is expressed via edges (nodes with no incoming edge). End is expressed by nodes with no outgoing edge.
 5. Use condition nodes for branching. Each branch.nextNodeId MUST reference a real node id.

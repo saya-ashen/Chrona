@@ -1,7 +1,40 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createTask } from "@/modules/tasks/create-task";
+import { reopenTask } from "@/modules/tasks/reopen-task";
 import { updateTask } from "@/modules/tasks/update-task";
+import type { CompiledPlan } from "@chrona/contracts/ai";
+
+function makeAcceptedPlan(planId: string): CompiledPlan {
+  return {
+    id: `compiled_${planId}`,
+    editablePlanId: planId,
+    sourceVersion: 1,
+    title: `Accepted plan ${planId}`,
+    goal: "Allow task to enter ready state",
+    assumptions: [],
+    nodes: [],
+    edges: [],
+    entryNodeIds: [],
+    terminalNodeIds: [],
+    topologicalOrder: [],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
+async function seedAcceptedPlan(workspaceId: string, taskId: string, planId: string) {
+  await saveCompiledPlan({
+    workspaceId,
+    taskId,
+    compiledPlan: makeAcceptedPlan(planId),
+    status: "accepted",
+    prompt: "Seed accepted plan",
+    summary: "Accepted plan fixture",
+    generatedBy: "command-chain-test",
+  });
+}
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -30,7 +63,7 @@ describe("createTask", () => {
     await resetDb();
   });
 
-  it("creates a ready human-owned task and rebuilds projection", async () => {
+  it("creates a draft human-owned task before any accepted plan exists and rebuilds projection", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Create Commands",
@@ -61,7 +94,7 @@ describe("createTask", () => {
     expect(result.workspaceId).toBe(workspace.id);
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
-    expect(storedTask.status).toBe("Ready");
+    expect(storedTask.status).toBe("Draft");
     expect(storedTask.executionRuntime).toBe("openclaw");
     expect(storedTask.executionConfig).toEqual({
       approvalPolicy: "never",
@@ -81,7 +114,7 @@ describe("createTask", () => {
       expect.objectContaining({
         title: "Bootstrap task creation",
         priority: "High",
-        status: "Ready",
+        status: "Draft",
       }),
     );
   });
@@ -107,6 +140,7 @@ describe("createTask", () => {
       }),
     ).rejects.toThrow(/Approval policy must be one of/);
   });
+
 });
 
 describe("updateTask", () => {
@@ -158,4 +192,123 @@ describe("updateTask", () => {
       toolMode: "workspace-write",
     });
   });
+
+  it("keeps draft tasks in draft when no accepted plan exists", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Promote Draft",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "OpenClaw draft",
+        executionRuntime: "openclaw",
+        executionConfig: {},
+        status: "Draft",
+        priority: "Medium",
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      title: "OpenClaw ready",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(storedTask.status).toBe("Draft");
+  });
+
+  it("promotes draft tasks to ready once an accepted plan exists", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Promote With Plan",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Draft with accepted plan",
+        executionRuntime: "openclaw",
+        executionConfig: {},
+        status: "Draft",
+        priority: "Medium",
+      },
+    });
+
+    await seedAcceptedPlan(workspace.id, task.id, "plan_update_ready");
+
+    await updateTask({
+      taskId: task.id,
+      title: "Ready after accepted plan",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(storedTask.status).toBe("Ready");
+  });
+});
+
+describe("reopenTask", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("reopens tasks without an accepted plan to draft", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Reopen Ready",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Reopen me",
+        executionRuntime: "openclaw",
+        executionConfig: {},
+        status: "Completed",
+        priority: "Medium",
+      },
+    });
+
+    const result = await reopenTask({ taskId: task.id });
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(result.status).toBe("Draft");
+    expect(storedTask.status).toBe("Draft");
+  });
+
+  it("reopens tasks with an accepted plan to ready", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Reopen Ready",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Reopen me with plan",
+        executionRuntime: "openclaw",
+        executionConfig: {},
+        status: "Completed",
+        priority: "Medium",
+      },
+    });
+
+    await seedAcceptedPlan(workspace.id, task.id, "plan_reopen_ready");
+
+    const result = await reopenTask({ taskId: task.id });
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+
+    expect(result.status).toBe("Ready");
+    expect(storedTask.status).toBe("Ready");
+  });
+
 });

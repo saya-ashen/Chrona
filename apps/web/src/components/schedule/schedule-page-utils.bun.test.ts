@@ -1,9 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
 
-mock.module("@chrona/shared", () => ({
-  deriveTaskRunnability: () => ({ isRunnable: false, state: "not_configured", summary: "Not configured" }),
-}));
-
 import {
   addDays,
   buildCompressedTimeline,

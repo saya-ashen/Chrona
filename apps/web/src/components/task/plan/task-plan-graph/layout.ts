@@ -156,7 +156,7 @@ export function buildFlowLayout(input: {
       id: edge.id,
       source: from,
       target: to,
-      type: "smoothstep",
+      type: "taskPlanEdge",
       selectable: false,
       reconnectable: false,
       animated: runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input",
@@ -173,7 +173,9 @@ export function buildFlowLayout(input: {
             ? 0.35
             : 1,
       },
-      label: edge.label ?? undefined,
+      data: {
+        stableLabel: edge.label ?? undefined,
+      },
     };
   });
 

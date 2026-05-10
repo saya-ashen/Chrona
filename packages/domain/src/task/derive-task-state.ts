@@ -58,8 +58,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
 
   if (activeRun?.status === "WaitingForApproval") {
     return {
-      persistedStatus: "Blocked",
-      displayState: "WaitingForApproval",
+      persistedStatus: "WaitingForApproval",
+      displayState: null,
       blockReason: {
         blockType: "waiting_for_approval",
         scope: "run",
@@ -71,8 +71,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
 
   if (activeRun?.status === "WaitingForInput") {
     return {
-      persistedStatus: "Blocked",
-      displayState: "WaitingForInput",
+      persistedStatus: "WaitingForInput",
+      displayState: null,
       blockReason: {
         blockType: "waiting_for_input",
         scope: "run",
@@ -137,8 +137,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     const pauseReason = input.executionSession.pauseReason;
     if (pauseReason === "needs_user_input") {
       return {
-        persistedStatus: "Blocked",
-        displayState: "WaitingForInput",
+        persistedStatus: "WaitingForInput",
+        displayState: null,
         blockReason: {
           blockType: "execution_paused_input",
           scope: "execution_session",
@@ -149,8 +149,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     }
     if (pauseReason === "needs_approval") {
       return {
-        persistedStatus: "Blocked",
-        displayState: "WaitingForApproval",
+        persistedStatus: "WaitingForApproval",
+        displayState: null,
         blockReason: {
           blockType: "execution_paused_approval",
           scope: "execution_session",

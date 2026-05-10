@@ -14,6 +14,54 @@ import {
   startOfDay,
 } from "@/components/schedule/utils/date";
 
+function deriveLocalRunnability(input: {
+  executionRuntime?: string | null;
+  executionConfig?: unknown;
+  hasAcceptedPlan: boolean;
+}) {
+  const config =
+    input.executionConfig &&
+    typeof input.executionConfig === "object" &&
+    !Array.isArray(input.executionConfig)
+      ? input.executionConfig
+      : {};
+  const prompt = typeof (config as { prompt?: unknown }).prompt === "string"
+    ? (config as { prompt: string }).prompt.trim()
+    : "";
+  const requiresPrompt = input.executionRuntime === "research";
+
+  if (requiresPrompt && prompt.length === 0) {
+    return {
+      isRunnable: false,
+      state: "missing_required_config",
+      summary: "Missing required config: prompt",
+    };
+  }
+
+  if (!input.hasAcceptedPlan) {
+    return {
+      isRunnable: false,
+      state: "missing_accepted_plan",
+      summary: "Generate and accept a plan",
+    };
+  }
+
+  return {
+    isRunnable: true,
+    state: "ready_to_run",
+    summary: "Ready to run",
+  };
+}
+
+function hasAcceptedSavedPlan(item: object): boolean {
+  if (!("savedPlan" in item)) {
+    return false;
+  }
+
+  const savedPlan = (item as { savedPlan?: { status?: string } | null }).savedPlan;
+  return savedPlan?.status === "accepted";
+}
+
 function roundUpToQuarterHour(value: Date) {
   const next = new Date(value);
   next.setSeconds(0, 0);
@@ -87,9 +135,9 @@ export function createScheduledItemFromCreateInput(
     title: input.title,
     description: input.description || null,
     priority: input.priority,
-    persistedStatus: "Ready",
+    persistedStatus: "Draft",
     displayState: null,
-    actionRequired: null,
+    actionRequired: "Generate and accept a plan",
     approvalPendingCount: 0,
     scheduleStatus: "Scheduled",
     scheduleSource: "human",
@@ -102,6 +150,8 @@ export function createScheduledItemFromCreateInput(
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
     isRunnable: false,
+    runnabilityState: "missing_accepted_plan",
+    runnabilitySummary: "Generate and accept a plan",
     parentTaskId: null,
   };
 }
@@ -134,9 +184,11 @@ export function applyScheduleToListItem(
 export function applyTaskConfigToItem<
   T extends ScheduledItem | UnscheduledItem | ListItem | ScheduleRecord,
 >(item: T, input: TaskConfigFormInput): T {
-  const runnability = deriveTaskRunnability({
+  const hasAcceptedPlan = hasAcceptedSavedPlan(item);
+  const runnability = deriveLocalRunnability({
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
+    hasAcceptedPlan,
   });
 
   return {
@@ -158,9 +210,7 @@ export function applyTaskConfigToItem<
           ? "Ready"
           : "Draft"
         : item.persistedStatus,
-    actionRequired: runnability.isRunnable
-      ? item.actionRequired
-      : runnability.summary,
+    actionRequired: runnability.isRunnable ? null : runnability.summary,
   };
 }
 
