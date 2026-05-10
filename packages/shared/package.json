@@ -1,0 +1,15 @@
+{
+  "name": "@chrona/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
+    "@chrona/runtime-core": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./logger": "./src/logger.ts"
+  }
+}

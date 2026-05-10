@@ -13,6 +13,13 @@ type RuntimeAdapterFactory = (
 
 const runtimeAdapterFactories = new Map<string, RuntimeAdapterFactory>([
   [OPENCLAW_EXECUTION_RUNTIME, createOpenClawAdapter],
+  [
+    "research",
+    async (config) =>
+      (await import("@/modules/research-execution/adapter")).createResearchRuntimeAdapter(
+        await createOpenClawAdapter(config),
+      ),
+  ],
 ]);
 
 export function overrideRuntimeExecutionAdapter(
@@ -29,27 +36,20 @@ async function loadAdapterConfig(): Promise<OpenClawAdapterConfig | undefined> {
   if (!client) return undefined;
   const config = client.config as Record<string, unknown> | null;
   if (!config) return undefined;
-  const bridgeUrl =
-    typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
-  const bridgeToken =
-    typeof config.bridgeToken === "string" ? config.bridgeToken : "";
+  const bridgeUrl = typeof config.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const bridgeToken = typeof config.bridgeToken === "string" ? config.bridgeToken : "";
   if (!bridgeUrl) return undefined;
   return { bridgeUrl, bridgeToken };
 }
 
-export async function createRuntimeExecutionAdapter(
-  key: string,
-): Promise<RuntimeExecutionAdapter> {
+export async function createRuntimeExecutionAdapter(key: string): Promise<RuntimeExecutionAdapter> {
   const definition = getRuntimeAdapterDefinition(key);
   const factory = runtimeAdapterFactories.get(definition.key);
   if (!factory) {
-    throw new Error(
-      `No runtime adapter factory registered for key: ${definition.key}`,
-    );
+    throw new Error(`No runtime adapter factory registered for key: ${definition.key}`);
   }
   const config =
-    definition.key === OPENCLAW_EXECUTION_RUNTIME ||
-    definition.key === "research"
+    definition.key === OPENCLAW_EXECUTION_RUNTIME || definition.key === "research"
       ? await loadAdapterConfig()
       : undefined;
   return factory(config);
