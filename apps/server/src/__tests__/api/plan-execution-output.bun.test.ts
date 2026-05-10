@@ -12,7 +12,8 @@ import { describe, expect, it, beforeEach } from "bun:test";
 import { db } from "@chrona/db";
 import { MemoryScope, MemorySourceType, MemoryStatus, RunStatus } from "@chrona/db/generated/prisma/client";
 import { resetTestDb, seedWorkspace, seedTask } from "../bun-test-helpers";
-import { overrideRuntimeExecutionAdapter, executePlanNode } from "@chrona/engine";
+import { executePlanNode } from "@chrona/engine/modules/plan-execution";
+import { overrideRuntimeExecutionAdapter } from "@chrona/engine/modules/task-execution/execution-registry";
 
 
 

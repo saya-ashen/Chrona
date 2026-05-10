@@ -9,7 +9,7 @@ import {
 function makeTask(overrides: Partial<TaskLike> = {}): TaskLike {
   return {
     status: "Ready",
-    runtimeAdapterKey: "openclaw",
+    executionRuntime: "openclaw",
     ...overrides,
   };
 }
@@ -202,9 +202,9 @@ describe("deriveAutoStartEligibility", () => {
   });
 
   describe("not eligible — no_runtime_config", () => {
-    it("rejects tasks without a runtimeAdapterKey", () => {
+    it("rejects tasks without an execution runtime", () => {
       const result = deriveAutoStartEligibility({
-        task: makeTask({ runtimeAdapterKey: null }),
+        task: makeTask({ executionRuntime: null }),
         workBlock: makeWorkBlock(),
         now,
         activeRun: null,

@@ -6,7 +6,6 @@ import { Bot, Loader2, Send, Sparkles, AlertTriangle, Check, X } from "lucide-re
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
-import { api } from "@/lib/rpc-client";
 
 type ChatHistoryEntry = {
   id: string;
@@ -208,14 +207,16 @@ export function TaskWorkspaceAssistant({
         content: h.content,
       }));
 
-      const response = await api.ai["task-workspace"].chat.$post({
-        json: {
+      const response = await fetch("/api/ai/task-workspace/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           taskId,
           message: trimmed,
           currentTask,
           currentPlan,
           history: apiHistory,
-        },
+        }),
       });
 
       if (!response.ok && response.status !== 503) {

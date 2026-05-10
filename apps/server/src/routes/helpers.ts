@@ -1,6 +1,5 @@
 import { createLogger } from "@chrona/shared/logger";
-
-import { TASK_PLAN_GENERATION_IN_FLIGHT_CODE } from "@chrona/engine";
+import { ENGINE_ERROR_CODES } from "@chrona/engine";
 
 import { HttpError } from "../lib/http";
 
@@ -35,7 +34,7 @@ export function planGenerationConflictBody(taskId: string) {
   return {
     error:
       "A task plan generation job is already running. Stop the current generation before starting a new one.",
-    code: TASK_PLAN_GENERATION_IN_FLIGHT_CODE,
+    code: ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT,
     taskId,
     stopEndpoint: `/api/tasks/${taskId}/plan/generations/stop`,
   };

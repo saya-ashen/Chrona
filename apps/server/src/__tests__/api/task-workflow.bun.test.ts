@@ -11,12 +11,19 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
+import type { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
-import { appendCanonicalEvent, createTask, updateTask } from "@chrona/engine";
+import { createTask } from "@chrona/engine/modules/commands/create-task";
+import { updateTask } from "@chrona/engine/modules/commands/update-task";
+import { appendCanonicalEvent } from "@chrona/engine/modules/events/append-canonical-event";
 import { resetTestDb, seedWorkspace, seedTask, expectTaskExists, expectTaskNotFound } from "../bun-test-helpers";
 import { json, error, internalServerError, parseLimit, toHttpError, HttpError } from "../../lib/http";
 
 const VALID_TASK_STATUSES = new Set(Object.values(TaskStatus));
+type TransactionClient = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
 
 async function deleteTaskWithRelations(taskId: string) {
   const task = await db.task.findUnique({
@@ -37,7 +44,7 @@ async function deleteTaskWithRelations(taskId: string) {
     dedupeKey: `task.deleted:${task.id}`,
   });
 
-  await db.$transaction(async (tx) => {
+  await db.$transaction(async (tx: TransactionClient) => {
     await tx.taskProjection.deleteMany({ where: { taskId } });
     await tx.run.deleteMany({ where: { taskId } });
     await tx.taskSession.deleteMany({ where: { taskId } });
@@ -128,12 +135,8 @@ function createTaskRouter() {
         title,
         description: body.description,
         priority: body.priority,
-        runtimeAdapterKey: body.runtimeAdapterKey,
-        runtimeInput: body.runtimeInput,
-        runtimeInputVersion: body.runtimeInputVersion,
-        runtimeModel: body.runtimeModel,
-        prompt: body.prompt,
-        runtimeConfig: body.runtimeConfig,
+        executionRuntime: body.executionRuntime,
+        executionConfig: body.executionConfig,
       });
 
       return json(c, result, 201);
@@ -166,12 +169,8 @@ function createTaskRouter() {
         description: body.description,
         priority: body.priority,
         status: body.status,
-        runtimeAdapterKey: body.runtimeAdapterKey,
-        runtimeInput: body.runtimeInput,
-        runtimeInputVersion: body.runtimeInputVersion,
-        runtimeModel: body.runtimeModel,
-        prompt: body.prompt,
-        runtimeConfig: body.runtimeConfig,
+        executionRuntime: body.executionRuntime,
+        executionConfig: body.executionConfig,
       });
       return json(c, result);
     } catch (cause) {

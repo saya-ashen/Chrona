@@ -51,8 +51,10 @@ describe("createTask", () => {
       title: "  Bootstrap task creation  ",
       description: "  Add the first real create flow  ",
       priority: "High",
-      runtimeModel: "  gpt-5.4  ",
-      prompt: "  Add the first real create flow  ",
+      executionRuntime: "openclaw",
+      executionConfig: {
+        prompt: "  Add the first real create flow  ",
+      },
     });
 
     const storedTask = await db.task.findUniqueOrThrow({
@@ -67,19 +69,14 @@ describe("createTask", () => {
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
     expect(storedTask.status).toBe("Ready");
-    expect(storedTask.runtimeAdapterKey).toBe("openclaw");
-    expect(storedTask.runtimeInput).toEqual({
+    expect(storedTask.executionRuntime).toBe("openclaw");
+    expect(storedTask.executionConfig).toEqual({
       approvalPolicy: "never",
-      model: "gpt-5.4",
       prompt: "Add the first real create flow",
       sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
-    expect(storedTask.runtimeInputVersion).toBe("openclaw-legacy-v1");
-    expect(storedTask.runtimeModel).toBe("gpt-5.4");
-    expect(storedTask.prompt).toBe("Add the first real create flow");
-    expect(storedTask.runtimeConfig).toBeNull();
     expect(storedTask.priority).toBe("High");
     expect(storedTask.defaultSessionId).toBeTruthy();
     expect(storedTask.sessions).toHaveLength(1);
@@ -109,10 +106,10 @@ describe("createTask", () => {
       createTask({
         workspaceId: workspace.id,
         title: "Invalid runtime config",
-        runtimeModel: "gpt-5.4",
-        prompt: "Run the invalid case",
-        runtimeConfig: {
-          approvalPolicy: "sometimes",
+        executionRuntime: "openclaw",
+        executionConfig: {
+          prompt: "Run the invalid case",
+          approvalPolicy: "sometimes" as never,
         },
       }),
     ).rejects.toThrow(/Approval policy must be one of/);
@@ -124,7 +121,7 @@ describe("updateTask", () => {
     await resetDb();
   });
 
-  it("preserves existing runtime input keys when updating the prompt", async () => {
+  it("preserves existing execution config keys when updating the prompt", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Update Commands",
@@ -136,18 +133,13 @@ describe("updateTask", () => {
       data: {
         workspaceId: workspace.id,
         title: "Keep adapter config",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: {
-          model: "gpt-5.4",
+        executionRuntime: "openclaw",
+        executionConfig: {
           prompt: "Original prompt",
           temperature: 0.2,
           approvalPolicy: "never",
           toolMode: "workspace-write",
         },
-        runtimeInputVersion: "openclaw-legacy-v1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Original prompt",
-        runtimeConfig: { temperature: 0.2 },
         status: "Ready",
         priority: "High",
       },
@@ -155,22 +147,20 @@ describe("updateTask", () => {
 
     await updateTask({
       taskId: task.id,
-      prompt: "Updated prompt",
+      executionConfig: {
+        prompt: "Updated prompt",
+        temperature: 0.2,
+        approvalPolicy: "never",
+        toolMode: "workspace-write",
+      },
     });
 
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
 
-    expect(storedTask.runtimeInput).toEqual({
+    expect(storedTask.executionConfig).toEqual({
       approvalPolicy: "never",
-      model: "gpt-5.4",
       prompt: "Updated prompt",
       sessionStrategy: "per_subtask",
-      temperature: 0.2,
-      toolMode: "workspace-write",
-    });
-    expect(storedTask.runtimeInputVersion).toBe("openclaw-legacy-v1");
-    expect(storedTask.runtimeConfig).toEqual({
-      approvalPolicy: "never",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
@@ -194,6 +184,8 @@ describe("invalidateMemory", () => {
       data: {
         workspaceId: workspace.id,
         title: "Remember projection rules",
+        executionRuntime: "openclaw",
+        executionConfig: {},
         status: "Running",
         priority: "High",
       },
@@ -247,6 +239,8 @@ describe("resolveApproval", () => {
       data: {
         workspaceId: workspace.id,
         title: "Review generated patch",
+        executionRuntime: "openclaw",
+        executionConfig: {},
         status: "WaitingForApproval",
         priority: "High",
       },
@@ -341,6 +335,8 @@ describe("resolveApproval", () => {
       data: {
         workspaceId: workspace.id,
         title: "Reject dangerous command",
+        executionRuntime: "openclaw",
+        executionConfig: {},
         status: "WaitingForApproval",
         priority: "Urgent",
       },
@@ -437,8 +433,8 @@ describe("closure commands", () => {
       data: {
         workspaceId: workspace.id,
         title: "Close execution loop",
-        runtimeModel: "gpt-5.4",
-        prompt: "Ship the change",
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Ship the change" },
         status: "Completed",
         priority: "High",
       },

@@ -44,12 +44,8 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     scheduleSource: null,
     scheduleProposalCount: 0,
     lastActivityAt: null,
-    runtimeAdapterKey: null,
-    runtimeInput: null,
-    runtimeInputVersion: null,
-    runtimeModel: null,
-    prompt: null,
-    runtimeConfig: null,
+    executionRuntime: "openclaw",
+    executionConfig: {},
     isRunnable: true,
     runnabilityState: "Ready",
     runnabilitySummary: "Ready",
@@ -90,8 +86,8 @@ const mockItems: ScheduleTaskListItem[] = [failedItem, unscheduledItem, runningI
 
 const defaultProps = {
   items: mockItems,
-  runtimeAdapters: [],
-  defaultRuntimeAdapterKey: "default",
+  executionRuntimes: [],
+  defaultExecutionRuntime: "openclaw",
   isPending: false,
   onSaveTaskConfigAction: vi.fn().mockResolvedValue(undefined),
 };

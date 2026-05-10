@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
-import { saveCompiledPlan } from "@chrona/engine";
+import { createChronaEngine } from "@chrona/engine";
+import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 import { createApiRouter } from "../../routes/api";
@@ -15,7 +16,7 @@ import {
 
 function app() {
   const server = new Hono();
-  server.route("/api", createApiRouter());
+  server.route("/api", createApiRouter(createChronaEngine()));
   return server;
 }
 

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { ChronaEngine } from "@chrona/engine";
 
 import { json } from "../lib/http";
 
@@ -7,13 +8,13 @@ import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
 
-export function createApiRouter() {
+export function createApiRouter(engine: ChronaEngine) {
   return new Hono()
     .get("/health", (c) => json(c, { status: "ok" }))
-    .route("/", createTaskRoutes())
-    .route("/", createPageRoutes())
-    .route("/", createWorkspacesRoutes())
-    .route("/", createClientsRoutes());
+    .route("/", createTaskRoutes(engine))
+    .route("/", createPageRoutes(engine))
+    .route("/", createWorkspacesRoutes(engine))
+    .route("/", createClientsRoutes(engine));
 }
 
 /**

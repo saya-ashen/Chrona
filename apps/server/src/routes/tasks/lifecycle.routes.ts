@@ -1,27 +1,14 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import { markTaskDone, reopenTask } from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import {
   taskDoneParamSchema,
   taskReopenParamSchema,
 } from "@chrona/contracts/api";
 
-import { error, json } from "../../lib/http";
+import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
-function taskLifecycleErrorStatus(message: string) {
-  if (/not found|no longer exists|No 'Task' record/i.test(message)) {
-    return 404;
-  }
-
-  if (/Only .* can be/i.test(message)) {
-    return 400;
-  }
-
-  return 500;
-}
-
-export function createTaskLifecycleRoutes() {
+export function createTaskLifecycleRoutes(engine: ChronaEngine) {
   return new Hono()
     .post(
       "/tasks/:taskId/complete",
@@ -29,11 +16,13 @@ export function createTaskLifecycleRoutes() {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, await markTaskDone({ taskId }));
+          return json(c, await engine.tasks.lifecycle.complete({ taskId }));
         } catch (cause) {
-          const message =
-            cause instanceof Error ? cause.message : "Failed to mark task done";
-          return error(c, message, taskLifecycleErrorStatus(message));
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/complete", cause, "Failed to mark task done");
         }
       },
     )
@@ -43,11 +32,13 @@ export function createTaskLifecycleRoutes() {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, await reopenTask({ taskId }));
+          return json(c, await engine.tasks.lifecycle.reopen({ taskId }));
         } catch (cause) {
-          const message =
-            cause instanceof Error ? cause.message : "Failed to reopen task";
-          return error(c, message, taskLifecycleErrorStatus(message));
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(c, "POST /api/tasks/:taskId/reopen", cause, "Failed to reopen task");
         }
       },
     );

@@ -1,35 +1,24 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import { acceptTaskResult } from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import { taskResultAcceptParamSchema } from "@chrona/contracts/api";
 
-import { error, json } from "../../lib/http";
+import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
-function taskResultErrorStatus(message: string) {
-  if (/not found|no longer exists|No 'Task' record|No 'Run' record/i.test(message)) {
-    return 404;
-  }
-
-  if (/No accepted plan|Cannot .* work block|work block is active/i.test(message)) {
-    return 400;
-  }
-
-  return 500;
-}
-
-export function createTaskResultRoutes() {
+export function createTaskResultRoutes(engine: ChronaEngine) {
   return new Hono().post(
     "/tasks/:taskId/result/accept",
     zValidator("param", taskResultAcceptParamSchema),
     async (c) => {
       try {
         const { taskId } = c.req.valid("param");
-        return json(c, await acceptTaskResult({ taskId }));
+        return json(c, await engine.tasks.result.accept({ taskId }));
       } catch (cause) {
-        const message =
-          cause instanceof Error ? cause.message : "Failed to accept task result";
-        return error(c, message, taskResultErrorStatus(message));
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return internalServerError(c, "POST /api/tasks/:taskId/result/accept", cause, "Failed to accept task result");
       }
     },
   );

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import { getSchedulePage } from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import { scheduleProjectionQuerySchema } from "@chrona/contracts/api";
 
 import {
@@ -11,12 +10,12 @@ import {
   toHttpError,
 } from "../../lib/http";
 
-export function createScheduleRoutes() {
+export function createScheduleRoutes(engine: ChronaEngine) {
   return new Hono()
     .get("/schedule", zValidator("query", scheduleProjectionQuerySchema), async (c) => {
       try {
         const { workspaceId } = c.req.valid("query");
-        return json(c, await getSchedulePage(workspaceId));
+        return json(c, await engine.pages.getSchedule({ workspaceId }));
       } catch (cause) {
         const httpError = toHttpError(cause);
         if (httpError) {

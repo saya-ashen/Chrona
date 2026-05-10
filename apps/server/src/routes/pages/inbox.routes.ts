@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import { getInbox } from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import { inboxProjectionQuerySchema } from "@chrona/contracts/api";
 
 import {
@@ -11,12 +10,12 @@ import {
   toHttpError,
 } from "../../lib/http";
 
-export function createInboxRoutes() {
+export function createInboxRoutes(engine: ChronaEngine) {
   return new Hono()
     .get("/inbox", zValidator("query", inboxProjectionQuerySchema), async (c) => {
       try {
         const { workspaceId } = c.req.valid("query");
-        return json(c, await getInbox(workspaceId));
+        return json(c, await engine.pages.getInbox({ workspaceId }));
       } catch (cause) {
         const httpError = toHttpError(cause);
         if (httpError) {

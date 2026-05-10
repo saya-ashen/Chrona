@@ -1,12 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import {
-  applySchedule,
-  clearSchedule,
-  decideScheduleProposal,
-  proposeSchedule,
-} from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
+import type { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import {
   clearScheduleParamSchema,
   scheduleBodySchema,
@@ -16,9 +11,9 @@ import {
   scheduleProposalDecisionBodySchema,
 } from "@chrona/contracts/api";
 
-import { error, internalServerError, json } from "../../lib/http";
+import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
-export function createTaskScheduleRoutes() {
+export function createTaskScheduleRoutes(engine: ChronaEngine) {
   return new Hono()
     .post(
       "/tasks/schedule-proposals/decision",
@@ -26,7 +21,7 @@ export function createTaskScheduleRoutes() {
       async (c) => {
         try {
           const body = c.req.valid("json");
-          const result = await decideScheduleProposal({
+          const result = await engine.tasks.schedule.decideProposal({
             proposalId: body.proposalId,
             decision: body.decision,
             resolutionNote: body.resolutionNote,
@@ -34,15 +29,9 @@ export function createTaskScheduleRoutes() {
 
           return json(c, result);
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to decide schedule proposal";
-          if (message.includes("not found")) {
-            return error(c, message, 404);
-          }
-          if (message.includes("workspace")) {
-            return error(c, message, 400);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,
@@ -61,7 +50,7 @@ export function createTaskScheduleRoutes() {
         try {
           const { taskId } = c.req.valid("param");
           const body = c.req.valid("json");
-          const result = await applySchedule({
+          const result = await engine.tasks.schedule.apply({
             taskId,
             dueAt: body.dueAt ? new Date(body.dueAt) : null,
             scheduledStartAt: new Date(body.scheduledStartAt),
@@ -71,13 +60,9 @@ export function createTaskScheduleRoutes() {
 
           return json(c, result);
         } catch (cause) {
-          const message =
-            cause instanceof Error ? cause.message : "Failed to apply schedule";
-          if (message.includes("not found")) {
-            return error(c, message, 404);
-          }
-          if (message.includes("scheduled") || message.includes("work block")) {
-            return error(c, message, 400);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,
@@ -94,14 +79,13 @@ export function createTaskScheduleRoutes() {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          const result = await clearSchedule({ taskId });
+          const result = await engine.tasks.schedule.clear({ taskId });
 
           return json(c, result);
         } catch (cause) {
-          const message =
-            cause instanceof Error ? cause.message : "Failed to clear schedule";
-          if (message.includes("not found")) {
-            return error(c, message, 404);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,
@@ -128,11 +112,9 @@ export function createTaskScheduleRoutes() {
             ? new Date(body.scheduledEndAt)
             : null;
 
-          const result = await proposeSchedule({
+          const result = await engine.tasks.schedule.propose({
             taskId,
-            source: (body.source ?? "system") as Parameters<
-              typeof proposeSchedule
-            >[0]["source"],
+            source: (body.source ?? "system") as ScheduleSource,
             proposedBy: body.proposedBy ?? "system",
             summary: body.summary ?? "Schedule proposal",
             dueAt,
@@ -142,12 +124,9 @@ export function createTaskScheduleRoutes() {
 
           return json(c, result, 201);
         } catch (cause) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to propose schedule";
-          if (message.includes("not found")) {
-            return error(c, message, 404);
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
           }
           return internalServerError(
             c,

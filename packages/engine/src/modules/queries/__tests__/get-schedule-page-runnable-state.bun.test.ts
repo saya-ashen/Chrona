@@ -47,12 +47,8 @@ describe("getSchedulePage runnable state", () => {
         description: "Has the minimum runnable config",
         status: "Ready",
         priority: "High",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: {},
-        runtimeInputVersion: "1",
-        runtimeModel: "gpt-5.4",
-        prompt: "Execute the configured task",
-        runtimeConfig: { temperature: 0.2, sessionStrategy: "per_subtask" },
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Execute the configured task", temperature: 0.2, sessionStrategy: "per_subtask" },
       },
     });
 
@@ -63,12 +59,8 @@ describe("getSchedulePage runnable state", () => {
         description: "Still needs instructions",
         status: "Draft",
         priority: "Medium",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: {},
-        runtimeInputVersion: "1",
-        runtimeModel: "gpt-5.4",
-        prompt: null,
-        runtimeConfig: {},
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -80,12 +72,8 @@ describe("getSchedulePage runnable state", () => {
         description: "Inherited from decomposition",
         status: "Draft",
         priority: "Low",
-        runtimeAdapterKey: "openclaw",
-        runtimeInput: {},
-        runtimeInputVersion: "1",
-        runtimeModel: "gpt-5.4",
-        prompt: null,
-        runtimeConfig: {},
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -138,8 +126,8 @@ describe("getSchedulePage runnable state", () => {
 
     expect(page.scheduled[0]).toMatchObject({
       taskId: readyTask.id,
-      runtimeModel: "gpt-5.4",
-      prompt: "Execute the configured task",
+      executionRuntime: "openclaw",
+      executionConfig: expect.objectContaining({ prompt: "Execute the configured task" }),
       isRunnable: true,
       runnabilityState: "ready_to_run",
       runnabilitySummary: "Ready to run",
@@ -148,8 +136,8 @@ describe("getSchedulePage runnable state", () => {
     expect(page.unscheduled).toHaveLength(1);
     expect(page.unscheduled[0]).toMatchObject({
       taskId: draftTask.id,
-      runtimeModel: "gpt-5.4",
-      prompt: null,
+      executionRuntime: "openclaw",
+      executionConfig: {},
       isRunnable: true,
       runnabilityState: "ready_to_run",
       runnabilitySummary: "Ready to run",

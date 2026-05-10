@@ -64,6 +64,8 @@ describe("runtime sync triggers plan progression", () => {
         title: "Parent task",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 
@@ -74,6 +76,8 @@ describe("runtime sync triggers plan progression", () => {
         status: TaskStatus.Running,
         priority: TaskPriority.Medium,
         parentTaskId: parentTask.id,
+        executionRuntime: "openclaw",
+        executionConfig: {},
       },
     });
 

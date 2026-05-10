@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-
-import { getMemoryConsole } from "@chrona/engine";
+import type { ChronaEngine } from "@chrona/engine";
 import { memoryProjectionQuerySchema } from "@chrona/contracts/api";
 
 import {
@@ -11,12 +10,12 @@ import {
   toHttpError,
 } from "../../lib/http";
 
-export function createMemoryRoutes() {
+export function createMemoryRoutes(engine: ChronaEngine) {
   return new Hono()
     .get("/memory", zValidator("query", memoryProjectionQuerySchema), async (c) => {
       try {
         const { workspaceId } = c.req.valid("query");
-        return json(c, await getMemoryConsole(workspaceId));
+        return json(c, await engine.pages.getMemory({ workspaceId }));
       } catch (cause) {
         const httpError = toHttpError(cause);
         if (httpError) {

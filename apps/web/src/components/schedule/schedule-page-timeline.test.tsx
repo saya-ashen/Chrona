@@ -36,12 +36,8 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    runtimeAdapterKey: overrides.runtimeAdapterKey ?? "mock",
-    runtimeInput: overrides.runtimeInput ?? {},
-    runtimeInputVersion: overrides.runtimeInputVersion ?? "1",
-    runtimeModel: overrides.runtimeModel ?? null,
-    prompt: overrides.prompt ?? null,
-    runtimeConfig: overrides.runtimeConfig ?? null,
+    executionRuntime: overrides.executionRuntime ?? "openclaw",
+    executionConfig: overrides.executionConfig ?? {},
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
@@ -68,8 +64,8 @@ describe("DayTimeline", () => {
           dueAt: null,
           durationMinutes: 60,
         }}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -99,8 +95,8 @@ describe("DayTimeline", () => {
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
         selectedDay="2026-04-15"
         draggedItem={null}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -122,8 +118,8 @@ describe("DayTimeline", () => {
         dayDate={new Date(2026, 3, 16, 0, 0, 0, 0)}
         selectedDay="2026-04-16"
         draggedItem={null}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -144,8 +140,8 @@ describe("DayTimeline", () => {
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
         selectedDay="2026-04-15"
         draggedItem={null}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -189,8 +185,8 @@ describe("DayTimeline", () => {
         selectedDay="2026-04-15"
         selectedTaskId="task-1"
         draggedItem={null}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -232,8 +228,8 @@ describe("DayTimeline", () => {
         selectedDay="2026-04-15"
         selectedTaskId="task-1"
         draggedItem={null}
-        runtimeAdapters={[]}
-        defaultRuntimeAdapterKey="mock"
+        executionRuntimes={[]}
+        defaultExecutionRuntime="openclaw"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}

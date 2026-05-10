@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
-import { taskWorkspaceChatSchema } from "../../routes/schemas";
+import { taskWorkspaceChatSchema } from "@chrona/contracts/api";
 import { error, json } from "../../lib/http";
 
 function createChatRouter() {
@@ -13,7 +13,13 @@ function createChatRouter() {
 
       const parsed = taskWorkspaceChatSchema.safeParse(body);
       if (!parsed.success) {
-        return error(c, parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "), 400);
+        return error(
+          c,
+          parsed.error.issues
+            .map((e: { path: PropertyKey[]; message: string }) => `${e.path.join(".")}: ${e.message}`)
+            .join("; "),
+          400,
+        );
       }
 
       // In real route this calls aiChat(); for validation tests we return OK

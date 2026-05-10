@@ -74,7 +74,7 @@ describe("OpenClawBridgeClient", () => {
         role: "user",
         content: [
           "Task title: Task title from runtime input",
-          "Runtime adapter: openclaw",
+          "Execution runtime: openclaw",
           'Runtime input JSON:\n{\n  "model": "gpt-5",\n  "prompt": "Task title from runtime input",\n  "maxTokens": 321\n}',
           "Analyze code",
         ].join("\n\n"),

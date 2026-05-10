@@ -151,6 +151,14 @@ function generatePreparationSteps(task: TaskAutomationInput): string[] {
     steps.push(`Review related context for tags: ${task.tags.join(", ")}`);
   }
 
+  const teamText = [task.title, task.description, ...(task.tags ?? [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (teamText.includes("team") || teamText.includes("review")) {
+    steps.push("Coordinate with team members before starting");
+  }
+
   // Fallback: always have at least one step
   if (steps.length === 0) {
     steps.push("Review task details before starting");

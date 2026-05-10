@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { db } from "@chrona/db";
-import { createAiClientSchema } from "../../routes/schemas";
+import type { AiClient, AiFeatureBinding } from "@chrona/db/generated/prisma/client";
+import { createAiClientSchema } from "@chrona/contracts/api";
 import {
   resetTestDb,
   seedWorkspace,
@@ -11,6 +12,8 @@ import {
 } from "../bun-test-helpers";
 import { error, internalServerError, json as httpJson } from "../../lib/http";
 import { randomUUID } from "node:crypto";
+
+type AiClientWithBindings = AiClient & { bindings: AiFeatureBinding[] };
 
 // ---------------------------------------------------------------------------
 // Inline AI client CRUD router (avoids full ai.routes.ts cascade import)
@@ -27,14 +30,14 @@ function createAiClientRouter() {
       });
 
       return httpJson(c, {
-        clients: clients.map((client) => ({
+        clients: clients.map((client: AiClientWithBindings) => ({
           id: client.id,
           name: client.name,
           type: client.type,
           config: client.config,
           isDefault: client.isDefault,
           enabled: client.enabled,
-          bindings: client.bindings.map((binding) => binding.feature),
+          bindings: client.bindings.map((binding: AiFeatureBinding) => binding.feature),
           createdAt: client.createdAt.toISOString(),
         })),
       });
@@ -57,7 +60,7 @@ function createAiClientRouter() {
         return error(
           c,
           parsed.error.issues
-            .map((e) => `${e.path.join(".")}: ${e.message}`)
+            .map((e: { path: PropertyKey[]; message: string }) => `${e.path.join(".")}: ${e.message}`)
             .join("; "),
           400,
         );
