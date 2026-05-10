@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/task/plan/task-plan-view-model";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
-import { fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "./task-workspace-query";
+import { dispatchTaskExecutionAction, fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "./task-workspace-query";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -16,6 +16,7 @@ import {
   startPlanAccept,
 } from "./task-workspace-plan-flow-machine";
 import type { TaskData } from "./task-workspace-types";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
   if (isGenerationRunning) {
@@ -208,6 +209,15 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     setRequestGenerationKey((current) => current + 1);
   }, []);
 
+  const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
+    const result = await dispatchTaskExecutionAction(task.id, action);
+    await Promise.all([
+      planStateQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.detail(task.id) }),
+    ]);
+    return result;
+  }, [planStateQuery, queryClient, task.id]);
+
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;
     const compiledPlan = plan.compiledPlan;
@@ -271,6 +281,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     requestGenerationKey,
     acceptPlanById,
     handleAcceptPlan,
+    dispatchExecutionAction,
     handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,

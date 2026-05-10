@@ -31,6 +31,7 @@ import {
 } from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
+  buildOpenClawFeatureGatewayRequest,
   openclawCall,
   getOrCreateClient,
 } from "./providers";
@@ -77,27 +78,6 @@ function prepareStreamInput(
     input: prepared.input,
     userMessage: featureSpec?.inputText ?? prepared.inputText,
     signal,
-  };
-}
-
-function toOpenClawStreamRequest(
-  input: PreparedStreamInput,
-  timeout: number,
-): {
-  sessionKey: string;
-  instructions: string;
-  inputText: string;
-  featureSpec?: PreparedAiFeatureSpec;
-  input: Record<string, unknown>;
-  timeout: number;
-} {
-  return {
-    sessionKey: input.scope,
-    instructions: input.instructions,
-    inputText: input.inputText,
-    featureSpec: input.featureSpec,
-    input: input.input,
-    timeout,
   };
 }
 
@@ -174,11 +154,20 @@ async function* openclawStream(
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
   const timeout = config.timeoutSeconds ?? 120;
-  const providerInput = toOpenClawStreamRequest(input, timeout);
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
     feature,
     input.scope,
   );
+  const providerInput = buildOpenClawFeatureGatewayRequest({
+    feature,
+    sessionKey,
+    inputText: input.inputText,
+    input: input.input,
+    instructions: input.instructions,
+    featureSpec: input.featureSpec,
+    timeoutSeconds: timeout,
+    stream: false,
+  });
 
   logger.info("openclaw.stream.start", {
     feature,
@@ -212,10 +201,22 @@ async function* openclawStream(
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-      for await (const event of client.executeFeatureStream(
-        feature as "suggest" | "generate_plan",
-        { ...providerInput, sessionKey, signal: input.signal },
-      )) {
+      for await (const event of client.stream({
+        request: {
+          ...buildOpenClawFeatureGatewayRequest({
+            feature,
+            sessionKey,
+            inputText: input.inputText,
+            input: input.input,
+            instructions: input.instructions,
+            featureSpec: input.featureSpec,
+            timeoutSeconds: timeout,
+            stream: true,
+          }),
+          sessionId,
+        },
+        signal: input.signal,
+      })) {
         const parsed = convertProviderEvent(event);
         await dump?.write({
           type: "provider_event",
@@ -277,7 +278,7 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(config, feature, providerInput);
+    const text = await openclawCall(config, providerInput);
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {

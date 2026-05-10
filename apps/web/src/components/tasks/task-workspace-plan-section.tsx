@@ -1,10 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/task/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspector } from "@/components/task/plan/task-plan-graph/inspector";
 import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph/types";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
+import type { TaskExecutionDispatchResult } from "./task-workspace-query";
 import type { TaskPlanGenerationStatus } from "./task-workspace-types";
 import { useTaskWorkspacePlanSectionState } from "./use-task-workspace-plan-section-state";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
@@ -20,6 +22,7 @@ type TaskWorkspacePlanSectionProps = {
   acceptPlanError: string | null;
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void;
+  onDispatchExecutionAction: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
 };
 
 export function TaskWorkspacePlanSection({
@@ -33,6 +36,7 @@ export function TaskWorkspacePlanSection({
   acceptPlanError,
   onAcceptPlan,
   onGeneratePlan,
+  onDispatchExecutionAction,
 }: TaskWorkspacePlanSectionProps) {
   const {
     selectedPlanNode,
@@ -57,12 +61,18 @@ export function TaskWorkspacePlanSection({
           planGenerationStatus={planGenerationStatus}
           onAcceptPlan={onAcceptPlan}
           onGeneratePlan={onGeneratePlan}
+          onDispatchExecutionAction={onDispatchExecutionAction}
           onSelectedNodeChange={handleSelectedPlanNodeChange}
         />
       </div>
 
       <aside className="min-w-0 space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:self-stretch xl:overflow-hidden">
-        <TaskPlanGraphInspector node={selectedPlanNode} graphCopy={DEFAULT_GRAPH_COPY} nodes={selectedPlanNodes} />
+        <TaskPlanGraphInspector
+          node={selectedPlanNode}
+          graphCopy={DEFAULT_GRAPH_COPY}
+          nodes={selectedPlanNodes}
+          onDispatchExecutionAction={onDispatchExecutionAction}
+        />
       </aside>
     </>
   );

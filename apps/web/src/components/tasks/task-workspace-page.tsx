@@ -78,6 +78,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     requestGenerationKey,
     acceptPlanById,
     handleAcceptPlan,
+    dispatchExecutionAction,
     handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,
@@ -147,6 +148,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           acceptPlanError={acceptPlanError}
           onAcceptPlan={handleAcceptPlan}
           onGeneratePlan={handleGeneratePlanFromHeader}
+          onDispatchExecutionAction={dispatchExecutionAction}
         />
       </div>
 

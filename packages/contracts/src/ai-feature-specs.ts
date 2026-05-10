@@ -1,4 +1,8 @@
-import type { GenerateTaskPlanRequest } from "./ai-plan-runtime";
+import type {
+  GenerateTaskPlanRequest,
+  GraphMutationOperation,
+  WaitKind,
+} from "./ai-plan-runtime";
 import {
   planBlueprintSchema,
   planPatchSchema,
@@ -19,7 +23,8 @@ export type StructuredAiFeature =
   | "edit_plan"
   | "conflicts"
   | "timeslots"
-  | "dispatch_task";
+  | "dispatch_task"
+  | "execute_node";
 
 export type PreparedAiFeatureSpec = {
   feature: StructuredAiFeature;
@@ -36,6 +41,8 @@ export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "generate_task_plan_graph";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
+export const CHRONA_NODE_EXECUTION_RESULT_TOOL_NAME =
+  "chrona_node_execution_result";
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION =
   "Return Chrona task suggestions as structured tool arguments.";
@@ -54,6 +61,170 @@ export const GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION =
 
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
+
+export const CHRONA_NODE_EXECUTION_RESULT_TOOL_DESCRIPTION =
+  "Return the observed Chrona plan node execution result as structured tool arguments.";
+
+export type ChronaNodeExecutionReturnStatus =
+  | "completed"
+  | "waiting"
+  | "blocked"
+  | "failed"
+  | "replan_required"
+  | "external_running";
+
+export interface ChronaNodeExecutionReturn {
+  kind: "node_execution_result";
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  attemptId: string;
+  contextSnapshotId: string;
+  status: ChronaNodeExecutionReturnStatus;
+  result?: {
+    summary: string;
+    outputData?: unknown;
+    artifactRefs?: string[];
+    evidenceRefs?: string[];
+  };
+  wait?: {
+    kind: WaitKind;
+    reason: string;
+    prompt?: string;
+  };
+  branch?: {
+    label: string;
+    nextNodeId: string;
+    source: "user" | "ai" | "system" | "default";
+  };
+  replan?: {
+    reason: string;
+    scope: "future_only" | "from_node" | "include_completed";
+    proposedOperations: GraphMutationOperation[];
+    requiresUserConfirmation: boolean;
+    affectedNodeIds?: string[];
+    invalidatedNodeIds?: string[];
+  };
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  };
+  evidence?: {
+    sessionId?: string;
+    runId?: string;
+    childTaskId?: string;
+    childSessionId?: string;
+    artifactIds?: string[];
+    conversationEntryIds?: string[];
+    eventIds?: string[];
+    toolCallIds?: string[];
+  };
+  ui?: {
+    userMessage?: string;
+    debugSummary?: string;
+    recommendedFollowups?: string[];
+  };
+}
+
+export interface NodeExecutionFeatureInput {
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  attemptId: string;
+  contextSnapshotId: string;
+  taskId: string;
+  planTitle?: string;
+  nodeTitle: string;
+  nodeType: string;
+  nodeObjective: string;
+  completedNodeTitles: string[];
+  instructions: string;
+}
+
+const chronaNodeExecutionReturnSchema = z.object({
+  kind: z.literal("node_execution_result"),
+  graphId: z.string(),
+  nodeId: z.string(),
+  nodeLayerId: z.string(),
+  attemptId: z.string(),
+  contextSnapshotId: z.string(),
+  status: z.enum([
+    "completed",
+    "waiting",
+    "blocked",
+    "failed",
+    "replan_required",
+    "external_running",
+  ]),
+  result: z
+    .object({
+      summary: z.string(),
+      outputData: z.unknown().optional(),
+      artifactRefs: z.array(z.string()).optional(),
+      evidenceRefs: z.array(z.string()).optional(),
+    })
+    .optional(),
+  wait: z
+    .object({
+      kind: z.enum([
+        "user_input",
+        "approval",
+        "review",
+        "manual_action",
+        "external_dependency",
+        "capability_unavailable",
+      ]),
+      reason: z.string(),
+      prompt: z.string().optional(),
+    })
+    .optional(),
+  branch: z
+    .object({
+      label: z.string(),
+      nextNodeId: z.string(),
+      source: z.enum(["user", "ai", "system", "default"]),
+    })
+    .optional(),
+  replan: z
+    .object({
+      reason: z.string(),
+      scope: z.enum(["future_only", "from_node", "include_completed"]),
+      proposedOperations: z.array(z.record(z.string(), z.unknown())),
+      requiresUserConfirmation: z.boolean(),
+      affectedNodeIds: z.array(z.string()).optional(),
+      invalidatedNodeIds: z.array(z.string()).optional(),
+    })
+    .optional(),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+      retryable: z.boolean(),
+    })
+    .optional(),
+  evidence: z
+    .object({
+      sessionId: z.string().optional(),
+      runId: z.string().optional(),
+      childTaskId: z.string().optional(),
+      childSessionId: z.string().optional(),
+      artifactIds: z.array(z.string()).optional(),
+      conversationEntryIds: z.array(z.string()).optional(),
+      eventIds: z.array(z.string()).optional(),
+      toolCallIds: z.array(z.string()).optional(),
+    })
+    .optional(),
+  ui: z
+    .object({
+      userMessage: z.string().optional(),
+      debugSummary: z.string().optional(),
+      recommendedFollowups: z.array(z.string()).optional(),
+    })
+    .optional(),
+});
+
+export { chronaNodeExecutionReturnSchema };
 
 export const SUGGEST_SYSTEM_PROMPT = `
 
@@ -96,6 +267,21 @@ Rules:
 6. Provide a concise reason and confidence between 0 and 1.
 7. Set safety.requiresHumanApproval true when risk is non-trivial.
 `;
+
+export const EXECUTE_NODE_SYSTEM_PROMPT = `
+You are Chrona's plan-node execution worker.
+Execute or assess only the current node described in the input.
+You MUST call the business tool chrona_node_execution_result.
+Do not decide graph traversal outside the fields in the tool payload.
+
+Rules:
+1. Return kind "node_execution_result".
+2. Use status "completed" only when the node objective is actually satisfied.
+3. Use status "waiting" when human input, approval, review, manual action, external dependency, or unavailable capability blocks progress.
+4. Use status "replan_required" only when future plan graph changes are needed; propose operations but do not apply them.
+5. Use status "external_running" only when you started external work that cannot complete in this turn.
+6. Keep summaries concise and evidence-based.
+`.trim();
 
 export const GENERATE_PLAN_SYSTEM_PROMPT = `
 You are a task planning assistant that generates concise execution blueprints as directed acyclic graphs (DAGs).
@@ -147,6 +333,8 @@ Pause execution for a time duration or external event.
 8. If you need user input, choice, or confirmation: use checkpoint. Do NOT create separate user_input/decision nodes.
 9. If you are at a phase boundary, use a task node with a summary-like title. Do NOT create milestone nodes.
 10. Maximize parallelism: independent tasks should not be chained sequentially.
+11. The graph MUST be a DAG: never create cycles, back edges, self-loops, or edges from a later step back to an earlier step.
+12. Do NOT model retries, revisions, or "loop until done" by pointing edges back to previous nodes. Use checkpoints, wait nodes, or runtime retry/replan behavior instead.
 
 Respond in the same language as the input.`.trim();
 
@@ -331,6 +519,13 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
   parameters: toProviderJsonSchema(planPatchSchema),
 };
 
+export const chronaNodeExecutionResultToolSpec: AiFeatureToolSpec = {
+  type: "function",
+  name: CHRONA_NODE_EXECUTION_RESULT_TOOL_NAME,
+  description: CHRONA_NODE_EXECUTION_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(chronaNodeExecutionReturnSchema),
+};
+
 export function buildGeneratePlanFeatureInputText(
   input: GenerateTaskPlanRequest,
 ): string {
@@ -454,6 +649,45 @@ export function buildDispatchTaskFeatureSpec(): PreparedAiFeatureSpec {
   };
 }
 
+export function buildNodeExecutionFeatureInputText(
+  input: NodeExecutionFeatureInput,
+): string {
+  return [
+    "Execute the current Chrona plan node and return only the structured tool result.",
+    "",
+    `Task ID: ${input.taskId}`,
+    input.planTitle ? `Plan: ${input.planTitle}` : "",
+    `Graph ID: ${input.graphId}`,
+    `Node ID: ${input.nodeId}`,
+    `Node layer ID: ${input.nodeLayerId}`,
+    `Attempt ID: ${input.attemptId}`,
+    `Context snapshot ID: ${input.contextSnapshotId}`,
+    `Node title: ${input.nodeTitle}`,
+    `Node type: ${input.nodeType}`,
+    `Objective: ${input.nodeObjective}`,
+    input.completedNodeTitles.length > 0
+      ? `Already completed: ${input.completedNodeTitles.join(", ")}`
+      : "Already completed: none",
+    "",
+    "Execution instructions:",
+    input.instructions,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildNodeExecutionFeatureSpec(
+  input: NodeExecutionFeatureInput,
+): PreparedAiFeatureSpec {
+  return {
+    feature: "execute_node",
+    instructions: EXECUTE_NODE_SYSTEM_PROMPT,
+    inputText: buildNodeExecutionFeatureInputText(input),
+    requiredTool: chronaNodeExecutionResultToolSpec,
+    toolChoice: "required",
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -572,6 +806,18 @@ export function validatePreparedFeaturePayload(
           error:
             validation.error.issues[0]?.message ??
             "Feature 'dispatch_task' returned an invalid decision payload",
+        };
+      }
+      return { ok: true };
+    }
+    case "execute_node": {
+      const validation = chronaNodeExecutionReturnSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'execute_node' returned an invalid node execution result",
         };
       }
       return { ok: true };

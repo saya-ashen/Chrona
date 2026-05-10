@@ -1,7 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { OPENCLAW_EXECUTION_RUNTIME, type OpenClawAdapter } from "@chrona/openclaw";
-import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
+import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
+import type { OpenClawRuntimeSyncClient } from "@/modules/runtime-sync/sync-run";
 
 import { SYNC_STALE_MS } from "../../constants";
 
@@ -43,18 +43,15 @@ async function markSyncDegraded(run: { id: string; runtimeName: string | null },
   });
 }
 
-async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
+async function syncRunForRead(runId: string, client?: OpenClawRuntimeSyncClient) {
   const run = await db.run.findUniqueOrThrow({
     where: { id: runId },
     select: { id: true, runtimeName: true },
   });
 
   try {
-    const activeAdapter =
-      adapter ??
-      ((await createRuntimeExecutionAdapter(OPENCLAW_EXECUTION_RUNTIME)) as OpenClawAdapter);
     const { syncRunFromRuntime } = await import("@/modules/runtime-sync/sync-run");
-    await syncRunFromRuntime({ runId, adapter: activeAdapter });
+    await syncRunFromRuntime({ runId, client });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Runtime sync failed";
     await markSyncDegraded(run, message);
@@ -63,7 +60,7 @@ async function syncRunForRead(runId: string, adapter?: OpenClawAdapter) {
 
 export async function syncStaleWorkspaceRunsForRead(
   workspaceId: string,
-  adapter?: OpenClawAdapter,
+  client?: OpenClawRuntimeSyncClient,
 ) {
   const staleBefore = new Date(Date.now() - SYNC_STALE_MS);
   const runs = await db.run.findMany({
@@ -81,31 +78,14 @@ export async function syncStaleWorkspaceRunsForRead(
     return;
   }
 
-  let activeAdapter = adapter;
-
-  if (!activeAdapter) {
-    try {
-      activeAdapter =
-        (await createRuntimeExecutionAdapter(OPENCLAW_EXECUTION_RUNTIME)) as OpenClawAdapter;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Runtime sync failed";
-
-      for (const run of runs) {
-        await markSyncDegraded(run, message);
-      }
-
-      return;
-    }
-  }
-
   for (const run of runs) {
-    await syncRunForRead(run.id, activeAdapter);
+    await syncRunForRead(run.id, client);
   }
 }
 
 export async function syncTaskRunForRead(
   taskId: string,
-  adapter?: OpenClawAdapter,
+  client?: OpenClawRuntimeSyncClient,
   options?: { forceActive?: boolean },
 ) {
   const run = await db.run.findFirst({
@@ -131,5 +111,5 @@ export async function syncTaskRunForRead(
     return;
   }
 
-  await syncRunForRead(run.id, adapter);
+  await syncRunForRead(run.id, client);
 }

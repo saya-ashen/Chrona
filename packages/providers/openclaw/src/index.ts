@@ -13,11 +13,9 @@ export {
 } from "./gateway";
 
 export {
-  createMockOpenClawAdapter,
-  createOpenClawAdapter,
-  OpenClawBridgeClient,
-  type OpenClawAdapter,
-} from "./runtime";
+  createOpenClawClient,
+  OpenClawClient,
+} from "./OpenClawClient";
 
 export {
   getOpenClawTaskConfigSpec,
@@ -29,22 +27,20 @@ export {
   buildFeatureResultFromResponse,
 } from "./feature-contracts";
 
-export {
-  OpenClawClient,
+export type {
+  OpenClawConnectionConfig,
+  OpenClawResponseRequest,
 } from "./OpenClawClient";
 
 export type {
   BridgeEnvironment,
-  BridgeExecutionTaskRequest,
   BridgeFeature,
-  BridgeFeatureRequest,
   BridgeFeatureResult,
   BridgeLogger,
   BridgeRequest,
   BridgeResponse,
   ExecutionResult,
   NDJSONEvent,
-  OpenClawAdapterConfig,
   OpenClawApprovalDecision,
   OpenClawApprovalRequest,
   OpenClawApprovalRequestResult,
@@ -52,19 +48,12 @@ export type {
   OpenClawClientConfig,
   OpenClawChatHistory,
   OpenClawFeature,
-  OpenClawHello,
+  OpenClawGatewayRequest,
   OpenClawPendingApproval,
+  OpenClawResponseSnapshot,
   OpenClawResponse,
-  OpenClawRunSnapshot,
-  OpenClawRuntimeClient,
-  OpenClawSendInput,
-  OpenClawSendInputResult,
-  OpenClawSessionStatus,
   OpenClawStreamEvent,
-  OpenClawStructuredRunResult,
   OpenClawToolCall,
-  OpenClawWaitForRunInput,
-  RouteKind,
   StructuredAgentResult,
   ToolCallInfo,
   ToolCallOutputInfo,

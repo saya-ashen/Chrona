@@ -34,6 +34,7 @@ export interface NodeAttempt {
   startedAt: string;
   finishedAt?: string;
   error?: NodeAttemptError;
+  runtimeSnapshot?: Record<string, unknown>;
 }
 
 export interface NodeExecutionStateTransition {

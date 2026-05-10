@@ -1,15 +1,11 @@
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
 import type {
   BridgeEnvironment,
-  BridgeExecutionTaskRequest,
-  BridgeFeature,
-  BridgeFeatureRequest,
   BridgeLogger,
   BridgeRequest,
   BridgeResponse,
   ExecutionResult,
   NDJSONEvent,
-  RouteKind,
   ToolCallInfo,
   ToolCallOutputInfo,
 } from "./types";
@@ -42,55 +38,24 @@ function safeParseJsonArguments(
   return parseJsonObject(value);
 }
 
-function routeLabel(route: RouteKind): string {
-  return route.kind === "feature"
-    ? route.stream
-      ? `features.${route.feature}.stream`
-      : `features.${route.feature}`
-    : route.stream
-      ? "execution.task.stream"
-      : "execution.task";
-}
-
-function isFeatureRequest(
-  request: BridgeRequest,
-): request is BridgeFeatureRequest<Record<string, unknown>> {
-  return "input" in request;
-}
-
-function summarizeInput(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { kind: typeof value };
-  }
-  return { keys: Object.keys(value).sort() };
+function requestLabel(request: BridgeRequest): string {
+  return request.feature ? `features.${request.feature}` : "execution.task";
 }
 
 function summarizeBridgeRequest(
-  route: RouteKind,
   request: BridgeRequest,
 ): Record<string, unknown> {
-  if (isFeatureRequest(request)) {
-    return {
-      route: routeLabel(route),
-      sessionId: request.sessionId ?? null,
-      timeout: request.timeout ?? null,
-      instructionsChars: request.instructions?.length ?? 0,
-      input: summarizeInput(request.input),
-    };
-  }
-
   return {
-    route: routeLabel(route),
-    sessionId: request.sessionId ?? null,
-    timeout: request.timeout ?? null,
-    instructionsChars: request.instructions.length,
-    taskId: request.taskId ?? null,
-    workspaceId: request.workspaceId ?? null,
-    taskTitle: request.taskTitle ?? null,
-    executionRuntime: request.executionRuntime ?? null,
-    runtimeInputKeys: request.runtimeInput
-      ? Object.keys(request.runtimeInput).sort()
-      : [],
+    route: requestLabel(request),
+    sessionId: request.sessionId,
+    sessionKey: request.sessionKey ?? null,
+    timeoutSeconds: request.timeoutSeconds ?? null,
+    bodyKeys: Object.keys(request.body).sort(),
+    stream: Boolean(request.body.stream),
+    instructionsChars:
+      typeof request.body.instructions === "string"
+        ? request.body.instructions.length
+        : 0,
   };
 }
 
@@ -139,7 +104,9 @@ function parseFunctionItems(response: Record<string, unknown>): {
 
 function mapUsage(response: Record<string, unknown>): BridgeResponse["usage"] {
   const usage =
-    response.usage && typeof response.usage === "object" && !Array.isArray(response.usage)
+    response.usage &&
+    typeof response.usage === "object" &&
+    !Array.isArray(response.usage)
       ? (response.usage as Record<string, unknown>)
       : null;
   if (!usage) return null;
@@ -180,11 +147,16 @@ function mapGatewaySseEvent(
   sessionId: string,
 ): NDJSONEvent | null {
   const responseRecord =
-    data.response && typeof data.response === "object" && !Array.isArray(data.response)
+    data.response &&
+    typeof data.response === "object" &&
+    !Array.isArray(data.response)
       ? (data.response as Record<string, unknown>)
       : null;
 
-  if (eventType === "response.created" || eventType === "response.in_progress") {
+  if (
+    eventType === "response.created" ||
+    eventType === "response.in_progress"
+  ) {
     return {
       type: "status",
       sessionId,
@@ -213,7 +185,10 @@ function mapGatewaySseEvent(
     };
   }
 
-  if (eventType === "response.output_item.added" || eventType === "response.output_item.done") {
+  if (
+    eventType === "response.output_item.added" ||
+    eventType === "response.output_item.done"
+  ) {
     const item =
       data.item && typeof data.item === "object" && !Array.isArray(data.item)
         ? (data.item as Record<string, unknown>)
@@ -316,43 +291,10 @@ type OpenResponsesTurnState = {
   }>;
 };
 
-function defaultFeatureInstructions(feature: BridgeFeature): string {
-  return feature === "chat"
-    ? "Answer user request normally."
-    : "Return the structured result through tool arguments.";
-}
-
-function stringifyFeatureInput(input: Record<string, unknown>): string {
-  return JSON.stringify(input);
-}
-
 function resolveFeatureSpec(
-  request: BridgeFeatureRequest<Record<string, unknown>>,
+  request: BridgeRequest,
 ): PreparedAiFeatureSpec | undefined {
   return request.featureSpec;
-}
-
-function resolveFeatureInstructions(
-  route: Extract<RouteKind, { kind: "feature" }>,
-  request: BridgeFeatureRequest<Record<string, unknown>>,
-  featureSpec?: PreparedAiFeatureSpec,
-): string {
-  return (
-    featureSpec?.instructions ??
-    request.instructions?.trim() ??
-    defaultFeatureInstructions(route.feature)
-  );
-}
-
-function resolveFeatureInputText(
-  request: BridgeFeatureRequest<Record<string, unknown>>,
-  featureSpec?: PreparedAiFeatureSpec,
-): string {
-  return (
-    featureSpec?.inputText ??
-    request.inputText ??
-    stringifyFeatureInput(request.input)
-  );
 }
 
 function resolveRequiredTool(featureSpec?: PreparedAiFeatureSpec): {
@@ -362,59 +304,6 @@ function resolveRequiredTool(featureSpec?: PreparedAiFeatureSpec): {
   parameters: Record<string, unknown>;
 } | null {
   return featureSpec?.requiredTool ?? null;
-}
-
-function normalizeSessionSegment(
-  value: string | undefined,
-  fallback: string,
-): string {
-  const normalized = value
-    ?.trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48);
-  return normalized && normalized.length > 0 ? normalized : fallback;
-}
-
-function timestampSessionSegment(date = new Date()): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    "-",
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    pad(date.getSeconds()),
-  ].join("");
-}
-
-function buildReadableSessionId(
-  route: RouteKind,
-  request: BridgeRequest,
-): string {
-  if (route.kind === "feature") {
-    const featureRequest = request as BridgeFeatureRequest<
-      Record<string, unknown>
-    >;
-    const input = featureRequest.input ?? {};
-    const task =
-      input.task && typeof input.task === "object" && !Array.isArray(input.task)
-        ? (input.task as Record<string, unknown>)
-        : input;
-    const taskId = typeof task.taskId === "string" ? task.taskId : undefined;
-    const title = typeof task.title === "string" ? task.title : undefined;
-    return `${normalizeSessionSegment(route.feature, "feature")}-${normalizeSessionSegment(taskId ?? title, "adhoc")}-${timestampSessionSegment()}`;
-  }
-
-  const execution = request as BridgeExecutionTaskRequest;
-  return `execution-${normalizeSessionSegment(execution.taskId ?? execution.taskTitle, "adhoc")}-${timestampSessionSegment()}`;
-}
-
-function resolveSessionId(route: RouteKind, request: BridgeRequest): string {
-  return request.sessionId?.trim() || buildReadableSessionId(route, request);
 }
 
 function normalizeOpenResponsesSessionKey(
@@ -471,12 +360,12 @@ function buildToolOutputItems(
 }
 
 function shouldAcknowledgeFeatureToolCalls(
-  route: RouteKind,
+  request: BridgeRequest,
   toolCalls: Array<{ callId: string; tool: string }>,
   toolCallOutputs: Array<{ callId: string }>,
   featureSpec?: PreparedAiFeatureSpec,
 ): boolean {
-  if (route.kind !== "feature") return false;
+  if (!request.feature) return false;
   const requiredTool = featureSpec?.requiredTool.name;
   if (!requiredTool) return false;
   if (toolCalls.length === 0) return false;
@@ -485,50 +374,6 @@ function shouldAcknowledgeFeatureToolCalls(
   }
   const acknowledged = new Set(toolCallOutputs.map((output) => output.callId));
   return toolCalls.some((toolCall) => !acknowledged.has(toolCall.callId));
-}
-
-function stringifyExecutionInput(
-  execution: BridgeExecutionTaskRequest,
-): string {
-  const parts: string[] = [];
-
-  if (execution.taskTitle?.trim()) {
-    parts.push(`Task title: ${execution.taskTitle.trim()}`);
-  }
-  if (execution.taskId?.trim()) {
-    parts.push(`Task id: ${execution.taskId.trim()}`);
-  }
-  if (execution.workspaceId?.trim()) {
-    parts.push(`Workspace id: ${execution.workspaceId.trim()}`);
-  }
-  if (execution.executionRuntime?.trim()) {
-    parts.push(`Execution runtime: ${execution.executionRuntime.trim()}`);
-  }
-
-  const runtimeInput = execution.runtimeInput ?? {};
-  if (Object.keys(runtimeInput).length > 0) {
-    parts.push(`Runtime input JSON:\n${JSON.stringify(runtimeInput, null, 2)}`);
-  }
-
-  parts.push(execution.instructions);
-  return parts.join("\n\n");
-}
-
-function buildOpenResponsesInput(
-  text: string,
-  pendingToolOutputs: Array<{
-    type: "function_call_output";
-    call_id: string;
-    output: string;
-  }>,
-): Array<
-  | { type: "function_call_output"; call_id: string; output: string }
-  | { type: "message"; role: "user"; content: string }
-> {
-  return [
-    ...pendingToolOutputs,
-    { type: "message", role: "user", content: text },
-  ];
 }
 
 export function normalizeGatewayHttpUrl(
@@ -556,70 +401,16 @@ export function normalizeGatewayHttpUrl(
 }
 
 export function buildGatewayBody(
-  route: RouteKind,
   request: BridgeRequest,
-  sessionId: string,
   environment: BridgeEnvironment,
 ): Record<string, unknown> {
   const { sessionKey, previousResponseId, pendingToolOutputs } =
-    resolveOpenResponsesTurnState(request, sessionId);
+    resolveOpenResponsesTurnState(request, request.sessionId);
+  const body: Record<string, unknown> = { ...request.body };
 
-  if (route.kind === "feature") {
-    const featureRequest = request as BridgeFeatureRequest<
-      Record<string, unknown>
-    >;
-    const featureSpec = resolveFeatureSpec(featureRequest);
-    const featureInstructions = resolveFeatureInstructions(
-      route,
-      featureRequest,
-      featureSpec,
-    );
-    const featureInputText = resolveFeatureInputText(
-      featureRequest,
-      featureSpec,
-    );
-    const body: Record<string, unknown> = {
-      model: "openclaw",
-      user: sessionKey,
-      instructions: `[Structured Feature Request]\nFeature: ${route.feature}\n${featureInstructions}`,
-      input: buildOpenResponsesInput(featureInputText, pendingToolOutputs),
-      stream: route.stream,
-    };
-
-    const requiredTool = resolveRequiredTool(featureSpec);
-    if (requiredTool) {
-      body.tools = [requiredTool];
-      body.tool_choice = {
-        type: "function",
-        function: {
-          name: requiredTool.name,
-        },
-      };
-    }
-
-    if (previousResponseId) {
-      body.previous_response_id = previousResponseId;
-    }
-
-    return body;
-  }
-
-  const execution = request as BridgeExecutionTaskRequest;
-  const executionInputText = stringifyExecutionInput(execution);
-  const body: Record<string, unknown> = {
-    model: "openclaw",
-    input: buildOpenResponsesInput(executionInputText, pendingToolOutputs),
-    stream: route.stream,
-    max_output_tokens:
-      typeof execution.runtimeInput?.maxTokens === "number"
-        ? execution.runtimeInput.maxTokens
-        : typeof execution.runtimeInput?.maxOutputTokens === "number"
-          ? execution.runtimeInput.maxOutputTokens
-          : undefined,
-  };
-
-  if (execution.instructions.trim()) {
-    body.instructions = execution.instructions;
+  if (pendingToolOutputs.length > 0) {
+    const input = Array.isArray(body.input) ? body.input : [];
+    body.input = [...pendingToolOutputs, ...input];
   }
   if (sessionKey) {
     body.user = sessionKey;
@@ -679,34 +470,33 @@ export async function checkGatewayAvailable(
 }
 
 export async function executeGatewayRequest(
-  route: RouteKind,
   request: BridgeRequest,
   logger: BridgeLogger,
   environment: BridgeEnvironment,
 ): Promise<ExecutionResult> {
-  const sessionId = resolveSessionId(route, request);
+  const sessionId = request.sessionId;
   const { sessionKey, pendingToolOutputs } = resolveOpenResponsesTurnState(
     request,
     sessionId,
   );
   const startedAt = Date.now();
-  const body = buildGatewayBody(route, request, sessionId, environment);
+  const body = buildGatewayBody(request, environment);
 
-  const timeoutMs = ((request.timeout ?? 300) + 15) * 1000;
+  const timeoutMs = ((request.timeoutSeconds ?? 300) + 15) * 1000;
   const headers = gatewayHeaders(environment, request);
 
   logger.info("bridge.request.start", {
     sessionId,
     sessionKey,
     gateway: environment.gatewayHttpUrl,
-    route: routeLabel(route),
+    route: requestLabel(request),
     timeoutMs,
-    request: summarizeBridgeRequest(route, request),
+    request: summarizeBridgeRequest(request),
   });
   logger.debug("bridge.gateway.request", {
     sessionId,
     sessionKey,
-    route: routeLabel(route),
+    route: requestLabel(request),
     url: `${environment.gatewayHttpUrl}/v1/responses`,
     headers: summarizeHeaders(headers),
     body,
@@ -731,7 +521,7 @@ export async function executeGatewayRequest(
   logger.info("bridge.gateway.response", {
     sessionId,
     sessionKey,
-    route: routeLabel(route),
+    route: requestLabel(request),
     status: response.status,
     ok: response.ok,
     contentType: response.headers.get("content-type") ?? null,
@@ -744,7 +534,7 @@ export async function executeGatewayRequest(
     logger.warn("bridge.gateway.response_error", {
       sessionId,
       sessionKey,
-      route: routeLabel(route),
+      route: requestLabel(request),
       status: response.status,
       contentType: response.headers.get("content-type") ?? null,
       bodyPreview: previewText(errBody),
@@ -762,32 +552,27 @@ export async function executeGatewayRequest(
         output: "",
         toolCalls: [],
         error: `Gateway /v1/responses failed (${response.status})`,
-        feature: route.kind === "feature" ? route.feature : null,
+        feature: request.feature ?? null,
       }),
       feature: null,
     };
     return { response: bridgeResponse, events: [] };
   }
 
-  if (!route.stream) {
+  if (!body.stream) {
     const gateway = (responseJsonPreview ?? {}) as Record<string, unknown>;
     const responseId = typeof gateway.id === "string" ? gateway.id : undefined;
     if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
     const { toolCalls, toolCallOutputs } = parseFunctionItems(gateway);
-    const featureSpec =
-      route.kind === "feature"
-        ? resolveFeatureSpec(
-            request as BridgeFeatureRequest<Record<string, unknown>>,
-          )
-        : undefined;
+    const featureSpec = request.feature ? resolveFeatureSpec(request) : undefined;
     if (pendingToolOutputs.length > 0) {
       sessionPendingToolOutputMap.delete(sessionKey);
     }
     if (
       responseId &&
       shouldAcknowledgeFeatureToolCalls(
-        route,
+        request,
         toolCalls,
         toolCallOutputs,
         featureSpec,
@@ -803,9 +588,9 @@ export async function executeGatewayRequest(
     let feature = null;
     let semanticError: string | null = null;
 
-    if (route.kind === "feature") {
+    if (request.feature) {
       const built = buildFeatureResultFromResponse(
-        route.feature,
+        request.feature,
         outputText,
         toolCalls,
         featureSpec,
@@ -835,7 +620,7 @@ export async function executeGatewayRequest(
         error:
           semanticError ??
           (gateway.error ? JSON.stringify(gateway.error) : null),
-        feature: route.kind === "feature" ? route.feature : null,
+        feature: request.feature ?? null,
         featurePayload: feature?.payload,
         featureToolName: feature?.toolName ?? null,
         featureSource: feature?.source,
@@ -917,35 +702,34 @@ export async function executeGatewayRequest(
       : undefined;
   if (responseId) sessionPreviousResponseMap.set(sessionKey, responseId);
 
-  const { toolCalls, toolCallOutputs } = parseFunctionItems(finalGatewayResponse);
-  const featureSpec =
-    route.kind === "feature"
-      ? resolveFeatureSpec(
-          request as BridgeFeatureRequest<Record<string, unknown>>,
-        )
-      : undefined;
+  const { toolCalls, toolCallOutputs } =
+    parseFunctionItems(finalGatewayResponse);
+  const featureSpec = request.feature ? resolveFeatureSpec(request) : undefined;
   if (pendingToolOutputs.length > 0) {
     sessionPendingToolOutputMap.delete(sessionKey);
   }
   if (
     responseId &&
     shouldAcknowledgeFeatureToolCalls(
-      route,
+      request,
       toolCalls,
       toolCallOutputs,
       featureSpec,
     )
   ) {
-    sessionPendingToolOutputMap.set(sessionKey, buildToolOutputItems(toolCalls));
+    sessionPendingToolOutputMap.set(
+      sessionKey,
+      buildToolOutputItems(toolCalls),
+    );
   }
   const outputText = extractOutputText(finalGatewayResponse);
 
   let feature = null;
   let semanticError: string | null = null;
 
-  if (route.kind === "feature") {
+  if (request.feature) {
     const built = buildFeatureResultFromResponse(
-      route.feature,
+      request.feature,
       outputText,
       toolCalls,
       featureSpec,
@@ -984,7 +768,7 @@ export async function executeGatewayRequest(
         (finalGatewayResponse.error
           ? JSON.stringify(finalGatewayResponse.error)
           : null),
-      feature: route.kind === "feature" ? route.feature : null,
+      feature: request.feature ?? null,
       featurePayload: feature?.payload,
       featureToolName: feature?.toolName ?? null,
       featureSource: feature?.source,

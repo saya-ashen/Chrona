@@ -1,6 +1,19 @@
 import { api } from "@/lib/rpc-client";
-import type { TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type { TaskData, TaskPlanGenerationStatus } from "./task-workspace-types";
+
+export type TaskExecutionDispatchResult = {
+  taskId: string;
+  planId: string | null;
+  mainSessionId: string | null;
+  status: string;
+  currentNodeId: string | null;
+  executedNodeIds: string[];
+  waitingNodeIds: string[];
+  blockedNodeIds: string[];
+  message: string;
+  errorDetails?: unknown;
+};
 
 export type TaskPlanState = {
   taskId: string;
@@ -52,4 +65,21 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
     savedPlan: payload.savedPlan ?? null,
     generationSession: payload.generationSession ?? null,
   };
+}
+
+export async function dispatchTaskExecutionAction(
+  taskId: string,
+  action: ExecutionActionInput,
+): Promise<TaskExecutionDispatchResult> {
+  const response = await api.tasks[":taskId"].execution.actions.$post({
+    param: { taskId },
+    json: action,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to dispatch execution action" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to dispatch execution action");
+  }
+
+  return await response.json() as TaskExecutionDispatchResult;
 }

@@ -670,6 +670,12 @@ describe("compileEditablePlan", () => {
     // Should have edges for both branches
     const edges = compiled.edges;
     expect(edges.length).toBeGreaterThanOrEqual(2);
+
+    const yesNode = compiled.nodes.find((n) => n.localId === "do_yes")!;
+    const noNode = compiled.nodes.find((n) => n.localId === "do_no")!;
+    const config = conditionNode.config as { branches: Array<{ nextNodeId: string }>; defaultNextNodeId?: string };
+    expect(config.branches[0]?.nextNodeId).toBe(yesNode.id);
+    expect(config.defaultNextNodeId).toBe(noNode.id);
   });
 
   it("32b. keeps explicit condition branch labels when default shares the same edge", () => {

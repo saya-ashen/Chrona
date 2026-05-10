@@ -1,10 +1,15 @@
 import { ApprovalStatus, Prisma, RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import type { OpenClawAdapter } from "@chrona/openclaw";
+import {
+  type OpenClawChatHistory,
+  type OpenClawConnectionConfig,
+  type OpenClawPendingApproval,
+  type OpenClawResponseSnapshot,
+} from "@chrona/openclaw";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { createRuntimeExecutionAdapter } from "@/modules/task-execution/execution-registry";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
+import { syncPlanRunRuntimeResult } from "@/modules/plan-execution/plan-runner";
 import {
   decodeSyncCursor,
   encodeSyncCursor,
@@ -50,12 +55,131 @@ function toRunStatus(status: string): RunStatus {
   }
 }
 
+function normalizeResponseStatus(status: string | undefined): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Cancelled";
+    case "requires_action":
+      return "WaitingForApproval";
+    case "queued":
+    case "in_progress":
+      return "Running";
+    default:
+      return status ?? "Running";
+  }
+}
+
+export type OpenClawRuntimeSyncClient = {
+  getResponseSnapshot(input: {
+    responseId?: string;
+    sessionKey?: string;
+  }): Promise<OpenClawResponseSnapshot>;
+  readSessionHistory(sessionKey: string): Promise<OpenClawChatHistory>;
+  listApprovals(): Promise<OpenClawPendingApproval[]>;
+  waitForApprovalDecision(approvalId: string): Promise<"allow-once" | "allow-always" | "deny" | null>;
+};
+
+async function loadOpenClawConfig(): Promise<OpenClawConnectionConfig> {
+  const aiClient = await db.aiClient.findFirst({
+    where: { type: "openclaw", isDefault: true, enabled: true },
+  });
+  const config = aiClient?.config as Record<string, unknown> | null | undefined;
+  const bridgeUrl = typeof config?.bridgeUrl === "string" ? config.bridgeUrl : "";
+  const bridgeToken =
+    typeof config?.bridgeToken === "string" ? config.bridgeToken : undefined;
+  const timeoutSeconds =
+    typeof config?.timeoutSeconds === "number" ? config.timeoutSeconds : undefined;
+  if (!bridgeUrl.trim()) {
+    throw new Error("OpenClaw bridgeUrl is required");
+  }
+  return { bridgeUrl, bridgeToken, timeoutSeconds };
+}
+
+function textFromGatewayResponse(response: Record<string, unknown>): string {
+  if (typeof response.output_text === "string") return response.output_text;
+  if (typeof response.output === "string") return response.output;
+  return "";
+}
+
+async function retrieveOpenClawResponse(
+  config: OpenClawConnectionConfig,
+  responseId: string,
+): Promise<Record<string, unknown>> {
+  if (!config.bridgeUrl?.trim()) {
+    throw new Error("OpenClaw bridgeUrl is required");
+  }
+  const baseUrl = config.bridgeUrl.replace(/\/+$/, "");
+  const res = await fetch(
+    `${baseUrl}/v1/responses/${encodeURIComponent(responseId)}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "x-openclaw-agent-id": "main",
+        ...(config.bridgeToken
+          ? { Authorization: `Bearer ${config.bridgeToken}` }
+          : {}),
+      },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(
+      `OpenClaw response lookup failed (${res.status}): ${text.slice(0, 500)}`,
+    );
+  }
+  const parsed = text ? (JSON.parse(text) as unknown) : null;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("OpenClaw response lookup returned invalid JSON");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncClient> {
+  const config = await loadOpenClawConfig();
+  return {
+    async getResponseSnapshot(input) {
+      if (!input.responseId) {
+        throw new Error("OpenClaw responseId is required for runtime sync");
+      }
+      const response = await retrieveOpenClawResponse(config, input.responseId);
+      return {
+        responseId:
+          typeof response.id === "string" ? response.id : input.responseId,
+        sessionId: input.sessionKey ?? input.responseId,
+        sessionKey: input.sessionKey,
+        status: typeof response.status === "string" ? response.status : undefined,
+        output: textFromGatewayResponse(response),
+        error:
+          typeof response.error === "string"
+            ? response.error
+            : response.error
+              ? JSON.stringify(response.error)
+              : null,
+      };
+    },
+    async readSessionHistory() {
+      return { messages: [] };
+    },
+    async listApprovals() {
+      return [];
+    },
+    async waitForApprovalDecision() {
+      return null;
+    },
+  };
+}
+
 export async function syncRunFromRuntime(input: {
   runId: string;
-  adapter?: OpenClawAdapter;
+  client?: OpenClawRuntimeSyncClient;
 }) {
-  const adapter: OpenClawAdapter =
-    input.adapter ?? ((await createRuntimeExecutionAdapter("openclaw")) as OpenClawAdapter);
+  const client = input.client ?? (await createDefaultOpenClawSyncClient());
   const cursorRecord = await db.runtimeCursor.findUnique({
     where: { runId: input.runId },
   });
@@ -72,16 +196,16 @@ export async function syncRunFromRuntime(input: {
     throw new Error(`Run ${run.id} is missing runtimeRunRef`);
   }
 
-  const snapshot = await adapter.getRunSnapshot({
-    runtimeRunRef: run.runtimeRunRef,
-    runtimeSessionKey: resolveSessionKey({
+  const snapshot = await client.getResponseSnapshot({
+    responseId: run.runtimeRunRef,
+    sessionKey: resolveSessionKey({
       taskSession: run.taskSession,
       runtimeSessionRef: run.runtimeSessionRef,
       cursor,
     }),
   });
   const runtimeSessionKey =
-    snapshot.runtimeSessionKey ??
+    snapshot.sessionKey ??
     resolveSessionKey({
       taskSession: run.taskSession,
       runtimeSessionRef: run.runtimeSessionRef,
@@ -93,10 +217,13 @@ export async function syncRunFromRuntime(input: {
       `Run ${run.id} is missing a runtime session key for history sync`,
     );
   }
+  const snapshotStatus = normalizeResponseStatus(snapshot.status);
+  const runtimeRunRef = snapshot.responseId ?? run.runtimeRunRef;
+  const snapshotMessage = snapshot.error ?? snapshot.output ?? null;
 
   const [history, approvals] = await Promise.all([
-    adapter.readHistory({ runtimeSessionKey }),
-    adapter.listApprovals({ runtimeSessionKey }),
+    client.readSessionHistory(runtimeSessionKey),
+    client.listApprovals(),
   ]);
   const pendingApprovals = await db.approval.findMany({
     where: {
@@ -109,14 +236,14 @@ export async function syncRunFromRuntime(input: {
   const approvalDelta = mapApprovalDelta({ approvals, cursor });
   const lifecycleEvent = mapRunLifecycleEvent({
     previousStatus: run.status,
-    snapshot,
+    snapshot: { ...snapshot, status: snapshotStatus },
     runId: run.id,
   });
   const currentApprovalIds = new Set(
     approvals.map((approval) => approval.approvalId),
   );
   const resolvedApprovals =
-    snapshot.status === "WaitingForApproval"
+    snapshotStatus === "WaitingForApproval"
       ? []
       : await Promise.all(
           pendingApprovals
@@ -124,7 +251,7 @@ export async function syncRunFromRuntime(input: {
             .map(async (approval) => {
               const resolution = mapApprovalResolution({
                 approvalId: approval.id,
-                decision: await adapter.waitForApprovalDecision(approval.id),
+                decision: await client.waitForApprovalDecision(approval.id),
               });
 
               return {
@@ -235,7 +362,7 @@ export async function syncRunFromRuntime(input: {
       runId: run.id,
       actorType: "runtime",
       actorId: run.runtimeName,
-      source: "adapter",
+      source: "provider",
       payload: event.payload,
       dedupeKey: event.dedupeKey,
       runtimeTs: event.runtimeTs,
@@ -246,23 +373,23 @@ export async function syncRunFromRuntime(input: {
   await db.run.update({
     where: { id: run.id },
     data: {
-      status: toRunStatus(snapshot.status),
+      status: toRunStatus(snapshotStatus),
       runtimeSessionRef: runtimeSessionKey,
       endedAt:
-        snapshot.status === "Completed" ||
-        snapshot.status === "Failed" ||
-        snapshot.status === "Cancelled"
+        snapshotStatus === "Completed" ||
+        snapshotStatus === "Failed" ||
+        snapshotStatus === "Cancelled"
           ? now
           : null,
       errorSummary:
-        snapshot.status === "Failed" ? (snapshot.lastMessage ?? null) : null,
-      retryable: snapshot.status === "Failed",
+        snapshotStatus === "Failed" ? snapshotMessage : null,
+      retryable: snapshotStatus === "Failed",
       resumeSupported:
-        snapshot.status === "WaitingForApproval" ||
-        snapshot.status === "WaitingForInput",
+        snapshotStatus === "WaitingForApproval" ||
+        snapshotStatus === "WaitingForInput",
       pendingInputPrompt:
-        snapshot.status === "WaitingForInput"
-          ? (snapshot.lastMessage ?? null)
+        snapshotStatus === "WaitingForInput"
+          ? snapshotMessage
           : null,
       lastSyncedAt: now,
       syncStatus: "healthy",
@@ -270,19 +397,34 @@ export async function syncRunFromRuntime(input: {
     },
   });
 
-  const nextRunStatus = toRunStatus(snapshot.status);
+  const nextRunStatus = toRunStatus(snapshotStatus);
 
   await updateTaskSessionStateFromRun({
     taskSessionId: run.taskSessionId,
     runId: run.id,
     runStatus: nextRunStatus,
-    runtimeRunRef: snapshot.runtimeRunRef ?? run.runtimeRunRef,
+    runtimeRunRef,
   });
+
+  if (
+    snapshotStatus === "Completed" ||
+    snapshotStatus === "Failed" ||
+    snapshotStatus === "Cancelled"
+  ) {
+    await syncPlanRunRuntimeResult({
+      taskId: run.taskId,
+      runtimeRunRef,
+      status: snapshotStatus,
+      summary: snapshotMessage,
+      error: snapshotStatus === "Failed" ? snapshotMessage : null,
+      output: snapshot.output ?? undefined,
+    });
+  }
 
   const nextCursor = encodeSyncCursor({
     sessionKey: runtimeSessionKey,
     lastMessageSeq: historyDelta.lastMessageSeq,
-    lastRunStatus: snapshot.status,
+    lastRunStatus: snapshotStatus,
     approvalIds: approvalDelta.approvalIds,
   });
 

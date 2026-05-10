@@ -50,6 +50,7 @@ export function updateAttemptStatus(input: {
   status: NodeAttempt["status"];
   finishedAt?: string;
   error?: NodeAttempt["error"];
+  runtimeSnapshot?: Record<string, unknown>;
 }): NodeAttempt[] {
   return input.attempts.map((attempt) =>
     attempt.id === input.attemptId
@@ -57,6 +58,7 @@ export function updateAttemptStatus(input: {
           ...attempt,
           status: input.status,
           finishedAt: input.finishedAt ?? attempt.finishedAt,
+          runtimeSnapshot: input.runtimeSnapshot ?? attempt.runtimeSnapshot,
           ...(input.error ? { error: input.error } : {}),
         }
       : attempt,

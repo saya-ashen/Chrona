@@ -337,7 +337,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "execute") {
     actions.push({
       id: `${node.id}:start`,
-      label: "开始节点",
+      label: "启动计划",
       kind: "trigger",
       emphasis: "primary",
     });
@@ -347,7 +347,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "observe" && (node.status === "ready" || node.status === "active")) {
     actions.push({
       id: `${node.id}:open`,
-      label: node.status === "ready" ? "开始节点" : "继续运行",
+      label: node.status === "ready" ? "启动计划" : "继续运行",
       kind: node.status === "ready" ? "trigger" : "observe",
       emphasis: node.status === "ready" ? "primary" : "default",
     });
@@ -378,7 +378,11 @@ function toPlanNode(node: {
   requiredInfo?: string[];
   status?: EffectivePlanNode["status"] | null;
   ready?: boolean;
-  result?: { outputSummary?: string | null } | null;
+  result?: {
+    outputSummary?: string | null;
+    error?: string | null;
+    errorDetails?: unknown;
+  } | null;
   nextAction?: string | null;
   config: NodeConfig;
 }): PlanNodeDataModel {
@@ -442,7 +446,11 @@ function toPlanNode(node: {
       interactionType,
       hasInteractiveFields: interactiveFields.length > 0,
     }),
-    metadata: metadata as Record<string, unknown>,
+    metadata: {
+      ...(metadata as Record<string, unknown>),
+      ...(node.result?.error ? { error: node.result.error } : {}),
+      ...(node.result?.errorDetails ? { errorDetails: node.result.errorDetails } : {}),
+    },
   };
 }
 

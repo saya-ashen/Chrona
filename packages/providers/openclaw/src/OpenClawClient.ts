@@ -1,20 +1,37 @@
-import { buildGatewayBody, checkGatewayAvailable, gatewayHeaders, normalizeGatewayHttpUrl } from "./gateway";
-import type { BridgeEnvironment, OpenClawClientConfig, OpenClawFeature, OpenClawResponse, OpenClawStreamEvent } from "./types";
-import type { PreparedAiFeatureSpec } from "@chrona/contracts";
+import {
+  buildGatewayBody,
+  executeGatewayRequest,
+  gatewayHeaders,
+  normalizeGatewayHttpUrl,
+} from "./gateway";
+import type {
+  BridgeEnvironment,
+  BridgeLogger,
+  BridgeRequest,
+  ExecutionResult,
+  OpenClawClientConfig,
+  OpenClawStreamEvent,
+} from "./types";
 import { mkdir, open } from "node:fs/promises";
 import { join } from "node:path";
 
-type GatewayRoute =
-  | { kind: "feature"; feature: OpenClawFeature; stream: boolean }
-  | { kind: "execution"; stream: boolean };
+export type OpenClawResponseRequest = {
+  request: BridgeRequest;
+  signal?: AbortSignal;
+};
 
-type GatewayRequestInput = {
-  sessionKey: string;
-  timeout: number;
-  instructions: string;
-  inputText?: string;
-  featureSpec?: PreparedAiFeatureSpec;
-  input: Record<string, unknown>;
+export type OpenClawConnectionConfig = {
+  bridgeUrl?: string;
+  bridgeToken?: string;
+  timeoutSeconds?: number;
+  mode?: "live" | "mock";
+};
+
+const NOOP_LOGGER: BridgeLogger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
 };
 
 function parseToolArguments(raw: unknown): Record<string, unknown> {
@@ -42,13 +59,15 @@ function extractFunctionCallsFromOutput(
 }
 
 function safeDebugSegment(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80) || "unknown";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "unknown"
+  );
 }
 
 function openClawDumpEnabled() {
@@ -58,14 +77,17 @@ function openClawDumpEnabled() {
 }
 
 function openClawDumpDirectory() {
-  return process.env.CHRONA_OPENCLAW_DUMP_DIR?.trim() || join(process.cwd(), ".chrona-debug", "openclaw");
+  return (
+    process.env.CHRONA_OPENCLAW_DUMP_DIR?.trim() ||
+    join(process.cwd(), ".chrona-debug", "openclaw")
+  );
 }
 
 async function createOpenClawDump(input: {
-  feature: OpenClawFeature;
+  label: string;
   sessionId: string;
   url: string;
-  request: GatewayRequestInput;
+  request: BridgeRequest;
   body: unknown;
 }) {
   if (!openClawDumpEnabled()) {
@@ -78,14 +100,14 @@ async function createOpenClawDump(input: {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filePath = join(
     directory,
-    `${timestamp}-${safeDebugSegment(input.feature)}-${safeDebugSegment(input.sessionId)}.sse.log`,
+    `${timestamp}-${safeDebugSegment(input.label)}-${safeDebugSegment(input.sessionId)}.sse.log`,
   );
   const handle = await open(filePath, "a");
   await handle.appendFile(
     JSON.stringify({
       type: "meta",
       timestamp: new Date().toISOString(),
-      feature: input.feature,
+      label: input.label,
       sessionId: input.sessionId,
       url: input.url,
       request: input.request,
@@ -104,49 +126,6 @@ async function createOpenClawDump(input: {
   };
 }
 
-function buildRoute(
-  kind: "feature" | "execution",
-  feature: OpenClawFeature | undefined,
-  stream: boolean,
-): GatewayRoute {
-  return kind === "feature" && feature
-    ? { kind: "feature", feature, stream }
-    : { kind: "execution", stream };
-}
-
-function normalizeGatewayRequestInput(
-  input: Record<string, unknown>,
-): GatewayRequestInput {
-  const sessionKey = (input.sessionKey as string) ?? `openclaw-${Date.now()}`;
-  const timeout = (input.timeout as number) ?? 300;
-  const instructions = (input.instructions as string) ?? "";
-  const {
-    sessionKey: _sk,
-    instructions: _in,
-    inputText,
-    featureSpec,
-    timeout: _to,
-    signal: _signal,
-    ...featureInput
-  } = input;
-
-  return {
-    sessionKey,
-    timeout,
-    instructions,
-    inputText:
-      typeof inputText === "string" && inputText.trim() ? inputText : undefined,
-    featureSpec:
-      featureSpec && typeof featureSpec === "object"
-        ? (featureSpec as PreparedAiFeatureSpec)
-        : undefined,
-    input:
-      Object.keys(featureInput).length > 0
-        ? featureInput
-        : { prompt: instructions },
-  };
-}
-
 async function* parseStreamingGatewayGenerator(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   dump?: Awaited<ReturnType<typeof createOpenClawDump>>,
@@ -159,7 +138,10 @@ async function* parseStreamingGatewayGenerator(
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
-      await dump?.write({ type: "reader.done", timestamp: new Date().toISOString() });
+      await dump?.write({
+        type: "reader.done",
+        timestamp: new Date().toISOString(),
+      });
       break;
     }
 
@@ -296,59 +278,31 @@ export class OpenClawClient {
     };
   }
 
-  async checkHealth(): Promise<boolean> {
-    return checkGatewayAvailable(this.env);
-  }
-
-  async executeFeature(
-    feature: OpenClawFeature,
-    input: {
-      sessionKey?: string;
-      instructions?: string;
-      timeout?: number;
-      [key: string]: unknown;
-    },
-  ): Promise<OpenClawResponse> {
-    throw new Error(
-      "executeFeature is not supported, use executeFeatureStream instead: " +
-        JSON.stringify({ feature, input }),
+  async create(input: OpenClawResponseRequest): Promise<ExecutionResult> {
+    return executeGatewayRequest(
+      input.request,
+      NOOP_LOGGER,
+      this.env,
     );
   }
 
-  async *executeFeatureStream(
-    feature: OpenClawFeature,
-    input: {
-      sessionKey?: string;
-      instructions?: string;
-      timeout?: number;
-      signal?: AbortSignal;
-      [key: string]: unknown;
-    },
+  async *stream(
+    input: OpenClawResponseRequest,
   ): AsyncGenerator<OpenClawStreamEvent> {
-    const route = buildRoute("feature", feature, true);
-    const request = normalizeGatewayRequestInput(input);
-    const sessionId = `${request.sessionKey}-${Date.now()}`;
-    const body = buildGatewayBody(
-      route,
-      request as unknown as Parameters<typeof buildGatewayBody>[1],
-      sessionId,
-      this.env,
-    );
-    const headers = gatewayHeaders(
-      this.env,
-      request as unknown as Parameters<typeof gatewayHeaders>[1],
-    );
-    const timeoutMs = (request.timeout + 15) * 1000;
+    const sessionId = input.request.sessionId;
+    const body = buildGatewayBody(input.request, this.env);
+    const headers = gatewayHeaders(this.env, input.request);
+    const timeoutMs = ((input.request.timeoutSeconds ?? 300) + 15) * 1000;
     const signal = input.signal
       ? AbortSignal.any([input.signal, AbortSignal.timeout(timeoutMs)])
       : AbortSignal.timeout(timeoutMs);
 
     const url = `${this.env.gatewayHttpUrl}/v1/responses`;
     const dump = await createOpenClawDump({
-      feature,
+      label: input.request.feature ?? "execution",
       sessionId,
       url,
-      request,
+      request: input.request,
       body,
     });
 
@@ -382,7 +336,10 @@ export class OpenClawClient {
 
     const reader = res.body?.getReader();
     if (!reader) {
-      await dump?.write({ type: "missing_body", timestamp: new Date().toISOString() });
+      await dump?.write({
+        type: "missing_body",
+        timestamp: new Date().toISOString(),
+      });
       await dump?.close();
       throw new Error("[openclaw] Stream response missing body");
     }
@@ -394,4 +351,17 @@ export class OpenClawClient {
       await dump?.close();
     }
   }
+}
+
+export async function createOpenClawClient(
+  config?: OpenClawConnectionConfig,
+): Promise<OpenClawClient> {
+  if (!config?.bridgeUrl?.trim()) {
+    throw new Error("OpenClaw bridgeUrl is required");
+  }
+
+  return new OpenClawClient({
+    gatewayUrl: config.bridgeUrl,
+    gatewayToken: config.bridgeToken,
+  });
 }

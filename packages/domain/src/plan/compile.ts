@@ -20,7 +20,27 @@ function generateCompiledId(): string {
   return `cn_${Date.now().toString(36)}_${idCounter.toString(36)}`;
 }
 
-function buildNodeConfig(node: EditableNode): CompiledNode["config"] {
+function rewriteConditionTarget(
+  nodeId: string,
+  targetNodeId: string,
+  localToCompiled: Map<string, string>,
+): string {
+  const compiledTarget = localToCompiled.get(targetNodeId);
+  if (!compiledTarget) {
+    throw new PlanCompileError("Condition references unresolvable node", [
+      {
+        path: `nodes.${nodeId}.branches`,
+        message: `Cannot resolve condition target ${nodeId} → ${targetNodeId}`,
+      },
+    ]);
+  }
+  return compiledTarget;
+}
+
+function buildNodeConfig(
+  node: EditableNode,
+  localToCompiled?: Map<string, string>,
+): CompiledNode["config"] {
   switch (node.type) {
     case "task":
       return {
@@ -36,11 +56,28 @@ function buildNodeConfig(node: EditableNode): CompiledNode["config"] {
         inputFields: node.inputFields,
       } satisfies CheckpointConfig;
     case "condition":
+      if (!localToCompiled) {
+        return {
+          condition: node.condition,
+          evaluationBy: node.evaluationBy,
+          branches: node.branches,
+          defaultNextNodeId: node.defaultNextNodeId,
+        } satisfies ConditionConfig;
+      }
       return {
         condition: node.condition,
         evaluationBy: node.evaluationBy,
-        branches: node.branches,
-        defaultNextNodeId: node.defaultNextNodeId,
+        branches: node.branches.map((branch) => ({
+          ...branch,
+          nextNodeId: rewriteConditionTarget(
+            node.id,
+            branch.nextNodeId,
+            localToCompiled,
+          ),
+        })),
+        defaultNextNodeId: node.defaultNextNodeId
+          ? rewriteConditionTarget(node.id, node.defaultNextNodeId, localToCompiled)
+          : undefined,
       } satisfies ConditionConfig;
     case "wait":
       return {
@@ -53,13 +90,14 @@ function buildNodeConfig(node: EditableNode): CompiledNode["config"] {
 function buildCompiledNode(
   node: EditableNode,
   compiledId: string,
+  localToCompiled?: Map<string, string>,
 ): CompiledNode {
   const base: CompiledNode = {
     id: compiledId,
     localId: node.id,
     type: node.type,
     title: node.title,
-    config: buildNodeConfig(node),
+    config: buildNodeConfig(node, localToCompiled),
     dependencies: [],
     dependents: [],
   };
@@ -106,10 +144,15 @@ export function compileEditablePlan(plan: EditablePlan): CompiledPlan {
 
   // 2. Build localId → compiledId mapping + compiled nodes
   const localToCompiled = new Map<string, string>();
-  const compiledNodes: CompiledNode[] = plan.nodes.map((node) => {
-    const compiledId = generateCompiledId();
+  const compiledNodeIds = plan.nodes.map((node) => ({
+    node,
+    compiledId: generateCompiledId(),
+  }));
+  for (const { node, compiledId } of compiledNodeIds) {
     localToCompiled.set(node.id, compiledId);
-    return buildCompiledNode(node, compiledId);
+  }
+  const compiledNodes: CompiledNode[] = compiledNodeIds.map(({ node, compiledId }) => {
+    return buildCompiledNode(node, compiledId, localToCompiled);
   });
 
   // 3. Rewrite edges

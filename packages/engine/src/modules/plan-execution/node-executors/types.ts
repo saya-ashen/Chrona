@@ -3,12 +3,20 @@ import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/c
 type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
+  runtimeName?: string;
+  runtimeRunRef?: string | null;
   artifactIds?: string[];
   conversationEntryIds?: string[];
   eventIds?: string[];
 };
 
 export type NodeExecutionResult =
+  | {
+      status: "started";
+      summary: string;
+      evidence: NodeExecutionEvidence;
+      output?: unknown;
+    }
   | {
       status: "done";
       summary: string;
@@ -24,7 +32,12 @@ export type NodeExecutionResult =
   | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "blocked"; reason: string; evidence?: NodeExecutionEvidence }
   | { status: "replan_required"; reason: string; evidence?: NodeExecutionEvidence; proposedPatch?: PlanPatch }
-  | { status: "failed"; error: string; evidence?: NodeExecutionEvidence };
+  | {
+      status: "failed";
+      error: string;
+      evidence?: NodeExecutionEvidence;
+      details?: Record<string, unknown>;
+    };
 
 export interface NodeExecutor {
   readonly nodeType: "task" | "checkpoint" | "condition" | "wait";

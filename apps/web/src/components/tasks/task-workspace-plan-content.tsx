@@ -1,9 +1,11 @@
 import { Check, Loader2, Sparkles } from "lucide-react";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import { TaskPlanGraphPanel } from "@/components/task/panels/task-plan-graph-panel";
 import type { PlanNodeDataModel } from "@/components/task/plan/task-plan-graph/types";
 import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph/types";
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
+import type { TaskExecutionDispatchResult } from "./task-workspace-query";
 import type { TaskPlanGenerationStatus } from "./task-workspace-types";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
@@ -17,6 +19,7 @@ type TaskWorkspacePlanContentProps = {
   planGenerationStatus: TaskPlanGenerationStatus;
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void;
+  onDispatchExecutionAction: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
   onSelectedNodeChange: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
 };
 
@@ -30,8 +33,10 @@ export function TaskWorkspacePlanContent({
   planGenerationStatus,
   onAcceptPlan,
   onGeneratePlan,
+  onDispatchExecutionAction: _onDispatchExecutionAction,
   onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
+  void _onDispatchExecutionAction;
   const planSummary = graphPlan && plan
     ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;

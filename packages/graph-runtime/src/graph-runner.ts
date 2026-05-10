@@ -41,6 +41,12 @@ export type GraphNodeExecutionEvidence = {
 
 export type GraphNodeExecutionResult =
   | {
+      status: "started";
+      summary: string;
+      evidence: GraphNodeExecutionEvidence;
+      output?: unknown;
+    }
+  | {
       status: "done";
       summary: string;
       evidence: GraphNodeExecutionEvidence;
@@ -66,7 +72,12 @@ export type GraphNodeExecutionResult =
       evidence?: GraphNodeExecutionEvidence;
       proposedPatch?: unknown;
     }
-  | { status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence };
+  | {
+      status: "failed";
+      error: string;
+      evidence?: GraphNodeExecutionEvidence;
+      details?: unknown;
+    };
 
 export type GraphExternalSyncResult =
   | {
@@ -333,6 +344,8 @@ function appendExecutionResult(input: {
           selectedBranch: input.result.selectedBranch,
         },
       });
+    case "started":
+      return input.state.results;
     case "waiting_for_user":
       return appendCurrentResult({
         results: input.state.results,
@@ -367,7 +380,12 @@ function appendExecutionResult(input: {
     case "failed":
       return appendCurrentResult({
         results: input.state.results,
-        result: { ...base, status: "rejected", error: input.result.error },
+        result: {
+          ...base,
+          status: "rejected",
+          error: input.result.error,
+          errorDetails: input.result.details,
+        },
       });
     case "replan_required":
       return appendCurrentResult({
@@ -407,6 +425,7 @@ function getResultMessage(result: GraphNodeExecutionResult): string {
     case "waiting_for_approval":
       return result.prompt;
     case "done":
+    case "started":
       return result.summary;
     case "blocked":
     case "replan_required":
@@ -560,6 +579,32 @@ export async function runGraphExecution<TContext = unknown>(
         };
       }
 
+      if (result.status === "started") {
+        state = {
+          ...state,
+          attempts: updateAttemptStatus({
+            attempts: state.attempts,
+            attemptId: attempt.id,
+            status: "running",
+            runtimeSnapshot: {
+              ...(attempt.runtimeSnapshot ?? {}),
+              evidence: result.evidence,
+              output: result.output,
+            },
+          }),
+        };
+        await input.callbacks.onStateChange?.(state);
+        const runningEffective = resolveEffectivePlanGraph(state);
+        return {
+          status: "running",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          effective: runningEffective,
+          state,
+          message: result.summary,
+        };
+      }
+
       state = {
         ...state,
         attempts: updateAttemptStatus({
@@ -569,7 +614,7 @@ export async function runGraphExecution<TContext = unknown>(
           finishedAt,
           error:
             result.status === "failed"
-              ? { code: "NODE_FAILED", message: result.error }
+              ? { code: "NODE_FAILED", message: result.error, details: result.details }
               : result.status === "blocked"
                 ? { code: "NODE_BLOCKED", message: result.reason }
                 : undefined,

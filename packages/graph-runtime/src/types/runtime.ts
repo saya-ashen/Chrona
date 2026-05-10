@@ -69,6 +69,7 @@ export interface NodeResult {
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
+  errorDetails?: unknown;
   waitKind?: WaitKind;
   review?: NodeResultReview;
   selectedBranch?: NodeResultSelectedBranch;

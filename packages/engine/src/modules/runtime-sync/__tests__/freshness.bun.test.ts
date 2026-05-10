@@ -1,8 +1,32 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus, WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createMockOpenClawAdapter } from "@chrona/openclaw";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
+import type { OpenClawRuntimeSyncClient } from "@/modules/runtime-sync/sync-run";
+
+function createCompletedOpenClawClient(): OpenClawRuntimeSyncClient {
+  return {
+    async getResponseSnapshot() {
+      return {
+        responseId: "runtime_completed_1",
+        sessionId: "session_completed_1",
+        sessionKey: "agent:main:dashboard:session_completed_1",
+        status: "completed",
+        output: "Package name is chrona.",
+        error: null,
+      };
+    },
+    async readSessionHistory() {
+      return { messages: [] };
+    },
+    async listApprovals() {
+      return [];
+    },
+    async waitForApprovalDecision() {
+      return null;
+    },
+  };
+}
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -64,7 +88,7 @@ describe("syncTaskRunForRead", () => {
       data: { latestRunId: run.id },
     });
 
-    await syncTaskRunForRead(task.id, createMockOpenClawAdapter({ fixtureName: "run-completed" }), {
+    await syncTaskRunForRead(task.id, createCompletedOpenClawClient(), {
       forceActive: true,
     });
 
