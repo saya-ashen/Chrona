@@ -3,11 +3,6 @@ import {
   getOpenClawTaskConfigSpec,
   validateOpenClawTaskConfig,
 } from "@chrona/openclaw";
-import {
-  getResearchTaskConfigSpec,
-  RESEARCH_EXECUTION_RUNTIME,
-  validateResearchTaskConfig,
-} from "../research-execution/config";
 import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
@@ -23,19 +18,9 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
       getTaskConfigSpec: getOpenClawTaskConfigSpec,
       validateTaskConfig: validateOpenClawTaskConfig,
       createExecutionAdapter: async () => {
-        throw new Error("createExecutionAdapter is only available from the server execution registry");
-      },
-    },
-  ],
-  [
-    RESEARCH_EXECUTION_RUNTIME,
-    {
-      key: RESEARCH_EXECUTION_RUNTIME,
-      inputVersion: getResearchTaskConfigSpec().version,
-      getTaskConfigSpec: getResearchTaskConfigSpec,
-      validateTaskConfig: validateResearchTaskConfig,
-      createExecutionAdapter: async () => {
-        throw new Error("createExecutionAdapter is only available from the server execution registry");
+        throw new Error(
+          "createExecutionAdapter is only available from the server execution registry",
+        );
       },
     },
   ],
@@ -72,7 +57,10 @@ export function getRuntimeTaskConfigSpec(key: string): RuntimeTaskConfigSpec {
   return getRuntimeAdapterDefinition(key).getTaskConfigSpec();
 }
 
-export function validateRuntimeTaskConfig(key: string, input: unknown): RuntimeInput {
+export function validateRuntimeTaskConfig(
+  key: string,
+  input: unknown,
+): RuntimeInput {
   return getRuntimeAdapterDefinition(key).validateTaskConfig(input);
 }
 
