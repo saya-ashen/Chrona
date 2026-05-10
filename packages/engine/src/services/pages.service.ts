@@ -1,7 +1,7 @@
-import { getInbox } from "../modules/queries/get-inbox";
-import { getMemoryConsole } from "../modules/queries/get-memory-console";
-import { getSchedulePage } from "../modules/queries/get-schedule-page";
-import { getWorkPage, WorkPageTaskNotFoundError } from "../modules/queries/work-page";
+import { getInbox } from "../modules/pages/get-inbox";
+import { getMemoryConsole } from "../modules/pages/get-memory-console";
+import { getSchedulePage } from "../modules/scheduling/get-schedule-page";
+import { getWorkPage, WorkPageTaskNotFoundError } from "../modules/pages/work-page";
 import { ENGINE_ERROR_CODES, EngineError, engineErrorFromUnknown } from "../errors";
 
 export function createPagesService() {

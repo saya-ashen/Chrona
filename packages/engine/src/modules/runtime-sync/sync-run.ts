@@ -8,7 +8,7 @@ import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-ses
 import {
   progressAcceptedTaskPlan,
   syncParentTaskStateFromAcceptedPlan,
-} from "@/modules/commands/progress-accepted-task-plan";
+} from "@/modules/plans/progress-accepted-task-plan";
 import { syncAcceptedTaskPlanForTask } from "@/modules/plan-execution/sync-accepted-plan";
 import {
   decodeSyncCursor,

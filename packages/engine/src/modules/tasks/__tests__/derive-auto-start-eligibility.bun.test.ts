@@ -4,7 +4,7 @@ import {
   type TaskLike,
   type RunLike,
   type WorkBlockLike,
-} from "@/modules/tasks/derive-auto-start-eligibility";
+} from "@/modules/scheduling/derive-auto-start-eligibility";
 
 function makeTask(overrides: Partial<TaskLike> = {}): TaskLike {
   return {

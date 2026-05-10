@@ -2,16 +2,18 @@
 
 import { MemoryConsole } from "@/components/memory/memory-console";
 
+type MemoryConsoleData = Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
+
 type MemoryPageClientProps = {
   workspaceId: string;
-  initialData: Awaited<ReturnType<typeof import("@/modules/queries/get-memory-console").getMemoryConsole>>;
+  initialData: MemoryConsoleData;
   copy: Parameters<typeof MemoryConsole>[0]["copy"];
 };
 
 export function MemoryPageClient({ initialData, copy }: MemoryPageClientProps) {
   return (
     <MemoryConsole
-      items={initialData.map((item) => ({
+      items={initialData.map((item: MemoryConsoleData[number]) => ({
         ...item,
         actions: null,
       }))}

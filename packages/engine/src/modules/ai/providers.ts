@@ -42,7 +42,7 @@ export function getOrCreateClient(
   return client;
 }
 
-export async function checkClientHealth(
+async function checkClientHealth(
   client: AiClientRecord,
 ): Promise<{ available: boolean; reason: string }> {
   try {

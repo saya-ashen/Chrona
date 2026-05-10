@@ -5,7 +5,7 @@ import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createMockOpenClawAdapter } from "@chrona/openclaw";
 import type { NodeConfig } from "@chrona/contracts/ai";
 
-const realProgressAcceptedPlan = await import("@/modules/commands/progress-accepted-task-plan");
+const realProgressAcceptedPlan = await import("@/modules/plans/progress-accepted-task-plan");
 
 const progressAcceptedTaskPlanMock = mock(async () => ({
   parentTaskId: "parent",
@@ -15,7 +15,7 @@ const progressAcceptedTaskPlanMock = mock(async () => ({
   parentCompleted: false,
 }));
 
-mock.module("@/modules/commands/progress-accepted-task-plan", () => ({
+mock.module("@/modules/plans/progress-accepted-task-plan", () => ({
   progressAcceptedTaskPlan: progressAcceptedTaskPlanMock,
   syncParentTaskStateFromAcceptedPlan: realProgressAcceptedPlan.syncParentTaskStateFromAcceptedPlan,
 }));

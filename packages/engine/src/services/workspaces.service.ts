@@ -1,6 +1,6 @@
 import { getDefaultWorkspace } from "../modules/workspaces/get-default-workspace";
-import { getWorkspaceOverview } from "../modules/queries/get-workspace-overview";
-import { getWorkspaces } from "../modules/queries/get-workspaces";
+import { getWorkspaceOverview } from "../modules/workspaces/get-workspace-overview";
+import { getWorkspaces } from "../modules/workspaces/get-workspaces";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 export function createWorkspacesService() {

@@ -5,7 +5,7 @@ import { InboxList } from "@/components/inbox/inbox-list";
 
 type InboxPageClientProps = {
   workspaceId: string;
-  initialData: Awaited<ReturnType<typeof import("@/modules/queries/get-inbox").getInbox>>;
+  initialData: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
   copy: Parameters<typeof InboxList>[0]["copy"] & {
     openSchedule?: string;
     acceptProposal?: string;

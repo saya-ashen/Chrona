@@ -1,9 +1,9 @@
-import { createTask } from "../modules/commands/create-task";
-import { deleteTask } from "../modules/commands/delete-task";
-import { updateTask } from "../modules/commands/update-task";
-import { getTaskPage } from "../modules/queries/get-task-page";
-import { ensureTaskInWorkspace } from "../modules/queries/task-by-id";
-import { listTasksByWorkspace } from "../modules/queries/list-tasks";
+import { createTask } from "../modules/tasks/create-task";
+import { deleteTask } from "../modules/tasks/delete-task";
+import { updateTask } from "../modules/tasks/update-task";
+import { getTaskPage } from "../modules/tasks/get-task-page";
+import { ensureTaskInWorkspace } from "../modules/tasks/task-by-id";
+import { listTasksByWorkspace } from "../modules/tasks/list-tasks";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 export function createTasksService() {

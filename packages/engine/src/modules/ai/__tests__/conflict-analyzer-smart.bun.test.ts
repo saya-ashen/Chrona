@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
-mock.module("../ai-service", () => ({
+mock.module("../runtime/ai-service", () => ({
   aiChat: mock(() => Promise.resolve(null)),
 }));
 
-import { aiChat } from "../ai-service";
+import { aiChat } from "../runtime/ai-service";
 import { analyzeConflictsSmart, analyzeConflicts } from "../conflict-analyzer";
 import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 

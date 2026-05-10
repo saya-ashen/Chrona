@@ -1,16 +1,16 @@
-import { applyPlanPatchCommand } from "../modules/commands/apply-plan-patch-command";
-import { generateTaskPlanManualStream } from "../modules/commands/generate-task-plan-manual-stream";
-import { materializeTaskPlan } from "../modules/commands/materialize-task-plan";
+import { applyPlanPatchCommand } from "../modules/plans/apply-plan-patch-command";
+import { generateTaskPlanManualStream } from "../modules/plans/generate-task-plan-manual-stream";
+import { materializeTaskPlan } from "../modules/plans/materialize-task-plan";
 import {
   isTaskPlanGenerationRunning,
   startTaskPlanGeneration,
   stopTaskPlanGeneration,
   TaskPlanGenerationInFlightError,
-} from "../modules/commands/task-plan-generation-registry";
+} from "../modules/plans/task-plan-generation-registry";
 import { getLatestCompiledPlan, saveCompiledPlan } from "../modules/plan-execution/compiled-plan-store";
-import { ensurePlanInWorkspace } from "../modules/queries/plan-in-workspace";
-import { ensureTaskInWorkspace } from "../modules/queries/task-by-id";
-import { getLatestTaskPlanReadModel } from "../modules/queries/task-plan-read-model";
+import { ensurePlanInWorkspace } from "../modules/plans/plan-in-workspace";
+import { ensureTaskInWorkspace } from "../modules/tasks/task-by-id";
+import { getLatestTaskPlanReadModel } from "../modules/plans/task-plan-read-model";
 import { ENGINE_ERROR_CODES, EngineError, engineErrorFromUnknown } from "../errors";
 
 export function createTaskPlanService() {

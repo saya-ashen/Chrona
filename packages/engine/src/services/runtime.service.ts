@@ -1,4 +1,4 @@
-import { startAutoStartScheduler } from "../modules/scheduler/auto-start-runner";
+import { startAutoStartScheduler } from "../modules/scheduling/auto-start-runner";
 
 export function createRuntimeService() {
   return {

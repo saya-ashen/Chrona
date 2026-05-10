@@ -23,17 +23,17 @@ export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 export type AppBootData = {
   locale: Locale;
   dictionary: Dictionary;
-  defaultWorkspace: Awaited<ReturnType<typeof import("@/modules/workspaces/get-default-workspace").getDefaultWorkspace>>;
-  schedule: Awaited<ReturnType<typeof import("@/modules/queries/get-schedule-page").getSchedulePage>>;
-  inbox: Awaited<ReturnType<typeof import("@/modules/queries/get-inbox").getInbox>>;
-  memory: Awaited<ReturnType<typeof import("@/modules/queries/get-memory-console").getMemoryConsole>>;
-  workspaces: Awaited<ReturnType<typeof import("@/modules/queries/get-workspaces").getWorkspaces>>;
+  defaultWorkspace: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-default-workspace").getDefaultWorkspace>>;
+  schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/scheduling/get-schedule-page").getSchedulePage>>;
+  inbox: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
+  memory: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
+  workspaces: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-workspaces").getWorkspaces>>;
 };
 
 export type TaskPageRouteData = {
   locale: Locale;
   dictionary: Dictionary;
-  task: Awaited<ReturnType<typeof import("@/modules/queries/get-task-page").getTaskPage>>;
+  task: Awaited<ReturnType<typeof import("@chrona/engine/modules/tasks/get-task-page").getTaskPage>>;
 };
 
 export type TaskListRouteData = {
@@ -66,15 +66,17 @@ export type WorkbenchHubRouteData = {
 export type WorkPageRouteData = {
   locale: Locale;
   dictionary: Dictionary;
-  work: Awaited<ReturnType<typeof import("@/modules/queries/work-page/get-work-page").getWorkPage>>;
+  work: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/work-page/get-work-page").getWorkPage>>;
 };
 
 export type WorkspaceOverviewRouteData = {
   locale: Locale;
   dictionary: Dictionary;
   workspaceId: string;
-  data: Awaited<ReturnType<typeof import("@/modules/queries/get-workspace-overview").getWorkspaceOverview>>;
+  data: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-workspace-overview").getWorkspaceOverview>>;
 };
+
+type WorkspaceListItem = AppBootData["workspaces"][number];
 
 export function LocaleLandingPage() {
   const params = useParams();
@@ -217,7 +219,7 @@ export function WorkspacesRoutePage() {
       </div>
       <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">{t.notice}</div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {workspaces.map((workspace) => (
+        {workspaces.map((workspace: WorkspaceListItem) => (
           <LocalizedLink
             key={workspace.id}
             href={`/workspaces/${workspace.id}`}

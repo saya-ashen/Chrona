@@ -1,7 +1,7 @@
-import { applySchedule } from "../modules/commands/apply-schedule";
-import { clearSchedule } from "../modules/commands/clear-schedule";
-import { decideScheduleProposal } from "../modules/commands/decide-schedule-proposal";
-import { proposeSchedule } from "../modules/commands/propose-schedule";
+import { applySchedule } from "../modules/scheduling/apply-schedule";
+import { clearSchedule } from "../modules/scheduling/clear-schedule";
+import { decideScheduleProposal } from "../modules/scheduling/decide-schedule-proposal";
+import { proposeSchedule } from "../modules/scheduling/propose-schedule";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 export function createTaskScheduleService() {
