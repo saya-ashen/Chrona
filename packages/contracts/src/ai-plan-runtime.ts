@@ -359,6 +359,7 @@ export interface NodeAttempt {
     message: string;
     details?: unknown;
   };
+  runtimeSnapshot?: Record<string, unknown>;
 }
 
 export interface PlanRun {
@@ -459,6 +460,7 @@ export interface NodeResult {
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
+  errorDetails?: unknown;
   waitKind?: WaitKind;
   review?: {
     required: boolean;
@@ -579,6 +581,7 @@ export type ExecutionActionType =
   | "resume_with_input"
   | "resume_with_approval"
   | "resume_after_unblock"
+  | "complete_manual_node"
   | "retry_node"
   | "cancel_session";
 
@@ -615,6 +618,14 @@ export type ExecutionActionInput =
       sessionId?: string;
       nodeId?: string;
       note?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "complete_manual_node";
+      sessionId?: string;
+      nodeId: string;
+      summary?: string;
+      output?: unknown;
       idempotencyKey?: string;
     }
   | {

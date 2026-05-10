@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Play, RotateCcw, Send, Sparkles } from "lucide-react";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import { buttonVariants } from "@/components/ui/button";
 import { inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 import { interactionLabel } from "./logic";
 import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
@@ -36,7 +38,7 @@ function getRunPanelTheme(mode: RunPanelMode) {
 function getRunPanelHints(mode: RunPanelMode) {
   switch (mode) {
     case "execute":
-      return ["Review dependencies and objective.", "Start this node when you are ready to proceed."];
+      return ["Review dependencies and objective.", "Execution starts from the plan entry node, not from an arbitrary selected node."];
     case "confirm":
       return ["Read the checkpoint summary carefully.", "Confirm only when the prerequisite condition is truly satisfied."];
     case "choose":
@@ -141,7 +143,7 @@ function getActionVerb(action: PlanNodeAction | null) {
   if (action.kind === "edit") return "Submit";
   if (action.kind === "retry") return "Retry";
   if (action.kind === "observe") return "Observe";
-  if (action.kind === "trigger") return "Run";
+  if (action.kind === "trigger") return "Start plan";
   if (action.kind === "open") return "Open";
   return "Send";
 }
@@ -149,7 +151,7 @@ function getActionVerb(action: PlanNodeAction | null) {
 function getRunPanelCopy(mode: RunPanelMode) {
   switch (mode) {
     case "execute":
-      return { eyebrow: "Execution panel", title: "Ready to execute", description: "This node is ready. Start it directly from here.", submitLabel: "Start node", submitIcon: Play };
+      return { eyebrow: "Execution panel", title: "Ready to execute", description: "Execution starts from the plan entry node. This action starts or continues the plan.", submitLabel: "Start plan", submitIcon: Play };
     case "confirm":
       return { eyebrow: "Confirmation panel", title: "Waiting for confirmation", description: "This node needs a clear confirmation before the run can proceed.", submitLabel: "Confirm", submitIcon: Check };
     case "choose":
@@ -170,7 +172,7 @@ function getRunPanelCopy(mode: RunPanelMode) {
 }
 
 function resolvePrimarySubmitLabel(node: PlanNodeDataModel, mode: RunPanelMode, fallbackLabel: string) {
-  if (mode === "execute") return "Start node";
+  if (mode === "execute") return node.executionMode === "manual" ? "Mark done" : "Start plan";
   if (mode === "observe" && (node.status === "active" || node.active)) return "Continue run";
   return fallbackLabel;
 }
@@ -187,10 +189,114 @@ function extractRunResult(node: PlanNodeDataModel) {
   return candidates[0] ?? null;
 }
 
-export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataModel }) {
+function formatErrorDetails(details: unknown): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const record = details as Record<string, unknown>;
+  const parts = [
+    typeof record.errorSummary === "string" ? record.errorSummary : null,
+    typeof record.runtimeName === "string" ? `runtime=${record.runtimeName}` : null,
+    typeof record.runtimeRunRef === "string" ? `runtimeRunRef=${record.runtimeRunRef}` : null,
+    typeof record.runId === "string" ? `runId=${record.runId}` : null,
+    typeof record.runtimeSessionKey === "string" ? `session=${record.runtimeSessionKey}` : null,
+  ].filter((value): value is string => Boolean(value && value.trim()));
+
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
+function extractRunError(node: PlanNodeDataModel): string | null {
+  const error = typeof node.metadata?.error === "string" ? node.metadata.error : null;
+  const details = formatErrorDetails(node.metadata?.errorDetails);
+
+  if (error && details) return `${error}\n${details}`;
+  return error ?? details;
+}
+
+function summarizeFieldValues(fields: PlanNodeField[], values: Record<string, string>) {
+  return fields
+    .map((field) => `${field.label}: ${values[field.key]?.trim() || "-"}`)
+    .join(" · ");
+}
+
+function buildInputText(fields: PlanNodeField[], values: Record<string, string>) {
+  const parts = fields
+    .map((field) => {
+      const value = values[field.key]?.trim();
+      return value ? `${field.label}: ${value}` : null;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  return parts.join("\n");
+}
+
+function buildExecutionAction(input: {
+  node: PlanNodeDataModel;
+  selectedAction: PlanNodeAction | null;
+  fields: PlanNodeField[];
+  values: Record<string, string>;
+}): ExecutionActionInput {
+  const kind = input.selectedAction?.kind;
+  const inputText = buildInputText(input.fields, input.values);
+  const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
+
+  if (kind === "approve" || input.node.interactionType === "approve") {
+    return {
+      action: "resume_with_approval",
+      nodeId: input.node.id,
+      decision: selectedDecision?.includes("reject") ? "reject" : "approve",
+      feedback: inputText || undefined,
+    };
+  }
+
+  if (kind === "retry" || input.node.interactionType === "retry") {
+    return {
+      action: "retry_node",
+      nodeId: input.node.id,
+      prompt: inputText || input.node.nextAction || undefined,
+    };
+  }
+
+  if (kind === "trigger" || input.node.interactionType === "execute") {
+    if (input.node.executionMode === "manual") {
+      return {
+        action: "complete_manual_node",
+        nodeId: input.node.id,
+        summary: inputText || input.node.nextAction || `Manual node ${input.node.title} completed`,
+        output: inputText || undefined,
+      };
+    }
+
+    return {
+      action: "start_manual",
+      prompt: inputText || input.node.nextAction || undefined,
+    };
+  }
+
+  if (input.node.interactionType === "wait") {
+    return {
+      action: "resume_after_unblock",
+      nodeId: input.node.id,
+      note: inputText || input.node.nextAction || undefined,
+    };
+  }
+
+  return {
+    action: "resume_with_input",
+    nodeId: input.node.id,
+    inputText: inputText || input.selectedAction?.label || input.node.nextAction || "Continue",
+  };
+}
+
+export function TaskPlanGraphInspectorRunPanel({
+  node,
+  onDispatchExecutionAction,
+}: {
+  node: PlanNodeDataModel;
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
+}) {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() => defaultActionForNode(node));
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => buildDefaultFieldValues(node.interactiveFields ?? []));
   const [runLog, setRunLog] = useState<Array<{ id: string; title: string; detail: string }>>([]);
+  const [isDispatching, setIsDispatching] = useState(false);
 
   useEffect(() => {
     setSelectedActionId(defaultActionForNode(node));
@@ -200,6 +306,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
 
   const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
   const runResult = useMemo(() => extractRunResult(node), [node]);
+  const runError = useMemo(() => extractRunError(node), [node]);
   const runPanelMode = useMemo(() => node.interactionType, [node]);
   const resolvedRunPanelMode = runPanelMode ?? "observe";
   const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode), [resolvedRunPanelMode]);
@@ -212,10 +319,52 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
   const availableActions = node.availableActions ?? [];
   const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
 
-  function handleRunAction() {
-    const payload = interactiveFields.map((field) => `${field.label}: ${fieldValues[field.key] || "-"}`).join(" · ");
-    const label = selectedAction?.label ?? node.nextAction ?? "Run action";
-    setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "UI-only preview. No backend action sent." }, ...current].slice(0, 4));
+  async function handleRunAction() {
+    const payload = summarizeFieldValues(interactiveFields, fieldValues);
+    const label = selectedAction?.kind === "trigger"
+      ? primarySubmitLabel
+      : selectedAction?.label ?? node.nextAction ?? "Run action";
+
+    if (!onDispatchExecutionAction) {
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+      return;
+    }
+
+    setIsDispatching(true);
+    try {
+      const result = await onDispatchExecutionAction(buildExecutionAction({ node, selectedAction, fields: interactiveFields, values: fieldValues }));
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
+      setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} still running` : `${label} failed`, detail: message }, ...current].slice(0, 4));
+    } finally {
+      setIsDispatching(false);
+    }
+  }
+
+  async function handleMarkDone() {
+    const label = "Mark done";
+    const summary = buildInputText(interactiveFields, fieldValues) || runResult || `Manual node ${node.title} completed`;
+
+    if (!onDispatchExecutionAction) {
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+      return;
+    }
+
+    setIsDispatching(true);
+    try {
+      const result = await onDispatchExecutionAction({
+        action: "complete_manual_node",
+        nodeId: node.id,
+        summary,
+        output: summary,
+      });
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
+    } catch (cause) {
+      setRunLog((current) => [{ id: `${Date.now()}`, title: `${label} failed`, detail: cause instanceof Error ? cause.message : "Failed to mark node done" }, ...current].slice(0, 4));
+    } finally {
+      setIsDispatching(false);
+    }
   }
 
   return (
@@ -265,7 +414,9 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
                 {resolvedRunPanelMode === "wait"
                   ? "This node is waiting on an external event, so there is no manual form to fill here."
                   : resolvedRunPanelMode === "execute"
-                    ? "This node can be started directly. No extra manual fields are required first."
+                    ? node.executionMode === "manual"
+                      ? "Complete the manual work outside Chrona, then mark this node done here."
+                      : "Execution starts from the plan entry node. This action starts or continues the plan."
                     : resolvedRunPanelMode === "retry"
                       ? "This node is blocked. Use retry once the failure cause is understood."
                       : "This node does not require free-form input. The action here is a direct decision or execution step."}
@@ -275,11 +426,13 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction}
+                disabled={isDispatching || (!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction)}
                 className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
                 onClick={handleRunAction}
               >
-                {selectedAction?.kind === "approve"
+                {isDispatching
+                  ? <Sparkles className="size-4 animate-spin" />
+                  : selectedAction?.kind === "approve"
                   ? <Check className="size-4" />
                   : selectedAction?.kind === "confirm" || selectedAction?.kind === "choose"
                     ? <Check className="size-4" />
@@ -288,7 +441,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
                       : selectedAction?.kind === "trigger"
                         ? <Sparkles className="size-4" />
                         : <SubmitIcon className="size-4" />}
-                {selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
+                {isDispatching ? "Sending..." : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
               </button>
 
               {!["observe", "wait"].includes(resolvedRunPanelMode) ? (
@@ -307,17 +460,16 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
               {node.status === "active" || node.active ? (
                 <button
                   type="button"
+                  disabled={isDispatching}
                   className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
-                  onClick={() => {
-                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Mark done", detail: `Simulated completion for "${node.title}".` }, ...current].slice(0, 4));
-                  }}
+                  onClick={handleMarkDone}
                 >
                   <Check className="size-4" />
                   Mark done
                 </button>
               ) : null}
 
-              <span className="text-xs text-muted-foreground">Preview only. Backend wiring comes later.</span>
+              <span className="text-xs text-muted-foreground">Actions are sent to the task execution backend.</span>
             </div>
           </div>
         </section>
@@ -326,11 +478,17 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Run result</p>
         <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
-          {runResult ? <p className="text-sm leading-6 text-foreground">{runResult}</p> : <p className="text-sm text-muted-foreground">No run result yet for this node.</p>}
+          {runError ? (
+            <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">{runError}</pre>
+          ) : runResult ? (
+            <p className="text-sm leading-6 text-foreground">{runResult}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No run result yet for this node.</p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-dashed border-border/60 bg-muted/[0.14] p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Simulated run feed</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Run feed</p>
           {runLog.length > 0 ? (
             <div className="mt-3 space-y-2">
               {runLog.map((entry) => (
@@ -343,7 +501,7 @@ export function TaskPlanGraphInspectorRunPanel({ node }: { node: PlanNodeDataMod
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
               {showRunControls
-                ? "Select a node action, fill required fields, then simulate the run flow here."
+                ? "Select a node action, fill required fields, then send it to the execution backend."
                 : "Run controls appear only for the current node. Results for this node still show here."}
             </p>
           )}

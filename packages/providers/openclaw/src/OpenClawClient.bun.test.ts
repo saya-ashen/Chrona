@@ -46,11 +46,20 @@ describe("OpenClawClient", () => {
     });
 
     const events = [] as Array<{ type: string; data: string; toolCall?: { tool: string; callId: string } }>;
-    for await (const event of client.executeFeatureStream("generate_plan", {
-      sessionKey: "sess-1",
-      instructions: "plan this task",
-      task: { title: "Write docs" },
-      timeout: 5,
+    for await (const event of client.stream({
+      request: {
+        sessionId: "sess-1",
+        sessionKey: "sess-1",
+        feature: "generate_plan",
+        body: {
+          model: "openclaw",
+          user: "sess-1",
+          instructions: "plan this task",
+          input: [{ type: "message", role: "user", content: "Write docs" }],
+          stream: true,
+        },
+        timeoutSeconds: 5,
+      },
     })) {
       events.push({
         type: event.type,
@@ -98,11 +107,20 @@ describe("OpenClawClient", () => {
     });
 
     const events = [] as Array<{ type: string; data: string; toolCall?: { tool: string; callId: string } }>;
-    for await (const event of client.executeFeatureStream("generate_plan", {
-      sessionKey: "sess-2",
-      instructions: "plan this task",
-      task: { title: "Write docs" },
-      timeout: 5,
+    for await (const event of client.stream({
+      request: {
+        sessionId: "sess-2",
+        sessionKey: "sess-2",
+        feature: "generate_plan",
+        body: {
+          model: "openclaw",
+          user: "sess-2",
+          instructions: "plan this task",
+          input: [{ type: "message", role: "user", content: "Write docs" }],
+          stream: true,
+        },
+        timeoutSeconds: 5,
+      },
     })) {
       events.push({
         type: event.type,
@@ -152,11 +170,20 @@ describe("OpenClawClient", () => {
       gatewayToken: "secret",
     });
 
-    for await (const _event of client.executeFeatureStream("generate_plan", {
-      sessionKey: "sess-dump",
-      instructions: "plan this task",
-      task: { title: "Write docs" },
-      timeout: 5,
+    for await (const _event of client.stream({
+      request: {
+        sessionId: "sess-dump",
+        sessionKey: "sess-dump",
+        feature: "generate_plan",
+        body: {
+          model: "openclaw",
+          user: "sess-dump",
+          instructions: "plan this task",
+          input: [{ type: "message", role: "user", content: "Write docs" }],
+          stream: true,
+        },
+        timeoutSeconds: 5,
+      },
     })) {
       // Consume stream to completion so the dump file is closed.
     }

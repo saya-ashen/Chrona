@@ -1,5 +1,4 @@
 import type { PreparedAiFeatureSpec } from "@chrona/contracts";
-import type { RuntimeInput } from "@chrona/runtime-core";
 
 export type StructuredResultReliability = "business_tool" | "assistant_text";
 
@@ -34,31 +33,19 @@ export type BridgeFeature =
   | "conflicts"
   | "timeslots"
   | "chat"
-  | "dispatch_task";
+  | "dispatch_task"
+  | "execute_node";
 
-export interface BridgeFeatureRequest<TInput = Record<string, unknown>> {
-  sessionId?: string;
+export interface OpenClawGatewayRequest {
+  sessionId: string;
   sessionKey?: string;
-  input: TInput;
-  instructions?: string;
-  inputText?: string;
+  body: Record<string, unknown>;
+  feature?: BridgeFeature;
   featureSpec?: PreparedAiFeatureSpec;
-  timeout?: number;
+  timeoutSeconds?: number;
 }
 
-export interface BridgeExecutionTaskRequest {
-  sessionId?: string;
-  sessionKey?: string;
-  instructions: string;
-  taskId?: string;
-  workspaceId?: string;
-  taskTitle?: string;
-  executionRuntime?: string;
-  runtimeInput?: Record<string, unknown>;
-  timeout?: number;
-}
-
-export type BridgeRequest = BridgeFeatureRequest | BridgeExecutionTaskRequest;
+export type BridgeRequest = OpenClawGatewayRequest;
 
 export interface ToolCallInfo {
   tool: string;
@@ -131,10 +118,6 @@ export type BridgeLogger = {
   error: (event: string, data?: Record<string, unknown>) => void;
 };
 
-export type RouteKind =
-  | { kind: "feature"; feature: BridgeFeature; stream: boolean }
-  | { kind: "execution"; stream: boolean };
-
 export interface ExecutionResult {
   response: BridgeResponse;
   events: NDJSONEvent[];
@@ -165,25 +148,13 @@ export interface OpenClawStreamEvent {
   toolCall?: OpenClawToolCall;
 }
 
-export type OpenClawHello = {
-  protocol: number;
-  methods: string[];
-};
-
-export type OpenClawRunSnapshot = {
-  runtimeRunRef: string;
-  runtimeSessionRef?: string;
-  runtimeSessionKey?: string;
-  status:
-    | "Pending"
-    | "Running"
-    | "WaitingForInput"
-    | "WaitingForApproval"
-    | "Failed"
-    | "Completed"
-    | "Cancelled";
-  rawStatus?: string;
-  lastMessage?: string;
+export type OpenClawResponseSnapshot = {
+  responseId?: string;
+  sessionId: string;
+  sessionKey?: string;
+  status?: string;
+  output?: string;
+  error?: string | null;
 };
 
 export type OpenClawChatHistory = {
@@ -219,79 +190,3 @@ export type OpenClawPendingApproval = {
   createdAtMs?: number;
   expiresAtMs?: number;
 };
-
-export type OpenClawSendInput = {
-  runtimeSessionKey: string;
-  message: string;
-};
-
-export type OpenClawSendInputResult = {
-  accepted: boolean;
-  runtimeRunRef?: string;
-  runtimeSessionKey?: string;
-  runStarted: boolean;
-};
-
-export type OpenClawStructuredRunResult<T = unknown> = StructuredAgentResult<T>;
-
-export type OpenClawSessionStatus = {
-  runtimeSessionKey: string;
-  exists: boolean;
-  activeRunRef?: string;
-  activeRunStatus?: OpenClawRunSnapshot["status"];
-  pendingApprovals: OpenClawPendingApproval[];
-  lastMessage?: string;
-};
-
-export type OpenClawWaitForRunInput = {
-  runtimeRunRef: string;
-  runtimeSessionKey?: string;
-  timeoutMs?: number;
-};
-
-export type OpenClawAdapterConfig = {
-  bridgeUrl?: string;
-  bridgeToken?: string;
-  timeoutSeconds?: number;
-  mode?: "live" | "mock";
-};
-
-export interface OpenClawRuntimeClient {
-  connect(): Promise<OpenClawHello>;
-  close(code?: number, reason?: string): void;
-  createRun(input: {
-    prompt: string;
-    runtimeInput: RuntimeInput;
-    runtimeSessionKey?: string;
-  }): Promise<{
-    runtimeRunRef?: string;
-    runtimeSessionRef?: string;
-    runtimeSessionKey?: string;
-    runStarted: boolean;
-  }>;
-  createStructuredRun<T = unknown>(input: {
-    feature: BridgeFeature;
-    prompt: string;
-    runtimeSessionKey?: string;
-    instructions?: string;
-    inputText?: string;
-    featureSpec?: PreparedAiFeatureSpec;
-    timeoutSeconds?: number;
-  }): Promise<OpenClawStructuredRunResult<T>>;
-  getStructuredResult<T = unknown>(
-    runtimeSessionKey: string,
-  ): Promise<OpenClawStructuredRunResult<T> | null>;
-  waitForRun(
-    input: OpenClawWaitForRunInput | string,
-    timeoutMs?: number,
-  ): Promise<OpenClawRunSnapshot>;
-  readOutputs(runtimeSessionKey: string): Promise<OpenClawChatHistory>;
-  listApprovals(): Promise<OpenClawPendingApproval[]>;
-  sendInput(input: OpenClawSendInput): Promise<OpenClawSendInputResult>;
-  waitForApprovalDecision(approvalId: string): Promise<OpenClawApprovalDecision | null>;
-  requestApproval(input: OpenClawApprovalRequest): Promise<OpenClawApprovalRequestResult>;
-  resolveApproval(input: OpenClawApprovalResolution): Promise<{
-    accepted: boolean;
-  }>;
-  getSessionStatus(runtimeSessionKey: string): Promise<OpenClawSessionStatus>;
-}

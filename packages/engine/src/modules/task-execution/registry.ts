@@ -17,11 +17,6 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
       inputVersion: getOpenClawTaskConfigSpec().version,
       getTaskConfigSpec: getOpenClawTaskConfigSpec,
       validateTaskConfig: validateOpenClawTaskConfig,
-      createExecutionAdapter: async () => {
-        throw new Error(
-          "createExecutionAdapter is only available from the server execution registry",
-        );
-      },
     },
   ],
 ]);
@@ -30,13 +25,13 @@ export function getRuntimeAdapterDefinition(key: string) {
   const normalizedKey = key.trim();
 
   if (!normalizedKey) {
-    throw new Error("runtime adapter key is required");
+    throw new Error("runtime key is required");
   }
 
   const definition = runtimeRegistry.get(normalizedKey);
 
   if (!definition) {
-    throw new Error(`Unknown runtime adapter: ${normalizedKey}`);
+    throw new Error(`Unknown runtime: ${normalizedKey}`);
   }
 
   return definition;

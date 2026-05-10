@@ -2,7 +2,7 @@ import type {
   OpenClawApprovalDecision,
   OpenClawChatHistory,
   OpenClawPendingApproval,
-  OpenClawRunSnapshot,
+  OpenClawResponseSnapshot,
 } from "@chrona/openclaw";
 
 type OpenClawSyncCursor = {
@@ -284,7 +284,7 @@ export function mapApprovalDelta(input: {
 
 export function mapRunLifecycleEvent(input: {
   previousStatus?: string | null;
-  snapshot: OpenClawRunSnapshot;
+  snapshot: OpenClawResponseSnapshot;
   runId: string;
 }) {
   if (input.previousStatus === input.snapshot.status) {
@@ -296,7 +296,7 @@ export function mapRunLifecycleEvent(input: {
       eventType: "run.completed",
       dedupeKey: `run.completed:${input.runId}`,
       payload: {
-        runtime_run_ref: input.snapshot.runtimeRunRef,
+        runtime_run_ref: input.snapshot.responseId,
       },
       runtimeTs: undefined,
     } satisfies OpenClawTimelineEvent;
@@ -307,8 +307,8 @@ export function mapRunLifecycleEvent(input: {
       eventType: "run.failed",
       dedupeKey: `run.failed:${input.runId}`,
       payload: {
-        runtime_run_ref: input.snapshot.runtimeRunRef,
-        error_summary: input.snapshot.lastMessage,
+        runtime_run_ref: input.snapshot.responseId,
+        error_summary: input.snapshot.error ?? input.snapshot.output,
       },
       runtimeTs: undefined,
     } satisfies OpenClawTimelineEvent;
@@ -319,8 +319,8 @@ export function mapRunLifecycleEvent(input: {
       eventType: "human.input_requested",
       dedupeKey: `human.input_requested:${input.runId}`,
       payload: {
-        runtime_run_ref: input.snapshot.runtimeRunRef,
-        prompt: input.snapshot.lastMessage,
+        runtime_run_ref: input.snapshot.responseId,
+        prompt: input.snapshot.output,
       },
       runtimeTs: undefined,
     } satisfies OpenClawTimelineEvent;

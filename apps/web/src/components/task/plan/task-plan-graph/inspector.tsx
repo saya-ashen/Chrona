@@ -1,18 +1,22 @@
 "use client";
 
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import { interactionLabel, nodeKindLabel } from "./logic";
 import { TaskPlanGraphInspectorDetails } from "./inspector-details";
 import { TaskPlanGraphInspectorRunPanel } from "./inspector-run-panel";
 import type { GraphCopy, PlanNodeDataModel } from "./types";
+import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 
 export function TaskPlanGraphInspector({
   node,
   graphCopy,
   nodes = [],
+  onDispatchExecutionAction,
 }: {
   node: PlanNodeDataModel | null;
   graphCopy: GraphCopy;
   nodes?: PlanNodeDataModel[];
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
 }) {
   if (!node) {
     return (
@@ -37,7 +41,7 @@ export function TaskPlanGraphInspector({
 
       <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         <TaskPlanGraphInspectorDetails node={node} graphCopy={graphCopy} nodes={nodes} />
-        <TaskPlanGraphInspectorRunPanel node={node} />
+        <TaskPlanGraphInspectorRunPanel node={node} onDispatchExecutionAction={onDispatchExecutionAction} />
       </div>
     </aside>
   );

@@ -1,8 +1,113 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createMockOpenClawAdapter } from "@chrona/openclaw";
-import { syncRunFromRuntime } from "@/modules/runtime-sync/sync-run";
+import {
+  syncRunFromRuntime,
+  type OpenClawRuntimeSyncClient,
+} from "@/modules/runtime-sync/sync-run";
+
+type MockClientFixture = {
+  snapshot: Awaited<ReturnType<OpenClawRuntimeSyncClient["getResponseSnapshot"]>>;
+  history: Awaited<ReturnType<OpenClawRuntimeSyncClient["readSessionHistory"]>>;
+  approvals: Awaited<ReturnType<OpenClawRuntimeSyncClient["listApprovals"]>>;
+  approvalDecisions?: Record<string, Awaited<ReturnType<OpenClawRuntimeSyncClient["waitForApprovalDecision"]>>>;
+};
+
+const waitingApprovalFixture: MockClientFixture = {
+  snapshot: {
+    responseId: "runtime_waiting_1",
+    sessionId: "session_waiting_1",
+    sessionKey: "agent:main:dashboard:session_waiting_1",
+    status: "requires_action",
+    output: "Waiting for approval before I continue.",
+    error: null,
+  },
+  history: {
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "Read package.json and report the package name." }],
+        timestamp: 1737264000000,
+        __openclaw: { id: "msg_user_1", seq: 1 },
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "tool_call_read_1",
+            name: "read",
+            arguments: { path: "package.json" },
+          },
+        ],
+        timestamp: 1737264001000,
+        __openclaw: { id: "msg_assistant_2", seq: 2 },
+      },
+      {
+        role: "toolResult",
+        toolCallId: "tool_call_read_1",
+        toolName: "read",
+        content: [{ type: "text", text: '{"name":"chrona"}' }],
+        isError: false,
+        timestamp: 1737264002000,
+        __openclaw: { id: "msg_tool_3", seq: 3 },
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Waiting for approval before I continue." }],
+        timestamp: 1737264003000,
+        __openclaw: { id: "msg_assistant_4", seq: 4 },
+      },
+    ],
+  },
+  approvals: [
+    {
+      approvalId: "approval_waiting_1",
+      sessionKey: "agent:main:dashboard:session_waiting_1",
+      host: "node",
+      command: "cat package.json",
+      ask: "Allow reading package.json?",
+      createdAtMs: 1737264004000,
+    },
+  ],
+};
+
+const completedFixture: MockClientFixture = {
+  snapshot: {
+    responseId: "runtime_completed_1",
+    sessionId: "session_completed_1",
+    sessionKey: "agent:main:dashboard:session_completed_1",
+    status: "completed",
+    output: "Package name is chrona.",
+    error: null,
+  },
+  history: { messages: [] },
+  approvals: [],
+};
+
+function createMockOpenClawClient(input: {
+  fixtureName?: "run-waiting-approval" | "run-completed";
+  fixture?: MockClientFixture;
+}): OpenClawRuntimeSyncClient {
+  const fixture =
+    input.fixture ??
+    (input.fixtureName === "run-completed" ? completedFixture : waitingApprovalFixture);
+
+  return {
+    async getResponseSnapshot() {
+      return fixture.snapshot;
+    },
+    async readSessionHistory() {
+      return fixture.history;
+    },
+    async listApprovals() {
+      return fixture.approvals;
+    },
+    async waitForApprovalDecision(approvalId: string) {
+      return fixture.approvalDecisions?.[approvalId] ?? null;
+    },
+  };
+}
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -62,12 +167,12 @@ describe("syncRunFromRuntime", () => {
       data: { latestRunId: run.id },
     });
 
-    const adapter = createMockOpenClawAdapter({
+    const client = createMockOpenClawClient({
       fixtureName: "run-waiting-approval",
     });
 
-    await syncRunFromRuntime({ runId: run.id, adapter });
-    await syncRunFromRuntime({ runId: run.id, adapter });
+    await syncRunFromRuntime({ runId: run.id, client });
+    await syncRunFromRuntime({ runId: run.id, client });
 
     const storedRun = await db.run.findUniqueOrThrow({ where: { id: run.id } });
     const approvals = await db.approval.findMany({ where: { runId: run.id } });
@@ -93,7 +198,8 @@ describe("syncRunFromRuntime", () => {
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]?.toolName).toBe("read");
     expect(toolCalls[0]?.status).toBe("completed");
-    expect(projection?.displayState).toBe("WaitingForApproval");
+    expect(projection?.persistedStatus).toBe("WaitingForApproval");
+    expect(projection?.displayState).toBeNull();
     expect(projection?.approvalPendingCount).toBe(1);
     expect(JSON.parse(cursor?.nextCursor ?? "{}")).toMatchObject({
       sessionKey: "agent:main:dashboard:session_waiting_1",
@@ -139,9 +245,9 @@ describe("syncRunFromRuntime", () => {
       data: { latestRunId: run.id },
     });
 
-    const adapter = createMockOpenClawAdapter({ fixtureName: "run-completed" });
+    const client = createMockOpenClawClient({ fixtureName: "run-completed" });
 
-    await syncRunFromRuntime({ runId: run.id, adapter });
+    await syncRunFromRuntime({ runId: run.id, client });
 
     const storedRun = await db.run.findUniqueOrThrow({ where: { id: run.id } });
     const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
@@ -194,19 +300,18 @@ describe("syncRunFromRuntime", () => {
 
     await syncRunFromRuntime({
       runId: run.id,
-      adapter: createMockOpenClawAdapter({ fixtureName: "run-waiting-approval" }),
+      client: createMockOpenClawClient({ fixtureName: "run-waiting-approval" }),
     });
 
     await syncRunFromRuntime({
       runId: run.id,
-      adapter: createMockOpenClawAdapter({
+      client: createMockOpenClawClient({
         fixture: {
           snapshot: {
-            runtimeRunRef: "runtime_waiting_1",
-            runtimeSessionRef: "session_waiting_1",
-            runtimeSessionKey: "agent:main:dashboard:session_waiting_1",
-            rawStatus: "running",
-            status: "Running",
+            responseId: "runtime_waiting_1",
+            sessionId: "session_waiting_1",
+            sessionKey: "agent:main:dashboard:session_waiting_1",
+            status: "in_progress",
           },
           history: {
             messages: [

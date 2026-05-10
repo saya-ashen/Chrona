@@ -121,6 +121,9 @@ export type {
   StructuredAiFeature,
   PreparedAiFeatureSpec,
   EditPlanFeatureInput,
+  ChronaNodeExecutionReturn,
+  ChronaNodeExecutionReturnStatus,
+  NodeExecutionFeatureInput,
 } from "./ai-feature-specs";
 
 export type { AiFeatureToolSpec } from "./ai-feature-specs";
@@ -144,6 +147,9 @@ export {
   CONFLICTS_SYSTEM_PROMPT,
   DISPATCH_NEXT_TASK_ACTION_TOOL_NAME,
   DISPATCH_TASK_SYSTEM_PROMPT,
+  CHRONA_NODE_EXECUTION_RESULT_TOOL_DESCRIPTION,
+  CHRONA_NODE_EXECUTION_RESULT_TOOL_NAME,
+  EXECUTE_NODE_SYSTEM_PROMPT,
   GENERATE_PLAN_SYSTEM_PROMPT,
   EDIT_PLAN_PATCH_SYSTEM_PROMPT,
   SUGGEST_SYSTEM_PROMPT,
@@ -158,6 +164,10 @@ export {
   analyzeScheduleConflictsToolSpec,
   buildAnalyzeConflictsFeatureSpec,
   buildDispatchTaskFeatureSpec,
+  buildNodeExecutionFeatureInputText,
+  buildNodeExecutionFeatureSpec,
+  chronaNodeExecutionReturnSchema,
+  chronaNodeExecutionResultToolSpec,
   GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION,
   GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   buildGeneratePlanFeatureInputText,

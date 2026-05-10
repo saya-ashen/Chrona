@@ -1,6 +1,10 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { createRuntimeExecutionAdapter } from "./execution-registry";
+import type {
+  BridgeResponse,
+  OpenClawChatHistory,
+  OpenClawGatewayRequest,
+} from "@chrona/openclaw";
 
 type StartRuntimeRunMode = "allow_async" | "require_sync_output";
 
@@ -13,6 +17,7 @@ type StartRuntimeRunInput = {
   prompt: string;
   triggeredBy: "system" | "user";
   mode: StartRuntimeRunMode;
+  client: OpenClawResponseClient;
 };
 
 type StartRuntimeRunResult = {
@@ -21,8 +26,16 @@ type StartRuntimeRunResult = {
   runtimeSessionKey: string;
   runStarted: boolean;
   status: RunStatus;
+  errorSummary: string | null;
   hasAssistantOutput: boolean;
   conversationEntryIds: string[];
+  response: BridgeResponse;
+};
+
+export type OpenClawResponseClient = {
+  create(input: {
+    request: OpenClawGatewayRequest;
+  }): Promise<{ response: BridgeResponse }>;
 };
 
 type RuntimeHistory = {
@@ -46,31 +59,46 @@ export async function startRuntimeRun(
   });
 
   try {
-    const adapter = await createRuntimeExecutionAdapter(input.runtimeName);
-    const created = await adapter.createRun({
-      prompt: input.prompt,
+    const request = buildExecutionGatewayRequest({
+      instructions: input.prompt,
       runtimeInput: input.runtimeInput,
-      runtimeSessionKey: input.runtimeSessionKey,
+      sessionKey: input.runtimeSessionKey,
+      sessionId: input.runtimeSessionKey,
+      taskId: input.taskId,
+      executionRuntime: input.runtimeName,
+    });
+    const { response: started } = await input.client.create({
+      request,
     });
 
-    const runtimeSessionKey =
-      created.runtimeSessionKey ??
-      created.runtimeSessionRef ??
-      input.runtimeSessionKey;
-    const runtimeRunRef = created.runtimeRunRef ?? null;
+    const runtimeSessionKey = started.sessionId || input.runtimeSessionKey;
+    const runtimeRunRef = started.responseId ?? started.runId ?? null;
 
     const persistedHistory = await persistRuntimeHistory({
-      adapter,
       runId: run.id,
       runtimeSessionKey,
+      request,
+      response: started,
     });
 
     const status = deriveRunStatus({
       mode: input.mode,
-      runStarted: created.runStarted,
+      runStarted: !started.error,
       hasAssistantOutput: persistedHistory.hasAssistantOutput,
       savedMessageCount: persistedHistory.conversationEntryIds.length,
+      providerStatus: normalizeProviderStatus(started.responseStatus, started.error),
     });
+    const errorSummary =
+      status === RunStatus.Failed
+        ? buildRuntimeStartError({
+            mode: input.mode,
+            runStarted: !started.error,
+            hasAssistantOutput: persistedHistory.hasAssistantOutput,
+            savedMessageCount: persistedHistory.conversationEntryIds.length,
+            runtimeRunRef,
+            providerError: started.error ?? null,
+          })
+        : null;
 
     await db.run.update({
       where: { id: run.id },
@@ -80,6 +108,7 @@ export async function startRuntimeRun(
         status,
         syncStatus: "healthy",
         endedAt: status === RunStatus.Completed ? new Date() : null,
+        errorSummary,
       },
     });
 
@@ -87,10 +116,12 @@ export async function startRuntimeRun(
       runId: run.id,
       runtimeRunRef,
       runtimeSessionKey,
-      runStarted: created.runStarted,
+      runStarted: !started.error,
       status,
+      errorSummary,
       hasAssistantOutput: persistedHistory.hasAssistantOutput,
       conversationEntryIds: persistedHistory.conversationEntryIds,
+      response: started,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -102,12 +133,90 @@ export async function startRuntimeRun(
   }
 }
 
+function buildRuntimeStartError(input: {
+  mode: StartRuntimeRunMode;
+  runStarted: boolean;
+  hasAssistantOutput: boolean;
+  savedMessageCount: number;
+  runtimeRunRef: string | null;
+  providerError?: string | null;
+}): string {
+  if (!input.runStarted) {
+    return [
+      "Runtime provider did not accept the run",
+      input.providerError ? `providerError=${input.providerError}` : null,
+      input.runtimeRunRef ? `runtimeRunRef=${input.runtimeRunRef}` : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  if (input.mode === "require_sync_output" && !input.hasAssistantOutput) {
+    return [
+      "Runtime completed without assistant output",
+      `savedMessages=${input.savedMessageCount}`,
+      input.runtimeRunRef ? `runtimeRunRef=${input.runtimeRunRef}` : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  return [
+    "Runtime run failed during startup",
+    `savedMessages=${input.savedMessageCount}`,
+    input.runtimeRunRef ? `runtimeRunRef=${input.runtimeRunRef}` : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+function normalizeProviderStatus(
+  status: string | undefined,
+  error: string | null,
+): string | undefined {
+  if (error) return "Failed";
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Cancelled";
+    case "requires_action":
+      return "WaitingForApproval";
+    case "queued":
+    case "in_progress":
+      return "Running";
+    default:
+      return status;
+  }
+}
+
 function deriveRunStatus(input: {
   mode: StartRuntimeRunMode;
   runStarted: boolean;
   hasAssistantOutput: boolean;
   savedMessageCount: number;
+  providerStatus?: string;
 }): RunStatus {
+  switch (input.providerStatus) {
+    case "Failed":
+      return RunStatus.Failed;
+    case "Cancelled":
+      return RunStatus.Cancelled;
+    case "WaitingForInput":
+      return RunStatus.WaitingForInput;
+    case "WaitingForApproval":
+      return RunStatus.WaitingForApproval;
+    case "Running":
+      return input.mode === "require_sync_output" ? RunStatus.Failed : RunStatus.Running;
+    case "Completed":
+      if (input.mode === "require_sync_output" && !input.hasAssistantOutput) {
+        return RunStatus.Failed;
+      }
+      return RunStatus.Completed;
+  }
+
   if (input.mode === "require_sync_output") {
     if (!input.runStarted) {
       return RunStatus.Failed;
@@ -118,25 +227,35 @@ function deriveRunStatus(input: {
     return RunStatus.Completed;
   }
 
+  if (!input.runStarted) {
+    return RunStatus.Failed;
+  }
+
   if (input.hasAssistantOutput) {
     return RunStatus.Completed;
   }
 
-  return input.runStarted ? RunStatus.Running : RunStatus.Pending;
+  return RunStatus.Running;
 }
 
 async function persistRuntimeHistory(input: {
-  adapter: Awaited<ReturnType<typeof createRuntimeExecutionAdapter>>;
   runId: string;
   runtimeSessionKey: string;
+  request: OpenClawGatewayRequest;
+  response: BridgeResponse;
 }): Promise<{
   hasAssistantOutput: boolean;
   conversationEntryIds: string[];
 }> {
   try {
-    const history = (await input.adapter.readHistory({
-      runtimeSessionKey: input.runtimeSessionKey,
-    })) as RuntimeHistory;
+    const history: OpenClawChatHistory = {
+      messages: [
+        { role: "user", content: extractUserText(input.request.body) },
+        ...(input.response.output
+          ? [{ role: "assistant", content: input.response.output }]
+          : []),
+      ],
+    };
     const conversationEntryIds: string[] = [];
     let hasAssistantOutput = false;
 
@@ -173,4 +292,54 @@ async function persistRuntimeHistory(input: {
     // Initial history hydrate is best-effort. Runtime sync remains source of truth.
     return { hasAssistantOutput: false, conversationEntryIds: [] };
   }
+}
+
+function buildExecutionGatewayRequest(input: {
+  instructions: string;
+  runtimeInput: Record<string, unknown>;
+  sessionKey: string;
+  sessionId: string;
+  taskId: string;
+  executionRuntime: string;
+}): OpenClawGatewayRequest {
+  const parts: string[] = [];
+  parts.push(`Task id: ${input.taskId}`);
+  parts.push(`Execution runtime: ${input.executionRuntime}`);
+  if (Object.keys(input.runtimeInput).length > 0) {
+    parts.push(`Runtime input JSON:\n${JSON.stringify(input.runtimeInput, null, 2)}`);
+  }
+  parts.push(input.instructions);
+
+  const body: Record<string, unknown> = {
+    model: "openclaw",
+    user: input.sessionKey,
+    input: [
+      { type: "message", role: "user", content: parts.join("\n\n") },
+    ],
+    stream: false,
+  };
+  const maxTokens = input.runtimeInput.maxTokens ?? input.runtimeInput.maxOutputTokens;
+  if (typeof maxTokens === "number") {
+    body.max_output_tokens = maxTokens;
+  }
+
+  return {
+    sessionId: input.sessionId,
+    sessionKey: input.sessionKey,
+    body,
+  };
+}
+
+function extractUserText(body: Record<string, unknown>): string {
+  const input = body.input;
+  if (!Array.isArray(input)) return "";
+  const message = input.find(
+    (item): item is { role: string; content: string } =>
+      Boolean(item) &&
+      typeof item === "object" &&
+      !Array.isArray(item) &&
+      (item as Record<string, unknown>).role === "user" &&
+      typeof (item as Record<string, unknown>).content === "string",
+  );
+  return message?.content ?? "";
 }

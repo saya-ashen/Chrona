@@ -271,6 +271,58 @@ describe("plan-runner task executor approval flows", () => {
     expect(updatedTask.status).toBe(TaskStatus.Blocked);
   });
 
+  it("persists detailed runtime failure context for a failed task node", async () => {
+    executePlanNodeMock.mockResolvedValueOnce({
+      status: "failed",
+      error: "Runtime failed while starting main session run for node task_node: Gateway refused the run",
+      evidence: {
+        sessionId: "main-session",
+        runId: "run_failed",
+        runtimeName: "openclaw",
+        runtimeRunRef: "resp_failed",
+      },
+      details: {
+        nodeId: "task_node",
+        nodeTitle: "Execute task",
+        runtimeName: "openclaw",
+        runtimeRunRef: "resp_failed",
+        runId: "run_failed",
+        errorSummary: "Gateway refused the run",
+      },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner preserves failure details");
+    const compiledPlan = makeSingleTaskPlan("graph_task_failed_details");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await dispatchExecutionAction({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.message).toContain("Gateway refused the run");
+    expect(result.errorDetails).toMatchObject({
+      runtimeName: "openclaw",
+      runtimeRunRef: "resp_failed",
+      runId: "run_failed",
+      errorSummary: "Gateway refused the run",
+    });
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts[0]?.error).toMatchObject({
+      code: "NODE_FAILED",
+      message: expect.stringContaining("Gateway refused the run"),
+      details: expect.objectContaining({ runtimeRunRef: "resp_failed" }),
+    });
+    expect(persisted?.results[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "rejected",
+      error: expect.stringContaining("Gateway refused the run"),
+      errorDetails: expect.objectContaining({ runtimeName: "openclaw" }),
+    });
+  });
+
   it("resumes approval-waiting task node and replaces prior result with a completed result", async () => {
     executePlanNodeMock
       .mockResolvedValueOnce({

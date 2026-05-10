@@ -6,6 +6,5 @@ export type {
   RuntimeTaskConfigFieldOption,
   RuntimeTaskConfigFieldVisibilityRule,
   RuntimeTaskConfigSpec,
-  RuntimeExecutionAdapter,
   RuntimeAdapterDefinition,
 } from "./contracts";

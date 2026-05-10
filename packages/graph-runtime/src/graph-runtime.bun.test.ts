@@ -218,6 +218,60 @@ describe("graph-runtime", () => {
     expect(second.events[0]?.type).toBe("command_received");
   });
 
+  it("returns running and keeps the attempt active when a node starts asynchronously", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const initialState: GraphExecutionState = {
+      graph,
+      attempts: [],
+      results: [],
+      executionContextSnapshots: [],
+    };
+    const runtime = createGraphRuntime({
+      taskId: "task_1",
+      runtimeName: "test",
+      now: () => 123,
+      callbacks: {
+        executeNode: async () => ({
+          status: "started",
+          summary: "Run accepted",
+          evidence: { sessionId: "session_1", runId: "run_1" },
+          output: { runtimeRunRef: "runtime_run_1" },
+        }),
+      },
+    });
+
+    const outcome = await runtime.dispatch({
+      type: "start",
+      state: initialState,
+      trigger: "manual",
+      context: null,
+    });
+
+    expect(outcome.status).toBe("running");
+    expect(outcome.currentNodeId).toBe("choose");
+    expect(outcome.state.attempts).toHaveLength(1);
+    expect(outcome.state.attempts[0]).toMatchObject({
+      nodeId: "choose",
+      status: "running",
+      runtimeSnapshot: {
+        evidence: { sessionId: "session_1", runId: "run_1" },
+        output: { runtimeRunRef: "runtime_run_1" },
+      },
+    });
+    expect(outcome.state.results).toHaveLength(0);
+    expect(outcome.effective.runningNodeIds).toContain("choose");
+    expect(outcome.effective.nodes.find((node) => node.id === "choose")?.status).toBe("running");
+    expect(outcome.events.map((event) => event.type)).toEqual([
+      "command_received",
+      "executable_path_computed",
+      "node_started",
+    ]);
+  });
+
   it("syncs external results and resumes downstream execution", async () => {
     const graph = createPlanGraphFromCompiledPlan({
       taskId: "task_1",

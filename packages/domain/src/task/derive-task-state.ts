@@ -104,22 +104,6 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (activeRun?.status === "Completed") {
-    const reopenedStatus = new Set(["Draft", "Ready"]);
-
-    return {
-      persistedStatus:
-        input.task.status === "Done"
-          ? "Done"
-          : reopenedStatus.has(input.task.status)
-            ? input.task.status
-            : "Completed",
-      displayState: null,
-      blockReason: null,
-      blockSince: null,
-    };
-  }
-
   if (latestPendingApproval) {
     return {
       persistedStatus: input.task.status,
@@ -187,6 +171,22 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     return {
       persistedStatus: "Running",
       displayState: "ExecutionActive",
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
+  if (activeRun?.status === "Completed") {
+    const reopenedStatus = new Set(["Draft", "Ready"]);
+
+    return {
+      persistedStatus:
+        input.task.status === "Done"
+          ? "Done"
+          : reopenedStatus.has(input.task.status)
+            ? input.task.status
+            : "Completed",
+      displayState: null,
       blockReason: null,
       blockSince: null,
     };
