@@ -1,7 +1,7 @@
 import type { EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
-import { executePlanNode } from "../node-executor";
+import { executeTaskNodeCapability } from "../node-ai-capabilities";
 
 export class TaskNodeExecutor implements NodeExecutor {
   readonly nodeType = "task" as const;
@@ -17,15 +17,41 @@ export class TaskNodeExecutor implements NodeExecutor {
       parentTaskId: input.taskId,
     });
 
-    return executePlanNode({
-      taskId: input.taskId,
-      planId: input.planId,
-      mainSession: input.mainSession,
-      node: input.node,
-      plan: input.plan,
-      sessionDecision,
-      trigger: input.trigger,
-      runtimeName: input.runtimeName,
-    });
+    if (input.node.status === "completed" || input.node.status === "skipped") {
+      const config = input.node.config as Record<string, unknown>;
+      return {
+        status: "done",
+        summary:
+          typeof config.completionSummary === "string"
+            ? config.completionSummary
+            : `Node ${input.node.id} was already completed`,
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    switch (sessionDecision.kind) {
+      case "wait_for_user":
+        return {
+          status: "waiting_for_user",
+          prompt: `Please provide input for: ${input.node.title}`,
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "manual_only":
+        return {
+          status: "blocked",
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "wait_for_approval":
+        return {
+          status: "waiting_for_approval",
+          prompt: `Please approve: ${input.node.title}`,
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "main_session":
+        return executeTaskNodeCapability(input);
+    }
   }
 }

@@ -1,5 +1,6 @@
 import type { ConditionConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
+import { evaluateConditionNodeCapability } from "../node-ai-capabilities";
 
 function normalizeBranchToken(value: string) {
   return value.trim().toLowerCase();
@@ -84,9 +85,32 @@ export class ConditionNodeExecutor implements NodeExecutor {
       };
     }
 
+    if (config.evaluationBy === "ai") {
+      return evaluateConditionNodeCapability(input);
+    }
+
+    const defaultBranch = config.defaultNextNodeId
+      ? {
+          label: "default",
+          nextNodeId: config.defaultNextNodeId,
+          source: "default" as const,
+        }
+      : null;
+    if (defaultBranch) {
+      return {
+        status: "done",
+        summary: `Condition resolved to branch: ${defaultBranch.label}`,
+        evidence: { sessionId: input.mainSession.id },
+        selectedBranch: {
+          ...defaultBranch,
+          nextNodeId: toCompiledBranchTarget(input, defaultBranch.nextNodeId),
+        },
+      };
+    }
+
     return {
       status: "blocked",
-      reason: `Condition node ${input.node.id} uses ${config.evaluationBy} evaluation, but only explicit user branch selection is implemented in runtime.`,
+      reason: `Condition node ${input.node.id} uses ${config.evaluationBy} evaluation without an AI evaluator or default branch.`,
       evidence: { sessionId: input.mainSession.id },
     };
   }

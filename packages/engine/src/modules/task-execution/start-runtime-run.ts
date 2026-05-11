@@ -1,6 +1,9 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type {
+  PreparedAiFeatureSpec,
+} from "@chrona/contracts/ai";
+import type {
   BridgeResponse,
   OpenClawChatHistory,
   OpenClawGatewayRequest,
@@ -15,6 +18,7 @@ type StartRuntimeRunInput = {
   runtimeSessionKey: string;
   runtimeInput: Record<string, unknown>;
   prompt: string;
+  featureSpec?: PreparedAiFeatureSpec;
   triggeredBy: "system" | "user";
   mode: StartRuntimeRunMode;
   client: OpenClawResponseClient;
@@ -62,6 +66,7 @@ export async function startRuntimeRun(
     const request = buildExecutionGatewayRequest({
       instructions: input.prompt,
       runtimeInput: input.runtimeInput,
+      featureSpec: input.featureSpec,
       sessionKey: input.runtimeSessionKey,
       sessionId: input.runtimeSessionKey,
       taskId: input.taskId,
@@ -297,6 +302,7 @@ async function persistRuntimeHistory(input: {
 function buildExecutionGatewayRequest(input: {
   instructions: string;
   runtimeInput: Record<string, unknown>;
+  featureSpec?: PreparedAiFeatureSpec;
   sessionKey: string;
   sessionId: string;
   taskId: string;
@@ -327,6 +333,8 @@ function buildExecutionGatewayRequest(input: {
     sessionId: input.sessionId,
     sessionKey: input.sessionKey,
     body,
+    feature: input.featureSpec?.feature,
+    featureSpec: input.featureSpec,
   };
 }
 

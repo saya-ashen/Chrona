@@ -30,11 +30,14 @@ export interface StructuredAgentResult<T = unknown> {
 export type BridgeFeature =
   | "suggest"
   | "generate_plan"
+  | "edit_plan"
   | "conflicts"
   | "timeslots"
   | "chat"
   | "dispatch_task"
-  | "execute_node";
+  | "execute_task_node"
+  | "evaluate_condition_node"
+  | "review_checkpoint_node";
 
 export interface OpenClawGatewayRequest {
   sessionId: string;

@@ -7,7 +7,10 @@ import {
 } from "./execution-state";
 import { resolveEffectivePlanGraph } from "./resolve";
 import { applyGraphMutation } from "./mutations";
-import { applyDownstreamInvalidation, planDownstreamInvalidation } from "./invalidation";
+import {
+  applyDownstreamInvalidation,
+  planDownstreamInvalidation,
+} from "./invalidation";
 import { validatePlanGraph } from "./validation";
 import type {
   EffectivePlanGraph,
@@ -116,17 +119,53 @@ export type GraphExecutionState = {
 
 export type GraphExecutionEvent =
   | { type: "command_received"; command: GraphRuntimeCommand }
-  | { type: "command_unsupported"; command: GraphRuntimeCommand; reason: string }
-  | { type: "command_validation_failed"; command: GraphRuntimeCommand; issues: string[] }
-  | { type: "graph_mutation_applied"; mutationId: string; affectedNodeIds: string[] }
-  | { type: "external_result_synced"; nodeId: string; status: GraphExternalSyncResult["status"] }
+  | {
+      type: "command_unsupported";
+      command: GraphRuntimeCommand;
+      reason: string;
+    }
+  | {
+      type: "command_validation_failed";
+      command: GraphRuntimeCommand;
+      issues: string[];
+    }
+  | {
+      type: "graph_mutation_applied";
+      mutationId: string;
+      affectedNodeIds: string[];
+    }
+  | {
+      type: "external_result_synced";
+      nodeId: string;
+      status: GraphExternalSyncResult["status"];
+    }
   | { type: "executable_path_computed"; effective: EffectivePlanGraph }
   | { type: "node_started"; node: EffectivePlanNode; attempt: NodeAttempt }
-  | { type: "node_completed"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
-  | { type: "node_waiting_for_user"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
-  | { type: "node_waiting_for_approval"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
-  | { type: "node_blocked"; node: EffectivePlanNode; result: GraphNodeExecutionResult }
-  | { type: "replan_proposed"; node: EffectivePlanNode; result: GraphNodeExecutionResult };
+  | {
+      type: "node_completed";
+      node: EffectivePlanNode;
+      result: GraphNodeExecutionResult;
+    }
+  | {
+      type: "node_waiting_for_user";
+      node: EffectivePlanNode;
+      result: GraphNodeExecutionResult;
+    }
+  | {
+      type: "node_waiting_for_approval";
+      node: EffectivePlanNode;
+      result: GraphNodeExecutionResult;
+    }
+  | {
+      type: "node_blocked";
+      node: EffectivePlanNode;
+      result: GraphNodeExecutionResult;
+    }
+  | {
+      type: "replan_proposed";
+      node: EffectivePlanNode;
+      result: GraphNodeExecutionResult;
+    };
 
 export type GraphNodeExecutorInput<TContext = unknown> = {
   node: EffectivePlanNode;
@@ -138,7 +177,9 @@ export type GraphNodeExecutorInput<TContext = unknown> = {
 };
 
 export type GraphExecutionCallbacks<TContext = unknown> = {
-  executeNode(input: GraphNodeExecutorInput<TContext>): Promise<GraphNodeExecutionResult | null>;
+  executeNode(
+    input: GraphNodeExecutorInput<TContext>,
+  ): Promise<GraphNodeExecutionResult | null>;
   onEvent?(event: GraphExecutionEvent): Promise<void> | void;
   onStateChange?(state: GraphExecutionState): Promise<void> | void;
 };
@@ -189,7 +230,11 @@ export type GraphRuntimeCommand =
       state: GraphExecutionState;
       trigger?: GraphExecutionTrigger;
       context: unknown;
-      input: { nodeId: string; value: string; replaceStatus?: NonNullable<NodeResult["status"]> };
+      input: {
+        nodeId: string;
+        value: string;
+        replaceStatus?: NonNullable<NodeResult["status"]>;
+      };
     }
   | {
       type: "resume_after_unblock";
@@ -203,7 +248,12 @@ export type GraphRuntimeCommand =
       state: GraphExecutionState;
       trigger?: GraphExecutionTrigger;
       context: unknown;
-      input: { nodeId: string; approved: boolean; feedback?: string };
+      input: {
+        nodeId: string;
+        approved: boolean;
+        feedback?: string;
+        userInput?: string;
+      };
     }
   | {
       type: "retry_node";
@@ -266,7 +316,9 @@ export type GraphRuntime<TContext = unknown> = {
 
 const DEFAULT_MAX_STEPS = 10;
 
-export function mapWaitKindToGraphStatus(waitKind: WaitKind | undefined): GraphExecutionStatus {
+export function mapWaitKindToGraphStatus(
+  waitKind: WaitKind | undefined,
+): GraphExecutionStatus {
   switch (waitKind) {
     case "user_input":
       return "waiting_for_user";
@@ -278,7 +330,9 @@ export function mapWaitKindToGraphStatus(waitKind: WaitKind | undefined): GraphE
   }
 }
 
-export function mapTerminalReasonToGraphStatus(effective: EffectivePlanGraph): GraphExecutionStatus {
+export function mapTerminalReasonToGraphStatus(
+  effective: EffectivePlanGraph,
+): GraphExecutionStatus {
   if (effective.readyNodeIds.length > 0) return "running";
   if (effective.runningNodeIds.length > 0) return "running";
   if (effective.nodes.some((node) => node.status === "waiting_for_user")) {
@@ -287,11 +341,21 @@ export function mapTerminalReasonToGraphStatus(effective: EffectivePlanGraph): G
   if (effective.nodes.some((node) => node.status === "waiting_for_approval")) {
     return "waiting_for_approval";
   }
-  if (effective.blockedNodeIds.length > 0 || effective.failedNodeIds.length > 0) {
+  if (
+    effective.blockedNodeIds.length > 0 ||
+    effective.failedNodeIds.length > 0
+  ) {
     return "blocked";
   }
-  const reachableNodeIds = effective.nodes.filter((node) => node.reachable).map((node) => node.id);
-  if (reachableNodeIds.every((nodeId) => effective.completedNodeIds.includes(nodeId))) return "completed";
+  const reachableNodeIds = effective.nodes
+    .filter((node) => node.reachable)
+    .map((node) => node.id);
+  if (
+    reachableNodeIds.every((nodeId) =>
+      effective.completedNodeIds.includes(nodeId),
+    )
+  )
+    return "completed";
   return "blocked";
 }
 
@@ -435,7 +499,9 @@ function getResultMessage(result: GraphNodeExecutionResult): string {
   }
 }
 
-function getEventType(result: GraphNodeExecutionResult): GraphExecutionEvent["type"] | null {
+function getEventType(
+  result: GraphNodeExecutionResult,
+): GraphExecutionEvent["type"] | null {
   switch (result.status) {
     case "done":
       return "node_completed";
@@ -464,7 +530,10 @@ export async function runGraphExecution<TContext = unknown>(
 
   for (let step = 0; step < maxSteps; step++) {
     const effective = resolveEffectivePlanGraph(state);
-    await input.callbacks.onEvent?.({ type: "executable_path_computed", effective });
+    await input.callbacks.onEvent?.({
+      type: "executable_path_computed",
+      effective,
+    });
 
     if (effective.readyNodeIds.length === 0 && !forcedNodeId) {
       const status = mapTerminalReasonToGraphStatus(effective);
@@ -478,7 +547,9 @@ export async function runGraphExecution<TContext = unknown>(
       };
     }
 
-    const forcedNextNodeId = forcedNodeId ? pickNextNodeId(effective, forcedNodeId) : null;
+    const forcedNextNodeId = forcedNodeId
+      ? pickNextNodeId(effective, forcedNodeId)
+      : null;
     const nextNodeIds = forcedNextNodeId
       ? [forcedNextNodeId]
       : effective.readyNodeIds.slice(0, maxConcurrency);
@@ -494,7 +565,9 @@ export async function runGraphExecution<TContext = unknown>(
     }
 
     for (const nextNodeId of nextNodeIds) {
-      const node = effective.nodes.find((candidate) => candidate.id === nextNodeId);
+      const node = effective.nodes.find(
+        (candidate) => candidate.id === nextNodeId,
+      );
       if (!node || !node.activeLayerId) {
         throw new Error(`Effective node ${nextNodeId} is missing active layer`);
       }
@@ -532,14 +605,19 @@ export async function runGraphExecution<TContext = unknown>(
         executionContextSnapshotId: snapshot.id,
         status: "running",
         idempotencyKey: `${state.graph.id}:${nextNodeId}:${now}`,
-        attemptNumber: state.attempts.filter((candidate) => candidate.nodeId === nextNodeId).length + 1,
+        attemptNumber:
+          state.attempts.filter((candidate) => candidate.nodeId === nextNodeId)
+            .length + 1,
         startedAt: snapshot.createdAt,
       };
 
       state = {
         ...state,
         attempts: [...state.attempts, attempt],
-        executionContextSnapshots: [...state.executionContextSnapshots, snapshot],
+        executionContextSnapshots: [
+          ...state.executionContextSnapshots,
+          snapshot,
+        ],
       };
       await input.callbacks.onEvent?.({ type: "node_started", node, attempt });
       await input.callbacks.onStateChange?.(state);
@@ -562,9 +640,17 @@ export async function runGraphExecution<TContext = unknown>(
             attemptId: attempt.id,
             status: "failed",
             finishedAt,
-            error: { code: "CAPABILITY_UNAVAILABLE", message: `No executor for node type: ${node.type}` },
+            error: {
+              code: "CAPABILITY_UNAVAILABLE",
+              message: `No executor for node type: ${node.type}`,
+            },
           }),
-          results: appendCapabilityUnavailableResult({ taskId: input.taskId, state, node, now }),
+          results: appendCapabilityUnavailableResult({
+            taskId: input.taskId,
+            state,
+            node,
+            now,
+          }),
         };
         await input.callbacks.onStateChange?.(state);
         const blockedEffective = resolveEffectivePlanGraph(state);
@@ -610,21 +696,39 @@ export async function runGraphExecution<TContext = unknown>(
         attempts: updateAttemptStatus({
           attempts: state.attempts,
           attemptId: attempt.id,
-          status: result.status === "failed" || result.status === "blocked" ? "failed" : "succeeded",
+          status:
+            result.status === "failed" || result.status === "blocked"
+              ? "failed"
+              : "succeeded",
           finishedAt,
           error:
             result.status === "failed"
-              ? { code: "NODE_FAILED", message: result.error, details: result.details }
+              ? {
+                  code: "NODE_FAILED",
+                  message: result.error,
+                  details: result.details,
+                }
               : result.status === "blocked"
                 ? { code: "NODE_BLOCKED", message: result.reason }
                 : undefined,
         }),
-        results: appendExecutionResult({ taskId: input.taskId, state, node, attempt, result, now }),
+        results: appendExecutionResult({
+          taskId: input.taskId,
+          state,
+          node,
+          attempt,
+          result,
+          now,
+        }),
       };
 
       const eventType = getEventType(result);
       if (eventType) {
-        await input.callbacks.onEvent?.({ type: eventType, node, result } as GraphExecutionEvent);
+        await input.callbacks.onEvent?.({
+          type: eventType,
+          node,
+          result,
+        } as GraphExecutionEvent);
       }
       await input.callbacks.onStateChange?.(state);
 
@@ -670,26 +774,6 @@ export async function runGraphExecution<TContext = unknown>(
   };
 }
 
-function unsupportedDispatchOutcome(input: {
-  command: GraphRuntimeCommand;
-  reason: string;
-  events: GraphExecutionEvent[];
-}): GraphDispatchOutcome {
-  const effective = resolveEffectivePlanGraph(input.command.state);
-  return {
-    status: "unsupported",
-    currentNodeId: null,
-    executedNodeIds: [],
-    effective,
-    state: input.command.state,
-    events: [
-      ...input.events,
-      { type: "command_unsupported", command: input.command, reason: input.reason },
-    ],
-    message: input.reason,
-  };
-}
-
 function validationFailureOutcome(input: {
   command: GraphRuntimeCommand;
   state: GraphExecutionState;
@@ -704,7 +788,11 @@ function validationFailureOutcome(input: {
     state: input.state,
     events: [
       ...input.events,
-      { type: "command_validation_failed", command: input.command, issues: input.issues },
+      {
+        type: "command_validation_failed",
+        command: input.command,
+        issues: input.issues,
+      },
     ],
     message: `Graph validation failed: ${input.issues.join("; ")}`,
   };
@@ -741,7 +829,9 @@ function createRegistryExecutor<TContext>(
 ): GraphNodeExecutor<TContext> {
   return async (input) => {
     const executorName = getExecutorName(input.node);
-    const executor = executorName ? options.executors?.[executorName] : undefined;
+    const executor = executorName
+      ? options.executors?.[executorName]
+      : undefined;
     if (executor) return executor(input);
     return options.callbacks?.executeNode?.(input) ?? null;
   };
@@ -830,7 +920,11 @@ function cancelSessionState(input: {
 }): GraphExecutionState {
   return {
     ...input.state,
-    graph: { ...input.state.graph, status: "cancelled", updatedAt: input.finishedAt },
+    graph: {
+      ...input.state.graph,
+      status: "cancelled",
+      updatedAt: input.finishedAt,
+    },
     attempts: input.state.attempts.map((attempt) =>
       attempt.status === "running"
         ? {
@@ -854,10 +948,16 @@ function syncExternalResultState(input: {
   syncedAt: string;
 }): GraphExecutionState {
   const effective = resolveEffectivePlanGraph(input.state);
-  const node = effective.nodes.find((candidate) => candidate.id === input.externalResult.nodeId);
+  const node = effective.nodes.find(
+    (candidate) => candidate.id === input.externalResult.nodeId,
+  );
   const currentAttempt = [...input.state.attempts]
     .reverse()
-    .find((attempt) => attempt.nodeId === input.externalResult.nodeId && attempt.status === "running");
+    .find(
+      (attempt) =>
+        attempt.nodeId === input.externalResult.nodeId &&
+        attempt.status === "running",
+    );
   const baseResult = {
     id: `result_${input.state.graph.id}_${input.externalResult.nodeId}_${input.syncedAt}`,
     taskId: input.taskId,
@@ -881,9 +981,16 @@ function syncExternalResultState(input: {
       attemptStatus = "succeeded";
       break;
     case "failed":
-      syncedResult = { ...baseResult, status: "rejected", error: input.externalResult.error };
+      syncedResult = {
+        ...baseResult,
+        status: "rejected",
+        error: input.externalResult.error,
+      };
       attemptStatus = "failed";
-      attemptError = { code: "EXTERNAL_RESULT_FAILED", message: input.externalResult.error };
+      attemptError = {
+        code: "EXTERNAL_RESULT_FAILED",
+        message: input.externalResult.error,
+      };
       break;
     case "blocked":
       syncedResult = {
@@ -893,7 +1000,10 @@ function syncExternalResultState(input: {
         error: input.externalResult.reason,
       };
       attemptStatus = "failed";
-      attemptError = { code: "EXTERNAL_RESULT_BLOCKED", message: input.externalResult.reason };
+      attemptError = {
+        code: "EXTERNAL_RESULT_BLOCKED",
+        message: input.externalResult.reason,
+      };
       break;
     case "cancelled":
       syncedResult = {
@@ -921,7 +1031,10 @@ function syncExternalResultState(input: {
             error: attemptError,
           })
         : input.state.attempts,
-    results: appendCurrentResult({ results: input.state.results, result: syncedResult }),
+    results: appendCurrentResult({
+      results: input.state.results,
+      result: syncedResult,
+    }),
   };
 }
 
@@ -930,7 +1043,9 @@ export function createGraphRuntime<TContext = unknown>(
 ): GraphRuntime<TContext> {
   return {
     async dispatch(command) {
-      const events: GraphExecutionEvent[] = [{ type: "command_received", command }];
+      const events: GraphExecutionEvent[] = [
+        { type: "command_received", command },
+      ];
       if (options.policies?.validateGraph !== false) {
         const validationFailure = validateCommandGraphState({
           command,
@@ -998,7 +1113,9 @@ export function createGraphRuntime<TContext = unknown>(
           return { ...outcome, events };
         }
         case "resume_with_approval": {
-          const reviewedAt = new Date(options.now?.() ?? Date.now()).toISOString();
+          const reviewedAt = new Date(
+            options.now?.() ?? Date.now(),
+          ).toISOString();
           const approvedState = approveCurrentNodeResult({
             state: command.state,
             nodeId: command.input.nodeId,
@@ -1028,6 +1145,7 @@ export function createGraphRuntime<TContext = unknown>(
             maxSteps: options.policies?.maxSteps,
             maxConcurrency: options.policies?.maxConcurrency,
             forcedNodeId: command.input.nodeId,
+            userInput: command.input.userInput,
             now: options.now,
             callbacks,
           });
@@ -1124,7 +1242,9 @@ export function createGraphRuntime<TContext = unknown>(
           };
         }
         case "sync_external_result": {
-          const syncedAt = new Date(options.now?.() ?? Date.now()).toISOString();
+          const syncedAt = new Date(
+            options.now?.() ?? Date.now(),
+          ).toISOString();
           const syncedState = syncExternalResultState({
             taskId: options.taskId,
             state: command.state,
@@ -1138,9 +1258,15 @@ export function createGraphRuntime<TContext = unknown>(
           });
           if (command.externalResult.status !== "done") {
             const effective = resolveEffectivePlanGraph(syncedState);
-            const waitKind = command.externalResult.status === "blocked" ? "manual_action" : undefined;
+            const waitKind =
+              command.externalResult.status === "blocked"
+                ? "manual_action"
+                : undefined;
             return {
-              status: command.externalResult.status === "blocked" ? "blocked" : "blocked",
+              status:
+                command.externalResult.status === "blocked"
+                  ? "blocked"
+                  : "blocked",
               currentNodeId: command.externalResult.nodeId,
               executedNodeIds: [],
               effective,
@@ -1151,7 +1277,8 @@ export function createGraphRuntime<TContext = unknown>(
                 command.externalResult.status === "failed"
                   ? command.externalResult.error
                   : command.externalResult.status === "cancelled"
-                    ? (command.externalResult.reason ?? "External work cancelled")
+                    ? (command.externalResult.reason ??
+                      "External work cancelled")
                     : command.externalResult.reason,
             };
           }

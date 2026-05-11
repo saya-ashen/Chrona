@@ -1,8 +1,5 @@
-/**
- * Integration tests for executePlanNode: verifies provider output persists as
- * conversationEntry records after the provider response succeeds.
- */
 import { beforeEach, describe, expect, it } from "bun:test";
+import { executeTaskNodeCapability } from "@chrona/engine/modules/plan-execution";
 import { db } from "@chrona/db";
 import {
   MemoryScope,
@@ -10,9 +7,8 @@ import {
   MemoryStatus,
   RunStatus,
 } from "@chrona/db/generated/prisma/client";
-import type { ChronaNodeExecutionReturn } from "@chrona/contracts";
+import type { TaskNodeAiResult } from "@chrona/contracts";
 import type { BridgeResponse, OpenClawGatewayRequest } from "@chrona/openclaw";
-import { executePlanNode } from "@chrona/engine/modules/plan-execution";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 type TestOpenClawResponseClient = {
@@ -24,7 +20,7 @@ type TestOpenClawResponseClient = {
 function createMockOpenClawClient(input: {
   outputMessages: string[];
   runStarted?: boolean;
-  structuredResult?: ChronaNodeExecutionReturn | null;
+  structuredResult?: TaskNodeAiResult | null;
 }): TestOpenClawResponseClient {
   const messages: Array<{ role: string; content: string }> = [];
 
@@ -69,24 +65,11 @@ function extractUserText(body: Record<string, unknown>): string {
   return message?.content ?? "";
 }
 
-function completedNodeResult(input: {
-  graphId: string;
-  nodeId: string;
-  nodeLayerId: string;
-  outputContent: string;
-}): ChronaNodeExecutionReturn {
+function completedTaskResult(outputContent: string): TaskNodeAiResult {
   return {
-    kind: "node_execution_result",
-    graphId: input.graphId,
-    nodeId: input.nodeId,
-    nodeLayerId: input.nodeLayerId,
-    attemptId: `${input.graphId}:${input.nodeId}:1`,
-    contextSnapshotId: `${input.graphId}:1:${input.nodeId}`,
-    status: "completed",
-    result: {
-      summary: input.outputContent,
-      outputData: input.outputContent,
-    },
+    outcome: "completed",
+    summary: outputContent,
+    output: outputContent,
   };
 }
 
@@ -187,33 +170,25 @@ async function seedFullSetup() {
   };
 }
 
-describe("executePlanNode output persistence", () => {
+describe("executeTaskNodeCapability output persistence", () => {
   beforeEach(async () => {
     await resetTestDb();
   });
 
   it("persists assistant output as conversationEntry records in main_session execution", async () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const openClawClient = createMockOpenClawClient({
       outputMessages: [outputContent],
-      structuredResult: completedNodeResult({
-        graphId: planGraph.graphId,
-        nodeId: node.id,
-        nodeLayerId: node.activeLayerId,
-        outputContent,
-      }),
+      structuredResult: completedTaskResult(outputContent),
     });
 
-    const result = await executePlanNode({
+    const result = await executeTaskNodeCapability({
       taskId,
-      planId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      sessionDecision: { kind: "main_session", reason: "auto node" },
-      trigger: "auto",
       runtimeName: "openclaw",
       openClawClient,
     });
@@ -241,20 +216,17 @@ describe("executePlanNode output persistence", () => {
   });
 
   it("sets run status to Failed when the provider produces no output", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
       structuredResult: null,
     });
 
-    const result = await executePlanNode({
+    const result = await executeTaskNodeCapability({
       taskId,
-      planId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      sessionDecision: { kind: "main_session", reason: "auto node" },
-      trigger: "auto",
       runtimeName: "openclaw",
       openClawClient,
     });
@@ -276,21 +248,18 @@ describe("executePlanNode output persistence", () => {
   });
 
   it("sets run status to Failed when the provider refuses to start", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
       runStarted: false,
       structuredResult: null,
     });
 
-    const result = await executePlanNode({
+    const result = await executeTaskNodeCapability({
       taskId,
-      planId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      sessionDecision: { kind: "main_session", reason: "auto node" },
-      trigger: "auto",
       runtimeName: "openclaw",
       openClawClient,
     });
@@ -300,7 +269,7 @@ describe("executePlanNode output persistence", () => {
   });
 
   it("persists the final provider response when a response has multiple deltas", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const openClawClient = createMockOpenClawClient({
       outputMessages: [
@@ -308,22 +277,14 @@ describe("executePlanNode output persistence", () => {
         "Step 1 done.",
         "Final answer: task complete.",
       ],
-      structuredResult: completedNodeResult({
-        graphId: planGraph.graphId,
-        nodeId: node.id,
-        nodeLayerId: node.activeLayerId,
-        outputContent: "Final answer: task complete.",
-      }),
+      structuredResult: completedTaskResult("Final answer: task complete."),
     });
 
-    const result = await executePlanNode({
+    const result = await executeTaskNodeCapability({
       taskId,
-      planId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      sessionDecision: { kind: "main_session", reason: "auto node" },
-      trigger: "auto",
       runtimeName: "openclaw",
       openClawClient,
     });
