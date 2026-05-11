@@ -6,7 +6,7 @@ import type {
   TaskConfigDraftState,
   TaskConfigFormDraft,
   TaskConfigFormInput,
-} from "@/components/schedule/task-config-form";
+} from "@/components/schedule/forms/task-config-form";
 
 function normalizePriority(value: string): TaskConfigFormDraft["priority"] {
   switch (value) {

@@ -2,7 +2,7 @@ import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import type {
   TaskConfigExecutionRuntime,
   TaskConfigFormInput,
-} from "@/components/schedule/task-config-form";
+} from "@/components/schedule/forms/task-config-form";
 
 export interface SelectedBlockSheetProps {
   item: ScheduledItem;

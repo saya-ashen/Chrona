@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ScheduleEditorForm } from "../schedule-editor-form";
+import { ScheduleEditorForm } from "../forms/schedule-editor-form";
 import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
 
 vi.mock("@/lib/task-actions-client", () => ({

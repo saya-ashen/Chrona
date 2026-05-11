@@ -14,7 +14,7 @@ vi.mock("@/components/i18n/localized-link", () => ({
   ),
 }));
 
-import { DayTimeline } from "@/components/schedule/schedule-page-timeline";
+import { DayTimeline } from "@/components/schedule/timeline/schedule-page-timeline";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
 function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {

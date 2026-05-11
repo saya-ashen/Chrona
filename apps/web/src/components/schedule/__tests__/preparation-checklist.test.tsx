@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PreparationChecklist, type PreparationStep } from "../preparation-checklist";
+import { PreparationChecklist, type PreparationStep } from "../panels/preparation-checklist";
 
 vi.mock("@/components/ui/surface-card", () => ({
   SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,

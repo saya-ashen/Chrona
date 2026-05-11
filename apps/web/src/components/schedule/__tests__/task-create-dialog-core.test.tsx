@@ -15,11 +15,11 @@ vi.mock("@/hooks/use-ai", () => ({
   useSmartAutomation: () => mockUseSmartAutomation(),
 }));
 
-vi.mock("@/components/schedule/automation-suggestion-panel", () => ({
+vi.mock("@/components/schedule/panels/automation-suggestion-panel", () => ({
   AutomationSuggestionPanel: () => null,
 }));
 
-import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 
 const defaultProps = {
   isOpen: true,

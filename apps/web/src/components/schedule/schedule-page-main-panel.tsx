@@ -1,4 +1,4 @@
-import { PlanningHeader } from "@/components/schedule/planning-header";
+import { PlanningHeader } from "@/components/schedule/panels/planning-header";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { DayTimeline } from "@/components/schedule/timeline/schedule-page-timeline";
 import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";

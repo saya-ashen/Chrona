@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { PlanningHeader } from "@/components/schedule/planning-header";
+import { PlanningHeader } from "@/components/schedule/panels/planning-header";
 
 describe("PlanningHeader", () => {
   it("renders cockpit summary metrics and action affordances", () => {

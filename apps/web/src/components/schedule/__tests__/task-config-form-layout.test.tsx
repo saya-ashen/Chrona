@@ -11,7 +11,7 @@ vi.mock("@/i18n/client", () => ({
   useLocale: () => "en",
 }));
 
-import { TaskConfigForm } from "@/components/schedule/task-config-form";
+import { TaskConfigForm } from "@/components/schedule/forms/task-config-form";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */

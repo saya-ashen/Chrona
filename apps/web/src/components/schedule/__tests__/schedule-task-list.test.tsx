@@ -22,7 +22,7 @@ vi.mock("@/components/task/shared/task-context-links", () => ({ TaskContextLinks
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, ...props }: any) => <a {...props}>{children}</a>,
 }));
-vi.mock("@/components/schedule/task-config-form", () => ({
+vi.mock("@/components/schedule/forms/task-config-form", () => ({
   TaskConfigForm: () => <div data-testid="task-config-form" />,
 }));
 vi.mock("@/lib/utils", () => ({ cn: (...args: any[]) => args.filter(Boolean).join(" ") }));

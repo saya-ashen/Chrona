@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TimeslotSuggestionPanel } from "../timeslot-suggestion-panel";
+import { TimeslotSuggestionPanel } from "../panels/timeslot-suggestion-panel";
 import { suggestTimeslots } from "@chrona/shared";
 
 const makeSuggestions = () => [

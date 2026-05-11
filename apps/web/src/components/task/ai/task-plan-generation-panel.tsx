@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import {
   compiledPlanToGraphPlan,
   taskPlanReadModelToGraphPlan,

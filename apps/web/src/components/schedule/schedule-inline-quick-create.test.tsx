@@ -6,7 +6,7 @@ vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),
 }));
 
-import { ScheduleInlineQuickCreate } from "@/components/schedule/schedule-inline-quick-create";
+import { ScheduleInlineQuickCreate } from "@/components/schedule/forms/schedule-inline-quick-create";
 
 afterEach(() => {
   cleanup();

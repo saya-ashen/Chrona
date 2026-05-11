@@ -1,4 +1,4 @@
-import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 import type {
   SchedulePageData,
   ScheduleViewMode,

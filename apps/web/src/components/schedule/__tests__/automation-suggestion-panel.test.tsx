@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { AutomationSuggestionPanel } from "../automation-suggestion-panel";
+import { AutomationSuggestionPanel } from "../panels/automation-suggestion-panel";
 
 describe("AutomationSuggestionPanel", () => {
   it("renders nothing when the legacy panel is disabled", () => {
