@@ -1,7 +1,7 @@
 # Data Model
 
 > **Database:** SQLite via Prisma 7
-> **Models:** 15
+> **Models:** 22
 > **Enums:** 10+
 > **Migration:** auto-run on first `chrona start`
 
@@ -24,17 +24,24 @@ erDiagram
     Workspace ||--o{ Task : contains
     Workspace ||--o{ Memory : owns
     Workspace ||--o{ Event : records
+    Workspace ||--o{ AiClient : configures
     Task ||--o{ Run : executes
     Task ||--o| TaskProjection : materializes
     Task ||--o{ TaskSession : manages
     Task ||--o{ TaskDependency : "depends on / blocks"
     Task ||--o{ ScheduleProposal : receives
     Task ||--o{ Task : "parent of (subtask)"
+    Task ||--o{ TaskPlan : plans
+    Task ||--o{ WorkBlock : organizes
+    Task ||--o{ ExecutionSession : "orchestrates (plan runs)"
+    TaskPlan ||--o{ TaskPlanRun : executes
+    TaskPlan ||--o{ TaskPlanLayer : layers
     Run ||--o{ Approval : requires
     Run ||--o{ Artifact : produces
     Run ||--o{ ConversationEntry : records
     Run ||--o{ ToolCallDetail : logs
     Run ||--|| RuntimeCursor : syncs
+    AiClient ||--o{ AiFeatureBinding : binds
 
     Workspace {
         string id PK
@@ -53,22 +60,16 @@ erDiagram
         string description
         string status
         string priority
-        string ownerType
-        string runtimeAdapterKey
-        string runtimeInput
-        string runtimeInputVersion
-        string runtimeModel
-        string prompt
-        string runtimeConfig
-        datetime dueAt
-        datetime scheduledStartAt
-        datetime scheduledEndAt
-        string scheduleStatus
-        string scheduleSource
+        string executionRuntime
+        json executionConfig
         string parentTaskId FK
+        datetime dueAt
+        json blockReason
+        string defaultSessionId
         string latestRunId FK
-        int budgetLimit
-        string blockReason
+        datetime completedAt
+        datetime createdAt
+        datetime updatedAt
     }
 
     Run {
@@ -209,6 +210,77 @@ erDiagram
         string healthStatus
         datetime updatedAt
     }
+
+    TaskPlan {
+        string id PK
+        string taskId FK
+        string status
+        string summary
+        json nodes
+        json edges
+        string generatedBy
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    TaskPlanRun {
+        string id PK
+        string taskId FK
+        string taskPlanId FK
+        string status
+        json effectiveGraph
+        json nodeStates
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    TaskPlanLayer {
+        string id PK
+        string taskPlanId FK
+        string name
+        int priority
+        json addedNodeIds
+        datetime createdAt
+    }
+
+    WorkBlock {
+        string id PK
+        string taskId FK
+        string status
+        string sessionKey UK
+        string promptText
+        datetime startedAt
+        datetime endedAt
+    }
+
+    ExecutionSession {
+        string id PK
+        string taskId FK
+        string taskPlanRunId FK
+        string status
+        string sessionKey UK
+        datetime startedAt
+        datetime updatedAt
+    }
+
+    AiClient {
+        string id PK
+        string workspaceId FK
+        string name
+        string type
+        json config
+        boolean isDefault
+        boolean enabled
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    AiFeatureBinding {
+        string id PK
+        string clientId FK
+        string feature
+        datetime createdAt
+    }
 ```
 
 ---
@@ -219,6 +291,8 @@ erDiagram
 
 ```
 Workspace (root)
+  ├── AiClient[]
+  │     └── AiFeatureBinding[]
   ├── Task[]
   │     ├── Run[]
   │     │     ├── Approval[]
@@ -230,6 +304,11 @@ Workspace (root)
   │     ├── TaskDependency[]
   │     ├── ScheduleProposal[]
   │     ├── TaskProjection (1:1)
+  │     ├── TaskPlan[]
+  │     │     ├── TaskPlanRun[]
+  │     │     └── TaskPlanLayer[]
+  │     ├── WorkBlock[]
+  │     ├── ExecutionSession[]
   │     └── Task[] (subtasks, recursive)
   ├── Memory[]
   └── Event[]
@@ -247,52 +326,79 @@ Tasks carry three categories of fields:
 
 | Category | Fields | Purpose |
 |----------|--------|---------|
-| **Identity** | title, description, priority, ownerType | What the task is |
-| **Runtime** | runtimeAdapterKey, runtimeModel, prompt, runtimeConfig | How to execute it |
-| **Schedule** | scheduledStartAt, scheduledEndAt, dueAt, scheduleStatus, scheduleSource | When to execute it |
+| **Identity** | title, description, priority | What the task is |
+| **Runtime** | executionRuntime, executionConfig | How to execute it |
+| **Schedule** | dueAt | When to complete by |
 
 This separation enables tasks that have a schedule but no runtime config (planning phase) and tasks with a runtime config but no schedule (manual execution).
 
-### 3. Task Plan Graph (stored externally)
+### 3. Task Plan (graph-structured)
 
-Task plans are stored as graph objects outside the relational model:
+Task plans are structured as directed graphs:
 
+**PlanBlueprint** (AI-generated plan, Zod schema from `@chrona/contracts`):
 ```typescript
-interface TaskPlanGraph {
-  id: string
-  taskId: string
-  status: "draft" | "accepted" | "archived"
-  summary: string | null
-  nodes: TaskPlanNode[]
-  edges: TaskPlanEdge[]
-  createdAt: Date
-  updatedAt: Date
-  generatedBy?: string  // AI client ID
+interface PlanBlueprint {
+  nodes: PlanNode[]    // task | checkpoint | condition | wait
+  edges: PlanEdge[]    // directed edges between nodes
 }
 
-interface TaskPlanNode {
+interface PlanNode {
   id: string
-  type: "step" | "checkpoint" | "decision" | "user_input" | "deliverable" | "tool_action"
+  type: "task" | "checkpoint" | "condition" | "wait"
   title: string
-  objective: string | null
-  status: "pending" | "in_progress" | "completed" | "blocked" | "skipped"
-  executionMode: "auto" | "manual" | "hybrid"
-  estimatedMinutes: number | null
-  actualMinutes: number | null
-  order: number
-  metadata: Record<string, unknown> | null
+  objective?: string
+  estimatedMinutes?: number
+  metadata?: Record<string, unknown>
 }
 
-interface TaskPlanEdge {
+interface PlanEdge {
   id: string
   fromNodeId: string
   toNodeId: string
-  type: "sequential" | "parallel" | "conditional" | "feedback" | "dependency"
-  label: string | null
+  label?: string
 }
 ```
 
-The plan graph is mutable by users (via patch operations) and by AI (via suggest-confirm proposals).
+**EditablePlan** (user-editable version):
+```typescript
+interface EditablePlan {
+  taskId: string
+  planId: string
+  version: number
+  status: "draft" | "accepted" | "archived"
+  nodes: EditablePlanNode[]
+  edges: EditablePlanEdge[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface EditablePlanNode {
+  id: string
+  type: "task" | "checkpoint" | "condition" | "wait"
+  title: string
+  objective?: string
+  status: "pending" | "in_progress" | "completed" | "blocked" | "skipped"
+  estimatedMinutes?: number
+  actualMinutes?: number
+  order: number
+  metadata?: Record<string, unknown>
+}
+
+interface EditablePlanEdge {
+  id: string
+  fromNodeId: string
+  toNodeId: string
+  label?: string
+}
+```
+
+**Database models:**
+- **TaskPlan** — persisted plan graph (JSON nodes, JSON edges)
+- **TaskPlanRun** — one execution run through a plan (effectiveGraph, nodeStates)
+- **TaskPlanLayer** — hierarchical overlay for plan organization
+
+Plans are mutable via `POST /api/tasks/:taskId/plan` patch operations (add/delete/update nodes, update dependencies).
 
 ---
 
@@ -353,15 +459,7 @@ stateDiagram-v2
 
 ### Schedule Status Map
 
-| Status | Condition |
-|--------|-----------|
-| `Unscheduled` | No time block assigned |
-| `Scheduled` | Has future scheduledStartAt / scheduledEndAt |
-| `InProgress` | Currently within the scheduled window |
-| `AtRisk` | Scheduled start approaching, plan not accepted |
-| `Overdue` | Past dueAt without completion |
-| `Interrupted` | Scheduled window passed, not completed |
-| `Completed` | Task completed within or after schedule |
+Task scheduling is managed via the task schedule API (PUT/DELETE /api/tasks/:taskId/schedule) and ScheduleProposal records. The schedule status is computed externally rather than stored as a field on the Task model.
 
 ---
 
@@ -371,7 +469,6 @@ stateDiagram-v2
 |-------|-------|---------|
 | Task | `[workspaceId, status]` | Filter tasks by workspace + status (list views) |
 | Task | `[workspaceId, priority]` | Sort by priority within workspace |
-| Task | `[workspaceId, scheduleStatus]` | Schedule page — filter by schedule state |
 | TaskProjection | `taskId` (PK) | Lookup by task (1:1) |
 | TaskDependency | `UNIQUE [taskId, dependsOnTaskId]` | Guarantee no duplicate dependencies |
 | TaskSession | `sessionKey` (unique) | Lookup sessions by external key |

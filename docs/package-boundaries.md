@@ -12,8 +12,10 @@ Use this when `apps/web` and `apps/server` feel clear, but `packages/*` feels ab
 - `packages/domain`: pure business rules
 - `packages/db`: Prisma, SQLite bootstrap, repositories
 - `packages/engine`: application orchestration and use cases
-- `packages/ai-features`, `packages/runtime-core`, `packages/i18n`, `packages/cli`: reusable system support packages
+- `packages/runtime-core`, `packages/i18n`, `packages/cli`: reusable system support packages
 - `packages/providers/*`: external AI/runtime provider integrations
+
+> **Note:** `packages/ai-features` was absorbed into `packages/contracts` (AI feature types, specs) and `packages/engine/modules/ai/` (feature implementation). It no longer exists as a standalone package.
 
 If `apps/*` is where the program starts, `packages/*` is where the reusable system layers live.
 
@@ -24,7 +26,7 @@ Prefer this direction:
 ```text
 apps/web, apps/server
   -> engine
-  -> ai-features, providers/*
+  -> providers/*
   -> contracts, domain, db, runtime-core
 ```
 
@@ -35,7 +37,6 @@ engine
   -> contracts
   -> domain
   -> db
-  -> ai-features
   -> provider integrations
 
 domain
@@ -61,17 +62,18 @@ packages/
   contracts/            # canonical shared contracts and schemas
   domain/               # pure business rules
   db/                   # Prisma/bootstrap/repositories
-  engine/              # application orchestration and use cases
+  engine/               # application orchestration and use cases
   runtime-core/         # backend-agnostic runtime adapter contracts
-  ai-features/          # provider-neutral AI feature APIs
   providers/
-    core/               # provider-facing middle layer Chrona calls
+    foundation/         # provider-facing middle layer Chrona calls
     openclaw/
       integration/      # OpenClaw protocol/transport/runtime integration
       bridge/           # OpenClaw HTTP/SSE bridge server
     hermes/             # future provider, mirroring the same shape when real
   i18n/                 # small shared locale utilities
 ```
+
+> **Note:** `packages/ai-features` was absorbed into `contracts` (AI types/specs) and `engine` (feature implementation). The old `packages/common/*` nesting has been flattened — `cli`, `runtime-core`, `i18n` now live directly under `packages/`. `providers/core` is now `providers/foundation`.
 
 This target means:
 
@@ -103,26 +105,18 @@ Reason:
 
 These should stay as packages, but need cleanup to match their intended role:
 
-- `packages/ai-features`
-  - should expose feature-level APIs only
-  - should not drift into provider transport semantics
-- `packages/providers/core`
+- `packages/providers/foundation`
   - should be the provider-facing middle layer Chrona calls
   - should not leak provider wire protocol details upward
 
 ### Rename / Re-home For Clarity
 
-These placements are structurally acceptable today, but are not the clearest final form:
+These renames have been completed:
 
-- `packages/common/cli` -> `packages/cli`
-- `packages/common/runtime-core` -> `packages/runtime-core`
-- `packages/common/ai-features` -> `packages/ai-features`
-- `packages/common/i18n` -> `packages/i18n`
-
-Reason:
-- these are not generic "misc common" utilities
-- their current `common/*` location makes them look looser and more incidental than they really are
-- moving them to top-level package names makes the architecture easier to read
+- ~~`packages/common/cli`~~ -> `packages/cli` ✓
+- ~~`packages/common/runtime-core`~~ -> `packages/runtime-core` ✓
+- ~~`packages/common/ai-features`~~ -> absorbed into `contracts` + `engine` ✓
+- ~~`packages/common/i18n`~~ -> `packages/i18n` ✓
 
 ### Move Out Of Current Package Home
 
@@ -222,7 +216,7 @@ Do not put here:
 - provider-specific wire parsing
 - bridge transport knowledge
 
-### `packages/providers/core`
+### `packages/providers/foundation`
 
 Put here:
 - the middle layer Chrona calls for provider access
@@ -249,7 +243,7 @@ Put here:
 1. Do not move `domain`, `db`, `runtime`, `contracts`, or provider integration code back into `apps/server` just because `apps/server` currently consumes them.
 2. Do move thin HTTP glue, route-local helpers, and app-specific startup code into `apps/server`.
 3. Do keep CLI as a separate package-level entrypoint.
-4. Do treat `packages/providers/core` as the only provider-facing layer upper Chrona code should call.
+4. Do treat `packages/providers/foundation` as the only provider-facing layer upper Chrona code should call.
 5. Do keep provider-specific protocol knowledge below `packages/providers/<provider>/...`.
 6. Do keep canonical business contracts in `packages/contracts` only.
 7. If a package exists only as a compatibility facade, remove it after imports are migrated.
@@ -270,9 +264,8 @@ Chrona's intended direction is:
 In practical terms, the target stack is:
 
 ```text
-runtime / apps
-  -> common/ai-features
-  -> providers/core
+engine / apps
+  -> providers/foundation
   -> providers/<provider>/integration + bridge
 ```
 
@@ -282,11 +275,10 @@ With responsibility split like this:
    - consumes normalized feature results
   - does business orchestration, storage, projections, and execution flow
   - must not parse provider protocol details
-- `packages/common/ai-features`
-  - exposes feature-level APIs like `generatePlan()` and `dispatchTask()`
-  - consumes provider-facing normalized payloads
-  - must not become the owner of provider transport semantics
-- `packages/providers/core`
+- `packages/contracts`
+  - defines canonical AI payload contracts (PlanBlueprint, feature specs, etc.)
+  - consumed by engine and providers alike
+- `packages/providers/foundation`
   - is the middle layer Chrona talks to
   - should expose provider-client interfaces and normalized provider result shapes
   - should hide provider-specific request/stream/protocol mechanics from upper layers
@@ -313,12 +305,12 @@ The current codebase is partway to this design, but not fully there yet.
 Already aligned with the target:
 - canonical AI plan contract lives in `packages/contracts/src/ai.ts`
 - provider-specific bridge logic lives under `packages/providers/openclaw/*`
-- runtime usually consumes normalized feature results instead of raw provider responses
+- engine consumes normalized feature results instead of raw provider responses
 
 Still drifting away from the target:
-- `packages/providers/core` is not fully provider-neutral yet
-- `packages/common/ai-features` still has some lower-level helper surface that feels too close to provider mechanics
-- some package names describe the desired future boundary more cleanly than the current implementation does
+- `packages/providers/foundation` is not fully provider-neutral yet
+- some package internals still feel too close to provider mechanics
+- engine could use a more explicit public barrel that reflects its real role
 
 ### Rule For Future Changes
 
@@ -326,11 +318,9 @@ When changing AI/provider code, prefer this question order:
 
 1. Is this a canonical Chrona contract?
    Put it in `packages/contracts`.
-2. Is this feature-level behavior Chrona wants, regardless of provider?
-   Put it in `packages/common/ai-features`.
-3. Is this the generic provider-client facade Chrona should call?
-   Put it in `packages/providers/core`.
-4. Does this exist only because OpenClaw/Hermes has a specific protocol?
+2. Is this provider-neutral layer Chrona should call?
+   Put it in `packages/providers/foundation`.
+3. Does this exist only because OpenClaw/Hermes has a specific protocol?
    Put it in `packages/providers/<provider>/...`.
 
 If upper layers need to understand raw provider protocol details to work, the boundary is probably wrong.
@@ -439,7 +429,7 @@ Current drift to watch:
 Rule of thumb:
 - if the code answers “what should the app do next?”, it usually belongs in `runtime`
 
-### `packages/common/runtime-core`
+### `packages/runtime-core`
 
 Responsible for:
 - backend-agnostic runtime adapter contracts
@@ -457,37 +447,6 @@ Healthy boundary status:
 Rule of thumb:
 - if a runtime adapter interface should work for OpenClaw, Hermes, or any future backend, it belongs here
 
-### `packages/ai-features`
-
-Responsible for:
-- feature-level AI APIs such as suggest, generate plan, conflicts, and timeslots
-- prompt selection and feature normalization
-- provider-neutral AI feature facade consumed by higher layers
-
-Not responsible for:
-- owning provider protocol contracts
-- becoming a second provider transport layer
-- redefining canonical schemas already owned by `contracts`
-
-Current drift to watch:
-- this package has historically mixed feature API with provider-specific helpers
-- some cleanup has already been done, but it is still broader than ideal
-
-Rule of thumb:
-- if callers should think in terms of “generate a plan” rather than “call this provider endpoint”, `ai-features` is the right level
-
-### `packages/cli`
-
-Responsible for:
-- CLI command wiring
-- terminal UX
-
-Not responsible for:
-- core business orchestration logic itself
-
-Rule of thumb:
-- if it is about parsing command-line input or rendering terminal output, it belongs here
-
 ### `packages/i18n`
 
 Responsible for:
@@ -500,7 +459,7 @@ Not responsible for:
 Rule of thumb:
 - keep this package small; do not let it become a dumping ground for unrelated shared utilities
 
-### `packages/providers/core`
+### `packages/providers/foundation`
 
 Responsible for:
 - provider client abstractions used by the app
@@ -556,10 +515,8 @@ Healthier boundaries today:
 - the `apps/web` and `apps/server` split
 
 Boundaries that still drift and therefore feel confusing:
-- `common/ai-features` vs `providers/openclaw/*`
-- `ai-features` vs `providers/openclaw/*`
-- `providers/core` abstraction vs concrete OpenClaw implementation
-- `runtime` public barrel vs actual package scope
+- `providers/foundation` abstraction vs concrete OpenClaw implementation
+- `engine` public barrel vs actual package scope
 - `contracts` because of `src/hooks/`
 
 This means your confusion is not just inexperience. Some of the repo is genuinely mid-cleanup.
@@ -597,8 +554,8 @@ Before adding a new file, ask in order:
    If yes, put it in `packages/db`.
 5. Is this orchestrating a use case across multiple lower layers?
    If yes, put it in `packages/engine`.
-6. Is this feature-level AI behavior that should feel provider-neutral to callers?
-   If yes, put it in `packages/ai-features`.
+6. Is this a provider integration that should feel provider-neutral to callers?
+   If yes, put it in `packages/providers/foundation`.
 7. Does this concept only exist because of one external provider?
    If yes, put it in `packages/providers/<provider>/...`.
 
@@ -606,7 +563,6 @@ Before adding a new file, ask in order:
 
 - a package named `contracts` starts owning hooks or framework behavior
 - a package named `core` depends on one concrete provider everywhere
-- feature facades export transport helpers and protocol parsing details
 - runtime packages re-export compatibility aliases for lower packages for too long
 - app routes contain business decisions or direct DB logic
 - provider packages start inventing canonical business schemas instead of consuming `contracts`
@@ -635,7 +591,6 @@ Before adding a new file, ask in order:
 If you want to reduce package confusion further, the highest-value cleanup targets are:
 
 1. remove or relocate `packages/contracts/src/hooks/`
-2. make `packages/providers/core` truly middle-layer oriented and less OpenClaw-shaped
-3. narrow the public surface of `packages/ai-features` to feature APIs, not transport helpers
-4. replace deprecated runtime compatibility exports with direct imports from `@chrona/contracts`
-5. make `packages/engine/src/index.ts` reflect the package's real role more honestly
+2. make `packages/providers/foundation` truly middle-layer oriented and less OpenClaw-shaped
+3. replace deprecated runtime compatibility exports with direct imports from `@chrona/contracts`
+4. make `packages/engine/src/index.ts` reflect the package's real role more honestly

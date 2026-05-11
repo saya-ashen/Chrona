@@ -35,14 +35,13 @@ graph TB
     end
 
     subgraph API["API Layer (Hono)"]
-        ROUTES["/api/tasks/*<br/>/api/ai/*<br/>/api/schedule/*<br/>/api/inbox/*<br/>/api/memory/*"]
+        ROUTES["/api/tasks/*<br/>/api/pages/*<br/>/api/ai/*<br/>/api/workspaces/*"]
         STATIC["Static SPA Host<br/>apps/web/dist"]
     end
 
-    subgraph Runtime["Runtime Layer"]
-        CMDS["Commands<br/>createTask<br/>startRun<br/>scheduleTask"]
-        QRYS["Queries<br/>getSchedulePage<br/>getInbox<br/>getTaskDetail"]
-        AI["AI Features<br/>suggest<br/>generatePlan<br/>conflicts<br/>timeslots"]
+    subgraph Engine["Engine Layer"]
+        SVC["Services<br/>tasks service<br/>pages service<br/>workspaces service<br/>ai-clients service"]
+        MOD["Modules<br/>tasks / plans<br/>plan-execution<br/>scheduling / ai / events"]
     end
 
     subgraph Data["Data Layer"]
@@ -59,16 +58,16 @@ graph TB
     SPA -->|"fetch /api/*"| ROUTES
     CLI -->|"fetch /api/*"| ROUTES
     BRIDGE -->|"fetch /api/*"| ROUTES
-    ROUTES --> CMDS
-    ROUTES --> QRYS
-    ROUTES --> AI
-    CMDS --> EVENTS
-    CMDS --> DB
+    ROUTES --> SVC
+    ROUTES --> MOD
+    SVC --> EVENTS
+    SVC --> DB
+    MOD --> EVENTS
+    MOD --> DB
     EVENTS --> PROJ
-    QRYS --> PROJ
-    QRYS --> DB
-    AI --> LLM
-    AI --> CMDS
+    PROJ --> DB
+    SVC --> LLM
+    MOD --> LLM
     BRIDGE --> OCB
 ```
 
@@ -115,7 +114,7 @@ C4Container
     Container_Boundary(c1, "Chrona (single machine)") {
         Container(web, "Web SPA", "React 19 + Vite", "Schedule, inbox, task workspace, work execution views")
         Container(api, "API Server", "Hono (Bun)", "REST API + static SPA hosting on :3101")
-        Container(db, "Database", "SQLite", "15 models via Prisma 7 with Bun SQLite adapter")
+        Container(db, "Database", "SQLite", "22 models via Prisma 7 with Bun SQLite adapter")
         Container(cli, "CLI", "Bun binary", "chrona task|run|schedule|ai commands")
     }
 
@@ -186,8 +185,8 @@ sequenceDiagram
     participant PROJ as Projection (cache)
     participant DB as SQLite
 
-    U->>API: GET /api/schedule/projection?workspaceId=default
-    API->>QRY: getSchedulePage(workspaceId, date)
+    U->>API: GET /api/schedule?workspaceId=default
+    API->>QRY: getSchedulePage(workspaceId)
     QRY->>PROJ: Read TaskProjection (scheduled)
     QRY->>DB: Read related data (workspace, events)
     QRY-->>API: SchedulePageData
@@ -197,14 +196,13 @@ sequenceDiagram
 **Example: Loading the schedule page**
 
 ```
-GET /schedule
-  → getSchedulePage(workspaceId, selectedDay)
+GET /api/schedule?workspaceId=default
+  → engine.pages.getSchedule({ workspaceId })
     → Read TaskProjection rows (filtered by scheduleStatus)
     → Compute focus zones (high-priority task clusters)
     → Compute automation candidates (Ready tasks with accepted plans)
-    → Run analyzeConflicts() (deterministic rule engine)
     → Aggregate planning summary
-    → Return SchedulePageData { scheduled, unscheduled, atRisk, conflicts, ... }
+    → Return SchedulePageData { scheduled, unscheduled, atRisk, ... }
 ```
 
 ---
@@ -213,21 +211,20 @@ GET /schedule
 
 ```mermaid
 graph TD
-    commands["commands/"] --> events["events/"]
-    commands --> projections["projections/"]
-    commands --> runtime-sync["runtime-sync/"]
-    commands --> tasks["tasks/"]
-    queries["queries/"] --> projections
-    queries --> tasks
-    queries --> runtime-sync
-    queries --> ai["ai/"]
-    ai --> queries
-    ai --> openclaw["providers/openclaw/"]
-    tasks --> runtime-sync
-    projections --> tasks
+    services["services/"] --> events["events/"]
+    services --> projections["projections/"]
+    services --> runtime-sync["runtime-sync/"]
+    services --> tasks["tasks/"]
+    tasks["tasks/"] --> runtime-sync
+    projections["projections/"] --> tasks
+    plans["plans/"] --> ai["ai/"]
+    plan-exec["plan-execution/"] --> plans
+    plan-exec --> tasks
+    ai --> providers["providers/openclaw/"]
+    ai --> plans
     events["events/"]
     subgraph External
-        openclaw
+        providers
     end
     subgraph "Depends on nothing"
         events
@@ -235,12 +232,12 @@ graph TD
 ```
 
 **Rules:**
-- `events/` — bottom layer, no dependencies
-- `commands/` → `events/`, `projections/`, `runtime-sync/`, `tasks/`
-- `queries/` → `projections/`, `tasks/`, `runtime-sync/`, `ai/`
-- `tasks/` → `runtime-sync/` only (for config specs)
-- `projections/` → `tasks/` only (state derivation)
-- `ai/` → `queries/` (plugins need to read data)
+- `events/` — bottom layer, no dependencies (canonical event log)
+- `services/` — orchestrates across modules (tasks, pages, workspaces, ai-clients)
+- `modules/tasks/` → `runtime-sync/`
+- `modules/projections/` → `modules/tasks/` (state derivation)
+- `modules/ai/` → `modules/plans/`, `providers/openclaw/`
+- `modules/plan-execution/` → `modules/plans/`, `modules/tasks/`
 
 ---
 
@@ -251,22 +248,22 @@ Chrona's core safety mechanism: **AI never writes directly to the data layer.**
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant API as /api/ai/*
+    participant API as /api/tasks/*plan*
     participant AI as AI Feature
-    participant LLM as LLM / OpenClaw
+    participant LLM as LLM Provider
     participant CMD as Command Handler
 
-    U->>API: generate-task-plan(taskId)
-    API->>AI: dispatch to bound AI client
+    U->>API: POST /tasks/:taskId/plan/generations
+    API->>AI: generate task plan
     AI->>LLM: stream plan generation
     LLM-->>AI: SSE: partial nodes, edges, status
     AI-->>API: streaming response
     API-->>U: SSE stream (draft plan)
     Note over U: User reviews draft plan
-    U->>API: accept-plan(taskId, planId)
-    API->>CMD: acceptTaskPlan(input)
+    U->>API: POST /tasks/:taskId/plan (patch operations)
+    API->>CMD: apply plan mutations
     CMD->>CMD: validate, apply mutations
-    CMD-->>U: 200 OK (plan materialized)
+    CMD-->>U: 200 OK (plan updated)
 ```
 
 **Every AI feature follows this flow:**
@@ -284,8 +281,8 @@ This ensures: no silent data corruption, full auditability, and user remains the
 |---------|---------|---------------------------|
 | Conflict detection | LLM analysis | Deterministic time-overlap check |
 | Timeslot suggestion | LLM recommendation | Rule-based gap detection |
-| Auto-complete | LLM streaming | Keyword matching against existing tasks |
-| Task decomposition | LLM plan generation | Template-based breakdown |
+| Task suggestions | LLM streaming | Keyword matching against existing tasks |
+| Plan generation | LLM plan generation | Template-based breakdown |
 
 Core functionality never requires an LLM to be available.
 
@@ -392,12 +389,12 @@ In production mode, a single Hono server hosts both the static SPA (`apps/web/di
 
 **Date:** 2025 · **Status:** Accepted
 
-**Context:** Support multiple AI runtimes (OpenClaw, Hermes, Opencode, bare LLM) without changing the product model.
+**Context:** Support multiple AI runtimes (OpenClaw, bare LLM) without changing the product model.
 
-**Decision:** Define `RuntimeExecutionAdapter` in `packages/common/runtime-core/` as the canonical interface. Each provider (openclaw, hermes) implements it.
+**Decision:** Define `RuntimeExecutionAdapter` in `packages/runtime-core/` as the canonical interface. The `packages/providers/foundation/` layer provides the provider-facing contracts Chrona calls through.
 
 **Rationale:**
-- Decouples provider-specific code from the runtime module
+- Decouples provider-specific code from the engine module
 - Tasks, schedules, and plans remain provider-agnostic
 - Enables A/B testing and gradual migration between runtimes
 
@@ -431,6 +428,9 @@ apps/
   server/                       — Hono API server + static SPA host
     src/
       app.ts                    — Hono app composition (CORS, locale redirect, middleware)
-      routes/api.ts             — API route handlers (40+ endpoints)
+      routes/api.ts             — API route aggregation (tasks, pages, workspaces, ai)
+      routes/tasks/             — Task CRUD, plan, execution, lifecycle, result, schedule
+      routes/pages/             — Page data endpoints (schedule, inbox, memory, work)
+      routes/ai/                — AI client management
       index.bun.ts              — Bun entry (primary)
 ```
