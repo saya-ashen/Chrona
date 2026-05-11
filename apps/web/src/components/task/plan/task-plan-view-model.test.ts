@@ -113,6 +113,8 @@ describe("task-plan-view-model", () => {
             reachable: true,
             result: {
               outputSummary: "选择了是",
+              outputs: [{ kind: "json", value: { selectedBranch: "是" } }],
+              evidence: { runId: "run-1", runtimeRunRef: "runtime-ref-1" },
               selectedBranch: { label: "是", nextNodeId: "task-yes", source: "user" },
             },
           },
@@ -163,15 +165,23 @@ describe("task-plan-view-model", () => {
 
     expect(graphPlan?.currentStepId).toBe(null);
     expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.status).toBe("done");
-    expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.status).toBe("pending");
+    expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultOutputs).toEqual([
+      { kind: "json", value: { selectedBranch: "是" } },
+    ]);
+    expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultEvidence).toMatchObject({
+      runId: "run-1",
+      runtimeRunRef: "runtime-ref-1",
+    });
+    expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.status).toBe("ready");
     expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.readiness).toBe("ready");
     expect(graphPlan?.edges).toEqual([
       {
         id: "edge-yes",
-        fromNodeId: "condition-1",
-        toNodeId: "task-yes",
-        type: "sequential",
+        from: "condition-1",
+        to: "task-yes",
         label: "是",
+        kind: "branch_option",
+        emphasis: "normal",
       },
     ]);
   });

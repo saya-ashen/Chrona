@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Play, RotateCcw, Send, Sparkles } from "lucide-react";
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
 import { buttonVariants } from "@/components/ui/button";
 import { inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -178,15 +180,135 @@ function resolvePrimarySubmitLabel(node: PlanNodeDataModel, mode: RunPanelMode, 
 }
 
 function extractRunResult(node: PlanNodeDataModel) {
-  const candidates = [
-    node.completionSummary,
-    typeof node.metadata?.output === "string" ? node.metadata.output : null,
-    typeof node.metadata?.result === "string" ? node.metadata.result : null,
-    typeof node.metadata?.lastResult === "string" ? node.metadata.lastResult : null,
-    typeof node.metadata?.summary === "string" ? node.metadata.summary : null,
-  ].filter((value): value is string => Boolean(value && value.trim()));
+  const candidates = [node.completionSummary].filter((value): value is string => Boolean(value && value.trim()));
 
   return candidates[0] ?? null;
+}
+
+function formatJson(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="font-medium text-sky-700 underline underline-offset-2 dark:text-sky-300">{children}</a>,
+        code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 text-[0.85em] text-foreground">{children}</code>,
+        h1: ({ children }) => <h3 className="text-base font-semibold text-foreground">{children}</h3>,
+        h2: ({ children }) => <h4 className="text-sm font-semibold text-foreground">{children}</h4>,
+        h3: ({ children }) => <h5 className="text-sm font-semibold text-foreground">{children}</h5>,
+        li: ({ children }) => <li className="pl-1 marker:text-muted-foreground">{children}</li>,
+        ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ol>,
+        p: ({ children }) => <p className="text-sm leading-6 text-foreground">{children}</p>,
+        pre: ({ children }) => <pre className="my-2 max-h-72 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-50">{children}</pre>,
+        strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+        table: ({ children }) => <div className="my-2 overflow-auto rounded-xl border border-border/60"><table className="w-full border-collapse text-sm">{children}</table></div>,
+        td: ({ children }) => <td className="border-t border-border/60 px-2 py-1.5 align-top text-foreground">{children}</td>,
+        th: ({ children }) => <th className="bg-muted/60 px-2 py-1.5 text-left font-semibold text-foreground">{children}</th>,
+        ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ul>,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+function outputTitle(output: NodeResultOutput, fallback: string) {
+  if ("title" in output && output.title) return output.title;
+  return fallback;
+}
+
+function ResultOutputCard({ output }: { output: NodeResultOutput }) {
+  switch (output.kind) {
+    case "text":
+      return (
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{outputTitle(output, output.kind)}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{output.content}</p>
+        </div>
+      );
+    case "markdown":
+      return (
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{outputTitle(output, "markdown")}</p>
+          <div className="mt-2">
+            <MarkdownContent content={output.content} />
+          </div>
+        </div>
+      );
+    case "json":
+      return (
+        <div className="rounded-xl border border-border/60 bg-slate-950 px-3 py-2 text-slate-50">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">{output.title ?? "JSON"}</p>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-5">{formatJson(output.value)}</pre>
+        </div>
+      );
+    case "file":
+      return (
+        <div className="rounded-xl border border-sky-200/70 bg-sky-50/70 px-3 py-2 dark:border-sky-400/20 dark:bg-sky-500/10">
+          <div className="flex items-start gap-2">
+            <FileText className="mt-0.5 size-4 text-sky-700 dark:text-sky-200" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">{output.title ?? "File output"}</p>
+              <code className="mt-1 block break-all rounded-lg bg-background/80 px-2 py-1 text-xs text-foreground">{output.path}</code>
+              {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
+              {output.language ? <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{output.language}</p> : null}
+            </div>
+          </div>
+        </div>
+      );
+    case "artifact":
+      return (
+        <div className="rounded-xl border border-purple-200/70 bg-purple-50/70 px-3 py-2 dark:border-purple-400/20 dark:bg-purple-500/10">
+          <p className="text-sm font-semibold text-foreground">{output.title}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Artifact: {output.artifactId}</p>
+          {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
+        </div>
+      );
+    case "command":
+      return (
+        <div className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-50">
+          <div className="flex items-center gap-2">
+            <Terminal className="size-4 text-zinc-300" />
+            <p className="text-sm font-semibold">{output.title ?? "Command"}</p>
+            {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-zinc-400">exit {output.exitCode}</span> : null}
+          </div>
+          <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs leading-5 text-zinc-100">{output.command}</pre>
+          {output.stdout ? <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-zinc-800 pt-2 text-xs text-emerald-200">{output.stdout}</pre> : null}
+          {output.stderr ? <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-zinc-800 pt-2 text-xs text-rose-200">{output.stderr}</pre> : null}
+        </div>
+      );
+    case "link":
+      return (
+        <a className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/75 px-3 py-2 hover:bg-muted/40" href={output.href} target="_blank" rel="noreferrer">
+          <LinkIcon className="mt-0.5 size-4 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">{output.title}</span>
+            <span className="mt-1 block break-all text-xs text-muted-foreground">{output.href}</span>
+            {output.description ? <span className="mt-2 block text-xs leading-5 text-muted-foreground">{output.description}</span> : null}
+          </span>
+          <ExternalLink className="size-3 text-muted-foreground" />
+        </a>
+      );
+  }
+}
+
+function evidenceLines(evidence: NodeResultEvidence | null | undefined) {
+  if (!evidence) return [];
+  return [
+    evidence.runtimeName ? `runtime=${evidence.runtimeName}` : null,
+    evidence.runtimeRunRef ? `runtimeRunRef=${evidence.runtimeRunRef}` : null,
+    evidence.runId ? `runId=${evidence.runId}` : null,
+    evidence.sessionId ? `session=${evidence.sessionId}` : null,
+    evidence.conversationEntryIds?.length ? `conversationEntries=${evidence.conversationEntryIds.join(", ")}` : null,
+    evidence.artifactIds?.length ? `artifacts=${evidence.artifactIds.join(", ")}` : null,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function formatErrorDetails(details: unknown): string | null {
@@ -307,6 +429,8 @@ export function TaskPlanGraphInspectorRunPanel({
   const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
   const runResult = useMemo(() => extractRunResult(node), [node]);
   const runError = useMemo(() => extractRunError(node), [node]);
+  const resultOutputs = node.resultOutputs ?? [];
+  const resultEvidence = useMemo(() => evidenceLines(node.resultEvidence), [node.resultEvidence]);
   const runPanelMode = useMemo(() => node.interactionType, [node]);
   const resolvedRunPanelMode = runPanelMode ?? "observe";
   const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode), [resolvedRunPanelMode]);
@@ -477,14 +601,29 @@ export function TaskPlanGraphInspectorRunPanel({
 
       <section className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Run result</p>
-        <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
+        <div className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-3">
           {runError ? (
             <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">{runError}</pre>
+          ) : resultOutputs.length > 0 ? (
+            <>
+              {runResult ? <p className="text-sm leading-6 text-muted-foreground">{runResult}</p> : null}
+              <div className="space-y-2">
+                {resultOutputs.map((output, index) => (
+                  <ResultOutputCard key={`${output.kind}:${index}`} output={output} />
+                ))}
+              </div>
+            </>
           ) : runResult ? (
             <p className="text-sm leading-6 text-foreground">{runResult}</p>
           ) : (
             <p className="text-sm text-muted-foreground">No run result yet for this node.</p>
           )}
+          {resultEvidence.length > 0 ? (
+            <details className="rounded-xl border border-dashed border-border/60 bg-muted/[0.16] px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Evidence</summary>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{resultEvidence.join("\n")}</pre>
+            </details>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-dashed border-border/60 bg-muted/[0.14] p-3">

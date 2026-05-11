@@ -77,7 +77,7 @@ function completedTaskResult(outputContent: string): TaskNodeAiResult {
   return {
     outcome: "completed",
     summary: outputContent,
-    output: outputContent,
+    outputs: [{ kind: "text", content: outputContent }],
   };
 }
 

@@ -314,6 +314,7 @@ describe("graph-runtime", () => {
         status: "done",
         summary: "External run completed",
         evidence: { runId: "run_1" },
+        output: [{ kind: "json", value: { selected: "yes" } }],
         selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
       },
     });
@@ -325,6 +326,10 @@ describe("graph-runtime", () => {
       ["choose", "current"],
       ["done", "current"],
     ]);
+    expect(second.state.results[1]).toMatchObject({
+      evidence: { runId: "run_1" },
+      outputs: [{ kind: "json", value: { selected: "yes" } }],
+    });
     expect(second.events.map((event) => event.type)).toEqual([
       "command_received",
       "external_result_synced",

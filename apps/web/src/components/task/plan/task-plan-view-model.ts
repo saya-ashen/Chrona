@@ -378,11 +378,7 @@ function toPlanNode(node: {
   requiredInfo?: string[];
   status?: EffectivePlanNode["status"] | null;
   ready?: boolean;
-  result?: {
-    outputSummary?: string | null;
-    error?: string | null;
-    errorDetails?: unknown;
-  } | null;
+  result?: EffectivePlanNode["result"] | null;
   nextAction?: string | null;
   config: NodeConfig;
 }): PlanNodeDataModel {
@@ -429,6 +425,9 @@ function toPlanNode(node: {
     requiredInfo,
     nextAction: node.nextAction ?? null,
     completionSummary: node.result?.outputSummary ?? null,
+    result: node.result ?? null,
+    resultOutputs: node.result?.outputs ?? [],
+    resultEvidence: node.result?.evidence ?? null,
     branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `分支 ${index + 1}`) ?? [],
     options: metadata.options ?? [],
     active: status === "active",
