@@ -23,13 +23,14 @@ mock.module("../providers", () => ({
     };
   },
   openclawCall: openclawCallMock,
-  getOrCreateClient: () => ({
-    executeFeatureStream: executeFeatureStreamMock,
-  }),
+}));
+
+mock.module("../runtime/client-registry", () => ({
+  requireOpenClawClient: (client: EngineAiClient) => client,
 }));
 
 import { generatePlanStream } from "../streaming";
-import type { AiClientRecord } from "@chrona/contracts";
+import type { EngineAiClient } from "../runtime/client-registry";
 
 describe("generatePlanStream", () => {
   it("does not fall back to blocking OpenClaw calls when streaming generate_plan fails", async () => {
@@ -37,12 +38,20 @@ describe("generatePlanStream", () => {
     executeFeatureStreamMock.mockClear();
 
     const client = {
-      type: "openclaw",
-      config: {
-        gatewayUrl: "http://gateway.local",
+      record: {
+        id: "client-1",
+        name: "OpenClaw",
+        type: "openclaw",
+        config: {
+          gatewayUrl: "http://gateway.local",
+          bridgeUrl: "http://gateway.local",
+          bridgeToken: "",
+        },
+        isDefault: true,
+        enabled: true,
       },
-      enabled: true,
-    } as AiClientRecord;
+      providerClient: { stream: executeFeatureStreamMock } as unknown as EngineAiClient["providerClient"],
+    } as EngineAiClient;
 
     const events = [] as Array<{ type: string; message?: string }>;
     for await (const event of generatePlanStream(client, { title: "Build plan" })) {

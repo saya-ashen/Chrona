@@ -5,9 +5,7 @@
 import { createHash } from "node:crypto";
 
 import type {
-  AiClientRecord,
   AiFeature,
-  OpenClawClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
   SmartSuggestRequest,
@@ -33,8 +31,9 @@ import {
   buildPreparedFeatureRequest,
   buildOpenClawFeatureGatewayRequest,
   openclawCall,
-  getOrCreateClient,
 } from "./providers";
+import type { EngineAiClient } from "./runtime/client-registry";
+import { requireLlmClient, requireOpenClawClient } from "./runtime/client-registry";
 import { buildOpenClawSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
@@ -149,10 +148,12 @@ function summarizeStreamEvent(event: StreamEvent | null) {
 }
 
 async function* openclawStream(
-  config: OpenClawClientConfig,
+  client: EngineAiClient,
   feature: AiFeature,
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
+  const openClawClient = requireOpenClawClient(client);
+  const config = openClawClient.record.config;
   const timeout = config.timeoutSeconds ?? 120;
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
     feature,
@@ -195,13 +196,11 @@ async function* openclawStream(
       },
     });
     try {
-      const client = getOrCreateClient(config);
-
       await dump?.write({ type: "yield", stage: "openclaw.status", event: { type: "status", message: "AI 正在思考..." } });
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-      for await (const event of client.stream({
+      for await (const event of openClawClient.providerClient.stream({
         request: {
           ...buildOpenClawFeatureGatewayRequest({
             feature,
@@ -278,7 +277,7 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(config, providerInput);
+    const text = await openclawCall(client, providerInput);
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -381,20 +380,21 @@ async function* llmStream(
 }
 
 function dispatchStream(
-  client: AiClientRecord,
+  client: EngineAiClient,
   feature: AiFeature,
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
-  if (client.type === "openclaw") {
+  if (client.record.type === "openclaw") {
     return openclawStream(
-      client.config as OpenClawClientConfig,
+      client,
       feature,
       input,
     );
   }
+  const llmClient = requireLlmClient(client);
   const request = toLlmStreamRequest(feature, input);
   return llmStream(
-    client.config as LLMClientConfig,
+    llmClient.record.config,
     request.systemPrompt,
     request.userMessage,
     input.signal,
@@ -434,7 +434,7 @@ function buildSuggestScope(request: SmartSuggestRequest): string {
 }
 
 export async function* suggestStream(
-  client: AiClientRecord,
+  client: EngineAiClient,
   request: SmartSuggestRequest,
 ): AsyncGenerator<StreamEvent> {
   const preparedInput = prepareStreamInput(
@@ -481,7 +481,7 @@ export async function* suggestStream(
 
       const suggestions = normalizeSuggestResponse({
         parsed,
-        source: client.type,
+        source: client.record.type,
         structured: event.structured,
       });
       yield { type: "result", suggestions };
@@ -755,7 +755,7 @@ function collectGeneratePlanResult(
 }
 
 export async function* generatePlanStream(
-  client: AiClientRecord,
+  client: EngineAiClient,
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
   const featureSpec = buildGeneratePlanFeatureSpec(request);
@@ -772,7 +772,7 @@ export async function* generatePlanStream(
     label: `generate-plan-${request.taskId ?? preparedInput.scope}`,
     meta: {
       layer: "engine.generatePlanStream",
-      clientType: client.type,
+      clientType: client.record.type,
       taskId: request.taskId ?? null,
       scope: preparedInput.scope,
     },
@@ -813,7 +813,7 @@ export async function* generatePlanStream(
 
     if (event.type === "done") {
       latestStructured = event.structured ?? null;
-      const resolved = collectGeneratePlanResult(acc, event, client.type);
+      const resolved = collectGeneratePlanResult(acc, event, client.record.type);
       await dump?.write({
         type: "resolved",
         event: summarizeStreamEvent(resolved),

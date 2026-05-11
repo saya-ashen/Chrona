@@ -5,7 +5,6 @@
 import { randomUUID } from "node:crypto";
 
 import type {
-  AiClientRecord,
   LLMClientConfig,
   SmartSuggestRequest,
   SmartSuggestResponse,
@@ -28,6 +27,8 @@ import type {
 import { parseTaskDispatchDecision } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
+import type { EngineAiClient } from "./runtime/client-registry";
+import { requireLlmClient } from "./runtime/client-registry";
 import { buildGeneratePlanScope } from "./streaming";
 import { type PlanBlueprint, planBlueprintSchema } from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/shared/logger";
@@ -127,24 +128,25 @@ export function normalizeGeneratePlanResponse(input: {
 }
 
 export async function chat(
-  client: AiClientRecord,
+  client: EngineAiClient,
   request: ChatRequest,
 ): Promise<ChatResponse> {
-  if (client.type === "openclaw") {
+  if (client.record.type === "openclaw") {
     if (request.jsonMode) {
       const content = await dispatch(client, "chat", request, "chat");
       return {
         content,
         parsed: extractJSON(content) as unknown,
-        source: client.type,
+        source: client.record.type,
       };
     }
 
     const raw = await dispatch(client, "chat", request, "chat");
-    return { content: raw, source: client.type };
+    return { content: raw, source: client.record.type };
   }
 
-  const config = client.config as LLMClientConfig;
+  const llmClient = requireLlmClient(client);
+  const config = llmClient.record.config;
   const model = config.model ?? "gpt-4o-mini";
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
@@ -215,7 +217,7 @@ export async function chat(
   const content = contentChunks.join("");
   if (request.jsonMode) {
     const parsed = extractJSON(content) as unknown;
-    return { content, parsed, source: client.type };
+    return { content, parsed, source: client.record.type };
   }
-  return { content, source: client.type };
+  return { content, source: client.record.type };
 }
