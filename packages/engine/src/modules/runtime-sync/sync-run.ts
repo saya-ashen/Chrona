@@ -2,7 +2,6 @@ import { ApprovalStatus, Prisma, RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
   type OpenClawChatHistory,
-  type OpenClawConnectionConfig,
   type OpenClawPendingApproval,
   type OpenClawResponseSnapshot,
 } from "@chrona/openclaw";
@@ -18,6 +17,7 @@ import {
   mapHistoryDelta,
   mapRunLifecycleEvent,
 } from "@/modules/runtime-sync/mapper";
+import { getAiClient, requireOpenClawClient } from "@/modules/ai/runtime/client-registry";
 
 function resolveSessionKey(run: {
   taskSession?: { sessionKey: string } | null;
@@ -83,22 +83,6 @@ export type OpenClawRuntimeSyncClient = {
   waitForApprovalDecision(approvalId: string): Promise<"allow-once" | "allow-always" | "deny" | null>;
 };
 
-async function loadOpenClawConfig(): Promise<OpenClawConnectionConfig> {
-  const aiClient = await db.aiClient.findFirst({
-    where: { type: "openclaw", isDefault: true, enabled: true },
-  });
-  const config = aiClient?.config as Record<string, unknown> | null | undefined;
-  const bridgeUrl = typeof config?.bridgeUrl === "string" ? config.bridgeUrl : "";
-  const bridgeToken =
-    typeof config?.bridgeToken === "string" ? config.bridgeToken : undefined;
-  const timeoutSeconds =
-    typeof config?.timeoutSeconds === "number" ? config.timeoutSeconds : undefined;
-  if (!bridgeUrl.trim()) {
-    throw new Error("OpenClaw bridgeUrl is required");
-  }
-  return { bridgeUrl, bridgeToken, timeoutSeconds };
-}
-
 function textFromGatewayResponse(response: Record<string, unknown>): string {
   if (typeof response.output_text === "string") return response.output_text;
   if (typeof response.output === "string") return response.output;
@@ -106,13 +90,20 @@ function textFromGatewayResponse(response: Record<string, unknown>): string {
 }
 
 async function retrieveOpenClawResponse(
-  config: OpenClawConnectionConfig,
+  clientId: string | null,
   responseId: string,
 ): Promise<Record<string, unknown>> {
-  if (!config.bridgeUrl?.trim()) {
-    throw new Error("OpenClaw bridgeUrl is required");
+  const client = await getAiClient(clientId);
+  if (!client) {
+    throw new Error("AI client is required for runtime sync");
   }
-  const baseUrl = config.bridgeUrl.replace(/\/+$/, "");
+  const openClawClient = requireOpenClawClient(client);
+  const config = openClawClient.record.config;
+  const gatewayUrl = config.gatewayUrl ?? config.bridgeUrl;
+  if (!gatewayUrl?.trim()) {
+    throw new Error("OpenClaw gatewayUrl is required");
+  }
+  const baseUrl = gatewayUrl.replace(/\/+$/, "");
   const res = await fetch(
     `${baseUrl}/v1/responses/${encodeURIComponent(responseId)}`,
     {
@@ -120,8 +111,8 @@ async function retrieveOpenClawResponse(
       headers: {
         "Content-Type": "application/json",
         "x-openclaw-agent-id": "main",
-        ...(config.bridgeToken
-          ? { Authorization: `Bearer ${config.bridgeToken}` }
+        ...(config.gatewayToken ?? config.bridgeToken
+          ? { Authorization: `Bearer ${config.gatewayToken ?? config.bridgeToken}` }
           : {}),
       },
       signal: AbortSignal.timeout(15_000),
@@ -141,13 +132,17 @@ async function retrieveOpenClawResponse(
 }
 
 async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncClient> {
-  const config = await loadOpenClawConfig();
+  const client = await getAiClient();
+  if (!client) {
+    throw new Error("Default AI client is required for runtime sync");
+  }
+  const openClawClient = requireOpenClawClient(client);
   return {
     async getResponseSnapshot(input) {
       if (!input.responseId) {
         throw new Error("OpenClaw responseId is required for runtime sync");
       }
-      const response = await retrieveOpenClawResponse(config, input.responseId);
+      const response = await retrieveOpenClawResponse(openClawClient.record.id, input.responseId);
       return {
         responseId:
           typeof response.id === "string" ? response.id : input.responseId,

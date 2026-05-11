@@ -1,4 +1,3 @@
-import { OpenClawClient } from "@chrona/openclaw";
 import { checkGatewayAvailable, normalizeGatewayHttpUrl } from "@chrona/openclaw";
 import type { ProviderResponse } from "@chrona/providers-foundation";
 import type {
@@ -11,37 +10,13 @@ import type {
 } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import type { OpenClawGatewayRequest } from "@chrona/openclaw";
-
-const clientCache = new Map<string, OpenClawClient>();
+import type { EngineAiClient } from "./runtime/client-registry";
+import { requireLlmClient, requireOpenClawClient } from "./runtime/client-registry";
 
 function getOpenClawGatewayUrl(config: OpenClawClientConfig): string | undefined {
   return typeof config.gatewayUrl === "string" && config.gatewayUrl
     ? config.gatewayUrl
     : config.bridgeUrl;
-}
-
-function getClientKey(config: OpenClawClientConfig): string {
-  return [
-    getOpenClawGatewayUrl(config),
-    config.gatewayToken ?? config.bridgeToken,
-    config.model,
-  ].join(":");
-}
-
-export function getOrCreateClient(
-  config: OpenClawClientConfig,
-): OpenClawClient {
-  const key = getClientKey(config);
-  const cached = clientCache.get(key);
-  if (cached) return cached;
-  const client = new OpenClawClient({
-    gatewayUrl: getOpenClawGatewayUrl(config) ?? "",
-    gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
-    model: config.model,
-    timeoutSeconds: config.timeoutSeconds,
-  });
-  clientCache.set(key, client);
-  return client;
 }
 
 async function checkClientHealth(
@@ -143,16 +118,15 @@ export function extractJSON(text: string): Record<string, unknown> | null {
 }
 
 async function openclawFeaturePayload(
-  client: AiClientRecord,
+  client: EngineAiClient,
   request: OpenClawGatewayRequest,
 ): Promise<string> {
-  const config = client.config as OpenClawClientConfig;
-  const openClawClient = getOrCreateClient(config);
+  const openClawClient = requireOpenClawClient(client).providerClient;
   const result = await openClawClient.create({
     request,
   });
   if (result.response.error) {
-    throw new AiClientError(result.response.error, client.type, "internal");
+    throw new AiClientError(result.response.error, client.record.type, "internal");
   }
   return result.response.output;
 }
@@ -210,13 +184,10 @@ async function llmFeaturePayload(
 }
 
 export async function openclawCall(
-  config: OpenClawClientConfig,
+  client: EngineAiClient,
   request: OpenClawGatewayRequest,
 ): Promise<string> {
-  return openclawFeaturePayload(
-    { type: "openclaw", config, enabled: true } as AiClientRecord,
-    request,
-  );
+  return openclawFeaturePayload(client, request);
 }
 
 export async function llmCall(
@@ -307,24 +278,23 @@ type FeaturePayloadResult<T> = {
 };
 
 async function openclawFeaturePayloadFull<T>(
-  client: AiClientRecord,
+  client: EngineAiClient,
   feature: AiFeature,
   request: OpenClawGatewayRequest,
 ): Promise<FeaturePayloadResult<T>> {
-  const config = client.config as OpenClawClientConfig;
-  const openClawClient = getOrCreateClient(config);
+  const openClawClient = requireOpenClawClient(client).providerClient;
   const result = (await openClawClient.create({
     request,
   })).response as ProviderResponse;
 
   if (result.error) {
-    throw new AiClientError(result.error, client.type, "internal");
+    throw new AiClientError(result.error, client.record.type, "internal");
   }
 
   if (result.feature?.payload == null) {
     throw new AiClientError(
       `Feature '${feature}' did not return a parsed payload`,
-      client.type,
+      client.record.type,
       "invalid_response",
     );
   }
@@ -356,12 +326,12 @@ async function openclawFeaturePayloadFull<T>(
 }
 
 export async function dispatch(
-  client: AiClientRecord,
+  client: EngineAiClient,
   feature: AiFeature,
   input: unknown,
   scope = "default",
 ): Promise<string> {
-  if (client.type === "openclaw") {
+  if (client.record.type === "openclaw") {
     const inputText = typeof input === "string" ? input : JSON.stringify(input);
     const inputObj =
       typeof input === "string"
@@ -377,9 +347,10 @@ export async function dispatch(
       }),
     });
   }
+  const llmClient = requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
   return llmCall(
-    client.config as LLMClientConfig,
+    llmClient.record.config,
     `Feature: ${feature}`,
     userMessage,
     { jsonMode: feature !== "chat" },
@@ -387,12 +358,12 @@ export async function dispatch(
 }
 
 export async function dispatchFeaturePayload<T = unknown>(
-  client: AiClientRecord,
+  client: EngineAiClient,
   feature: AiFeature,
   input: unknown,
   scope = "default",
 ): Promise<FeaturePayloadResult<T>> {
-  if (client.type === "openclaw") {
+  if (client.record.type === "openclaw") {
     const inputText = typeof input === "string" ? input : JSON.stringify(input);
     const inputObj =
       typeof input === "string"
@@ -409,9 +380,10 @@ export async function dispatchFeaturePayload<T = unknown>(
     });
   }
 
+  const llmClient = requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
   const text = await llmCall(
-    client.config as LLMClientConfig,
+    llmClient.record.config,
     `Feature: ${feature}`,
     userMessage,
     { jsonMode: feature !== "chat" },

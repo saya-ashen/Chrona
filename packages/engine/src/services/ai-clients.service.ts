@@ -4,6 +4,7 @@ import { updateAiClient } from "../modules/ai/management/update-ai-client";
 import { updateAiClientBindings } from "../modules/ai/management/update-ai-client-bindings";
 import { testAiClientAvailability } from "../modules/ai/providers";
 import { listAiClients } from "../modules/ai/management/list-ai-clients";
+import { refreshAiClientRegistry } from "../modules/ai/runtime/client-registry";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 
 type AiClientListItem = Awaited<ReturnType<typeof listAiClients>>[number];
@@ -19,14 +20,18 @@ export function createAiClientsService() {
     },
     async create(input: Parameters<typeof createAiClient>[0]) {
       try {
-        return await createAiClient(input);
+        const client = await createAiClient(input);
+        await refreshAiClientRegistry();
+        return client;
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to create AI client");
       }
     },
     async update(input: { clientId: string; data: Parameters<typeof updateAiClient>[1] }) {
       try {
-        return await updateAiClient(input.clientId, input.data);
+        const client = await updateAiClient(input.clientId, input.data);
+        await refreshAiClientRegistry();
+        return client;
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND, "Failed to update AI client");
       }
@@ -34,6 +39,7 @@ export function createAiClientsService() {
     async delete(input: { clientId: string }) {
       try {
         await deleteAiClient(input.clientId);
+        await refreshAiClientRegistry();
         return { success: true };
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND, "Failed to delete AI client");
@@ -44,7 +50,9 @@ export function createAiClientsService() {
     },
     async updateBindings(input: Parameters<typeof updateAiClientBindings>[0]) {
       try {
-        return await updateAiClientBindings(input);
+        const features = await updateAiClientBindings(input);
+        await refreshAiClientRegistry();
+        return features;
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND, "Failed to update feature bindings");
       }

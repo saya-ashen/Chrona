@@ -12,10 +12,7 @@ import {
   startRuntimeRun,
   type OpenClawResponseClient,
 } from "@/modules/task-execution/start-runtime-run";
-import {
-  createOpenClawClient,
-  type OpenClawConnectionConfig,
-} from "@chrona/openclaw";
+import { getAiClient, requireOpenClawClient } from "@/modules/ai/runtime/client-registry";
 
 type NodeExecutionEvidence = {
   sessionId?: string;
@@ -95,6 +92,14 @@ type NodeExecutorInput = {
   openClawClient?: OpenClawResponseClient;
 };
 
+async function resolveDefaultAiClient() {
+  const client = await getAiClient();
+  if (!client) {
+    throw new Error("Default AI client is required");
+  }
+  return client;
+}
+
 function buildInstructions(input: NodeExecutorInput): string {
   const completedNodes = input.plan.nodes
     .filter((n) => n.status === "completed" || n.status === "skipped")
@@ -151,22 +156,6 @@ function getNodeObjective(node: EffectivePlanNode): string {
       : typeof legacyObjective === "string"
         ? legacyObjective
         : node.title;
-}
-
-async function loadOpenClawConfig(): Promise<OpenClawConnectionConfig> {
-  const client = await db.aiClient.findFirst({
-    where: { type: "openclaw", isDefault: true, enabled: true },
-  });
-  const config = client?.config as Record<string, unknown> | null | undefined;
-  const bridgeUrl = typeof config?.bridgeUrl === "string" ? config.bridgeUrl : "";
-  const bridgeToken =
-    typeof config?.bridgeToken === "string" ? config.bridgeToken : undefined;
-  const timeoutSeconds =
-    typeof config?.timeoutSeconds === "number" ? config.timeoutSeconds : undefined;
-  if (!bridgeUrl.trim()) {
-    throw new Error("OpenClaw bridgeUrl is required");
-  }
-  return { bridgeUrl, bridgeToken, timeoutSeconds };
 }
 
 function buildAttemptId(input: NodeExecutorInput): string {
@@ -293,9 +282,12 @@ export async function executePlanNode(
       const contextSnapshotId = buildContextSnapshotId(input);
 
       try {
-        const client =
-          input.openClawClient ??
-          (await createOpenClawClient(await loadOpenClawConfig()));
+        const client = input.openClawClient ?? requireOpenClawClient(
+          await resolveDefaultAiClient(),
+        ).providerClient;
+        if (!client) {
+          throw new Error("Default OpenClaw client is required");
+        }
         const featureSpec = buildNodeExecutionFeatureSpec({
           graphId: input.plan.graphId,
           nodeId: node.id,
