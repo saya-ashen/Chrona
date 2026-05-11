@@ -51,8 +51,8 @@ bun run lint && bun run typecheck && bun run test
 
 位于 `packages/engine/src/modules/` 内各子模块的 `__tests__/` 目录，覆盖：
 
-- **命令（commands）** — create-task、update-task、generate-task-plan 等 CQRS 写操作
-- **查询（queries）** — get-work-page、get-schedule-page 等读模型
+- **服务（services）** — create-task、update-task、generate-task-plan 等 CQRS 写操作
+- **页面模块（pages）** — get-work-page、get-schedule-page 等读模型
 - **投影（projections）** — 事件溯源投影重建逻辑
 - **运行时同步（runtime-sync）** — 计划节点状态同步、父子计划一致性
 - **AI 模块** — 计划生成、冲突检测、时间槽建议、自动化建议
@@ -79,9 +79,8 @@ App (Hono)
         ├── GET  /tasks/:taskId
         ├── PATCH /tasks/:taskId
         ├── DELETE /tasks/:taskId
-        ├── GET  /tasks/:taskId/plan-state
-        ├── POST /ai/task-plan/accept
-        ├── POST /ai/batch-apply-plan
+        ├── GET  /tasks/:taskId/plan
+        ├── POST /tasks/:taskId/plan/accept
         ├── POST /tasks/:taskId/schedule/proposals
         └── POST /schedule/proposals/decision
 ```

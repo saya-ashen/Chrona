@@ -1,6 +1,6 @@
 # Chrona Roadmap
 
-> **Current version:** 0.1.2
+> **Current version:** 0.1.4
 > **Status:** Phase 1 — Scheduling Cockpit
 
 ---
@@ -34,7 +34,7 @@ The long-term goal: make the schedule not just a passive calendar, but the **con
 
 | Capability | Status |
 |-----------|--------|
-| Smart task suggestions from partial text (auto-complete) | ✅ Shipped |
+| Smart task suggestions from partial text (suggest) | ✅ Shipped |
 | AI task plan generation with streaming SSE | ✅ Shipped |
 | Editable plan graph (nodes, edges, dependencies) | ✅ Shipped |
 | Accept/dismiss flow for AI-generated plans | ✅ Shipped |

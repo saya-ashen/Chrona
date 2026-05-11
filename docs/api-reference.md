@@ -1,754 +1,466 @@
-# API Reference
+# Chrona API Reference
 
-> **Base URL:** `http://localhost:3101/api`
-> **Content-Type:** `application/json`
-> **Auth:** optional `Authorization: Bearer <token>` header (set via `API_KEY` env var)
-> **Streaming:** endpoints marked with ⚡ return SSE when `Accept: text/event-stream` is set
+Base URL: `http://localhost:3101/api`
 
----
-
-## Table of Contents
-
-1. [Conventions](#conventions)
-2. [Health](#health)
-3. [Tasks](#tasks)
-4. [Runs & Execution](#runs--execution)
-5. [Task Plans](#task-plans)
-6. [Schedule](#schedule)
-7. [Approvals](#approvals)
-8. [Memory](#memory)
-9. [Workspaces](#workspaces)
-10. [Projections](#projections)
-11. [AI Features](#ai-features)
-12. [Assistant Messages](#assistant-messages)
-13. [Error Codes](#error-codes)
-
----
-
-## Conventions
-
-### Authentication
-
-No authentication is required by default. Set `API_KEY` in your environment or `~/.config/chrona/.env` to enforce Bearer token auth on all endpoints.
-
-```bash
-curl -H "Authorization: Bearer $API_KEY" http://localhost:3101/api/tasks
-```
-
-### Response Envelope
-
-Successful responses return data directly or in a wrapper:
-
-```json
-// List endpoints
-{ "tasks": [...], "count": 15 }
-
-// Detail endpoints
-{ "id": "cm...", "title": "...", ... }
-
-// Action endpoints
-{ "success": true, "taskId": "cm..." }
-```
-
-### Error Format
-
-```json
-{ "error": "Human-readable description", "code": "ERROR_CODE" }
-```
-
-### Dates
-
-All timestamps use ISO 8601 format: `2025-01-15T14:00:00Z`.
-
----
+- **Content-Type:** `application/json`
+- **Auth:** Optional `Authorization: Bearer <token>` (when `API_KEY` env var is set)
+- **Response envelope:** List endpoints return `{ tasks: [], count: N }`, detail endpoints return the object directly, action endpoints return `{ success: true, ... }`.
+- **Dates:** ISO 8601
 
 ## Health
 
-```bash
-GET /api/health
+### `GET /api/health`
+
+```sh
+curl http://localhost:3101/api/health
 ```
 
-**Response `200`**
-
-```json
-{ "status": "ok" }
-```
-
----
+Response: `{ "status": "ok" }`
 
 ## Tasks
 
-### List Tasks
+### `GET /api/tasks`
 
-```bash
-GET /api/tasks?workspaceId=default&status=Ready&limit=20
+List tasks.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `workspaceId` | string | Yes | |
+| `status` | string | No | Filter by status |
+| `limit` | number | No | |
+
+```sh
+curl "http://localhost:3101/api/tasks?workspaceId=ws_abc"
 ```
 
-| Param | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `workspaceId` | string | ✅ | — | Workspace ID |
-| `status` | TaskStatus | — | all | Filter by status |
-| `limit` | number | — | 50 (max 200) | Result count |
+Response: `{ tasks: Task[], count: number }`
 
-```json
-// Response 200
-{
-  "tasks": [
-    {
-      "id": "cm_abc123",
-      "workspaceId": "default",
-      "title": "Analyze user data",
-      "status": "Ready",
-      "priority": "High",
-      "scheduledStartAt": null,
-      "scheduledEndAt": null
-    }
-  ],
-  "count": 1
-}
-```
+### `POST /api/tasks`
 
-### Create Task
-
-```bash
-POST /api/tasks
-Content-Type: application/json
-
-{
-  "workspaceId": "default",
-  "title": "Analyze user behavior data",
-  "description": "Analyze 30 days of data using Python",
-  "priority": "High",
-  "dueAt": "2025-01-20T00:00:00Z",
-  "runtimeAdapterKey": "openclaw",
-  "runtimeModel": "gpt-4o",
-  "prompt": "Analyze user behavior data and generate a report",
-  "runtimeConfig": "{\"maxTokens\": 4096}"
-}
-```
-
-```bash
-# Minimal create
-curl -s http://localhost:3101/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"workspaceId": "default", "title": "Quick task"}'
-```
+Create a task.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `workspaceId` | string | ✅ | Workspace ID |
-| `title` | string | ✅ | Task title |
-| `description` | string | — | Description |
-| `priority` | `Low\|Medium\|High\|Urgent` | — | Priority (default: `Medium`) |
-| `dueAt` | ISO datetime | — | Due date |
-| `runtimeAdapterKey` | string | — | Runtime adapter (e.g. `openclaw`) |
-| `runtimeInput` | string (JSON) | — | Runtime input data |
-| `runtimeInputVersion` | string | — | Input version tag |
-| `runtimeModel` | string | — | AI model name |
-| `prompt` | string | — | Execution prompt for the agent |
-| `runtimeConfig` | string (JSON) | — | Additional runtime config |
+| `workspaceId` | string | Yes | |
+| `title` | string | Yes | |
+| `description` | string | No | |
+| `priority` | `"Low" \| "Medium" \| "High" \| "Urgent"` | No | Default `"Medium"` |
+| `executionRuntime` | string (`EXECUTION_RUNTIMES`) | No | e.g. `"openclaw"` |
+| `executionConfig` | `Record<string, unknown>` | No | Runtime-specific configuration |
+| `parentTaskId` | string \| null | No | Parent for subtask nesting |
 
-**Response `201`** — Created task object.
-
-### Get Task Detail (full page data)
-
-```bash
-GET /api/tasks/:taskId/detail
+```sh
+curl -X POST http://localhost:3101/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"ws_abc","title":"Deploy service","priority":"High"}'
 ```
 
-Returns complete task page payload: task data, plan graph, subtasks, runs, projection, and related workspace info.
+Response: `201 Created`
 
-### Update Task
+### `GET /api/tasks/:taskId`
 
-```bash
-PATCH /api/tasks/:taskId
-Content-Type: application/json
+Get full task detail page data.
 
-{ "title": "Updated title", "priority": "Urgent" }
+```sh
+curl http://localhost:3101/api/tasks/task_xyz
 ```
 
-All create fields are accepted; any field not provided is left unchanged (partial update).
+### `PATCH /api/tasks/:taskId`
 
-### Delete Task
+Partial update.
 
-```bash
-DELETE /api/tasks/:taskId
+```sh
+curl -X PATCH http://localhost:3101/api/tasks/task_xyz \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Updated title","priority":"Urgent"}'
 ```
 
-Cascading delete — removes task, subtasks, all runs, sessions, approvals, artifacts, events, projections, and conversation history.
+### `DELETE /api/tasks/:taskId`
+
+Cascade-delete a task.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `workspaceId` | string | Yes | |
+
+```sh
+curl -X DELETE "http://localhost:3101/api/tasks/task_xyz?workspaceId=ws_abc"
+```
+
+## Task Execution
+
+### `POST /api/tasks/:taskId/execution/actions`
+
+Dispatch an execution action. Body validated against `executionActionBodySchema`.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/execution/actions \
+  -H "Content-Type: application/json" \
+  -d '{"action":"start"}'
+```
+
+## Task Lifecycle
+
+### `POST /api/tasks/:taskId/complete`
+
+Mark a task as done.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/complete
+```
+
+### `POST /api/tasks/:taskId/reopen`
+
+Reopen a completed task.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/reopen
+```
+
+## Task Result
+
+### `POST /api/tasks/:taskId/result/accept`
+
+Accept a task result.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/result/accept
+```
+
+## Task Plan
+
+### `POST /api/tasks/:taskId/plan/generations`
+
+Generate a plan via SSE streaming.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `forceRefresh` | boolean | No | Bypass cache |
+| `planningPrompt` | string | No | Custom prompt override |
+
+For streaming, set `Accept: text/event-stream`. Without it, falls back to JSON.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/plan/generations \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"forceRefresh":true}'
+```
+
+#### SSE Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `status` | `{ phase: string, message: string }` | Progress update |
+| `tool_call` | `{ tool: string, callId?: string, input?: object }` | AI tool invocation |
+| `partial` | `{ text: string }` | Streaming text fragment |
+| `result` | `{ plan: PlanBlueprint }` | Completed plan graph |
+| `done` | `{ text: string }` | Stream finished successfully |
+| `error` | `{ code: string, message: string, rawText?: string }` | Error during generation |
+
+### `POST /api/tasks/:taskId/plan/generations/stop`
+
+Stop an in-flight plan generation.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/plan/generations/stop
+```
+
+### `POST /api/tasks/:taskId/plan`
+
+Edit a plan with patch operations (passthrough schema — allows extra fields).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `operation` | string | Top-level operation |
+| `operations` | string[] | Batch operations |
+| `nodes` | Record[] | Plan nodes |
+| `edges` | Record[] | Plan edges |
+| `nodePatches` | `{ id: string }[]` | Targeted node updates |
+| `deletedNodeIds` | string[] | Nodes to remove |
+| `reorder` | string[] | New ordering |
+| `summary` | string | Text summary |
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/plan \
+  -H "Content-Type: application/json" \
+  -d '{"operation":"add_node","nodes":[{"type":"task","title":"New step"}]}'
+```
+
+#### Plan Types
+
+- **PlanBlueprint** — AI-generated plan with nodes (`task`, `checkpoint`, `condition`, `wait`) and edges.
+- **EditablePlan** — User-editable plan with version tracking.
+- **PlanPatch** — Operations: `add_node`, `delete_node`, `update_node`, `update_dependencies`.
+
+## Task Schedule
+
+### `PUT /api/tasks/:taskId/schedule`
+
+Apply a schedule to a task.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scheduledStartAt` | ISO 8601 | Yes | |
+| `scheduledEndAt` | ISO 8601 | Yes | |
+| `dueAt` | ISO 8601 | No | |
+| `scheduleSource` | `"human" \| "ai" \| "system"` | No | Origin of schedule |
+
+```sh
+curl -X PUT http://localhost:3101/api/tasks/task_xyz/schedule \
+  -H "Content-Type: application/json" \
+  -d '{"scheduledStartAt":"2026-05-10T09:00:00Z","scheduledEndAt":"2026-05-10T11:00:00Z"}'
+```
+
+### `DELETE /api/tasks/:taskId/schedule`
+
+Clear a task's schedule.
+
+```sh
+curl -X DELETE http://localhost:3101/api/tasks/task_xyz/schedule
+```
+
+### `POST /api/tasks/:taskId/schedule/proposals`
+
+Create an AI-generated schedule proposal for a task.
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/task_xyz/schedule/proposals
+```
+
+### `POST /api/tasks/schedule-proposals/decision`
+
+Accept or reject a schedule proposal.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `proposalId` | string | Yes | |
+| `decision` | `"Accepted" \| "Rejected"` | Yes | |
+| `workspaceId` | string | No | |
+| `resolutionNote` | string | No | |
+
+```sh
+curl -X POST http://localhost:3101/api/tasks/schedule-proposals/decision \
+  -H "Content-Type: application/json" \
+  -d '{"proposalId":"prop_123","decision":"Accepted"}'
+```
+
+## Pages
+
+Pre-computed page data endpoints. Each requires `workspaceId` query param.
+
+### `GET /api/schedule`
+
+Schedule page data.
+
+```sh
+curl "http://localhost:3101/api/schedule?workspaceId=ws_abc"
+```
+
+### `GET /api/inbox`
+
+Inbox page data.
+
+```sh
+curl "http://localhost:3101/api/inbox?workspaceId=ws_abc"
+```
+
+### `GET /api/memory`
+
+Memory page data.
+
+```sh
+curl "http://localhost:3101/api/memory?workspaceId=ws_abc"
+```
+
+### `GET /api/work/:taskId`
+
+Work page data for a specific task.
+
+```sh
+curl "http://localhost:3101/api/work/task_xyz"
+```
+
+## Workspaces
+
+### `GET /api/workspaces/default`
+
+Get the default workspace.
+
+```sh
+curl http://localhost:3101/api/workspaces/default
+```
+
+### `GET /api/workspaces`
+
+List all workspaces.
+
+```sh
+curl http://localhost:3101/api/workspaces
+```
+
+### `GET /api/workspaces/:workspaceId/overview`
+
+Workspace overview (stats, counts, recent activity).
+
+```sh
+curl http://localhost:3101/api/workspaces/ws_abc/overview
+```
+
+## AI Clients
+
+### `GET /api/ai/clients`
+
+List all AI clients.
+
+```sh
+curl http://localhost:3101/api/ai/clients
+```
+
+Response:
 
 ```json
-// Response 200
-{ "success": true, "taskId": "cm_abc123" }
-```
-
----
-
-## Runs & Execution
-
-### Start Run
-
-```bash
-POST /api/tasks/:taskId/run
-Content-Type: application/json
-
-{ "prompt": "Override the default execution prompt" }
-```
-
-Launches an AI agent run on the task using its configured runtime adapter.
-
-### Retry Run
-
-```bash
-POST /api/tasks/:taskId/retry
-Content-Type: application/json
-
-{ "prompt": "Retry with this prompt" }
-```
-
-Retries the most recent failed or completed run.
-
-### Provide Mid-Run Input
-
-```bash
-POST /api/tasks/:taskId/input
-Content-Type: application/json
-
-{ "inputText": "The answer is 42", "runId": "cm_run123" }
-```
-
-Sends input to the agent while it's waiting. If `runId` is omitted, the latest `WaitingForInput` run is auto-selected.
-
-### Send Message During Run
-
-```bash
-POST /api/tasks/:taskId/message
-Content-Type: application/json
-
-{ "message": "Add a visualization section", "runId": "cm_run123" }
-```
-
-Sends an operator message to the running agent.
-
-### Mark Task Done
-
-```bash
-POST /api/tasks/:taskId/done
-```
-
-Closes a completed task.
-
-### Reopen Task
-
-```bash
-POST /api/tasks/:taskId/reopen
-```
-
-Reopens a done or cancelled task.
-
-### Accept Task Result
-
-```bash
-POST /api/tasks/:taskId/result/accept
-```
-
-Accepts the final delivery of a completed run.
-
-### Create Follow-Up Task
-
-```bash
-POST /api/tasks/:taskId/follow-up
-Content-Type: application/json
-
-{ "title": "Follow-up analysis", "priority": "Medium", "dueAt": "2025-01-25T00:00:00Z" }
-```
-
-Creates a new task linked to the current one as a follow-up.
-
----
-
-## Task Plans
-
-### Get Plan State
-
-```bash
-GET /api/tasks/:taskId/plan-state
-```
-
-```json
-// Response 200
 {
-  "taskId": "cm_abc123",
-  "aiPlanGenerationStatus": "accepted",
-  "savedAiPlan": {
-    "id": "graph_xyz",
-    "status": "accepted",
-    "plan": {
-      "nodes": [
-        { "id": "n1", "type": "step", "title": "Collect data", "executionMode": "auto", "status": "pending", "order": 0 },
-        { "id": "n2", "type": "step", "title": "Analyze trends", "executionMode": "auto", "status": "pending", "order": 1 }
-      ],
-      "edges": [
-        { "id": "e1", "fromNodeId": "n1", "toNodeId": "n2", "type": "sequential" }
-      ]
+  "clients": [
+    {
+      "id": "client_1",
+      "name": "OpenClaw",
+      "type": "openclaw",
+      "config": {},
+      "isDefault": true,
+      "enabled": true,
+      "bindings": ["suggest", "generate_plan"],
+      "createdAt": "2026-01-01T00:00:00Z"
     }
-  }
-}
-```
-
-`aiPlanGenerationStatus`: `idle` | `generating` | `waiting_acceptance` | `accepted`
-
-### Edit Plan (patch operations)
-
-```bash
-POST /api/tasks/:taskId/plan
-Content-Type: application/json
-
-{
-  "operation": "add_node",
-  "nodes": [
-    { "id": "n3", "type": "checkpoint", "title": "Validate results", "executionMode": "manual" }
-  ],
-  "edges": [
-    { "fromNodeId": "n2", "toNodeId": "n3", "type": "sequential" }
   ]
 }
 ```
 
-| Operation | Payload | Effect |
-|-----------|---------|--------|
-| `add_node` | `nodes[]`, `edges[]` | Add nodes with optional connecting edges |
-| `update_node` | `nodePatches[]` | Update node fields (title, objective, status, executionMode) |
-| `delete_node` | `deletedNodeIds[]` | Remove nodes (connected edges auto-cleaned) |
-| `update_dependencies` | `edges[]` | Add or replace edges between nodes |
-| `reorder_nodes` | `reorder[]` | Change node display sequence |
-| `update_plan_summary` | `summary` | Update plan-level summary text |
+### `POST /api/ai/clients`
 
-### Materialize Plan
-
-```bash
-POST /api/ai/batch-apply-plan
-Content-Type: application/json
-
-{ "taskId": "cm_abc123", "nodes": [...], "edges": [...] }
-```
-
-Converts plan nodes into real child tasks. If nodes/edges are omitted, the latest saved plan is used.
-
-### Accept AI-Generated Plan
-
-```bash
-POST /api/ai/task-plan/accept
-Content-Type: application/json
-
-{ "taskId": "cm_abc123", "planId": "graph_xyz" }
-```
-
-Promotes a draft AI plan to accepted status.
-
----
-
-## Schedule
-
-### Apply Schedule
-
-```bash
-POST /api/tasks/:taskId/schedule
-Content-Type: application/json
-
-{
-  "scheduledStartAt": "2025-01-15T14:00:00Z",
-  "scheduledEndAt": "2025-01-15T15:00:00Z",
-  "dueAt": "2025-01-20T00:00:00Z",
-  "scheduleSource": "human"
-}
-```
-
-Sets or updates a task's time window.
-
-### Clear Schedule
-
-```bash
-DELETE /api/tasks/:taskId/schedule
-```
-
-Removes the schedule from a task (back to `Unscheduled`).
-
-### Create Schedule Proposal
-
-```bash
-POST /api/tasks/:taskId/schedule/proposals
-Content-Type: application/json
-
-{
-  "source": "ai",
-  "proposedBy": "scheduler",
-  "summary": "Move to afternoon for better focus time",
-  "scheduledStartAt": "2025-01-15T15:00:00Z",
-  "scheduledEndAt": "2025-01-15T16:00:00Z",
-  "dueAt": "2025-01-20T00:00:00Z"
-}
-```
-
-### Resolve Schedule Proposal
-
-```bash
-POST /api/schedule/proposals/decision
-Content-Type: application/json
-
-{ "proposalId": "sp_xyz", "decision": "Accepted", "resolutionNote": "Looks good" }
-```
-
----
-
-## Approvals
-
-### Resolve Approval
-
-```bash
-POST /api/approvals/:approvalId/resolve
-```
-
-```json
-{
-  "decision": "Approved",
-  "resolutionNote": "Proceed with the suggested changes",
-  "editedContent": null
-}
-```
+Create an AI client.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `decision` | `Approved\|Rejected\|EditedAndApproved` | ✅ | Decision |
-| `resolutionNote` | string | — | Optional note |
-| `editedContent` | string | — | Edited content (for `EditedAndApproved`) |
+| `name` | string | Yes | |
+| `type` | `"openclaw" \| "llm"` | Yes | |
+| `config` | Record | Yes | Provider-specific configuration |
+| `isDefault` | boolean | No | |
 
----
-
-## Memory
-
-### Invalidate Memory
-
-```bash
-POST /api/memories/:memoryId/invalidate
-```
-
-Marks a memory entry as invalid.
-
----
-
-## Workspaces
-
-### Get Default Workspace
-
-```bash
-GET /api/workspaces/default
-```
-
-### List Workspaces
-
-```bash
-GET /api/workspaces
-```
-
-### Get Workspace Overview
-
-```bash
-GET /api/workspaces/:workspaceId/overview
-```
-
-Returns tasks grouped by status, counts, and workspace metadata.
-
----
-
-## Projections
-
-Materialized views for UI pages — each returns pre-computed page data.
-
-```bash
-GET /api/schedule/projection?workspaceId=default               # SchedulePageData
-GET /api/inbox/projection?workspaceId=default                  # InboxPageData
-GET /api/memory/projection?workspaceId=default                 # MemoryPageData
-GET /api/work/:taskId/projection                               # WorkPageData
-```
-
-| Projection | Contents |
-|------------|----------|
-| **Schedule** | Scheduled/unscheduled/at-risk tasks, conflict analysis, automation candidates, focus zones |
-| **Inbox** | Pending approvals, schedule proposals, AI suggestions |
-| **Memory** | Memory entries grouped by scope and status |
-| **Work** | Task details, all runs, plan graph, conversation entries, artifacts |
-
----
-
-## AI Features
-
-### AI Clients CRUD
-
-```bash
-GET    /api/ai/clients                           # List all clients
-POST   /api/ai/clients                           # Create client
-PATCH  /api/ai/clients/:clientId                 # Update client
-DELETE /api/ai/clients/:clientId                 # Delete client
-```
-
-```bash
-# Create an LLM client
-curl -s http://localhost:3101/api/ai/clients \
+```sh
+curl -X POST http://localhost:3101/api/ai/clients \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Claude",
-    "type": "llm",
-    "config": {
-      "apiKey": "sk-...",
-      "baseUrl": "https://api.openai.com/v1",
-      "model": "claude-sonnet-4-20250514"
-    },
-    "isDefault": true
-  }'
+  -d '{"name":"GPT-4","type":"llm","config":{"apiKey":"sk-..."}}'
 ```
 
-```bash
-# Create an OpenClaw client
-curl -s http://localhost:3101/api/ai/clients \
+Response: `201 Created`
+
+### `PATCH /api/ai/clients/:clientId`
+
+Update an AI client (partial).
+
+| Field | Type | Required |
+|-------|------|----------|
+| `name` | string | No |
+| `config` | Record | No |
+| `isDefault` | boolean | No |
+| `enabled` | boolean | No |
+
+```sh
+curl -X PATCH http://localhost:3101/api/ai/clients/client_1 \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "OpenClaw Gateway",
-    "type": "openclaw",
-    "config": {
-      "gatewayUrl": "http://localhost:18789",
-      "gatewayToken": "your-token"
-    }
-  }'
+  -d '{"enabled":false}'
 ```
 
-### Test AI Client Connectivity
+### `DELETE /api/ai/clients/:clientId`
 
-```bash
-POST /api/ai/clients/test
-Content-Type: application/json
+Delete an AI client.
 
-{ "type": "openclaw", "config": { "gatewayUrl": "http://localhost:18789", "gatewayToken": "..." } }
+```sh
+curl -X DELETE http://localhost:3101/api/ai/clients/client_1
 ```
 
-```json
-// Response 200
-{ "ok": true, "available": true, "reason": "Gateway is reachable" }
-```
+### `POST /api/ai/clients/test`
 
-### Feature Bindings
-
-```bash
-PUT /api/ai/clients/:clientId/bindings         # Set bindings
-```
-
-```json
-{ "features": ["suggest", "generate_plan", "conflicts", "timeslots", "chat"] }
-```
-
-Each feature can be bound to exactly one client. Features:
-
-| Feature | What it powers |
-|---------|---------------|
-| `suggest` | Task suggestions, auto-complete |
-| `generate_plan` | AI plan generation (streaming) |
-| `decompose` | Task decomposition into subtasks |
-| `conflicts` | Schedule conflict analysis |
-| `timeslots` | AI timeslot recommendations |
-| `chat` | Task workspace assistant chat |
-
-### ⚡ Generate Task Plan
-
-```bash
-POST /api/ai/generate-task-plan
-Content-Type: application/json
-Accept: text/event-stream
-```
-
-```bash
-# Task mode — generate plan for existing task
-curl -N http://localhost:3101/api/ai/generate-task-plan \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"taskId": "cm_abc123"}'
-
-# Adhoc mode — generate plan from free text
-curl -N http://localhost:3101/api/ai/generate-task-plan \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"title": "Prepare quarterly report", "description": "Includes sales, ops, financial", "estimatedMinutes": 120}'
-```
+Test connectivity to an AI provider.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `taskId` | string | task mode | Existing task ID |
-| `title` | string | adhoc mode | Task title |
-| `description` | string | — | Task description |
-| `estimatedMinutes` | number | — | Time estimate |
-| `planningPrompt` | string | — | Custom prompt override |
-| `forceRefresh` | boolean | — | Regenerate even if plan exists |
+| `type` | `"openclaw" \| "llm"` | Yes | |
+| `config` | Record | Yes | |
 
-**SSE events:** `status` · `tool_call` · `tool_result` · `partial` · `result` · `error` · `done`
-
-```json
-// Non-streaming response 200
-{
-  "source": "openclaw",
-  "planGraph": {
-    "nodes": [...],
-    "edges": [...],
-    "status": "draft",
-    "summary": "4-step plan for data analysis"
-  },
-  "savedPlan": { "id": "graph_xyz", "status": "draft" },
-  "reasoning": "This task breaks down into..."
-}
-```
-
-### Stop Plan Generation
-
-```bash
-POST /api/ai/generate-task-plan/stop
-Content-Type: application/json
-
-{ "taskId": "cm_abc123" }
-```
-
-### ⚡ Auto-Complete
-
-```bash
-POST /api/ai/auto-complete
-Content-Type: application/json
-Accept: text/event-stream
-
-{ "title": "Analyze", "workspaceId": "default" }
-```
-
-Streams task completion suggestions from partial input. Falls back to keyword rule engine when AI is unavailable.
-
-### ⚡ Task Workspace Chat
-
-```bash
-POST /api/ai/task-workspace/chat
-Content-Type: application/json
-
-{
-  "taskId": "cm_abc123",
-  "message": "Add a code review step after the design phase",
-  "currentTask": { ... },
-  "currentPlan": { ... },
-  "history": []
-}
-```
-
-Conversational AI assistant for modifying task plans. Returns proposals that the user can accept to update the plan.
-
----
-
-## Assistant Messages
-
-Persistent chat history in the task workspace, with proposal tracking:
-
-```bash
-GET    /api/tasks/:taskId/assistant/messages                        # List messages
-POST   /api/tasks/:taskId/assistant/messages                        # Save message
-PATCH  /api/tasks/:taskId/assistant/messages/:messageId/apply       # Mark proposal applied
-```
-
-```bash
-# Save a user message
-curl -s http://localhost:3101/api/tasks/cm_abc123/assistant/messages \
+```sh
+curl -X POST http://localhost:3101/api/ai/clients/test \
   -H "Content-Type: application/json" \
-  -d '{"role": "user", "content": "Can you review the plan?"}'
+  -d '{"type":"llm","config":{"apiKey":"sk-..."}}'
 ```
 
-```bash
-# Apply an AI proposal
-curl -s -X PATCH http://localhost:3101/api/tasks/cm_abc123/assistant/messages/msg_1/apply \
-  -H "Content-Type: application/json"
-```
+Response: `{ ok: boolean, available: boolean, reason?: string }`
 
-```json
-// POST body
-{
-  "role": "user",
-  "content": "Add a review step",
-  "proposal": {
-    "type": "plan_update",
-    "nodes": [...],
-    "edges": [...]
-  }
-}
-```
+### `PUT /api/ai/clients/:clientId/bindings`
 
----
+Assign feature bindings to an AI client.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `features` | string[] | Yes | One or more of: `"suggest"`, `"generate_plan"`, `"conflicts"`, `"timeslots"`, `"chat"`, `"dispatch_task"` |
+
+```sh
+curl -X PUT http://localhost:3101/api/ai/clients/client_1/bindings \
+  -H "Content-Type: application/json" \
+  -d '{"features":["suggest","chat"]}'
+```
 
 ## Error Codes
 
 | Status | Code | Description |
 |--------|------|-------------|
-| 400 | `INVALID_PARAMS` | Missing or malformed request parameters |
+| 400 | `INVALID_PARAMS` | Missing or malformed parameters |
 | 404 | `NOT_FOUND` | Resource not found |
-| 409 | `STATE_CONFLICT` | Operation conflicts with current state (e.g. plan generation already in flight) |
-| 500 | `INTERNAL_ERROR` | Unhandled server error |
-| 503 | `AI_UNAVAILABLE` | AI backend unreachable or not configured |
+| 409 | `STATE_CONFLICT` | State conflict (task not in correct state for operation) |
+| 409 | `PLAN_GENERATION_IN_FLIGHT` | A plan generation is already running for this task |
+| 500 | `INTERNAL_ERROR` | Unexpected server error |
 
-### Example error response
+Error response body:
 
 ```json
 {
-  "error": "Plan generation is already in progress for this task",
-  "code": "STATE_CONFLICT"
+  "error": "human-readable description",
+  "code": "ERROR_CODE"
 }
 ```
 
----
+## Quick Reference
 
-## Quick Reference: All Endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
+| Method | Path | Description |
+|--------|------|-------------|
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/tasks` | List tasks |
 | `POST` | `/api/tasks` | Create task |
-| `GET` | `/api/tasks/:taskId/detail` | Get task detail (full page) |
+| `GET` | `/api/tasks/:taskId` | Get task detail |
 | `PATCH` | `/api/tasks/:taskId` | Update task |
-| `DELETE` | `/api/tasks/:taskId` | Delete task (cascade) |
-| `POST` | `/api/tasks/:taskId/run` | Start run |
-| `POST` | `/api/tasks/:taskId/retry` | Retry run |
-| `POST` | `/api/tasks/:taskId/input` | Provide mid-run input |
-| `POST` | `/api/tasks/:taskId/message` | Send message during run |
-| `POST` | `/api/tasks/:taskId/done` | Mark task done |
+| `DELETE` | `/api/tasks/:taskId` | Delete task |
+| `POST` | `/api/tasks/:taskId/execution/actions` | Dispatch execution action |
+| `POST` | `/api/tasks/:taskId/complete` | Mark task done |
 | `POST` | `/api/tasks/:taskId/reopen` | Reopen task |
-| `POST` | `/api/tasks/:taskId/result/accept` | Accept result |
-| `POST` | `/api/tasks/:taskId/follow-up` | Create follow-up |
-| `GET` | `/api/tasks/:taskId/plan-state` | Get plan state |
-| `POST` | `/api/tasks/:taskId/plan` | Edit plan (patch ops) |
-| `POST` | `/api/tasks/:taskId/schedule` | Apply schedule |
+| `POST` | `/api/tasks/:taskId/result/accept` | Accept task result |
+| `POST` | `/api/tasks/:taskId/plan/generations` | Generate plan (SSE) |
+| `POST` | `/api/tasks/:taskId/plan/generations/stop` | Stop plan generation |
+| `POST` | `/api/tasks/:taskId/plan` | Edit plan |
+| `PUT` | `/api/tasks/:taskId/schedule` | Set schedule |
 | `DELETE` | `/api/tasks/:taskId/schedule` | Clear schedule |
-| `POST` | `/api/tasks/:taskId/schedule/proposals` | Create schedule proposal |
-| `POST` | `/api/schedule/proposals/decision` | Resolve proposal |
-| `POST` | `/api/approvals/:id/resolve` | Resolve approval |
-| `POST` | `/api/memories/:id/invalidate` | Invalidate memory |
-| `GET` | `/api/workspaces/default` | Get default workspace |
+| `POST` | `/api/tasks/:taskId/schedule/proposals` | Propose schedule |
+| `POST` | `/api/tasks/schedule-proposals/decision` | Resolve schedule proposal |
+| `GET` | `/api/schedule` | Schedule page |
+| `GET` | `/api/inbox` | Inbox page |
+| `GET` | `/api/memory` | Memory page |
+| `GET` | `/api/work/:taskId` | Work page |
+| `GET` | `/api/workspaces/default` | Default workspace |
 | `GET` | `/api/workspaces` | List workspaces |
-| `GET` | `/api/workspaces/:id/overview` | Get workspace overview |
-| `GET` | `/api/schedule/projection` | Schedule page data |
-| `GET` | `/api/inbox/projection` | Inbox page data |
-| `GET` | `/api/memory/projection` | Memory page data |
-| `GET` | `/api/work/:taskId/projection` | Work page data |
+| `GET` | `/api/workspaces/:workspaceId/overview` | Workspace overview |
 | `GET` | `/api/ai/clients` | List AI clients |
 | `POST` | `/api/ai/clients` | Create AI client |
-| `PATCH` | `/api/ai/clients/:id` | Update AI client |
-| `DELETE` | `/api/ai/clients/:id` | Delete AI client |
-| `POST` | `/api/ai/clients/test` | Test AI client |
-| `PUT` | `/api/ai/clients/:id/bindings` | Set feature bindings |
-| `POST` | `/api/ai/generate-task-plan` | Generate plan ⚡ |
-| `POST` | `/api/ai/generate-task-plan/stop` | Stop plan generation |
-| `POST` | `/api/ai/task-plan/accept` | Accept plan |
-| `POST` | `/api/ai/batch-apply-plan` | Materialize plan |
-| `POST` | `/api/ai/auto-complete` | Auto-complete task |
-| `POST` | `/api/ai/task-workspace/chat` | Task workspace chat ⚡ |
-| `GET` | `/api/tasks/:taskId/assistant/messages` | List assistant messages |
-| `POST` | `/api/tasks/:taskId/assistant/messages` | Save assistant message |
-| `PATCH` | `/api/tasks/:taskId/assistant/messages/:msgId/apply` | Apply proposal |
+| `PATCH` | `/api/ai/clients/:clientId` | Update AI client |
+| `DELETE` | `/api/ai/clients/:clientId` | Delete AI client |
+| `POST` | `/api/ai/clients/test` | Test AI connectivity |
+| `PUT` | `/api/ai/clients/:clientId/bindings` | Set AI client feature bindings |

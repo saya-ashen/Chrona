@@ -16,26 +16,18 @@ Primary focus:
 
 ### 1. `packages/db` has boundary leakage
 
-`packages/db` currently exposes more than persistence concerns:
+~~**Status:** Resolved.~~ The following items have been relocated:
+- `logger.ts`, `utils.ts`, `http-client.ts`, `task-actions-client.ts` — moved out of `packages/db/src/`
 
-- Prisma generated client
-- browser-side HTTP client helpers
-- logger helpers
-- `cn` utility
-- task action client consumed by `apps/web`
-
-This makes `db` act like a mixed persistence + frontend utility package.
+Remaining leak: Prisma generated client is still re-exported via `index.ts`.
 
 ### 2. Duplicate implementations exist
 
-Confirmed duplicates or near-duplicates:
+~~**Status:** Partially resolved.~~ `packages/shared/src/modules/task-execution/` directory has been removed.
+Remaining duplicates or near-duplicates in `packages/engine/src/modules/task-execution/`:
+- `registry.ts`, `task-config.ts` remain (canonical location)
 
-- `packages/shared/src/modules/task-execution/task-config.ts`
-- `packages/engine/src/modules/task-execution/task-config.ts`
-- `packages/shared/src/modules/task-execution/registry.ts`
-- `packages/engine/src/modules/task-execution/registry.ts`
-- `apps/web/src/hooks/ai/logger.ts`
-- `packages/db/src/logger.ts`
+`apps/web/src/hooks/ai/logger.ts` has been removed.
 
 ### 3. Prisma generated types leak upward
 
@@ -70,20 +62,13 @@ This increases branching and mental overhead in active code.
 
 ### 6. Naming drift adds unnecessary confusion
 
-Docs and specs still frequently refer to `packages/runtime`, while code uses `packages/engine`.
+~~**Status:** Docs now consistently use `packages/engine`.~~ Previous references to `packages/runtime` in docs have been corrected.
 
 ### 7. Existing tooling already shows cleanup opportunities
 
-`knip` identified:
+~~**Status:** Partially resolved.~~ `@chrona/domain` unused dependency in `apps/server` has been removed.
 
-- unused dependency: `@chrona/domain` in `apps/server/package.json`
-- unused devDependencies: `@base-ui/react`, `date-fns`
-- unused export: `FEATURE_ENDPOINTS`
-
-`dependency-cruiser` identified circular-dependency warnings in:
-
-- `packages/providers/openclaw/src/runtime/*`
-- `packages/engine/src/modules/ai/*`
+Remaining `knip` findings should be re-checked against current state. `dependency-cruiser` circular-dependency findings in `packages/providers/openclaw/src/runtime/*` and `packages/engine/src/modules/ai/*` may still exist.
 
 ## Refactor Principles
 
@@ -112,16 +97,12 @@ Docs and specs still frequently refer to `packages/runtime`, while code uses `pa
 
 Move out of `packages/db`:
 
-- `logger.ts`
-- `utils.ts`
-- `http-client.ts`
-- `task-actions-client.ts`
+- ~~logger.ts~~ ✓
+- ~~utils.ts~~ ✓
+- ~~http-client.ts~~ ✓
+- ~~task-actions-client.ts~~ ✓
 
-Preferred destinations:
-
-- browser/API helpers -> `apps/web/src/lib` or a dedicated API client package
-- generic logger -> dedicated shared utility location
-- UI utility like `cn` -> `apps/web` or shared UI package
+These have already been relocated. Remaining: ensure no new frontend helpers creep back in.
 
 ### Stop exposing generated Prisma as a general public API
 
@@ -164,10 +145,10 @@ Goal: remove code and dependencies with minimal architecture change.
 
 Tasks:
 
-1. remove unused dependencies and exports reported by `knip`
-2. remove exact duplicate implementations after choosing canonical source
+1. remove unused dependencies and exports reported by `knip` (partial: `@chrona/domain` removed)
+2. remove exact duplicate implementations after choosing canonical source (partial: shared/ dupes removed)
 3. delete compatibility barrels that only re-export renamed locations where safe
-4. standardize naming in docs from `runtime` to `engine` or define one canonical term and update all docs/spec references
+4. standardize naming in docs from `runtime` to `engine` — now complete ✓
 
 Success criteria:
 
@@ -182,16 +163,16 @@ Goal: stop layer leakage between web, db, and engine.
 
 Tasks:
 
-1. move browser-only HTTP helpers out of `packages/db`
-2. move `cn` out of `packages/db`
-3. move logger to a neutral shared location or keep separate web/server loggers
-4. replace `apps/web` imports of `@chrona/db/*` with frontend-local or API-client imports
-5. reduce `@chrona/db` public exports to persistence-facing APIs only
+1. ~~move browser-only HTTP helpers out of `packages/db`~~ ✓
+2. ~~move `cn` out of `packages/db`~~ ✓
+3. ~~move logger to a neutral shared location or keep separate web/server loggers~~ ✓
+4. ~~replace `apps/web` imports of `@chrona/db/*` with frontend-local or API-client imports~~ ✓
+5. ~~reduce `@chrona/db` public exports to persistence-facing APIs only~~ ✓
 
 Success criteria:
 
-- `apps/web` no longer imports frontend helpers from `@chrona/db`
-- `packages/db` reads as a persistence package again
+- `apps/web` no longer imports frontend helpers from `@chrona/db` ✓
+- `packages/db` reads as a persistence package again ✓
 
 ### Phase 3 — Prisma type isolation
 

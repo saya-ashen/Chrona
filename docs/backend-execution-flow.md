@@ -2,15 +2,14 @@
 
 本文档描述 Chrona 后端从用户创建任务到计划执行完成的主流程。当前实现以 Hono route 作为 HTTP 入口，业务逻辑主要落在 `packages/engine/src/modules/*`，执行编排由 `packages/engine/src/modules/plan-execution/plan-runner.ts` 驱动。
 
-当前 `apps/server/src/routes/plans.routes.ts` 暴露的 plan 路由只有：
+当前 `apps/server/src/routes/tasks/plan.routes.ts` 暴露的 plan 路由为：
 
-- `GET /api/tasks/:taskId/plan/state`
-- `POST /api/tasks/:taskId/plan/accept`
-- `POST /api/tasks/:taskId/plan/generate/stop`
-- `POST /api/tasks/:taskId/plan/generate`
-- `POST /api/tasks/:taskId/plan`
+- `POST /api/tasks/:taskId/plan/generations` — SSE 流式生成计划
+- `POST /api/tasks/:taskId/plan/generations/stop` — 停止生成
+- `POST /api/tasks/:taskId/plan` — 编辑计划 (patch 操作)
 
-`/plan/materialize` 和 `/plan/mutations` 不是当前公开后端主流程的一部分。`materializeTaskPlan()` 仍是内部命令，会由 `progressAcceptedTaskPlan()` 在 accepted plan 自动推进 child tasks 时调用；它不应画成用户 HTTP 主链路。
+计划接受通过 `POST /api/tasks/:taskId/plan` 的 patch 操作完成，不再有独立的 `/plan/accept` 路由。
+`materializeTaskPlan()` 仍是内部命令，由 `progressAcceptedTaskPlan()` 调用。
 
 ## End-to-End Flow
 
@@ -24,7 +23,7 @@ flowchart TD
   C2 --> C3[rebuildTaskProjection]
   C3 --> T[任务创建完成<br/>status: Ready 或 Draft]
 
-  T --> G[POST /api/tasks/:taskId/plan/generate]
+  T --> G[POST /api/tasks/:taskId/plan/generations]
   G --> GR[createPlansRoutes]
   GR --> GS[generateTaskPlanManualStream]
   GS --> GS1[检查是否已有 Scheduled/Active 生成任务]
@@ -32,15 +31,15 @@ flowchart TD
   GS2 --> GS3[接收 generate_task_plan_graph tool payload]
   GS3 --> GS4[materializeGeneratedTaskPlan]
   GS4 --> GS5[保存 compiled plan / read model]
-  GS5 --> WP[等待用户接受计划<br/>plan status: waiting_acceptance]
+  GS5 --> WP[等待用户审查/编辑计划<br/>plan status: waiting_acceptance]
 
-  WP --> AC[POST /api/tasks/:taskId/plan/accept]
+  WP --> AC[POST /api/tasks/:taskId/plan<br/>操作: 接受计划]
   AC --> AR[createPlansRoutes]
   AR --> AR1[ensurePlanInWorkspace]
   AR1 --> AR2[更新 saved plan status: accepted]
   AR2 --> AP[accepted plan 可执行]
 
-  AP --> RUN[POST /api/tasks/:taskId/run]
+  AP --> RUN[POST /api/tasks/:taskId/execution/actions<br/>action: start_manual]
   RUN --> ER[createExecutionRoutes]
   ER --> DEA[dispatchExecutionAction<br/>action: start_manual]
   DEA --> SPE[startPlanExecution]
@@ -117,23 +116,23 @@ flowchart TD
 flowchart TD
   P[执行暂停] --> K{暂停原因}
 
-  K -- waiting_for_user --> IN[POST /api/tasks/:taskId/input]
+  K -- waiting_for_user --> IN[POST /api/tasks/:taskId/execution/actions<br/>action: resume_with_input]
   IN --> A1[dispatchExecutionAction<br/>resume_with_input]
   A1 --> C1[continuePlanExecution]
   C1 --> ADV[advancePlanExecution<br/>forcedNodeId = waiting node]
 
-  K -- blocked --> MSG[POST /api/tasks/:taskId/message]
-  MSG --> A2[dispatchExecutionAction<br/>resume_after_unblock]
+  K -- blocked --> ACT[POST /api/tasks/:taskId/execution/actions<br/>action: resume_after_unblock]
+  ACT --> A2[dispatchExecutionAction<br/>resume_after_unblock]
   A2 --> C2[continuePlanExecution]
   C2 --> ADV
 
-  K -- waiting_for_approval --> APR[POST /api/approvals/:approvalId/resolve]
-  APR --> RA[resolveApproval]
+  K -- waiting_for_approval --> APR[POST /api/tasks/:taskId/execution/actions<br/>action: resume_with_approval]
+  APR --> RA[handle approval decision]
   RA --> A3[dispatchExecutionAction<br/>resume_with_approval]
   A3 --> C3[continuePlanExecution]
   C3 --> ADV
 
-  K -- failed node --> RETRY[POST /api/tasks/:taskId/retry<br/>或 execution/actions retry_node]
+  K -- failed node --> RETRY[POST /api/tasks/:taskId/execution/actions<br/>action: retry_node]
   RETRY --> A4[dispatchExecutionAction]
   A4 --> R1[cancel active attempt]
   R1 --> R2[mark old node results obsolete]
@@ -161,7 +160,7 @@ createTasksRoutes -> createTask
 Task: Ready 或 Draft
   |
   v
-POST /api/tasks/:taskId/plan/generate
+POST /api/tasks/:taskId/plan/generations
   |
   v
 generateTaskPlanManualStream
@@ -175,13 +174,13 @@ generateTaskPlanManualStream
 Plan: waiting_acceptance
   |
   v
-POST /api/tasks/:taskId/plan/accept
+POST /api/tasks/:taskId/plan (接受计划 patch)
   |
   v
 Plan: accepted
   |
   v
-POST /api/tasks/:taskId/run
+POST /api/tasks/:taskId/execution/actions (start_manual)
   |
   v
 dispatchExecutionAction(start_manual)
@@ -237,13 +236,13 @@ completeExecution
 
 | Area | File | Role |
 |------|------|------|
-| Task routes | `apps/server/src/routes/tasks.routes.ts` | `POST /tasks` creates tasks and validates task payloads. |
-| Plan routes | `apps/server/src/routes/plans.routes.ts` | Current public plan endpoints: state, generate, generate stop, accept, and high-level patch via `POST /tasks/:taskId/plan`. |
-| Execution routes | `apps/server/src/routes/execution.routes.ts` | Run, retry, input, message, done, reopen, result accept, follow-up, and approval resolve endpoints. |
-| Task command | `packages/engine/src/modules/commands/create-task.ts` | Validates runtime settings, creates `Task`, rebuilds projection. |
-| Plan generation | `packages/engine/src/modules/commands/generate-task-plan-manual-stream.ts` | Streams AI plan generation and persists generated plans. |
-| Internal plan materialization | `packages/engine/src/modules/commands/materialize-task-plan.ts` | Internal command used by `progressAcceptedTaskPlan()` to convert accepted plan nodes into child tasks and dependencies. Not exposed as a current public route. |
-| Parent plan progression | `packages/engine/src/modules/commands/progress-accepted-task-plan.ts` | Syncs accepted parent plans after child run completion, materializes ready child tasks internally, and starts child execution with `trigger: "auto"`. |
+| Task routes | `apps/server/src/routes/tasks/crud.routes.ts` | `POST /tasks` creates tasks and validates task payloads. |
+| Plan routes | `apps/server/src/routes/tasks/plan.routes.ts` | Current public plan endpoints: generations (SSE), generations stop, and high-level patch via `POST /tasks/:taskId/plan`. |
+| Execution routes | `apps/server/src/routes/tasks/execution.routes.ts` | All execution actions via `POST /tasks/:taskId/execution/actions`. |
+| Task command | `packages/engine/src/modules/tasks/create-task.ts` | Validates runtime settings, creates `Task`, rebuilds projection. |
+| Plan generation | `packages/engine/src/modules/plan-execution/generate-task-plan.ts` | Streams AI plan generation and persists generated plans. |
+| Internal plan materialization | `packages/engine/src/modules/plans/materialize-task-plan.ts` | Internal command used by `progressAcceptedTaskPlan()` to convert accepted plan nodes into child tasks and dependencies. Not exposed as a public route. |
+| Parent plan progression | `packages/engine/src/modules/plans/progress-accepted-task-plan.ts` | Syncs accepted parent plans after child run completion, materializes ready child tasks internally, and starts child execution with `trigger: "auto"`. |
 | Runtime sync | `packages/engine/src/modules/runtime-sync/sync-run.ts` | Synchronizes provider run status and triggers parent accepted-plan progression when child runs complete. |
 | Plan execution | `packages/engine/src/modules/plan-execution/plan-runner.ts` | Owns `dispatchExecutionAction`, `startPlanExecution`, `continuePlanExecution`, `advancePlanExecution`, and `completeExecution`. |
 | Node execution | `packages/engine/src/modules/plan-execution/node-executor.ts` | Executes one effective plan node through runtime or child-session logic. |
@@ -253,9 +252,9 @@ completeExecution
 | Node result | Backend effect |
 |-------------|----------------|
 | `done` | Attempt succeeds, current node result is appended, `node_completed` event is written, loop continues. |
-| `waiting_for_user` | Runtime state persists and task pauses as `WaitingForInput`. Resume via `POST /api/tasks/:taskId/input`. |
-| `waiting_for_approval` | Runtime state persists and task pauses as `WaitingForApproval`. Resume through approval resolution. |
+| `waiting_for_user` | Runtime state persists and task pauses as `WaitingForInput`. Resume via `POST /api/tasks/:taskId/execution/actions` with `resume_with_input`. |
+| `waiting_for_approval` | Runtime state persists and task pauses as `WaitingForApproval`. Resume via `POST /api/tasks/:taskId/execution/actions` with `resume_with_approval`. |
 | `child_running` | Task pauses on external dependency while child session/run continues. |
-| `blocked` | Task pauses as `Blocked` with `blockReason`. Resume via message/unblock action. |
+| `blocked` | Task pauses as `Blocked` with `blockReason`. Resume via `POST /api/tasks/:taskId/execution/actions` with `resume_after_unblock`. |
 | `failed` | Task becomes `Failed`; execution session is abandoned. |
 | `replan_required` | Task pauses for approval/review with replan context. |
