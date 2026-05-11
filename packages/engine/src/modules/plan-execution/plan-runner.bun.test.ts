@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { dispatchExecutionAction } from "@/modules/plan-execution/plan-runner";
+import { taskPlanExecution } from "@/modules/plan-execution";
 import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
@@ -210,7 +210,7 @@ describe("plan-runner native execution actions", () => {
     const compiledPlan = makeSingleUserConditionPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const result = await dispatchExecutionAction({
+    const result = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual", prompt: "start" },
     });
@@ -253,13 +253,13 @@ describe("plan-runner native execution actions", () => {
     const compiledPlan = makeUserThenSystemConditionPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const initial = await dispatchExecutionAction({
+    const initial = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
     expect(initial.status).toBe("waiting_for_user");
 
-    const resumed = await dispatchExecutionAction({
+    const resumed = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "resume_with_input", inputText: "yes" },
     });
@@ -316,7 +316,7 @@ describe("plan-runner native execution actions", () => {
     const compiledPlan = makeSingleUserConditionPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    await dispatchExecutionAction({
+    await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -325,7 +325,7 @@ describe("plan-runner native execution actions", () => {
       orderBy: { createdAt: "desc" },
     });
 
-    const cancelled = await dispatchExecutionAction({
+    const cancelled = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "cancel_session",
@@ -356,7 +356,7 @@ describe("plan-runner native execution actions", () => {
     const compiledPlan = makeSingleBlockedConditionPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const initial = await dispatchExecutionAction({
+    const initial = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -368,7 +368,7 @@ describe("plan-runner native execution actions", () => {
       orderBy: { createdAt: "desc" },
     });
 
-    const retried = await dispatchExecutionAction({
+    const retried = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "retry_node",

@@ -64,7 +64,7 @@ function createProviderClient(record: AiClientRecord): EngineAiClient["providerC
   });
 }
 
-export async function refreshAiClientRegistry() {
+async function refreshAiClientRegistry() {
   const records = await db.aiClient.findMany({
     where: { enabled: true },
     orderBy: { createdAt: "asc" },
@@ -93,7 +93,7 @@ async function ensureAiClientRegistryLoaded() {
   }
 }
 
-export async function getAiClient(
+async function getAiClient(
   clientId?: string | null,
 ): Promise<EngineAiClient | null> {
   await ensureAiClientRegistryLoaded();
@@ -105,7 +105,7 @@ export async function getAiClient(
   return defaultClientId ? clients.get(defaultClientId) ?? null : null;
 }
 
-export function requireOpenClawClient(
+function requireOpenClawClient(
   client: EngineAiClient,
 ): EngineOpenClawClient {
   if (client.record.type !== "openclaw" || !client.providerClient) {
@@ -115,7 +115,7 @@ export function requireOpenClawClient(
   return client as EngineOpenClawClient;
 }
 
-export function requireLlmClient(client: EngineAiClient): EngineLlmClient {
+function requireLlmClient(client: EngineAiClient): EngineLlmClient {
   if (client.record.type !== "llm") {
     throw new AiClientError("LLM client is required", client.record.type, "internal");
   }
@@ -123,7 +123,31 @@ export function requireLlmClient(client: EngineAiClient): EngineLlmClient {
   return client as EngineLlmClient;
 }
 
-export async function listRegisteredAiClients(): Promise<AiClientRecord[]> {
+async function listRegisteredAiClients(): Promise<AiClientRecord[]> {
   await ensureAiClientRegistryLoaded();
   return [...clients.values()].map((client) => client.record);
 }
+
+export class AiClientRegistry {
+  refresh() {
+    return refreshAiClientRegistry();
+  }
+
+  get(clientId?: string | null) {
+    return getAiClient(clientId);
+  }
+
+  requireOpenClawClient(client: EngineAiClient) {
+    return requireOpenClawClient(client);
+  }
+
+  requireLlmClient(client: EngineAiClient) {
+    return requireLlmClient(client);
+  }
+
+  list() {
+    return listRegisteredAiClients();
+  }
+}
+
+export const aiClientRegistry = new AiClientRegistry();

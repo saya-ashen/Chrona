@@ -1,6 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getAiClient, requireOpenClawClient } from "@/modules/ai/runtime/client-registry";
+import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
 import {
   startRuntimeRun,
   type OpenClawResponseClient,
@@ -39,11 +39,11 @@ export type NodeAiCapabilityInput = {
 };
 
 async function resolveDefaultOpenClawClient() {
-  const client = await getAiClient();
+  const client = await aiClientRegistry.get();
   if (!client) {
     throw new Error("Default AI client is required");
   }
-  return requireOpenClawClient(client).providerClient;
+  return aiClientRegistry.requireOpenClawClient(client).providerClient;
 }
 
 function completedNodeTitles(plan: EffectivePlanGraph): string[] {

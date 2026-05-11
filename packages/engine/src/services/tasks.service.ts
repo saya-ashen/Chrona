@@ -1,52 +1,39 @@
-import { createTask } from "../modules/tasks/create-task";
-import { deleteTask } from "../modules/tasks/delete-task";
-import { updateTask } from "../modules/tasks/update-task";
-import { getTaskPage } from "../modules/tasks/get-task-page";
-import { ensureTaskInWorkspace } from "../modules/tasks/task-by-id";
-import { listTasksByWorkspace } from "../modules/tasks/list-tasks";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
+import { tasks } from "../modules/tasks";
 
 export function createTasksService() {
   return {
-    async create(input: Parameters<typeof createTask>[0]) {
+    async create(input: Parameters<typeof tasks.create>[0]) {
       try {
-        return await createTask(input);
+        return await tasks.create(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to create task");
       }
     },
-    async update(input: Parameters<typeof updateTask>[0] & { workspaceId?: string }) {
+    async update(input: Parameters<typeof tasks.update>[0]) {
       try {
-        if (input.workspaceId) {
-          await ensureTaskInWorkspace(input.taskId, input.workspaceId);
-        }
-
-        const { workspaceId: _workspaceId, ...taskInput } = input;
-        return await updateTask(taskInput);
+        return await tasks.update(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to update task");
       }
     },
     async delete(input: { taskId: string; workspaceId?: string }) {
       try {
-        if (input.workspaceId) {
-          await ensureTaskInWorkspace(input.taskId, input.workspaceId);
-        }
-        return await deleteTask(input.taskId);
+        return await tasks.delete(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to delete task");
       }
     },
     async getPage(input: { taskId: string }) {
       try {
-        return await getTaskPage(input.taskId);
+        return await tasks.getPage(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task");
       }
     },
-    async list(input: Parameters<typeof listTasksByWorkspace>[0]) {
+    async list(input: Parameters<typeof tasks.list>[0]) {
       try {
-        return await listTasksByWorkspace(input);
+        return await tasks.list(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to list tasks");
       }

@@ -50,8 +50,8 @@ async function syncRunForRead(runId: string, client?: OpenClawRuntimeSyncClient)
   });
 
   try {
-    const { syncRunFromRuntime } = await import("@/modules/runtime-sync/sync-run");
-    await syncRunFromRuntime({ runId, client });
+    const { runtimeSync } = await import("@/modules/runtime-sync");
+    await runtimeSync.syncRun({ runId, client });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Runtime sync failed";
     await markSyncDegraded(run, message);

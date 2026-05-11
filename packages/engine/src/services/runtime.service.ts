@@ -1,7 +1,7 @@
-import { startAutoStartScheduler } from "../modules/scheduling/auto-start-runner";
+import { taskScheduling } from "../modules/scheduling";
 
 export function createRuntimeService() {
   return {
-    startAutoStartScheduler,
+    startAutoStartScheduler: () => taskScheduling.startAutoStartScheduler(),
   };
 }

@@ -1,35 +1,32 @@
-import { applySchedule } from "../modules/scheduling/apply-schedule";
-import { clearSchedule } from "../modules/scheduling/clear-schedule";
-import { decideScheduleProposal } from "../modules/scheduling/decide-schedule-proposal";
-import { proposeSchedule } from "../modules/scheduling/propose-schedule";
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
+import { taskScheduling } from "../modules/scheduling";
 
 export function createTaskScheduleService() {
   return {
-    async apply(input: Parameters<typeof applySchedule>[0]) {
+    async apply(input: Parameters<typeof taskScheduling.apply>[0]) {
       try {
-        return await applySchedule(input);
+        return await taskScheduling.apply(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to apply schedule");
       }
     },
-    async clear(input: Parameters<typeof clearSchedule>[0]) {
+    async clear(input: Parameters<typeof taskScheduling.clear>[0]) {
       try {
-        return await clearSchedule(input);
+        return await taskScheduling.clear(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to clear schedule");
       }
     },
-    async propose(input: Parameters<typeof proposeSchedule>[0]) {
+    async propose(input: Parameters<typeof taskScheduling.propose>[0]) {
       try {
-        return await proposeSchedule(input);
+        return await taskScheduling.propose(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to propose schedule");
       }
     },
-    async decideProposal(input: Parameters<typeof decideScheduleProposal>[0]) {
+    async decideProposal(input: Parameters<typeof taskScheduling.decideProposal>[0]) {
       try {
-        return await decideScheduleProposal(input);
+        return await taskScheduling.decideProposal(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to decide schedule proposal");
       }

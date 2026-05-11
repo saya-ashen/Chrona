@@ -16,7 +16,7 @@ mock.module("@/modules/plan-execution/node-ai-capabilities", () => ({
   evaluateConditionNodeCapability: evaluateConditionNodeCapabilityMock,
 }));
 
-const { dispatchExecutionAction } = await import("@/modules/plan-execution/plan-runner");
+const { taskPlanExecution } = await import("@/modules/plan-execution");
 
 async function resetDb() {
   await db.taskAssistantMessage.deleteMany();
@@ -243,7 +243,7 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_waiting_for_approval");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const result = await dispatchExecutionAction({
+    const result = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -304,7 +304,7 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_failed_details");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const result = await dispatchExecutionAction({
+    const result = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -350,12 +350,12 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_resume_approval");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    await dispatchExecutionAction({
+    await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
 
-    const resumed = await dispatchExecutionAction({
+    const resumed = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "resume_with_approval",
@@ -408,12 +408,12 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_reject_approval");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    await dispatchExecutionAction({
+    await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
 
-    const rejected = await dispatchExecutionAction({
+    const rejected = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "resume_with_approval",
@@ -470,7 +470,7 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_replan_required");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const result = await dispatchExecutionAction({
+    const result = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -518,7 +518,7 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeFullExecutionPlan("graph_full_execution_chain");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    const initial = await dispatchExecutionAction({
+    const initial = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
@@ -528,7 +528,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(initial.executedNodeIds).toEqual(["prepare_task"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
-    const afterBranchSelection = await dispatchExecutionAction({
+    const afterBranchSelection = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "resume_with_input", inputText: "approve" },
     });
@@ -538,7 +538,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(afterBranchSelection.executedNodeIds).toEqual(["route_condition"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
-    const completed = await dispatchExecutionAction({
+    const completed = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "resume_with_approval",

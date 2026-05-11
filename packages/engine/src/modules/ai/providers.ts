@@ -11,7 +11,7 @@ import type {
 import { AiClientError } from "@chrona/contracts";
 import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type { EngineAiClient } from "./runtime/client-registry";
-import { requireLlmClient, requireOpenClawClient } from "./runtime/client-registry";
+import { aiClientRegistry } from "./runtime/client-registry";
 
 function getOpenClawGatewayUrl(config: OpenClawClientConfig): string | undefined {
   return typeof config.gatewayUrl === "string" && config.gatewayUrl
@@ -121,7 +121,7 @@ async function openclawFeaturePayload(
   client: EngineAiClient,
   request: OpenClawGatewayRequest,
 ): Promise<string> {
-  const openClawClient = requireOpenClawClient(client).providerClient;
+  const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
   const result = await openClawClient.create({
     request,
   });
@@ -282,7 +282,7 @@ async function openclawFeaturePayloadFull<T>(
   feature: AiFeature,
   request: OpenClawGatewayRequest,
 ): Promise<FeaturePayloadResult<T>> {
-  const openClawClient = requireOpenClawClient(client).providerClient;
+  const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
   const result = (await openClawClient.create({
     request,
   })).response as ProviderResponse;
@@ -347,7 +347,7 @@ export async function dispatch(
       }),
     });
   }
-  const llmClient = requireLlmClient(client);
+  const llmClient = aiClientRegistry.requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
   return llmCall(
     llmClient.record.config,
@@ -380,7 +380,7 @@ export async function dispatchFeaturePayload<T = unknown>(
     });
   }
 
-  const llmClient = requireLlmClient(client);
+  const llmClient = aiClientRegistry.requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
   const text = await llmCall(
     llmClient.record.config,
