@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { WandSparkles, X } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
-import type { TaskConfigFormDraft } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import { TaskWorkspaceAssistant } from "@/components/tasks/task-workspace-assistant";
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";

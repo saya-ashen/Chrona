@@ -1,4 +1,4 @@
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import type { EditableTask, TaskData } from "../task-workspace-types";
 
 export function taskToEditableTask(task: TaskData): EditableTask {

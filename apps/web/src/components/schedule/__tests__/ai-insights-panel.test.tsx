@@ -14,7 +14,7 @@ vi.mock("@/components/task/ai/task-plan-generation-panel", () => ({
   },
 }));
 
-import { AiInsightsPanel } from "@/components/schedule/ai-insights-panel";
+import { AiInsightsPanel } from "@/components/schedule/panels/ai-insights-panel";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
 const mockItem: ScheduledItem = {

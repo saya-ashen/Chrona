@@ -1,5 +1,5 @@
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
-import type { TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
+import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 type SchedulePageSummary = {

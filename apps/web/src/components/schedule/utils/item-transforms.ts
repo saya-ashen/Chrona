@@ -1,4 +1,4 @@
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import { DEFAULT_SCHEDULE_BLOCK_MINUTES } from "@/components/schedule/schedule-page-copy";
 import type {
   ListItem,

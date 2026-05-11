@@ -28,7 +28,7 @@ import {
   sortScheduledItems,
 } from "@/components/schedule/schedule-page-utils";
 import { api } from "@/lib/rpc-client";
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 
 export function getQuickCreateDefaults(data: SchedulePageData) {
   const selectedRuntime =

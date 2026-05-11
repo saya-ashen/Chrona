@@ -10,12 +10,12 @@ import {
   getPriorityTone,
   toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
-import { ScheduleEditorForm } from "@/components/schedule/schedule-editor-form";
+import { ScheduleEditorForm } from "@/components/schedule/forms/schedule-editor-form";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
-} from "@/components/schedule/task-config-form";
+} from "@/components/schedule/forms/task-config-form";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskContextLinks } from "@/components/task/shared/task-context-links";
 import type { ScheduleSlot } from "@chrona/contracts/ai";

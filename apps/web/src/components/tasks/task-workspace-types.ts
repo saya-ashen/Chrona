@@ -1,4 +1,4 @@
-import type { TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
+import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";

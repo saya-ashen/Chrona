@@ -9,7 +9,7 @@ import type { ScheduleViewMode } from "@/components/schedule/schedule-page-types
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import {
   SurfaceCard,
   SurfaceCardDescription,

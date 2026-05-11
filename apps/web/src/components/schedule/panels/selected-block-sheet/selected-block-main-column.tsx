@@ -11,7 +11,7 @@ import {
   type TaskConfigFormDraft,
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
-} from "@/components/schedule/task-config-form";
+} from "@/components/schedule/forms/task-config-form";
 import { TaskAiPlanPanel } from "@/components/task/panels/task-ai-plan-panel";
 import { TaskEditPanel } from "@/components/task/panels/task-edit-panel";
 import { buttonVariants } from "@/components/ui/button";

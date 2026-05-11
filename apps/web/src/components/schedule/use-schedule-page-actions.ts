@@ -19,7 +19,7 @@ import {
   runSchedulePageAction,
 } from "@/components/schedule/schedule-page-actions";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type { TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import { api } from "@/lib/rpc-client";
 
 type DraggedTask = {

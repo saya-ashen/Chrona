@@ -48,7 +48,7 @@ vi.mock("@/components/ui/surface-card", () => ({
 }));
 
 // Mock the schedule editor form
-vi.mock("@/components/schedule/schedule-editor-form", () => ({
+vi.mock("@/components/schedule/forms/schedule-editor-form", () => ({
   ScheduleEditorForm: () => <div data-testid="schedule-editor-form" />,
 }));
 
@@ -56,7 +56,7 @@ const taskConfigSubmitHandlers: Array<(input: unknown) => Promise<void> | void> 
 const taskConfigDraftStateHandlers: Array<(state: unknown) => void> = [];
 
 // Mock the task config form
-vi.mock("@/components/schedule/task-config-form", () => ({
+vi.mock("@/components/schedule/forms/task-config-form", () => ({
   TaskConfigForm: ({
     onSubmitAction,
     onDraftStateChange,
@@ -140,7 +140,7 @@ function createJsonResponse(body: unknown, status = 200) {
   };
 }
 
-import { SelectedBlockSheet } from "@/components/schedule/schedule-page-panels";
+import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
 import type { ScheduledItem, ScheduledAiTaskPlan } from "@/components/schedule/schedule-page-types";
 
 /* ------------------------------------------------------------------ */

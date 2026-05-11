@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TaskConfigDraftState, TaskConfigFormInput } from "@/components/schedule/task-config-form";
+import type { TaskConfigDraftState, TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import { api } from "@/lib/rpc-client";
 import {
   dateToIsoStringOrNull,

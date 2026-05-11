@@ -6,7 +6,7 @@ import {
   TaskConfigForm,
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
-} from "@/components/schedule/task-config-form";
+} from "@/components/schedule/forms/task-config-form";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {

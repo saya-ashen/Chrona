@@ -15,12 +15,12 @@ import {
   TIMELINE_COMPOSER_MARGIN,
   TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
-import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 import { DayTimelineSummary } from "@/components/schedule/panels/schedule-page-panels";
 import {
   ScheduledTimelineBlock,
   TimelinePlacementCard,
-} from "@/components/schedule/schedule-timeline-primitives";
+} from "@/components/schedule/timeline/schedule-timeline-primitives";
 import type {
   ScheduledItem,
   TimelineCreateInput,
@@ -39,7 +39,7 @@ import {
   getTodayKey,
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
-import { type TaskConfigExecutionRuntime } from "@/components/schedule/task-config-form";
+import { type TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";

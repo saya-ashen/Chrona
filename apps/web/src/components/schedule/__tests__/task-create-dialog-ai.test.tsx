@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-ai", () => ({
   useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
 }));
 
-import { TaskCreateDialog } from "@/components/schedule/task-create-dialog";
+import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
