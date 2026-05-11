@@ -19,6 +19,8 @@ import type {
   GraphMutationOperation,
   NodeAttempt,
   NodeResult,
+  NodeResultEvidence,
+  NodeResultOutput,
   PlanGraph,
   WaitKind,
 } from "./types";
@@ -37,6 +39,8 @@ export type GraphExecutionTrigger = "manual" | "scheduler" | "system" | "auto";
 export type GraphNodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
+  runtimeName?: string;
+  runtimeRunRef?: string | null;
   artifactIds?: string[];
   conversationEntryIds?: string[];
   eventIds?: string[];
@@ -396,6 +400,7 @@ function appendExecutionResult(input: {
     nodeLayerId: input.node.activeLayerId ?? undefined,
     attemptId: input.attempt.id,
   } satisfies NodeResult;
+  const evidence = normalizeResultEvidence(input.result.evidence);
 
   switch (input.result.status) {
     case "done":
@@ -405,6 +410,8 @@ function appendExecutionResult(input: {
           ...base,
           status: "current",
           outputSummary: input.result.summary,
+          outputs: normalizeResultOutputs(input.result.output),
+          evidence,
           selectedBranch: input.result.selectedBranch,
         },
       });
@@ -418,6 +425,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "user_input",
           error: input.result.reason,
+          evidence,
         },
       });
     case "waiting_for_approval":
@@ -428,6 +436,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "approval",
           error: input.result.reason,
+          evidence,
           review: { required: true, status: "pending" },
         },
       });
@@ -439,6 +448,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "manual_action",
           error: input.result.reason,
+          evidence,
         },
       });
     case "failed":
@@ -449,6 +459,7 @@ function appendExecutionResult(input: {
           status: "rejected",
           error: input.result.error,
           errorDetails: input.result.details,
+          evidence,
         },
       });
     case "replan_required":
@@ -459,6 +470,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "approval",
           error: input.result.reason,
+          evidence,
           review: {
             required: true,
             status: "request_changes",
@@ -467,6 +479,57 @@ function appendExecutionResult(input: {
         },
       });
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeResultEvidence(
+  evidence: GraphNodeExecutionEvidence | undefined,
+): NodeResultEvidence | undefined {
+  if (!evidence) return undefined;
+  return {
+    sessionId: evidence.sessionId,
+    runId: evidence.runId,
+    runtimeName: evidence.runtimeName,
+    runtimeRunRef: evidence.runtimeRunRef,
+    artifactIds: evidence.artifactIds,
+    conversationEntryIds: evidence.conversationEntryIds,
+    eventIds: evidence.eventIds,
+  };
+}
+
+function isNodeResultOutput(value: unknown): value is NodeResultOutput {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  switch (value.kind) {
+    case "text":
+    case "markdown":
+      return typeof value.content === "string";
+    case "json":
+      return "value" in value;
+    case "file":
+      return typeof value.path === "string";
+    case "artifact":
+      return typeof value.artifactId === "string" && typeof value.title === "string";
+    case "command":
+      return typeof value.command === "string";
+    case "link":
+      return typeof value.href === "string" && typeof value.title === "string";
+    default:
+      return false;
+  }
+}
+
+function normalizeResultOutputs(output: unknown): NodeResultOutput[] | undefined {
+  if (output === undefined || output === null) return undefined;
+  if (Array.isArray(output) && output.every(isNodeResultOutput)) return output;
+  if (isRecord(output) && Array.isArray(output.outputs) && output.outputs.every(isNodeResultOutput)) {
+    return output.outputs;
+  }
+  if (isNodeResultOutput(output)) return [output];
+  if (typeof output === "string") return [{ kind: "text", content: output }];
+  return [{ kind: "json", value: output }];
 }
 
 function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {
@@ -966,6 +1029,7 @@ function syncExternalResultState(input: {
     nodeLayerId: node?.activeLayerId ?? undefined,
     attemptId: currentAttempt?.id,
   } satisfies NodeResult;
+  const evidence = normalizeResultEvidence(input.externalResult.evidence);
   let syncedResult: NodeResult;
   let attemptStatus: NodeAttempt["status"] | null = null;
   let attemptError: NodeAttempt["error"] | undefined;
@@ -976,6 +1040,8 @@ function syncExternalResultState(input: {
         ...baseResult,
         status: "current",
         outputSummary: input.externalResult.summary,
+        outputs: normalizeResultOutputs(input.externalResult.output),
+        evidence,
         selectedBranch: input.externalResult.selectedBranch,
       };
       attemptStatus = "succeeded";
@@ -985,6 +1051,7 @@ function syncExternalResultState(input: {
         ...baseResult,
         status: "rejected",
         error: input.externalResult.error,
+        evidence,
       };
       attemptStatus = "failed";
       attemptError = {
@@ -998,6 +1065,7 @@ function syncExternalResultState(input: {
         status: "current",
         waitKind: "manual_action",
         error: input.externalResult.reason,
+        evidence,
       };
       attemptStatus = "failed";
       attemptError = {
@@ -1010,6 +1078,7 @@ function syncExternalResultState(input: {
         ...baseResult,
         status: "rejected",
         error: input.externalResult.reason ?? "External work cancelled",
+        evidence,
       };
       attemptStatus = "cancelled";
       attemptError = {

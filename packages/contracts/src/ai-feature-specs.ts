@@ -1,5 +1,6 @@
 import type {
   GenerateTaskPlanRequest,
+  NodeResultOutput,
 } from "./ai-plan-runtime";
 import {
   planBlueprintSchema,
@@ -105,10 +106,55 @@ export type TaskNodeAiOutcome =
 export interface TaskNodeAiResult {
   outcome: TaskNodeAiOutcome;
   summary: string;
-  output?: unknown;
+  outputs?: NodeResultOutput[];
   reason?: string;
   prompt?: string;
 }
+
+const nodeResultOutputSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("text"),
+    content: z.string().min(1),
+    title: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("markdown"),
+    content: z.string().min(1),
+    title: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("json"),
+    value: z.unknown(),
+    title: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("file"),
+    path: z.string().min(1),
+    title: z.string().optional(),
+    language: z.string().optional(),
+    description: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("artifact"),
+    artifactId: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("command"),
+    command: z.string().min(1),
+    title: z.string().optional(),
+    exitCode: z.number().int().optional(),
+    stdout: z.string().optional(),
+    stderr: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("link"),
+    href: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().optional(),
+  }).strict(),
+]);
 
 export interface ConditionNodeEvaluationFeatureInput {
   graphId: string;
@@ -159,7 +205,7 @@ export const taskNodeAiResultSchema = z.object({
     "external_running",
   ]),
   summary: z.string().min(1),
-  output: z.unknown().optional(),
+  outputs: z.array(nodeResultOutputSchema).optional(),
   reason: z.string().optional(),
   prompt: z.string().optional(),
 }).strict();
@@ -230,6 +276,10 @@ Rules:
 4. Return "external_running" only when work has started but cannot complete in this turn.
 5. Do not propose plan patches or graph traversal.
 6. Keep summary concise and evidence-based.
+7. Put user-visible results in outputs, never only in summary.
+8. Use output kind "file" for created/modified files with exact path, title, language, and description.
+9. Use "json" for structured data, "markdown" for rich text, "command" for commands and important stdout/stderr, "link" for URLs, and "artifact" for persisted artifacts.
+10. Use input.planContext to understand predecessor/successor relationships, but execute only the current node. Do not mark downstream or sibling nodes as completed early.
 `.trim();
 
 export const EVALUATE_CONDITION_NODE_SYSTEM_PROMPT = `

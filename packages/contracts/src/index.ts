@@ -83,6 +83,8 @@ export type {
   NodeExecutionAttempt,
   CheckpointResponse,
   ArtifactRef,
+  NodeResultEvidence,
+  NodeResultOutput,
   ExecutionContextSnapshot,
   NodeAttempt,
   RuntimeCommand,

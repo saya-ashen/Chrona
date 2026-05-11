@@ -22,6 +22,30 @@ type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
 >;
 
+type PlanContextNode = {
+  id: string;
+  title: string;
+  type: EffectivePlanNode["type"];
+  status: EffectivePlanNode["status"];
+  objective: string;
+  dependencies: string[];
+  dependents: string[];
+};
+
+type PlanContextEdge = {
+  from: string;
+  to: string;
+  label?: string;
+};
+
+type PlanExecutionContext = {
+  currentNodeId: string;
+  entryNodeIds: string[];
+  terminalNodeIds: string[];
+  nodes: PlanContextNode[];
+  edges: PlanContextEdge[];
+};
+
 export type NodeAiCapabilityInput = {
   taskId: string;
   mainSession: {
@@ -70,11 +94,34 @@ function buildContextSnapshotId(input: NodeAiCapabilityInput): string {
   return `${input.plan.graphId}:${input.plan.resolvedVersion}:${input.node.id}`;
 }
 
+function buildPlanExecutionContext(input: NodeAiCapabilityInput): PlanExecutionContext {
+  return {
+    currentNodeId: input.node.id,
+    entryNodeIds: input.plan.entryNodeIds,
+    terminalNodeIds: input.plan.terminalNodeIds,
+    nodes: input.plan.nodes.map((node) => ({
+      id: node.id,
+      title: node.title,
+      type: node.type,
+      status: node.status,
+      objective: getNodeObjective(node),
+      dependencies: node.dependencies,
+      dependents: node.dependents,
+    })),
+    edges: input.plan.edges.map((edge) => ({
+      from: edge.from,
+      to: edge.to,
+      ...(edge.label ? { label: edge.label } : {}),
+    })),
+  };
+}
+
 function buildInstructions(input: NodeAiCapabilityInput): string {
   return [
     `Task: ${input.plan.planId}`,
     `Current node: [${input.node.id}] ${input.node.title}`,
     `Objective: ${getNodeObjective(input.node)}`,
+    "Plan context: use input.planContext for the graph nodes and logical relationships; execute only the current node and do not complete unrelated downstream nodes early.",
     completedNodeTitles(input.plan).length > 0
       ? `Already completed: ${completedNodeTitles(input.plan).join(", ")}`
       : "",
@@ -100,6 +147,7 @@ function buildTaskNodeProviderInput(
     expectedOutput: config.expectedOutput,
     completionCriteria: config.completionCriteria,
     completedNodeTitles: completedNodeTitles(input.plan),
+    planContext: buildPlanExecutionContext(input),
   };
 }
 
@@ -379,7 +427,7 @@ export async function executeTaskNodeCapability(
       nodeResult = {
         status: "done",
         summary: result.parsed.summary,
-        output: result.parsed.output,
+        output: result.parsed.outputs,
         evidence: result.evidence,
       };
       break;
@@ -387,7 +435,7 @@ export async function executeTaskNodeCapability(
       nodeResult = {
         status: "started",
         summary: result.parsed.summary,
-        output: result.parsed.output,
+        output: result.parsed.outputs,
         evidence: result.evidence,
       };
       break;

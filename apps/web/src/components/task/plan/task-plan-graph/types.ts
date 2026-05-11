@@ -1,4 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
+import type { NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -85,6 +86,9 @@ export type PlanNodeDataModel = {
   requiredInfo?: string[];
   nextAction?: string | null;
   completionSummary?: string | null;
+  result?: NodeResult | null;
+  resultOutputs?: NodeResultOutput[];
+  resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];
   options?: string[];
   active?: boolean;
