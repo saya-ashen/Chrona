@@ -50,13 +50,12 @@ describe("OpenClawClient", () => {
       request: {
         sessionId: "sess-1",
         sessionKey: "sess-1",
-        feature: "generate_plan",
-        body: {
-          model: "openclaw",
-          user: "sess-1",
-          instructions: "plan this task",
-          input: [{ type: "message", role: "user", content: "Write docs" }],
-          stream: true,
+        instructions: "plan this task",
+        input: { prompt: "Write docs" },
+        structuredOutputSchema: {
+          name: "generate_task_plan_graph",
+          description: "Return a generated plan graph.",
+          schema: { type: "object" },
         },
         timeoutSeconds: 5,
       },
@@ -111,13 +110,12 @@ describe("OpenClawClient", () => {
       request: {
         sessionId: "sess-2",
         sessionKey: "sess-2",
-        feature: "generate_plan",
-        body: {
-          model: "openclaw",
-          user: "sess-2",
-          instructions: "plan this task",
-          input: [{ type: "message", role: "user", content: "Write docs" }],
-          stream: true,
+        instructions: "plan this task",
+        input: { prompt: "Write docs" },
+        structuredOutputSchema: {
+          name: "generate_task_plan_graph",
+          description: "Return a generated plan graph.",
+          schema: { type: "object" },
         },
         timeoutSeconds: 5,
       },
@@ -147,6 +145,59 @@ describe("OpenClawClient", () => {
     ]);
   });
 
+  it("aggregates streamed responses in execute using the same SSE path", async () => {
+    let seenStream: unknown;
+    let seenModel: unknown;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body) {
+        const body = JSON.parse(String(init.body)) as {
+          stream?: unknown;
+          model?: unknown;
+        };
+        seenStream = body.stream;
+        seenModel = body.model;
+      }
+      const sse = [
+        'event: response.output_text.delta\n',
+        'data: {"delta":"Hello ","type":"response.output_text.delta"}\n\n',
+        'event: response.completed\n',
+        'data: {"response":{"id":"resp-create","status":"completed","usage":{"input_tokens":3,"output_tokens":2,"total_tokens":5},"output":[{"type":"message","content":[{"type":"output_text","text":"Hello world"}]}]}}\n\n',
+      ].join("");
+
+      return new Response(sse, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new OpenClawClient({
+      gatewayUrl: "http://gateway.local",
+      gatewayToken: "secret",
+    });
+
+    const result = await client.execute({
+      request: {
+        sessionId: "sess-create",
+        sessionKey: "sess-create",
+        instructions: "say hello",
+        input: "Hello",
+        timeoutSeconds: 5,
+      },
+    });
+
+    expect(seenStream).toBe(true);
+    expect(seenModel).toBe("openclaw/default");
+    expect(result.output).toBe("Hello world");
+    expect(result.responseId).toBe("resp-create");
+    expect(result.usage).toEqual({
+      inputTokens: 3,
+      outputTokens: 2,
+      totalTokens: 5,
+    });
+    expect(result.feature).toBeNull();
+    expect(result.structured).toBeNull();
+  });
+
   it("dumps raw gateway stream events when enabled", async () => {
     const dumpDir = await mkdtemp(join(tmpdir(), "chrona-openclaw-dump-"));
     process.env.CHRONA_OPENCLAW_DUMP = "1";
@@ -174,13 +225,12 @@ describe("OpenClawClient", () => {
       request: {
         sessionId: "sess-dump",
         sessionKey: "sess-dump",
-        feature: "generate_plan",
-        body: {
-          model: "openclaw",
-          user: "sess-dump",
-          instructions: "plan this task",
-          input: [{ type: "message", role: "user", content: "Write docs" }],
-          stream: true,
+        instructions: "plan this task",
+        input: { prompt: "Write docs" },
+        structuredOutputSchema: {
+          name: "generate_task_plan_graph",
+          description: "Return a generated plan graph.",
+          schema: { type: "object" },
         },
         timeoutSeconds: 5,
       },

@@ -15,6 +15,12 @@ export type AiFeatureToolSpec = {
   parameters: Record<string, unknown>;
 };
 
+export type AiFeatureStructuredOutputSchema = {
+  name: string;
+  description: string;
+  schema: Record<string, unknown>;
+};
+
 export type StructuredAiFeature =
   | "suggest"
   | "generate_plan"
@@ -30,8 +36,7 @@ export type PreparedAiFeatureSpec = {
   feature: StructuredAiFeature;
   instructions: string;
   inputText?: string;
-  requiredTool: AiFeatureToolSpec;
-  toolChoice: "required";
+  structuredOutputSchema: AiFeatureStructuredOutputSchema;
 };
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_NAME = "suggest_task_completions";
@@ -508,6 +513,16 @@ export const reviewCheckpointNodeResultToolSpec: AiFeatureToolSpec = {
   parameters: toProviderJsonSchema(checkpointNodeAiResultSchema),
 };
 
+function toStructuredOutputSchema(
+  toolSpec: AiFeatureToolSpec,
+): AiFeatureStructuredOutputSchema {
+  return {
+    name: toolSpec.name,
+    description: toolSpec.description,
+    schema: toolSpec.parameters,
+  };
+}
+
 export function buildGeneratePlanFeatureInputText(
   input: GenerateTaskPlanRequest,
 ): string {
@@ -544,8 +559,7 @@ export function buildGeneratePlanFeatureSpec(
     feature: "generate_plan",
     instructions: GENERATE_PLAN_SYSTEM_PROMPT,
     inputText: buildGeneratePlanFeatureInputText(input),
-    requiredTool: generatePlanBlueprintToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(generatePlanBlueprintToolSpec),
   };
 }
 
@@ -590,8 +604,7 @@ export function buildEditPlanPatchFeatureSpec(
     feature: "edit_plan",
     instructions: EDIT_PLAN_PATCH_SYSTEM_PROMPT,
     inputText: buildEditPlanPatchFeatureInputText(input),
-    requiredTool: editPlanPatchToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(editPlanPatchToolSpec),
   };
 }
 
@@ -599,8 +612,7 @@ export function buildSuggestFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "suggest",
     instructions: SUGGEST_SYSTEM_PROMPT,
-    requiredTool: suggestTaskCompletionsToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(suggestTaskCompletionsToolSpec),
   };
 }
 
@@ -608,8 +620,7 @@ export function buildAnalyzeConflictsFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "conflicts",
     instructions: CONFLICTS_SYSTEM_PROMPT,
-    requiredTool: analyzeScheduleConflictsToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(analyzeScheduleConflictsToolSpec),
   };
 }
 
@@ -617,8 +628,7 @@ export function buildSuggestTimeslotsFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "timeslots",
     instructions: TIMESLOTS_SYSTEM_PROMPT,
-    requiredTool: suggestTaskTimeslotsToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(suggestTaskTimeslotsToolSpec),
   };
 }
 
@@ -626,8 +636,7 @@ export function buildDispatchTaskFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "dispatch_task",
     instructions: DISPATCH_TASK_SYSTEM_PROMPT,
-    requiredTool: dispatchNextTaskActionToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(dispatchNextTaskActionToolSpec),
   };
 }
 
@@ -668,8 +677,7 @@ export function buildTaskNodeExecutionFeatureSpec(
     feature: "execute_task_node",
     instructions: EXECUTE_TASK_NODE_SYSTEM_PROMPT,
     inputText: buildTaskNodeExecutionFeatureInputText(input),
-    requiredTool: executeTaskNodeResultToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(executeTaskNodeResultToolSpec),
   };
 }
 
@@ -709,8 +717,7 @@ export function buildConditionNodeEvaluationFeatureSpec(
     feature: "evaluate_condition_node",
     instructions: EVALUATE_CONDITION_NODE_SYSTEM_PROMPT,
     inputText: buildConditionNodeEvaluationFeatureInputText(input),
-    requiredTool: evaluateConditionNodeResultToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(evaluateConditionNodeResultToolSpec),
   };
 }
 
@@ -747,8 +754,7 @@ export function buildCheckpointNodeReviewFeatureSpec(
     feature: "review_checkpoint_node",
     instructions: REVIEW_CHECKPOINT_NODE_SYSTEM_PROMPT,
     inputText: buildCheckpointNodeReviewFeatureInputText(input),
-    requiredTool: reviewCheckpointNodeResultToolSpec,
-    toolChoice: "required",
+    structuredOutputSchema: toStructuredOutputSchema(reviewCheckpointNodeResultToolSpec),
   };
 }
 

@@ -1,4 +1,8 @@
-import type { EffectivePlanNode, EffectivePlanGraph, PlanPatch } from "@chrona/contracts/ai";
+import type {
+  EffectivePlanNode,
+  EffectivePlanGraph,
+  PlanPatch,
+} from "@chrona/contracts/ai";
 
 type NodeExecutionEvidence = {
   sessionId?: string;
@@ -28,10 +32,25 @@ export type NodeExecutionResult =
         source: "user" | "ai" | "system" | "default";
       };
     }
-  | { status: "waiting_for_user"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
-  | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: NodeExecutionEvidence }
+  | {
+      status: "waiting_for_user";
+      prompt: string;
+      reason: string;
+      evidence?: NodeExecutionEvidence;
+    }
+  | {
+      status: "waiting_for_approval";
+      prompt: string;
+      reason: string;
+      evidence?: NodeExecutionEvidence;
+    }
   | { status: "blocked"; reason: string; evidence?: NodeExecutionEvidence }
-  | { status: "replan_required"; reason: string; evidence?: NodeExecutionEvidence; proposedPatch?: PlanPatch }
+  | {
+      status: "replan_required";
+      reason: string;
+      evidence?: NodeExecutionEvidence;
+      proposedPatch?: PlanPatch;
+    }
   | {
       status: "failed";
       error: string;

@@ -1,14 +1,18 @@
+import { OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
 import {
   buildGatewayBody,
-  executeGatewayRequest,
+  commitGatewayTurnState,
   gatewayHeaders,
+  mapUsage,
   normalizeGatewayHttpUrl,
+  parseFunctionItems,
+  resolveRequestedFunctionToolName,
 } from "./gateway";
+import { buildStructuredResult, extractOutputText } from "./feature-contracts";
 import type {
+  BridgeResponse,
   BridgeEnvironment,
-  BridgeLogger,
   BridgeRequest,
-  ExecutionResult,
   OpenClawClientConfig,
   OpenClawStreamEvent,
 } from "./types";
@@ -25,13 +29,6 @@ export type OpenClawConnectionConfig = {
   bridgeToken?: string;
   timeoutSeconds?: number;
   mode?: "live" | "mock";
-};
-
-const NOOP_LOGGER: BridgeLogger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
 };
 
 function parseToolArguments(raw: unknown): Record<string, unknown> {
@@ -129,7 +126,11 @@ async function createOpenClawDump(input: {
 async function* parseStreamingGatewayGenerator(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   dump?: Awaited<ReturnType<typeof createOpenClawDump>>,
-): AsyncGenerator<OpenClawStreamEvent> {
+): AsyncGenerator<{
+  gatewayEventType: string;
+  payload: Record<string, unknown>;
+  streamEvent?: OpenClawStreamEvent;
+}> {
   const decoder = new TextDecoder();
   let buffer = "";
   let currentEventType = "";
@@ -206,7 +207,11 @@ async function* parseStreamingGatewayGenerator(
               ? parsed.text
               : "";
         if (delta) {
-          yield { type: "text", data: delta };
+          yield {
+            gatewayEventType: currentEventType,
+            payload: parsed,
+            streamEvent: { type: "text", data: delta },
+          };
         }
         currentEventType = "";
         continue;
@@ -221,20 +226,30 @@ async function* parseStreamingGatewayGenerator(
           const toolCall = item as Record<string, unknown>;
           if (toolCall.type === "function_call") {
             yield {
-              type: "tool_call",
-              data: JSON.stringify(toolCall),
-              toolCall: {
-                tool: (toolCall.name as string) ?? "unknown",
-                callId: (toolCall.call_id as string) ?? `${Date.now()}`,
-                input: parseToolArguments(toolCall.arguments),
-                status: "completed",
+              gatewayEventType: currentEventType,
+              payload: parsed,
+              streamEvent: {
+                type: "tool_call",
+                data: JSON.stringify(toolCall),
+                toolCall: {
+                  tool: (toolCall.name as string) ?? "unknown",
+                  callId: (toolCall.call_id as string) ?? `${Date.now()}`,
+                  input: parseToolArguments(toolCall.arguments),
+                  status: "completed",
+                },
               },
             };
           }
         }
+        currentEventType = "";
+        continue;
       }
 
       if (currentEventType === "response.completed") {
+        yield {
+          gatewayEventType: currentEventType,
+          payload: parsed,
+        };
         const response = parsed.response;
         if (
           response &&
@@ -246,13 +261,17 @@ async function* parseStreamingGatewayGenerator(
           )) {
             if (item.type !== "function_call") continue;
             yield {
-              type: "tool_call",
-              data: JSON.stringify(item),
-              toolCall: {
-                tool: (item.name as string) ?? "unknown",
-                callId: (item.call_id as string) ?? `${Date.now()}`,
-                input: parseToolArguments(item.arguments),
-                status: "completed",
+              gatewayEventType: currentEventType,
+              payload: parsed,
+              streamEvent: {
+                type: "tool_call",
+                data: JSON.stringify(item),
+                toolCall: {
+                  tool: (item.name as string) ?? "unknown",
+                  callId: (item.call_id as string) ?? `${Date.now()}`,
+                  input: parseToolArguments(item.arguments),
+                  status: "completed",
+                },
               },
             };
           }
@@ -260,6 +279,11 @@ async function* parseStreamingGatewayGenerator(
         currentEventType = "";
         continue;
       }
+
+      yield {
+        gatewayEventType: currentEventType,
+        payload: parsed,
+      };
 
       currentEventType = "";
     }
@@ -274,20 +298,13 @@ export class OpenClawClient {
       gatewayHttpUrl: normalizeGatewayHttpUrl(config.gatewayUrl),
       gatewayToken: config.gatewayToken ?? "",
       agentId: "main",
-      model: config.model,
+      model: config.model?.trim() || OPENCLAW_DEFAULT_MODEL,
     };
   }
 
-  async create(input: OpenClawResponseRequest): Promise<ExecutionResult> {
-    return executeGatewayRequest(
-      input.request,
-      NOOP_LOGGER,
-      this.env,
-    );
-  }
-
-  async *stream(
+  private async *executeStreamingRequest(
     input: OpenClawResponseRequest,
+    state: { finalResponse: Record<string, unknown> },
   ): AsyncGenerator<OpenClawStreamEvent> {
     const sessionId = input.request.sessionId;
     const body = buildGatewayBody(input.request, this.env);
@@ -299,13 +316,12 @@ export class OpenClawClient {
 
     const url = `${this.env.gatewayHttpUrl}/v1/responses`;
     const dump = await createOpenClawDump({
-      label: input.request.feature ?? "execution",
+      label: sessionId,
       sessionId,
       url,
       request: input.request,
       body,
     });
-
     const res = await fetch(url, {
       method: "POST",
       headers,
@@ -344,12 +360,112 @@ export class OpenClawClient {
       throw new Error("[openclaw] Stream response missing body");
     }
 
+    state.finalResponse = {};
+
     try {
-      yield* parseStreamingGatewayGenerator(reader, dump);
+      for await (const event of parseStreamingGatewayGenerator(reader, dump)) {
+        if (
+          (event.gatewayEventType === "response.completed" ||
+            event.gatewayEventType === "response.failed") &&
+          event.payload.response &&
+          typeof event.payload.response === "object" &&
+          !Array.isArray(event.payload.response)
+        ) {
+          state.finalResponse = event.payload.response as Record<
+            string,
+            unknown
+          >;
+        }
+        if (event.streamEvent) {
+          yield event.streamEvent;
+        }
+      }
     } finally {
       await dump?.write({ type: "close", timestamp: new Date().toISOString() });
       await dump?.close();
     }
+
+    const responseId =
+      typeof state.finalResponse.id === "string"
+        ? state.finalResponse.id
+        : undefined;
+    const { toolCalls, toolCallOutputs } = parseFunctionItems(
+      state.finalResponse,
+    );
+    commitGatewayTurnState({
+      request: input.request,
+      responseId,
+      toolCalls,
+      toolCallOutputs,
+    });
+  }
+
+  async execute(input: OpenClawResponseRequest): Promise<BridgeResponse> {
+    const startedAt = Date.now();
+    const request: BridgeRequest = {
+      ...input.request,
+      stream: true,
+    };
+    const state = { finalResponse: {} as Record<string, unknown> };
+    for await (const _event of this.executeStreamingRequest(
+      {
+        ...input,
+        request,
+      },
+      state,
+    )) {
+      void _event;
+    }
+    const finalResponse = state.finalResponse;
+    const responseId =
+      typeof finalResponse.id === "string" ? finalResponse.id : undefined;
+    const { toolCalls } = parseFunctionItems(finalResponse);
+
+    const outputText = extractOutputText(finalResponse);
+    const error = finalResponse.error
+      ? JSON.stringify(finalResponse.error)
+      : Object.keys(finalResponse).length === 0
+        ? "response.completed event missing response payload"
+        : null;
+
+    return {
+      sessionId: request.sessionId,
+      responseId,
+      responseStatus:
+        typeof finalResponse.status === "string"
+          ? finalResponse.status
+          : undefined,
+      runId: responseId,
+      output: outputText,
+      usage: mapUsage(finalResponse),
+      error,
+      durationMs: Date.now() - startedAt,
+      structured: buildStructuredResult({
+        sessionId: request.sessionId,
+        runId: responseId,
+        output: outputText,
+        toolCalls,
+        error,
+        requestedToolName: resolveRequestedFunctionToolName(request),
+      }),
+      feature: null,
+    };
+  }
+
+  async *stream(
+    input: OpenClawResponseRequest,
+  ): AsyncGenerator<OpenClawStreamEvent> {
+    const request: BridgeRequest = {
+      ...input.request,
+      stream: true,
+    };
+    yield* this.executeStreamingRequest(
+      {
+        ...input,
+        request,
+      },
+      { finalResponse: {} },
+    );
   }
 }
 

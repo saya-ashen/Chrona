@@ -10,6 +10,7 @@ import { createTaskScheduleService } from "./services/task-schedule.service";
 import { createTasksService } from "./services/tasks.service";
 import { createWorkspacesService } from "./services/workspaces.service";
 import { aiClientRegistry } from "./modules/ai/runtime/client-registry";
+import { getAiClient } from "./modules/ai/runtime/client-resolution";
 
 export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
   return {
@@ -27,7 +28,7 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
     runtime: {
       ...createRuntimeService(),
       aiClients: {
-        get: (clientId?: string | null) => aiClientRegistry.get(clientId),
+        get: (clientId?: string | null) => getAiClient(clientId),
         list: () => aiClientRegistry.list(),
         refresh: () => aiClientRegistry.refresh(),
       },

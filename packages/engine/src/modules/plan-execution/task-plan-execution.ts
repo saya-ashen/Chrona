@@ -38,6 +38,7 @@ import { TaskNodeExecutor } from "./node-executors/task-executor";
 import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
 import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
+import { AiRuntimeInvoker } from "./ai-runtime-invoker";
 
 type PlanExecutionStatus =
   | "started"
@@ -68,12 +69,20 @@ type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
 
 const DEFAULT_MAX_STEPS = 10;
 
-const executors: NodeExecutor[] = [
-  new TaskNodeExecutor(),
-  new CheckpointNodeExecutor(),
-  new ConditionNodeExecutor(),
-  new WaitNodeExecutor(),
-];
+function createNodeExecutors(input: {
+  aiRuntimeInvoker: AiRuntimeInvoker;
+}): NodeExecutor[] {
+  return [
+    new TaskNodeExecutor(input.aiRuntimeInvoker),
+    new CheckpointNodeExecutor(input.aiRuntimeInvoker),
+    new ConditionNodeExecutor(input.aiRuntimeInvoker),
+    new WaitNodeExecutor(),
+  ];
+}
+
+const executors = createNodeExecutors({
+  aiRuntimeInvoker: new AiRuntimeInvoker(),
+});
 
 export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
   const createdAt = new Date().toISOString();

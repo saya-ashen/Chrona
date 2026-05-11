@@ -1,18 +1,4 @@
-import type {
-  BridgeFeature,
-  BridgeFeatureResult,
-  StructuredAgentResult,
-  ToolCallInfo,
-} from "./types";
-import type { PreparedAiFeatureSpec } from "@chrona/contracts";
-import { validatePreparedFeaturePayload } from "@chrona/contracts";
-
-function validateFeaturePayload(
-  payload: unknown,
-  featureSpec: PreparedAiFeatureSpec,
-): { ok: true } | { ok: false; error: string } {
-  return validatePreparedFeaturePayload(featureSpec, payload);
-}
+import type { StructuredAgentResult, ToolCallInfo } from "./types";
 
 export function extractOutputText(response: Record<string, unknown>): string {
   const output = Array.isArray(response.output) ? response.output : [];
@@ -48,116 +34,46 @@ export function extractOutputText(response: Record<string, unknown>): string {
   return "";
 }
 
-export function buildFeatureResultFromResponse(
-  feature: BridgeFeature,
-  outputText: string,
-  toolCalls: ToolCallInfo[],
-  featureSpec?: PreparedAiFeatureSpec,
-): { featureResult: BridgeFeatureResult | null; error: string | null } {
-  const requiredTool = featureSpec?.requiredTool.name;
-  if (requiredTool) {
-    const matching = [...toolCalls].reverse().find((call) => call.tool === requiredTool);
-    if (matching) {
-      const payloadValidation = validateFeaturePayload(matching.input, featureSpec);
-      if (!payloadValidation.ok) {
-        return {
-          featureResult: null,
-          error: payloadValidation.error,
-        };
-      }
-
-      return {
-        featureResult: {
-          feature,
-          source: "business_tool",
-          toolName: requiredTool,
-          payload: matching.input,
-        },
-        error: null,
-      };
-    }
-
-    return {
-      featureResult: null,
-      error: `Feature '${feature}' requires business tool call '${requiredTool}' but none was found in the response`,
-    };
-  }
-
-  if (feature === "chat") {
-    return {
-      featureResult: {
-        feature,
-        source: "assistant_text",
-        payload: { content: outputText },
-      },
-      error: null,
-    };
-  }
-
-  if (!featureSpec) {
-    return {
-      featureResult: null,
-      error: `Feature '${feature}' requires a prepared feature specification but none was provided`,
-    };
-  }
-
-  return {
-    featureResult: null,
-    error: `Feature '${feature}' requires a business tool result but none was found in the response`,
-  };
-}
-
 export function buildStructuredResult(params: {
   sessionId: string;
   runId?: string;
   toolCalls: ToolCallInfo[];
   output: string;
   error: string | null;
-  feature?: BridgeFeature | null;
-  featurePayload?: unknown;
-  featureToolName?: string | null;
-  featureSource?: StructuredAgentResult["source"];
-}): StructuredAgentResult {
-  if (params.featurePayload !== undefined) {
+  requestedToolName?: string;
+}): StructuredAgentResult | null {
+  if (!params.requestedToolName) {
+    return null;
+  }
+
+  const matching = [...params.toolCalls]
+    .reverse()
+    .find((toolCall) => toolCall.tool === params.requestedToolName);
+
+  if (matching) {
     return {
       ok: true,
-      parsed: params.featurePayload,
-      source: params.featureSource ?? "business_tool",
-      feature: params.feature ?? null,
-      toolName: params.featureToolName ?? null,
+      parsed: matching.input,
+      source: "business_tool",
+      toolName: matching.tool,
       rawOutput: params.output,
       error: params.error,
       validationIssues: [],
       sessionId: params.sessionId,
       runId: params.runId,
-      bridgeToolCalls: params.toolCalls.map((toolCall) => ({
-        tool: toolCall.tool,
-        callId: toolCall.callId,
-        input: toolCall.input,
-        result: toolCall.result,
-        status: toolCall.status,
-      })),
     };
   }
 
   return {
     ok: false,
     parsed: null,
-    feature: params.feature ?? null,
-    toolName: params.featureToolName ?? null,
+    toolName: params.requestedToolName,
     rawOutput: params.output,
     error:
       params.error ??
-      "No structured payload was extracted from OpenResponses function_call.arguments",
+      `Required tool '${params.requestedToolName}' was not returned by OpenClaw`,
     validationIssues: [],
     sessionId: params.sessionId,
     runId: params.runId,
-    bridgeToolCalls: params.toolCalls.map((toolCall) => ({
-      tool: toolCall.tool,
-      callId: toolCall.callId,
-      input: toolCall.input,
-      result: toolCall.result,
-      status: toolCall.status,
-    })),
   };
 }

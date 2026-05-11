@@ -1,4 +1,7 @@
-import type { PreparedAiFeatureSpec } from "@chrona/contracts";
+import type {
+  AiFeatureStructuredOutputSchema,
+  AiFeatureToolSpec,
+} from "@chrona/contracts";
 
 export type StructuredResultReliability = "business_tool" | "assistant_text";
 
@@ -18,13 +21,6 @@ export interface StructuredAgentResult<T = unknown> {
   validationIssues?: StructuredValidationIssue[];
   sessionId?: string;
   runId?: string;
-  bridgeToolCalls?: Array<{
-    tool: string;
-    callId?: string;
-    input: Record<string, unknown>;
-    result?: string;
-    status?: "pending" | "completed" | "error";
-  }>;
 }
 
 export type BridgeFeature =
@@ -39,12 +35,48 @@ export type BridgeFeature =
   | "evaluate_condition_node"
   | "review_checkpoint_node";
 
+export type OpenClawGatewayFunctionToolChoice = {
+  type: "function";
+  function: { name: string };
+};
+
+export type OpenClawGatewayToolChoice =
+  | "auto"
+  | boolean
+  | OpenClawGatewayFunctionToolChoice[];
+
+export type OpenClawGatewayInputItem =
+  | {
+      type: "message";
+      role: "user";
+      content: string;
+    }
+  | {
+      type: "function_call_output";
+      call_id: string;
+      output: string;
+    };
+
+export interface OpenClawGatewayBody {
+  model?: string;
+  user?: string;
+  previous_response_id?: string;
+  instructions: string;
+  input: OpenClawGatewayInputItem[];
+  tools?: AiFeatureToolSpec[];
+  tool_choice?: OpenClawGatewayToolChoice;
+  stream: boolean;
+  max_output_tokens?: number;
+}
+
 export interface OpenClawGatewayRequest {
   sessionId: string;
   sessionKey?: string;
-  body: Record<string, unknown>;
-  feature?: BridgeFeature;
-  featureSpec?: PreparedAiFeatureSpec;
+  instructions: string;
+  input: unknown;
+  structuredOutputSchema?: AiFeatureStructuredOutputSchema;
+  stream?: boolean;
+  maxOutputTokens?: number;
   timeoutSeconds?: number;
 }
 
@@ -76,8 +108,6 @@ export interface BridgeResponse {
   responseStatus?: string;
   runId?: string;
   output: string;
-  toolCalls: ToolCallInfo[];
-  toolCallOutputs?: ToolCallOutputInfo[];
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -120,11 +150,6 @@ export type BridgeLogger = {
   warn: (event: string, data?: Record<string, unknown>) => void;
   error: (event: string, data?: Record<string, unknown>) => void;
 };
-
-export interface ExecutionResult {
-  response: BridgeResponse;
-  events: NDJSONEvent[];
-}
 
 export interface BridgeEnvironment {
   gatewayHttpUrl: string;

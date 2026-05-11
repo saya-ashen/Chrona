@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
+import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 import { ConditionNodeExecutor } from "./condition-executor";
+
+const aiRuntimeInvoker = {} as AiRuntimeInvoker;
 
 function makeConditionNode(
   overrides: Partial<EffectivePlanNode> & { id: string },
@@ -67,7 +70,7 @@ function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
 
 describe("ConditionNodeExecutor", () => {
   it("waits for explicit user branch selection", async () => {
-    const executor = new ConditionNodeExecutor();
+    const executor = new ConditionNodeExecutor(aiRuntimeInvoker);
     const condition = makeConditionNode({ id: "condition-1" });
     const plan = makePlan([
       condition,
@@ -89,7 +92,7 @@ describe("ConditionNodeExecutor", () => {
   });
 
   it("maps selected user branch to compiled target node id", async () => {
-    const executor = new ConditionNodeExecutor();
+    const executor = new ConditionNodeExecutor(aiRuntimeInvoker);
     const condition = makeConditionNode({ id: "condition-1" });
     const yesNode: EffectivePlanNode = {
       id: "compiled-yes",

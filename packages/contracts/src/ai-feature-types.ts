@@ -26,6 +26,8 @@ export interface AiClientRecord {
   enabled: boolean;
 }
 
+export const OPENCLAW_DEFAULT_MODEL = "openclaw/default";
+
 export interface OpenClawClientConfig {
   bridgeUrl: string;
   bridgeToken: string;
@@ -58,13 +60,6 @@ export interface StructuredDebugInfo {
   sessionId?: string;
   runId?: string;
   validationIssues?: StructuredValidationIssue[];
-  bridgeToolCalls?: Array<{
-    tool: string;
-    callId?: string;
-    input: Record<string, unknown>;
-    result?: string;
-    status?: "pending" | "completed" | "error";
-  }>;
 }
 
 export interface StructuredResponseMeta {

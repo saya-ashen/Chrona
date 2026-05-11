@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
 import { useI18n } from "@/i18n/client";
 import { api } from "@/lib/rpc-client";
 
@@ -44,6 +45,7 @@ function buildClientPayload(input: {
     ? {
         bridgeUrl: input.bridgeUrl,
         bridgeToken: input.bridgeToken,
+        model: input.model.trim() || OPENCLAW_DEFAULT_MODEL,
         timeoutSeconds: Number(input.timeoutSeconds),
       }
     : { baseUrl: input.baseUrl, apiKey: input.apiKey, model: input.model };
@@ -164,7 +166,9 @@ function ClientForm({
   const [timeoutSeconds, setTimeoutSeconds] = useState(String((initial?.config as { timeoutSeconds?: number })?.timeoutSeconds ?? 120));
   const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState((initial?.config as { apiKey?: string })?.apiKey ?? "");
-  const [model, setModel] = useState((initial?.config as { model?: string })?.model ?? "gpt-4o-mini");
+  const [model, setModel] = useState(
+    (initial?.config as { model?: string })?.model ?? OPENCLAW_DEFAULT_MODEL,
+  );
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
 

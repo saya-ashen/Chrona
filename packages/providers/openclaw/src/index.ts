@@ -7,25 +7,17 @@
 export {
   buildGatewayBody,
   checkGatewayAvailable,
-  executeGatewayRequest,
   gatewayHeaders,
   normalizeGatewayHttpUrl,
 } from "./gateway";
 
-export {
-  createOpenClawClient,
-  OpenClawClient,
-} from "./OpenClawClient";
+export { createOpenClawClient, OpenClawClient } from "./OpenClawClient";
 
 export {
   getOpenClawTaskConfigSpec,
   OPENCLAW_EXECUTION_RUNTIME,
   validateOpenClawTaskConfig,
 } from "./config";
-
-export {
-  buildFeatureResultFromResponse,
-} from "./feature-contracts";
 
 export type {
   OpenClawConnectionConfig,
@@ -39,7 +31,6 @@ export type {
   BridgeLogger,
   BridgeRequest,
   BridgeResponse,
-  ExecutionResult,
   NDJSONEvent,
   OpenClawApprovalDecision,
   OpenClawApprovalRequest,
