@@ -6,7 +6,7 @@ import type {
   LLMClientConfig,
   OpenClawClientConfig,
 } from "@chrona/contracts";
-import { AiClientError } from "@chrona/contracts";
+import { AiClientError, OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
 
 type StoredAiClient = {
   id: string;
@@ -17,9 +17,10 @@ type StoredAiClient = {
   enabled: boolean;
 };
 
-export type EngineAiClient =
-  | { record: AiClientRecord; providerClient: OpenClawClient }
-  | { record: AiClientRecord; providerClient: null };
+export type EngineAiClient = {
+  record: AiClientRecord;
+  providerClient: OpenClawClient | null;
+};
 
 export type EngineOpenClawClient = EngineAiClient & {
   record: AiClientRecord & { type: "openclaw"; config: OpenClawClientConfig };
@@ -46,20 +47,24 @@ function toAiClientRecord(client: StoredAiClient): AiClientRecord {
   };
 }
 
-function getOpenClawGatewayUrl(config: OpenClawClientConfig): string | undefined {
+function getOpenClawGatewayUrl(
+  config: OpenClawClientConfig,
+): string | undefined {
   return typeof config.gatewayUrl === "string" && config.gatewayUrl
     ? config.gatewayUrl
     : config.bridgeUrl;
 }
 
-function createProviderClient(record: AiClientRecord): EngineAiClient["providerClient"] {
+function createProviderClient(
+  record: AiClientRecord,
+): EngineAiClient["providerClient"] {
   if (record.type !== "openclaw") return null;
 
   const config = record.config as OpenClawClientConfig;
   return new OpenClawClient({
     gatewayUrl: getOpenClawGatewayUrl(config) ?? "",
     gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
-    model: config.model,
+    model: config.model?.trim() || OPENCLAW_DEFAULT_MODEL,
     timeoutSeconds: config.timeoutSeconds,
   });
 }
@@ -102,14 +107,16 @@ async function getAiClient(
     return clients.get(clientId) ?? null;
   }
 
-  return defaultClientId ? clients.get(defaultClientId) ?? null : null;
+  return defaultClientId ? (clients.get(defaultClientId) ?? null) : null;
 }
 
-function requireOpenClawClient(
-  client: EngineAiClient,
-): EngineOpenClawClient {
+function requireOpenClawClient(client: EngineAiClient): EngineOpenClawClient {
   if (client.record.type !== "openclaw" || !client.providerClient) {
-    throw new AiClientError("OpenClaw client is required", client.record.type, "internal");
+    throw new AiClientError(
+      "OpenClaw client is required",
+      client.record.type,
+      "internal",
+    );
   }
 
   return client as EngineOpenClawClient;
@@ -117,7 +124,11 @@ function requireOpenClawClient(
 
 function requireLlmClient(client: EngineAiClient): EngineLlmClient {
   if (client.record.type !== "llm") {
-    throw new AiClientError("LLM client is required", client.record.type, "internal");
+    throw new AiClientError(
+      "LLM client is required",
+      client.record.type,
+      "internal",
+    );
   }
 
   return client as EngineLlmClient;

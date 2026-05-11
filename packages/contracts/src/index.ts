@@ -118,6 +118,7 @@ export type {
 
 // AI feature specs
 export type {
+  AiFeatureStructuredOutputSchema,
   StructuredAiFeature,
   PreparedAiFeatureSpec,
   EditPlanFeatureInput,
@@ -235,7 +236,7 @@ export type {
   StructuredResponseMeta,
 } from "./ai-feature-types";
 
-export { AiClientError } from "./ai-feature-types";
+export { AiClientError, OPENCLAW_DEFAULT_MODEL } from "./ai-feature-types";
 
 export type {
   TaskDispatchAction,

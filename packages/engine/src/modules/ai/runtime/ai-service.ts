@@ -1,6 +1,6 @@
 /**
  * AI runtime entry points.
- * Resolves configured client per feature, then delegates to provider adapters.
+ * Resolves the current engine AI client, then delegates to provider adapters.
  */
 
 import type {
@@ -12,12 +12,12 @@ import type {
 
 import { chat } from "@/modules/ai/feature-normalizers";
 import { generatePlanStream } from "@/modules/ai/features/generate-plan";
-import { getClientForFeature } from "./client-resolution";
+import { getAiClient } from "./client-resolution";
 
 export async function aiChat(
   request: ChatRequest,
 ): Promise<ChatResponse | null> {
-  const client = await getClientForFeature("chat");
+  const client = await getAiClient();
   if (!client) return null;
   return chat(client, request);
 }
@@ -25,7 +25,7 @@ export async function aiChat(
 export async function* aiGeneratePlanStream(
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const client = await getClientForFeature("generate_plan");
+  const client = await getAiClient();
   if (!client) {
     yield {
       type: "error",

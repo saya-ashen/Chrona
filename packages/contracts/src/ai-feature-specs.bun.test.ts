@@ -11,7 +11,7 @@ import {
 } from "./ai";
 
 describe("generate_plan feature spec", () => {
-  it("builds a provider-agnostic feature spec with structured tool requirements", () => {
+  it("builds a provider-agnostic feature spec with structured output schema", () => {
     const spec = buildGeneratePlanFeatureSpec({
       taskId: "task-1",
       title: "制作一个汉堡",
@@ -21,9 +21,7 @@ describe("generate_plan feature spec", () => {
 
     expect(spec).toMatchObject({
       feature: "generate_plan",
-      toolChoice: "required",
-      requiredTool: {
-        type: "function",
+      structuredOutputSchema: {
         name: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
       },
     });
@@ -61,7 +59,7 @@ describe("generate_plan feature spec", () => {
       title: "制作一个汉堡",
     });
 
-    const parameters = spec.requiredTool.parameters as {
+    const parameters = spec.structuredOutputSchema.schema as {
       additionalProperties?: unknown;
       properties?: {
         nodes?: {
@@ -97,7 +95,7 @@ describe("generate_plan feature spec", () => {
       title: "制作一个汉堡",
     });
 
-    const parameters = spec.requiredTool.parameters as {
+    const parameters = spec.structuredOutputSchema.schema as {
       $schema?: unknown;
     };
 
@@ -111,9 +109,7 @@ describe("structured feature specs", () => {
 
     expect(spec).toMatchObject({
       feature: "suggest",
-      toolChoice: "required",
-      requiredTool: {
-        type: "function",
+      structuredOutputSchema: {
         name: SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
       },
     });

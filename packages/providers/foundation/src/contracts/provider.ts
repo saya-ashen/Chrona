@@ -1,7 +1,6 @@
-import type { BridgeResponse, ToolCallInfo } from "@chrona/openclaw";
+import type { BridgeResponse } from "@chrona/openclaw";
 
 export type ProviderResponse = BridgeResponse;
-export type ProviderToolCall = ToolCallInfo;
 
 export type ProviderMode = "chat" | "structured";
 
@@ -46,11 +45,10 @@ export type ProviderContinuation = {
   }>;
 };
 
-export type ProviderToolSpec = {
-  required?: boolean;
+export type ProviderStructuredOutputSchema = {
   name: string;
   description: string;
-  parameters: Record<string, unknown>;
+  schema: Record<string, unknown>;
 };
 
 export type ProviderExecuteRequest = {
@@ -58,7 +56,7 @@ export type ProviderExecuteRequest = {
   instructions?: string;
   inputText: string;
   input?: Record<string, unknown>;
-  toolSpec?: ProviderToolSpec;
+  structuredOutputSchema?: ProviderStructuredOutputSchema;
   continuation?: ProviderContinuation;
   timeoutMs?: number;
 };
@@ -71,12 +69,6 @@ export type ProviderExecuteResponse = {
   status?: string;
   outputText: string;
   structuredPayload?: unknown;
-  toolCalls: Array<{
-    tool: string;
-    callId: string;
-    input: Record<string, unknown>;
-    status: "pending" | "completed" | "error";
-  }>;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;

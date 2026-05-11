@@ -19,6 +19,5 @@ export {
   type ProviderSessionRef,
   type ProviderSessionStatus,
   type ProviderStreamEvent,
-  type ProviderToolCall,
-  type ProviderToolSpec,
+  type ProviderStructuredOutputSchema,
 } from "./ProviderClient";

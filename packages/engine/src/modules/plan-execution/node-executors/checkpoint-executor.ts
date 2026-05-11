@@ -2,9 +2,12 @@ import type { CheckpointConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
 import { reviewCheckpointNodeCapability } from "../node-ai-capabilities";
+import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 export class CheckpointNodeExecutor implements NodeExecutor {
   readonly nodeType = "checkpoint" as const;
+
+  constructor(private readonly aiRuntimeInvoker: AiRuntimeInvoker) {}
 
   canExecute(node: EffectivePlanNode): boolean {
     return node.type === "checkpoint";
@@ -65,7 +68,10 @@ export class CheckpointNodeExecutor implements NodeExecutor {
             evidence: { sessionId: input.mainSession.id },
           };
         }
-        return reviewCheckpointNodeCapability(input);
+        return reviewCheckpointNodeCapability({
+          ...input,
+          aiRuntimeInvoker: this.aiRuntimeInvoker,
+        });
     }
   }
 }

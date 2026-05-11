@@ -1,6 +1,7 @@
 import type { ConditionConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { evaluateConditionNodeCapability } from "../node-ai-capabilities";
+import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 function normalizeBranchToken(value: string) {
   return value.trim().toLowerCase();
@@ -56,6 +57,8 @@ function toCompiledBranchTarget(input: NodeExecutorInput, nextNodeId: string) {
 export class ConditionNodeExecutor implements NodeExecutor {
   readonly nodeType = "condition" as const;
 
+  constructor(private readonly aiRuntimeInvoker: AiRuntimeInvoker) {}
+
   canExecute(node: EffectivePlanNode): boolean {
     return node.type === "condition";
   }
@@ -86,7 +89,10 @@ export class ConditionNodeExecutor implements NodeExecutor {
     }
 
     if (config.evaluationBy === "ai") {
-      return evaluateConditionNodeCapability(input);
+      return evaluateConditionNodeCapability({
+        ...input,
+        aiRuntimeInvoker: this.aiRuntimeInvoker,
+      });
     }
 
     const defaultBranch = config.defaultNextNodeId

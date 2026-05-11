@@ -19,6 +19,5 @@ export type {
   ProviderSessionRef,
   ProviderSessionStatus,
   ProviderStreamEvent,
-  ProviderToolCall,
-  ProviderToolSpec,
+  ProviderStructuredOutputSchema,
 } from "./contracts/provider";

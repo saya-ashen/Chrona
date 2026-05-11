@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it } from "bun:test";
-import { executeTaskNodeCapability } from "@chrona/engine/modules/plan-execution";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import {
+  AiRuntimeInvoker,
+  executeTaskNodeCapability,
+} from "@chrona/engine/modules/plan-execution";
+import { aiClientRegistry } from "@chrona/engine/modules/ai/runtime/client-registry";
 import { db } from "@chrona/db";
 import {
   MemoryScope,
@@ -12,9 +16,9 @@ import type { BridgeResponse, OpenClawGatewayRequest } from "@chrona/openclaw";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 type TestOpenClawResponseClient = {
-  create(input: {
+  execute(input: {
     request: OpenClawGatewayRequest;
-  }): Promise<{ response: BridgeResponse }>;
+  }): Promise<BridgeResponse>;
 };
 
 function createMockOpenClawClient(input: {
@@ -25,8 +29,8 @@ function createMockOpenClawClient(input: {
   const messages: Array<{ role: string; content: string }> = [];
 
   return {
-    async create({ request }) {
-      messages.push({ role: "user", content: extractUserText(request.body) });
+    async execute({ request }) {
+      messages.push({ role: "user", content: extractUserText(request) });
       for (const outputContent of input.outputMessages) {
         messages.push({ role: "assistant", content: outputContent });
       }
@@ -36,8 +40,6 @@ function createMockOpenClawClient(input: {
         responseId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
         responseStatus: input.runStarted === false ? "failed" : "completed",
         output: input.outputMessages.at(-1) ?? "",
-        toolCalls: [],
-        toolCallOutputs: [],
         usage: null,
         error: input.runStarted === false ? "provider refused to start" : null,
         durationMs: 1,
@@ -46,23 +48,29 @@ function createMockOpenClawClient(input: {
           : null,
         feature: null,
       };
-      return { response, events: [] };
+      return response;
     },
   };
 }
 
-function extractUserText(body: Record<string, unknown>): string {
-  const input = body.input;
-  if (!Array.isArray(input)) return "";
-  const message = input.find(
-    (item): item is { role: string; content: string } =>
-      Boolean(item) &&
-      typeof item === "object" &&
-      !Array.isArray(item) &&
-      (item as Record<string, unknown>).role === "user" &&
-      typeof (item as Record<string, unknown>).content === "string",
-  );
-  return message?.content ?? "";
+const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
+
+function installMockRegistryClient(openClawClient: TestOpenClawResponseClient) {
+  aiClientRegistry.get = (async () =>
+    ({
+      record: { type: "openclaw" },
+      providerClient: openClawClient,
+    }) as any) as typeof aiClientRegistry.get;
+}
+
+function extractUserText(request: OpenClawGatewayRequest): string {
+  const parts = [request.instructions];
+  try {
+    parts.push(JSON.stringify(request.input, null, 2));
+  } catch {
+    parts.push(String(request.input));
+  }
+  return parts.filter(Boolean).join("\n\n");
 }
 
 function completedTaskResult(outputContent: string): TaskNodeAiResult {
@@ -71,6 +79,10 @@ function completedTaskResult(outputContent: string): TaskNodeAiResult {
     summary: outputContent,
     output: outputContent,
   };
+}
+
+function createAiRuntimeInvoker() {
+  return new AiRuntimeInvoker();
 }
 
 async function seedFullSetup() {
@@ -175,6 +187,10 @@ describe("executeTaskNodeCapability output persistence", () => {
     await resetTestDb();
   });
 
+  afterEach(() => {
+    aiClientRegistry.get = realGetAiClient;
+  });
+
   it("persists assistant output as conversationEntry records in main_session execution", async () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
@@ -183,6 +199,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       outputMessages: [outputContent],
       structuredResult: completedTaskResult(outputContent),
     });
+    installMockRegistryClient(openClawClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
@@ -190,7 +207,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       node: node as any,
       plan: planGraph as any,
       runtimeName: "openclaw",
-      openClawClient,
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
     expect(result.status).toBe("done");
@@ -204,6 +221,8 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(entries[0].role).toBe("user");
     expect(entries[0].content).toContain("Echo step");
     expect(entries[0].content).toContain("Produce a hello-world message");
+    expect(entries[0].content).not.toContain("nodeLayerId");
+    expect(entries[0].content).not.toContain("contextSnapshotId");
     expect(entries[1].role).toBe("assistant");
     expect(entries[1].content).toBe(outputContent);
 
@@ -221,6 +240,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       outputMessages: [],
       structuredResult: null,
     });
+    installMockRegistryClient(openClawClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
@@ -228,7 +248,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
       runtimeName: "openclaw",
-      openClawClient,
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
     expect(result.status).toBe("failed");
@@ -247,13 +267,13 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(run.status).toBe(RunStatus.Failed);
   });
 
-  it("sets run status to Failed when the provider refuses to start", async () => {
+  it("treats successful structured output as assistant output when text output is empty", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
-      runStarted: false,
-      structuredResult: null,
+      structuredResult: completedTaskResult("Structured task complete."),
     });
+    installMockRegistryClient(openClawClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
@@ -261,7 +281,42 @@ describe("executeTaskNodeCapability output persistence", () => {
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
       runtimeName: "openclaw",
-      openClawClient,
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("done");
+
+    const entries = await db.conversationEntry.findMany({
+      where: { runId: result.evidence?.runId },
+      orderBy: { sequence: "asc" },
+    });
+    expect(entries.length).toBe(2);
+    expect(entries[1].role).toBe("assistant");
+    expect(entries[1].content).toBe("Structured task complete.");
+
+    const run = await db.run.findFirstOrThrow({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(run.status).toBe(RunStatus.Completed);
+  });
+
+  it("sets run status to Failed when the provider refuses to start", async () => {
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const openClawClient = createMockOpenClawClient({
+      outputMessages: [],
+      runStarted: false,
+      structuredResult: null,
+    });
+    installMockRegistryClient(openClawClient);
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0] as any,
+      plan: planGraph as any,
+      runtimeName: "openclaw",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
     expect(result.status).toBe("failed");
@@ -279,6 +334,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       ],
       structuredResult: completedTaskResult("Final answer: task complete."),
     });
+    installMockRegistryClient(openClawClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
@@ -286,7 +342,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       node: node as any,
       plan: planGraph as any,
       runtimeName: "openclaw",
-      openClawClient,
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
     expect(result.status).toBe("done");

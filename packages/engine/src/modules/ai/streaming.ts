@@ -153,9 +153,7 @@ async function* openclawStream(
     input.scope,
   );
   const providerInput = buildOpenClawFeatureGatewayRequest({
-    feature,
     sessionKey,
-    inputText: input.inputText,
     input: input.input,
     instructions: input.instructions,
     featureSpec: input.featureSpec,
@@ -193,15 +191,13 @@ async function* openclawStream(
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-      for await (const event of openClawClient.providerClient.stream({
-        request: {
-          ...buildOpenClawFeatureGatewayRequest({
-            feature,
-            sessionKey,
-            inputText: input.inputText,
-            input: input.input,
-            instructions: input.instructions,
-            featureSpec: input.featureSpec,
+        for await (const event of openClawClient.providerClient.stream({
+          request: {
+            ...buildOpenClawFeatureGatewayRequest({
+              sessionKey,
+              input: input.input,
+              instructions: input.instructions,
+              featureSpec: input.featureSpec,
             timeoutSeconds: timeout,
             stream: true,
           }),
@@ -492,18 +488,8 @@ export function extractPreferredPlanGraphFromStructured(
     | null
     | undefined,
 ): Record<string, unknown> | null {
-  const toolCalls = (
-    structured as
-      | { bridgeToolCalls?: Array<{ tool?: unknown; input?: unknown }> }
-      | null
-      | undefined
-  )?.bridgeToolCalls;
-  const toolInput = toolCalls?.find(
-    (toolCall) => toolCall.tool === "generate_task_plan_graph",
-  )?.input;
-  return toolInput && typeof toolInput === "object"
-    ? (toolInput as Record<string, unknown>)
-    : null;
+  void structured;
+  return null;
 }
 
 function previewText(value: string, maxLength: number): string | null {
@@ -548,7 +534,6 @@ export function describeGeneratePlanFailure(params: {
         error?: string | null;
         toolName?: string | null;
         source?: string | null;
-        bridgeToolCalls?: Array<{ tool?: string; status?: string }>;
       }
     | null
     | undefined;
@@ -571,19 +556,6 @@ export function describeGeneratePlanFailure(params: {
   ) {
     parts.push(`Structured source: ${structuredRecord.source.trim()}`);
   }
-  if (
-    Array.isArray(structuredRecord?.bridgeToolCalls) &&
-    structuredRecord!.bridgeToolCalls.length > 0
-  ) {
-    const toolSummary = structuredRecord!.bridgeToolCalls
-      .map(
-        (toolCall) =>
-          `${toolCall.tool ?? "unknown"}${toolCall.status ? `(${toolCall.status})` : ""}`,
-      )
-      .join(", ");
-    parts.push(`Bridge tool calls seen: ${toolSummary}`);
-  }
-
   const textPreview = previewText(params.text, 240);
   if (textPreview) {
     parts.push(`Raw output preview: ${textPreview}`);
@@ -621,12 +593,6 @@ export function buildGeneratePlanDiagnostics(params: {
         source?: string | null;
         sessionId?: string | null;
         runId?: string | null;
-        bridgeToolCalls?: Array<{
-          tool?: string;
-          callId?: string;
-          status?: string;
-          input?: unknown;
-        }>;
       }
     | null
     | undefined;
@@ -646,17 +612,6 @@ export function buildGeneratePlanDiagnostics(params: {
           source: structuredRecord.source ?? null,
           sessionId: structuredRecord.sessionId ?? null,
           runId: structuredRecord.runId ?? null,
-          bridgeToolCalls: Array.isArray(structuredRecord.bridgeToolCalls)
-            ? structuredRecord.bridgeToolCalls.map((toolCall) => ({
-                tool: toolCall.tool ?? null,
-                callId: toolCall.callId ?? null,
-                status: toolCall.status ?? null,
-                inputPreview:
-                  toolCall.input && typeof toolCall.input === "object"
-                    ? previewText(JSON.stringify(toolCall.input), 240)
-                    : null,
-              }))
-            : [],
         }
       : null,
   };

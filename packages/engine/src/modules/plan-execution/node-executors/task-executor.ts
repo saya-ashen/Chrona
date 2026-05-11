@@ -2,9 +2,12 @@ import type { EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
 import { executeTaskNodeCapability } from "../node-ai-capabilities";
+import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 export class TaskNodeExecutor implements NodeExecutor {
   readonly nodeType = "task" as const;
+
+  constructor(private readonly aiRuntimeInvoker: AiRuntimeInvoker) {}
 
   canExecute(node: EffectivePlanNode): boolean {
     return node.type === "task";
@@ -51,7 +54,10 @@ export class TaskNodeExecutor implements NodeExecutor {
           evidence: { sessionId: input.mainSession.id },
         };
       case "main_session":
-        return executeTaskNodeCapability(input);
+        return executeTaskNodeCapability({
+          ...input,
+          aiRuntimeInvoker: this.aiRuntimeInvoker,
+        });
     }
   }
 }

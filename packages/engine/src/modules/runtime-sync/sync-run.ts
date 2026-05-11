@@ -18,6 +18,7 @@ import {
   mapRunLifecycleEvent,
 } from "@/modules/runtime-sync/mapper";
 import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
+import { requireAiClient } from "@/modules/ai/runtime/client-resolution";
 
 function resolveSessionKey(run: {
   taskSession?: { sessionKey: string } | null;
@@ -93,10 +94,7 @@ async function retrieveOpenClawResponse(
   clientId: string | null,
   responseId: string,
 ): Promise<Record<string, unknown>> {
-  const client = await aiClientRegistry.get(clientId);
-  if (!client) {
-    throw new Error("AI client is required for runtime sync");
-  }
+  const client = await requireAiClient(clientId, "AI client is required for runtime sync");
   const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   const config = openClawClient.record.config;
   const gatewayUrl = config.gatewayUrl ?? config.bridgeUrl;
@@ -132,10 +130,10 @@ async function retrieveOpenClawResponse(
 }
 
 async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncClient> {
-  const client = await aiClientRegistry.get();
-  if (!client) {
-    throw new Error("Default AI client is required for runtime sync");
-  }
+  const client = await requireAiClient(
+    undefined,
+    "Default AI client is required for runtime sync",
+  );
   const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   return {
     async getResponseSnapshot(input) {
