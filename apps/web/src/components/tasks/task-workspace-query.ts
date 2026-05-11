@@ -1,19 +1,9 @@
 import { api } from "@/lib/rpc-client";
-import type { ExecutionActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
+import type { ExecutionActionInput, PlanExecutionResult, PlanExecutionSSEEvent, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type { TaskData, TaskPlanGenerationStatus } from "./task-workspace-types";
 
-export type TaskExecutionDispatchResult = {
-  taskId: string;
-  planId: string | null;
-  mainSessionId: string | null;
-  status: string;
-  currentNodeId: string | null;
-  executedNodeIds: string[];
-  waitingNodeIds: string[];
-  blockedNodeIds: string[];
-  message: string;
-  errorDetails?: unknown;
-};
+export type TaskExecutionDispatchResult = PlanExecutionResult;
 
 export type TaskPlanState = {
   taskId: string;
@@ -70,16 +60,32 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
 export async function dispatchTaskExecutionAction(
   taskId: string,
   action: ExecutionActionInput,
+  onEvent: (event: PlanExecutionSSEEvent) => void,
 ): Promise<TaskExecutionDispatchResult> {
-  const response = await api.tasks[":taskId"].execution.actions.$post({
-    param: { taskId },
-    json: action,
+  let result: TaskExecutionDispatchResult | null = null;
+
+  await fetchJsonEventSource(`/api/tasks/${taskId}/execution/actions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(action),
+    onEvent({ data }) {
+      const event = data as PlanExecutionSSEEvent;
+      onEvent(event);
+      if (event.type === "result") {
+        result = event.result;
+      }
+      if (event.type === "error") {
+        throw new Error(event.message);
+      }
+    },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to dispatch execution action" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to dispatch execution action");
+  if (!result) {
+    throw new Error("Execution stream ended without a result");
   }
 
-  return await response.json() as TaskExecutionDispatchResult;
+  return result;
 }

@@ -210,7 +210,19 @@ export function useTaskWorkspacePlanState(task: TaskData) {
   }, []);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
-    const result = await dispatchTaskExecutionAction(task.id, action);
+    const result = await dispatchTaskExecutionAction(task.id, action, (event) => {
+      if (event.type !== "state") return;
+      queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+        if (!current?.savedPlan) return current;
+        return {
+          ...current,
+          savedPlan: {
+            ...current.savedPlan,
+            effectivePlan: event.effectivePlan,
+          },
+        } satisfies TaskPlanState;
+      });
+    });
     await Promise.all([
       planStateQuery.refetch(),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.detail(task.id) }),

@@ -30,6 +30,8 @@ import type {
   NodeAttempt,
   NodeResult,
   PlanGraph,
+  PlanExecutionResult,
+  PlanExecutionStatus,
   PlanRun,
   WaitKind,
 } from "@chrona/contracts/ai";
@@ -40,30 +42,12 @@ import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
 import { AiRuntimeInvoker } from "./ai-runtime-invoker";
 
-type PlanExecutionStatus =
-  | "started"
-  | "running"
-  | "waiting_for_user"
-  | "waiting_for_approval"
-  | "blocked"
-  | "completed"
-  | "cancelled"
-  | "no_plan";
-
-type PlanExecutionResult = {
-  taskId: string;
-  planId: string | null;
-  mainSessionId: string | null;
-  status: PlanExecutionStatus;
-  currentNodeId: string | null;
-  executedNodeIds: string[];
-  waitingNodeIds: string[];
-  blockedNodeIds: string[];
-  message: string;
-  errorDetails?: unknown;
-};
-
 type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
+
+type PlanExecutionObserver = {
+  onGraphEvent?: (event: GraphExecutionEvent) => Promise<void> | void;
+  onStateChange?: (effectivePlan: EffectivePlanGraph) => Promise<void> | void;
+};
 
 type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
 
@@ -681,7 +665,7 @@ async function advancePlanExecution(input: {
   userInput?: string;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   command?: AdvanceRuntimeCommand;
-}): Promise<PlanExecutionResult> {
+} & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
     return {
@@ -709,6 +693,10 @@ async function advancePlanExecution(input: {
     runtimeName,
     policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS },
     callbacks: {
+      onEvent: input.onGraphEvent,
+      onStateChange: input.onStateChange
+        ? (state) => input.onStateChange?.(resolveEffectivePlanGraph(state))
+        : undefined,
       executeNode: async (executorInput) => {
         const engineNode = executorInput.node as unknown as EffectivePlanNode;
         const enginePlan = executorInput.plan as unknown as EffectivePlanGraph;
@@ -929,7 +917,7 @@ async function startPlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   prompt?: string;
-}): Promise<PlanExecutionResult> {
+} & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
     return {
@@ -970,6 +958,8 @@ async function startPlanExecution(input: {
     trigger: input.trigger,
     mainSession,
     executionSession,
+    onGraphEvent: input.onGraphEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
@@ -979,7 +969,7 @@ async function continuePlanExecution(input: {
   userInput?: string;
   sessionId?: string;
   nodeId?: string;
-}): Promise<PlanExecutionResult> {
+} & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
     return {
@@ -1045,6 +1035,8 @@ async function continuePlanExecution(input: {
     userInput: input.userInput,
     forcedNodeId: waitingNode?.id,
     forcedReplaceStatus: "obsolete",
+    onGraphEvent: input.onGraphEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
@@ -1054,7 +1046,7 @@ async function resumePlanExecutionWithApproval(input: {
   nodeId?: string;
   approved: boolean;
   feedback?: string;
-}): Promise<PlanExecutionResult> {
+} & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
     return {
@@ -1131,24 +1123,30 @@ async function resumePlanExecutionWithApproval(input: {
       approved: input.approved,
       feedback: input.feedback,
     },
+    onGraphEvent: input.onGraphEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
 async function dispatchExecutionAction(input: {
   taskId: string;
   action: ExecutionActionInput;
-}): Promise<PlanExecutionResult> {
+} & PlanExecutionObserver): Promise<PlanExecutionResult> {
   switch (input.action.action) {
     case "start_manual":
       return startPlanExecution({
         taskId: input.taskId,
         trigger: "manual",
         prompt: input.action.prompt,
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     case "start_scheduled":
       return startPlanExecution({
         taskId: input.taskId,
         trigger: "scheduler",
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     case "resume_with_input":
       return continuePlanExecution({
@@ -1157,6 +1155,8 @@ async function dispatchExecutionAction(input: {
         userInput: input.action.inputText,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     case "resume_with_approval":
       return resumePlanExecutionWithApproval({
@@ -1165,6 +1165,8 @@ async function dispatchExecutionAction(input: {
         nodeId: input.action.nodeId,
         approved: input.action.decision === "approve",
         feedback: input.action.feedback ?? input.action.editedContent,
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     case "resume_after_unblock":
       return continuePlanExecution({
@@ -1173,6 +1175,8 @@ async function dispatchExecutionAction(input: {
         userInput: input.action.note,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     case "complete_manual_node": {
       const runtime = await ensureNativePlanRun(input.taskId);
@@ -1213,6 +1217,8 @@ async function dispatchExecutionAction(input: {
           summary: input.action.summary,
           output: input.action.output,
         },
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     }
     case "retry_node": {
@@ -1254,6 +1260,8 @@ async function dispatchExecutionAction(input: {
           reason: input.action.prompt ?? "Node retry requested",
           userInput: input.action.prompt,
         },
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     }
     case "cancel_session": {
@@ -1293,6 +1301,8 @@ async function dispatchExecutionAction(input: {
           type: "cancel_session",
           reason: input.action.reason ?? "Execution cancelled",
         },
+        onGraphEvent: input.onGraphEvent,
+        onStateChange: input.onStateChange,
       });
     }
     default: {

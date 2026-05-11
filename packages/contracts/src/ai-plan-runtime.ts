@@ -642,6 +642,60 @@ export type ExecutionActionInput =
       idempotencyKey?: string;
     };
 
+export type PlanExecutionStatus =
+  | "started"
+  | "running"
+  | "waiting_for_user"
+  | "waiting_for_approval"
+  | "blocked"
+  | "completed"
+  | "cancelled"
+  | "no_plan";
+
+export type PlanExecutionResult = {
+  taskId: string;
+  planId: string | null;
+  mainSessionId: string | null;
+  status: PlanExecutionStatus;
+  currentNodeId: string | null;
+  executedNodeIds: string[];
+  waitingNodeIds: string[];
+  blockedNodeIds: string[];
+  message: string;
+  errorDetails?: unknown;
+};
+
+export type PlanExecutionSSEEvent =
+  | {
+      type: "status";
+      action: ExecutionActionType;
+      message: string;
+    }
+  | {
+      type: "graph_event";
+      event: string;
+      nodeId?: string;
+      nodeTitle?: string;
+      status?: string;
+      message?: string;
+    }
+  | {
+      type: "state";
+      effectivePlan: EffectivePlanGraph;
+    }
+  | {
+      type: "result";
+      result: PlanExecutionResult;
+    }
+  | {
+      type: "error";
+      code: "INTERNAL_ERROR";
+      message: string;
+    }
+  | {
+      type: "done";
+    };
+
 export type GraphMutationRequest = {
   expectedGraphId?: string;
   expectedRevision?: number;
