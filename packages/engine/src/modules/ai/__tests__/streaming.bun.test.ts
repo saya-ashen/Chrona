@@ -26,7 +26,9 @@ mock.module("../providers", () => ({
 }));
 
 mock.module("../runtime/client-registry", () => ({
-  requireOpenClawClient: (client: EngineAiClient) => client,
+  aiClientRegistry: {
+    requireOpenClawClient: (client: EngineAiClient) => client,
+  },
 }));
 
 import { generatePlanStream } from "../features/generate-plan";

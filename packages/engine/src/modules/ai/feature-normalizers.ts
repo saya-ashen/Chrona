@@ -5,32 +5,18 @@
 import { randomUUID } from "node:crypto";
 
 import type {
-  LLMClientConfig,
-  SmartSuggestRequest,
   SmartSuggestResponse,
   SmartSuggestion,
-  GenerateTaskPlanRequest,
   GenerateTaskPlanResponse,
-  AnalyzeConflictsRequest,
-  AnalyzeConflictsResponse,
-  ConflictInfo,
-  ResolutionSuggestion,
-  SuggestTimeslotRequest,
-  SuggestTimeslotResponse,
-  TimeslotOption,
   ChatRequest,
   ChatResponse,
   StructuredDebugInfo,
-  DispatchTaskInput,
-  DispatchTaskOutput,
 } from "@chrona/contracts";
-import { parseTaskDispatchDecision } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
-import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
+import { dispatch, extractJSON } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
-import { requireLlmClient } from "./runtime/client-registry";
-import { type PlanBlueprint, planBlueprintSchema } from "@chrona/contracts/ai";
-import { createLogger } from "@chrona/shared/logger";
+import { aiClientRegistry } from "./runtime/client-registry";
+import { planBlueprintSchema } from "@chrona/contracts/ai";
 import type { ZodIssue } from "zod";
 
 function formatZodIssues(
@@ -144,7 +130,7 @@ export async function chat(
     return { content: raw, source: client.record.type };
   }
 
-  const llmClient = requireLlmClient(client);
+  const llmClient = aiClientRegistry.requireLlmClient(client);
   const config = llmClient.record.config;
   const model = config.model ?? "gpt-4o-mini";
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;

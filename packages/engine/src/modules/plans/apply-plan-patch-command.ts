@@ -5,7 +5,7 @@ import {
   getPlanRun,
   savePlanRun,
 } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
 import {
   analyzeStructuralChangeImpact,
   applyDownstreamInvalidation,

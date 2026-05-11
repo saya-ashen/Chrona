@@ -8,7 +8,7 @@ import {
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
-import { syncPlanRunRuntimeResult } from "@/modules/plan-execution/plan-runner";
+import { taskPlanExecution } from "@/modules/plan-execution";
 import {
   decodeSyncCursor,
   encodeSyncCursor,
@@ -17,7 +17,7 @@ import {
   mapHistoryDelta,
   mapRunLifecycleEvent,
 } from "@/modules/runtime-sync/mapper";
-import { getAiClient, requireOpenClawClient } from "@/modules/ai/runtime/client-registry";
+import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
 
 function resolveSessionKey(run: {
   taskSession?: { sessionKey: string } | null;
@@ -93,11 +93,11 @@ async function retrieveOpenClawResponse(
   clientId: string | null,
   responseId: string,
 ): Promise<Record<string, unknown>> {
-  const client = await getAiClient(clientId);
+  const client = await aiClientRegistry.get(clientId);
   if (!client) {
     throw new Error("AI client is required for runtime sync");
   }
-  const openClawClient = requireOpenClawClient(client);
+  const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   const config = openClawClient.record.config;
   const gatewayUrl = config.gatewayUrl ?? config.bridgeUrl;
   if (!gatewayUrl?.trim()) {
@@ -132,11 +132,11 @@ async function retrieveOpenClawResponse(
 }
 
 async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncClient> {
-  const client = await getAiClient();
+  const client = await aiClientRegistry.get();
   if (!client) {
     throw new Error("Default AI client is required for runtime sync");
   }
-  const openClawClient = requireOpenClawClient(client);
+  const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   return {
     async getResponseSnapshot(input) {
       if (!input.responseId) {
@@ -406,7 +406,7 @@ export async function syncRunFromRuntime(input: {
     snapshotStatus === "Failed" ||
     snapshotStatus === "Cancelled"
   ) {
-    await syncPlanRunRuntimeResult({
+    await taskPlanExecution.syncRuntimeResult({
       taskId: run.taskId,
       runtimeRunRef,
       status: snapshotStatus,

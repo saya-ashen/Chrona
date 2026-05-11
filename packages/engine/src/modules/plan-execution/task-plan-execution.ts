@@ -916,7 +916,7 @@ async function advancePlanExecution(input: {
   });
 }
 
-export async function startPlanExecution(input: {
+async function startPlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   prompt?: string;
@@ -1125,7 +1125,7 @@ async function resumePlanExecutionWithApproval(input: {
   });
 }
 
-export async function dispatchExecutionAction(input: {
+async function dispatchExecutionAction(input: {
   taskId: string;
   action: ExecutionActionInput;
 }): Promise<PlanExecutionResult> {
@@ -1295,7 +1295,7 @@ export async function dispatchExecutionAction(input: {
   }
 }
 
-export async function syncPlanRunRuntimeResult(
+async function syncPlanRunRuntimeResult(
   input: SyncPlanRunRuntimeResultInput,
 ): Promise<void> {
   const runtime = await ensureNativePlanRun(input.taskId);
@@ -1468,3 +1468,19 @@ export async function syncPlanRunRuntimeResult(
     await rebuildTaskProjection(input.taskId);
   }
 }
+
+export class TaskPlanExecution {
+  async start(input: Parameters<typeof startPlanExecution>[0]) {
+    return startPlanExecution(input);
+  }
+
+  async dispatch(input: Parameters<typeof dispatchExecutionAction>[0]) {
+    return dispatchExecutionAction(input);
+  }
+
+  async syncRuntimeResult(input: Parameters<typeof syncPlanRunRuntimeResult>[0]) {
+    return syncPlanRunRuntimeResult(input);
+  }
+}
+
+export const taskPlanExecution = new TaskPlanExecution();

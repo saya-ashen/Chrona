@@ -26,7 +26,7 @@ import {
   openclawCall,
 } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
-import { requireLlmClient, requireOpenClawClient } from "./runtime/client-registry";
+import { aiClientRegistry } from "./runtime/client-registry";
 import { buildOpenClawSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
@@ -145,7 +145,7 @@ async function* openclawStream(
   feature: AiFeature,
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
-  const openClawClient = requireOpenClawClient(client);
+  const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   const config = openClawClient.record.config;
   const timeout = config.timeoutSeconds ?? 120;
   const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
@@ -384,7 +384,7 @@ export function dispatchStream(
       input,
     );
   }
-  const llmClient = requireLlmClient(client);
+  const llmClient = aiClientRegistry.requireLlmClient(client);
   const request = toLlmStreamRequest(feature, input);
   return llmStream(
     llmClient.record.config,

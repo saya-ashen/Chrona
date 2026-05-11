@@ -9,7 +9,7 @@ import {
   createPlanGraphFromCompiledPlan,
   savePlanRun,
 } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
 import { buildTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { upgradeBlueprintToEditable } from "@chrona/contracts";
 

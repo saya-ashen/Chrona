@@ -5,7 +5,7 @@ export {
 } from "./node-ai-capabilities";
 
 export {
-  startPlanExecution,
-  dispatchExecutionAction,
+  TaskPlanExecution,
   createPlanRunFromCompiledPlan,
-} from "./plan-runner";
+  taskPlanExecution,
+} from "./task-plan-execution";

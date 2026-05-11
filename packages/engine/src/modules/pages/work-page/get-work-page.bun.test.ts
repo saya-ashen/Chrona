@@ -13,7 +13,7 @@ import { db } from "@/lib/db";
 import { getWorkPage, WorkPageTaskNotFoundError } from "@/modules/pages/work-page";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/plan-runner";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
 async function resetDb() {
