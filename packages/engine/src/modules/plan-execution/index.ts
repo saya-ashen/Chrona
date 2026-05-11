@@ -15,3 +15,7 @@ export {
   createPlanRunFromCompiledPlan,
   taskPlanExecution,
 } from "./task-plan-execution";
+
+export type {
+  GraphExecutionEvent,
+} from "@chrona/graph-runtime";

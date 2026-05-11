@@ -90,6 +90,49 @@ function makeSmokeCompiledPlan(planId: string): CompiledPlan {
   };
 }
 
+function makeWaitExecutionPlan(planId: string): CompiledPlan {
+  return {
+    id: `compiled_${planId}`,
+    editablePlanId: planId,
+    sourceVersion: 1,
+    title: "Execution stream plan",
+    goal: "Pause on an external wait node",
+    assumptions: [],
+    nodes: [
+      {
+        id: "wait_for_user",
+        localId: "wait_for_user",
+        type: "wait",
+        title: "Wait for user input",
+        description: "Stop execution until the UI can react",
+        config: { waitFor: "user confirmation" },
+        dependencies: [],
+        dependents: [],
+        mode: "manual",
+        executor: "user",
+        priority: "Medium",
+      },
+    ],
+    edges: [],
+    entryNodeIds: ["wait_for_user"],
+    terminalNodeIds: ["wait_for_user"],
+    topologicalOrder: ["wait_for_user"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
+function parseSseEvents(text: string) {
+  return text
+    .trim()
+    .split(/\n\n+/)
+    .map((chunk) => {
+      const event = chunk.match(/^event: (.+)$/m)?.[1] ?? "message";
+      const data = chunk.match(/^data: (.+)$/m)?.[1] ?? "{}";
+      return { event, data: JSON.parse(data) as Record<string, unknown> };
+    });
+}
+
 describe("Real router smoke", () => {
   beforeEach(async () => {
     await resetTestDb();
@@ -186,6 +229,43 @@ describe("Real router smoke", () => {
     expect(stateBody.aiPlanGenerationStatus).toBe("accepted");
     expect(stateBody.savedPlan?.id).toBe(compiledPlan.editablePlanId);
     expect(stateBody.savedPlan?.compiledPlan.nodes.length).toBeGreaterThan(0);
+  });
+
+  it("streams execution action state and result through SSE", async () => {
+    const { workspaceId } = await seedWorkspace("Real Router Execution Stream");
+    const { taskId } = await seedTask(workspaceId, { title: "Streamed execution", status: "Ready" });
+    const compiledPlan = makeWaitExecutionPlan("real-router-execution-stream");
+
+    await saveCompiledPlan({
+      workspaceId,
+      taskId,
+      compiledPlan,
+      status: "accepted",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "real-router-smoke",
+    });
+
+    const streamRes = await app().request(`http://local/api/tasks/${taskId}/execution/actions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify({ action: "start_manual" }),
+    });
+
+    expect(streamRes.status).toBe(200);
+    expect(streamRes.headers.get("content-type")).toContain("text/event-stream");
+
+    const events = parseSseEvents(await streamRes.text());
+    expect(events.map((entry) => entry.event)).toContain("status");
+    expect(events.map((entry) => entry.event)).toContain("state");
+    expect(events.map((entry) => entry.event)).toContain("result");
+    expect(events.at(-1)?.event).toBe("done");
+
+    const result = events.find((entry) => entry.event === "result")?.data.result as { status?: string } | undefined;
+    expect(result?.status).toBe("waiting_for_user");
   });
 
   it("runs schedule proposal create, accept, and reject through the production router", async () => {
