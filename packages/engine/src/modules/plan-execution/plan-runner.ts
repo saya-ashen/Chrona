@@ -752,6 +752,7 @@ async function advancePlanExecution(input: {
                 nodeId: command.nodeId,
                 approved: command.approved,
                 feedback: command.feedback,
+                userInput: command.feedback,
               },
             }
           : command.type === "complete_manual_node"

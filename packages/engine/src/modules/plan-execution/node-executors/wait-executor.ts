@@ -1,7 +1,5 @@
-import type { EffectivePlanNode } from "@chrona/contracts/ai";
+import type { EffectivePlanNode, WaitConfig } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
-import { decideNodeExecutionSession } from "../session-policy";
-import { executePlanNode } from "../node-executor";
 
 export class WaitNodeExecutor implements NodeExecutor {
   readonly nodeType = "wait" as const;
@@ -11,21 +9,29 @@ export class WaitNodeExecutor implements NodeExecutor {
   }
 
   async execute(input: NodeExecutorInput): Promise<NodeExecutionResult> {
-    const sessionDecision = decideNodeExecutionSession({
-      node: input.node,
-      plan: input.plan,
-      parentTaskId: input.taskId,
-    });
+    const config = input.node.config as WaitConfig;
 
-    return executePlanNode({
-      taskId: input.taskId,
-      planId: input.planId,
-      mainSession: input.mainSession,
-      node: input.node,
-      plan: input.plan,
-      sessionDecision,
-      trigger: input.trigger,
-      runtimeName: input.runtimeName,
-    });
+    if (input.node.status === "completed" || input.node.status === "skipped") {
+      return {
+        status: "done",
+        summary: `Wait node ${input.node.id} was already completed`,
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    if (config.timeout?.onTimeout === "continue") {
+      return {
+        status: "done",
+        summary: `Wait condition noted: ${config.waitFor}`,
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    return {
+      status: "waiting_for_user",
+      prompt: `Waiting for: ${config.waitFor}`,
+      reason: `Wait node ${input.node.id} requires external completion`,
+      evidence: { sessionId: input.mainSession.id },
+    };
   }
 }

@@ -1,4 +1,8 @@
-export { executePlanNode } from "./node-executor";
+export {
+  executeTaskNodeCapability,
+  evaluateConditionNodeCapability,
+  reviewCheckpointNodeCapability,
+} from "./node-ai-capabilities";
 
 export {
   startPlanExecution,

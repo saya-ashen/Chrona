@@ -1,7 +1,5 @@
 import type {
   GenerateTaskPlanRequest,
-  GraphMutationOperation,
-  WaitKind,
 } from "./ai-plan-runtime";
 import {
   planBlueprintSchema,
@@ -24,7 +22,9 @@ export type StructuredAiFeature =
   | "conflicts"
   | "timeslots"
   | "dispatch_task"
-  | "execute_node";
+  | "execute_task_node"
+  | "evaluate_condition_node"
+  | "review_checkpoint_node";
 
 export type PreparedAiFeatureSpec = {
   feature: StructuredAiFeature;
@@ -41,8 +41,11 @@ export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "generate_task_plan_graph";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
-export const CHRONA_NODE_EXECUTION_RESULT_TOOL_NAME =
-  "chrona_node_execution_result";
+export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "execute_task_node_result";
+export const EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME =
+  "evaluate_condition_node_result";
+export const REVIEW_CHECKPOINT_NODE_RESULT_TOOL_NAME =
+  "review_checkpoint_node_result";
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION =
   "Return Chrona task suggestions as structured tool arguments.";
@@ -62,72 +65,16 @@ export const GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION =
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
 
-export const CHRONA_NODE_EXECUTION_RESULT_TOOL_DESCRIPTION =
-  "Return the observed Chrona plan node execution result as structured tool arguments.";
+export const EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION =
+  "Return the minimal result of executing one Chrona task node.";
 
-export type ChronaNodeExecutionReturnStatus =
-  | "completed"
-  | "waiting"
-  | "blocked"
-  | "failed"
-  | "replan_required"
-  | "external_running";
+export const EVALUATE_CONDITION_NODE_RESULT_TOOL_DESCRIPTION =
+  "Return the selected branch for one Chrona condition node.";
 
-export interface ChronaNodeExecutionReturn {
-  kind: "node_execution_result";
-  graphId: string;
-  nodeId: string;
-  nodeLayerId: string;
-  attemptId: string;
-  contextSnapshotId: string;
-  status: ChronaNodeExecutionReturnStatus;
-  result?: {
-    summary: string;
-    outputData?: unknown;
-    artifactRefs?: string[];
-    evidenceRefs?: string[];
-  };
-  wait?: {
-    kind: WaitKind;
-    reason: string;
-    prompt?: string;
-  };
-  branch?: {
-    label: string;
-    nextNodeId: string;
-    source: "user" | "ai" | "system" | "default";
-  };
-  replan?: {
-    reason: string;
-    scope: "future_only" | "from_node" | "include_completed";
-    proposedOperations: GraphMutationOperation[];
-    requiresUserConfirmation: boolean;
-    affectedNodeIds?: string[];
-    invalidatedNodeIds?: string[];
-  };
-  error?: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  };
-  evidence?: {
-    sessionId?: string;
-    runId?: string;
-    childTaskId?: string;
-    childSessionId?: string;
-    artifactIds?: string[];
-    conversationEntryIds?: string[];
-    eventIds?: string[];
-    toolCallIds?: string[];
-  };
-  ui?: {
-    userMessage?: string;
-    debugSummary?: string;
-    recommendedFollowups?: string[];
-  };
-}
+export const REVIEW_CHECKPOINT_NODE_RESULT_TOOL_DESCRIPTION =
+  "Return a recommendation for one Chrona checkpoint node.";
 
-export interface NodeExecutionFeatureInput {
+export interface TaskNodeExecutionFeatureInput {
   graphId: string;
   nodeId: string;
   nodeLayerId: string;
@@ -136,95 +83,93 @@ export interface NodeExecutionFeatureInput {
   taskId: string;
   planTitle?: string;
   nodeTitle: string;
-  nodeType: string;
   nodeObjective: string;
+  expectedOutput?: string;
+  completionCriteria?: string;
   completedNodeTitles: string[];
   instructions: string;
 }
 
-const chronaNodeExecutionReturnSchema = z.object({
-  kind: z.literal("node_execution_result"),
-  graphId: z.string(),
-  nodeId: z.string(),
-  nodeLayerId: z.string(),
-  attemptId: z.string(),
-  contextSnapshotId: z.string(),
-  status: z.enum([
+export type TaskNodeAiOutcome =
+  | "completed"
+  | "blocked"
+  | "needs_input"
+  | "failed"
+  | "external_running";
+
+export interface TaskNodeAiResult {
+  outcome: TaskNodeAiOutcome;
+  summary: string;
+  output?: unknown;
+  reason?: string;
+  prompt?: string;
+}
+
+export interface ConditionNodeEvaluationFeatureInput {
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  taskId: string;
+  planTitle?: string;
+  nodeTitle: string;
+  condition: string;
+  branches: Array<{ label: string; nextNodeId: string }>;
+  defaultNextNodeId?: string;
+  completedNodeTitles: string[];
+  instructions: string;
+}
+
+export interface ConditionNodeAiResult {
+  selectedBranchLabel: string;
+  reason: string;
+  confidence?: number;
+}
+
+export interface CheckpointNodeReviewFeatureInput {
+  graphId: string;
+  nodeId: string;
+  nodeLayerId: string;
+  taskId: string;
+  planTitle?: string;
+  nodeTitle: string;
+  checkpointType: string;
+  prompt: string;
+  options?: string[];
+  completedNodeTitles: string[];
+  instructions: string;
+}
+
+export interface CheckpointNodeAiResult {
+  recommendation: "approve" | "request_changes" | "block";
+  summary: string;
+  reason: string;
+}
+
+export const taskNodeAiResultSchema = z.object({
+  outcome: z.enum([
     "completed",
-    "waiting",
     "blocked",
+    "needs_input",
     "failed",
-    "replan_required",
     "external_running",
   ]),
-  result: z
-    .object({
-      summary: z.string(),
-      outputData: z.unknown().optional(),
-      artifactRefs: z.array(z.string()).optional(),
-      evidenceRefs: z.array(z.string()).optional(),
-    })
-    .optional(),
-  wait: z
-    .object({
-      kind: z.enum([
-        "user_input",
-        "approval",
-        "review",
-        "manual_action",
-        "external_dependency",
-        "capability_unavailable",
-      ]),
-      reason: z.string(),
-      prompt: z.string().optional(),
-    })
-    .optional(),
-  branch: z
-    .object({
-      label: z.string(),
-      nextNodeId: z.string(),
-      source: z.enum(["user", "ai", "system", "default"]),
-    })
-    .optional(),
-  replan: z
-    .object({
-      reason: z.string(),
-      scope: z.enum(["future_only", "from_node", "include_completed"]),
-      proposedOperations: z.array(z.record(z.string(), z.unknown())),
-      requiresUserConfirmation: z.boolean(),
-      affectedNodeIds: z.array(z.string()).optional(),
-      invalidatedNodeIds: z.array(z.string()).optional(),
-    })
-    .optional(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-      retryable: z.boolean(),
-    })
-    .optional(),
-  evidence: z
-    .object({
-      sessionId: z.string().optional(),
-      runId: z.string().optional(),
-      childTaskId: z.string().optional(),
-      childSessionId: z.string().optional(),
-      artifactIds: z.array(z.string()).optional(),
-      conversationEntryIds: z.array(z.string()).optional(),
-      eventIds: z.array(z.string()).optional(),
-      toolCallIds: z.array(z.string()).optional(),
-    })
-    .optional(),
-  ui: z
-    .object({
-      userMessage: z.string().optional(),
-      debugSummary: z.string().optional(),
-      recommendedFollowups: z.array(z.string()).optional(),
-    })
-    .optional(),
-});
+  summary: z.string().min(1),
+  output: z.unknown().optional(),
+  reason: z.string().optional(),
+  prompt: z.string().optional(),
+}).strict();
 
-export { chronaNodeExecutionReturnSchema };
+export const conditionNodeAiResultSchema = z.object({
+  selectedBranchLabel: z.string().min(1),
+  reason: z.string().min(1),
+  confidence: z.number().min(0).max(1).optional(),
+}).strict();
+
+export const checkpointNodeAiResultSchema = z.object({
+  recommendation: z.enum(["approve", "request_changes", "block"]),
+  summary: z.string().min(1),
+  reason: z.string().min(1),
+}).strict();
 
 export const SUGGEST_SYSTEM_PROMPT = `
 
@@ -268,19 +213,42 @@ Rules:
 7. Set safety.requiresHumanApproval true when risk is non-trivial.
 `;
 
-export const EXECUTE_NODE_SYSTEM_PROMPT = `
-You are Chrona's plan-node execution worker.
-Execute or assess only the current node described in the input.
-You MUST call the business tool chrona_node_execution_result.
-Do not decide graph traversal outside the fields in the tool payload.
+export const EXECUTE_TASK_NODE_SYSTEM_PROMPT = `
+You are Chrona's task-node worker.
+Execute or assess only the task node described in the input.
+You MUST call the business tool execute_task_node_result.
 
 Rules:
-1. Return kind "node_execution_result".
-2. Use status "completed" only when the node objective is actually satisfied.
-3. Use status "waiting" when human input, approval, review, manual action, external dependency, or unavailable capability blocks progress.
-4. Use status "replan_required" only when future plan graph changes are needed; propose operations but do not apply them.
-5. Use status "external_running" only when you started external work that cannot complete in this turn.
-6. Keep summaries concise and evidence-based.
+1. Return outcome "completed" only when the task objective is satisfied.
+2. Return "needs_input" only when a specific user answer is required; include prompt.
+3. Return "blocked" when progress depends on an external condition or unavailable capability; include reason.
+4. Return "external_running" only when work has started but cannot complete in this turn.
+5. Do not propose plan patches or graph traversal.
+6. Keep summary concise and evidence-based.
+`.trim();
+
+export const EVALUATE_CONDITION_NODE_SYSTEM_PROMPT = `
+You are Chrona's condition evaluator.
+Evaluate only the condition node described in the input.
+You MUST call the business tool evaluate_condition_node_result.
+
+Rules:
+1. Pick exactly one provided branch label.
+2. Use the default branch only when no explicit branch matches.
+3. Do not invent branch labels or next node ids.
+4. Provide a short reason and confidence from 0 to 1.
+`.trim();
+
+export const REVIEW_CHECKPOINT_NODE_SYSTEM_PROMPT = `
+You are Chrona's checkpoint reviewer.
+Review only the checkpoint node described in the input.
+You MUST call the business tool review_checkpoint_node_result.
+
+Rules:
+1. Recommend "approve" only when the checkpoint criteria are satisfied.
+2. Recommend "request_changes" when user edits or clarification are needed.
+3. Recommend "block" when approval would be unsafe or impossible.
+4. Do not approve on behalf of the user; provide a recommendation only.
 `.trim();
 
 export const GENERATE_PLAN_SYSTEM_PROMPT = `
@@ -519,11 +487,25 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
   parameters: toProviderJsonSchema(planPatchSchema),
 };
 
-export const chronaNodeExecutionResultToolSpec: AiFeatureToolSpec = {
+export const executeTaskNodeResultToolSpec: AiFeatureToolSpec = {
   type: "function",
-  name: CHRONA_NODE_EXECUTION_RESULT_TOOL_NAME,
-  description: CHRONA_NODE_EXECUTION_RESULT_TOOL_DESCRIPTION,
-  parameters: toProviderJsonSchema(chronaNodeExecutionReturnSchema),
+  name: EXECUTE_TASK_NODE_RESULT_TOOL_NAME,
+  description: EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(taskNodeAiResultSchema),
+};
+
+export const evaluateConditionNodeResultToolSpec: AiFeatureToolSpec = {
+  type: "function",
+  name: EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME,
+  description: EVALUATE_CONDITION_NODE_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(conditionNodeAiResultSchema),
+};
+
+export const reviewCheckpointNodeResultToolSpec: AiFeatureToolSpec = {
+  type: "function",
+  name: REVIEW_CHECKPOINT_NODE_RESULT_TOOL_NAME,
+  description: REVIEW_CHECKPOINT_NODE_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(checkpointNodeAiResultSchema),
 };
 
 export function buildGeneratePlanFeatureInputText(
@@ -649,11 +631,11 @@ export function buildDispatchTaskFeatureSpec(): PreparedAiFeatureSpec {
   };
 }
 
-export function buildNodeExecutionFeatureInputText(
-  input: NodeExecutionFeatureInput,
+export function buildTaskNodeExecutionFeatureInputText(
+  input: TaskNodeExecutionFeatureInput,
 ): string {
   return [
-    "Execute the current Chrona plan node and return only the structured tool result.",
+    "Execute the current Chrona task node and return only the structured tool result.",
     "",
     `Task ID: ${input.taskId}`,
     input.planTitle ? `Plan: ${input.planTitle}` : "",
@@ -663,8 +645,11 @@ export function buildNodeExecutionFeatureInputText(
     `Attempt ID: ${input.attemptId}`,
     `Context snapshot ID: ${input.contextSnapshotId}`,
     `Node title: ${input.nodeTitle}`,
-    `Node type: ${input.nodeType}`,
     `Objective: ${input.nodeObjective}`,
+    input.expectedOutput ? `Expected output: ${input.expectedOutput}` : "",
+    input.completionCriteria
+      ? `Completion criteria: ${input.completionCriteria}`
+      : "",
     input.completedNodeTitles.length > 0
       ? `Already completed: ${input.completedNodeTitles.join(", ")}`
       : "Already completed: none",
@@ -676,14 +661,93 @@ export function buildNodeExecutionFeatureInputText(
     .join("\n");
 }
 
-export function buildNodeExecutionFeatureSpec(
-  input: NodeExecutionFeatureInput,
+export function buildTaskNodeExecutionFeatureSpec(
+  input: TaskNodeExecutionFeatureInput,
 ): PreparedAiFeatureSpec {
   return {
-    feature: "execute_node",
-    instructions: EXECUTE_NODE_SYSTEM_PROMPT,
-    inputText: buildNodeExecutionFeatureInputText(input),
-    requiredTool: chronaNodeExecutionResultToolSpec,
+    feature: "execute_task_node",
+    instructions: EXECUTE_TASK_NODE_SYSTEM_PROMPT,
+    inputText: buildTaskNodeExecutionFeatureInputText(input),
+    requiredTool: executeTaskNodeResultToolSpec,
+    toolChoice: "required",
+  };
+}
+
+export function buildConditionNodeEvaluationFeatureInputText(
+  input: ConditionNodeEvaluationFeatureInput,
+): string {
+  return [
+    "Evaluate the current Chrona condition node and return only the selected branch.",
+    "",
+    `Task ID: ${input.taskId}`,
+    input.planTitle ? `Plan: ${input.planTitle}` : "",
+    `Graph ID: ${input.graphId}`,
+    `Node ID: ${input.nodeId}`,
+    `Node layer ID: ${input.nodeLayerId}`,
+    `Node title: ${input.nodeTitle}`,
+    `Condition: ${input.condition}`,
+    "Branches:",
+    ...input.branches.map(
+      (branch) => `  - ${branch.label} -> ${branch.nextNodeId}`,
+    ),
+    input.defaultNextNodeId ? `Default next node: ${input.defaultNextNodeId}` : "",
+    input.completedNodeTitles.length > 0
+      ? `Already completed: ${input.completedNodeTitles.join(", ")}`
+      : "Already completed: none",
+    "",
+    "Evaluation instructions:",
+    input.instructions,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildConditionNodeEvaluationFeatureSpec(
+  input: ConditionNodeEvaluationFeatureInput,
+): PreparedAiFeatureSpec {
+  return {
+    feature: "evaluate_condition_node",
+    instructions: EVALUATE_CONDITION_NODE_SYSTEM_PROMPT,
+    inputText: buildConditionNodeEvaluationFeatureInputText(input),
+    requiredTool: evaluateConditionNodeResultToolSpec,
+    toolChoice: "required",
+  };
+}
+
+export function buildCheckpointNodeReviewFeatureInputText(
+  input: CheckpointNodeReviewFeatureInput,
+): string {
+  return [
+    "Review the current Chrona checkpoint node and return only the recommendation.",
+    "",
+    `Task ID: ${input.taskId}`,
+    input.planTitle ? `Plan: ${input.planTitle}` : "",
+    `Graph ID: ${input.graphId}`,
+    `Node ID: ${input.nodeId}`,
+    `Node layer ID: ${input.nodeLayerId}`,
+    `Node title: ${input.nodeTitle}`,
+    `Checkpoint type: ${input.checkpointType}`,
+    `Prompt: ${input.prompt}`,
+    input.options?.length ? `Options: ${input.options.join(", ")}` : "",
+    input.completedNodeTitles.length > 0
+      ? `Already completed: ${input.completedNodeTitles.join(", ")}`
+      : "Already completed: none",
+    "",
+    "Review instructions:",
+    input.instructions,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildCheckpointNodeReviewFeatureSpec(
+  input: CheckpointNodeReviewFeatureInput,
+): PreparedAiFeatureSpec {
+  return {
+    feature: "review_checkpoint_node",
+    instructions: REVIEW_CHECKPOINT_NODE_SYSTEM_PROMPT,
+    inputText: buildCheckpointNodeReviewFeatureInputText(input),
+    requiredTool: reviewCheckpointNodeResultToolSpec,
     toolChoice: "required",
   };
 }
@@ -810,14 +874,38 @@ export function validatePreparedFeaturePayload(
       }
       return { ok: true };
     }
-    case "execute_node": {
-      const validation = chronaNodeExecutionReturnSchema.safeParse(payload);
+    case "execute_task_node": {
+      const validation = taskNodeAiResultSchema.safeParse(payload);
       if (!validation.success) {
         return {
           ok: false,
           error:
             validation.error.issues[0]?.message ??
-            "Feature 'execute_node' returned an invalid node execution result",
+            "Feature 'execute_task_node' returned an invalid task node result",
+        };
+      }
+      return { ok: true };
+    }
+    case "evaluate_condition_node": {
+      const validation = conditionNodeAiResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'evaluate_condition_node' returned an invalid condition result",
+        };
+      }
+      return { ok: true };
+    }
+    case "review_checkpoint_node": {
+      const validation = checkpointNodeAiResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'review_checkpoint_node' returned an invalid checkpoint result",
         };
       }
       return { ok: true };

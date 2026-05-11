@@ -29,7 +29,7 @@ mock.module("../runtime/client-registry", () => ({
   requireOpenClawClient: (client: EngineAiClient) => client,
 }));
 
-import { generatePlanStream } from "../streaming";
+import { generatePlanStream } from "../features/generate-plan";
 import type { EngineAiClient } from "../runtime/client-registry";
 
 describe("generatePlanStream", () => {

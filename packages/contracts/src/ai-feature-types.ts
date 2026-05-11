@@ -12,7 +12,10 @@ export type AiFeature =
   | "conflicts"
   | "timeslots"
   | "chat"
-  | "dispatch_task";
+  | "dispatch_task"
+  | "execute_task_node"
+  | "evaluate_condition_node"
+  | "review_checkpoint_node";
 
 export interface AiClientRecord {
   id: string;

@@ -29,7 +29,6 @@ import { AiClientError } from "@chrona/contracts";
 import { dispatch, dispatchFeaturePayload, extractJSON } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { requireLlmClient } from "./runtime/client-registry";
-import { buildGeneratePlanScope } from "./streaming";
 import { type PlanBlueprint, planBlueprintSchema } from "@chrona/contracts/ai";
 import { createLogger } from "@chrona/shared/logger";
 import type { ZodIssue } from "zod";

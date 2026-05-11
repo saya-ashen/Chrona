@@ -14,19 +14,12 @@ import type {
   AnalyzeConflictsRequest,
   SuggestTimeslotRequest,
   ChatRequest,
-  EditablePlan,
 } from "@chrona/contracts";
-import {
-  buildGeneratePlanFeatureSpec,
-  buildSuggestFeatureSpec,
-} from "@chrona/contracts";
+import { buildSuggestFeatureSpec } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import { createLogger } from "@chrona/shared/logger";
 import type { OpenClawStreamEvent as ProviderStreamEvent } from "@chrona/openclaw";
-import {
-  normalizeGeneratePlanResponse,
-  normalizeSuggestResponse,
-} from "./feature-normalizers";
+import { normalizeSuggestResponse } from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
   buildOpenClawFeatureGatewayRequest,
@@ -43,7 +36,7 @@ function summarizeText(value: string, maxLength: number) {
 
 const logger = createLogger("ai-features.openclaw.streaming");
 
-type PreparedStreamInput = {
+export type PreparedStreamInput = {
   scope: string;
   instructions: string;
   inputText: string;
@@ -53,7 +46,7 @@ type PreparedStreamInput = {
   signal?: AbortSignal;
 };
 
-function prepareStreamInput(
+export function prepareStreamInput(
   scope: string,
   input:
     | string
@@ -125,7 +118,7 @@ function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
   }
 }
 
-function summarizeStreamEvent(event: StreamEvent | null) {
+export function summarizeStreamEvent(event: StreamEvent | null) {
   if (!event) return null;
   switch (event.type) {
     case "partial":
@@ -379,7 +372,7 @@ async function* llmStream(
   yield { type: "done", text: fullText, structured: null };
 }
 
-function dispatchStream(
+export function dispatchStream(
   client: EngineAiClient,
   feature: AiFeature,
   input: PreparedStreamInput,
@@ -493,7 +486,7 @@ export async function* suggestStream(
   }
 }
 
-function extractPreferredPlanGraphFromStructured(
+export function extractPreferredPlanGraphFromStructured(
   structured:
     | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
     | null
@@ -521,7 +514,7 @@ function previewText(value: string, maxLength: number): string | null {
     : `${trimmed.slice(0, maxLength - 1)}…`;
 }
 
-function describeGeneratePlanFailure(params: {
+export function describeGeneratePlanFailure(params: {
   text: string;
   structured:
     | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
@@ -608,7 +601,7 @@ function describeGeneratePlanFailure(params: {
   return parts.join(" ");
 }
 
-function buildGeneratePlanDiagnostics(params: {
+export function buildGeneratePlanDiagnostics(params: {
   text: string;
   structured:
     | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
@@ -667,177 +660,4 @@ function buildGeneratePlanDiagnostics(params: {
         }
       : null,
   };
-}
-
-export function buildGeneratePlanScope(
-  request: GenerateTaskPlanRequest,
-): string {
-  if (request.sessionKey?.trim()) {
-    return request.sessionKey.trim();
-  }
-  const taskPart = request.taskId?.trim();
-  if (taskPart) {
-    return `chrona:openclaw:task:${taskPart}:default`;
-  }
-  const titlePart =
-    request.title.trim().toLowerCase().slice(0, 120) || "untitled";
-  const nonce = Math.random().toString(36).slice(2, 10);
-  return `adhoc-${titlePart}-${nonce}`;
-}
-
-type GeneratePlanAccumulator = {
-  finalText: string;
-  latestToolInput: Record<string, unknown> | null;
-};
-
-function hasNonEmptyPlanBlueprint(
-  plan: unknown,
-): plan is { blueprint: { nodes: unknown[] } } {
-  if (!plan || typeof plan !== "object") {
-    return false;
-  }
-
-  const blueprint = (plan as { blueprint?: unknown }).blueprint;
-  if (!blueprint || typeof blueprint !== "object") {
-    return false;
-  }
-
-  const nodes = (blueprint as { nodes?: unknown }).nodes;
-  return Array.isArray(nodes) && nodes.length > 0;
-}
-
-function collectGeneratePlanResult(
-  acc: GeneratePlanAccumulator,
-  doneEvent: Extract<StreamEvent, { type: "done" }>,
-  source: string,
-): StreamEvent {
-  const text = doneEvent.text ?? acc.finalText;
-  const structuredToolGraph = extractPreferredPlanGraphFromStructured(
-    doneEvent.structured ?? null,
-  );
-
-  let parsed = (acc.latestToolInput ??
-    structuredToolGraph ??
-    null) as EditablePlan | null;
-  if (!acc.latestToolInput && !structuredToolGraph) {
-    try {
-      parsed = text ? (JSON.parse(text) as EditablePlan) : null;
-    } catch {
-      parsed = null;
-    }
-  }
-
-  const normalized = normalizeGeneratePlanResponse({
-    parsed: parsed,
-    source,
-    structured: doneEvent.structured,
-  });
-  const plan = normalized.plan;
-  if (!hasNonEmptyPlanBlueprint(plan)) {
-    const diagnostics = buildGeneratePlanDiagnostics({
-      text,
-      structured: doneEvent.structured ?? null,
-      latestToolInput: acc.latestToolInput,
-      structuredToolGraph,
-      validationErrors: normalized.validationErrors,
-      validationWarnings: normalized.validationWarnings,
-    });
-    return {
-      type: "error",
-      message: `${describeGeneratePlanFailure({ text, structured: doneEvent.structured ?? null, latestToolInput: acc.latestToolInput, structuredToolGraph, validationErrors: normalized.validationErrors })} Normalized plan blueprint contained zero nodes.`,
-      rawText: text,
-      structured: doneEvent.structured ?? null,
-      diagnostics,
-    };
-  }
-
-  return { type: "result", plan };
-}
-
-export async function* generatePlanStream(
-  client: EngineAiClient,
-  request: GenerateTaskPlanRequest,
-): AsyncGenerator<StreamEvent> {
-  const featureSpec = buildGeneratePlanFeatureSpec(request);
-  const preparedInput = prepareStreamInput(
-    buildGeneratePlanScope(request),
-    request,
-    featureSpec,
-  );
-  const generator = dispatchStream(client, "generate_plan", preparedInput);
-  const dump = await createDebugDump({
-    enabledEnv: "CHRONA_AI_STREAM_DUMP",
-    directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-    kind: "ai-stream",
-    label: `generate-plan-${request.taskId ?? preparedInput.scope}`,
-    meta: {
-      layer: "engine.generatePlanStream",
-      clientType: client.record.type,
-      taskId: request.taskId ?? null,
-      scope: preparedInput.scope,
-    },
-  });
-  const acc: GeneratePlanAccumulator = { finalText: "", latestToolInput: null };
-  let latestStructured: NonNullable<
-    Extract<StreamEvent, { type: "done" }>["structured"]
-  > | null = null;
-
-  for await (const event of generator) {
-    await dump?.write({ type: "input_event", event: summarizeStreamEvent(event) });
-    if (
-      event.type === "tool_call" &&
-      event.tool === "generate_task_plan_graph"
-    ) {
-      acc.latestToolInput = event.input;
-      await dump?.write({
-        type: "accumulator",
-        field: "latestToolInput",
-        value: previewDebugValue(acc.latestToolInput, 1200),
-      });
-      await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
-      yield event;
-      continue;
-    }
-
-    if (event.type === "partial") {
-      acc.finalText += event.text;
-      await dump?.write({
-        type: "accumulator",
-        field: "finalText",
-        textLength: acc.finalText.length,
-      });
-      await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
-      yield event;
-      continue;
-    }
-
-    if (event.type === "done") {
-      latestStructured = event.structured ?? null;
-      const resolved = collectGeneratePlanResult(acc, event, client.record.type);
-      await dump?.write({
-        type: "resolved",
-        event: summarizeStreamEvent(resolved),
-        hasLatestToolInput: Boolean(acc.latestToolInput),
-        finalTextLength: acc.finalText.length,
-      });
-      yield resolved;
-      if (resolved.type === "result") {
-        const doneEvent: StreamEvent = {
-          type: "done",
-          text: event.text ?? acc.finalText,
-          structured: latestStructured ?? null,
-        };
-        await dump?.write({ type: "yield", event: summarizeStreamEvent(doneEvent) });
-        yield doneEvent;
-      }
-      await dump?.close();
-      return;
-    }
-
-    await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
-    yield event;
-  }
-
-  await dump?.write({ type: "generator_exhausted" });
-  await dump?.close();
 }

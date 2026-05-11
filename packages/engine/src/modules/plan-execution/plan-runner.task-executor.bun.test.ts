@@ -6,10 +6,14 @@ import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
 import type { CheckpointConfig, CompiledPlan, ConditionConfig, TaskConfig, WaitConfig } from "@chrona/contracts/ai";
 import type { NodeExecutionResult } from "./node-executors/types";
 
-const executePlanNodeMock = mock<(...args: any[]) => Promise<NodeExecutionResult>>();
+const executeTaskNodeCapabilityMock = mock<(...args: any[]) => Promise<NodeExecutionResult>>();
+const reviewCheckpointNodeCapabilityMock = mock<(...args: any[]) => Promise<NodeExecutionResult>>();
+const evaluateConditionNodeCapabilityMock = mock<(...args: any[]) => Promise<NodeExecutionResult>>();
 
-mock.module("@/modules/plan-execution/node-executor", () => ({
-  executePlanNode: executePlanNodeMock,
+mock.module("@/modules/plan-execution/node-ai-capabilities", () => ({
+  executeTaskNodeCapability: executeTaskNodeCapabilityMock,
+  reviewCheckpointNodeCapability: reviewCheckpointNodeCapabilityMock,
+  evaluateConditionNodeCapability: evaluateConditionNodeCapabilityMock,
 }));
 
 const { dispatchExecutionAction } = await import("@/modules/plan-execution/plan-runner");
@@ -148,7 +152,10 @@ function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
         type: "wait",
         title: "Wait for external readiness",
         description: "Wait node that completes in the main execution path",
-        config: { waitFor: "external readiness signal" } satisfies WaitConfig,
+        config: {
+          waitFor: "external readiness signal",
+          timeout: { minutes: 0, onTimeout: "continue" },
+        } satisfies WaitConfig,
         dependencies: ["approval_checkpoint"],
         dependents: ["final_task"],
       },
@@ -213,7 +220,9 @@ async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, com
 
 describe("plan-runner task executor approval flows", () => {
   beforeEach(async () => {
-    executePlanNodeMock.mockReset();
+    executeTaskNodeCapabilityMock.mockReset();
+    reviewCheckpointNodeCapabilityMock.mockReset();
+    evaluateConditionNodeCapabilityMock.mockReset();
     await resetDb();
   });
 
@@ -223,7 +232,7 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("persists waiting_for_approval state for a runtime-backed task node", async () => {
-    executePlanNodeMock.mockResolvedValueOnce({
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "waiting_for_approval",
       prompt: "Please approve the generated output",
       reason: "Human approval required before proceeding",
@@ -242,7 +251,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(result.status).toBe("waiting_for_approval");
     expect(result.currentNodeId).toBe("task_node");
     expect(result.waitingNodeIds).toEqual([]);
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(1);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results).toHaveLength(1);
@@ -272,7 +281,7 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("persists detailed runtime failure context for a failed task node", async () => {
-    executePlanNodeMock.mockResolvedValueOnce({
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "failed",
       error: "Runtime failed while starting main session run for node task_node: Gateway refused the run",
       evidence: {
@@ -324,7 +333,7 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("resumes approval-waiting task node and replaces prior result with a completed result", async () => {
-    executePlanNodeMock
+    executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({
         status: "waiting_for_approval",
         prompt: "Approve the task output",
@@ -358,7 +367,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(resumed.status).toBe("completed");
     expect(resumed.currentNodeId).toBeNull();
     expect(resumed.executedNodeIds).toContain("task_node");
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(2);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind, item.review?.status, item.outputSummary])).toEqual([
@@ -374,7 +383,7 @@ describe("plan-runner task executor approval flows", () => {
       persisted?.executionContextSnapshots.some(
         (snapshot) => snapshot.nodeId === "task_node" && snapshot.refs?.userInput === "approved in test",
       ),
-    ).toBe(false);
+    ).toBe(true);
 
     const session = await db.executionSession.findFirstOrThrow({
       where: { taskId: task.id },
@@ -388,7 +397,7 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("rejects approval-waiting task node without re-executing it", async () => {
-    executePlanNodeMock.mockResolvedValueOnce({
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "waiting_for_approval",
       prompt: "Approve the task output",
       reason: "Need approval",
@@ -416,7 +425,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(rejected.status).toBe("waiting_for_approval");
     expect(rejected.currentNodeId).toBe("task_node");
     expect(rejected.message).toBe("not acceptable");
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(1);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results).toHaveLength(2);
@@ -451,7 +460,7 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("turns replan_required into approval waiting state with request_changes review metadata", async () => {
-    executePlanNodeMock.mockResolvedValueOnce({
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "replan_required",
       reason: "Execution context changed, please replan",
       evidence: { sessionId: "main-session" },
@@ -468,7 +477,7 @@ describe("plan-runner task executor approval flows", () => {
 
     expect(result.status).toBe("waiting_for_approval");
     expect(result.currentNodeId).toBe("task_node");
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(1);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results).toHaveLength(1);
@@ -493,27 +502,11 @@ describe("plan-runner task executor approval flows", () => {
   });
 
   it("runs a full plan execution chain through task, user condition, approval, wait, and final task", async () => {
-    executePlanNodeMock
+    executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({
         status: "done",
         summary: "Preparation complete",
         evidence: { sessionId: "main-session", runId: "run_prepare" },
-      })
-      .mockResolvedValueOnce({
-        status: "waiting_for_approval",
-        prompt: "Approve prepared work",
-        reason: "Prepared work needs approval",
-        evidence: { sessionId: "main-session" },
-      })
-      .mockResolvedValueOnce({
-        status: "done",
-        summary: "Approval checkpoint accepted",
-        evidence: { sessionId: "main-session", runId: "run_approval" },
-      })
-      .mockResolvedValueOnce({
-        status: "done",
-        summary: "External readiness observed",
-        evidence: { sessionId: "main-session", runId: "run_wait" },
       })
       .mockResolvedValueOnce({
         status: "done",
@@ -533,7 +526,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(initial.status).toBe("waiting_for_user");
     expect(initial.currentNodeId).toBe("route_condition");
     expect(initial.executedNodeIds).toEqual(["prepare_task"]);
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(1);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const afterBranchSelection = await dispatchExecutionAction({
       taskId: task.id,
@@ -543,7 +536,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(afterBranchSelection.status).toBe("waiting_for_approval");
     expect(afterBranchSelection.currentNodeId).toBe("approval_checkpoint");
     expect(afterBranchSelection.executedNodeIds).toEqual(["route_condition"]);
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(2);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const completed = await dispatchExecutionAction({
       taskId: task.id,
@@ -562,7 +555,7 @@ describe("plan-runner task executor approval flows", () => {
       "final_task",
     ]);
     expect(completed.executedNodeIds).not.toContain("skipped_task");
-    expect(executePlanNodeMock).toHaveBeenCalledTimes(5);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [
@@ -577,8 +570,8 @@ describe("plan-runner task executor approval flows", () => {
       ["route_condition", "obsolete", "user_input", undefined, undefined, undefined],
       ["route_condition", "current", undefined, undefined, "approve", "Condition resolved to branch: approve"],
       ["approval_checkpoint", "obsolete", undefined, "accepted", undefined, undefined],
-      ["approval_checkpoint", "current", undefined, undefined, undefined, "Approval checkpoint accepted"],
-      ["cooldown_wait", "current", undefined, undefined, undefined, "External readiness observed"],
+      ["approval_checkpoint", "current", undefined, undefined, undefined, "Checkpoint approved: Approve prepared work"],
+      ["cooldown_wait", "current", undefined, undefined, undefined, "Wait condition noted: external readiness signal"],
       ["final_task", "current", undefined, undefined, undefined, "Final result produced"],
     ]);
     expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
@@ -608,7 +601,7 @@ describe("plan-runner task executor approval flows", () => {
       persisted?.executionContextSnapshots.some(
         (snapshot) => snapshot.nodeId === "approval_checkpoint" && snapshot.refs?.userInput === "approval accepted",
       ),
-    ).toBe(false);
+    ).toBe(true);
 
     const session = await db.executionSession.findFirstOrThrow({
       where: { taskId: task.id },

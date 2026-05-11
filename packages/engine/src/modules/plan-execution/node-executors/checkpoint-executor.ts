@@ -1,7 +1,7 @@
-import type { EffectivePlanNode } from "@chrona/contracts/ai";
+import type { CheckpointConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
-import { executePlanNode } from "../node-executor";
+import { reviewCheckpointNodeCapability } from "../node-ai-capabilities";
 
 export class CheckpointNodeExecutor implements NodeExecutor {
   readonly nodeType = "checkpoint" as const;
@@ -17,15 +17,55 @@ export class CheckpointNodeExecutor implements NodeExecutor {
       parentTaskId: input.taskId,
     });
 
-    return executePlanNode({
-      taskId: input.taskId,
-      planId: input.planId,
-      mainSession: input.mainSession,
-      node: input.node,
-      plan: input.plan,
-      sessionDecision,
-      trigger: input.trigger,
-      runtimeName: input.runtimeName,
-    });
+    const config = input.node.config as CheckpointConfig;
+    if (input.userInput && config.checkpointType === "approve") {
+      return {
+        status: "done",
+        summary: `Checkpoint approved: ${input.node.title}`,
+        output: { feedback: input.userInput },
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    if (input.node.status === "completed" || input.node.status === "skipped") {
+      return {
+        status: "done",
+        summary: `Checkpoint ${input.node.id} was already completed`,
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    switch (sessionDecision.kind) {
+      case "wait_for_approval":
+        return {
+          status: "waiting_for_approval",
+          prompt: config.prompt || `Please approve: ${input.node.title}`,
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "wait_for_user":
+        return {
+          status: "waiting_for_user",
+          prompt: config.prompt || `Please provide input for: ${input.node.title}`,
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "manual_only":
+        return {
+          status: "blocked",
+          reason: sessionDecision.reason,
+          evidence: { sessionId: input.mainSession.id },
+        };
+      case "main_session":
+        if (config.checkpointType === "input" || config.checkpointType === "choose") {
+          return {
+            status: "waiting_for_user",
+            prompt: config.prompt,
+            reason: `Checkpoint node ${input.node.id} requires user input`,
+            evidence: { sessionId: input.mainSession.id },
+          };
+        }
+        return reviewCheckpointNodeCapability(input);
+    }
   }
 }

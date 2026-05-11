@@ -11,7 +11,7 @@ import type {
 } from "@chrona/contracts";
 
 import { chat } from "@/modules/ai/feature-normalizers";
-import { generatePlanStream } from "@/modules/ai/streaming";
+import { generatePlanStream } from "@/modules/ai/features/generate-plan";
 import { getClientForFeature } from "./client-resolution";
 
 export async function aiChat(
