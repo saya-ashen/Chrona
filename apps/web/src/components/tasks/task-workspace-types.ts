@@ -1,4 +1,5 @@
 import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph/types";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
@@ -89,4 +90,59 @@ export type EditableTask = {
 export type CurrentProposalState = {
   proposal: TaskWorkspaceUpdateProposal;
   originalTask: EditableTask;
+};
+
+export type ProgressSummary = {
+  completedSteps: number;
+  totalSteps: number;
+  percentComplete: number;
+  label: string;
+};
+
+export type ExecutionOverviewTone = "neutral" | "info" | "success" | "warning" | "critical";
+
+export type ExecutionOverviewCard = {
+  id: string;
+  title: string;
+  description: string;
+  statusLabel?: string;
+  tone: ExecutionOverviewTone;
+  actionLabel?: string;
+  actionNodeId?: string;
+};
+
+export type WorkspaceArtifactItem = {
+  id: string;
+  title: string;
+  type: string;
+  uri?: string;
+  sourceNodeId?: string;
+};
+
+export type WorkspaceActivityItem = {
+  id: string;
+  title: string;
+  description: string;
+  tone: ExecutionOverviewTone;
+  timestamp?: string | null;
+};
+
+export type NodeDetailPanelState = {
+  selectedNode: PlanNodeDataModel | null;
+  currentNode: PlanNodeDataModel | null;
+  title: string;
+  description: string;
+  isEmpty: boolean;
+};
+
+export type TaskWorkspaceExecutionConsoleView = {
+  task: TaskData;
+  graphPlan: TaskPlanGraphPlan | null;
+  progress: ProgressSummary;
+  nodeDetail: NodeDetailPanelState;
+  readiness: ExecutionOverviewCard;
+  latestResult: ExecutionOverviewCard;
+  attention: ExecutionOverviewCard | null;
+  artifacts: WorkspaceArtifactItem[];
+  activity: WorkspaceActivityItem[];
 };

@@ -204,3 +204,48 @@ This document maps the current Chrona brownfield data model to the target execut
 3. Either promote `TaskPlanGraph` to first-class plan persistence or formalize the current graph store as an explicit subsystem with migration/versioning rules.
 4. Separate runtime approval records from product-level review of final step results.
 5. Normalize provider capability and backend availability onto step/session contracts rather than exposing provider-specific assumptions in route/runtime code.
+
+## Task Workspace Execution Console View Model
+
+This view model is frontend-derived for the task workspace redesign. It does not introduce new persistence in the first implementation increment.
+
+### TaskWorkspaceExecutionConsoleView
+
+- **Source inputs**: `TaskPageData`, `TaskData.savedPlan`, `TaskPlanReadModel`, `TaskPlanGraphPlan`, selected `PlanNodeDataModel`
+- **Fields**:
+  - `taskTitle`: task title displayed in the top execution header
+  - `taskStatusLabel`: normalized user-facing task status
+  - `progress`: `completedSteps`, `totalSteps`, `activeStepIndex`, `percentComplete`
+  - `primaryAction`: current primary action label and disabled/loading state
+  - `currentNode`: selected node or current executable node
+  - `latestResult`: summary, timestamp label, evidence, and output references from current or most recent completed node
+  - `attentionItem`: waiting/blocked/approval/input item shown as the right-side "needs handling" card
+  - `artifacts`: merged display list from node result outputs and `TaskPageData.artifacts`
+  - `timeline`: compact list of node/task execution events for the right-side activity card
+- **Validation rules**:
+  - `totalSteps` is `0` when no graph exists; percent complete is `0` in that state
+  - `percentComplete` is clamped to `0..100`
+  - current node preference is selected node, then `currentStepId`, then first active node, then first attention node, then first node
+  - timeline must not invent completed work; it can only summarize known node statuses, task latest run data, or persisted events if later added
+
+### ProgressSummary
+
+- **Fields**: `completedSteps`, `totalSteps`, `activeStepIndex`, `percentComplete`, `stateLabel`
+- **Derived from**: `TaskPlanGraphPlan.nodes` and node statuses
+- **Status mapping**:
+  - completed: `done`, `completed`, `skipped`
+  - active: `active`, `in_progress`
+  - attention: `waiting`, `waiting_for_user`, `blocked`
+  - pending: `idle`, `pending`, `ready`
+
+### ExecutionOverviewCard
+
+- **Fields**: `kind`, `title`, `description`, `items`, `actionLabel`, `tone`
+- **Kinds**: `latest-result`, `attention`, `artifacts`, `timeline`
+- **Relationships**: cards are rendered in the right column of the task workspace page and reference the same selected/current node as the lower detail panel.
+
+### NodeDetailPanelState
+
+- **Fields**: `selectedTab`, `node`, `evidence`, `availableActions`, `configurationFields`
+- **Tabs**: `result`, `evidence`, `actions`, `configuration`
+- **Relationships**: wraps existing `TaskPlanGraphInspector` content and `TaskPlanGraphInspectorRunPanel` behavior where possible.

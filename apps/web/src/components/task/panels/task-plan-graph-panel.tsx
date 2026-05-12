@@ -28,8 +28,8 @@ export function TaskPlanGraphPanel({
   dismissSelectionOnOutsideClick,
 }: TaskPlanGraphPanelProps) {
   return (
-    <div className={cn("flex min-w-0 flex-col", fillHeight && "h-full min-h-0", className)}>
-      <div className="mb-1 flex min-w-0 items-start justify-between gap-2 px-1">
+    <div className={cn("flex min-w-0 flex-col rounded-[1.35rem] border border-border/50 bg-background/65 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.06)]", fillHeight && "h-full min-h-0", className)}>
+      <div className="mb-2 flex min-w-0 items-start justify-between gap-2 px-1">
         <div className="min-w-0">
           <p className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/75">
             {label}

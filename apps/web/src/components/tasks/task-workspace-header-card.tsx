@@ -4,7 +4,7 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard, SurfaceCardHeader } from "@/components/ui/surface-card";
-import type { TaskData } from "./task-workspace-types";
+import type { ProgressSummary, TaskData } from "./task-workspace-types";
 
 function priorityTone(priority: string) {
   if (priority === "Urgent") return "critical" as const;
@@ -24,6 +24,9 @@ function statusTone(status: string) {
 
 type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
+  progress: ProgressSummary;
+  currentNodeTitle?: string | null;
+  nextAction?: string | null;
   backToScheduleLabel: string;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
@@ -35,6 +38,9 @@ type TaskWorkspaceHeaderCardProps = {
 
 export function TaskWorkspaceHeaderCard({
   task,
+  progress,
+  currentNodeTitle,
+  nextAction,
   backToScheduleLabel,
   showDeleteConfirm,
   isDeleting,
@@ -70,7 +76,7 @@ export function TaskWorkspaceHeaderCard({
       padding="sm"
     >
       <SurfaceCardHeader className="flex flex-wrap items-start justify-between gap-2">
-        <div className="max-w-3xl space-y-1.5">
+        <div className="max-w-3xl space-y-2">
           <h1 className="text-xl font-semibold tracking-tight text-balance xl:text-base">
             {task.title}
           </h1>
@@ -87,6 +93,23 @@ export function TaskWorkspaceHeaderCard({
               </StatusBadge>
             ) : null}
           </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{progress.label}</span>
+            <span>{progress.percentComplete}% complete</span>
+            <span>{task.scheduleStatus}</span>
+          </div>
+          {currentNodeTitle || nextAction ? (
+            <div className="grid gap-2 rounded-2xl border border-border/45 bg-muted/25 px-3 py-2 text-xs text-muted-foreground sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+              <div className="min-w-0">
+                <p className="uppercase tracking-[0.14em]">Current node</p>
+                <p className="truncate font-medium text-foreground">{currentNodeTitle ?? "No active node"}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="uppercase tracking-[0.14em]">Next action</p>
+                <p className="truncate font-medium text-foreground">{nextAction ?? "Select a plan node to inspect next steps"}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-1.5">
