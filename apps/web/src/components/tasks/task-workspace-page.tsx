@@ -107,56 +107,54 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     });
   return (
     <>
-      <div className="h-full min-h-0 space-y-3 overflow-visible rounded-[1.75rem] border border-border/40 bg-[linear-gradient(180deg,hsl(var(--muted)/0.18),transparent_20%),hsl(var(--background))] p-2.5 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-3 xl:overflow-hidden">
-        <TaskWorkspacePlanSection
-          label={copy.planPanelTitle ?? "Plan"}
-          topContent={
-            <TaskWorkspaceHeaderCard
-              task={task}
-              progress={progress}
-              currentNodeTitle={currentNode?.title ?? null}
-              nextAction={currentNode?.nextAction ?? currentNode?.summary ?? null}
-              backToScheduleLabel={copy.backToSchedule}
-              showDeleteConfirm={showDeleteConfirm}
-              isDeleting={isDeleting}
-              onStartDeleteConfirm={() => setShowDeleteConfirm(true)}
-              onCancelDeleteConfirm={() => setShowDeleteConfirm(false)}
-              onDelete={() => void handleDelete()}
-            >
-              <TaskWorkspaceEditSection
-                executionRuntimes={data.executionRuntimes}
-                defaultExecutionRuntime={data.defaultExecutionRuntime}
-                isSaving={isSaving}
-                taskConfigInitialValues={taskConfigInitialValues}
-                saveSuccess={saveSuccess}
-                saveError={saveError}
-                editSummary={editSummary}
-                hasUnsavedConfigChanges={hasUnsavedConfigChanges}
-                isEditExpanded={isEditExpanded}
-                currentProposal={currentProposal}
-                isApplying={isApplying}
-                onToggleExpanded={() =>
-                  setIsEditExpanded((current) => !current)
-                }
-                onDraftStateChange={handleTaskConfigDraftStateChange}
-                onSubmitAction={persistTaskConfig}
-                onApplyProposal={handleApplyProposal}
-                onCancelProposal={handleCancelProposal}
-              />
-            </TaskWorkspaceHeaderCard>
-          }
-          graphPlan={graphPlan}
-          pageData={{ ...data, task }}
-          plan={plan}
-          planGenerationStatus={planGenerationStatus}
-          canAcceptPlan={canAcceptPlan}
-          isAcceptingPlan={isAcceptingPlan}
-          acceptPlanError={acceptPlanError}
-          onAcceptPlan={handleAcceptPlan}
-          onGeneratePlan={handleGeneratePlanFromHeader}
-          onDispatchExecutionAction={dispatchExecutionAction}
-        />
-      </div>
+      <TaskWorkspacePlanSection
+        label={copy.planPanelTitle ?? "Plan"}
+        topContent={
+          <TaskWorkspaceHeaderCard
+            task={task}
+            progress={progress}
+            currentNodeTitle={currentNode?.title ?? null}
+            nextAction={currentNode?.nextAction ?? currentNode?.summary ?? null}
+            backToScheduleLabel={copy.backToSchedule}
+            showDeleteConfirm={showDeleteConfirm}
+            isDeleting={isDeleting}
+            onStartDeleteConfirm={() => setShowDeleteConfirm(true)}
+            onCancelDeleteConfirm={() => setShowDeleteConfirm(false)}
+            onDelete={() => void handleDelete()}
+          >
+            <TaskWorkspaceEditSection
+              executionRuntimes={data.executionRuntimes}
+              defaultExecutionRuntime={data.defaultExecutionRuntime}
+              isSaving={isSaving}
+              taskConfigInitialValues={taskConfigInitialValues}
+              saveSuccess={saveSuccess}
+              saveError={saveError}
+              editSummary={editSummary}
+              hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+              isEditExpanded={isEditExpanded}
+              currentProposal={currentProposal}
+              isApplying={isApplying}
+              onToggleExpanded={() =>
+                setIsEditExpanded((current) => !current)
+              }
+              onDraftStateChange={handleTaskConfigDraftStateChange}
+              onSubmitAction={persistTaskConfig}
+              onApplyProposal={handleApplyProposal}
+              onCancelProposal={handleCancelProposal}
+            />
+          </TaskWorkspaceHeaderCard>
+        }
+        graphPlan={graphPlan}
+        pageData={{ ...data, task }}
+        plan={plan}
+        planGenerationStatus={planGenerationStatus}
+        canAcceptPlan={canAcceptPlan}
+        isAcceptingPlan={isAcceptingPlan}
+        acceptPlanError={acceptPlanError}
+        onAcceptPlan={handleAcceptPlan}
+        onGeneratePlan={handleGeneratePlanFromHeader}
+        onDispatchExecutionAction={dispatchExecutionAction}
+      />
 
       <TaskWorkspaceAiSection
         isOpen={isAiWorkspaceOpen}
