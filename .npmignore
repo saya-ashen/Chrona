@@ -22,3 +22,14 @@ prisma/*.db-journal
 prisma/seed.ts
 apps/web/node_modules
 apps/web/src
+dist
+build
+*.log
+*.log*
+.env*
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode
+.idea

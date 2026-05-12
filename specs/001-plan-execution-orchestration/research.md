@@ -63,3 +63,36 @@
 - **Alternatives considered**:
   - Add more providers first. Rejected because provider growth would harden existing architectural leaks.
   - Focus only on UI changes. Rejected because the core gaps are in data ownership, orchestration boundaries, and persistence semantics.
+
+## Decision 9: Redesign task workspace as an execution console using current data first
+
+- **Decision**: Use the provided `docs/assets/设计参考.png` reference to reshape the task workspace into a top execution header, central plan graph, lower node-detail panel, and right execution overview, while deriving all visible summaries from existing task, plan, run, artifact, approval, and proposal data.
+- **Rationale**: Current `apps/web/src/components/tasks/task-workspace-page.tsx` already composes task edit state, plan state, graph rendering, inspector behavior, AI workspace, and execution dispatch. A frontend-first console redesign can improve progress comprehension without blocking on first-class `WorkBlock` or `ExecutionSession` persistence.
+- **Alternatives considered**:
+  - Wait for backend execution-session modeling before changing the workspace UI. Rejected because the UI can already expose current execution state better for supported scenarios.
+  - Build a separate new execution page. Rejected because it would split task planning and execution context and duplicate existing graph/assistant behavior.
+
+## Decision 10: Keep global navigation in ControlPlaneShell, not in the task page
+
+- **Decision**: Treat the reference image's left navigation as equivalent to Chrona's existing `ControlPlaneShell`; task workspace implementation should adapt only the page content area.
+- **Rationale**: `apps/web/src/components/control-plane-shell.tsx` already owns brand, primary navigation, breadcrumb, locale switcher, and new-task action. Re-implementing navigation inside the task page would violate shell ownership and create inconsistent responsive behavior.
+- **Alternatives considered**:
+  - Duplicate the left navigation inside `TaskWorkspacePage`. Rejected because it would produce nested navigation and unclear route ownership.
+  - Redesign `ControlPlaneShell` together with the task page. Rejected for the first increment because the user request targets task workspace and the shell already resembles the reference structure enough.
+
+## Decision 11: Reuse TaskPlanGraphPanel and inspector behavior
+
+- **Decision**: Keep `TaskPlanGraphPanel` as the central graph renderer and reuse `TaskPlanGraphInspector` behavior inside the lower node-detail/current-operation area instead of recreating node action logic.
+- **Rationale**: The graph and inspector already understand plan node selection, graph copy, node details, and execution dispatch through `TaskExecutionDispatchResult`. Reuse minimizes behavior risk while allowing the layout to change substantially.
+- **Alternatives considered**:
+  - Replace the graph with a custom static flow diagram. Rejected because it would regress current graph interaction and selection behavior.
+  - Duplicate inspector UI for the new lower panel. Rejected because action behavior and node metadata rendering would diverge.
+
+## Decision 12: Define a frontend view model for right-side execution overview, backed by APIs when needed
+
+- **Decision**: Introduce a task workspace console view model concept for progress summary, current node, latest result, attention item, artifact list, and execution timeline. Derive fields from existing loader/plan data where possible, but add narrowly scoped read APIs when required console data is not available or cannot be attributed reliably on the client.
+- **Rationale**: The reference image includes cards that may require richer execution results, evidence, artifacts, approvals, and activity data than the current task detail payload exposes. Keeping derivation pure where possible makes behavior testable, while allowing backend read contracts prevents UI components from becoming incomplete or inventing unavailable data.
+- **Alternatives considered**:
+  - Add new server fields immediately for every right-side card. Rejected because implementation should first verify gaps and avoid unnecessary API surface.
+  - Inline all calculations in JSX. Rejected because progress and attention-state mapping should be tested independently.
+  - Forbid new APIs for the UI redesign. Rejected because several reference components may need data not exposed by current task workspace reads.

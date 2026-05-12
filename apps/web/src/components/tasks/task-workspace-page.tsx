@@ -5,6 +5,7 @@ import { TaskWorkspacePlanSection } from "@/components/tasks/task-workspace-plan
 import { TaskWorkspaceEditSection } from "@/components/tasks/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "@/components/tasks/task-workspace-header-card";
 import type { TaskPageData } from "@/components/tasks/task-workspace-types";
+import { buildProgressSummary, pickWorkspaceCurrentNode } from "@/components/tasks/task-workspace-query";
 import { useTaskWorkspaceDeleteFlow } from "@/components/tasks/use-task-workspace-delete-flow";
 import { useTaskWorkspaceEditorState } from "@/components/tasks/use-task-workspace-editor-state";
 import { useTaskWorkspacePlanState } from "@/components/tasks/use-task-workspace-plan-state";
@@ -82,6 +83,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,
   } = useTaskWorkspacePlanState(task);
+  const progress = buildProgressSummary(graphPlan);
+  const currentNode = pickWorkspaceCurrentNode(graphPlan);
   const {
     currentProposal,
     setCurrentProposal,
@@ -110,6 +113,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           topContent={
             <TaskWorkspaceHeaderCard
               task={task}
+              progress={progress}
+              currentNodeTitle={currentNode?.title ?? null}
+              nextAction={currentNode?.nextAction ?? currentNode?.summary ?? null}
               backToScheduleLabel={copy.backToSchedule}
               showDeleteConfirm={showDeleteConfirm}
               isDeleting={isDeleting}
@@ -140,6 +146,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             </TaskWorkspaceHeaderCard>
           }
           graphPlan={graphPlan}
+          pageData={{ ...data, task }}
           plan={plan}
           planGenerationStatus={planGenerationStatus}
           canAcceptPlan={canAcceptPlan}

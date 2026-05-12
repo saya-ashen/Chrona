@@ -152,3 +152,16 @@ Request shape used today:
 3. Converge route language around plan execution rather than mixing raw run terminology with orchestrated-step terminology.
 4. Add step-result review contracts for accept, reject, and request-changes flows.
 5. Preserve backward compatibility intentionally if existing UI surfaces already depend on current route names and payloads.
+
+## Task Workspace Redesign Contract Note
+
+The first execution-console redesign for `TaskWorkspacePage` should reuse the current API surfaces above where they are sufficient and follow the UI contract in `contracts/task-workspace-execution-console.md`. New read endpoints or expanded task detail fields are allowed when implementation proves that a required visible state cannot be derived from `TaskPageData`, plan-state reads, accepted plan graph data, node result outputs, approvals, artifacts, or run summaries.
+
+Any new task workspace API should be justified by a specific visible component, return a narrow read model, preserve existing route behavior, and include tests for response shape and empty/error states.
+
+### Implemented First Increment
+
+- No new or expanded task workspace read API was added.
+- The console view model derives progress, current work, latest result, needs handling, artifacts, and activity from existing task page data plus the existing plan-state graph read.
+- Right-side console card actions do not introduce new mutation routes. They focus the existing node action panel, which continues to dispatch through the established `/api/tasks/:taskId/execution/actions` SSE mutation path and existing result/schedule/task flows.
+- Future read APIs remain allowed for normalized event timelines, node-attributed artifacts, or dedicated result-review models if later visible UI scope cannot be derived reliably from the existing surfaces.

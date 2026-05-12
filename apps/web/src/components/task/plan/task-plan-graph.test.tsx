@@ -51,6 +51,101 @@ afterEach(() => {
 });
 
 describe("TaskPlanGraph", () => {
+  it("renders no graph chrome when a plan is empty or not ready", () => {
+    const { rerender } = render(
+      <TaskPlanGraph
+        mode="full"
+        plan={testPlan({
+          state: "empty",
+          currentStepId: null,
+          steps: [],
+          edges: [],
+        })}
+      />,
+    );
+
+    expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
+
+    rerender(
+      <TaskPlanGraph
+        mode="full"
+        plan={testPlan({
+          state: "empty",
+          currentStepId: null,
+          steps: [
+            {
+              id: "node-pending",
+              title: "等待计划生成",
+              objective: "生成中",
+              phase: "planning",
+              status: "pending",
+              requiresHumanInput: false,
+              type: "task",
+              displayType: "task",
+              executionMode: "automatic",
+              linkedTaskId: null,
+            },
+          ],
+          edges: [],
+        })}
+      />,
+    );
+
+    expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
+  });
+
+  it("presents pending and accepted nodes with selectable execution-console states", () => {
+    render(
+      <TaskPlanGraph
+        mode="full"
+        plan={testPlan({
+          state: "ready",
+          currentStepId: "node-pending",
+          steps: [
+            {
+              id: "node-pending",
+              title: "准备执行",
+              objective: "等待启动",
+              phase: "execution",
+              status: "ready",
+              requiresHumanInput: false,
+              type: "task",
+              displayType: "task",
+              executionMode: "automatic",
+              linkedTaskId: null,
+            },
+            {
+              id: "node-accepted",
+              title: "已完成验收",
+              objective: "产出已确认",
+              phase: "review",
+              status: "done",
+              requiresHumanInput: false,
+              type: "checkpoint",
+              displayType: "checkpoint",
+              executionMode: "manual",
+              linkedTaskId: null,
+            },
+          ],
+          edges: [
+            { id: "edge-1", fromNodeId: "node-pending", toNodeId: "node-accepted", type: "sequential" },
+          ],
+        })}
+      />,
+    );
+
+    const pendingNode = screen.getByTestId("task-plan-node-node-pending");
+    const acceptedNode = screen.getByTestId("task-plan-node-node-accepted");
+    expect(pendingNode).toHaveTextContent("Ready to start");
+    expect(pendingNode).toHaveAttribute("data-node-current", "true");
+    expect(acceptedNode).toHaveTextContent("done");
+
+    fireEvent.click(acceptedNode);
+
+    expect(acceptedNode).toHaveAttribute("data-node-selected", "true");
+    expect(acceptedNode).toHaveAttribute("data-node-shape", "parallelogram");
+  });
+
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", () => {
     render(
       <TaskPlanGraph

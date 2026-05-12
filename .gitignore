@@ -65,3 +65,10 @@ apps/web/node_modules/.vite/
 /assets/
 result
 .gitnexus
+
+# common local/editor artifacts
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
