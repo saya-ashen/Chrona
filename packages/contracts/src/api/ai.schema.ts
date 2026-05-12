@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { workspaceId } from "./common";
 
 // ── GET /ai/clients ──
 // (no input)

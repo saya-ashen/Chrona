@@ -66,7 +66,11 @@ describe("ScheduleEditorForm", () => {
     render(<ScheduleEditorForm {...baseProps} />);
 
     const dueInput = document.querySelector('input[name="dueAt"]')!;
+    const startInput = document.querySelector('input[name="scheduledStartAt"]')!;
+    const endInput = document.querySelector('input[name="scheduledEndAt"]')!;
     fireEvent.change(dueInput, { target: { value: "2026-04-20T14:00" } });
+    fireEvent.change(startInput, { target: { value: "2026-04-20T09:00" } });
+    fireEvent.change(endInput, { target: { value: "2026-04-20T10:00" } });
 
     const submitButton = screen.getByRole("button", { name: "Apply Schedule" });
     fireEvent.click(submitButton);
@@ -75,8 +79,8 @@ describe("ScheduleEditorForm", () => {
       expect(mockedApply).toHaveBeenCalledWith({
         taskId: "task-1",
         dueAt: expect.any(Date),
-        scheduledStartAt: null,
-        scheduledEndAt: null,
+        scheduledStartAt: expect.any(Date),
+        scheduledEndAt: expect.any(Date),
         scheduleSource: "human",
       });
     });
@@ -89,6 +93,8 @@ describe("ScheduleEditorForm", () => {
       <ScheduleEditorForm
         {...baseProps}
         dueAt={new Date("2026-04-15T10:00:00Z")}
+        scheduledStartAt={new Date("2026-04-15T09:00:00Z")}
+        scheduledEndAt={new Date("2026-04-15T11:00:00Z")}
       />,
     );
 
@@ -124,6 +130,8 @@ describe("ScheduleEditorForm", () => {
       <ScheduleEditorForm
         {...baseProps}
         dueAt={new Date("2026-04-15T10:00:00Z")}
+        scheduledStartAt={new Date("2026-04-15T09:00:00Z")}
+        scheduledEndAt={new Date("2026-04-15T11:00:00Z")}
       />,
     );
 
@@ -165,6 +173,8 @@ describe("ScheduleEditorForm", () => {
       <ScheduleEditorForm
         {...baseProps}
         dueAt={new Date("2026-04-15T10:00:00Z")}
+        scheduledStartAt={new Date("2026-04-15T09:00:00Z")}
+        scheduledEndAt={new Date("2026-04-15T11:00:00Z")}
         onMutatedAction={onMutated}
       />,
     );

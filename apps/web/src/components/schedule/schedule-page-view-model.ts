@@ -44,6 +44,7 @@ export type SchedulePageViewModel = {
   calendarDays: ScheduleCalendarDay[];
   cockpitSummary: string;
   activeRailLabel: string;
+  conflictTaskIds: Set<string>;
 };
 
 export function buildSchedulePageViewModel({
@@ -111,6 +112,7 @@ export function buildSchedulePageViewModel({
     activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ??
     null;
   const todayFocusItems = buildTodayFocusItems(viewData, activeGroup, copy);
+  const conflictTaskIds = new Set(viewData.risks.map((item) => item.taskId));
 
   const activeRailLabel =
     secondaryView === "risks"
@@ -177,5 +179,6 @@ export function buildSchedulePageViewModel({
     calendarDays,
     cockpitSummary,
     activeRailLabel,
+    conflictTaskIds,
   };
 }

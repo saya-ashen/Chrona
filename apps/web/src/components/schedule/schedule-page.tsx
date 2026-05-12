@@ -113,7 +113,6 @@ export function SchedulePage({
     handleDeleteTask,
   } = useSchedulePageActions({
     workspaceId,
-    data,
     hydratedData,
     viewData,
     activeView,

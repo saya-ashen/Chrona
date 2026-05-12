@@ -427,7 +427,7 @@ export async function stopTaskPlanGenerationSession(taskId: string) {
   }
 }
 
-export function useTaskPlanGenerationSession(taskId?: string) {
+export function useTaskPlanGenerationSession(taskId?: string, options?: { hydrate?: boolean }) {
   const subscribe = (onStoreChange: () => void) => {
     if (!taskId) {
       return () => undefined;
@@ -444,11 +444,11 @@ export function useTaskPlanGenerationSession(taskId?: string) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    if (!taskId) {
+    if (!taskId || options?.hydrate === false) {
       return;
     }
     void hydrateTaskPlanGenerationSession(taskId);
-  }, [taskId]);
+  }, [options?.hydrate, taskId]);
 
   return state;
 }

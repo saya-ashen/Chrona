@@ -119,7 +119,10 @@ export function useSelectedBlockPlanState({
 
     applyPlanStateSnapshot({
       savedPlan: nextSavedPlan,
-      aiPlanGenerationStatus: nextStatus,
+      aiPlanGenerationStatus:
+        generationStatusRef.current === "generating" && nextStatus === "idle"
+          ? "generating"
+          : nextStatus,
     });
   }, [applyPlanStateSnapshot, displayedSavedPlan, generationSession.result, generationSession.sessionStatus]);
 
@@ -129,25 +132,51 @@ export function useSelectedBlockPlanState({
     }
 
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    void fetchPersistedPlanState(item.taskId)
-      .then((payload) => {
+    const loadPersistedPlanState = async () => {
+      try {
+        const payload = await fetchPersistedPlanState(item.taskId);
         if (cancelled) {
           return;
         }
 
         const persistedPlan = payload.savedPlan ?? null;
+        const nextStatus = deriveGenerationStatus(persistedPlan, generationSession.sessionStatus);
         applyPlanStateSnapshot({
           savedPlan: persistedPlan,
-          aiPlanGenerationStatus: deriveGenerationStatus(persistedPlan, generationSession.sessionStatus),
+          aiPlanGenerationStatus:
+            generationStatusRef.current === "generating" && nextStatus === "idle"
+              ? "generating"
+              : nextStatus,
         });
-      })
-      .catch(() => {
+      } catch {
         // Keep current optimistic session-backed state when refresh fails.
-      });
+      }
+    };
+
+    const scheduleNextPoll = (delayMs: number) => {
+      timeoutId = setTimeout(() => {
+        void loadPersistedPlanState().finally(() => {
+          if (cancelled) {
+            return;
+          }
+          if (generationStatusRef.current === "generating" || !lastDisplayedSavedPlanKeyRef.current) {
+            scheduleNextPoll(1400);
+          }
+        });
+      }, delayMs);
+    };
+
+    if (generationStatusRef.current === "generating" || !lastDisplayedSavedPlanKeyRef.current) {
+      scheduleNextPoll(generationStatusRef.current === "generating" ? 1800 : 400);
+    }
 
     return () => {
       cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.taskId]);
 

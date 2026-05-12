@@ -3,7 +3,6 @@
 import type { Dispatch, DragEvent, SetStateAction } from "react";
 import type {
   SchedulePageData,
-  SchedulePageProps,
   ScheduleViewMode,
   ScheduledItem,
   TimelineCreateInput,
@@ -29,7 +28,6 @@ type DraggedTask = {
 
 type UseSchedulePageActionsArgs = {
   workspaceId: string;
-  data: SchedulePageProps["data"];
   hydratedData: SchedulePageData;
   viewData: SchedulePageData;
   activeView: ScheduleViewMode;
@@ -54,7 +52,6 @@ type UseSchedulePageActionsArgs = {
 
 export function useSchedulePageActions({
   workspaceId,
-  data,
   hydratedData,
   viewData,
   activeView,
@@ -137,7 +134,6 @@ export function useSchedulePageActions({
     await handleCreateTaskBlockAction({
       input,
       workspaceId,
-      data,
       activeDay,
       activeView,
       locale,

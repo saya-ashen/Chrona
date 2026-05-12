@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { taskIdParam, workspaceId } from "./common";
+import { taskIdParam } from "./common";
 
 // ── GET /tasks/:taskId/plan ──
 export const planStateParamSchema = z.object({

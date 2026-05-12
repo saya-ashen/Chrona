@@ -1,22 +1,13 @@
 "use client";
 
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type {
-  ScheduleCardItem,
-  ScheduledItem,
-} from "@/components/schedule/schedule-page-types";
+import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import {
   formatShortDay,
   formatTime,
-  getPriorityTone,
-  getRunTone,
-  getRunnabilityTone,
-  getScheduleTone,
   toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { useI18n, useLocale } from "@/i18n/client";
-import { cn } from "@/lib/utils";
 
 export function EmptyState({ children }: { children: string }) {
   return (

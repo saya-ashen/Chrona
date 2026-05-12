@@ -128,16 +128,6 @@ export async function saveCompiledPlan(input: {
   });
 }
 
-async function getEditablePlan(taskId: string): Promise<EditablePlan | null> {
-  const saved = await getLatestCompiledPlan(taskId);
-  return saved?.editablePlan ?? null;
-}
-
-async function getCompiledPlan(taskId: string): Promise<CompiledPlan | null> {
-  const saved = await getLatestCompiledPlan(taskId);
-  return saved?.compiledPlan ?? null;
-}
-
 export async function getAcceptedCompiledPlan(
   taskId: string,
 ): Promise<SavedCompiledPlan | null> {

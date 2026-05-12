@@ -314,7 +314,7 @@ export type GraphDispatchOutcome = GraphExecutionOutcome & {
   events: GraphExecutionEvent[];
 };
 
-export type GraphRuntime<TContext = unknown> = {
+export type GraphRuntime<_TContext = unknown> = {
   dispatch(command: GraphRuntimeCommand): Promise<GraphDispatchOutcome>;
 };
 

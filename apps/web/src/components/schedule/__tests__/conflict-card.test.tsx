@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ScheduleConflict, ScheduleSuggestion } from "../schedule-page-types";
-import { ConflictCard } from "../conflict-card";
+import { ConflictCard } from "../panels/conflict-card";
 
 vi.mock("@/components/ui/surface-card", () => ({
   SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,

@@ -251,16 +251,3 @@ export async function getPlanRun(
     executionContextSnapshots: migrated.executionContextSnapshots,
   };
 }
-
-async function getLatestPlanRun(taskId: string): Promise<SavedPlanRunState | null> {
-  const row = await db.taskPlanRun.findFirst({
-    where: { taskId },
-    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-  });
-
-  if (!row) {
-    return null;
-  }
-
-  return getPlanRun(taskId, row.planId);
-}

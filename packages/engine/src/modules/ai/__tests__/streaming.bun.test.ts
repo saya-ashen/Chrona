@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 
 const openclawCallMock = mock(() => Promise.resolve('{"unexpected":true}'));
 const executeFeatureStreamMock = mock(async function* () {
+  yield* [];
   throw new Error("stream exploded");
 });
 

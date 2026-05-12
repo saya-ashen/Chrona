@@ -77,13 +77,66 @@ const taskDecompositionPanelProps = vi.fn();
 
 
 vi.mock("@/components/schedule/panels/selected-block-sheet/selected-block-main-column", () => ({
-  SelectedBlockMainColumn: ({ onTaskConfigDraftStateChange, onSaveTaskConfig }: { onTaskConfigDraftStateChange: (state: unknown) => void; onSaveTaskConfig: (input: unknown) => Promise<void> | void }) => {
+  SelectedBlockMainColumn: ({
+    acceptedPlan,
+    generationStatus,
+    hasUnsavedConfigChanges,
+    onApplyPlan,
+    onPlanLoaded,
+    onSaveConfigBeforeRegenerate,
+    onSaveTaskConfig,
+    onTaskConfigDraftStateChange,
+    planningTaskDraft,
+    savedPlan,
+    unsavedConfigDraft,
+  }: {
+    acceptedPlan?: { id?: string } | null;
+    generationStatus?: string;
+    hasUnsavedConfigChanges?: boolean;
+    onApplyPlan?: (result: unknown) => Promise<void> | void;
+    onPlanLoaded?: (savedPlan: unknown) => void;
+    onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
+    onSaveTaskConfig: (input: unknown) => Promise<void> | void;
+    onTaskConfigDraftStateChange: (state: unknown) => void;
+    planningTaskDraft?: {
+      title?: string;
+      description?: string | null;
+      priority?: string;
+      dueAt?: Date | null;
+    };
+    savedPlan?: { id?: string } | null;
+    unsavedConfigDraft?: unknown;
+  }) => {
     taskConfigDraftStateHandlers.push(onTaskConfigDraftStateChange);
     taskConfigSubmitHandlers.push(onSaveTaskConfig);
+    taskDecompositionPanelProps({
+      activeAcceptedPlanId: acceptedPlan?.id ?? null,
+      generationStatus,
+      hasUnsavedConfigChanges,
+      onApply: onApplyPlan,
+      onPlanLoaded,
+      onSaveConfigBeforeRegenerate,
+      savedPlan,
+      title: planningTaskDraft?.title,
+      description: planningTaskDraft?.description,
+      priority: planningTaskDraft?.priority,
+      dueAt: planningTaskDraft?.dueAt,
+      unsavedConfigDraft,
+    });
     return (
       <div data-testid="selected-block-main-column">
         <div data-testid="schedule-editor-form" />
         <div data-testid="task-config-form" />
+        <div
+          data-testid="task-decomposition-panel"
+          data-active-accepted-plan-id={acceptedPlan?.id ?? ""}
+          data-title={planningTaskDraft?.title ?? ""}
+          data-description={planningTaskDraft?.description ?? ""}
+          data-draft-dirty={String(Boolean(hasUnsavedConfigChanges))}
+          data-saved-plan-id={savedPlan?.id ?? ""}
+          data-generation-status={generationStatus ?? ""}
+        />
+        <div data-testid="task-context-links" />
       </div>
     );
   },
@@ -317,28 +370,25 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(screen.getByTestId("task-context-links")).toBeInTheDocument();
   });
 
-  it("renders a dedicated AI sidebar for the popup", () => {
+  it("renders planning and context links in the popup main column", () => {
     render(<SelectedBlockSheet {...defaultSheetProps} />);
 
     const mainColumn = document.body.querySelector("[data-testid='selected-block-main-column']");
-    const aiSidebar = document.body.querySelector("[data-testid='selected-block-ai-sidebar']");
 
     expect(mainColumn).toBeTruthy();
-    expect(aiSidebar).toBeTruthy();
-    expect(aiSidebar).toContainElement(screen.getByTestId("task-decomposition-panel"));
-    expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
+    expect(mainColumn).toContainElement(screen.getByTestId("task-decomposition-panel"));
+    expect(mainColumn).toContainElement(screen.getByTestId("task-context-links"));
   });
 
-  it("keeps schedule editing and task config merged in the main popup column while planning lives in the sidebar", () => {
+  it("keeps schedule editing, task config, and planning in the main popup column", () => {
     render(<SelectedBlockSheet {...defaultSheetProps} />);
 
     const mainColumn = document.body.querySelector("[data-testid='selected-block-main-column']");
-    const aiSidebar = document.body.querySelector("[data-testid='selected-block-ai-sidebar']");
 
     expect(mainColumn).toContainElement(screen.getByTestId("schedule-editor-form"));
     expect(mainColumn).toContainElement(screen.getByTestId("task-config-form"));
-    expect(aiSidebar).toContainElement(screen.getByTestId("task-decomposition-panel"));
-    expect(aiSidebar).toContainElement(screen.getByTestId("task-context-links"));
+    expect(mainColumn).toContainElement(screen.getByTestId("task-decomposition-panel"));
+    expect(mainColumn).toContainElement(screen.getByTestId("task-context-links"));
   });
 
   it("passes no accepted plan id into the sidebar before apply", () => {
@@ -522,7 +572,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-polled");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -534,7 +584,7 @@ describe("SelectedBlockSheet – layout order", () => {
       await Promise.resolve();
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
@@ -573,7 +623,7 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", { cache: "no-store" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
   });
 
   it("keeps polling while generation remains unchanged across responses", async () => {

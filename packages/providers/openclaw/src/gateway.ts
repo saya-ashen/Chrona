@@ -1,7 +1,6 @@
 import type {
   BridgeEnvironment,
   OpenClawGatewayBody,
-  OpenClawGatewayToolChoice,
   OpenClawGatewayInputItem,
   BridgeRequest,
   BridgeResponse,

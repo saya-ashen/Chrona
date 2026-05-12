@@ -1,7 +1,6 @@
 "use client";
 
 import { TaskWorkspaceAiSection } from "@/components/tasks/task-workspace-ai-section";
-import { TaskAiPlanPanel } from "@/components/task/panels/task-ai-plan-panel";
 import { TaskWorkspacePlanSection } from "@/components/tasks/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "@/components/tasks/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "@/components/tasks/task-workspace-header-card";

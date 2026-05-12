@@ -11,9 +11,9 @@ import type {
 
 export function getNodeTone(node: PlanNodeDataModel): NodeTone {
   if (node.status === "blocked") return "blocked";
-  if (node.status === "active") return "active";
-  if (node.status === "waiting") return "attention";
-  if (node.status === "done" || node.status === "skipped") return "done";
+  if (node.status === "active" || node.status === "in_progress") return "active";
+  if (node.status === "waiting" || node.status === "waiting_for_user") return "attention";
+  if (node.status === "done" || node.status === "completed" || node.status === "skipped") return "done";
   if (node.status === "ready") return "upcoming";
   return "idle";
 }
@@ -201,6 +201,14 @@ export function buildEdgeLegend(graphCopy: GraphCopy): EdgeLegendItem[] {
 
 export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
   return [
+    { label: graphCopy.nodeTypeTask, shape: "rounded", tone: "idle" },
+    {
+      label: graphCopy.nodeTypeCheckpoint,
+      shape: "parallelogram",
+      tone: "attention",
+    },
+    { label: graphCopy.nodeTypeCondition, shape: "diamond", tone: "blocked" },
+    { label: graphCopy.nodeTypeWait, shape: "pill", tone: "done" },
     { label: graphCopy.statusActive, shape: "rounded", tone: "active" },
     {
       label: graphCopy.statusWaiting,

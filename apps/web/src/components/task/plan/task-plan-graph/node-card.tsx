@@ -6,7 +6,7 @@ import { getShapeClassName, nodeKindLabel, TONE_STYLES } from "./logic";
 import type { FlowGraphNode } from "./types";
 
 function formatEstimatedMinutes(value: number | null) {
-  return typeof value === "number" ? `${value}m` : null;
+  return typeof value === "number" ? `${value} min` : null;
 }
 
 function resolveInteractionBadge(node: FlowGraphNode["data"]["node"]) {
@@ -132,7 +132,7 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
 }
 
 function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
-  const { node, tone, shape, isSelected, isFocus, onSelect, graphCopy } = data;
+  const { node, tone, shape, isSelected, isCurrent, isFocus, onSelect, graphCopy } = data;
   const styles = TONE_STYLES[tone];
   const runtimeSpotlight = resolveRuntimeSpotlight(node);
   const interactionBadge = resolveInteractionBadge(node);
@@ -160,8 +160,10 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         type="button"
         onClick={() => onSelect(node.id)}
         data-testid={`task-plan-node-${node.id}`}
-        data-node-tone={tone}
+        data-node-tone={node.linkedTaskId ? "child-task" : tone}
         data-node-shape={shape}
+        data-node-current={isCurrent ? "true" : "false"}
+        data-node-display-type={node.displayType ?? node.kind ?? node.type ?? "task"}
         data-node-selected={isSelected ? "true" : "false"}
         className={cn(
           "rf-node-button group relative w-full overflow-hidden border px-3 py-2.5 text-left transition-all duration-200",
@@ -220,10 +222,29 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
               {durationLabel ? (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{durationLabel}</span>
               ) : null}
+              {isSelected && node.executionMode ? (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{node.executionMode}</span>
+              ) : null}
+              {isSelected && node.priority ? (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{node.priority}</span>
+              ) : null}
+              {isSelected && node.linkedTaskId ? (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{node.linkedTaskId}</span>
+              ) : null}
               {primaryActionLabel ? (
                 <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{primaryActionLabel}</span>
               ) : null}
             </div>
+            {isSelected ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                详细说明 {node.objective}
+              </p>
+            ) : null}
+            {typeof node.metadata?.prompt === "string" ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {node.metadata.prompt}
+              </p>
+            ) : null}
           </div>
         </div>
       </button>

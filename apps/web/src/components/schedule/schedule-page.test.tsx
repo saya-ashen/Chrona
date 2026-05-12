@@ -33,7 +33,7 @@ vi.mock("@/lib/task-actions-client", () => ({
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
 }));
 
-vi.mock("@/components/schedule/planning-header", () => ({
+vi.mock("@/components/schedule/panels/planning-header", () => ({
   PlanningHeader: ({ actions }: { actions?: Array<{ label: string; onClick?: () => void }> }) => (
     <div data-testid="planning-header">
       {actions?.map((action) => (
@@ -106,7 +106,7 @@ vi.mock("@/components/schedule/conflict-card", () => ({
   ConflictCard: () => <div data-testid="conflict-card" />,
 }));
 
-vi.mock("@/components/schedule/task-create-dialog", () => ({
+vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({
   TaskCreateDialog: ({
     isOpen,
     onClose,
@@ -116,13 +116,10 @@ vi.mock("@/components/schedule/task-create-dialog", () => ({
     onClose: () => void;
     onSubmit: (draft: {
       title: string;
-      startAt: Date;
-      endAt: Date;
+      scheduledStartAt: Date;
+      scheduledEndAt: Date;
       priority: string;
       dueAt: Date | null;
-      runtimeAdapterKey: string;
-      runtimeInputVersion: string;
-      runtimeInput: Record<string, unknown>;
     }) => void;
   }) =>
     isOpen ? (
@@ -132,13 +129,10 @@ vi.mock("@/components/schedule/task-create-dialog", () => ({
           onClick={() =>
             onSubmit({
               title: "Inbox triage",
-              startAt: new Date(2026, 3, 15, 9, 0, 0, 0),
-              endAt: new Date(2026, 3, 15, 10, 30, 0, 0),
+              scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
+              scheduledEndAt: new Date(2026, 3, 15, 10, 30, 0, 0),
               priority: "High",
               dueAt: null,
-              runtimeAdapterKey: "openclaw",
-              runtimeInputVersion: "openclaw-legacy-v1",
-              runtimeInput: {},
             })
           }
         >
@@ -284,8 +278,6 @@ function createData(): SchedulePageData {
     proposals: [],
     risks: [],
     listItems: [],
-    conflicts: [],
-    suggestions: [],
     workBlocks: [],
   };
 }

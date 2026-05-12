@@ -297,7 +297,6 @@ export async function handleScheduleDropAction({
 export async function handleCreateTaskBlockAction({
   input,
   workspaceId,
-  data,
   activeDay,
   activeView,
   locale,
@@ -316,7 +315,6 @@ export async function handleCreateTaskBlockAction({
 }: {
   input: TimelineCreateInput;
   workspaceId: string;
-  data: SchedulePageData;
   activeDay: string;
   activeView: ScheduleViewMode;
   locale: string;
