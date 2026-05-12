@@ -21,7 +21,7 @@ export function useTaskPlanGeneration({
   forceRefresh = false,
   onPlanLoaded,
 }: UseTaskPlanGenerationOptions) {
-  const state = useTaskPlanGenerationSession(taskId);
+  const state = useTaskPlanGenerationSession(taskId, { hydrate: autoRequest });
   const onPlanLoadedRef = useRef(onPlanLoaded);
 
   useEffect(() => {

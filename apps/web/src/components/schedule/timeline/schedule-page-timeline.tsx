@@ -89,7 +89,7 @@ export function DayTimeline({
   selectedTaskId,
   conflictTaskIds,
   draggedItem,
-  executionRuntimes,
+  executionRuntimes: _executionRuntimes,
   defaultExecutionRuntime,
   isPending,
   onScheduleDrop,

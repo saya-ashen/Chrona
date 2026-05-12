@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { db } from "@chrona/db";
 import { isTaskPlanGenerationRunning } from "@chrona/engine/modules/plans/task-plan-generation-registry";
 import { getLatestCompiledPlan, saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
 import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";

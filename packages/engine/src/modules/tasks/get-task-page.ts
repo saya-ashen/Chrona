@@ -6,6 +6,7 @@ import {
   getRuntimeTaskConfigSpec,
   listExecutionRuntimes,
 } from "@/modules/task-execution/registry";
+import { deriveTaskRunnability } from "@chrona/shared";
 
 type TaskPlanGenerationStatus =
   | "idle"
@@ -79,6 +80,10 @@ export async function getTaskPage(taskId: string) {
   });
 
   const latestRun = task.runs[0] ?? null;
+  const runnability = deriveTaskRunnability({
+    executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
+    executionConfig: task.executionConfig,
+  });
 
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
@@ -102,6 +107,9 @@ export async function getTaskPage(taskId: string) {
       scheduledEndAt: task.projection?.scheduledEndAt?.toISOString() ?? null,
       scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
       scheduleSource: task.projection?.scheduleSource ?? null,
+      isRunnable: runnability.isRunnable,
+      runnabilityState: runnability.state,
+      runnabilitySummary: runnability.summary,
       savedPlan,
       aiPlanGenerationStatus,
       blockReason: readBlockReason(task),

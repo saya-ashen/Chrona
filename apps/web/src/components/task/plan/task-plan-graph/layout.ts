@@ -95,8 +95,9 @@ export function buildFlowLayout(input: {
   }
 
   const contentWidth = Math.max(Math.ceil(maxRight - minLeft + LAYOUT_PADDING * 2), NODE_WIDTH + LAYOUT_PADDING * 2);
-  const contentHeight = Math.max(Math.ceil(maxBottom - minTop + LAYOUT_PADDING * 2), NODE_HEIGHT + LAYOUT_PADDING * 2);
-  const viewportHeight = Math.max(Math.min(contentHeight, MAX_VIEWPORT_HEIGHT), MIN_VIEWPORT_HEIGHT);
+  const rawContentHeight = Math.max(Math.ceil(maxBottom - minTop + LAYOUT_PADDING * 2), NODE_HEIGHT + LAYOUT_PADDING * 2);
+  const viewportHeight = Math.max(Math.min(rawContentHeight, MAX_VIEWPORT_HEIGHT), MIN_VIEWPORT_HEIGHT);
+  const contentHeight = Math.max(rawContentHeight, viewportHeight);
 
   const focusSet = new Set(input.plan.analytics.reachableFromActiveIds);
   const nodeById = new Map(input.plan.nodes.map((node) => [node.id, node]));
@@ -129,6 +130,7 @@ export function buildFlowLayout(input: {
         tone: getNodeTone(node),
         shape: nodeShapeForKind(node.kind === "step" || node.kind === "user_input" ? "task" : (node.kind ?? node.type ?? "task")),
         isSelected,
+        isCurrent: node.id === input.plan.currentStepId,
         isFocus: focusSet.size === 0 || focusSet.has(node.id) || node.status === "blocked",
         graphCopy: input.graphCopy,
         onSelect: input.onSelect,
@@ -205,6 +207,7 @@ export function syncNodeState(
       data: {
         ...node.data,
         isSelected,
+        isCurrent: node.data.isCurrent,
         isFocus,
         graphCopy: input.graphCopy,
         onSelect: input.onSelect,

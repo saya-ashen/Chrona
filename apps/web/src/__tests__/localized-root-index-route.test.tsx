@@ -44,8 +44,8 @@ const bootData: AppBootData = {
   } as unknown) as AppBootData["dictionary"],
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
   schedule: hydrateSchedulePageData(({
-    defaultRuntimeAdapterKey: "openclaw",
-    runtimeAdapters: [],
+    defaultExecutionRuntime: "openclaw",
+    executionRuntimes: [],
     summary: {
       scheduledCount: 0,
       unscheduledCount: 0,
@@ -76,8 +76,7 @@ const bootData: AppBootData = {
     proposals: [],
     risks: [],
     listItems: [],
-    conflicts: [],
-    suggestions: [],
+    workBlocks: [],
   } as unknown as AppBootData["schedule"])) as unknown as AppBootData["schedule"],
   inbox: {} as AppBootData["inbox"],
   memory: {} as AppBootData["memory"],

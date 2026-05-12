@@ -226,6 +226,7 @@ export type FlowNodeData = {
   tone: NodeTone;
   shape: NodeShape;
   isSelected: boolean;
+  isCurrent: boolean;
   isFocus: boolean;
   graphCopy: GraphCopy;
   onSelect: (nodeId: string) => void;
@@ -266,5 +267,8 @@ export type CompactFocusItem = {
   statusLabel: string;
   summary: string;
   tone: NodeTone;
+  displayTone: string;
+  isCurrent: boolean;
+  hasLinkedTask: boolean;
   relationLabel: string | null;
 };

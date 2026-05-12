@@ -1,5 +1,6 @@
 // scripts/replace-deprecated-plan-types.mjs
-import { Project, SyntaxKind, Node } from "ts-morph";
+/* global process, console */
+import { Project } from "ts-morph";
 
 const dryRun = process.argv.includes("--dry");
 

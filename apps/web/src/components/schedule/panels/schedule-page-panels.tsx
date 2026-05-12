@@ -11,6 +11,7 @@ import {
   toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
 import { ScheduleEditorForm } from "@/components/schedule/forms/schedule-editor-form";
+import { TimeslotSuggestionPanel } from "@/components/schedule/panels/timeslot-suggestion-panel";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
@@ -230,6 +231,24 @@ export function QueueCard({
               Cancel
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {showTimeslots ? (
+        <div className="border-t border-border/60 px-3 py-3">
+          <TimeslotSuggestionPanel
+            taskId={item.taskId}
+            title={item.title}
+            priority={item.priority}
+            estimatedMinutes={suggestedDurationMinutes ?? 60}
+            dueAt={item.dueAt}
+            currentSchedule={currentSchedule ?? []}
+            onSchedule={
+              onScheduleSlot
+                ? (startAt, endAt) => onScheduleSlot(item.taskId, startAt, endAt)
+                : undefined
+            }
+          />
         </div>
       ) : null}
 

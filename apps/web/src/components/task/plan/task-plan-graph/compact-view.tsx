@@ -7,6 +7,20 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan): {
   focusItems: CompactFocusItem[];
 } {
   const nodesById = new Map(plan.nodes.map((node) => [node.id, node]));
+  const upstreamByNodeId: Record<string, string[]> = Object.fromEntries(
+    plan.nodes.map((node) => [node.id, [...(plan.analytics.upstreamByNodeId[node.id] ?? [])]]),
+  );
+  const downstreamByNodeId: Record<string, string[]> = Object.fromEntries(
+    plan.nodes.map((node) => [node.id, [...(plan.analytics.downstreamByNodeId[node.id] ?? [])]]),
+  );
+
+  for (const edge of plan.edges) {
+    const from = edge.from ?? edge.fromNodeId;
+    const to = edge.to ?? edge.toNodeId;
+    if (!from || !to) continue;
+    downstreamByNodeId[from] = [...(downstreamByNodeId[from] ?? []), to];
+    upstreamByNodeId[to] = [...(upstreamByNodeId[to] ?? []), from];
+  }
   const stageMap = new Map<number, string[]>();
 
   for (const node of plan.nodes) {
@@ -38,16 +52,31 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan): {
 
   const focusItems = focusIds.slice(0, 7).map((id) => {
     const node = nodesById.get(id);
-    const upstreamCount = plan.analytics.upstreamByNodeId[id]?.length ?? 0;
-    const downstreamCount = plan.analytics.downstreamByNodeId[id]?.length ?? 0;
+    const upstreamCount = new Set(upstreamByNodeId[id] ?? []).size;
+    const downstreamCount = new Set(downstreamByNodeId[id] ?? []).size;
     return {
       id,
       title: node?.title ?? id,
       statusLabel: node?.statusLabel ?? "",
       summary: node?.summary ?? "",
       tone: node ? getNodeTone(node) : "idle",
+      displayTone:
+        node?.linkedTaskId
+          ? "child-task"
+          : node?.status === "waiting_for_user"
+          ? "waiting"
+          : node
+            ? getNodeTone(node)
+            : "idle",
+      isCurrent: id === plan.currentStepId,
+      hasLinkedTask: Boolean(node?.linkedTaskId),
       relationLabel:
-        upstreamCount > 0 || downstreamCount > 0 ? `${upstreamCount} 前置 · ${downstreamCount} 后续` : null,
+        upstreamCount > 0 || downstreamCount > 0
+          ? [
+              upstreamCount > 0 ? `${upstreamCount} 个前置` : null,
+              downstreamCount > 0 ? `${downstreamCount} 个后续` : null,
+            ].filter(Boolean).join(" · ")
+          : null,
     };
   });
 
@@ -85,6 +114,11 @@ export function CompactFocusStack({
 }) {
   return (
     <div className="space-y-2">
+      <div className="grid gap-2 border-l border-border/70 pl-3" data-testid="task-plan-compact-groups">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">当前推进</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">待处理 / 阻塞</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">后续摘要</p>
+      </div>
       {items.map((item) => {
         const toneStyle = TONE_STYLES[item.tone];
         const isSelected = selectedNodeId === item.id;
@@ -93,7 +127,9 @@ export function CompactFocusStack({
             key={item.id}
             type="button"
             onClick={() => onSelect(item.id)}
-            data-testid={`task-plan-focus-node-${item.id}`}
+            data-testid={`task-plan-outline-node-${item.id}`}
+            data-node-current={item.isCurrent ? "true" : "false"}
+            data-node-tone={item.displayTone}
             className={cn(
               "w-full rounded-[20px] border px-3 py-2.5 text-left transition-colors",
               toneStyle.border,
@@ -104,6 +140,9 @@ export function CompactFocusStack({
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               <span className={cn("size-2 rounded-full", toneStyle.dot)} />
               <span>{item.statusLabel}</span>
+              {item.isCurrent ? <span>当前节点</span> : null}
+              {item.displayTone === "waiting" ? <span>需处理</span> : null}
+              {item.hasLinkedTask ? <span>已关联任务</span> : null}
             </div>
             <p className="mt-1 text-sm font-medium text-foreground">{item.title}</p>
             <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{item.summary}</p>

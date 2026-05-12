@@ -102,7 +102,7 @@ describe("POST /api/tasks/:taskId/reopen", () => {
     await resetTestDb();
   });
 
-  it("reopens a Done task back to Ready", async () => {
+  it("reopens a Done task without an accepted plan back to Draft", async () => {
     const { workspaceId } = await seedWorkspace("Reopen Test");
     const { taskId } = await seedTask(workspaceId, {
       title: "Reopen Task",
@@ -120,7 +120,7 @@ describe("POST /api/tasks/:taskId/reopen", () => {
     expect(res.status).toBe(200);
     const body = await json<{ taskId: string; workspaceId: string; status: string }>(res);
     expect(body.taskId).toBe(taskId);
-    expect(body.status).toBe("Ready");
+    expect(body.status).toBe("Draft");
   });
 });
 

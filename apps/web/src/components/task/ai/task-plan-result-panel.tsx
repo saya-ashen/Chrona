@@ -65,6 +65,10 @@ export function TaskPlanResultPanel({
         </div>
       ) : null}
 
+      <div className="sr-only">
+        <span>{graphSummary.totalEstimatedMinutes} min</span>
+      </div>
+
       {isAppliedPlan ? (
         showGraph ? (
           <div

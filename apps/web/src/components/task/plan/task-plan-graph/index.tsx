@@ -317,7 +317,7 @@ export function TaskPlanGraph({
     },
     {
       label: graphCopy.overviewEstimate,
-      value: `${plan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)}m`,
+      value: `${plan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`,
     },
   ];
 
@@ -332,6 +332,7 @@ export function TaskPlanGraph({
           className={cn("min-w-0 w-full max-w-full", className)}
         >
           <div
+            aria-label={graphCopy.ariaLabel}
             className="rounded-[24px] border border-border/50 bg-muted/[0.16] p-4"
             data-graph-mode="compact"
             data-testid="task-plan-graph"

@@ -1,13 +1,5 @@
 import { db } from "@/lib/db";
 
-async function getTaskOrThrow(taskId: string) {
-  const task = await db.task.findUnique({ where: { id: taskId } });
-  if (!task) {
-    throw new Error("Task not found");
-  }
-  return task;
-}
-
 export async function ensureTaskInWorkspace(taskId: string, workspaceId: string) {
   const task = await db.task.findUnique({
     where: { id: taskId },
