@@ -143,7 +143,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/001-plan-execution-orchestration/plan.md`
+`specs/003-task-workspace-components/plan.md`
 
 <!-- SPECKIT END -->
 

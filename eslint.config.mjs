@@ -140,6 +140,7 @@ const eslintConfig = defineConfig([
     "**/build/**",
     "**/dist/**",
     "**/coverage/**",
+    "**/*.min.js",
     "agent-dashboard-app/**",
     "packages/db/src/generated/prisma/**",
     ".dependency-cruiser.cjs",
