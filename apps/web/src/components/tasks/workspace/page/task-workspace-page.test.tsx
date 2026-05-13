@@ -1,0 +1,447 @@
+import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { TaskWorkspacePage } from "./task-workspace-page";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
+import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import type { TaskPageData, TaskPlanGenerationStatus } from "../model/task-workspace-types";
+
+const mocks = vi.hoisted(() => ({
+  editorTask: null as TaskPageData["task"] | null,
+  plan: null as { id: string; status: string } | null,
+  graphPlan: null as TaskPlanGraphPlan | null,
+  planGenerationStatus: "idle" as TaskPlanGenerationStatus,
+  canAcceptPlan: false,
+}));
+
+vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", () => ({
+  useTaskWorkspaceEditorState: (task: TaskPageData["task"]) => {
+    mocks.editorTask = mocks.editorTask ?? task;
+    return {
+      task: mocks.editorTask,
+      setTask: vi.fn(),
+      hasUnsavedConfigChanges: false,
+      isSaving: false,
+      saveError: null,
+      setSaveError: vi.fn(),
+      saveSuccess: false,
+      isEditExpanded: false,
+      setIsEditExpanded: vi.fn(),
+      taskConfigInitialValues: {},
+      draftEditableTask: mocks.editorTask,
+      editSummary: [],
+      planningTaskDraft: mocks.editorTask,
+      assistantBuildCurrentTask: vi.fn(),
+      handleTaskConfigDraftStateChange: vi.fn(),
+      persistTaskConfig: vi.fn(),
+      handleSaveCurrentDraft: vi.fn(),
+    };
+  },
+}));
+
+vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-plan-state", () => ({
+  useTaskWorkspacePlanState: () => ({
+    plan: mocks.plan,
+    setPlan: vi.fn(),
+    fetchPlan: vi.fn(),
+    planGenerationStatus: mocks.planGenerationStatus,
+    graphPlan: mocks.graphPlan,
+    canAcceptPlan: mocks.canAcceptPlan,
+    isAcceptingPlan: false,
+    acceptPlanError: null,
+    setAcceptPlanError: vi.fn(),
+    isAiWorkspaceOpen: false,
+    setIsAiWorkspaceOpen: vi.fn(),
+    requestGenerationKey: 0,
+    acceptPlanById: vi.fn(),
+    handleAcceptPlan: vi.fn(),
+    dispatchExecutionAction: vi.fn(),
+    handleOpenAiWorkspace: vi.fn(),
+    handleGeneratePlanFromHeader: vi.fn(),
+    assistantBuildCurrentPlan: vi.fn(),
+  }),
+}));
+
+vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-proposal-flow", () => ({
+  useTaskWorkspaceProposalFlow: () => ({
+    currentProposal: null,
+    setCurrentProposal: vi.fn(),
+    isApplying: false,
+    handleApplyProposal: vi.fn(),
+    handleProposal: vi.fn(),
+    handleCancelProposal: vi.fn(),
+  }),
+}));
+
+vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () => ({
+  useTaskWorkspaceDeleteFlow: () => ({
+    showDeleteConfirm: false,
+    setShowDeleteConfirm: vi.fn(),
+    isDeleting: false,
+    handleDelete: vi.fn(),
+  }),
+}));
+
+vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
+  TaskWorkspaceHeaderCard: ({ task, header, planGenerationStatus, hasPlan }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; planGenerationStatus: TaskPlanGenerationStatus; hasPlan: boolean }) => (
+    <header>
+      <h1>{task.title}</h1>
+      <p>header-status:{task.status}</p>
+      <p>workspace-status:{header.status}</p>
+      <button type="button" disabled={planGenerationStatus === "generating"}>{planGenerationStatus === "generating" ? "Generating..." : hasPlan ? "Regenerate plan" : "Generate plan"}</button>
+      <button type="button">Edit</button>
+      {header.actions.filter((action) => action.id !== "more").map((action) => (
+        <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
+      ))}
+    </header>
+  ),
+}));
+
+vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () => ({
+  TaskWorkspaceEditSection: () => <section>Edit section</section>,
+}));
+
+vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", async () => {
+  const React = await import("react");
+  const { createTaskWorkspaceExecutionConsoleView } = await import("@/components/tasks/workspace/model/task-workspace-query");
+
+  return {
+    TaskWorkspacePlanSection: ({ pageData, plan, planGenerationStatus, canAcceptPlan, graphPlan }: { pageData: TaskPageData; plan: { status?: string } | null; planGenerationStatus: TaskPlanGenerationStatus; canAcceptPlan: boolean; graphPlan: TaskPlanGraphPlan | null }) => {
+      const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
+      const selectedNode = graphPlan?.nodes.find((node) => node.id === selectedNodeId) ?? null;
+      const consoleView = createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, selectedNode });
+
+      return (
+        <section aria-label="workspace plan section">
+          <p>task:{pageData.task.title}</p>
+          <p>generation:{planGenerationStatus}</p>
+          <p>plan:{plan?.status ?? "none"}</p>
+          <p>accept:{canAcceptPlan ? "enabled" : "disabled"}</p>
+          <p>nodes:{graphPlan?.nodes.length ?? 0}</p>
+          <p>approvals:{pageData.approvals.length}</p>
+          <p>artifacts:{pageData.artifacts.length}</p>
+          <p>latest-run:{pageData.latestRunSummary?.status ?? "none"}</p>
+          <p>detail-title:{consoleView.nodeDetail.title}</p>
+          <p>detail-status:{consoleView.nodeDetail.status ?? "none"}</p>
+          <p>detail-step:{consoleView.nodeDetail.stepPosition}</p>
+          <p>detail-refresh:{consoleView.nodeDetail.autoRefreshEnabled ? "on" : "off"}</p>
+          <p>detail-disabled:{consoleView.nodeDetail.disabledActionReason ?? "none"}</p>
+          <p>nav-brand:{consoleView.navigation.brandName}</p>
+          <p>nav-active:{consoleView.navigation.activeSection}</p>
+          <p>nav-member:{consoleView.navigation.memberIdentity}</p>
+          <p>nav-notifications:{consoleView.navigation.notificationCount}</p>
+          <p>header-member:{consoleView.header.memberContext.memberLabel}</p>
+          <p>header-notifications:{consoleView.header.memberContext.notificationCount}</p>
+          <section aria-label="Execution flow" />
+          <section aria-label="Current node details" />
+          <aside aria-label="Execution overview" />
+          {(graphPlan?.nodes ?? []).map((node) => (
+            <button key={node.id} type="button" onClick={() => setSelectedNodeId(node.id)}>
+              Select {node.title}
+            </button>
+          ))}
+        </section>
+      );
+    },
+  };
+});
+
+vi.mock("@/components/tasks/workspace/sections/task-workspace-ai-section", () => ({
+  TaskWorkspaceAiSection: ({ generationStatus }: { generationStatus: TaskPlanGenerationStatus }) => <aside>ai:{generationStatus}</aside>,
+}));
+
+afterEach(() => {
+  cleanup();
+  mocks.editorTask = null;
+  mocks.plan = null;
+  mocks.graphPlan = null;
+  mocks.planGenerationStatus = "idle";
+  mocks.canAcceptPlan = false;
+});
+
+function taskData(): TaskPageData {
+  return {
+    defaultExecutionRuntime: "local",
+    executionRuntimes: [],
+    task: {
+      id: "task-1",
+      workspaceId: "workspace-1",
+      title: "Plan migration",
+      description: null,
+      executionRuntime: "local",
+      executionConfig: null,
+      status: "Ready",
+      priority: "High",
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      scheduleStatus: "Unscheduled",
+      scheduleSource: null,
+      isRunnable: true,
+      runnabilitySummary: "Ready to run",
+      blockReason: null,
+      dependencies: [],
+    },
+    latestRunSummary: null,
+    scheduleProposals: [],
+    approvals: [],
+    artifacts: [],
+  };
+}
+
+function graphPlan(status: TaskPlanGenerationStatus): TaskPlanGraphPlan {
+  return {
+    state: "ready",
+    currentStepId: "step-1",
+    nodes: [
+      {
+        id: "step-1",
+        title: "Draft plan",
+        objective: "Create execution outline",
+        nextAction: "Start drafting",
+        phase: "planning",
+        status: status === "accepted" ? "done" : "ready",
+      },
+    ],
+    steps: [
+      {
+        id: "step-1",
+        title: "Draft plan",
+        objective: "Create execution outline",
+        nextAction: "Start drafting",
+        phase: "planning",
+        status: status === "accepted" ? "done" : "ready",
+      },
+    ],
+    edges: [],
+    analytics: {
+      entryNodeIds: ["step-1"],
+      terminalNodeIds: ["step-1"],
+      activeNodeIds: [],
+      reachableFromActiveIds: ["step-1"],
+      criticalPathNodeIds: ["step-1"],
+      attentionNodeIds: [],
+      blockedNodeIds: [],
+      rankByNodeId: { "step-1": 0 },
+      laneByNodeId: { "step-1": 0 },
+      upstreamByNodeId: { "step-1": [] },
+      downstreamByNodeId: { "step-1": [] },
+    },
+  };
+}
+
+describe("TaskWorkspacePage", () => {
+  it("renders the no-plan state with empty progress", () => {
+    render(<TaskWorkspacePage data={taskData()} />);
+
+    expect(screen.getByText("Plan migration")).toBeInTheDocument();
+    expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByText("generation:idle")).toBeInTheDocument();
+    expect(screen.getByText("plan:none")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+  });
+
+  it("passes generating-plan state through the console regions", () => {
+    mocks.planGenerationStatus = "generating";
+    mocks.plan = { id: "plan-1", status: "draft" };
+    mocks.graphPlan = graphPlan("generating");
+
+    render(<TaskWorkspacePage data={taskData()} />);
+
+    expect(screen.getByText("generation:generating")).toBeInTheDocument();
+    expect(screen.getByText("ai:generating")).toBeInTheDocument();
+    expect(screen.getByText("nodes:1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generating..." })).toBeDisabled();
+  });
+
+  it("passes scheduled-ready current work into the header", () => {
+    mocks.planGenerationStatus = "accepted";
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = graphPlan("waiting_acceptance");
+    const data = taskData();
+    data.task.scheduleStatus = "Scheduled";
+
+    render(<TaskWorkspacePage data={data} />);
+
+    expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByText("header-notifications:0")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
+  });
+
+  it("keeps generated plans reviewable before acceptance", () => {
+    mocks.planGenerationStatus = "waiting_acceptance";
+    mocks.plan = { id: "plan-1", status: "draft" };
+    mocks.graphPlan = graphPlan("waiting_acceptance");
+    mocks.canAcceptPlan = true;
+
+    render(<TaskWorkspacePage data={taskData()} />);
+
+    expect(screen.getByText("generation:waiting_acceptance")).toBeInTheDocument();
+    expect(screen.getByText("accept:enabled")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+  });
+
+  it("renders accepted plans with completed progress", () => {
+    mocks.planGenerationStatus = "accepted";
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = graphPlan("accepted");
+
+    render(<TaskWorkspacePage data={taskData()} />);
+
+    expect(screen.getByText("generation:accepted")).toBeInTheDocument();
+    expect(screen.getByText("plan:accepted")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+  });
+
+  it("passes human-review data through the workspace page", () => {
+    const data = taskData();
+    data.latestRunSummary = {
+      id: "run-1",
+      status: "WaitingForApproval",
+      startedAt: "2026-05-12T11:00:00.000Z",
+      syncStatus: "fresh",
+    };
+    data.approvals = [{
+      id: "approval-1",
+      title: "Approve generated patch",
+      status: "Pending",
+      riskLevel: "medium",
+      requestedAt: "2026-05-12T11:05:00.000Z",
+    }];
+    data.artifacts = [{ id: "artifact-1", title: "Generated patch", type: "patch", uri: "file://patch.diff" }];
+
+    render(<TaskWorkspacePage data={data} />);
+
+    expect(screen.getByText("latest-run:WaitingForApproval")).toBeInTheDocument();
+    expect(screen.getByText("approvals:1")).toBeInTheDocument();
+    expect(screen.getByText("artifacts:1")).toBeInTheDocument();
+  });
+
+  it("passes navigation and member notification context through the workspace page", () => {
+    const fixture = taskWorkspaceStateFixtures.approvalNeeded;
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText("nav-brand:Chrona")).toBeInTheDocument();
+    expect(screen.getByText("nav-active:tasks")).toBeInTheDocument();
+    expect(screen.getByText("nav-member:Project member")).toBeInTheDocument();
+    expect(screen.getByText("header-member:Project member")).toBeInTheDocument();
+    expect(screen.getByText("nav-notifications:2")).toBeInTheDocument();
+    expect(screen.getByText("header-notifications:2")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+  });
+
+  it("renders running task header progress and execution controls", () => {
+    const fixture = taskWorkspaceStateFixtures.running;
+    mocks.planGenerationStatus = "accepted";
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByRole("heading", { name: "Launch task" })).toBeInTheDocument();
+    expect(screen.getByText("header-status:Running")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:running")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+  });
+
+  it("renders waiting task progress without losing schedule context", () => {
+    const fixture = taskWorkspaceStateFixtures.waiting;
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText("header-status:Queued")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByText("header-notifications:1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
+  });
+
+  it("renders empty task state with disabled progress totals", () => {
+    const fixture = taskWorkspaceStateFixtures.empty;
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+  });
+
+  it("renders permission-limited header controls as unavailable", () => {
+    const fixture = taskWorkspaceStateFixtures.permissionLimited;
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+  });
+
+  it("updates node detail context when a different plan node is selected", () => {
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = {
+      ...taskWorkspaceStateFixtures.running.graphPlan,
+      nodes: [
+        ...taskWorkspaceStateFixtures.running.graphPlan.nodes,
+        {
+          id: "approve",
+          title: "Approve output",
+          objective: "Review generated output",
+          phase: "Review",
+          status: "waiting_for_user",
+          nextAction: "Approve or request changes",
+          requiresHumanInput: true,
+          availableActions: [],
+        },
+      ],
+      steps: [
+        ...taskWorkspaceStateFixtures.running.graphPlan.steps,
+        {
+          id: "approve",
+          title: "Approve output",
+          objective: "Review generated output",
+          phase: "Review",
+          status: "waiting_for_user",
+          nextAction: "Approve or request changes",
+          requiresHumanInput: true,
+          availableActions: [],
+        },
+      ],
+    };
+
+    render(<TaskWorkspacePage data={taskWorkspaceStateFixtures.running.pageData} />);
+
+    expect(screen.getByText("detail-title:execute")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select Approve output" }));
+
+    expect(screen.getByText("detail-title:Approve output")).toBeInTheDocument();
+    expect(screen.getByText("detail-status:approval-needed")).toBeInTheDocument();
+    expect(screen.getByText("detail-step:3/3")).toBeInTheDocument();
+    expect(screen.getByText("detail-refresh:on")).toBeInTheDocument();
+    expect(screen.getByText("detail-disabled:No actions are available for this node.")).toBeInTheDocument();
+  });
+
+  it("keeps flow, node detail, and overview regions reachable in the workspace page", () => {
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = taskWorkspaceStateFixtures.running.graphPlan;
+
+    render(<TaskWorkspacePage data={taskWorkspaceStateFixtures.running.pageData} />);
+
+    expect(screen.getByLabelText("Execution flow")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current node details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
+  });
+});

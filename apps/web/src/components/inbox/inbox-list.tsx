@@ -7,7 +7,7 @@ import {
   SurfaceCardHeader,
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
-import { TaskContextLinks } from "@/components/task/shared/task-context-links";
+import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 
 type InboxListProps = {
   items: Array<{

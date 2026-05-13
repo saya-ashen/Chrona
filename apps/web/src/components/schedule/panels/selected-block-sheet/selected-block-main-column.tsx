@@ -12,8 +12,8 @@ import {
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
 } from "@/components/schedule/forms/task-config-form";
-import { TaskAiPlanPanel } from "@/components/task/panels/task-ai-plan-panel";
-import { TaskEditPanel } from "@/components/task/panels/task-edit-panel";
+import { TaskAiPlanPanel } from "@/components/tasks/panels/task-ai-plan-panel";
+import { TaskEditPanel } from "@/components/tasks/panels/task-edit-panel";
 import { buttonVariants } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { cn } from "@/lib/utils";

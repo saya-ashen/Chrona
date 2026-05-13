@@ -3,7 +3,7 @@
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
-import { TaskContextLinks } from "@/components/task/shared/task-context-links";
+import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { buttonVariants } from "@/components/ui/button";
 
 export function SelectedBlockSheetHeader({

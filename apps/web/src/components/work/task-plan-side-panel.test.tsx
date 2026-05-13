@@ -37,7 +37,7 @@ vi.mock("@/lib/utils", () => ({
 
 import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
 import { DEFAULT_WORK_PAGE_COPY } from "@/components/work/work-page/work-page-copy";
-import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
 function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
   return {

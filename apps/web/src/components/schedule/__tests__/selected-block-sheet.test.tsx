@@ -149,7 +149,7 @@ vi.mock("@/components/schedule/panels/selected-block-sheet/selected-block-sheet-
 }));
 
 // Mock the task planning panel
-vi.mock("@/components/task/ai/task-plan-generation-panel", () => ({
+vi.mock("@/components/tasks/ai/task-plan-generation-panel", () => ({
   TaskPlanGenerationPanel: (props: {
     activeAcceptedPlanId?: string | null;
     title?: string;
@@ -173,7 +173,7 @@ vi.mock("@/components/task/ai/task-plan-generation-panel", () => ({
 }));
 
 // Mock the task context links
-vi.mock("@/components/task/shared/task-context-links", () => ({
+vi.mock("@/components/tasks/shared/task-context-links", () => ({
   TaskContextLinks: () => <div data-testid="task-context-links" />,
 }));
 

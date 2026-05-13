@@ -29,7 +29,7 @@ import { WorkPageClient } from "@/components/work/work-page-client";
 import { useWorkPageController } from "@/components/work/work-page/use-work-page-controller";
 
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
-import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
 function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
   return {

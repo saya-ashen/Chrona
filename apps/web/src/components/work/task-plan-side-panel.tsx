@@ -1,7 +1,7 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui/status-badge";
-import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 import { useI18n } from "@/i18n/client";
 import type { WorkbenchCopy } from "./work-page/work-page-types";
 

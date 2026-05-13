@@ -18,7 +18,7 @@ import {
   type TaskConfigExecutionRuntime,
 } from "@/components/schedule/forms/task-config-form";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { TaskContextLinks } from "@/components/task/shared/task-context-links";
+import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
 import { useI18n, useLocale } from "@/i18n/client";
 import { cn } from "@/lib/utils";

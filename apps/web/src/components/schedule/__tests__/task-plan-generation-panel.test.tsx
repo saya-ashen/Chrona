@@ -17,7 +17,7 @@ vi.mock("@/i18n/client", () => ({
   useLocale: () => "en",
 }));
 
-import { TaskPlanGenerationPanel } from "@/components/task/ai/task-plan-generation-panel";
+import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 const defaultProps = {
