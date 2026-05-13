@@ -2,10 +2,13 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type {
-  BridgeResponse,
   OpenClawChatHistory,
   OpenClawGatewayRequest,
 } from "@chrona/openclaw";
+import type {
+  ProviderRunSnapshot,
+  StartRunInput,
+} from "@chrona/providers-foundation";
 import { requireAiClient } from "../ai/runtime/client-resolution";
 
 export type AiRuntimeInvocationInput = {
@@ -25,7 +28,7 @@ export type AiRuntimeInvocation = {
   runtimeRunRef: string | null;
   runtimeSessionKey: string;
   conversationEntryIds: string[];
-  response: BridgeResponse;
+  response: ProviderRunSnapshot;
 };
 
 export class AiRuntimeInvoker {
@@ -60,9 +63,9 @@ export class AiRuntimeInvoker {
         taskId: input.taskId,
         executionRuntime: input.runtimeName,
       });
-      const response = await client.providerClient.execute({ request });
+      const response = await runProviderRequest(client.providerClient, request);
       const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
-      const runtimeRunRef = response.responseId ?? response.runId ?? null;
+      const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
       const conversationEntryIds = await persistRuntimeHistory({
         runId: run.id,
         request,
@@ -96,6 +99,62 @@ export class AiRuntimeInvoker {
       throw error;
     }
   }
+}
+
+function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
+  return {
+    sessionId: request.sessionId,
+    sessionKey: request.sessionKey,
+    instructions: request.instructions,
+    input: request.input,
+    structuredOutputSchema: request.structuredOutputSchema,
+    maxOutputTokens: request.maxOutputTokens,
+    timeoutMs: request.timeoutSeconds
+      ? request.timeoutSeconds * 1000
+      : undefined,
+    stream: true,
+  };
+}
+
+async function runProviderRequest(
+  providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
+  request: OpenClawGatewayRequest,
+): Promise<ProviderRunSnapshot> {
+  let snapshot: ProviderRunSnapshot | null = null;
+  for await (const event of providerClient.streamRun({
+    ...toStartRunInput(request),
+    stream: true,
+  })) {
+    if (event.type === "run_completed") {
+      snapshot = {
+        provider: providerClient.provider,
+        runId: event.run.runId,
+        nativeRunId: event.run.nativeRunId,
+        sessionId: event.run.sessionId,
+        status: event.run.status ?? "completed",
+        outputText: event.outputText,
+        structuredPayload: event.structuredPayload,
+        usage: event.usage,
+        error: null,
+        raw: event.raw,
+      };
+    }
+    if (event.type === "run_failed") {
+      snapshot = {
+        provider: providerClient.provider,
+        runId: event.run?.runId ?? crypto.randomUUID(),
+        nativeRunId: event.run?.nativeRunId,
+        sessionId: event.run?.sessionId ?? request.sessionId,
+        status: "failed",
+        error: event.error,
+        raw: event.raw,
+      };
+    }
+  }
+  if (!snapshot) {
+    throw new Error("Provider run finished without a snapshot");
+  }
+  return snapshot;
 }
 
 function buildExecutionGatewayRequest(input: {
@@ -245,7 +304,7 @@ function buildExecutionAiInput(input: {
 async function persistRuntimeHistory(input: {
   runId: string;
   request: OpenClawGatewayRequest;
-  response: BridgeResponse;
+  response: ProviderRunSnapshot;
 }): Promise<string[]> {
   try {
     const assistantContent = extractAssistantContent(input.response);
@@ -288,11 +347,14 @@ async function persistRuntimeHistory(input: {
   }
 }
 
-function extractAssistantContent(response: BridgeResponse): string | null {
-  const output = response.output.trim();
+function extractAssistantContent(response: ProviderRunSnapshot): string | null {
+  const output = (response.outputText ?? "").trim();
   if (output) return output;
 
-  const parsed = response.structured?.ok ? response.structured.parsed : null;
+  const structured = response.structuredPayload;
+  const parsed = structured && typeof structured === "object" && "ok" in structured && structured.ok
+    ? (structured as { parsed?: unknown }).parsed
+    : null;
   if (!parsed) return null;
   if (typeof parsed === "string") return parsed.trim() || null;
   if (typeof parsed !== "object" || Array.isArray(parsed)) return null;

@@ -1,5 +1,6 @@
 import { OpenClawClient } from "@chrona/openclaw";
 import { db } from "@/lib/db";
+import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
   AiClientType,
@@ -19,12 +20,12 @@ type StoredAiClient = {
 
 export type EngineAiClient = {
   record: AiClientRecord;
-  providerClient: OpenClawClient | null;
+  providerClient: AgentProviderClient | null;
 };
 
 export type EngineOpenClawClient = EngineAiClient & {
   record: AiClientRecord & { type: "openclaw"; config: OpenClawClientConfig };
-  providerClient: OpenClawClient;
+  providerClient: AgentProviderClient;
 };
 
 export type EngineLlmClient = EngineAiClient & {

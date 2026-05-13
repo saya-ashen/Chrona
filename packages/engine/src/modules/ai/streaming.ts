@@ -18,7 +18,7 @@ import type {
 import { buildSuggestFeatureSpec } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import { createLogger } from "@chrona/shared/logger";
-import type { OpenClawStreamEvent as ProviderStreamEvent } from "@chrona/openclaw";
+import type { ProviderRunEvent } from "@chrona/providers-foundation";
 import { normalizeSuggestResponse } from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
@@ -88,34 +88,40 @@ function toLlmStreamRequest(
   };
 }
 
-function convertProviderEvent(evt: ProviderStreamEvent): StreamEvent | null {
+function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
   switch (evt.type) {
-    case "text":
-      return { type: "partial", text: evt.data };
-    case "done":
-      return null;
+    case "text_delta":
+      return { type: "partial", text: evt.text };
     case "tool_call":
-      return evt.toolCall
-        ? {
-            type: "tool_call",
-            tool: evt.toolCall.tool,
-            input: evt.toolCall.input,
-          }
-        : {
-            type: "status",
-            message: `Tool call: ${evt.data.slice(0, 80)}`,
-          };
+      return {
+        type: "tool_call",
+        tool: evt.tool,
+        input: evt.input,
+      };
     case "tool_result":
       return {
         type: "tool_result",
-        tool: evt.toolCall?.tool ?? "unknown",
-        result: evt.data,
+        tool: evt.tool ?? "unknown",
+        result: typeof evt.result === "string" ? evt.result : JSON.stringify(evt.result),
       };
-    case "error":
-      return { type: "error", message: evt.data };
+    case "run_failed":
+      return { type: "error", message: evt.error };
+    case "run_completed":
+      return {
+        type: "done",
+        text: evt.outputText ?? "",
+        structured: isStructuredDebugInfo(evt.structuredPayload)
+          ? evt.structuredPayload
+          : null,
+      };
+    case "run_started":
     default:
       return null;
   }
+}
+
+function isStructuredDebugInfo(value: unknown): value is NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export function summarizeStreamEvent(event: StreamEvent | null) {
@@ -191,18 +197,14 @@ async function* openclawStream(
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-        for await (const event of openClawClient.providerClient.stream({
-          request: {
-            ...buildOpenClawFeatureGatewayRequest({
-              sessionKey,
-              input: input.input,
-              instructions: input.instructions,
-              featureSpec: input.featureSpec,
-            timeoutSeconds: timeout,
-            stream: true,
-          }),
-          sessionId,
-        },
+      for await (const event of openClawClient.providerClient.streamRun({
+        sessionId,
+        sessionKey,
+        instructions: input.instructions,
+        input: input.input,
+        structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
+        timeoutMs: timeout * 1000,
+        stream: true,
         signal: input.signal,
       })) {
         const parsed = convertProviderEvent(event);

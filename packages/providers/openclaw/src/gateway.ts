@@ -3,7 +3,7 @@ import type {
   OpenClawGatewayBody,
   OpenClawGatewayInputItem,
   BridgeRequest,
-  BridgeResponse,
+  OpenClawUsage,
   ToolCallInfo,
   ToolCallOutputInfo,
 } from "./types";
@@ -76,7 +76,7 @@ export function parseFunctionItems(response: Record<string, unknown>): {
 
 export function mapUsage(
   response: Record<string, unknown>,
-): BridgeResponse["usage"] {
+): OpenClawUsage {
   const usage =
     response.usage &&
     typeof response.usage === "object" &&

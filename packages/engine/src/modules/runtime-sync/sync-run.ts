@@ -5,6 +5,7 @@ import {
   type OpenClawPendingApproval,
   type OpenClawResponseSnapshot,
 } from "@chrona/openclaw";
+import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/task-execution/task-sessions";
@@ -84,49 +85,34 @@ export type OpenClawRuntimeSyncClient = {
   waitForApprovalDecision(approvalId: string): Promise<"allow-once" | "allow-always" | "deny" | null>;
 };
 
-function textFromGatewayResponse(response: Record<string, unknown>): string {
-  if (typeof response.output_text === "string") return response.output_text;
-  if (typeof response.output === "string") return response.output;
-  return "";
+function toOpenClawResponseSnapshot(
+  snapshot: ProviderRunSnapshot,
+  sessionKey?: string,
+): OpenClawResponseSnapshot {
+  return {
+    responseId: snapshot.nativeRunId ?? snapshot.runId,
+    sessionId: snapshot.sessionId ?? sessionKey ?? snapshot.runId,
+    sessionKey,
+    status: snapshot.rawStatus ?? snapshot.status,
+    output: snapshot.outputText,
+    error: snapshot.error ?? null,
+  };
 }
 
 async function retrieveOpenClawResponse(
   clientId: string | null,
   responseId: string,
-): Promise<Record<string, unknown>> {
+  sessionKey?: string,
+): Promise<OpenClawResponseSnapshot> {
   const client = await requireAiClient(clientId, "AI client is required for runtime sync");
   const openClawClient = aiClientRegistry.requireOpenClawClient(client);
-  const config = openClawClient.record.config;
-  const gatewayUrl = config.gatewayUrl ?? config.bridgeUrl;
-  if (!gatewayUrl?.trim()) {
-    throw new Error("OpenClaw gatewayUrl is required");
-  }
-  const baseUrl = gatewayUrl.replace(/\/+$/, "");
-  const res = await fetch(
-    `${baseUrl}/v1/responses/${encodeURIComponent(responseId)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "x-openclaw-agent-id": "main",
-        ...(config.gatewayToken ?? config.bridgeToken
-          ? { Authorization: `Bearer ${config.gatewayToken ?? config.bridgeToken}` }
-          : {}),
-      },
-      signal: AbortSignal.timeout(15_000),
-    },
+  return toOpenClawResponseSnapshot(
+    await openClawClient.providerClient.getRun({
+      runId: responseId,
+      sessionKey,
+    }),
+    sessionKey,
   );
-  const text = await res.text().catch(() => "");
-  if (!res.ok) {
-    throw new Error(
-      `OpenClaw response lookup failed (${res.status}): ${text.slice(0, 500)}`,
-    );
-  }
-  const parsed = text ? (JSON.parse(text) as unknown) : null;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("OpenClaw response lookup returned invalid JSON");
-  }
-  return parsed as Record<string, unknown>;
 }
 
 async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncClient> {
@@ -140,21 +126,11 @@ async function createDefaultOpenClawSyncClient(): Promise<OpenClawRuntimeSyncCli
       if (!input.responseId) {
         throw new Error("OpenClaw responseId is required for runtime sync");
       }
-      const response = await retrieveOpenClawResponse(openClawClient.record.id, input.responseId);
-      return {
-        responseId:
-          typeof response.id === "string" ? response.id : input.responseId,
-        sessionId: input.sessionKey ?? input.responseId,
-        sessionKey: input.sessionKey,
-        status: typeof response.status === "string" ? response.status : undefined,
-        output: textFromGatewayResponse(response),
-        error:
-          typeof response.error === "string"
-            ? response.error
-            : response.error
-              ? JSON.stringify(response.error)
-              : null,
-      };
+      return retrieveOpenClawResponse(
+        openClawClient.record.id,
+        input.responseId,
+        input.sessionKey,
+      );
     },
     async readSessionHistory() {
       return { messages: [] };

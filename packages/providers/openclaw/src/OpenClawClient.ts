@@ -1,6 +1,23 @@
 import { OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
+import type {
+  AgentProviderClient,
+  CancelRunInput,
+  CreateSessionInput,
+  GetRunInput,
+  HealthCheckInput,
+  ProviderCapabilities,
+  ProviderHealth,
+  ProviderRunEvent,
+  ProviderRunRef,
+  ProviderRunSnapshot,
+  ProviderRunStatus,
+  ProviderSessionRef,
+  StartRunInput,
+  StreamRunInput,
+} from "@chrona/providers-foundation";
 import {
   buildGatewayBody,
+  checkGatewayAvailable,
   commitGatewayTurnState,
   gatewayHeaders,
   mapUsage,
@@ -10,18 +27,23 @@ import {
 } from "./gateway";
 import { buildStructuredResult, extractOutputText } from "./feature-contracts";
 import type {
-  BridgeResponse,
   BridgeEnvironment,
   BridgeRequest,
   OpenClawClientConfig,
-  OpenClawStreamEvent,
+  OpenClawToolCall,
 } from "./types";
 import { mkdir, open } from "node:fs/promises";
 import { join } from "node:path";
 
-export type OpenClawResponseRequest = {
+type OpenClawGatewayRunRequest = {
   request: BridgeRequest;
   signal?: AbortSignal;
+};
+
+type OpenClawGatewayStreamEvent = {
+  type: "text" | "tool_call" | "tool_result" | "done" | "error";
+  data: string;
+  toolCall?: OpenClawToolCall;
 };
 
 export type OpenClawConnectionConfig = {
@@ -29,6 +51,17 @@ export type OpenClawConnectionConfig = {
   bridgeToken?: string;
   timeoutSeconds?: number;
   mode?: "live" | "mock";
+};
+
+const OPENCLAW_PROVIDER = "openclaw";
+
+const OPENCLAW_CAPABILITIES: ProviderCapabilities = {
+  supportsSessions: true,
+  supportsStreaming: true,
+  supportsRunLookup: true,
+  supportsCancellation: true,
+  supportsToolCalls: true,
+  supportsPreviousResponse: true,
 };
 
 function parseToolArguments(raw: unknown): Record<string, unknown> {
@@ -80,6 +113,118 @@ function openClawDumpDirectory() {
   );
 }
 
+function isoNow() {
+  return new Date().toISOString();
+}
+
+function timeoutSignal(input: {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  timeoutSeconds?: number;
+}) {
+  const timeoutMs =
+    input.timeoutMs ?? ((input.timeoutSeconds ?? 300) + 15) * 1000;
+  return input.signal
+    ? AbortSignal.any([input.signal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs);
+}
+
+function mapProviderRunStatus(status: unknown): ProviderRunStatus {
+  switch (status) {
+    case "queued":
+      return "pending";
+    case "in_progress":
+      return "running";
+    case "requires_action":
+      return "waiting_for_approval";
+    case "failed":
+      return "failed";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "running";
+  }
+}
+
+function getResponseId(response: Record<string, unknown>) {
+  return typeof response.id === "string" ? response.id : undefined;
+}
+
+function buildBridgeRequest(input: StartRunInput): BridgeRequest {
+  return {
+    sessionId: input.sessionId,
+    sessionKey: input.sessionKey,
+    instructions: input.instructions,
+    input: input.input,
+    structuredOutputSchema: input.structuredOutputSchema,
+    stream: input.stream ?? false,
+    maxOutputTokens: input.maxOutputTokens,
+    timeoutSeconds: input.timeoutMs
+      ? Math.ceil(input.timeoutMs / 1000)
+      : undefined,
+  };
+}
+
+function buildRunRef(input: {
+  sessionId: string;
+  response: Record<string, unknown>;
+  fallbackRunId?: string;
+}): ProviderRunRef {
+  const responseId = getResponseId(input.response);
+  const runId = responseId ?? input.fallbackRunId ?? crypto.randomUUID();
+  return {
+    provider: OPENCLAW_PROVIDER,
+    runId,
+    nativeRunId: responseId,
+    responseId,
+    sessionId: input.sessionId,
+    status: mapProviderRunStatus(input.response.status),
+    raw: input.response,
+  };
+}
+
+function buildRunSnapshot(input: {
+  request?: BridgeRequest;
+  runId: string;
+  sessionId?: string;
+  response: Record<string, unknown>;
+}): ProviderRunSnapshot {
+  const responseId = getResponseId(input.response);
+  const status = mapProviderRunStatus(input.response.status);
+  const outputText = extractOutputText(input.response);
+  const error = input.response.error
+    ? typeof input.response.error === "string"
+      ? input.response.error
+      : JSON.stringify(input.response.error)
+    : null;
+  const { toolCalls } = parseFunctionItems(input.response);
+  return {
+    provider: OPENCLAW_PROVIDER,
+    runId: responseId ?? input.runId,
+    nativeRunId: responseId,
+    sessionId: input.sessionId ?? input.request?.sessionId,
+    status: error ? "failed" : status,
+    rawStatus:
+      typeof input.response.status === "string" ? input.response.status : undefined,
+    outputText,
+    structuredPayload: input.request
+      ? buildStructuredResult({
+          sessionId: input.request.sessionId,
+          runId: responseId,
+          output: outputText,
+          toolCalls,
+          error,
+          requestedToolName: resolveRequestedFunctionToolName(input.request),
+        })
+      : undefined,
+    usage: mapUsage(input.response),
+    error,
+    raw: input.response,
+  };
+}
+
 async function createOpenClawDump(input: {
   label: string;
   sessionId: string;
@@ -129,7 +274,7 @@ async function* parseStreamingGatewayGenerator(
 ): AsyncGenerator<{
   gatewayEventType: string;
   payload: Record<string, unknown>;
-  streamEvent?: OpenClawStreamEvent;
+  streamEvent?: OpenClawGatewayStreamEvent;
 }> {
   const decoder = new TextDecoder();
   let buffer = "";
@@ -290,7 +435,9 @@ async function* parseStreamingGatewayGenerator(
   }
 }
 
-export class OpenClawClient {
+export class OpenClawClient implements AgentProviderClient {
+  readonly provider = OPENCLAW_PROVIDER;
+
   private env: BridgeEnvironment;
 
   constructor(config: OpenClawClientConfig) {
@@ -302,17 +449,59 @@ export class OpenClawClient {
     };
   }
 
+  getCapabilities(): ProviderCapabilities {
+    return OPENCLAW_CAPABILITIES;
+  }
+
+  async checkHealth(input?: HealthCheckInput): Promise<ProviderHealth> {
+    const startedAt = Date.now();
+    try {
+      const ok = await checkGatewayAvailable({
+        ...this.env,
+        gatewayHttpUrl: this.env.gatewayHttpUrl,
+      });
+      return {
+        provider: this.provider,
+        ok,
+        checkedAt: isoNow(),
+        latencyMs: Date.now() - startedAt,
+        message: ok ? "Gateway is reachable" : "Gateway health check failed",
+      };
+    } catch (error) {
+      return {
+        provider: this.provider,
+        ok: false,
+        checkedAt: isoNow(),
+        latencyMs: Date.now() - startedAt,
+        message: error instanceof Error ? error.message : "Health check failed",
+      };
+    } finally {
+      void input;
+    }
+  }
+
+  async createSession(input?: CreateSessionInput): Promise<ProviderSessionRef> {
+    const sessionId = input?.sessionKey?.trim() || crypto.randomUUID();
+    return {
+      provider: this.provider,
+      sessionId,
+      nativeSessionId: sessionId,
+      sessionKey: input?.sessionKey,
+      createdAt: isoNow(),
+    };
+  }
+
   private async *executeStreamingRequest(
-    input: OpenClawResponseRequest,
+    input: OpenClawGatewayRunRequest,
     state: { finalResponse: Record<string, unknown> },
-  ): AsyncGenerator<OpenClawStreamEvent> {
+  ): AsyncGenerator<OpenClawGatewayStreamEvent> {
     const sessionId = input.request.sessionId;
     const body = buildGatewayBody(input.request, this.env);
     const headers = gatewayHeaders(this.env, input.request);
-    const timeoutMs = ((input.request.timeoutSeconds ?? 300) + 15) * 1000;
-    const signal = input.signal
-      ? AbortSignal.any([input.signal, AbortSignal.timeout(timeoutMs)])
-      : AbortSignal.timeout(timeoutMs);
+    const signal = timeoutSignal({
+      signal: input.signal,
+      timeoutSeconds: input.request.timeoutSeconds,
+    });
 
     const url = `${this.env.gatewayHttpUrl}/v1/responses`;
     const dump = await createOpenClawDump({
@@ -400,72 +589,153 @@ export class OpenClawClient {
     });
   }
 
-  async execute(input: OpenClawResponseRequest): Promise<BridgeResponse> {
-    const startedAt = Date.now();
-    const request: BridgeRequest = {
-      ...input.request,
-      stream: true,
-    };
+  async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    const request: BridgeRequest = { ...buildBridgeRequest(input), stream: true };
     const state = { finalResponse: {} as Record<string, unknown> };
     for await (const _event of this.executeStreamingRequest(
       {
-        ...input,
         request,
+        signal: input.signal,
       },
       state,
     )) {
       void _event;
     }
-    const finalResponse = state.finalResponse;
-    const responseId =
-      typeof finalResponse.id === "string" ? finalResponse.id : undefined;
-    const { toolCalls } = parseFunctionItems(finalResponse);
-
-    const outputText = extractOutputText(finalResponse);
-    const error = finalResponse.error
-      ? JSON.stringify(finalResponse.error)
-      : Object.keys(finalResponse).length === 0
-        ? "response.completed event missing response payload"
-        : null;
-
-    return {
+    return buildRunRef({
       sessionId: request.sessionId,
-      responseId,
-      responseStatus:
-        typeof finalResponse.status === "string"
-          ? finalResponse.status
-          : undefined,
-      runId: responseId,
-      output: outputText,
-      usage: mapUsage(finalResponse),
-      error,
-      durationMs: Date.now() - startedAt,
-      structured: buildStructuredResult({
-        sessionId: request.sessionId,
-        runId: responseId,
-        output: outputText,
-        toolCalls,
-        error,
-        requestedToolName: resolveRequestedFunctionToolName(request),
-      }),
-      feature: null,
-    };
+      response: state.finalResponse,
+    });
   }
 
-  async *stream(
-    input: OpenClawResponseRequest,
-  ): AsyncGenerator<OpenClawStreamEvent> {
-    const request: BridgeRequest = {
-      ...input.request,
-      stream: true,
-    };
-    yield* this.executeStreamingRequest(
-      {
-        ...input,
+  async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
+    const request: BridgeRequest = { ...buildBridgeRequest(input), stream: true };
+    const state = { finalResponse: {} as Record<string, unknown> };
+    try {
+      for await (const event of this.executeStreamingRequest(
+        {
+          request,
+          signal: input.signal,
+        },
+        state,
+      )) {
+        if (event.type === "text") {
+          yield { type: "text_delta", text: event.data };
+        } else if (event.type === "tool_call" && event.toolCall) {
+          yield {
+            type: "tool_call",
+            tool: event.toolCall.tool,
+            callId: event.toolCall.callId,
+            input: event.toolCall.input,
+            status: event.toolCall.status,
+          };
+        } else if (event.type === "tool_result") {
+          yield {
+            type: "tool_result",
+            tool: event.toolCall?.tool,
+            callId: event.toolCall?.callId,
+            result: event.data,
+          };
+        } else if (event.type === "error") {
+          yield { type: "run_failed", error: event.data };
+          return;
+        }
+      }
+      const snapshot = buildRunSnapshot({
         request,
+        runId: getResponseId(state.finalResponse) ?? crypto.randomUUID(),
+        response: state.finalResponse,
+      });
+      if (snapshot.error) {
+        yield {
+          type: "run_failed",
+          run: {
+            provider: this.provider,
+            runId: snapshot.runId,
+            nativeRunId: snapshot.nativeRunId,
+            responseId: snapshot.nativeRunId,
+            sessionId: snapshot.sessionId ?? request.sessionId,
+            status: snapshot.status,
+            raw: snapshot.raw,
+          },
+          error: snapshot.error,
+          raw: snapshot.raw,
+        };
+        return;
+      }
+      yield {
+        type: "run_completed",
+        run: {
+          provider: this.provider,
+          runId: snapshot.runId,
+          nativeRunId: snapshot.nativeRunId,
+          responseId: snapshot.nativeRunId,
+          sessionId: snapshot.sessionId ?? request.sessionId,
+          status: snapshot.status,
+          raw: snapshot.raw,
+        },
+        outputText: snapshot.outputText,
+        structuredPayload: snapshot.structuredPayload,
+        usage: snapshot.usage,
+        raw: snapshot.raw,
+      };
+    } catch (error) {
+      yield {
+        type: "run_failed",
+        error: error instanceof Error ? error.message : "OpenClaw run failed",
+      };
+    }
+  }
+
+  async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
+    const res = await fetch(
+      `${this.env.gatewayHttpUrl}/v1/responses/${encodeURIComponent(input.runId)}`,
+      {
+        method: "GET",
+        headers: gatewayHeaders(this.env),
+        signal: timeoutSignal({ signal: input.signal, timeoutMs: 15_000 }),
       },
-      { finalResponse: {} },
     );
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      throw new Error(
+        `[openclaw] Run lookup failed (${res.status}): ${text.slice(0, 500)}`,
+      );
+    }
+    const parsed = text ? (JSON.parse(text) as unknown) : null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("[openclaw] Run lookup returned invalid JSON");
+    }
+    return buildRunSnapshot({
+      runId: input.runId,
+      sessionId: input.sessionId,
+      response: parsed as Record<string, unknown>,
+    });
+  }
+
+  async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
+    const res = await fetch(
+      `${this.env.gatewayHttpUrl}/v1/responses/${encodeURIComponent(input.runId)}/cancel`,
+      {
+        method: "POST",
+        headers: gatewayHeaders(this.env),
+        signal: timeoutSignal({ signal: input.signal, timeoutMs: 15_000 }),
+      },
+    );
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      throw new Error(
+        `[openclaw] Run cancellation failed (${res.status}): ${text.slice(0, 500)}`,
+      );
+    }
+    const parsed = text ? (JSON.parse(text) as unknown) : { id: input.runId, status: "cancelled" };
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("[openclaw] Run cancellation returned invalid JSON");
+    }
+    return buildRunSnapshot({
+      runId: input.runId,
+      sessionId: input.sessionId,
+      response: parsed as Record<string, unknown>,
+    });
   }
 }
 

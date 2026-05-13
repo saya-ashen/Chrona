@@ -19,10 +19,7 @@ export {
   validateOpenClawTaskConfig,
 } from "./config";
 
-export type {
-  OpenClawConnectionConfig,
-  OpenClawResponseRequest,
-} from "./OpenClawClient";
+export type { OpenClawConnectionConfig } from "./OpenClawClient";
 
 export type {
   BridgeEnvironment,
@@ -30,7 +27,6 @@ export type {
   BridgeFeatureResult,
   BridgeLogger,
   BridgeRequest,
-  BridgeResponse,
   NDJSONEvent,
   OpenClawApprovalDecision,
   OpenClawApprovalRequest,
@@ -42,8 +38,6 @@ export type {
   OpenClawGatewayRequest,
   OpenClawPendingApproval,
   OpenClawResponseSnapshot,
-  OpenClawResponse,
-  OpenClawStreamEvent,
   OpenClawToolCall,
   StructuredAgentResult,
   ToolCallInfo,
