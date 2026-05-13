@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Trash2 } from "lucide-react";
+import { Ellipsis, Pause, Pencil, Play, Square, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SurfaceCard, SurfaceCardHeader } from "@/components/ui/surface-card";
-import type { TaskData, TaskHeaderAction, TaskHeaderView, TaskPlanGenerationStatus } from "../model/task-workspace-types";
+import type { TaskData, TaskHeaderAction, TaskHeaderView } from "../model/task-workspace-types";
 
 function priorityTone(priority: string) {
   if (priority === "Urgent") return "critical" as const;
@@ -36,23 +36,23 @@ function userStatusLabel(status: TaskHeaderView["status"]) {
 }
 
 function actionIcon(actionId: TaskHeaderAction["id"]) {
-  if (actionId === "continue") return Play;
+  if (actionId === "start") return Play;
   if (actionId === "pause") return Pause;
-  if (actionId === "export") return Download;
+  if (actionId === "stop") return Square;
   return Ellipsis;
 }
 
 function actionVariant(actionId: TaskHeaderAction["id"]) {
-  return actionId === "continue" ? "default" : "outline";
+  if (actionId === "start") return "default" as const;
+  if (actionId === "stop") return "destructive" as const;
+  return "secondary" as const;
 }
 
 type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
   header: TaskHeaderView;
   backToScheduleLabel: string;
-  planGenerationStatus: TaskPlanGenerationStatus;
-  hasPlan: boolean;
-  onGeneratePlan: () => void;
+  onAction: (action: TaskHeaderAction) => void | Promise<void>;
   onEdit: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
@@ -65,9 +65,7 @@ export function TaskWorkspaceHeaderCard({
   task,
   header,
   backToScheduleLabel,
-  planGenerationStatus,
-  hasPlan,
-  onGeneratePlan,
+  onAction,
   onEdit,
   showDeleteConfirm,
   isDeleting,
@@ -76,9 +74,24 @@ export function TaskWorkspaceHeaderCard({
   onDelete,
 }: TaskWorkspaceHeaderCardProps) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [pendingActionId, setPendingActionId] = useState<TaskHeaderAction["id"] | null>(null);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-  const visibleActions = header.actions.filter((action) => action.id === "continue" || action.id === "pause");
-  const overflowActions = header.actions.filter((action) => action.id !== "continue" && action.id !== "pause" && action.id !== "more");
+  const visibleActions = header.actions.filter((action) => action.id !== "more");
+
+  const handleAction = async (action: TaskHeaderAction) => {
+    if (action.disabled || pendingActionId) return;
+    setPendingActionId(action.id);
+    setActionStatus(null);
+    try {
+      await onAction(action);
+      setActionStatus(`${action.label} request sent.`);
+    } catch (error) {
+      setActionStatus(error instanceof Error ? error.message : `Failed to ${action.label.toLowerCase()}.`);
+    } finally {
+      setPendingActionId(null);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -130,20 +143,22 @@ export function TaskWorkspaceHeaderCard({
         <div className="flex shrink-0 flex-wrap items-center justify-start gap-1 lg:justify-end">
           {visibleActions.map((action) => {
             const Icon = actionIcon(action.id);
+            const isPending = pendingActionId === action.id;
             return (
               <button
                 key={action.id}
                 type="button"
-                disabled={action.disabled}
+                disabled={action.disabled || Boolean(pendingActionId)}
                 title={action.disabledReason}
+                onClick={() => void handleAction(action)}
                 className={buttonVariants({
                   variant: actionVariant(action.id),
                   size: "sm",
-                  className: "h-7 rounded-lg px-2 text-xs",
+                  className: "rounded-xl",
                 })}
               >
-                <Icon className="size-3.5" />
-                {action.label}
+                <Icon className={isPending ? "size-3.5 animate-pulse" : "size-3.5"} />
+                {isPending ? `${action.label}...` : action.label}
               </button>
             );
           })}
@@ -173,33 +188,6 @@ export function TaskWorkspaceHeaderCard({
                     Edit
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onGeneratePlan();
-                    setShowMoreMenu(false);
-                  }}
-                  disabled={planGenerationStatus === "generating"}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {planGenerationStatus === "generating" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                  {planGenerationStatus === "generating" ? "Generating..." : hasPlan ? "Regenerate plan" : "Generate plan"}
-                </button>
-                {overflowActions.map((action) => {
-                  const Icon = actionIcon(action.id);
-                  return (
-                    <button
-                      key={action.id}
-                      type="button"
-                      disabled={action.disabled}
-                      title={action.disabledReason}
-                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Icon className="size-3.5" />
-                      {action.label}
-                    </button>
-                  );
-                })}
                 <LocalizedLink
                   href="/schedule"
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted"
@@ -225,6 +213,12 @@ export function TaskWorkspaceHeaderCard({
           </div>
         </div>
       </SurfaceCardHeader>
+
+      {actionStatus ? (
+        <p className="mt-1 px-2 text-xs text-muted-foreground" role="status">
+          {actionStatus}
+        </p>
+      ) : null}
 
       {showDeleteConfirm ? (
         <div className="mt-1 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">

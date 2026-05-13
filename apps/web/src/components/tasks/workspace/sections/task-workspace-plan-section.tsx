@@ -193,6 +193,8 @@ export function TaskWorkspacePlanSection({
               canAcceptPlan={canAcceptPlan}
               isAcceptingPlan={isAcceptingPlan}
               acceptPlanError={acceptPlanError}
+              planGenerationStatus={planGenerationStatus}
+              onGeneratePlan={onGeneratePlan}
               onAcceptPlan={onAcceptPlan}
               onSelectedNodeChange={handleSelectedPlanNodeChange}
             />

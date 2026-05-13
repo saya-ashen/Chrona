@@ -122,7 +122,7 @@ describe("task workspace execution console view model", () => {
     });
 
     expect(view.nodeDetail.currentNode?.id).toBe("active");
-    expect(view.header).toMatchObject({ title: "Launch task", status: "waiting", completedSteps: 0, totalSteps: 1 });
+    expect(view.header).toMatchObject({ title: "Launch task", status: "running", completedSteps: 0, totalSteps: 1 });
     expect(view.header.memberContext).toMatchObject({ memberLabel: "Project member", notificationCount: 2 });
     expect(view.navigation).toMatchObject({ brandName: "Chrona", activeSection: "tasks", settingsAvailable: true, memberIdentity: "Project member", notificationCount: 2 });
     expect(view.executionFlow.nodes[0]).toMatchObject({ id: "active", stepNumber: 1, status: "running" });
@@ -244,10 +244,27 @@ describe("task workspace execution console view model", () => {
     expect(artifact.artifacts.length).toBeGreaterThan(0);
     expect(stale.states.isStale).toBe(true);
     expect(permissionLimited.states.isPermissionLimited).toBe(true);
-    expect(permissionLimited.header.actions.find((action) => action.id === "continue")).toMatchObject({
-      disabled: true,
-      disabledReason: "You can view this task, but cannot run it",
-    });
+    expect(permissionLimited.header.actions).toEqual([
+      {
+        id: "start",
+        label: "Start",
+        disabled: true,
+        disabledReason: "You can view this task, but cannot run it",
+      },
+      {
+        id: "pause",
+        label: "Pause",
+        disabled: true,
+        disabledReason: "Pause is visible for task control, but the execution API does not expose pause yet.",
+      },
+      {
+        id: "stop",
+        label: "Stop",
+        disabled: true,
+        disabledReason: "No running execution session to stop.",
+      },
+      { id: "more", label: "More actions" },
+    ]);
   });
 
   it("builds selected-node detail state with tabs, refresh state, and step position", () => {

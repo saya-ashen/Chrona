@@ -1,7 +1,7 @@
 {
   "nav": {
     "brandTitle": "Chrona",
-    "brandTagline": "人机协作的 AI 任务工作台",
+    "brandTagline": "把任务变成可执行的 AI 工作",
     "workspaces": "工作区",
     "schedule": "日程",
     "tasks": "任务",
@@ -25,7 +25,7 @@
   },
   "metadata": {
     "title": "Chrona",
-    "description": "以任务为中心的 AI 执行工作台。"
+    "description": "Chrona 帮你把任务变成计划，安排进日程，并借助 AI 持续推进执行。"
   },
   "components": {
     "taskPage": {
@@ -807,7 +807,7 @@
   "pages": {
     "tasks": {
       "title": "任务中心",
-      "subtitle": "聚焦运行中、阻塞中、等待审批、未安排和已逾期的工作，无需通读完整对话。",
+      "subtitle": "统一查看哪些任务正在运行、被阻塞、等待审批，或还没安排进日程，不必翻完整对话。",
       "createTitle": "创建任务",
       "createDescription": "先记录新的工作单元，再立即进入规划或执行。",
       "titleLabel": "标题",
@@ -853,7 +853,7 @@
     "workspaces": {
       "title": "工作区",
       "subtitle": "面向内部或多工作区场景的高级工作区管理。",
-      "notice": "日常工作现在从日程、任务、收件箱和记忆开始；此页保留给更深入的工作区管理。",
+      "notice": "大多数用户应从日程、任务、收件箱和记忆开始；这个页面主要用于更深入的工作区管理。",
       "taskCountOne": "个任务",
       "taskCountOther": "个任务"
     },

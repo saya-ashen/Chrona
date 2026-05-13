@@ -83,12 +83,11 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header, planGenerationStatus, hasPlan }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; planGenerationStatus: TaskPlanGenerationStatus; hasPlan: boolean }) => (
+  TaskWorkspaceHeaderCard: ({ task, header }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } } }) => (
     <header>
       <h1>{task.title}</h1>
       <p>header-status:{task.status}</p>
       <p>workspace-status:{header.status}</p>
-      <button type="button" disabled={planGenerationStatus === "generating"}>{planGenerationStatus === "generating" ? "Generating..." : hasPlan ? "Regenerate plan" : "Generate plan"}</button>
       <button type="button">Edit</button>
       {header.actions.filter((action) => action.id !== "more").map((action) => (
         <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
@@ -132,6 +131,7 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
           <p>nav-notifications:{consoleView.navigation.notificationCount}</p>
           <p>header-member:{consoleView.header.memberContext.memberLabel}</p>
           <p>header-notifications:{consoleView.header.memberContext.notificationCount}</p>
+          <button type="button" disabled={planGenerationStatus === "generating"}>{planGenerationStatus === "generating" ? "Generating..." : plan ? "Regenerate plan" : "Generate plan"}</button>
           <section aria-label="Execution flow" />
           <section aria-label="Current node details" />
           <aside aria-label="Execution overview" />
@@ -293,7 +293,7 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("generation:accepted")).toBeInTheDocument();
     expect(screen.getByText("plan:accepted")).toBeInTheDocument();
-    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:completed")).toBeInTheDocument();
   });
 
   it("passes human-review data through the workspace page", () => {
@@ -333,10 +333,10 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("header-member:Project member")).toBeInTheDocument();
     expect(screen.getByText("nav-notifications:2")).toBeInTheDocument();
     expect(screen.getByText("header-notifications:2")).toBeInTheDocument();
-    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:approval-needed")).toBeInTheDocument();
   });
 
-  it("renders running task header progress and execution controls", () => {
+  it("renders running task header progress with task-level actions", () => {
     const fixture = taskWorkspaceStateFixtures.running;
     mocks.planGenerationStatus = "accepted";
     mocks.plan = { id: "plan-1", status: "accepted" };
@@ -349,9 +349,9 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("workspace-status:running")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });
 
   it("renders waiting task progress without losing schedule context", () => {
@@ -377,7 +377,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
   });
 
-  it("renders permission-limited header controls as unavailable", () => {
+  it("keeps task-level actions visible for permission-limited workspaces", () => {
     const fixture = taskWorkspaceStateFixtures.permissionLimited;
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
@@ -386,8 +386,9 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
   });
 
   it("updates node detail context when a different plan node is selected", () => {

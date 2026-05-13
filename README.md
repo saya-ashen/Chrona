@@ -6,9 +6,9 @@ English | [中文](./README.zh.md)
 
 <p align="center">
   <h1 align="center">Chrona</h1>
-  <p align="center"><strong>The control layer for AI-native work.</strong></p>
+  <p align="center"><strong>Turn tasks into plans, schedules, and executable AI work.</strong></p>
   <p align="center">
-    From tasks to plans, from plans to schedules, and from schedules to agent execution across backends.
+    Chrona helps you define work, break it down, place it on your schedule, and steadily move it forward with AI.
   </p>
 </p>
 
@@ -30,42 +30,40 @@ English | [中文](./README.zh.md)
 
 ## Vision
 
-AI is moving from answering questions to doing work.
+Chrona is an AI workbench for people who want more than a todo list and less than a pile of disconnected AI chats.
 
-But today, most tools are still fragmented:
-
-- Todo apps record tasks, but do not understand how to complete them
-- Calendars manage time, but do not understand what each task requires
-- AI chats generate suggestions, but the output usually stays inside the
-  conversation
-- Agent runtimes can execute tasks, but lack personal task, plan, and schedule
-  context
-
-Chrona is built to connect these pieces.
+It gives work a clear lifecycle:
 
 ```text
 Task → Plan → Schedule → Execution
 ```
 
-Chrona aims to become the control layer for AI-native work:
+In practical terms, Chrona helps you:
 
-- You create a task
-- Chrona generates a structured plan
-- AI helps modify and refine that plan
-- Chrona places the plan into your schedule
-- At the right time, Chrona dispatches agents to execute the task
-- If information is missing, Chrona pauses and asks you for input
-- Once the missing context is provided, the task continues until completion
+- capture a task or goal
+- turn it into a structured plan
+- refine that plan with AI
+- place the work into your schedule
+- keep execution moving instead of leaving the result inside a chat window
 
-This is not another todo app.
+The problem Chrona is trying to solve is simple:
 
-Chrona is a system for continuously moving work forward.
+- todo apps track tasks, but not how the work should unfold
+- calendars track time, but not what each block of work actually needs
+- AI chats can draft ideas, but the output often stays trapped in conversation history
+- agent runtimes can execute, but usually lack task, plan, and schedule context
+
+Chrona connects those layers into one system.
+
+So the product is not just “AI for tasks”.
+
+It is a workspace for turning intent into structured work, and structured work into forward progress.
 
 ---
 
 ## Current Status
 
-Chrona has two layers:
+Chrona currently has two layers:
 
 ```text
 Chrona
@@ -73,21 +71,39 @@ Chrona
 └── Execution Layer  Being built
 ```
 
-### Plan Layer
+### What you can use today
 
-The Plan Layer turns tasks into structured plans.
+Today, Chrona is strongest at the Plan Layer.
 
-This is the core part of Chrona available today.
+That means you can already use it to:
 
-### Execution Layer
+- create tasks
+- generate structured plans from rough goals
+- refine those plans with AI
+- organize work so it is easier to schedule and execute later
 
-The Execution Layer makes plans actually run.
+If you want to understand Chrona quickly, this is the shortest description:
 
-This is the next major stage of Chrona.
+> Today, Chrona helps you go from task to plan.
 
-Chrona will analyze executable paths inside a plan, determine which steps can be
-completed by AI, identify which steps require human input, and automatically
-advance tasks when they are scheduled.
+### What is being built next
+
+The next major step is the Execution Layer.
+
+This is the part that will make plans actively run instead of staying as static planning artifacts.
+
+Chrona is being built to:
+
+- inspect a plan and find which paths are executable
+- detect where human input or approval is still required
+- hand off runnable steps to the right agent backend
+- resume work after missing context is provided
+- keep scheduled work moving forward automatically when possible
+
+In short:
+
+> Today: Chrona helps structure work.
+> Next: Chrona helps run that work.
 
 ---
 

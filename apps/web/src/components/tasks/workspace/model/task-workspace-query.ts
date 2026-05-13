@@ -41,6 +41,32 @@ function isAttentionStatus(status: PlanNodeDataModel["status"]) {
   return status === "waiting" || status === "waiting_for_user" || status === "blocked";
 }
 
+function deriveTaskStatusFromGraph(
+  taskStatus: string,
+  graphPlan: TaskPlanGraphPlan | null,
+) {
+  const nodes = graphPlan?.nodes ?? [];
+  if (nodes.length === 0) return taskStatus;
+
+  if (nodes.some((node) => node.status === "active" || node.status === "in_progress")) {
+    return "Running";
+  }
+
+  if (nodes.some((node) => node.status === "waiting_for_user")) {
+    return "WaitingForInput";
+  }
+
+  if (nodes.some((node) => node.status === "blocked")) {
+    return "Blocked";
+  }
+
+  if (nodes.every((node) => isDoneStatus(node.status))) {
+    return "Completed";
+  }
+
+  return taskStatus;
+}
+
 function buildWorkspaceMemberContext(pageData: TaskPageData, hasAttention: boolean) {
   const notificationCount = pageData.approvals.filter((approval) => approval.status !== "Approved" && approval.status !== "Rejected").length
     + pageData.scheduleProposals.filter((proposal) => proposal.status === "Pending").length
@@ -292,21 +318,34 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
 }
 
 function buildTaskHeaderView(pageData: TaskPageData, progress: ProgressSummary, hasAttention: boolean): TaskHeaderView {
-  const cannotRunReason = pageData.task.isRunnable ? undefined : pageData.task.runnabilitySummary;
   const memberContext = buildWorkspaceMemberContext(pageData, hasAttention);
+  const workspaceStatus = mapTaskWorkspaceStatus(pageData.task.status);
+  const hasPlan = progress.totalSteps > 0 || Boolean(pageData.task.savedPlan);
+  const cannotStartReason = !hasPlan
+    ? "Generate and accept a plan before starting execution."
+    : !pageData.task.isRunnable
+      ? pageData.task.runnabilitySummary
+      : workspaceStatus === "running"
+        ? "Task is already running."
+        : workspaceStatus === "completed"
+          ? "Task is completed."
+          : undefined;
+  const cannotStopReason = workspaceStatus === "running" || workspaceStatus === "approval-needed"
+    ? undefined
+    : "No running execution session to stop.";
 
   return {
     breadcrumb: ["Tasks", pageData.task.title],
     title: pageData.task.title,
     canEditTitle: true,
-    status: mapTaskWorkspaceStatus(pageData.task.status),
+    status: workspaceStatus,
     completedSteps: progress.completedSteps,
     totalSteps: progress.totalSteps,
     progressPercent: progress.percentComplete,
     actions: [
-      { id: "continue", label: "Continue", disabled: !pageData.task.isRunnable, disabledReason: cannotRunReason },
-      { id: "pause", label: "Pause", disabled: pageData.task.status !== "Running" },
-      { id: "export", label: "Export", disabled: progress.totalSteps === 0, disabledReason: progress.totalSteps === 0 ? "No execution plan to export" : undefined },
+      { id: "start", label: "Start", disabled: Boolean(cannotStartReason), disabledReason: cannotStartReason },
+      { id: "pause", label: "Pause", disabled: true, disabledReason: "Pause is visible for task control, but the execution API does not expose pause yet." },
+      { id: "stop", label: "Stop", disabled: Boolean(cannotStopReason), disabledReason: cannotStopReason },
       { id: "more", label: "More actions" },
     ],
     memberContext,
@@ -378,15 +417,20 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   graphPlan: TaskPlanGraphPlan | null;
   selectedNode?: PlanNodeDataModel | null;
 }): TaskWorkspaceExecutionConsoleView {
+  const task = {
+    ...input.pageData.task,
+    status: deriveTaskStatusFromGraph(input.pageData.task.status, input.graphPlan),
+  } satisfies TaskData;
+  const pageData = { ...input.pageData, task } satisfies TaskPageData;
   const currentNode = pickWorkspaceCurrentNode(input.graphPlan, input.selectedNode ?? null);
   const progress = buildProgressSummary(input.graphPlan);
-  const attention = buildAttentionCard(input.pageData, currentNode);
-  const isPermissionLimited = !input.pageData.task.isRunnable && !input.pageData.task.blockReason;
+  const attention = buildAttentionCard(pageData, currentNode);
+  const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
 
   return {
-    task: input.pageData.task,
-    header: buildTaskHeaderView(input.pageData, progress, Boolean(attention)),
-    navigation: buildWorkspaceNavigationView(input.pageData, Boolean(attention)),
+    task,
+    header: buildTaskHeaderView(pageData, progress, Boolean(attention)),
+    navigation: buildWorkspaceNavigationView(pageData, Boolean(attention)),
     executionFlow: buildExecutionFlowView(input.graphPlan, input.selectedNode ?? currentNode),
     graphPlan: input.graphPlan,
     progress,
@@ -402,16 +446,16 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       disabledActionReason: currentNode?.availableActions?.length === 0 ? "No actions are available for this node." : undefined,
       isEmpty: !currentNode,
     },
-    readiness: buildReadinessCard(input.pageData, currentNode),
-    latestResult: buildLatestResultCard(input.pageData, currentNode),
+    readiness: buildReadinessCard(pageData, currentNode),
+    latestResult: buildLatestResultCard(pageData, currentNode),
     attention,
-    artifacts: buildArtifactItems(input.pageData, input.graphPlan),
-    activity: buildActivity(input.pageData, input.graphPlan),
+    artifacts: buildArtifactItems(pageData, input.graphPlan),
+    activity: buildActivity(pageData, input.graphPlan),
     states: {
       isEmpty: (input.graphPlan?.nodes.length ?? 0) === 0,
-      isStale: input.pageData.latestRunSummary?.syncStatus === "stale",
+      isStale: pageData.latestRunSummary?.syncStatus === "stale",
       isPermissionLimited,
-      errorMessage: input.graphPlan?.state === "empty" && input.pageData.task.status === "Failed" ? input.pageData.task.runnabilitySummary : null,
+      errorMessage: input.graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null,
     },
   };
 }

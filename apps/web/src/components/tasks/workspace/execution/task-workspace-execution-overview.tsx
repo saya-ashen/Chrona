@@ -1,4 +1,4 @@
-import { Archive, Bell, CalendarClock, FileText, RefreshCw, Sparkles } from "lucide-react";
+import { Archive, Bell, CalendarClock, FileText, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { cn } from "@/lib/utils";
@@ -36,10 +36,6 @@ export function TaskWorkspaceExecutionOverview({
             <Sparkles className="size-3.5 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">Execution result overview</h2>
           </div>
-          <button type="button" className={buttonVariants({ variant: "outline", size: "sm", className: "h-7 rounded-lg px-2 text-xs" })}>
-            <RefreshCw className="size-3.5" />
-            Refresh
-          </button>
         </div>
         <div className="space-y-1">
           <LatestResultCard card={latestResult} onAction={onAction} />
@@ -121,7 +117,6 @@ function ArtifactsCard({ artifacts, onAction }: { artifacts: WorkspaceArtifactIt
           <Archive className="size-4 text-primary" />
           <p className="text-sm font-semibold text-foreground">Artifacts ({artifacts.length})</p>
         </div>
-        {artifacts.length > 0 ? <button type="button" className="text-xs font-medium text-primary">View all -&gt;</button> : null}
       </div>
       {artifacts.length === 0 ? (
         <p className="mt-1.5 text-[13px] text-muted-foreground">No artifacts yet.</p>
@@ -165,7 +160,6 @@ function ActivityCard({ activity }: { activity: WorkspaceActivityItem[] }) {
           <CalendarClock className="size-4 text-primary" />
           <p className="text-sm font-semibold text-foreground">Execution activity</p>
         </div>
-        {activity.length > 0 ? <button type="button" className="text-xs font-medium text-primary">View all -&gt;</button> : null}
       </div>
       {activity.length === 0 ? (
         <p className="mt-1.5 text-[13px] text-muted-foreground">Activity will appear after planning or execution starts.</p>

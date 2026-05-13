@@ -1,10 +1,11 @@
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Sparkles } from "lucide-react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { buttonVariants } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { TaskPlanGenerationStatus } from "../model/task-workspace-types";
 
 type TaskWorkspacePlanContentProps = {
   label: string;
@@ -13,6 +14,8 @@ type TaskWorkspacePlanContentProps = {
   canAcceptPlan: boolean;
   isAcceptingPlan: boolean;
   acceptPlanError: string | null;
+  planGenerationStatus: TaskPlanGenerationStatus;
+  onGeneratePlan: () => void;
   onAcceptPlan: () => void | Promise<void>;
   onSelectedNodeChange: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
 };
@@ -24,12 +27,26 @@ export function TaskWorkspacePlanContent({
   canAcceptPlan,
   isAcceptingPlan,
   acceptPlanError,
+  planGenerationStatus,
+  onGeneratePlan,
   onAcceptPlan,
   onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
   const planSummary = graphPlan && plan
     ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;
+  const isGeneratingPlan = planGenerationStatus === "generating";
+  const generatePlanButton = (
+    <button
+      type="button"
+      disabled={isGeneratingPlan}
+      onClick={onGeneratePlan}
+      className={buttonVariants({ variant: "secondary", size: "sm", className: "rounded-xl" })}
+    >
+      {isGeneratingPlan ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+      {isGeneratingPlan ? "Generating..." : plan ? "Regenerate plan" : "Generate plan"}
+    </button>
+  );
 
   return (
     <div className="h-full min-h-0 space-y-1">
@@ -46,6 +63,7 @@ export function TaskWorkspacePlanContent({
             onSelectedNodeChange={onSelectedNodeChange}
             actions={(
               <div className="flex flex-wrap items-center justify-end gap-2">
+                {generatePlanButton}
                 {canAcceptPlan ? (
                   <button
                     type="button"
@@ -70,6 +88,7 @@ export function TaskWorkspacePlanContent({
         >
           <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">{label}</p>
+            {generatePlanButton}
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center rounded-[1rem] border border-dashed border-border/60 bg-background/40 px-5 text-center text-sm text-muted-foreground">
             The plan graph will appear here once AI generates a plan.

@@ -102,10 +102,47 @@ export type ProgressSummary = {
 export type TaskWorkspaceUserStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked";
 
 export type TaskHeaderAction = {
-  id: "continue" | "pause" | "export" | "more";
+  id: "start" | "pause" | "stop" | "more";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
+};
+
+export type WorkspaceActionDecision = "keep-working" | "wire" | "disable-with-reason" | "convert-to-info" | "remove";
+
+export type WorkspaceComponentInventoryItem = {
+  id: string;
+  region: string;
+  filePath: string;
+  controlLabel: string;
+  decision: WorkspaceActionDecision;
+  evidence: string;
+};
+
+export type WorkspaceActionInventory = {
+  featureId: string;
+  auditedAt: string;
+  items: WorkspaceComponentInventoryItem[];
+};
+
+export type WorkspaceActionContract = {
+  id: string;
+  trigger: string;
+  availability: "available" | "disabled" | "removed" | "informational";
+  disabledReason?: string;
+  progressLabel?: string;
+  successLabel?: string;
+  failureLabel?: string;
+  preventsDuplicateSubmission: boolean;
+  refreshesData: boolean;
+};
+
+export type TaskWorkspaceState = {
+  taskId: string;
+  selectedNodeId: string | null;
+  activeActionId: string | null;
+  stale: boolean;
+  permissionLimited: boolean;
 };
 
 export type TaskHeaderView = {
