@@ -76,7 +76,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Action required")).toBeInTheDocument();
     expect(screen.getAllByText("Accept").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Accept result" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept result" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
 
@@ -101,7 +101,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
     expect(screen.getByText("This node is waiting on an external event, so there is no manual form to fill here.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Supplement info" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Supplement info" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Result" }));
 

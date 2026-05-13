@@ -1,5 +1,4 @@
-import dagre from "@dagrejs/dagre";
-import ELK from "elkjs/lib/elk.bundled.js";
+import { coordGreedy, decrossDfs, graphConnect, sugiyama, tweakDirection } from "d3-dag";
 import { MarkerType, Position } from "@xyflow/react";
 import {
   EDGE_OFFSET,
@@ -16,14 +15,13 @@ import {
 import { buildEdgeStyle, getNodeTone, nodeShapeForKind } from "./logic";
 import type { FlowGraphEdge, FlowGraphNode, GraphCopy, TaskPlanGraphPlan } from "./types";
 
-const elk = new ELK();
-
 export type FlowLayout = {
   nodes: FlowGraphNode[];
   edges: FlowGraphEdge[];
   contentWidth: number;
   contentHeight: number;
   viewportHeight: number;
+  layoutDirection: "TB" | "LR";
 };
 
 type LayoutNodePosition = {
@@ -33,12 +31,24 @@ type LayoutNodePosition = {
   height: number;
 };
 
+type DagLayoutNode = {
+  id: string;
+};
+
+type DagLayoutLink = {
+  edge: TaskPlanGraphPlan["edges"][number];
+  source: string;
+  target: string;
+};
+
 type LayoutInput = {
   plan: TaskPlanGraphPlan;
   selectedNodeId: string | null;
   graphCopy: GraphCopy;
   onSelect: (nodeId: string) => void;
 };
+
+type LayoutMode = "horizontal";
 
 type GraphMaps = {
   incomingById: Map<string, string[]>;
@@ -47,18 +57,13 @@ type GraphMaps = {
 };
 
 type HybridLayoutMetadata = {
-  laneById: Map<string, number>;
-  rankById: Map<string, number>;
   roleById: Map<string, FlowGraphNode["data"]["layoutRole"]>;
+  horizontalRunByNodeId: Map<string, string[]>;
+  horizontalEdgeIds: Set<string>;
+  layoutMode: LayoutMode;
 };
 
-const HORIZONTAL_LANE_GAP = NODE_WIDTH + LAYOUT_NODE_SEP + 80;
-const VERTICAL_RANK_GAP = NODE_HEIGHT + LAYOUT_RANK_SEP;
-
-function alternatingLane(index: number) {
-  const magnitude = Math.floor(index / 2) + 1;
-  return index % 2 === 0 ? -magnitude : magnitude;
-}
+const MIN_HORIZONTAL_RUN_LENGTH = 4;
 
 function edgeEndpoints(edge: TaskPlanGraphPlan["edges"][number]) {
   return {
@@ -97,42 +102,77 @@ function isSidecarNode(node: TaskPlanGraphPlan["nodes"][number]) {
   );
 }
 
-function numericRecordValue(record: Record<string, number>, id: string) {
-  const value = record[id];
-  return Number.isFinite(value) ? value : null;
+function mainOutgoingIds(id: string, maps: GraphMaps) {
+  return (maps.outgoingById.get(id) ?? []).filter((targetId) => {
+    const target = maps.nodeById.get(targetId);
+    return target && !isSidecarNode(target);
+  });
 }
 
-function inferRankById(plan: TaskPlanGraphPlan, maps: GraphMaps) {
-  const rankById = new Map<string, number>();
-  const pending = [...plan.nodes.map((node) => node.id)];
-  let guard = pending.length * pending.length + 1;
+function mainIncomingIds(id: string, maps: GraphMaps) {
+  return (maps.incomingById.get(id) ?? []).filter((sourceId) => {
+    const source = maps.nodeById.get(sourceId);
+    return source && !isSidecarNode(source);
+  });
+}
 
-  for (const id of pending) {
-    const explicitRank = numericRecordValue(plan.analytics.rankByNodeId, id);
-    if (explicitRank !== null) rankById.set(id, explicitRank);
-  }
+function isConditionNode(node: TaskPlanGraphPlan["nodes"][number] | undefined) {
+  return Boolean(node?.kind === "condition" || node?.type === "condition");
+}
 
-  while (pending.length > 0 && guard > 0) {
-    guard -= 1;
-    const id = pending.shift();
-    if (!id || rankById.has(id)) continue;
-    const parents = maps.incomingById.get(id) ?? [];
-    if (parents.length === 0) {
-      rankById.set(id, 0);
-      continue;
+function isHorizontalChainNode(id: string, maps: GraphMaps) {
+  const node = maps.nodeById.get(id);
+  if (!node) return false;
+  if (isSidecarNode(node)) return false;
+  if (isConditionNode(node)) return false;
+  if (mainIncomingIds(id, maps).length > 1) return false;
+  if (mainOutgoingIds(id, maps).length > 1) return false;
+  return true;
+}
+
+function findLinearRuns(plan: TaskPlanGraphPlan, maps: GraphMaps) {
+  const visited = new Set<string>();
+  const runs: string[][] = [];
+
+  for (const node of plan.nodes) {
+    if (visited.has(node.id)) continue;
+    if (!isHorizontalChainNode(node.id, maps)) continue;
+
+    const incoming = mainIncomingIds(node.id, maps);
+    const isMiddleOfRun =
+      incoming.length === 1 &&
+      mainOutgoingIds(incoming[0], maps).length === 1 &&
+      isHorizontalChainNode(incoming[0], maps);
+
+    if (isMiddleOfRun) continue;
+
+    const run = [node.id];
+    let current = node.id;
+
+    while (true) {
+      const outgoing = mainOutgoingIds(current, maps);
+      if (outgoing.length !== 1) break;
+
+      const next = outgoing[0];
+      if (visited.has(next)) break;
+      if (!isHorizontalChainNode(next, maps)) break;
+      if (mainIncomingIds(next, maps).length !== 1) break;
+
+      run.push(next);
+      current = next;
     }
-    if (parents.every((parentId) => rankById.has(parentId))) {
-      rankById.set(id, Math.max(...parents.map((parentId) => rankById.get(parentId) ?? 0)) + 1);
-      continue;
+
+    if (run.length >= MIN_HORIZONTAL_RUN_LENGTH) {
+      for (const id of run) visited.add(id);
+      runs.push(run);
     }
-    pending.push(id);
   }
 
-  for (const [index, node] of plan.nodes.entries()) {
-    if (!rankById.has(node.id)) rankById.set(node.id, index);
-  }
+  return runs;
+}
 
-  return rankById;
+function chooseLayoutMode(_plan: TaskPlanGraphPlan, _maps: GraphMaps): LayoutMode {
+  return "horizontal";
 }
 
 function primaryPathIds(plan: TaskPlanGraphPlan, maps: GraphMaps) {
@@ -158,32 +198,46 @@ function primaryPathIds(plan: TaskPlanGraphPlan, maps: GraphMaps) {
   return path.length > 0 ? path : plan.nodes.map((node) => node.id);
 }
 
-function inferHybridLayoutMetadata(plan: TaskPlanGraphPlan, maps: GraphMaps): HybridLayoutMetadata {
-  const rankById = inferRankById(plan, maps);
-  const laneById = new Map<string, number>();
+function applyHorizontalRunsToMetadata(plan: TaskPlanGraphPlan, maps: GraphMaps, metadata: HybridLayoutMetadata) {
+  const runs = findLinearRuns(plan, maps);
+
+  for (const run of runs) {
+    run.forEach((id) => {
+      metadata.roleById.set(id, "chain");
+      metadata.horizontalRunByNodeId.set(id, run);
+    });
+
+    if (metadata.layoutMode !== "horizontal") continue;
+
+    for (let index = 0; index < run.length - 1; index += 1) {
+      const from = run[index];
+      const to = run[index + 1];
+      const edge = plan.edges.find((item) => {
+        const endpoints = edgeEndpoints(item);
+        return endpoints.from === from && endpoints.to === to;
+      });
+
+      if (edge) metadata.horizontalEdgeIds.add(edge.id);
+    }
+  }
+}
+
+function inferHybridLayoutMetadata(plan: TaskPlanGraphPlan, maps: GraphMaps, layoutMode: LayoutMode): HybridLayoutMetadata {
   const roleById = new Map<string, FlowGraphNode["data"]["layoutRole"]>();
   const primary = new Set(primaryPathIds(plan, maps));
+  const metadata: HybridLayoutMetadata = {
+    roleById,
+    horizontalRunByNodeId: new Map(),
+    horizontalEdgeIds: new Set(),
+    layoutMode,
+  };
 
   for (const node of plan.nodes) {
-    const explicitLane = numericRecordValue(plan.analytics.laneByNodeId, node.id);
-    laneById.set(node.id, explicitLane ?? 0);
     roleById.set(node.id, primary.has(node.id) ? "primary" : "parallel");
   }
 
   for (const node of plan.nodes) {
     if (!isSidecarNode(node) || primary.has(node.id)) continue;
-    const parents = maps.incomingById.get(node.id) ?? [];
-    const anchorId = parents.find((id) => primary.has(id)) ?? parents[0];
-    const sidecarSiblings = (anchorId ? maps.outgoingById.get(anchorId) : plan.nodes.map((item) => item.id))
-      ?.filter((id) => {
-        const sibling = maps.nodeById.get(id);
-        return sibling && !primary.has(id) && isSidecarNode(sibling);
-      }) ?? [];
-    const sidecarIndex = Math.max(0, sidecarSiblings.indexOf(node.id));
-    const anchorLane = anchorId ? (laneById.get(anchorId) ?? 0) : 0;
-    const anchorRank = anchorId ? (rankById.get(anchorId) ?? rankById.get(node.id) ?? 0) : (rankById.get(node.id) ?? 0);
-    laneById.set(node.id, anchorLane + alternatingLane(sidecarIndex) * 0.82);
-    rankById.set(node.id, anchorRank + 0.35);
     roleById.set(node.id, "sidecar");
   }
 
@@ -191,9 +245,7 @@ function inferHybridLayoutMetadata(plan: TaskPlanGraphPlan, maps: GraphMaps): Hy
     const children = (maps.outgoingById.get(node.id) ?? []).filter((id) => !primary.has(id) && roleById.get(id) !== "sidecar");
     if (children.length < 2 && node.kind !== "condition" && node.type !== "condition") continue;
 
-    children.forEach((childId, index) => {
-      const lane = alternatingLane(index);
-      laneById.set(childId, lane);
+    children.forEach((childId) => {
       roleById.set(childId, "branch");
 
       let current = childId;
@@ -204,64 +256,13 @@ function inferHybridLayoutMetadata(plan: TaskPlanGraphPlan, maps: GraphMaps): Hy
         if (nextCandidates.length !== 1) break;
         const next = nextCandidates[0];
         if ((maps.incomingById.get(next) ?? []).length > 1 || roleById.get(next) === "sidecar") break;
-        laneById.set(next, lane);
         roleById.set(next, "branch");
         current = next;
       }
     });
   }
 
-  const groupedByRank = new Map<number, string[]>();
-  for (const node of plan.nodes) {
-    if (roleById.get(node.id) !== "parallel") continue;
-    const rank = Math.round(rankById.get(node.id) ?? 0);
-    groupedByRank.set(rank, [...(groupedByRank.get(rank) ?? []), node.id]);
-  }
-
-  for (const siblings of groupedByRank.values()) {
-    if (siblings.length < 2) continue;
-    siblings.forEach((id, index) => {
-      laneById.set(id, alternatingLane(index));
-    });
-  }
-
-  return { laneById, rankById, roleById };
-}
-
-function applyHybridLayout(input: LayoutInput, layoutNodes: Map<string, LayoutNodePosition>) {
-  const maps = buildGraphMaps(input.plan);
-  const metadata = inferHybridLayoutMetadata(input.plan, maps);
-  const primaryNodes = input.plan.nodes.filter((node) => metadata.roleById.get(node.id) === "primary");
-  const primaryCenter = primaryNodes.length > 0
-    ? primaryNodes.reduce((sum, node) => {
-      const layoutNode = layoutNodes.get(node.id);
-      return sum + (layoutNode ? layoutNode.x + layoutNode.width / 2 : 0);
-    }, 0) / primaryNodes.length
-    : 0;
-
-  for (const node of input.plan.nodes) {
-    const layoutNode = layoutNodes.get(node.id);
-    if (!layoutNode) continue;
-    const lane = metadata.laneById.get(node.id) ?? 0;
-    const rank = metadata.rankById.get(node.id) ?? 0;
-    const role = metadata.roleById.get(node.id);
-    const targetX = primaryCenter + lane * HORIZONTAL_LANE_GAP - layoutNode.width / 2;
-    const targetY = rank * VERTICAL_RANK_GAP;
-
-    if (role === "primary") {
-      layoutNode.x = layoutNode.x * 0.35 + targetX * 0.65;
-      continue;
-    }
-
-    if (role === "sidecar") {
-      layoutNode.x = targetX;
-      layoutNode.y = layoutNode.y * 0.25 + targetY * 0.75;
-      continue;
-    }
-
-    layoutNode.x = layoutNode.x * 0.25 + targetX * 0.75;
-    layoutNode.y = layoutNode.y * 0.4 + targetY * 0.6;
-  }
+  if (layoutMode === "horizontal" || layoutMode === "hybrid") applyHorizontalRunsToMetadata(plan, maps, metadata);
 
   return metadata;
 }
@@ -297,7 +298,7 @@ function edgeMinLength(sourceNode: TaskPlanGraphPlan["nodes"][number] | undefine
   return 1;
 }
 
-function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, LayoutNodePosition>, metadata?: HybridLayoutMetadata): FlowLayout {
+function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, LayoutNodePosition>, metadata: HybridLayoutMetadata): FlowLayout {
   let minLeft = Number.POSITIVE_INFINITY;
   let minTop = Number.POSITIVE_INFINITY;
   let maxRight = Number.NEGATIVE_INFINITY;
@@ -330,6 +331,16 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
 
   const focusSet = new Set(input.plan.analytics.reachableFromActiveIds);
   const nodeById = new Map(input.plan.nodes.map((node) => [node.id, node]));
+  const graphIsHorizontal = metadata.layoutMode === "horizontal";
+  const sourceCountByNodeId = new Map<string, number>();
+  const targetCountByNodeId = new Map<string, number>();
+
+  for (const edge of input.plan.edges) {
+    const from = edge.from ?? edge.fromNodeId ?? "";
+    const to = edge.to ?? edge.toNodeId ?? "";
+    if (from) sourceCountByNodeId.set(from, (sourceCountByNodeId.get(from) ?? 0) + 1);
+    if (to) targetCountByNodeId.set(to, (targetCountByNodeId.get(to) ?? 0) + 1);
+  }
 
   const nodes: FlowGraphNode[] = input.plan.nodes.map((node, index) => {
     const layoutNode = layoutNodes.get(node.id) ?? { x: 0, y: 0, width: NODE_WIDTH, height: NODE_HEIGHT };
@@ -345,8 +356,8 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       height: layoutNode.height,
       initialWidth: layoutNode.width,
       initialHeight: layoutNode.height,
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
+      sourcePosition: graphIsHorizontal ? Position.Right : Position.Bottom,
+      targetPosition: graphIsHorizontal ? Position.Left : Position.Top,
       draggable: false,
       selectable: false,
       zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
@@ -372,6 +383,7 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
   const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => {
     const from = edge.from ?? edge.fromNodeId ?? "";
     const to = edge.to ?? edge.toNodeId ?? "";
+    const isHorizontalEdge = graphIsHorizontal || metadata.horizontalEdgeIds.has(edge.id);
     const baseStyle = buildEdgeStyle(edge.kind ?? "sequential", edge.emphasis ?? "normal");
     const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(from), nodeById.get(to));
 
@@ -390,6 +402,8 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       source: from,
       target: to,
       type: "taskPlanEdge",
+      sourceHandle: isHorizontalEdge ? "right-source" : "bottom-source",
+      targetHandle: isHorizontalEdge ? "left-target" : "top-target",
       selectable: false,
       reconnectable: false,
       animated: runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input",
@@ -409,116 +423,61 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       },
       data: {
         stableLabel: edge.label ?? undefined,
-        bypassOffset: edgeMinLength(nodeById.get(from), nodeById.get(to)) > 1 ? EDGE_OFFSET + 10 : EDGE_OFFSET,
+        orientation: isHorizontalEdge ? "horizontal" : "vertical",
+        fanOut: (sourceCountByNodeId.get(from) ?? 0) > 1,
+        fanIn: (targetCountByNodeId.get(to) ?? 0) > 1,
+        routeOffset: edgeMinLength(nodeById.get(from), nodeById.get(to)) > 1 ? EDGE_OFFSET + 10 : 0,
       },
     };
   });
 
-  return { nodes, edges, contentWidth, contentHeight, viewportHeight };
+  return { nodes, edges, contentWidth, contentHeight, viewportHeight, layoutDirection: graphIsHorizontal ? "LR" : "TB" };
 }
 
-export function buildFallbackFlowLayout(input: LayoutInput): FlowLayout {
+export function buildFlowLayout(input: LayoutInput): FlowLayout {
   const nodeCount = input.plan.nodes.length;
   const denseGraph = nodeCount >= 8;
   const compactNodeSep = denseGraph ? Math.max(24, LAYOUT_NODE_SEP - 10) : LAYOUT_NODE_SEP;
   const compactRankSep = denseGraph ? Math.max(58, LAYOUT_RANK_SEP - 8) : LAYOUT_RANK_SEP;
+  const maps = buildGraphMaps(input.plan);
+  const layoutMode = chooseLayoutMode(input.plan, maps);
 
-  const graph = new dagre.graphlib.Graph();
-  graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({
-    rankdir: LAYOUT_DIRECTION,
-    align: "UL",
-    acyclicer: "greedy",
-    ranker: "tight-tree",
-    nodesep: compactNodeSep,
-    ranksep: compactRankSep,
-    marginx: LAYOUT_PADDING,
-    marginy: LAYOUT_PADDING,
+  const layoutDirection = LAYOUT_DIRECTION;
+  const links = input.plan.edges.flatMap<DagLayoutLink>((edge) => {
+    const { from, to } = edgeEndpoints(edge);
+    return from && to ? [{ edge, source: from, target: to }] : [];
   });
+  const singleNodeLinks = input.plan.nodes.map<DagLayoutLink>((node) => ({
+    edge: { id: `node-${node.id}`, fromNodeId: node.id, toNodeId: node.id },
+    source: node.id,
+    target: node.id,
+  }));
+  const graph = graphConnect()
+    .sourceId(({ source }: DagLayoutLink) => source)
+    .targetId(({ target }: DagLayoutLink) => target)
+    .nodeDatum((id): DagLayoutNode => ({ id }))
+    .single(true)([...links, ...singleNodeLinks]);
+  const layoutGraph = sugiyama()
+    .nodeSize([NODE_WIDTH, NODE_HEIGHT])
+    .gap([compactNodeSep, compactRankSep])
+    .decross(denseGraph ? decrossDfs() : decrossDfs().topDown(false))
+    .coord(coordGreedy())
+    .tweaks([tweakDirection(layoutDirection)]);
 
-  for (const node of input.plan.nodes) {
-    graph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-
-  const nodeById = new Map(input.plan.nodes.map((node) => [node.id, node]));
-
-  for (const edge of input.plan.edges) {
-    const from = edge.from ?? edge.fromNodeId;
-    const to = edge.to ?? edge.toNodeId;
-    if (!from || !to) continue;
-    graph.setEdge(from, to, { minlen: edgeMinLength(nodeById.get(from), nodeById.get(to)), weight: edge.kind === "sequential" ? 3 : 1 });
-  }
-
-  dagre.layout(graph);
+  layoutGraph(graph);
 
   const layoutNodes = new Map<string, LayoutNodePosition>();
-  for (const node of input.plan.nodes) {
-    const layoutNode = graph.node(node.id);
-    if (!layoutNode) continue;
-    layoutNodes.set(node.id, {
-      x: layoutNode.x - layoutNode.width / 2,
-      y: layoutNode.y - layoutNode.height / 2,
-      width: layoutNode.width,
-      height: layoutNode.height,
+  for (const node of graph.nodes()) {
+    layoutNodes.set(node.data.id, {
+      x: node.x - NODE_WIDTH / 2,
+      y: node.y - NODE_HEIGHT / 2,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
     });
   }
 
-  const metadata = applyHybridLayout(input, layoutNodes);
+  const metadata = inferHybridLayoutMetadata(input.plan, maps, layoutMode);
   return materializeFlowLayout(input, layoutNodes, metadata);
-}
-
-export async function buildFlowLayout(input: LayoutInput): Promise<FlowLayout> {
-  const nodeCount = input.plan.nodes.length;
-  const denseGraph = nodeCount >= 8;
-  const compactNodeSep = denseGraph ? Math.max(28, LAYOUT_NODE_SEP - 6) : LAYOUT_NODE_SEP;
-  const compactRankSep = denseGraph ? Math.max(60, LAYOUT_RANK_SEP - 6) : LAYOUT_RANK_SEP;
-
-  try {
-    const graph = await elk.layout({
-      id: "task-plan-graph",
-      layoutOptions: {
-        "elk.algorithm": "layered",
-        "elk.direction": "DOWN",
-        "elk.aspectRatio": "1.45",
-        "elk.layered.spacing.nodeNodeBetweenLayers": String(compactRankSep),
-        "elk.spacing.nodeNode": String(compactNodeSep),
-        "elk.spacing.edgeNode": "18",
-        "elk.spacing.edgeEdge": "12",
-        "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-        "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-        "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
-        "elk.layered.edgeRouting": "ORTHOGONAL",
-      },
-      children: input.plan.nodes.map((node) => ({
-        id: node.id,
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-      })),
-      edges: input.plan.edges.flatMap((edge) => {
-        const from = edge.from ?? edge.fromNodeId;
-        const to = edge.to ?? edge.toNodeId;
-        return from && to
-          ? [{ id: edge.id, sources: [from], targets: [to] }]
-          : [];
-      }),
-    });
-
-    const layoutNodes = new Map<string, LayoutNodePosition>();
-    for (const node of graph.children ?? []) {
-      if (typeof node.x !== "number" || typeof node.y !== "number") continue;
-      layoutNodes.set(node.id, {
-        x: node.x,
-        y: node.y,
-        width: typeof node.width === "number" ? node.width : NODE_WIDTH,
-        height: typeof node.height === "number" ? node.height : NODE_HEIGHT,
-      });
-    }
-
-    const metadata = applyHybridLayout(input, layoutNodes);
-    return materializeFlowLayout(input, layoutNodes, metadata);
-  } catch {
-    return buildFallbackFlowLayout(input);
-  }
 }
 
 export function syncNodeState(
@@ -539,8 +498,8 @@ export function syncNodeState(
         zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
         opacity: isFocus ? 1 : 0.48,
       },
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
+      sourcePosition: node.sourcePosition,
+      targetPosition: node.targetPosition,
       data: {
         ...node.data,
         isSelected,

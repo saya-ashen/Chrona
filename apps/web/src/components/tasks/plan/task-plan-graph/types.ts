@@ -229,7 +229,7 @@ export type GraphCopy = {
 export type FlowNodeData = {
   node: PlanNodeDataModel;
   stepNumber: number;
-  layoutRole?: "primary" | "branch" | "parallel" | "sidecar";
+  layoutRole?: "primary" | "branch" | "parallel" | "sidecar" | "chain";
   tone: NodeTone;
   shape: NodeShape;
   isSelected: boolean;
@@ -242,7 +242,10 @@ export type FlowNodeData = {
 export type FlowGraphNode = Node<FlowNodeData, "taskPlanNode">;
 export type FlowEdgeData = {
   stableLabel?: string;
-  bypassOffset?: number;
+  routeOffset?: number;
+  orientation?: "vertical" | "horizontal";
+  fanIn?: boolean;
+  fanOut?: boolean;
 };
 
 export type FlowGraphEdge = Edge<FlowEdgeData, "taskPlanEdge">;

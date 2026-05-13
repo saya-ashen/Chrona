@@ -3,7 +3,6 @@ import { Maximize2, Minus, Plus, Scan, LocateFixed } from "lucide-react";
 import { ReactFlow, type NodeMouseHandler } from "@xyflow/react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { LAYOUT_DIRECTION } from "./constants";
 import { edgeTypes } from "./edge";
 import { EdgeLegend } from "./legend";
 import { nodeTypes } from "./node-card";
@@ -39,6 +38,7 @@ export function TaskPlanGraphFrame({
     contentWidth: number;
     contentHeight: number;
     viewportHeight: number;
+    layoutDirection: "TB" | "LR";
   };
   nodes: FlowGraphNode[];
   edges: FlowGraphEdge[];
@@ -74,8 +74,8 @@ export function TaskPlanGraphFrame({
       data-graph-editable="false"
       data-graph-interactive="true"
       data-graph-mode="full"
-      data-layout-direction={LAYOUT_DIRECTION}
-      data-layout-engine="elk-layered"
+      data-layout-direction={layout.layoutDirection}
+      data-layout-engine="d3-dag-sugiyama"
       data-renderer="react-flow"
       data-testid={testId}
     >

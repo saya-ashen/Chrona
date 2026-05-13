@@ -20,6 +20,17 @@ function formatEstimatedMinutes(value: number | null) {
   return typeof value === "number" ? `${value} min` : null;
 }
 
+const HIDDEN_HANDLE_STYLE = {
+  opacity: 0,
+  pointerEvents: "none" as const,
+  width: 1,
+  height: 1,
+  minWidth: 1,
+  minHeight: 1,
+  border: 0,
+  background: "transparent",
+};
+
 function resolveInteractionFrame(node: FlowGraphNode["data"]["node"]) {
   switch (node.interactionType) {
     case "execute":
@@ -130,7 +141,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
-      <Handle type="target" position={Position.Top} className="!top-0 !size-2.5 !-translate-y-1/2 !border-2 !border-background !bg-border/80" />
+      <Handle id="top-target" type="target" position={Position.Top} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="left-target" type="target" position={Position.Left} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
       <button
         type="button"
         onClick={() => onSelect(node.id)}
@@ -145,8 +157,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         data-node-step={stepNumber}
         data-node-workspace-status={workspaceStatus}
         className={cn(
-          "rf-node-button group relative w-full overflow-hidden border px-2.5 py-1.5 text-left transition-colors duration-150",
-          "before:absolute before:inset-y-2.5 before:left-0 before:w-px before:rounded-r-full before:content-['']",
+          "rf-node-button group relative w-full overflow-hidden border px-3 py-2 text-left transition-colors duration-150",
+          "before:absolute before:inset-y-3 before:left-0 before:w-px before:rounded-r-full before:content-['']",
           "shadow-none hover:border-foreground/18",
           getShapeClassName(shape),
           styles.border,
@@ -175,34 +187,35 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
             style={{ clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" }}
           />
         ) : null}
-        <div className="relative grid grid-cols-[1.1rem_minmax(0,1fr)] items-start gap-1.5">
-          <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[6px] bg-background/65 text-[8px] font-semibold text-muted-foreground ring-1 ring-border/35">
+        <div className="relative grid grid-cols-[1.35rem_minmax(0,1fr)] items-start gap-2">
+          <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-background/65 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/35">
             {stepNumber}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1 text-[8px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              <span className={cn("size-1.5 rounded-full", styles.dot)} />
+            <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              <span className={cn("size-2 rounded-full", styles.dot)} />
               <span className="truncate">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
             </div>
 
-            <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-snug text-foreground">{node.title}</p>
+            <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">{node.title}</p>
 
-            <div className="mt-1 flex items-center gap-1.5">
+            <div className="mt-1.5 flex items-center gap-2">
               {runtimeSpotlight ? (
-                <span className={cn("rounded-[6px] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em]", runtimeSpotlight.badge)}>
+                <span className={cn("rounded-[7px] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em]", runtimeSpotlight.badge)}>
                   {runtimeSpotlight.label}
                 </span>
               ) : (
-                <span className="rounded-[6px] bg-muted px-1.5 py-0.5 text-[8px] font-medium text-muted-foreground">{node.statusLabel ?? node.status}</span>
+                <span className="rounded-[7px] bg-muted px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{node.statusLabel ?? node.status}</span>
               )}
               {durationLabel ? (
-                <span className="truncate text-[10px] font-medium text-muted-foreground">{durationLabel}</span>
+                <span className="truncate text-[11px] font-medium text-muted-foreground">{durationLabel}</span>
               ) : null}
             </div>
           </div>
         </div>
       </button>
-      <Handle type="source" position={Position.Bottom} className="!bottom-0 !top-auto !size-2.5 !translate-y-1/2 !border-2 !border-background !bg-border/80" />
+      <Handle id="right-source" type="source" position={Position.Right} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="bottom-source" type="source" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
     </div>
   );
 }
