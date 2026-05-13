@@ -1,6 +1,6 @@
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
 
-import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
 export type WorkPageClientProps = {
   initialData: {

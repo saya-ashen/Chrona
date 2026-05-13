@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 import {
   renderWorkInspectorSectionPanel,
   workInspectorSections as sections,

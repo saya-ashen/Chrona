@@ -1,6 +1,6 @@
 import { Activity, CheckCircle2, GitBranch, Sparkles, type LucideIcon } from "lucide-react";
 import { LatestResultPanel } from "@/components/work/latest-result-panel";
-import { TaskPlanGraph } from "@/components/task/plan/task-plan-graph";
+import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";

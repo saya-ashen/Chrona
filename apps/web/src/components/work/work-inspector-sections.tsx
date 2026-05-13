@@ -1,5 +1,5 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/task/plan/task-plan-graph";
+import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 

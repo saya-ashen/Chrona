@@ -26,7 +26,7 @@ description: "Task list for Task Workspace Component Parity"
 
 - [X] T001 Review current task workspace implementation in `apps/web/src/components/tasks/task-workspace-page.tsx`
 - [X] T002 Review current task graph implementation in `apps/web/src/components/task/plan/task-plan-graph/index.tsx`
-- [ ] T003 [P] Document any implementation-only dependency decision in `specs/003-task-workspace-components/quickstart.md`
+- [X] T003 [P] Document any implementation-only dependency decision in `specs/003-task-workspace-components/quickstart.md`
 
 ---
 
@@ -36,11 +36,11 @@ description: "Task list for Task Workspace Component Parity"
 
 **Critical**: Keep business/state mapping logic out of React render bodies; use pure helpers in `task-workspace-query.ts` and shared types in `task-workspace-types.ts`.
 
-- [ ] T004 Extend execution-console view model types for navigation, task header actions, flow controls, node detail tabs, overview freshness, permissions, and empty/error states in `apps/web/src/components/tasks/task-workspace-types.ts`
-- [ ] T005 Implement pure status mapping helpers for completed, running, waiting, approval-needed, and blocked user-facing states in `apps/web/src/components/tasks/task-workspace-query.ts`
-- [ ] T006 Implement pure `createTaskWorkspaceExecutionConsoleView` fields for header, navigation, flow summary, selected node, overview, and state fallbacks in `apps/web/src/components/tasks/task-workspace-query.ts`
-- [ ] T007 [P] Add shared task workspace test fixtures for running, waiting, approval-needed, empty, artifact-present, stale/error, and permission-limited states in `apps/web/src/components/tasks/task-workspace-test-fixtures.ts`
-- [ ] T008 [P] Add view-model tests for progress, status mapping, attention derivation, artifacts, activity, and empty states in `apps/web/src/components/tasks/task-workspace-query.test.ts`
+- [X] T004 Extend execution-console view model types for navigation, task header actions, flow controls, node detail tabs, overview freshness, permissions, and empty/error states in `apps/web/src/components/tasks/task-workspace-types.ts`
+- [X] T005 Implement pure status mapping helpers for completed, running, waiting, approval-needed, and blocked user-facing states in `apps/web/src/components/tasks/task-workspace-query.ts`
+- [X] T006 Implement pure `createTaskWorkspaceExecutionConsoleView` fields for header, navigation, flow summary, selected node, overview, and state fallbacks in `apps/web/src/components/tasks/task-workspace-query.ts`
+- [X] T007 [P] Add shared task workspace test fixtures for running, waiting, approval-needed, empty, artifact-present, stale/error, and permission-limited states in `apps/web/src/components/tasks/task-workspace-test-fixtures.ts`
+- [X] T008 [P] Add view-model tests for progress, status mapping, attention derivation, artifacts, activity, and empty states in `apps/web/src/components/tasks/task-workspace-query.test.ts`
 - [X] T009 Create reference-aligned shell component exports for workspace navigation, main console, and right overview in `apps/web/src/components/tasks/task-workspace-execution-console.tsx`
 - [X] T010 Replace old duplicate workspace layout assumptions with the new execution-console composition entry point in `apps/web/src/components/tasks/task-workspace-page.tsx`
 
@@ -56,19 +56,19 @@ description: "Task list for Task Workspace Component Parity"
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Add header/progress/control component tests for running, waiting, empty, and permission-limited task states in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
-- [ ] T012 [P] [US1] Add graph state mapping tests for completed, running, waiting, approval-needed, blocked, artifact, and attention node markers in `apps/web/src/components/task/plan/task-plan-graph/task-plan-graph.test.tsx`
-- [ ] T013 [P] [US1] Add flow control tests for zoom, fit/center, expand, legend, and selected-node preservation in `apps/web/src/components/task/plan/task-plan-graph/task-plan-graph.test.tsx`
+- [X] T011 [P] [US1] Add header/progress/control component tests for running, waiting, empty, and permission-limited task states in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
+- [X] T012 [P] [US1] Add graph state mapping tests for completed, running, waiting, approval-needed, blocked, artifact, and attention node markers in `apps/web/src/components/task/plan/task-plan-graph/task-plan-graph.test.tsx`
+- [X] T013 [P] [US1] Add flow control tests for zoom, fit/center, expand, legend, and selected-node preservation in `apps/web/src/components/task/plan/task-plan-graph/task-plan-graph.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement reference-aligned task header region with breadcrumb, title edit affordance, status, completed/total steps, percentage, continue, pause, export, and more actions in `apps/web/src/components/tasks/task-workspace-header-card.tsx`
-- [ ] T015 [US1] Wire task header region to `TaskWorkspaceExecutionConsoleView` data and existing edit/delete/run callbacks in `apps/web/src/components/tasks/task-workspace-page.tsx`
-- [ ] T016 [US1] Update flow node card to show step number, title, state label, time/update label, artifact indicator, and required-action indicator in `apps/web/src/components/task/plan/task-plan-graph/node-card.tsx`
-- [ ] T017 [US1] Update graph frame to expose legend, zoom, fit/center, and expand controls with accessible labels and stable test ids in `apps/web/src/components/task/plan/task-plan-graph/frame.tsx`
-- [ ] T018 [US1] Preserve selected-node context across graph zoom, fit/center, expand, and outside-click behavior in `apps/web/src/components/task/plan/task-plan-graph/index.tsx`
-- [ ] T019 [US1] Replace the old plan-section-first visual hierarchy with header plus execution-flow map hierarchy in `apps/web/src/components/tasks/task-workspace-plan-section.tsx`
-- [ ] T020 [US1] Add explicit no-node, loading, stale, permission-denied, and graph error states for the at-a-glance workspace regions in `apps/web/src/components/tasks/task-workspace-execution-console.tsx`
+- [X] T014 [US1] Implement reference-aligned task header region with breadcrumb, title edit affordance, status, completed/total steps, percentage, continue, pause, export, and more actions in `apps/web/src/components/tasks/task-workspace-header-card.tsx`
+- [X] T015 [US1] Wire task header region to `TaskWorkspaceExecutionConsoleView` data and existing edit/delete/run callbacks in `apps/web/src/components/tasks/task-workspace-page.tsx`
+- [X] T016 [US1] Update flow node card to show step number, title, state label, time/update label, artifact indicator, and required-action indicator in `apps/web/src/components/task/plan/task-plan-graph/node-card.tsx`
+- [X] T017 [US1] Update graph frame to expose legend, zoom, fit/center, and expand controls with accessible labels and stable test ids in `apps/web/src/components/task/plan/task-plan-graph/frame.tsx`
+- [X] T018 [US1] Preserve selected-node context across graph zoom, fit/center, expand, and outside-click behavior in `apps/web/src/components/task/plan/task-plan-graph/index.tsx`
+- [X] T019 [US1] Replace the old plan-section-first visual hierarchy with header plus execution-flow map hierarchy in `apps/web/src/components/tasks/task-workspace-plan-section.tsx`
+- [X] T020 [US1] Add explicit no-node, loading, stale, permission-denied, and graph error states for the at-a-glance workspace regions in `apps/web/src/components/tasks/task-workspace-execution-console.tsx`
 
 **Checkpoint**: User Story 1 is functional and testable as the MVP.
 
@@ -82,18 +82,18 @@ description: "Task list for Task Workspace Component Parity"
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] Add node selection and detail-panel update tests in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
-- [ ] T022 [P] [US2] Add result, evidence, action, configuration tab and empty-state tests in `apps/web/src/components/tasks/task-workspace-node-detail-panel.test.tsx`
-- [ ] T023 [P] [US2] Add node action permission and disabled-reason view-model tests in `apps/web/src/components/tasks/task-workspace-query.test.ts`
+- [X] T021 [P] [US2] Add node selection and detail-panel update tests in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
+- [X] T022 [P] [US2] Add result, evidence, action, configuration tab and empty-state tests in `apps/web/src/components/tasks/task-workspace-node-detail-panel.test.tsx`
+- [X] T023 [P] [US2] Add node action permission and disabled-reason view-model tests in `apps/web/src/components/tasks/task-workspace-query.test.ts`
 
 ### Implementation for User Story 2
 
 - [ ] T024 [US2] Add selected-node state plumbing from `TaskPlanGraph` to the workspace console in `apps/web/src/components/tasks/task-workspace-page.tsx`
-- [ ] T025 [US2] Implement lower current-node panel with selected node title, status, step position, and auto-refresh state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
-- [ ] T026 [US2] Implement result tab with summary, primary findings, copy action, full-result affordance, and no-result state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
-- [ ] T027 [US2] Implement evidence tab with supporting artifacts/references, source metadata, open affordance, and no-evidence state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
-- [ ] T028 [US2] Implement action tab with accept, retry, block, view approval, supplement information, disabled permission reasons, and no-action state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
-- [ ] T029 [US2] Implement configuration tab with node objective, inputs, outputs, dependencies, runtime/config summary, and no-config state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
+- [X] T025 [US2] Implement lower current-node panel with selected node title, status, step position, and auto-refresh state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
+- [X] T026 [US2] Implement result tab with summary, primary findings, copy action, full-result affordance, and no-result state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
+- [X] T027 [US2] Implement evidence tab with supporting artifacts/references, source metadata, open affordance, and no-evidence state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
+- [X] T028 [US2] Implement action tab with accept, retry, block, view approval, supplement information, disabled permission reasons, and no-action state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
+- [X] T029 [US2] Implement configuration tab with node objective, inputs, outputs, dependencies, runtime/config summary, and no-config state in `apps/web/src/components/tasks/task-workspace-node-detail-panel.tsx`
 - [ ] T030 [US2] Wire node detail actions to existing execution action dispatch and approval affordances without adding duplicate data paths in `apps/web/src/components/tasks/task-workspace-page.tsx`
 - [ ] T031 [US2] Remove obsolete inline inspector reliance where the new lower panel provides current-node review in `apps/web/src/components/task/plan/task-plan-graph/index.tsx`
 
@@ -109,14 +109,14 @@ description: "Task list for Task Workspace Component Parity"
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Add global navigation and member/notification context tests in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
-- [ ] T033 [P] [US3] Add right overview latest-result, attention, artifact, activity, stale, and empty-state tests in `apps/web/src/components/tasks/task-workspace-execution-overview.test.tsx`
-- [ ] T034 [P] [US3] Add responsive reachability test for navigation, graph, node detail, and overview regions in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
+- [X] T032 [P] [US3] Add global navigation and member/notification context tests in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
+- [X] T033 [P] [US3] Add right overview latest-result, attention, artifact, activity, stale, and empty-state tests in `apps/web/src/components/tasks/task-workspace-execution-overview.test.tsx`
+- [X] T034 [P] [US3] Add responsive reachability test for navigation, graph, node detail, and overview regions in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
 
 ### Implementation for User Story 3
 
 - [X] T035 [US3] Implement left workspace navigation with Chrona identity, primary sections, active task section, notifications, and settings in `apps/web/src/components/tasks/task-workspace-navigation.tsx`
-- [ ] T036 [US3] Add notification state and active member identity to the top workspace context in `apps/web/src/components/tasks/task-workspace-header-card.tsx`
+- [X] T036 [US3] Add notification state and active member identity to the top workspace context in `apps/web/src/components/tasks/task-workspace-header-card.tsx`
 - [X] T037 [US3] Implement right overview latest result card with update time and full-result affordance in `apps/web/src/components/tasks/task-workspace-execution-overview.tsx`
 - [X] T038 [US3] Implement right overview attention-needed card with blocking/approval node, reason, status, and next actions in `apps/web/src/components/tasks/task-workspace-execution-overview.tsx`
 - [X] T039 [US3] Implement right overview artifact summary with name, type, size/comparable metadata, update time, and full-list affordance in `apps/web/src/components/tasks/task-workspace-execution-overview.tsx`
@@ -132,14 +132,14 @@ description: "Task list for Task Workspace Component Parity"
 
 **Purpose**: Validate quality gates, remove obsolete workspace paths, and document implementation-specific decisions.
 
-- [ ] T043 [P] Update manual verification notes with final workspace behavior and any dependency decisions in `specs/003-task-workspace-components/quickstart.md`
+- [X] T043 [P] Update manual verification notes with final workspace behavior and any dependency decisions in `specs/003-task-workspace-components/quickstart.md`
 - [X] T044 [P] Add or update accessibility labels for task header, graph controls, node detail tabs, overview cards, and navigation landmarks in `apps/web/src/components/tasks/task-workspace-execution-console.tsx`
-- [ ] T045 Verify and remove obsolete task workspace layout code that is no longer used after the new hierarchy in `apps/web/src/components/tasks/task-workspace-plan-content.tsx`
+- [X] T045 Verify and remove obsolete task workspace layout code that is no longer used after the new hierarchy in `apps/web/src/components/tasks/task-workspace-plan-content.tsx`
 - [X] T046 Run targeted workspace tests for query helpers, page rendering, node detail panel, graph controls, and overview in `apps/web/src/components/tasks/task-workspace-page.test.tsx`
 - [X] T047 Run required proof command `bun run typecheck` from repository root
 - [X] T048 Run required proof command `bun run lint` from repository root
 - [X] T049 Run required proof command `bun run test` from repository root
-- [ ] T050 Perform quickstart manual verification for desktop and narrow viewport in `specs/003-task-workspace-components/quickstart.md`
+- [X] T050 Perform quickstart manual verification for desktop and narrow viewport in `specs/003-task-workspace-components/quickstart.md`
 - [X] T051 Run GitNexus change detection for expected affected workspace symbols before any commit in repository root
 
 ---

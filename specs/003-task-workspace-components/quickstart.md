@@ -52,6 +52,18 @@ Add or update tests for:
 
 Use existing dependencies first. If adding a dependency, document the reason in implementation notes and verify that it materially improves the design versus current React, `@xyflow/react`, and existing utility dependencies.
 
+## Implementation Notes
+
+- No new dependency is required for the execution-console component parity work. The current React 19, Testing Library, Vitest, and `@xyflow/react` stack covers the shared view-model, graph state, node selection, and responsive component tests.
+- The lower node detail panel now reuses the existing graph inspector detail and execution-action primitives instead of duplicating action dispatch logic in a second implementation path.
+- Focused verification now covers navigation/member context, overview stale and empty states, lower detail tabs, and region reachability through `task-workspace-page`, `task-workspace-query`, `task-workspace-node-detail-panel`, and `task-workspace-execution-overview` tests.
+
+## Manual Verification Notes
+
+- Desktop: confirm the left navigation, header, flow graph, lower node detail panel, and right overview are visible in one workspace console layout.
+- Narrow viewport: confirm navigation, flow, node detail, and overview remain reachable as stacked regions without losing node selection context.
+- Use an approval-needed fixture or seeded task to confirm overview actions jump back into the selected node context and the lower panel stays in-page.
+
 ## No Legacy Compatibility Rule
 
 Do not keep old task workspace layout code in parallel with the new component hierarchy unless a concrete persisted-data, shipped-behavior, or external-consumer need is identified. Remove or replace obsolete local UI/data-shaping paths as part of implementation tasks.
