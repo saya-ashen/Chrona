@@ -45,43 +45,38 @@ describe("OpenClawClient", () => {
       gatewayToken: "secret",
     });
 
-    const events = [] as Array<{ type: string; data: string; toolCall?: { tool: string; callId: string } }>;
-    for await (const event of client.stream({
-      request: {
-        sessionId: "sess-1",
-        sessionKey: "sess-1",
-        instructions: "plan this task",
-        input: { prompt: "Write docs" },
-        structuredOutputSchema: {
-          name: "generate_task_plan_graph",
-          description: "Return a generated plan graph.",
-          schema: { type: "object" },
-        },
-        timeoutSeconds: 5,
+    const events = [] as Array<{ type: string; text?: string; toolCall?: { tool: string; callId: string } }>;
+    for await (const event of client.streamRun({
+      sessionId: "sess-1",
+      sessionKey: "sess-1",
+      instructions: "plan this task",
+      input: { prompt: "Write docs" },
+      structuredOutputSchema: {
+        name: "generate_task_plan_graph",
+        description: "Return a generated plan graph.",
+        schema: { type: "object" },
       },
+      timeoutMs: 5_000,
+      stream: true,
     })) {
       events.push({
         type: event.type,
-        data: event.data,
-        toolCall: event.toolCall
-          ? { tool: event.toolCall.tool, callId: event.toolCall.callId }
+        text: event.type === "text_delta" ? event.text : undefined,
+        toolCall: event.type === "tool_call"
+          ? { tool: event.tool, callId: event.callId }
           : undefined,
       });
     }
 
     expect(events).toEqual([
-      { type: "text", data: "Planning ", toolCall: undefined },
+      { type: "text_delta", text: "Planning ", toolCall: undefined },
       {
         type: "tool_call",
-        data: JSON.stringify({
-          type: "function_call",
-          name: "generate_task_plan_graph",
-          call_id: "call-1",
-          arguments: '{"title":"Plan ready","goal":"Produce the requested plan","summary":"Plan ready","nodes":[],"edges":[]}',
-        }),
         toolCall: { tool: "generate_task_plan_graph", callId: "call-1" },
+        text: undefined,
       },
-      { type: "text", data: "done", toolCall: undefined },
+      { type: "text_delta", text: "done", toolCall: undefined },
+      { type: "run_completed", text: undefined, toolCall: undefined },
     ]);
   });
 
@@ -105,47 +100,41 @@ describe("OpenClawClient", () => {
       gatewayToken: "secret",
     });
 
-    const events = [] as Array<{ type: string; data: string; toolCall?: { tool: string; callId: string } }>;
-    for await (const event of client.stream({
-      request: {
-        sessionId: "sess-2",
-        sessionKey: "sess-2",
-        instructions: "plan this task",
-        input: { prompt: "Write docs" },
-        structuredOutputSchema: {
-          name: "generate_task_plan_graph",
-          description: "Return a generated plan graph.",
-          schema: { type: "object" },
-        },
-        timeoutSeconds: 5,
+    const events = [] as Array<{ type: string; text?: string; toolCall?: { tool: string; callId: string } }>;
+    for await (const event of client.streamRun({
+      sessionId: "sess-2",
+      sessionKey: "sess-2",
+      instructions: "plan this task",
+      input: { prompt: "Write docs" },
+      structuredOutputSchema: {
+        name: "generate_task_plan_graph",
+        description: "Return a generated plan graph.",
+        schema: { type: "object" },
       },
+      timeoutMs: 5_000,
+      stream: true,
     })) {
       events.push({
         type: event.type,
-        data: event.data,
-        toolCall: event.toolCall
-          ? { tool: event.toolCall.tool, callId: event.toolCall.callId }
+        text: event.type === "text_delta" ? event.text : undefined,
+        toolCall: event.type === "tool_call"
+          ? { tool: event.tool, callId: event.callId }
           : undefined,
       });
     }
 
     expect(events).toEqual([
-      { type: "text", data: "Planning ", toolCall: undefined },
+      { type: "text_delta", text: "Planning ", toolCall: undefined },
       {
         type: "tool_call",
-        data: JSON.stringify({
-          type: "function_call",
-          name: "generate_task_plan_graph",
-          call_id: "call-2",
-          arguments:
-            '{"title":"Plan ready","goal":"Produce the requested plan","summary":"Plan ready","nodes":[],"edges":[]}',
-        }),
         toolCall: { tool: "generate_task_plan_graph", callId: "call-2" },
+        text: undefined,
       },
+      { type: "run_completed", text: undefined, toolCall: undefined },
     ]);
   });
 
-  it("aggregates streamed responses in execute using the same SSE path", async () => {
+  it("aggregates streamed responses in startRun using the same SSE path", async () => {
     let seenStream: unknown;
     let seenModel: unknown;
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -175,27 +164,19 @@ describe("OpenClawClient", () => {
       gatewayToken: "secret",
     });
 
-    const result = await client.execute({
-      request: {
-        sessionId: "sess-create",
-        sessionKey: "sess-create",
-        instructions: "say hello",
-        input: "Hello",
-        timeoutSeconds: 5,
-      },
+    const result = await client.startRun({
+      sessionId: "sess-create",
+      sessionKey: "sess-create",
+      instructions: "say hello",
+      input: "Hello",
+      timeoutMs: 5_000,
     });
 
     expect(seenStream).toBe(true);
     expect(seenModel).toBe("openclaw/default");
-    expect(result.output).toBe("Hello world");
+    expect(result.runId).toBe("resp-create");
     expect(result.responseId).toBe("resp-create");
-    expect(result.usage).toEqual({
-      inputTokens: 3,
-      outputTokens: 2,
-      totalTokens: 5,
-    });
-    expect(result.feature).toBeNull();
-    expect(result.structured).toBeNull();
+    expect(result.status).toBe("completed");
   });
 
   it("dumps raw gateway stream events when enabled", async () => {
@@ -221,19 +202,18 @@ describe("OpenClawClient", () => {
       gatewayToken: "secret",
     });
 
-    for await (const _event of client.stream({
-      request: {
-        sessionId: "sess-dump",
-        sessionKey: "sess-dump",
-        instructions: "plan this task",
-        input: { prompt: "Write docs" },
-        structuredOutputSchema: {
-          name: "generate_task_plan_graph",
-          description: "Return a generated plan graph.",
-          schema: { type: "object" },
-        },
-        timeoutSeconds: 5,
+    for await (const _event of client.streamRun({
+      sessionId: "sess-dump",
+      sessionKey: "sess-dump",
+      instructions: "plan this task",
+      input: { prompt: "Write docs" },
+      structuredOutputSchema: {
+        name: "generate_task_plan_graph",
+        description: "Return a generated plan graph.",
+        schema: { type: "object" },
       },
+      timeoutMs: 5_000,
+      stream: true,
     })) {
       // Consume stream to completion so the dump file is closed.
     }

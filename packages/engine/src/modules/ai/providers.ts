@@ -1,5 +1,8 @@
 import { checkGatewayAvailable, normalizeGatewayHttpUrl } from "@chrona/openclaw";
-import type { ProviderResponse } from "@chrona/providers-foundation";
+import type {
+  ProviderRunSnapshot,
+  StartRunInput,
+} from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
   AiFeature,
@@ -126,13 +129,71 @@ async function openclawFeaturePayload(
   request: OpenClawGatewayRequest,
 ): Promise<string> {
   const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
-  const result = await openClawClient.execute({
-    request,
-  });
+  const result = await runOpenClawRequest(openClawClient, request);
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
   }
-  return result.output;
+  return result.outputText ?? "";
+}
+
+function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
+  return {
+    sessionId: request.sessionId,
+    sessionKey: request.sessionKey,
+    instructions: request.instructions,
+    input: request.input,
+    structuredOutputSchema: request.structuredOutputSchema,
+    maxOutputTokens: request.maxOutputTokens,
+    timeoutMs: request.timeoutSeconds
+      ? request.timeoutSeconds * 1000
+      : undefined,
+    stream: true,
+  };
+}
+
+async function runOpenClawRequest(
+  providerClient: NonNullable<EngineAiClient["providerClient"]>,
+  request: OpenClawGatewayRequest,
+): Promise<ProviderRunSnapshot> {
+  let finalSnapshot: ProviderRunSnapshot | null = null;
+  for await (const event of providerClient.streamRun({
+    ...toStartRunInput(request),
+    stream: true,
+  })) {
+    if (event.type === "run_completed") {
+      finalSnapshot = {
+        provider: providerClient.provider,
+        runId: event.run.runId,
+        nativeRunId: event.run.nativeRunId,
+        sessionId: event.run.sessionId,
+        status: event.run.status ?? "completed",
+        outputText: event.outputText,
+        structuredPayload: event.structuredPayload,
+        usage: event.usage,
+        error: null,
+        raw: event.raw,
+      };
+    }
+    if (event.type === "run_failed") {
+      finalSnapshot = {
+        provider: providerClient.provider,
+        runId: event.run?.runId ?? crypto.randomUUID(),
+        nativeRunId: event.run?.nativeRunId,
+        sessionId: event.run?.sessionId ?? request.sessionId,
+        status: "failed",
+        error: event.error,
+        raw: event.raw,
+      };
+    }
+  }
+  if (!finalSnapshot) {
+    throw new AiClientError(
+      "OpenClaw run finished without a provider snapshot",
+      "openclaw",
+      "invalid_response",
+    );
+  }
+  return finalSnapshot;
 }
 
 async function llmFeaturePayload(
@@ -271,16 +332,18 @@ async function openclawFeaturePayloadFull<T>(
   featureSpec?: PreparedAiFeatureSpec,
 ): Promise<FeaturePayloadResult<T>> {
   const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
-  const result = (await openClawClient.execute({
-    request,
-  })) as ProviderResponse;
+  const result = await runOpenClawRequest(openClawClient, request);
 
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
   }
 
   const rawPayload =
-    result.structured?.parsed ?? null;
+    result.structuredPayload &&
+    typeof result.structuredPayload === "object" &&
+    "parsed" in result.structuredPayload
+      ? result.structuredPayload.parsed
+      : null;
 
   if (rawPayload == null) {
     throw new AiClientError(
@@ -303,21 +366,41 @@ async function openclawFeaturePayloadFull<T>(
 
   return {
     parsed: rawPayload as T,
-    rawText: result.output,
+    rawText: result.outputText ?? "",
     debug: {
-      rawOutput: result.structured?.rawOutput ?? result.output,
-      error: result.structured?.error ?? result.error,
-      source: result.structured?.source as StructuredDebugInfo["source"],
-      feature: result.structured?.feature ?? featureSpec?.feature ?? null,
+      rawOutput: getStructuredString(result.structuredPayload, "rawOutput") ?? result.outputText,
+      error: getStructuredString(result.structuredPayload, "error") ?? result.error,
+      source: getStructuredString(result.structuredPayload, "source") as StructuredDebugInfo["source"],
+      feature: getStructuredString(result.structuredPayload, "feature") ?? featureSpec?.feature ?? null,
       toolName:
-        result.structured?.toolName ??
+        getStructuredString(result.structuredPayload, "toolName") ??
         featureSpec?.structuredOutputSchema.name ??
         null,
-      sessionId: result.structured?.sessionId ?? result.sessionId,
-      runId: result.structured?.runId ?? result.runId,
-      validationIssues: result.structured?.validationIssues,
+      sessionId: getStructuredString(result.structuredPayload, "sessionId") ?? result.sessionId,
+      runId: getStructuredString(result.structuredPayload, "runId") ?? result.runId,
+      validationIssues: getStructuredValidationIssues(result.structuredPayload),
     },
   };
+}
+
+function getStructuredField(payload: unknown, field: string): unknown {
+  return payload && typeof payload === "object" && field in payload
+    ? (payload as Record<string, unknown>)[field]
+    : undefined;
+}
+
+function getStructuredString(payload: unknown, field: string): string | undefined {
+  const value = getStructuredField(payload, field);
+  return typeof value === "string" ? value : undefined;
+}
+
+function getStructuredValidationIssues(
+  payload: unknown,
+): StructuredDebugInfo["validationIssues"] {
+  const value = getStructuredField(payload, "validationIssues");
+  return Array.isArray(value)
+    ? (value as StructuredDebugInfo["validationIssues"])
+    : undefined;
 }
 
 export async function dispatch(

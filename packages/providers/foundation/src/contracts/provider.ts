@@ -1,26 +1,226 @@
-import type { BridgeResponse } from "@chrona/openclaw";
+import { z } from "zod";
 
-export type ProviderResponse = BridgeResponse;
+const unknownRecordSchema = z.record(z.string(), z.unknown());
 
-export type ProviderMode = "chat" | "structured";
+export const providerUsageSchema = z
+  .object({
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional(),
+    totalTokens: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 
-export type ProviderFeature =
-  | "suggest"
-  | "generate_plan"
-  | "conflicts"
-  | "timeslots"
-  | "chat"
-  | "dispatch_task";
+export const providerStructuredOutputSchemaSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().min(1),
+    schema: unknownRecordSchema,
+  })
+  .strict();
 
-export type ProviderCapabilities = {
-  supportsSessions: boolean;
-  supportsStreaming: boolean;
-  supportsApprovals: boolean;
-  supportsHistory: boolean;
-  supportsResponseLookup: boolean;
-  supportsPreviousResponse: boolean;
-  supportsToolCalls: boolean;
-};
+export const providerToolOutputSchema = z
+  .object({
+    callId: z.string().min(1),
+    output: z.unknown(),
+  })
+  .strict();
+
+export const providerCapabilitiesSchema = z
+  .object({
+    supportsSessions: z.boolean(),
+    supportsStreaming: z.boolean(),
+    supportsRunLookup: z.boolean(),
+    supportsCancellation: z.boolean(),
+    supportsToolCalls: z.boolean(),
+    supportsPreviousResponse: z.boolean(),
+  })
+  .strict();
+
+export const healthCheckInputSchema = z
+  .object({
+    timeoutMs: z.number().int().positive().optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export const providerHealthSchema = z
+  .object({
+    provider: z.string().min(1),
+    ok: z.boolean(),
+    checkedAt: z.string().datetime(),
+    latencyMs: z.number().int().nonnegative().optional(),
+    status: z.number().int().optional(),
+    message: z.string().optional(),
+    raw: z.unknown().optional(),
+  })
+  .strict();
+
+export const createSessionInputSchema = z
+  .object({
+    sessionKey: z.string().min(1).optional(),
+    metadata: unknownRecordSchema.optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export const providerSessionRefSchema = z
+  .object({
+    provider: z.string().min(1),
+    sessionId: z.string().min(1),
+    nativeSessionId: z.string().min(1).optional(),
+    sessionKey: z.string().min(1).optional(),
+    createdAt: z.string().datetime().optional(),
+    raw: z.unknown().optional(),
+  })
+  .strict();
+
+export const startRunInputSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    sessionKey: z.string().min(1).optional(),
+    instructions: z.string().min(1),
+    input: z.unknown(),
+    structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
+    previousRunId: z.string().min(1).optional(),
+    previousResponseId: z.string().min(1).optional(),
+    toolOutputs: z.array(providerToolOutputSchema).optional(),
+    model: z.string().min(1).optional(),
+    maxOutputTokens: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    stream: z.boolean().optional(),
+    signal: z.custom<AbortSignal>().optional(),
+    metadata: unknownRecordSchema.optional(),
+  })
+  .strict();
+
+export const providerRunStatusSchema = z.enum([
+  "pending",
+  "running",
+  "waiting_for_input",
+  "waiting_for_approval",
+  "failed",
+  "completed",
+  "cancelled",
+]);
+
+export const providerRunRefSchema = z
+  .object({
+    provider: z.string().min(1),
+    runId: z.string().min(1),
+    sessionId: z.string().min(1),
+    nativeRunId: z.string().min(1).optional(),
+    status: providerRunStatusSchema.optional(),
+    responseId: z.string().min(1).optional(),
+    raw: z.unknown().optional(),
+  })
+  .strict();
+
+export const streamRunInputSchema = startRunInputSchema.extend({
+  stream: z.literal(true).optional(),
+});
+
+export const providerRunEventSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("run_started"),
+      run: providerRunRefSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("text_delta"),
+      text: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool_call"),
+      tool: z.string().min(1),
+      callId: z.string().min(1),
+      input: unknownRecordSchema,
+      status: z.enum(["pending", "completed", "error"]),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool_result"),
+      tool: z.string().min(1).optional(),
+      callId: z.string().min(1).optional(),
+      result: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("run_completed"),
+      run: providerRunRefSchema,
+      outputText: z.string().optional(),
+      structuredPayload: z.unknown().optional(),
+      usage: providerUsageSchema.nullish(),
+      raw: z.unknown().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("run_failed"),
+      run: providerRunRefSchema.optional(),
+      error: z.string().min(1),
+      raw: z.unknown().optional(),
+    })
+    .strict(),
+]);
+
+export const getRunInputSchema = z
+  .object({
+    runId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+    sessionKey: z.string().min(1).optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export const providerRunSnapshotSchema = z
+  .object({
+    provider: z.string().min(1),
+    runId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+    nativeRunId: z.string().min(1).optional(),
+    status: providerRunStatusSchema,
+    rawStatus: z.string().optional(),
+    outputText: z.string().optional(),
+    structuredPayload: z.unknown().optional(),
+    usage: providerUsageSchema.nullish(),
+    error: z.string().nullable().optional(),
+    raw: z.unknown().optional(),
+  })
+  .strict();
+
+export const cancelRunInputSchema = z
+  .object({
+    runId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+    reason: z.string().optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export type ProviderUsage = z.infer<typeof providerUsageSchema>;
+export type ProviderStructuredOutputSchema = z.infer<
+  typeof providerStructuredOutputSchemaSchema
+>;
+export type ProviderToolOutput = z.infer<typeof providerToolOutputSchema>;
+export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
+export type HealthCheckInput = z.infer<typeof healthCheckInputSchema>;
+export type ProviderHealth = z.infer<typeof providerHealthSchema>;
+export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
+export type ProviderSessionRef = z.infer<typeof providerSessionRefSchema>;
+export type StartRunInput = z.infer<typeof startRunInputSchema>;
+export type ProviderRunStatus = z.infer<typeof providerRunStatusSchema>;
+export type ProviderRunRef = z.infer<typeof providerRunRefSchema>;
+export type StreamRunInput = z.infer<typeof streamRunInputSchema>;
+export type ProviderRunEvent = z.infer<typeof providerRunEventSchema>;
+export type GetRunInput = z.infer<typeof getRunInputSchema>;
+export type ProviderRunSnapshot = z.infer<typeof providerRunSnapshotSchema>;
+export type CancelRunInput = z.infer<typeof cancelRunInputSchema>;
 
 export type ProviderConfig = {
   gatewayUrl: string;
@@ -29,158 +229,20 @@ export type ProviderConfig = {
   timeoutSeconds?: number;
 };
 
-export type ProviderSessionRef = {
-  provider: string;
-  sessionId: string;
-  nativeSessionId?: string;
-  isVirtual?: boolean;
-};
-
-export type ProviderContinuation = {
-  sessionId?: string;
-  previousResponseId?: string;
-  toolOutputs?: Array<{
-    callId: string;
-    output: unknown;
-  }>;
-};
-
-export type ProviderStructuredOutputSchema = {
-  name: string;
-  description: string;
-  schema: Record<string, unknown>;
-};
-
-export type ProviderExecuteRequest = {
-  mode: ProviderMode;
-  instructions?: string;
-  inputText: string;
-  input?: Record<string, unknown>;
-  structuredOutputSchema?: ProviderStructuredOutputSchema;
-  continuation?: ProviderContinuation;
-  timeoutMs?: number;
-};
-
-export type ProviderExecuteResponse = {
-  provider: string;
-  sessionId?: string;
-  responseId?: string;
-  runId?: string;
-  status?: string;
-  outputText: string;
-  structuredPayload?: unknown;
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-  } | null;
-  error?: string | null;
-  raw?: unknown;
-};
-
-export type ProviderMessageInput = {
-  sessionId: string;
-  message: string;
-  previousResponseId?: string;
-  timeoutMs?: number;
-};
-
-export type ProviderMessageResult = {
-  accepted: boolean;
-  responseId?: string;
-  runId?: string;
-  sessionId?: string;
-};
-
-export type ProviderApproval = {
-  approvalId: string;
-  sessionId?: string;
-  host?: string;
-  command?: string;
-  ask?: string;
-  createdAtMs?: number;
-  expiresAtMs?: number;
-};
-
-export type ProviderApprovalDecision = "approve" | "reject";
-
-export type ProviderApprovalResolution = {
-  accepted: boolean;
-};
-
-export type ProviderRunStatus =
-  | "pending"
-  | "running"
-  | "waiting_for_input"
-  | "waiting_for_approval"
-  | "failed"
-  | "completed"
-  | "cancelled";
-
-export type ProviderRunSnapshot = {
-  runId: string;
-  sessionId?: string;
-  status: ProviderRunStatus;
-  rawStatus?: string;
-  outputText?: string;
-  error?: string;
-};
-
-export type ProviderHistory = {
-  messages: Array<Record<string, unknown>>;
-};
-
-export type ProviderSessionStatus = {
-  sessionId: string;
-  exists: boolean;
-  activeRunId?: string;
-  activeRunStatus?: ProviderRunStatus;
-  pendingApprovals: ProviderApproval[];
-  lastMessage?: string;
-};
-
-export type ProviderStreamEvent =
-  | { type: "text_delta"; text: string }
-  | {
-      type: "tool_call";
-      tool: string;
-      callId: string;
-      input: Record<string, unknown>;
-      status: "pending" | "completed" | "error";
-    }
-  | { type: "tool_result"; tool: string; callId?: string; result: unknown }
-  | {
-      type: "completed";
-      responseId?: string;
-      runId?: string;
-      status?: string;
-      usage?: {
-        inputTokens?: number;
-        outputTokens?: number;
-        totalTokens?: number;
-      };
-    }
-  | { type: "failed"; error: string };
-
-export interface ProviderClient {
+export interface AgentProviderClient {
   readonly provider: string;
 
   getCapabilities(): ProviderCapabilities;
-  checkHealth(): Promise<boolean>;
 
-  createSession?(): Promise<ProviderSessionRef>;
-  getSessionStatus(sessionId: string): Promise<ProviderSessionStatus>;
+  checkHealth(input?: HealthCheckInput): Promise<ProviderHealth>;
 
-  execute(request: ProviderExecuteRequest): Promise<ProviderExecuteResponse>;
-  executeStream?(
-    request: ProviderExecuteRequest,
-  ): AsyncGenerator<ProviderStreamEvent>;
+  createSession(input?: CreateSessionInput): Promise<ProviderSessionRef>;
 
-  sendMessage(input: ProviderMessageInput): Promise<ProviderMessageResult>;
-  readHistory(sessionId: string): Promise<ProviderHistory>;
-  listApprovals(sessionId: string): Promise<ProviderApproval[]>;
-  resolveApproval(input: {
-    approvalId: string;
-    decision: ProviderApprovalDecision;
-  }): Promise<ProviderApprovalResolution>;
+  startRun(input: StartRunInput): Promise<ProviderRunRef>;
+
+  streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent>;
+
+  getRun(input: GetRunInput): Promise<ProviderRunSnapshot>;
+
+  cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot>;
 }

@@ -12,14 +12,18 @@ import {
   RunStatus,
 } from "@chrona/db/generated/prisma/client";
 import type { TaskNodeAiResult } from "@chrona/contracts";
-import type { BridgeResponse, OpenClawGatewayRequest } from "@chrona/openclaw";
+import type { OpenClawGatewayRequest } from "@chrona/openclaw";
+import type {
+  AgentProviderClient,
+  ProviderCapabilities,
+  ProviderHealth,
+  ProviderRunRef,
+  ProviderRunSnapshot,
+  ProviderSessionRef,
+} from "@chrona/providers-foundation";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
-type TestOpenClawResponseClient = {
-  execute(input: {
-    request: OpenClawGatewayRequest;
-  }): Promise<BridgeResponse>;
-};
+type TestOpenClawResponseClient = AgentProviderClient;
 
 function createMockOpenClawClient(input: {
   outputMessages: string[];
@@ -29,26 +33,78 @@ function createMockOpenClawClient(input: {
   const messages: Array<{ role: string; content: string }> = [];
 
   return {
-    async execute({ request }) {
+    provider: "openclaw",
+    getCapabilities(): ProviderCapabilities {
+      return {
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: true,
+      };
+    },
+    async checkHealth(): Promise<ProviderHealth> {
+      return {
+        provider: "openclaw",
+        ok: true,
+        checkedAt: new Date().toISOString(),
+      };
+    },
+    async createSession(): Promise<ProviderSessionRef> {
+      return {
+        provider: "openclaw",
+        sessionId: "mock-session-key",
+        createdAt: new Date().toISOString(),
+      };
+    },
+    async startRun(request): Promise<ProviderRunRef> {
       messages.push({ role: "user", content: extractUserText(request) });
       for (const outputContent of input.outputMessages) {
         messages.push({ role: "assistant", content: outputContent });
       }
 
-      const response: BridgeResponse = {
+      const response: ProviderRunRef = {
+        provider: "openclaw",
+        runId: input.runStarted === false ? "mock-failed-run" : `mock-run-ref-${Date.now()}`,
+        nativeRunId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
         sessionId: request.sessionKey ?? "mock-session-key",
-        responseId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
-        responseStatus: input.runStarted === false ? "failed" : "completed",
-        output: input.outputMessages.at(-1) ?? "",
-        usage: null,
-        error: input.runStarted === false ? "provider refused to start" : null,
-        durationMs: 1,
-        structured: input.structuredResult
-          ? { ok: true, parsed: input.structuredResult, source: "business_tool" }
-          : null,
-        feature: null,
+        status: input.runStarted === false ? "failed" : "completed",
       };
       return response;
+    },
+    async *streamRun(request) {
+      const run = await this.startRun(request);
+      if (input.runStarted === false) {
+        yield {
+          type: "run_failed" as const,
+          run,
+          error: "provider refused to start",
+        };
+        return;
+      }
+      yield {
+        type: "run_completed" as const,
+        run,
+        outputText: input.outputMessages.at(-1) ?? "",
+        structuredPayload: input.structuredResult
+          ? { ok: true, parsed: input.structuredResult, source: "business_tool" }
+          : undefined,
+      };
+    },
+    async getRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "openclaw",
+        runId: "mock-run-ref",
+        status: "completed",
+      };
+    },
+    async cancelRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "openclaw",
+        runId: "mock-run-ref",
+        status: "cancelled",
+      };
     },
   };
 }

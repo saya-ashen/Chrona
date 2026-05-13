@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
     "@chrona/runtime-core": "workspace:*"
   },
   "exports": {

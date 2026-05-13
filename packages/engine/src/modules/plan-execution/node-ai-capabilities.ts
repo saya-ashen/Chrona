@@ -211,12 +211,12 @@ function buildFailureDetails(input: {
 function structuredPayload<T>(input: {
   featureSpec: PreparedAiFeatureSpec;
   response: {
-    structured: unknown;
+    structuredPayload?: unknown;
   };
 }):
   | { ok: true; parsed: T }
   | { ok: false; error: string; validationIssues?: unknown } {
-  const structured = input.response.structured as {
+  const structured = input.response.structuredPayload as {
     ok?: boolean;
     parsed?: T | null;
     error?: string | null;

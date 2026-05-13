@@ -102,22 +102,11 @@ export interface BridgeFeatureResult {
   payload: unknown;
 }
 
-export interface BridgeResponse {
-  sessionId: string;
-  responseId?: string;
-  responseStatus?: string;
-  runId?: string;
-  output: string;
-  usage: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens?: number;
-  } | null;
-  error: string | null;
-  durationMs: number;
-  structured: StructuredAgentResult | null;
-  feature: BridgeFeatureResult | null;
-}
+export type OpenClawUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens?: number;
+} | null;
 
 export interface NDJSONEvent {
   type:
@@ -167,14 +156,7 @@ export interface OpenClawClientConfig {
 }
 
 export type OpenClawFeature = BridgeFeature;
-export type OpenClawResponse = BridgeResponse;
 export type OpenClawToolCall = ToolCallInfo;
-
-export interface OpenClawStreamEvent {
-  type: "text" | "tool_call" | "tool_result" | "done" | "error";
-  data: string;
-  toolCall?: OpenClawToolCall;
-}
 
 export type OpenClawResponseSnapshot = {
   responseId?: string;
