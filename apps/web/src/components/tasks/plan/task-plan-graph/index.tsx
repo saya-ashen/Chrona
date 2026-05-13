@@ -28,7 +28,7 @@ import {
 import { TaskPlanGraphFrame } from "./frame";
 import { TaskPlanGraphInspector } from "./inspector";
 import { useGraphLegend } from "./legend";
-import { buildFallbackFlowLayout, buildFlowLayout, syncNodeState, type FlowLayout } from "./layout";
+import { buildFlowLayout, syncNodeState, type FlowLayout } from "./layout";
 import type {
   FlowGraphNode,
   GraphCopy,
@@ -202,9 +202,9 @@ export function TaskPlanGraph({
   const handleFitGraph = useCallback(() => adjustScroll(0.5, 0.5), [adjustScroll]);
   const handleCenterCurrentNode = useCallback(() => adjustScroll(0.5, 0.35), [adjustScroll]);
 
-  const fallbackLayout = useMemo(
+  const layout = useMemo(
     () =>
-      buildFallbackFlowLayout({
+      buildFlowLayout({
         plan,
         selectedNodeId,
         graphCopy,
@@ -213,30 +213,12 @@ export function TaskPlanGraph({
     [graphCopy, handleSelectNode, plan, selectedNodeId],
   );
 
-  const [layout, setLayout] = useState<FlowLayout>(fallbackLayout);
-
   const [nodes, setNodes] = useNodesState<FlowGraphNode>(layout.nodes);
   const [edges, setEdges] = useEdgesState(layout.edges);
   const { edgeLegend, nodeLegend } = useGraphLegend(graphCopy);
   const compact = useMemo(() => buildCompactViewModel(plan), [plan]);
   const selectedNode =
     plan.nodes.find((node) => node.id === selectedNodeId) ?? null;
-
-  useEffect(() => {
-    let cancelled = false;
-    setLayout(fallbackLayout);
-    void buildFlowLayout({
-      plan,
-      selectedNodeId,
-      graphCopy,
-      onSelect: handleSelectNode,
-    }).then((nextLayout) => {
-      if (!cancelled) setLayout(nextLayout);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fallbackLayout, graphCopy, handleSelectNode, plan, selectedNodeId]);
 
   useEffect(() => {
     onSelectedNodeChange?.(selectedNode, plan.nodes);

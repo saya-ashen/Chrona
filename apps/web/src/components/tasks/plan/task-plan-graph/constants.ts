@@ -2,14 +2,14 @@ import type { GraphCopy } from "./types";
 
 export const AUTO_FULL_MODE_MIN_WIDTH = 820;
 export const NODE_WIDTH = 168;
-export const NODE_HEIGHT = 64;
-export const LAYOUT_DIRECTION = "TB";
+export const NODE_HEIGHT = 88;
+export const LAYOUT_DIRECTION = "LR";
 export const LAYOUT_PADDING = 28;
 export const LAYOUT_NODE_SEP = 34;
-export const LAYOUT_RANK_SEP = 72;
+export const LAYOUT_RANK_SEP = 128;
 export const EDGE_OFFSET = 30;
-export const MAX_VIEWPORT_HEIGHT = 680;
-export const MIN_VIEWPORT_HEIGHT = 420;
+export const MAX_VIEWPORT_HEIGHT = 520;
+export const MIN_VIEWPORT_HEIGHT = 300;
 export const SELECTED_NODE_Z_INDEX = 1000;
 
 export const DEFAULT_GRAPH_COPY: GraphCopy = {

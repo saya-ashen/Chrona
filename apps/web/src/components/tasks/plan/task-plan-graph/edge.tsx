@@ -7,12 +7,20 @@ import {
 import type { FlowGraphEdge } from "./types";
 
 const EDGE_HIT_AREA_STYLE = { stroke: "transparent", strokeWidth: 10 };
+const MIN_DIRECT_DELTA = 6;
 
-function buildReadableEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
+function buildReadableEdgePath(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  orientation: "vertical" | "horizontal" = "vertical",
+  routeOffset = 0,
+) {
   const horizontalDelta = Math.abs(targetX - sourceX);
   const verticalDelta = Math.abs(targetY - sourceY);
 
-  if (horizontalDelta < 6 || verticalDelta < 24) {
+  if (horizontalDelta < MIN_DIRECT_DELTA && verticalDelta < MIN_DIRECT_DELTA) {
     return {
       path: `M ${sourceX},${sourceY} L ${targetX},${targetY}`,
       labelX: (sourceX + targetX) / 2,
@@ -20,11 +28,40 @@ function buildReadableEdgePath(sourceX: number, sourceY: number, targetX: number
     };
   }
 
-  const midY = sourceY + (targetY - sourceY) / 2;
+  if (orientation === "horizontal") {
+    const direction = targetX >= sourceX ? 1 : -1;
+    let routeX = sourceX + (targetX - sourceX) / 2 + routeOffset * direction;
+
+    if (Math.abs(routeX - targetX) < MIN_DIRECT_DELTA) {
+      routeX = targetX - MIN_DIRECT_DELTA * direction;
+    }
+
+    if (Math.abs(routeX - sourceX) < MIN_DIRECT_DELTA) {
+      routeX = sourceX + MIN_DIRECT_DELTA * direction;
+    }
+
+    return {
+      path: `M ${sourceX},${sourceY} L ${routeX},${sourceY} L ${routeX},${targetY} L ${targetX},${targetY}`,
+      labelX: routeX,
+      labelY: (sourceY + targetY) / 2,
+    };
+  }
+
+  const direction = targetY >= sourceY ? 1 : -1;
+  let routeY = sourceY + (targetY - sourceY) / 2 + routeOffset * direction;
+
+  if (Math.abs(routeY - targetY) < MIN_DIRECT_DELTA) {
+    routeY = targetY - MIN_DIRECT_DELTA * direction;
+  }
+
+  if (Math.abs(routeY - sourceY) < MIN_DIRECT_DELTA) {
+    routeY = sourceY + MIN_DIRECT_DELTA * direction;
+  }
+
   return {
-    path: `M ${sourceX},${sourceY} L ${sourceX},${midY} L ${targetX},${midY} L ${targetX},${targetY}`,
+    path: `M ${sourceX},${sourceY} L ${sourceX},${routeY} L ${targetX},${routeY} L ${targetX},${targetY}`,
     labelX: (sourceX + targetX) / 2,
-    labelY: midY,
+    labelY: routeY,
   };
 }
 
@@ -38,7 +75,16 @@ function TaskPlanGraphEdge({
   style,
   data,
 }: EdgeProps<FlowGraphEdge>) {
-  const { path, labelX, labelY } = buildReadableEdgePath(sourceX, sourceY, targetX, targetY);
+  const orientation = data?.orientation === "horizontal" ? "horizontal" : "vertical";
+  const routeOffset = typeof data?.routeOffset === "number" ? data.routeOffset : 0;
+  const { path, labelX, labelY } = buildReadableEdgePath(
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    orientation,
+    routeOffset,
+  );
 
   const label = data?.stableLabel?.trim();
 

@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
-import { buildFallbackFlowLayout } from "@/components/tasks/plan/task-plan-graph/layout";
+import { buildFlowLayout } from "@/components/tasks/plan/task-plan-graph/layout";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
 function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
@@ -269,8 +269,8 @@ describe("TaskPlanGraph", () => {
     const graph = screen.getByLabelText("任务计划图");
     expect(graph).toBeInTheDocument();
     expect(graph).toHaveAttribute("data-renderer", "react-flow");
-    expect(graph).toHaveAttribute("data-layout-engine", "elk-layered");
-    expect(graph).toHaveAttribute("data-layout-direction", "TB");
+    expect(graph).toHaveAttribute("data-layout-engine", "d3-dag-sugiyama");
+    expect(graph).toHaveAttribute("data-layout-direction", "LR");
     expect(graph).toHaveAttribute("data-graph-interactive", "true");
     expect(graph).toHaveAttribute("data-graph-editable", "false");
     expect(graph).toHaveAttribute("data-canvas-pan", "true");
@@ -278,8 +278,9 @@ describe("TaskPlanGraph", () => {
     expect(graph.querySelector(".react-flow")).not.toBeNull();
     expect(graph.querySelector(".react-flow__pane.draggable")).not.toBeNull();
     expect(graph.querySelector(".react-flow__edges")).not.toBeNull();
-    expect(graph.querySelector(".react-flow__node[data-id='node-current'] .source")).not.toBeNull();
-    expect(graph.querySelector(".react-flow__node[data-id='node-current'] .target")).not.toBeNull();
+    const currentFlowNode = graph.querySelector(".react-flow__node[data-id='node-current']") as HTMLElement | null;
+    expect(currentFlowNode?.querySelector("[data-handleid='right-source']")).not.toBeNull();
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-source']")?.style.opacity).toBe("0");
     expect(graph.querySelector("marker")).not.toBeNull();
     expect(graph.querySelector(".react-flow__edgelabel-renderer")?.childElementCount ?? 0).toBe(0);
 
@@ -580,7 +581,7 @@ describe("TaskPlanGraph", () => {
     plan.analytics.criticalPathNodeIds = ["start", "choice"];
     plan.analytics.rankByNodeId = { start: 0, choice: 1, "branch-left": 2, "branch-right": 2, approval: 2 };
 
-    const layout = buildFallbackFlowLayout({
+    const layout = buildFlowLayout({
       plan,
       selectedNodeId: null,
       graphCopy: DEFAULT_GRAPH_COPY,
@@ -597,10 +598,93 @@ describe("TaskPlanGraph", () => {
     expect(left?.data.layoutRole).toBe("branch");
     expect(right?.data.layoutRole).toBe("branch");
     expect(approval?.data.layoutRole).toBe("sidecar");
-    expect(left?.position.x).toBeLessThan((choice?.position.x ?? 0) - 80);
-    expect(right?.position.x).toBeGreaterThan((choice?.position.x ?? 0) + 80);
-    expect(approval?.position.x).not.toBeCloseTo(choice?.position.x ?? 0, 0);
-    expect(layout.contentWidth).toBeGreaterThan(680);
+    expect(left?.position.y).not.toBeCloseTo(right?.position.y ?? 0, 0);
+    expect(approval?.position.y).not.toBeCloseTo(left?.position.y ?? 0, 0);
+    expect(approval?.position.y).not.toBeCloseTo(right?.position.y ?? 0, 0);
+    expect(layout.contentWidth).toBeGreaterThan(360);
+  });
+
+  it("switches mostly linear plans to horizontal layout with side handles", () => {
+    const steps = Array.from({ length: 6 }, (_, index) => ({
+      id: `node-${index + 1}`,
+      title: `Step ${index + 1}`,
+      objective: "Linear work",
+      phase: "execute",
+      status: index === 0 ? "active" as const : "pending" as const,
+      type: "task" as const,
+      displayType: "task" as const,
+    }));
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "node-1",
+      steps,
+      edges: steps.slice(0, -1).map((node, index) => ({
+        id: `edge-${index + 1}`,
+        fromNodeId: node.id,
+        toNodeId: steps[index + 1].id,
+        type: "sequential",
+      })),
+    });
+
+    const layout = buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+    const nodeById = new Map(layout.nodes.map((node) => [node.id, node]));
+
+    expect(layout.layoutDirection).toBe("LR");
+    expect(nodeById.get("node-1")?.sourcePosition).toBe("right");
+    expect(nodeById.get("node-2")?.targetPosition).toBe("left");
+    expect(nodeById.get("node-2")?.position.x ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.x ?? 0) + 168);
+    expect(nodeById.get("node-6")?.position.x).toBeGreaterThan(nodeById.get("node-1")?.position.x ?? 0);
+    expect(layout.edges.every((edge) => edge.sourceHandle === "right-source" && edge.targetHandle === "left-target")).toBe(true);
+    expect(layout.edges.every((edge) => edge.data?.orientation === "horizontal")).toBe(true);
+  });
+
+  it("keeps branched plans horizontal while preserving branch roles", () => {
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "start",
+      steps: [
+        { id: "start", title: "Start", objective: "Begin", phase: "setup", status: "done", type: "task", displayType: "task" },
+        { id: "branch-a", title: "Branch A", objective: "Parallel", phase: "check", status: "done", type: "task", displayType: "task" },
+        { id: "branch-b", title: "Branch B", objective: "Parallel", phase: "check", status: "done", type: "task", displayType: "task" },
+        { id: "join", title: "Join", objective: "Merge", phase: "merge", status: "done", type: "checkpoint", displayType: "checkpoint" },
+        { id: "tail-1", title: "Tail 1", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
+        { id: "tail-2", title: "Tail 2", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
+        { id: "tail-3", title: "Tail 3", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
+        { id: "tail-4", title: "Tail 4", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
+      ],
+      edges: [
+        { id: "edge-start-a", fromNodeId: "start", toNodeId: "branch-a", type: "branch_true" },
+        { id: "edge-start-b", fromNodeId: "start", toNodeId: "branch-b", type: "branch_false" },
+        { id: "edge-a-join", fromNodeId: "branch-a", toNodeId: "join", type: "resume" },
+        { id: "edge-b-join", fromNodeId: "branch-b", toNodeId: "join", type: "resume" },
+        { id: "edge-join-tail-1", fromNodeId: "join", toNodeId: "tail-1", type: "sequential" },
+        { id: "edge-tail-1-tail-2", fromNodeId: "tail-1", toNodeId: "tail-2", type: "sequential" },
+        { id: "edge-tail-2-tail-3", fromNodeId: "tail-2", toNodeId: "tail-3", type: "sequential" },
+        { id: "edge-tail-3-tail-4", fromNodeId: "tail-3", toNodeId: "tail-4", type: "sequential" },
+      ],
+    });
+    plan.analytics.criticalPathNodeIds = ["start", "join"];
+    plan.analytics.rankByNodeId = { start: 0, "branch-a": 1, "branch-b": 1, join: 2, "tail-1": 3, "tail-2": 4, "tail-3": 5, "tail-4": 6 };
+
+    const layout = buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+    const nodeById = new Map(layout.nodes.map((node) => [node.id, node]));
+
+    expect(layout.layoutDirection).toBe("LR");
+    expect(nodeById.get("branch-a")?.data.layoutRole).toBe("branch");
+    expect(nodeById.get("branch-b")?.data.layoutRole).toBe("branch");
+    expect(nodeById.get("tail-1")?.data.layoutRole).toBe("chain");
+    expect(layout.edges.find((edge) => edge.id === "edge-join-tail-1")?.data?.orientation).toBe("horizontal");
+    expect(layout.edges.every((edge) => edge.sourceHandle === "right-source" && edge.targetHandle === "left-target")).toBe(true);
   });
 
   it("automatically switches to full mode when enough width is available", () => {
