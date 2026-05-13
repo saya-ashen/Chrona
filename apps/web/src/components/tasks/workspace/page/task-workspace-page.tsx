@@ -111,12 +111,17 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     <div className="space-y-1.5 pb-14">
       <div className="space-y-1">
         <TaskWorkspaceHeaderCard
-          task={task}
+          task={consoleView.task}
           header={consoleView.header}
           backToScheduleLabel={copy.backToSchedule}
-          planGenerationStatus={planGenerationStatus}
-          hasPlan={Boolean(plan)}
-          onGeneratePlan={handleGeneratePlanFromHeader}
+          onAction={async (action) => {
+            if (action.id === "start") {
+              await dispatchExecutionAction({ action: "start_manual" });
+            }
+            if (action.id === "stop") {
+              await dispatchExecutionAction({ action: "cancel_session", reason: "Stopped from task workspace" });
+            }
+          }}
           onEdit={() => setIsEditExpanded((current) => !current)}
           showDeleteConfirm={showDeleteConfirm}
           isDeleting={isDeleting}
@@ -147,7 +152,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
         graphPlan={graphPlan}
-        pageData={{ ...data, task }}
+        pageData={{ ...data, task: consoleView.task }}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}

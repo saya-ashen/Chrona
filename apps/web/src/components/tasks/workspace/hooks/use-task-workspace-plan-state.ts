@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
-import { dispatchTaskExecutionAction, fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { dispatchTaskExecutionAction, fetchTaskPlanState, fetchTaskWorkspaceTask, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -225,7 +225,10 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     });
     await Promise.all([
       planStateQuery.refetch(),
-      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.detail(task.id) }),
+      queryClient.fetchQuery({
+        queryKey: taskWorkspaceQueryKeys.detail(task.id),
+        queryFn: () => fetchTaskWorkspaceTask(task.id),
+      }),
     ]);
     return result;
   }, [planStateQuery, queryClient, task.id]);

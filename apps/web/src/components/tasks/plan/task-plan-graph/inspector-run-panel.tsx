@@ -568,19 +568,6 @@ export function TaskPlanGraphInspectorRunPanel({
                 {isDispatching ? "Sending..." : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
               </button>
 
-              {!["observe", "wait"].includes(resolvedRunPanelMode) ? (
-                <button
-                  type="button"
-                  className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
-                  onClick={() => {
-                    setRunLog((current) => [{ id: `${Date.now()}`, title: "Observe only", detail: `Simulated switch to passive observation for "${node.title}".` }, ...current].slice(0, 4));
-                  }}
-                >
-                  <Sparkles className="size-4" />
-                  Observe
-                </button>
-              ) : null}
-
               {node.status === "active" || node.active ? (
                 <button
                   type="button"

@@ -177,7 +177,6 @@ export interface ProviderClient {
   ): AsyncGenerator<ProviderStreamEvent>;
 
   sendMessage(input: ProviderMessageInput): Promise<ProviderMessageResult>;
-  getRun(runId: string, sessionId?: string): Promise<ProviderRunSnapshot>;
   readHistory(sessionId: string): Promise<ProviderHistory>;
   listApprovals(sessionId: string): Promise<ProviderApproval[]>;
   resolveApproval(input: {

@@ -23,7 +23,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
     expect(screen.getByText("Execution result overview")).toBeInTheDocument();
-    expect(screen.getAllByText("Refresh").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     expect(screen.getByText("Latest result")).toBeInTheDocument();
     expect(screen.getAllByText("Needs handling").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Approve result").length).toBeGreaterThan(0);
@@ -91,7 +91,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       />,
     );
 
-    expect(screen.getAllByText("Refresh").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Run is Running").length).toBeGreaterThan(0);
   });
 });

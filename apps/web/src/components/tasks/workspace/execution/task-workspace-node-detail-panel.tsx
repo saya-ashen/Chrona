@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultOutput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import {
@@ -22,6 +22,12 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
+import {
+  buildDefaultWorkspaceActionFields,
+  buildWorkspaceActionInput,
+  getWorkspaceActionDisabledReason,
+  pickDefaultWorkspaceAction,
+} from "../model/task-workspace-actions";
 import type { NodeDetailPanelState } from "../model/task-workspace-types";
 
 const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
@@ -55,21 +61,6 @@ function tabClassName(active: boolean) {
   );
 }
 
-function buildDefaultFieldValues(fields: PlanNodeField[]) {
-  return Object.fromEntries(
-    fields.map((field) => [field.key, field.value || ""]),
-  );
-}
-
-function defaultActionForNode(node: PlanNodeDataModel) {
-  return (
-    node.availableActions?.find((action) => action.emphasis === "primary")
-      ?.id ??
-    node.availableActions?.[0]?.id ??
-    null
-  );
-}
-
 function EmptyDetailState() {
   return (
     <section
@@ -89,10 +80,32 @@ function EmptyDetailState() {
   );
 }
 
+function stringifyOutput(output: NodeResultOutput) {
+  if (output.kind === "text" || output.kind === "markdown") return output.content;
+  if (output.kind === "json") return JSON.stringify(output.value, null, 2);
+  if (output.kind === "file") return [output.title, output.path, output.description].filter(Boolean).join("\n");
+  return "";
+}
+
 function ResultTab({ node }: { node: PlanNodeDataModel }) {
   const runResult = useMemo(() => extractRunResult(node), [node]);
   const runError = useMemo(() => extractRunError(node), [node]);
   const outputs = node.resultOutputs ?? [];
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const copyText = [runResult, ...outputs.map(stringifyOutput)]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join("\n\n");
+
+  async function handleCopyResult() {
+    if (!copyText) return;
+
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopyStatus("Copied result.");
+    } catch {
+      setCopyStatus("Copy failed. Select the result text manually.");
+    }
+  }
 
   return (
     <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px]">
@@ -104,6 +117,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
           {runResult || outputs.length > 0 ? (
             <button
               type="button"
+              onClick={handleCopyResult}
               className={buttonVariants({
                 variant: "outline",
                 size: "sm",
@@ -115,6 +129,11 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
             </button>
           ) : null}
         </div>
+        {copyStatus ? (
+          <p className="mb-2 text-xs text-muted-foreground" role="status">
+            {copyStatus}
+          </p>
+        ) : null}
         {runError ? (
           <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">
             {runError}
@@ -280,6 +299,7 @@ function ActionTab({
   setSelectedActionId,
   fieldValues,
   setFieldValues,
+  onDispatchExecutionAction,
 }: {
   node: PlanNodeDataModel;
   disabledActionReason?: string;
@@ -289,9 +309,41 @@ function ActionTab({
   setFieldValues: (
     update: (current: Record<string, string>) => Record<string, string>,
   ) => void;
+  onDispatchExecutionAction: (
+    action: ExecutionActionInput,
+  ) => Promise<TaskExecutionDispatchResult>;
 }) {
   const actions = node.availableActions ?? [];
   const fields = node.interactiveFields ?? [];
+  const selectedAction = actions.find((action) => action.id === selectedActionId) ?? null;
+  const [isDispatching, setIsDispatching] = useState(false);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const submitDisabledReason = getWorkspaceActionDisabledReason({
+    fields,
+    values: fieldValues,
+    isDispatching,
+    baseReason: disabledActionReason,
+  });
+
+  async function handleSubmitAction() {
+    if (submitDisabledReason) return;
+
+    setIsDispatching(true);
+    setActionStatus(null);
+    try {
+      const result = await onDispatchExecutionAction(buildWorkspaceActionInput({
+        node,
+        selectedAction,
+        fields,
+        values: fieldValues,
+      }));
+      setActionStatus(result.message);
+    } catch (cause) {
+      setActionStatus(cause instanceof Error ? cause.message : "Failed to dispatch execution action.");
+    } finally {
+      setIsDispatching(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-orange-200 bg-orange-50/55 p-2.5">
@@ -347,6 +399,31 @@ function ActionTab({
             : "This node does not require free-form input."}
         </p>
       )}
+      {actions.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={Boolean(submitDisabledReason)}
+            title={submitDisabledReason ?? undefined}
+            onClick={handleSubmitAction}
+            className={buttonVariants({
+              variant: "default",
+              size: "sm",
+              className: "h-8 rounded-lg px-3 text-xs",
+            })}
+          >
+            {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send action"}
+          </button>
+          {submitDisabledReason ? (
+            <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
+          ) : null}
+        </div>
+      ) : null}
+      {actionStatus ? (
+        <p className="mt-2 rounded-lg border border-border/50 bg-white/80 px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
+          {actionStatus}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -372,6 +449,7 @@ function ConfigurationTab({
 export function TaskWorkspaceNodeDetailPanel({
   detail,
   selectedNodes,
+  onDispatchExecutionAction,
 }: {
   detail: NodeDetailPanelState;
   selectedNodes: PlanNodeDataModel[];
@@ -384,17 +462,17 @@ export function TaskWorkspaceNodeDetailPanel({
     NodeDetailPanelState["tabs"][number]
   >(detail.tabs[0] ?? "result");
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() =>
-    currentNode ? defaultActionForNode(currentNode) : null,
+    currentNode ? pickDefaultWorkspaceAction(currentNode) : null,
   );
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
-    buildDefaultFieldValues(currentNode?.interactiveFields ?? []),
+    buildDefaultWorkspaceActionFields(currentNode?.interactiveFields ?? []),
   );
 
   useEffect(() => {
     setActiveTab(detail.tabs[0] ?? "result");
-    setSelectedActionId(currentNode ? defaultActionForNode(currentNode) : null);
+    setSelectedActionId(currentNode ? pickDefaultWorkspaceAction(currentNode) : null);
     setFieldValues(
-      buildDefaultFieldValues(currentNode?.interactiveFields ?? []),
+      buildDefaultWorkspaceActionFields(currentNode?.interactiveFields ?? []),
     );
   }, [currentNode, detail.tabs]);
 
@@ -473,6 +551,7 @@ export function TaskWorkspaceNodeDetailPanel({
             setSelectedActionId={setSelectedActionId}
             fieldValues={fieldValues}
             setFieldValues={setFieldValues}
+            onDispatchExecutionAction={onDispatchExecutionAction}
           />
         ) : null}
         {activeTab === "configuration" ? (

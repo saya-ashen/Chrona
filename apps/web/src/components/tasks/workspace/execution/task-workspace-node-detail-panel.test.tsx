@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TaskWorkspaceNodeDetailPanel } from "./task-workspace-node-detail-panel";
 import { createTaskWorkspaceFixtureNode } from "../test-support/task-workspace-test-fixtures";
 import type { NodeDetailPanelState } from "../model/task-workspace-types";
@@ -35,7 +35,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("选择一个节点后查看目标、依赖和后续可操作项。")).toBeInTheDocument();
   });
 
-  it("renders result, evidence, action, and configuration details for a selected node", () => {
+  it("renders result, evidence, action, and configuration details for a selected node", async () => {
+    const dispatchAction = vi.fn().mockResolvedValue({ message: "Action sent" });
     const node = createTaskWorkspaceFixtureNode({
       id: "approval",
       title: "Approve generated patch",
@@ -55,7 +56,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed", autoRefreshEnabled: true })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed", autoRefreshEnabled: true })} selectedNodes={[node]} onDispatchExecutionAction={dispatchAction} />);
 
     expect(screen.getByRole("heading", { name: "Current node: Approve generated patch" })).toBeInTheDocument();
     expect(screen.getByText("Step 1/1")).toBeInTheDocument();
@@ -76,13 +77,44 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Action required")).toBeInTheDocument();
     expect(screen.getAllByText("Accept").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Accept result" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send Accept" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Approve" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send Accept" }));
+    await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith(expect.objectContaining({
+      action: "resume_with_approval",
+      nodeId: "approval",
+      decision: "approve",
+    })));
 
     fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
 
     expect(screen.getByText("Review patch safety")).toBeInTheDocument();
     expect(screen.getByText("Research current task workspace")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
+  });
+
+  it("copies result text through the clipboard API", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const node = createTaskWorkspaceFixtureNode({
+      id: "done",
+      title: "Completed step",
+      objective: "Finish work",
+      phase: "Done",
+      status: "done",
+      completionSummary: "Finished research",
+      resultOutputs: [{ kind: "text", content: "Patch summary" }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy result" }));
+
+    await screen.findByText("Copied result.");
+    expect(writeText).toHaveBeenCalledWith("Finished research\n\nPatch summary");
   });
 
   it("renders no-result and no-action states when selected node has no outputs or actions", () => {
