@@ -120,6 +120,11 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "Be concise",
       input: { type: "text", text: "Hello" },
+      structuredOutputSchema: {
+        name: "ignored_schema",
+        description: "Hermes tools decide authoritative actions through MCP.",
+        schema: { type: "object" },
+      },
       idempotencyKey: "idem-1",
     });
 

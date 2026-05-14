@@ -30,6 +30,7 @@ export {
   chronaToolExpectedStateSchema,
   chronaToolIdempotencyStatusSchema,
   chronaToolInputSchema,
+  chronaToolInputSchemaFor,
   chronaToolNameSchema,
   chronaToolNames,
   chronaToolOperationSchema,

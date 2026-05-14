@@ -2,7 +2,11 @@ import { Hono } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ChronaEngine } from "@chrona/engine";
-import { chronaToolInputSchema, type ChronaToolName } from "@chrona/contracts/api";
+import {
+  chronaToolInputSchema,
+  chronaToolInputSchemaFor,
+  type ChronaToolName,
+} from "@chrona/contracts/api";
 
 function titleForTool(name: string) {
   return name
@@ -21,7 +25,7 @@ function createChronaMcpServer(engine: ChronaEngine) {
       {
         title: titleForTool(toolName),
         description: tool.description,
-        inputSchema: chronaToolInputSchema,
+        inputSchema: chronaToolInputSchemaFor(toolName),
         annotations: {
           readOnlyHint: !tool.mutates,
           destructiveHint: false,
@@ -30,9 +34,12 @@ function createChronaMcpServer(engine: ChronaEngine) {
         },
       },
       async (input) => {
+        const resolvedInput = "resolveInputContext" in engine.agentTools
+          ? await engine.agentTools.resolveInputContext(input)
+          : chronaToolInputSchema.parse(input);
         const result = await engine.agentTools.execute({
           toolName,
-          input: chronaToolInputSchema.parse(input),
+          input: resolvedInput,
         });
         return {
           content: [{ type: "text", text: result.message }],

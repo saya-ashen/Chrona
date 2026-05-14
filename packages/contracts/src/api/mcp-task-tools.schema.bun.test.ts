@@ -46,6 +46,19 @@ describe("MCP task tool contracts", () => {
     expect(isChronaToolMutating("chrona.task.update")).toBe(true);
   });
 
+  it("accepts session-scoped tool input before Chrona resolves workspace context", () => {
+    expect(
+      chronaToolInputSchema.parse({
+        sessionId: "chrona:hermes:task:task-1:execute",
+        payload: {},
+      }),
+    ).toMatchObject({ sessionId: "chrona:hermes:task:task-1:execute" });
+
+    expect(() => chronaToolInputSchema.parse({ payload: {} })).toThrow(
+      "workspaceId or sessionId is required",
+    );
+  });
+
   it("accepts provider evidence without making it authoritative state", () => {
     const input = chronaToolInputSchema.parse({
       workspaceId: "workspace-1",

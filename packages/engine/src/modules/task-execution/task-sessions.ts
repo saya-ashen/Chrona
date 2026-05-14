@@ -35,10 +35,12 @@ function buildLegacyTaskSessionKey(input: {
 export async function ensureDefaultTaskSession(
   input: EnsureDefaultTaskSessionInput,
 ) {
+  const suffix = input.suffix?.trim() || null;
+  const shouldUpdateDefaultSessionId = !suffix;
   const expectedSessionKey = buildDefaultTaskSessionKey({
     taskId: input.taskId,
     runtimeName: input.runtimeName,
-    suffix: input.suffix,
+    suffix,
   });
 
   if (input.defaultSessionId) {
@@ -57,12 +59,16 @@ export async function ensureDefaultTaskSession(
       runtimeName: input.runtimeName,
       OR: [
         { sessionKey: expectedSessionKey },
-        {
-          sessionKey: buildLegacyTaskSessionKey({
-            taskId: input.taskId,
-            runtimeName: input.runtimeName,
-          }),
-        },
+        ...(shouldUpdateDefaultSessionId
+          ? [
+              {
+                sessionKey: buildLegacyTaskSessionKey({
+                  taskId: input.taskId,
+                  runtimeName: input.runtimeName,
+                }),
+              },
+            ]
+          : []),
       ],
     },
     orderBy: { createdAt: "asc" },
@@ -76,10 +82,12 @@ export async function ensureDefaultTaskSession(
       });
     }
 
-    await db.task.update({
-      where: { id: input.taskId },
-      data: { defaultSessionId: existingSession.id },
-    });
+    if (shouldUpdateDefaultSessionId) {
+      await db.task.update({
+        where: { id: input.taskId },
+        data: { defaultSessionId: existingSession.id },
+      });
+    }
 
     return existingSession.sessionKey === expectedSessionKey
       ? existingSession
@@ -93,15 +101,17 @@ export async function ensureDefaultTaskSession(
       sessionKey: expectedSessionKey,
       label:
         input.label?.trim() ||
-        `${input.taskTitle.trim() || "Task"} · ${input.suffix?.trim() || "Default session"}`,
+        `${input.taskTitle.trim() || "Task"} · ${suffix || "Default session"}`,
       createdByFramework: true,
     },
   });
 
-  await db.task.update({
-    where: { id: input.taskId },
-    data: { defaultSessionId: createdSession.id },
-  });
+  if (shouldUpdateDefaultSessionId) {
+    await db.task.update({
+      where: { id: input.taskId },
+      data: { defaultSessionId: createdSession.id },
+    });
+  }
 
   return createdSession;
 }

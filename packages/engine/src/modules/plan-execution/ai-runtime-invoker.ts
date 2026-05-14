@@ -108,7 +108,6 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
     sessionKey: request.sessionKey,
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
-    structuredOutputSchema: request.structuredOutputSchema,
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutSeconds
       ? request.timeoutSeconds * 1000

@@ -110,14 +110,21 @@ describe("generateTaskPlanForTask", () => {
       title: "Updated task title",
       description: "Updated description from DB",
       estimatedMinutes: 90,
+      sessionKey: `chrona:openclaw:task:${task.id}:plan-graph`,
     }));
 
     const saved = await getLatestTaskPlanGraph(task.id);
+    const refreshedTask = await db.task.findUnique({ where: { id: task.id } });
+    const sessions = await db.taskSession.findMany({ where: { taskId: task.id } });
     const node = saved!.plan.nodes[0];
     expect(node?.title).toBe("Handle Updated task title");
     expect(node?.localId).toBe("handle_task");
     expect(node?.id).not.toBe(node?.localId);
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
+    expect(refreshedTask?.defaultSessionId).toBeNull();
+    expect(sessions.map((session) => session.sessionKey)).toContain(
+      `chrona:openclaw:task:${task.id}:plan-graph`,
+    );
   });
 
   it("always regenerates plans through the manual stream", async () => {

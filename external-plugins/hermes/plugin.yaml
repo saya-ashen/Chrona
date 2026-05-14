@@ -1,0 +1,9 @@
+name: chrona
+version: 0.1.0
+description: Dynamically registers Chrona MCP tools in Hermes
+provides_hooks:
+  - pre_llm_call
+requires_env:
+  - name: CHRONA_MCP_URL
+    description: Chrona MCP HTTP endpoint, for example http://127.0.0.1:3101/api/mcp
+    url: https://github.com/chrona-org/chrona

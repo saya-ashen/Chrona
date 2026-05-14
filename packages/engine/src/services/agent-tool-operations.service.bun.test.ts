@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { db } from "@/lib/db";
 import { ENGINE_ERROR_CODES, EngineError } from "../errors";
 import { createAgentToolOperationsService } from "./agent-tool-operations.service";
 
@@ -100,6 +101,19 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
 }
 
 describe("agent tool operations service", () => {
+  beforeEach(async () => {
+    await db.taskSession.deleteMany();
+    await db.task.deleteMany();
+    await db.workspace.deleteMany();
+  });
+
+  afterAll(async () => {
+    await db.taskSession.deleteMany();
+    await db.task.deleteMany();
+    await db.workspace.deleteMany();
+    await db.$disconnect();
+  });
+
   it("returns registry metadata", () => {
     expect(service().registry().tools.map((tool) => tool.name)).toContain("chrona.execution.dispatch");
   });
@@ -124,6 +138,42 @@ describe("agent tool operations service", () => {
         },
       }),
     ).resolves.toMatchObject({ status: "accepted", state: { taskTitle: "Updated" } });
+  });
+
+  it("resolves Hermes-injected sessionId to task and workspace context", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "MCP Session Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Session mapped task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.taskSession.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        sessionKey: "chrona:hermes:task:task-1:execute",
+        label: "Execution session",
+      },
+    });
+
+    const agentTools = service();
+    const resolved = await agentTools.resolveInputContext({
+      sessionId: "chrona:hermes:task:task-1:execute",
+      actorType: "agent",
+    });
+
+    expect(resolved).toMatchObject({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      sessionId: "chrona:hermes:task:task-1:execute",
+    });
   });
 
   it("rejects missing idempotency keys and stale expected revisions without writes", async () => {
