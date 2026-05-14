@@ -6,7 +6,7 @@ import type {
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getLatestCompiledPlan, saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { ensureTaskInWorkspace } from "@/modules/tasks/task-by-id";
-import { applyPlanPatchCommand } from "./apply-plan-patch-command";
+import { applyPlanMutationCommand, applyPlanPatchCommand } from "./apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
 import { ensurePlanInWorkspace } from "./plan-in-workspace";
 import {
@@ -127,6 +127,10 @@ export class TaskPlanning {
 
   patch(input: Parameters<typeof applyPlanPatchCommand>[0]) {
     return applyPlanPatchCommand(input);
+  }
+
+  mutate(input: Parameters<typeof applyPlanMutationCommand>[0]) {
+    return applyPlanMutationCommand(input);
   }
 }
 

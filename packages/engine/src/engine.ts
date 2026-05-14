@@ -1,5 +1,6 @@
 import type { ChronaEnginePorts } from "./ports";
 import { createAiClientsService } from "./services/ai-clients.service";
+import { createAgentToolOperationsService } from "./services/agent-tool-operations.service";
 import { createPagesService } from "./services/pages.service";
 import { createRuntimeService } from "./services/runtime.service";
 import { createTaskExecutionService } from "./services/task-execution.service";
@@ -13,15 +14,21 @@ import { aiClientRegistry } from "./modules/ai/runtime/client-registry";
 import { getAiClient } from "./modules/ai/runtime/client-resolution";
 
 export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
+  const tasks = createTasksService();
+  const schedule = createTaskScheduleService();
+  const plan = createTaskPlanService();
+  const execution = createTaskExecutionService();
+
   return {
     tasks: {
-      ...createTasksService(),
-      schedule: createTaskScheduleService(),
-      plan: createTaskPlanService(),
-      execution: createTaskExecutionService(),
+      ...tasks,
+      schedule,
+      plan,
+      execution,
       lifecycle: createTaskLifecycleService(),
       result: createTaskResultService(),
     },
+    agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution }),
     pages: createPagesService(),
     workspaces: createWorkspacesService(),
     aiClients: createAiClientsService(),

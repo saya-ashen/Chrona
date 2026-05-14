@@ -75,6 +75,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/client": "7.8.0",
     "hono": "^4.9.6",
     "prisma-adapter-bun-sqlite": "^0.7.1",

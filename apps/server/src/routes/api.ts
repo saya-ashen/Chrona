@@ -7,6 +7,7 @@ import { createTaskRoutes } from "./tasks";
 import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
+import { createMcpRoutes } from "./mcp/mcp.routes";
 
 export function createApiRouter(engine: ChronaEngine) {
   return new Hono()
@@ -14,7 +15,8 @@ export function createApiRouter(engine: ChronaEngine) {
     .route("/", createTaskRoutes(engine))
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))
-    .route("/", createClientsRoutes(engine));
+    .route("/", createClientsRoutes(engine))
+    .route("/", createMcpRoutes(engine));
 }
 
 /**

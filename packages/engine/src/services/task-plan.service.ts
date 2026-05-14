@@ -54,6 +54,9 @@ export type TaskPlanService = {
   patch(
     input: Parameters<typeof taskPlanning.patch>[0],
   ): ReturnType<typeof taskPlanning.patch>;
+  mutate(
+    input: Parameters<typeof taskPlanning.mutate>[0],
+  ): ReturnType<typeof taskPlanning.mutate>;
 };
 
 export function createTaskPlanService(): TaskPlanService {
@@ -131,6 +134,17 @@ export function createTaskPlanService(): TaskPlanService {
           cause,
           ENGINE_ERROR_CODES.VALIDATION_FAILED,
           "Failed to apply plan patch",
+        );
+      }
+    },
+    async mutate(input: Parameters<typeof taskPlanning.mutate>[0]) {
+      try {
+        return await taskPlanning.mutate(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.VALIDATION_FAILED,
+          "Failed to apply plan mutation",
         );
       }
     },

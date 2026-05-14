@@ -13,6 +13,38 @@ export type {
 export { TASK_PRIORITIES, TASK_STATUSES } from "./task";
 
 export type {
+  ChronaToolExpectedState,
+  ChronaToolIdempotencyStatus,
+  ChronaToolInput,
+  ChronaToolName,
+  ChronaToolOperation,
+  ChronaToolReasonCode,
+  ChronaToolRecovery,
+  ChronaToolRegistry,
+  ChronaToolResult,
+} from "./api/mcp-task-tools.schema";
+
+export {
+  chronaToolAffectedSchema,
+  chronaToolContextSchema,
+  chronaToolExpectedStateSchema,
+  chronaToolIdempotencyStatusSchema,
+  chronaToolInputSchema,
+  chronaToolNameSchema,
+  chronaToolNames,
+  chronaToolOperationSchema,
+  chronaToolPayloadSchemas,
+  chronaToolReasonCodeSchema,
+  chronaToolRecoverySchema,
+  chronaToolRegistryItemSchema,
+  chronaToolRegistrySchema,
+  chronaToolResultSchema,
+  chronaToolStatusSchema,
+  isChronaToolMutating,
+  parseChronaToolPayload,
+} from "./api/mcp-task-tools.schema";
+
+export type {
   EditablePlan,
   EditableNode,
   EditableTaskNode,
