@@ -33,6 +33,8 @@
       "@chrona/i18n/*": ["./packages/i18n/src/*"],
       "@chrona/openclaw": ["./packages/providers/openclaw/src/index.ts"],
       "@chrona/openclaw/*": ["./packages/providers/openclaw/src/*"],
+      "@chrona/hermes": ["./packages/providers/hermes/src/index.ts"],
+      "@chrona/hermes/*": ["./packages/providers/hermes/src/*"],
       "@chrona/graph-runtime": ["./packages/graph-runtime/src/index.ts"],
       "@chrona/graph-runtime/*": ["./packages/graph-runtime/src/*"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],

@@ -6,14 +6,14 @@ import { z } from "zod";
 // ── POST /ai/clients ──
 export const createAiClientSchema = z.object({
   name: z.string().min(1, "name is required"),
-  type: z.enum(["openclaw", "llm"], { message: "type must be 'openclaw' or 'llm'" }),
+  type: z.enum(["openclaw", "llm", "hermes"], { message: "type must be 'openclaw', 'llm', or 'hermes'" }),
   config: z.record(z.string(), z.unknown()).optional(),
   isDefault: z.boolean().optional(),
 });
 
 // ── POST /ai/clients/test ──
 export const testAiClientSchema = z.object({
-  type: z.enum(["openclaw", "llm"]),
+  type: z.enum(["openclaw", "llm", "hermes"]),
   config: z.record(z.string(), z.unknown()).optional(),
 });
 

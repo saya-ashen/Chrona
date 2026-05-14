@@ -36,16 +36,21 @@ function asciiSlug(value: string, maxLength: number): string {
   return normalized || "input";
 }
 
-export function buildGeneratePlanScope(request: GenerateTaskPlanRequest): string {
+export function buildGeneratePlanScope(
+  request: GenerateTaskPlanRequest,
+): string {
   if (request.sessionKey?.trim()) {
     return request.sessionKey.trim();
   }
   const taskPart = request.taskId?.trim();
   if (taskPart) {
-    return `chrona:openclaw:task:${taskPart}:default`;
+    return `chrona:task:${taskPart}:default`;
   }
   const titlePart = asciiSlug(request.title, 120) || "untitled";
-  const titleHash = createHash("sha1").update(request.title).digest("hex").slice(0, 8);
+  const titleHash = createHash("sha1")
+    .update(request.title)
+    .digest("hex")
+    .slice(0, 8);
   const nonce = Math.random().toString(36).slice(2, 10);
   return `adhoc-${titlePart}-${titleHash}-${nonce}`;
 }
@@ -76,7 +81,9 @@ function collectGeneratePlanResult(
     doneEvent.structured ?? null,
   );
 
-  let parsed = (acc.latestToolInput ?? structuredToolGraph ?? null) as EditablePlan | null;
+  let parsed = (acc.latestToolInput ??
+    structuredToolGraph ??
+    null) as EditablePlan | null;
   if (!acc.latestToolInput && !structuredToolGraph) {
     try {
       parsed = text ? (JSON.parse(text) as EditablePlan) : null;
@@ -141,8 +148,14 @@ export async function* generatePlanStream(
   > | null = null;
 
   for await (const event of generator) {
-    await dump?.write({ type: "input_event", event: summarizeStreamEvent(event) });
-    if (event.type === "tool_call" && event.tool === "generate_task_plan_graph") {
+    await dump?.write({
+      type: "input_event",
+      event: summarizeStreamEvent(event),
+    });
+    if (
+      event.type === "tool_call" &&
+      event.tool === "generate_task_plan_graph"
+    ) {
       acc.latestToolInput = event.input;
       await dump?.write({
         type: "accumulator",
@@ -168,7 +181,11 @@ export async function* generatePlanStream(
 
     if (event.type === "done") {
       latestStructured = event.structured ?? null;
-      const resolved = collectGeneratePlanResult(acc, event, client.record.type);
+      const resolved = collectGeneratePlanResult(
+        acc,
+        event,
+        client.record.type,
+      );
       await dump?.write({
         type: "resolved",
         event: summarizeStreamEvent(resolved),
@@ -182,7 +199,10 @@ export async function* generatePlanStream(
           text: event.text ?? acc.finalText,
           structured: latestStructured ?? null,
         };
-        await dump?.write({ type: "yield", event: summarizeStreamEvent(doneEvent) });
+        await dump?.write({
+          type: "yield",
+          event: summarizeStreamEvent(doneEvent),
+        });
         yield doneEvent;
       }
       await dump?.close();

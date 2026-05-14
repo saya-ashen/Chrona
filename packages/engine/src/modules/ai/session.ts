@@ -25,14 +25,20 @@ function timestampSessionPart(date = new Date()): string {
   ].join("");
 }
 
-export function buildOpenClawSessionIdentity(feature: AiFeature, scope: string): {
+export function buildSessionIdentity(
+  feature: AiFeature,
+  scope: string,
+): {
   sessionId: string;
   sessionKey: string;
 } {
   const sessionKey = scope.trim() || "default";
   const featurePart = sanitizeSessionPart(feature, 18);
   const scopePart = sanitizeSessionPart(sessionKey, 28);
-  const scopeHash = createHash("sha1").update(sessionKey).digest("hex").slice(0, 10);
+  const scopeHash = createHash("sha1")
+    .update(sessionKey)
+    .digest("hex")
+    .slice(0, 10);
   return {
     sessionId: `ai-${featurePart}-${scopePart}-${timestampSessionPart()}-${scopeHash}`,
     sessionKey,

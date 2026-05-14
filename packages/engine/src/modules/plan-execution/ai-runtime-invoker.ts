@@ -7,6 +7,7 @@ import type {
 } from "@chrona/openclaw";
 import type {
   ProviderRunSnapshot,
+  ProviderRunInput,
   StartRunInput,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "../ai/runtime/client-resolution";
@@ -106,7 +107,7 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,
-    input: request.input,
+    input: request.input as ProviderRunInput,
     structuredOutputSchema: request.structuredOutputSchema,
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutSeconds

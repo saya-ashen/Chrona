@@ -167,6 +167,12 @@ function buildBridgeRequest(input: StartRunInput): BridgeRequest {
   };
 }
 
+function isStartRunInput(
+  input: StreamRunInput,
+): input is Extract<StreamRunInput, { sessionId: string }> {
+  return "sessionId" in input && "instructions" in input && "input" in input;
+}
+
 function buildRunRef(input: {
   sessionId: string;
   response: Record<string, unknown>;
@@ -608,6 +614,14 @@ export class OpenClawClient implements AgentProviderClient {
   }
 
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
+    if (!isStartRunInput(input)) {
+      yield {
+        type: "run_failed",
+        error: "OpenClaw streamRun requires sessionId, instructions, and input",
+      };
+      return;
+    }
+
     const request: BridgeRequest = { ...buildBridgeRequest(input), stream: true };
     const state = { finalResponse: {} as Record<string, unknown> };
     try {

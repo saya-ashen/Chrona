@@ -18,7 +18,10 @@ import type {
 import { buildSuggestFeatureSpec } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import { createLogger } from "@chrona/shared/logger";
-import type { ProviderRunEvent } from "@chrona/providers-foundation";
+import type {
+  ProviderRunEvent,
+  ProviderRunInput,
+} from "@chrona/providers-foundation";
 import { normalizeSuggestResponse } from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
@@ -27,7 +30,7 @@ import {
 } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
-import { buildOpenClawSessionIdentity } from "./session";
+import { buildSessionIdentity } from "./session";
 
 function summarizeText(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
@@ -40,7 +43,7 @@ export type PreparedStreamInput = {
   scope: string;
   instructions: string;
   inputText: string;
-  input: Record<string, unknown>;
+  input: ProviderRunInput;
   featureSpec?: PreparedAiFeatureSpec;
   userMessage: string;
   signal?: AbortSignal;
@@ -67,7 +70,7 @@ export function prepareStreamInput(
     instructions: featureSpec?.instructions ?? prepared.instructions,
     inputText: featureSpec?.inputText ?? prepared.inputText,
     featureSpec,
-    input: prepared.input,
+    input: prepared.input as ProviderRunInput,
     userMessage: featureSpec?.inputText ?? prepared.inputText,
     signal,
   };
@@ -102,8 +105,27 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
       return {
         type: "tool_result",
         tool: evt.tool ?? "unknown",
-        result: typeof evt.result === "string" ? evt.result : JSON.stringify(evt.result),
+        result:
+          typeof evt.result === "string"
+            ? evt.result
+            : JSON.stringify(evt.result),
       };
+    case "tool_started":
+      return evt.input === undefined
+        ? null
+        : {
+            type: "tool_call",
+            tool: evt.toolName,
+            input: asRecord(evt.input),
+          };
+    case "tool_completed":
+      return evt.error
+        ? {
+            type: "tool_result",
+            tool: evt.toolName ?? "unknown",
+            result: evt.error.message,
+          }
+        : null;
     case "run_failed":
       return { type: "error", message: evt.error };
     case "run_completed":
@@ -120,7 +142,15 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
   }
 }
 
-function isStructuredDebugInfo(value: unknown): value is NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> {
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function isStructuredDebugInfo(
+  value: unknown,
+): value is NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -128,11 +158,23 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
   if (!event) return null;
   switch (event.type) {
     case "partial":
-      return { type: event.type, textLength: event.text.length, text: previewDebugValue(event.text, 300) };
+      return {
+        type: event.type,
+        textLength: event.text.length,
+        text: previewDebugValue(event.text, 300),
+      };
     case "tool_call":
-      return { type: event.type, tool: event.tool, input: previewDebugValue(event.input, 800) };
+      return {
+        type: event.type,
+        tool: event.tool,
+        input: previewDebugValue(event.input, 800),
+      };
     case "tool_result":
-      return { type: event.type, tool: event.tool, result: previewDebugValue(event.result, 800) };
+      return {
+        type: event.type,
+        tool: event.tool,
+        result: previewDebugValue(event.result, 800),
+      };
     case "result":
       return { type: event.type, value: previewDebugValue(event, 1200) };
     case "done":
@@ -154,10 +196,7 @@ async function* openclawStream(
   const openClawClient = aiClientRegistry.requireOpenClawClient(client);
   const config = openClawClient.record.config;
   const timeout = config.timeoutSeconds ?? 120;
-  const { sessionId, sessionKey } = buildOpenClawSessionIdentity(
-    feature,
-    input.scope,
-  );
+  const { sessionId, sessionKey } = buildSessionIdentity(feature, input.scope);
   const providerInput = buildOpenClawFeatureGatewayRequest({
     sessionKey,
     input: input.input,
@@ -193,7 +232,11 @@ async function* openclawStream(
       },
     });
     try {
-      await dump?.write({ type: "yield", stage: "openclaw.status", event: { type: "status", message: "AI 正在思考..." } });
+      await dump?.write({
+        type: "yield",
+        stage: "openclaw.status",
+        event: { type: "status", message: "AI 正在思考..." },
+      });
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
@@ -217,7 +260,11 @@ async function* openclawStream(
         if (parsed.type === "partial") {
           fullText += parsed.text;
         }
-        await dump?.write({ type: "yield", stage: "openclaw.converted", event: summarizeStreamEvent(parsed) });
+        await dump?.write({
+          type: "yield",
+          stage: "openclaw.converted",
+          event: summarizeStreamEvent(parsed),
+        });
         yield parsed;
         if (parsed.type === "error") {
           await dump?.close();
@@ -277,6 +324,59 @@ async function* openclawStream(
       message: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+async function* providerStream(
+  client: EngineAiClient,
+  feature: AiFeature,
+  input: PreparedStreamInput,
+): AsyncGenerator<StreamEvent> {
+  const providerClient = client.providerClient;
+  if (!providerClient) {
+    yield {
+      type: "error",
+      message: `${client.record.type} client does not support streaming`,
+    };
+    return;
+  }
+
+  const { sessionKey } = buildSessionIdentity(feature, input.scope);
+  const session = await providerClient.createSession({
+    sessionKey,
+    signal: input.signal,
+  });
+  const run = await providerClient.startRun({
+    sessionId: session.sessionId,
+    sessionKey,
+    instructions: input.instructions,
+    input: input.input,
+    structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
+    stream: true,
+    signal: input.signal,
+  });
+
+  let fullText = "";
+  for await (const event of providerClient.streamRun({
+    sessionId: session.sessionId,
+    sessionKey,
+    runId: run.runId,
+    instructions: input.instructions,
+    input: input.input,
+    structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
+    stream: true,
+    signal: input.signal,
+  })) {
+    const parsed = convertProviderEvent(event);
+    if (!parsed) continue;
+    if (parsed.type === "partial") {
+      fullText += parsed.text;
+    }
+    yield parsed;
+    if (parsed.type === "error") return;
+    if (parsed.type === "done") return;
+  }
+
+  yield { type: "done", text: fullText, structured: null };
 }
 
 async function* llmStream(
@@ -376,11 +476,10 @@ export function dispatchStream(
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
   if (client.record.type === "openclaw") {
-    return openclawStream(
-      client,
-      feature,
-      input,
-    );
+    return openclawStream(client, feature, input);
+  }
+  if (client.providerClient) {
+    return providerStream(client, feature, input);
   }
   const llmClient = aiClientRegistry.requireLlmClient(client);
   const request = toLlmStreamRequest(feature, input);

@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./ai-plan-runtime";
 
-export type AiClientType = "openclaw" | "llm";
+export type AiClientType = "openclaw" | "llm" | "hermes";
 export type AiFeature =
   | "suggest"
   | "generate_plan"
@@ -21,7 +21,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: OpenClawClientConfig | LLMClientConfig;
+  config: OpenClawClientConfig | LLMClientConfig | HermesClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -42,6 +42,12 @@ export interface LLMClientConfig {
   apiKey: string;
   model?: string;
   temperature?: number;
+}
+
+export interface HermesClientConfig {
+  baseUrl?: string;
+  apiKey?: string;
+  timeoutMs?: number;
 }
 
 type StructuredResultReliability = "business_tool" | "assistant_text";
