@@ -1,9 +1,11 @@
+import { HermesProviderClient } from "@chrona/hermes";
 import { OpenClawClient } from "@chrona/openclaw";
 import { db } from "@/lib/db";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
   AiClientType,
+  HermesClientConfig,
   LLMClientConfig,
   OpenClawClientConfig,
 } from "@chrona/contracts";
@@ -33,6 +35,11 @@ export type EngineLlmClient = EngineAiClient & {
   providerClient: null;
 };
 
+export type EngineHermesClient = EngineAiClient & {
+  record: AiClientRecord & { type: "hermes"; config: HermesClientConfig };
+  providerClient: AgentProviderClient;
+};
+
 const clients = new Map<string, EngineAiClient>();
 let defaultClientId: string | null = null;
 let loaded = false;
@@ -59,6 +66,15 @@ function getOpenClawGatewayUrl(
 function createProviderClient(
   record: AiClientRecord,
 ): EngineAiClient["providerClient"] {
+  if (record.type === "hermes") {
+    const config = record.config as HermesClientConfig;
+    return new HermesProviderClient({
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      timeoutMs: config.timeoutMs,
+    });
+  }
+
   if (record.type !== "openclaw") return null;
 
   const config = record.config as OpenClawClientConfig;

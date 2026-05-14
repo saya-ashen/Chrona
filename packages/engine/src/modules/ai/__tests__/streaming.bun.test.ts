@@ -53,7 +53,7 @@ describe("generatePlanStream", () => {
         isDefault: true,
         enabled: true,
       },
-      providerClient: { stream: executeFeatureStreamMock } as unknown as EngineAiClient["providerClient"],
+      providerClient: { streamRun: executeFeatureStreamMock } as unknown as EngineAiClient["providerClient"],
     } as EngineAiClient;
 
     const events = [] as Array<{ type: string; message?: string }>;
@@ -67,5 +67,67 @@ describe("generatePlanStream", () => {
       type: "error",
       message: "stream exploded",
     });
+  });
+
+  it("streams non-OpenClaw provider clients through startRun and run event stream", async () => {
+    const createSessionMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      sessionId: "session-1",
+    }));
+    const startRunMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      runId: "run-1",
+      sessionId: "session-1",
+    }));
+    const streamRunMock = mock(async function* () {
+      yield { type: "text_delta", text: "hello" };
+      yield {
+        type: "run_completed",
+        run: {
+          provider: "hermes",
+          runId: "run-1",
+          sessionId: "session-1",
+          status: "completed",
+        },
+        outputText: "hello",
+      };
+    });
+
+    const client = {
+      record: {
+        id: "client-2",
+        name: "Hermes",
+        type: "hermes",
+        config: { baseUrl: "" },
+        isDefault: true,
+        enabled: true,
+      },
+      providerClient: {
+        provider: "hermes",
+        createSession: createSessionMock,
+        startRun: startRunMock,
+        streamRun: streamRunMock,
+      },
+    } as unknown as EngineAiClient;
+
+    const { dispatchStream } = await import("../streaming");
+    const events = [] as Array<{ type: string; text?: string; structured?: unknown }>;
+    for await (const event of dispatchStream(client, "generate_plan", {
+      scope: "task-1",
+      instructions: "Generate plan",
+      inputText: "Build plan",
+      input: { title: "Build plan" },
+      userMessage: "Build plan",
+    })) {
+      events.push(event as { type: string; text?: string; structured?: unknown });
+    }
+
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
+    expect(startRunMock).toHaveBeenCalledTimes(1);
+    expect(streamRunMock).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1" }));
+    expect(events).toEqual([
+      { type: "partial", text: "hello" },
+      { type: "done", text: "hello", structured: null },
+    ]);
   });
 });

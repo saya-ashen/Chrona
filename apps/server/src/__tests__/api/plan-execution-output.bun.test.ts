@@ -20,6 +20,7 @@ import type {
   ProviderRunRef,
   ProviderRunSnapshot,
   ProviderSessionRef,
+  StreamRunInput,
 } from "@chrona/providers-foundation";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
@@ -31,6 +32,12 @@ function createMockOpenClawClient(input: {
   structuredResult?: TaskNodeAiResult | null;
 }): TestOpenClawResponseClient {
   const messages: Array<{ role: string; content: string }> = [];
+
+  function isStartRunInput(
+    request: Parameters<AgentProviderClient["streamRun"]>[0],
+  ): request is Extract<StreamRunInput, { sessionId: string }> {
+    return "sessionId" in request && "instructions" in request && "input" in request;
+  }
 
   return {
     provider: "openclaw",
@@ -74,6 +81,9 @@ function createMockOpenClawClient(input: {
       return response;
     },
     async *streamRun(request) {
+      if (!isStartRunInput(request)) {
+        throw new Error("Mock OpenClaw streamRun requires a start input");
+      }
       const run = await this.startRun(request);
       if (input.runStarted === false) {
         yield {

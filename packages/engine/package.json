@@ -8,6 +8,7 @@
     "@chrona/db": "workspace:*",
     "@chrona/domain": "workspace:*",
     "@chrona/graph-runtime": "workspace:*",
+    "@chrona/hermes": "workspace:*",
     "@chrona/openclaw": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
     "@chrona/shared": "workspace:*",

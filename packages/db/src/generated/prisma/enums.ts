@@ -164,7 +164,8 @@ export type TaskDependencyType = (typeof TaskDependencyType)[keyof typeof TaskDe
 
 export const AiClientType = {
   openclaw: 'openclaw',
-  llm: 'llm'
+  llm: 'llm',
+  hermes: 'hermes'
 } as const
 
 export type AiClientType = (typeof AiClientType)[keyof typeof AiClientType]

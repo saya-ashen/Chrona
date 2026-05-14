@@ -17,6 +17,7 @@ const messages = {
       nameLabel: "Name",
       typeLabel: "Type",
       llmCompatible: "LLM (OpenAI Compatible)",
+      hermes: "Hermes",
       timeoutSeconds: "Timeout (seconds)",
       modelLabel: "Model",
       setAsDefault: "Set as default Client",
@@ -84,6 +85,63 @@ describe("AiClientsManager", () => {
       );
     });
     expect(await screen.findByText("Available")).toBeInTheDocument();
+  });
+
+  it("creates a Hermes client with Hermes-specific config", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    fireEvent.change(screen.getByPlaceholderText("My OpenClaw Client"), {
+      target: { value: "Local Hermes" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "hermes" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
+      target: { value: "http://localhost:8642" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("optional for localhost"), {
+      target: { value: "hermes-token" },
+    });
+    fireEvent.change(screen.getByDisplayValue("120"), {
+      target: { value: "45" },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_hermes" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Local Hermes",
+      type: "hermes",
+      config: {
+        baseUrl: "http://localhost:8642",
+        apiKey: "hermes-token",
+        timeoutMs: 45000,
+      },
+    });
   });
 
   it("allows testing an existing client card and shows the returned failure reason", async () => {

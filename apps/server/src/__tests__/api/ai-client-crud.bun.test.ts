@@ -211,6 +211,19 @@ describe("AI Client CRUD", () => {
     expect(body.client.type).toBe("llm");
   });
 
+  it("POST /ai/clients creates hermes client and returns 201", async () => {
+    const res = await createClient({
+      name: "My Hermes",
+      type: "hermes",
+      config: { baseUrl: "http://127.0.0.1:8642", timeoutMs: 30000 },
+    });
+
+    expect(res.status).toBe(201);
+    const body = await json<{ client: { type: string; config: { baseUrl?: string; timeoutMs?: number } } }>(res);
+    expect(body.client.type).toBe("hermes");
+    expect(body.client.config).toMatchObject({ baseUrl: "http://127.0.0.1:8642", timeoutMs: 30000 });
+  });
+
   it("POST /ai/clients with isDefault=true unsets other defaults", async () => {
     await createClient({ name: "Client A", type: "openclaw", isDefault: true });
     await createClient({ name: "Client B", type: "llm", isDefault: true });

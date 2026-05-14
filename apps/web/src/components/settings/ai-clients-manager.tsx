@@ -5,10 +5,12 @@ import { OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
 import { useI18n } from "@/i18n/client";
 import { api } from "@/lib/rpc-client";
 
+type AiClientType = "openclaw" | "llm" | "hermes";
+
 interface AiClientInfo {
   id: string;
   name: string;
-  type: "openclaw" | "llm";
+  type: AiClientType;
   config: Record<string, unknown>;
   isDefault: boolean;
   enabled: boolean;
@@ -18,7 +20,7 @@ interface AiClientInfo {
 
 type ClientFormPayload = {
   name: string;
-  type: "openclaw" | "llm";
+  type: AiClientType;
   config: Record<string, unknown>;
   isDefault: boolean;
 };
@@ -32,7 +34,7 @@ type TestResult = {
 
 function buildClientPayload(input: {
   name: string;
-  type: "openclaw" | "llm";
+  type: AiClientType;
   isDefault: boolean;
   bridgeUrl: string;
   bridgeToken: string;
@@ -48,7 +50,13 @@ function buildClientPayload(input: {
         model: input.model.trim() || OPENCLAW_DEFAULT_MODEL,
         timeoutSeconds: Number(input.timeoutSeconds),
       }
-    : { baseUrl: input.baseUrl, apiKey: input.apiKey, model: input.model };
+    : input.type === "hermes"
+      ? {
+          baseUrl: input.baseUrl || "http://127.0.0.1:8642",
+          apiKey: input.apiKey,
+          timeoutMs: Number(input.timeoutSeconds) * 1000,
+        }
+      : { baseUrl: input.baseUrl, apiKey: input.apiKey, model: input.model };
 
   return {
     name: input.name,
@@ -114,6 +122,7 @@ const DEFAULTS: Record<string, string> = {
   nameLabel: "Name",
   typeLabel: "Type",
   llmCompatible: "LLM (OpenAI Compatible)",
+  hermes: "Hermes",
   timeoutSeconds: "Timeout (seconds)",
   modelLabel: "Model",
   setAsDefault: "Set as default Client",
@@ -159,12 +168,12 @@ function ClientForm({
   copy: Record<string, string>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [type, setType] = useState<"openclaw" | "llm">(initial?.type ?? "openclaw");
+  const [type, setType] = useState<AiClientType>(initial?.type ?? "openclaw");
   const [isDefault, setIsDefault] = useState(initial?.isDefault ?? false);
   const [bridgeUrl, setBridgeUrl] = useState((initial?.config as { bridgeUrl?: string })?.bridgeUrl ?? "http://localhost:7677");
   const [bridgeToken, setBridgeToken] = useState((initial?.config as { bridgeToken?: string })?.bridgeToken ?? "");
   const [timeoutSeconds, setTimeoutSeconds] = useState(String((initial?.config as { timeoutSeconds?: number })?.timeoutSeconds ?? 120));
-  const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? "");
+  const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? (initial?.type === "hermes" ? "http://127.0.0.1:8642" : ""));
   const [apiKey, setApiKey] = useState((initial?.config as { apiKey?: string })?.apiKey ?? "");
   const [model, setModel] = useState(
     (initial?.config as { model?: string })?.model ?? OPENCLAW_DEFAULT_MODEL,
@@ -201,9 +210,10 @@ function ClientForm({
           <select
             className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
             value={type}
-            onChange={(e) => setType(e.target.value as "openclaw" | "llm")}
+            onChange={(e) => setType(e.target.value as AiClientType)}
           >
             <option value="openclaw">OpenClaw</option>
+            <option value="hermes">{copy.hermes}</option>
             <option value="llm">{copy.llmCompatible}</option>
           </select>
         </label>
@@ -238,6 +248,39 @@ function ClientForm({
               onChange={(e) => setTimeoutSeconds(e.target.value)}
             />
           </label>
+        </div>
+      ) : type === "hermes" ? (
+        <div className="space-y-3">
+          <label className="space-y-1.5">
+            <span className="text-xs text-muted-foreground">Base URL</span>
+            <input
+              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://127.0.0.1:8642"
+            />
+          </label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">API Key</span>
+              <input
+                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="optional for localhost"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Timeout (seconds)</span>
+              <input
+                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+                type="number"
+                value={timeoutSeconds}
+                onChange={(e) => setTimeoutSeconds(e.target.value)}
+              />
+            </label>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -454,6 +497,8 @@ export function AiClientsManager() {
                   <div className="text-xs text-muted-foreground">
                     {client.type === "openclaw" ? (
                       <span>Bridge: {(client.config as { bridgeUrl?: string }).bridgeUrl ?? "—"}</span>
+                    ) : client.type === "hermes" ? (
+                      <span>Hermes: {(client.config as { baseUrl?: string }).baseUrl ?? "http://127.0.0.1:8642"}</span>
                     ) : (
                       <span>
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}

@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
-
-type AiClientType = "openclaw" | "llm";
+import type { AiClientType } from "@chrona/contracts";
 
 interface CreateAiClientInput {
   name: string;

@@ -209,6 +209,7 @@ export type {
   AiClientRecord,
   AiClientType,
   AiFeature,
+  HermesClientConfig,
   LLMClientConfig,
   OpenClawClientConfig,
   SmartSuggestRequest,

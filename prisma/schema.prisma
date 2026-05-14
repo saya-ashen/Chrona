@@ -497,6 +497,7 @@ model RuntimeCursor {
 enum AiClientType {
   openclaw
   llm
+  hermes
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -529,6 +530,7 @@ model AiClient {
   /// JSON config — shape depends on type:
   ///   openclaw: { bridgeUrl, bridgeToken, timeoutSeconds }
   ///   llm: { baseUrl, apiKey, model, temperature }
+  ///   hermes: { baseUrl, apiKey, timeoutMs }
   config    Json
   isDefault Boolean            @default(false)
   enabled   Boolean            @default(true)

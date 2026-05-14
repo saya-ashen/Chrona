@@ -1,11 +1,14 @@
+import { HermesProviderClient } from "@chrona/hermes";
 import { checkGatewayAvailable, normalizeGatewayHttpUrl } from "@chrona/openclaw";
 import type {
+  ProviderRunInput,
   ProviderRunSnapshot,
   StartRunInput,
 } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
   AiFeature,
+  HermesClientConfig,
   OpenClawClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -70,6 +73,20 @@ async function checkClientHealth(
             error instanceof Error ? error.message : "Failed to reach LLM",
         };
       }
+    }
+
+    if (client.type === "hermes") {
+      const config = client.config as HermesClientConfig;
+      const health = await new HermesProviderClient({
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }).checkHealth({ deep: true });
+
+      return {
+        available: health.ok,
+        reason: health.reason ?? health.message ?? (health.ok ? "Hermes API is reachable" : "Hermes health check failed"),
+      };
     }
 
     return { available: false, reason: `Unknown client type: ${client.type}` };
@@ -141,7 +158,7 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,
-    input: request.input,
+    input: request.input as ProviderRunInput,
     structuredOutputSchema: request.structuredOutputSchema,
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutSeconds
