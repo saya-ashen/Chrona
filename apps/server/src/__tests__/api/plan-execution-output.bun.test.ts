@@ -367,6 +367,29 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(run.status).toBe(RunStatus.Completed);
   });
 
+  it("does not let final structured output override Chrona task state", async () => {
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const openClawClient = createMockOpenClawClient({
+      outputMessages: [],
+      structuredResult: completedTaskResult("Provider claims execution finished."),
+    });
+    installMockRegistryClient(openClawClient);
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0] as any,
+      plan: planGraph as any,
+      runtimeName: "openclaw",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("done");
+
+    const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task.status).toBe("Ready");
+  });
+
   it("sets run status to Failed when the provider refuses to start", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({

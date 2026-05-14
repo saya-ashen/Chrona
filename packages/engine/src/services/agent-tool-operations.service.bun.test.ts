@@ -1,0 +1,276 @@
+import { describe, expect, it } from "bun:test";
+import { ENGINE_ERROR_CODES, EngineError } from "../errors";
+import { createAgentToolOperationsService } from "./agent-tool-operations.service";
+
+function service() {
+  const calls = {
+    planPatch: 0,
+    taskUpdate: 0,
+  };
+  const task = {
+    id: "task-1",
+    title: "Build MCP tools",
+    status: "Ready",
+    priority: "High",
+  };
+  const agentTools = createAgentToolOperationsService({
+    tasks: {
+      create: async () => ({ task }),
+      update: async () => {
+        calls.taskUpdate += 1;
+        return { task: { ...task, title: "Updated" } };
+      },
+      delete: async () => ({}),
+      getPage: async () => ({ task }),
+      list: async () => ({ tasks: [task] }),
+    },
+    plan: {
+      getState: async () => ({
+        taskId: task.id,
+        aiPlanGenerationStatus: "accepted" as const,
+        savedPlan: { id: "plan-1", revision: 2, status: "Accepted" },
+        generationSession: null,
+      }),
+      getActiveGeneration: () => ({ generationSession: null }),
+      getGenerationSession: () => ({ generationSession: null }),
+      subscribeToActiveGeneration: () => null,
+      subscribeToGeneration: () => null,
+      accept: async () => ({ savedPlan: null }),
+      generate: () => { throw new Error("unused"); },
+      stopGeneration: () => ({ taskId: task.id, stopped: false }),
+      patch: async (input: Record<string, unknown>) => {
+        calls.planPatch += 1;
+        return { ...input, savedPlan: { id: "plan-1", revision: 3, status: "Accepted" } };
+      },
+      mutate: async (input: Record<string, unknown>) => {
+        calls.planPatch += 1;
+        return { ...input, revision: 3 };
+      },
+    },
+    schedule: {
+      apply: async () => ({ task: { ...task, scheduledStartAt: "start" } }),
+      clear: async () => ({ task }),
+      propose: async () => ({ proposalId: "proposal-1" }),
+      decideProposal: async () => ({ proposalId: "proposal-1" }),
+    },
+    execution: {
+      dispatch: async () => ({ result: { status: "running", sessionId: "session-1" } }),
+      syncRuntimeResult: async () => ({}),
+    },
+  } as unknown as Parameters<typeof createAgentToolOperationsService>[0]) as ReturnType<typeof createAgentToolOperationsService> & { calls: typeof calls };
+
+  (agentTools as { calls: typeof calls }).calls = calls;
+  return agentTools;
+}
+
+function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
+  return createAgentToolOperationsService({
+    tasks: {
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      getPage: async () => ({ task: { id: "task-1", status: "Ready" } }),
+      list: async () => ({ tasks: [] }),
+    },
+    plan: {
+      getState: async () => ({ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: null, generationSession: null }),
+      getActiveGeneration: () => ({ generationSession: null }),
+      getGenerationSession: () => ({ generationSession: null }),
+      subscribeToActiveGeneration: () => null,
+      subscribeToGeneration: () => null,
+      accept: async () => ({ savedPlan: null }),
+      generate: () => { throw new Error("unused"); },
+      stopGeneration: () => ({ taskId: "task-1", stopped: false }),
+      patch: async () => ({}),
+      mutate: async () => ({}),
+    },
+    schedule: {
+      apply: async () => ({}),
+      clear: async () => ({}),
+      propose: async () => ({}),
+      decideProposal: async () => ({}),
+    },
+    execution: {
+      dispatch: async () => {
+        throw new EngineError(ENGINE_ERROR_CODES[code], "Mapped failure");
+      },
+      syncRuntimeResult: async () => ({}),
+    },
+  } as unknown as Parameters<typeof createAgentToolOperationsService>[0]);
+}
+
+describe("agent tool operations service", () => {
+  it("returns registry metadata", () => {
+    expect(service().registry().tools.map((tool) => tool.name)).toContain("chrona.execution.dispatch");
+  });
+
+  it("executes read and mutating task tools through Chrona services", async () => {
+    await expect(
+      service().execute({
+        toolName: "chrona.task.read",
+        input: { workspaceId: "workspace-1", taskId: "task-1", actorType: "agent" },
+      }),
+    ).resolves.toMatchObject({ status: "accepted", state: { taskStatus: "Ready" } });
+
+    await expect(
+      service().execute({
+        toolName: "chrona.task.update",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "update-1",
+          payload: { title: "Updated" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted", state: { taskTitle: "Updated" } });
+  });
+
+  it("rejects missing idempotency keys and stale expected revisions without writes", async () => {
+    const agentTools = service();
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.task.update",
+        input: { workspaceId: "workspace-1", taskId: "task-1", actorType: "agent", payload: { title: "Updated" } },
+      }),
+    ).resolves.toMatchObject({ status: "rejected", reasonCode: "VALIDATION_ERROR" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.plan.read",
+        input: { workspaceId: "workspace-1", taskId: "task-1", actorType: "agent", expectedRevision: 1 },
+      }),
+    ).resolves.toMatchObject({ status: "rejected", reasonCode: "STALE_STATE" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.task.update",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "stale-task-update",
+          expectedRevision: 1,
+          payload: { title: "Updated" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "rejected", reasonCode: "STALE_STATE" });
+    expect(agentTools.calls.taskUpdate).toBe(0);
+  });
+
+  it("passes plan mutations to the existing plan patch command", async () => {
+    const agentTools = service();
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.plan.mutate",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "plan-mutate-1",
+          expectedRevision: 2,
+          payload: {
+            reason: "Rename node",
+            operations: [
+              {
+                type: "push_node_layer",
+                nodeId: "node-1",
+                layer: {
+                  id: "layer-1",
+                  nodeId: "node-1",
+                  type: "definition",
+                  createdAt: "2026-01-01T00:00:00.000Z",
+                  createdBy: "ai",
+                  definition: {
+                    title: "Renamed",
+                    objective: "Renamed objective",
+                    semantics: { type: "task" },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted", state: { planRevision: 3 } });
+    expect(agentTools.calls.planPatch).toBe(1);
+  });
+
+  it("replays duplicate mutating operations without duplicate side effects", async () => {
+    const agentTools = service();
+    const operation = {
+      toolName: "chrona.task.update" as const,
+      input: {
+        workspaceId: "workspace-1",
+        taskId: "task-1",
+        actorType: "agent" as const,
+        idempotencyKey: "same-key",
+        payload: { title: "Updated" },
+      },
+    };
+
+    await expect(agentTools.execute(operation)).resolves.toMatchObject({ status: "accepted" });
+    await expect(agentTools.execute(operation)).resolves.toMatchObject({
+      status: "noop",
+      reasonCode: "DUPLICATE_OPERATION",
+      idempotency: "replayed",
+    });
+  });
+
+  it("maps engine failures to structured rejection reason codes", async () => {
+    await expect(
+      serviceWithDispatchError("TASK_NOT_FOUND").execute({
+        toolName: "chrona.execution.dispatch",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "missing-task",
+          payload: { action: "start_manual" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "rejected", reasonCode: "NOT_FOUND", auditRef: expect.any(String) });
+
+    await expect(
+      serviceWithDispatchError("CONFLICT").execute({
+        toolName: "chrona.execution.dispatch",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "conflict",
+          payload: { action: "start_manual" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "rejected", reasonCode: "CONFLICT" });
+  });
+
+  it("keeps provider traces and structured output as evidence only", async () => {
+    await expect(
+      service().execute({
+        toolName: "chrona.task.update",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "evidence-only",
+          payload: { title: "Updated" },
+          evidence: {
+            providerText: "Final answer claims task is Done.",
+            toolCalls: [{ tool: "chrona.task.update", callId: "call-1" }],
+            toolOutputs: [{ callId: "call-1", status: "accepted" }],
+            structuredOutput: { taskTitle: "Provider title", taskStatus: "Done" },
+          },
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "accepted",
+      state: { taskTitle: "Updated", taskStatus: "Ready" },
+      evidence: {
+        providerText: "Final answer claims task is Done.",
+        structuredOutput: { taskTitle: "Provider title", taskStatus: "Done" },
+      },
+    });
+  });
+});

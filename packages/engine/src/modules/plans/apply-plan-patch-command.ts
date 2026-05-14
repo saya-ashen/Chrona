@@ -146,7 +146,7 @@ async function ensureGraphRuntime(taskId: string) {
   };
 }
 
-async function applyPlanMutationCommand(input: {
+export async function applyPlanMutationCommand(input: {
   taskId: string;
   mutation: GraphMutationRequest;
 }) {
