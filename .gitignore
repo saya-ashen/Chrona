@@ -44,6 +44,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
+# python
+__pycache__/
+*.py[cod]
+
 # local workspaces / scaffolding
 .worktrees/
 agent-dashboard-app/
