@@ -117,6 +117,16 @@ describe("generatePlanStream", () => {
       instructions: "Generate plan",
       inputText: "Build plan",
       input: { title: "Build plan" },
+      featureSpec: {
+        feature: "generate_plan",
+        instructions: "Generate plan",
+        inputText: "Build plan",
+        structuredOutputSchema: {
+          name: "ignored_schema",
+          description: "Should not be sent to Hermes.",
+          schema: { type: "object" },
+        },
+      } as never,
       userMessage: "Build plan",
     })) {
       events.push(event as { type: string; text?: string; structured?: unknown });
@@ -124,7 +134,13 @@ describe("generatePlanStream", () => {
 
     expect(createSessionMock).toHaveBeenCalledTimes(1);
     expect(startRunMock).toHaveBeenCalledTimes(1);
+    expect(startRunMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ structuredOutputSchema: expect.anything() }),
+    );
     expect(streamRunMock).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1" }));
+    expect(streamRunMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ structuredOutputSchema: expect.anything() }),
+    );
     expect(events).toEqual([
       { type: "partial", text: "hello" },
       { type: "done", text: "hello", structured: null },

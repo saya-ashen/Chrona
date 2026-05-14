@@ -1,4 +1,5 @@
 import {
+  chronaToolInputSchema,
   type ChronaToolName,
   type ChronaToolOperation,
   type ChronaToolResult,
@@ -6,6 +7,7 @@ import {
   isChronaToolMutating,
   parseChronaToolPayload,
 } from "@chrona/contracts";
+import { db } from "@/lib/db";
 import type { createTaskExecutionService } from "./task-execution.service";
 import type { createTaskPlanService } from "./task-plan.service";
 import type { createTaskScheduleService } from "./task-schedule.service";
@@ -48,7 +50,7 @@ function operationId() {
 
 function duplicateKey(operation: ChronaToolOperation) {
   const { toolName, input } = operation;
-  return `${input.workspaceId}:${input.taskId ?? "workspace"}:${toolName}:${input.idempotencyKey ?? ""}`;
+  return `${input.workspaceId ?? "workspace"}:${input.taskId ?? "workspace"}:${toolName}:${input.idempotencyKey ?? ""}`;
 }
 
 function requireTaskId(input: ChronaToolOperation["input"]) {
@@ -56,6 +58,19 @@ function requireTaskId(input: ChronaToolOperation["input"]) {
     throw new Error("taskId is required");
   }
   return input.taskId;
+}
+
+function requireWorkspaceId(input: ChronaToolOperation["input"]) {
+  if (!input.workspaceId) {
+    throw new Error("workspaceId is required");
+  }
+  return input.workspaceId;
+}
+
+function asInputRecord(input: unknown): Record<string, unknown> {
+  return input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>)
+    : {};
 }
 
 function ensureExpectedRevision(operation: ChronaToolOperation, state: Record<string, unknown>) {
@@ -129,6 +144,28 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           description: toolDescriptions[name],
         })),
       };
+    },
+
+    async resolveInputContext(input: unknown) {
+      const raw = asInputRecord(input);
+      const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+      if (!sessionId || (raw.workspaceId && raw.taskId)) {
+        return chronaToolInputSchema.parse(raw);
+      }
+
+      const session = await db.taskSession.findUnique({
+        where: { sessionKey: sessionId },
+        include: {
+          task: { select: { id: true, workspaceId: true } },
+        },
+      });
+
+      return chronaToolInputSchema.parse({
+        ...raw,
+        taskId: typeof raw.taskId === "string" ? raw.taskId : session?.task.id,
+        workspaceId:
+          typeof raw.workspaceId === "string" ? raw.workspaceId : session?.task.workspaceId,
+      });
     },
 
     async execute(operation: ChronaToolOperation): Promise<ChronaToolResult> {
@@ -255,13 +292,13 @@ async function executeValidatedTool(
     case "chrona.task.create":
       return deps.tasks.create({
         ...(payload as Parameters<typeof deps.tasks.create>[0]),
-        workspaceId: input.workspaceId,
+        workspaceId: requireWorkspaceId(input),
       });
     case "chrona.task.update":
       return deps.tasks.update({
         ...(payload as Omit<Parameters<typeof deps.tasks.update>[0], "taskId">),
         taskId: requireTaskId(input),
-        workspaceId: input.workspaceId,
+        workspaceId: requireWorkspaceId(input),
       });
     case "chrona.plan.read":
       return deps.plan.getState({ taskId: requireTaskId(input) });

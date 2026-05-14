@@ -1,0 +1,19 @@
+"""Chrona Hermes plugin registration."""
+
+from . import tools
+
+
+def register(ctx):
+    """Register Chrona MCP tools with Hermes."""
+    ctx.register_hook("pre_llm_call", tools.capture_session_context)
+
+    for tool in tools.list_chrona_tools():
+        name = tool.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        ctx.register_tool(
+            name=name,
+            toolset="chrona",
+            schema=tools.schema_for_chrona_tool(tool),
+            handler=tools.handler_for_chrona_tool(name),
+        )

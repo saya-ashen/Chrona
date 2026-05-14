@@ -12,19 +12,37 @@ function app(rejected = false) {
           { name: "chrona.task.update", mutates: true, description: "Update task." },
         ],
       }),
-      execute: async (operation: unknown) => ({
-        operationId: rejected ? "op-rejected" : "op-1",
-        toolName: (operation as { toolName: string }).toolName,
-        status: rejected ? "rejected" : "accepted",
-        reasonCode: rejected ? "STALE_STATE" : null,
-        message: rejected ? "Expected state is stale." : "Tool executed.",
-        affected: { taskId: "task-1" },
-        state: { taskStatus: "Ready" },
-        idempotency: rejected ? "new" : "not_applicable",
-        auditRef: rejected ? "op-rejected" : null,
-        recovery: rejected ? { nextTool: "chrona.task.read" } : null,
-        completedAt: new Date().toISOString(),
+      resolveInputContext: async (input: unknown) => ({
+        ...(input as Record<string, unknown>),
+        workspaceId: (input as { workspaceId?: string }).workspaceId ?? "workspace-from-session",
+        taskId: (input as { taskId?: string }).taskId ?? "task-from-session",
       }),
+      execute: async (operation: unknown) => {
+        const toolName = (operation as { toolName: string }).toolName;
+        const input = (operation as { input: { idempotencyKey?: string; taskId?: string } }).input;
+        const missingIdempotency = toolName === "chrona.task.update" && !input.idempotencyKey;
+        return {
+          operationId: rejected ? "op-rejected" : "op-1",
+          toolName,
+          status: rejected || missingIdempotency ? "rejected" : "accepted",
+          reasonCode: rejected
+            ? "STALE_STATE"
+            : missingIdempotency
+              ? "VALIDATION_ERROR"
+              : null,
+          message: rejected
+            ? "Expected state is stale."
+            : missingIdempotency
+              ? "idempotencyKey is required for mutating Chrona tool calls."
+              : "Tool executed.",
+          affected: { taskId: input.taskId ?? "task-1" },
+          state: { taskStatus: "Ready" },
+          idempotency: rejected || missingIdempotency ? "new" : "not_applicable",
+          auditRef: rejected ? "op-rejected" : null,
+          recovery: rejected ? { nextTool: "chrona.task.read" } : null,
+          completedAt: new Date().toISOString(),
+        };
+      },
     },
   };
   const a = new Hono();
@@ -78,6 +96,27 @@ describe("MCP routes", () => {
     });
   });
 
+  it("lists tool-specific payload schemas derived from Chrona contracts", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const taskRead = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona.task.read",
+    );
+    const taskUpdate = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona.task.update",
+    );
+
+    expect(taskRead.inputSchema.required ?? []).not.toContain("workspaceId");
+    expect(taskRead.inputSchema.properties.sessionId).toMatchObject({ type: "string" });
+    expect(taskRead.inputSchema.properties.payload).toMatchObject({ type: "object" });
+    expect(taskUpdate.inputSchema.properties.payload.properties).toMatchObject({
+      title: { type: "string" },
+      status: { type: "string" },
+    });
+  });
+
   it("dispatches Chrona tools through tools/call", async () => {
     const response = await postRpc(
       rpc("tools/call", {
@@ -91,6 +130,25 @@ describe("MCP routes", () => {
       result: {
         content: [{ type: "text", text: "Tool executed." }],
         structuredContent: { status: "accepted", state: { taskStatus: "Ready" } },
+      },
+    });
+  });
+
+  it("resolves injected sessionId before dispatching Chrona tools", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona.task.read",
+        arguments: { sessionId: "chrona:hermes:task:task-1:plan-graph" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          status: "accepted",
+          affected: { taskId: "task-from-session" },
+        },
       },
     });
   });
@@ -117,6 +175,31 @@ describe("MCP routes", () => {
           status: "rejected",
           reasonCode: "STALE_STATE",
           recovery: { nextTool: "chrona.task.read" },
+        },
+      },
+    });
+  });
+
+  it("returns structured validation errors for mutating calls missing idempotency", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona.task.update",
+        arguments: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          payload: { title: "Updated" },
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          status: "rejected",
+          reasonCode: "VALIDATION_ERROR",
+          message: "idempotencyKey is required for mutating Chrona tool calls.",
         },
       },
     });

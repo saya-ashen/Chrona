@@ -120,6 +120,8 @@ export async function* generateTaskPlanManualStream(input: {
         executionRuntime: task.executionRuntime,
       }),
       defaultSessionId: task.defaultSessionId,
+      suffix: "plan-graph",
+      label: `${task.title} · Plan graph generation session`,
     })
   ).sessionKey;
 

@@ -64,7 +64,7 @@ export const chronaToolEvidenceSchema = z.object({
 }).passthrough();
 
 export const chronaToolContextSchema = z.object({
-  workspaceId: z.string().min(1, "workspaceId is required"),
+  workspaceId: z.string().min(1).optional(),
   taskId: z.string().min(1).optional(),
   sessionId: z.string().min(1).optional(),
   actorType: z.enum(["agent", "human", "system"]).optional().default("agent"),
@@ -73,6 +73,15 @@ export const chronaToolContextSchema = z.object({
   expectedState: chronaToolExpectedStateSchema.optional(),
   expectedRevision: z.number().int().nonnegative().optional(),
   evidence: chronaToolEvidenceSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (value.workspaceId || value.sessionId) {
+    return;
+  }
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["workspaceId"],
+    message: "workspaceId or sessionId is required",
+  });
 });
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
@@ -100,6 +109,12 @@ export const chronaToolPayloadSchemas = {
 export const chronaToolInputSchema = chronaToolContextSchema.extend({
   payload: z.unknown().optional(),
 });
+
+export function chronaToolInputSchemaFor(toolName: ChronaToolName) {
+  return chronaToolContextSchema.extend({
+    payload: chronaToolPayloadSchemas[toolName],
+  });
+}
 
 export const chronaToolOperationSchema = z.object({
   toolName: chronaToolNameSchema,

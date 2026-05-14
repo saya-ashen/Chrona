@@ -350,7 +350,6 @@ async function* providerStream(
     sessionKey,
     instructions: input.instructions,
     input: input.input,
-    structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
     stream: true,
     signal: input.signal,
   });
@@ -362,7 +361,6 @@ async function* providerStream(
     runId: run.runId,
     instructions: input.instructions,
     input: input.input,
-    structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
     stream: true,
     signal: input.signal,
   })) {
