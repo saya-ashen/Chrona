@@ -64,6 +64,45 @@ describe("task-plan-view-model", () => {
     expect(graphPlan?.edges?.[0]?.label).toBe("是");
   });
 
+  it("models confirm checkpoints as approval decisions", () => {
+    const graphPlan = compiledPlanToGraphPlan({
+      ...compiledPlan,
+      nodes: [
+        {
+          id: "checkpoint-1",
+          localId: "confirm_scope",
+          type: "checkpoint",
+          title: "确认需求范围",
+          config: {
+            checkpointType: "confirm",
+            prompt: "是否确认当前需求范围？",
+            required: true,
+          },
+          dependencies: [],
+          dependents: [],
+        },
+      ],
+      edges: [],
+      entryNodeIds: ["checkpoint-1"],
+      terminalNodeIds: ["checkpoint-1"],
+      topologicalOrder: ["checkpoint-1"],
+    });
+
+    expect(graphPlan?.steps[0]).toMatchObject({
+      interactionType: "confirm",
+      availableActions: [{ label: "审批", kind: "approve" }],
+      interactiveFields: [
+        {
+          key: "checkpoint:decision",
+          label: "审批决策",
+          control: "approval",
+          required: true,
+          options: ["Approve", "Reject"],
+        },
+      ],
+    });
+  });
+
   it("uses effective plan runtime status and active labeled edges from read model", () => {
     const readModel: TaskPlanReadModel = {
       id: "plan-1",

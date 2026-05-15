@@ -443,7 +443,12 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       stepPosition: currentNode ? `${(input.graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${input.graphPlan?.nodes.length ?? 0}` : "0/0",
       autoRefreshEnabled: currentNode ? ["running", "approval-needed"].includes(mapTaskWorkspaceStatus(currentNode.status)) : false,
       tabs: ["result", "evidence", "action", "configuration"],
-      disabledActionReason: currentNode?.availableActions?.length === 0 ? "No actions are available for this node." : undefined,
+      disabledActionReason:
+        currentNode &&
+        (currentNode.availableActions?.length ?? 0) === 0 &&
+        (currentNode.interactiveFields?.length ?? 0) === 0
+          ? "No actions are available for this node."
+          : undefined,
       isEmpty: !currentNode,
     },
     readiness: buildReadinessCard(pageData, currentNode),

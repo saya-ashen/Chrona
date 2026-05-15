@@ -12,7 +12,7 @@ describe("MCP task tool contracts", () => {
     expect(
       chronaToolOperationSchema.parse({
         toolName: "chrona.task.read",
-        input: { sessionId: "chrona:hermes:task:task-1:execute" },
+        input: { sessionId: "chrona:task:task-1:execute" },
       }),
     ).toMatchObject({ toolName: "chrona.task.read" });
 
@@ -49,10 +49,10 @@ describe("MCP task tool contracts", () => {
   it("accepts session-scoped tool input before Chrona resolves task context", () => {
     expect(
       chronaToolInputSchema.parse({
-        sessionId: "chrona:hermes:task:task-1:execute",
+        sessionId: "chrona:task:task-1:execute",
         payload: {},
       }),
-    ).toMatchObject({ sessionId: "chrona:hermes:task:task-1:execute" });
+    ).toMatchObject({ sessionId: "chrona:task:task-1:execute" });
 
     expect(() => chronaToolInputSchema.parse({ payload: {} })).toThrow(
       "sessionId or resolved taskId is required",
@@ -148,7 +148,7 @@ describe("MCP task tool contracts", () => {
       }),
     ).toMatchObject({ action: "complete_manual_node" });
 
-    expect(parseChronaToolPayload("chrona.node.result", { status: "complete", summary: "Done" })).toEqual({ status: "complete", summary: "Done" });
+    expect(parseChronaToolPayload("chrona.node.result", { status: "complete", nodeId: "node-1", summary: "Done" })).toEqual({ status: "complete", nodeId: "node-1", summary: "Done" });
     expect(parseChronaToolPayload("chrona.node.result", { status: "blocked", reason: "Waiting on API" })).toEqual({ status: "blocked", reason: "Waiting on API" });
     expect(parseChronaToolPayload("chrona.node.result", { status: "failed", error: "Command failed" })).toEqual({ status: "failed", error: "Command failed" });
     expect(() => parseChronaToolPayload("chrona.node.result", { status: "blocked" })).toThrow("reason is required");

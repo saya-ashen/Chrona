@@ -18,18 +18,10 @@ type TaskSessionStatus =
 
 export function buildDefaultTaskSessionKey(input: {
   taskId: string;
-  runtimeName: string;
   suffix?: string | null;
 }) {
   const suffix = input.suffix?.trim() || "default";
-  return `chrona:${input.runtimeName}:task:${input.taskId}:${suffix}`;
-}
-
-function buildLegacyTaskSessionKey(input: {
-  taskId: string;
-  runtimeName: string;
-}) {
-  return `agent-dashboard:${input.runtimeName}:task:${input.taskId}:default`;
+  return `chrona:task:${input.taskId}:${suffix}`;
 }
 
 export async function ensureDefaultTaskSession(
@@ -39,7 +31,6 @@ export async function ensureDefaultTaskSession(
   const shouldUpdateDefaultSessionId = !suffix;
   const expectedSessionKey = buildDefaultTaskSessionKey({
     taskId: input.taskId,
-    runtimeName: input.runtimeName,
     suffix,
   });
 
@@ -56,20 +47,7 @@ export async function ensureDefaultTaskSession(
   const existingSession = await db.taskSession.findFirst({
     where: {
       taskId: input.taskId,
-      runtimeName: input.runtimeName,
-      OR: [
-        { sessionKey: expectedSessionKey },
-        ...(shouldUpdateDefaultSessionId
-          ? [
-              {
-                sessionKey: buildLegacyTaskSessionKey({
-                  taskId: input.taskId,
-                  runtimeName: input.runtimeName,
-                }),
-              },
-            ]
-          : []),
-      ],
+      sessionKey: expectedSessionKey,
     },
     orderBy: { createdAt: "asc" },
   });

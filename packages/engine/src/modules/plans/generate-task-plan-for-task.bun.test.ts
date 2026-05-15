@@ -126,7 +126,7 @@ describe("generateTaskPlanForTask", () => {
       title: "Updated task title",
       description: "Updated description from DB",
       estimatedMinutes: 90,
-      sessionKey: `chrona:openclaw:task:${task.id}:plan-graph`,
+      sessionKey: `chrona:task:${task.id}:plan-graph`,
     }));
 
     const saved = await getLatestTaskPlanGraph(task.id);
@@ -139,7 +139,7 @@ describe("generateTaskPlanForTask", () => {
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
     expect(refreshedTask?.defaultSessionId).toBeNull();
     expect(sessions.map((session) => session.sessionKey)).toContain(
-      `chrona:openclaw:task:${task.id}:plan-graph`,
+      `chrona:task:${task.id}:plan-graph`,
     );
   });
 

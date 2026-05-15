@@ -316,6 +316,7 @@ function ActionTab({
   const actions = node.availableActions ?? [];
   const fields = node.interactiveFields ?? [];
   const selectedAction = actions.find((action) => action.id === selectedActionId) ?? null;
+  const hasActionPayload = actions.length > 0 || fields.length > 0;
   const [isDispatching, setIsDispatching] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const submitDisabledReason = getWorkspaceActionDisabledReason({
@@ -358,23 +359,24 @@ function ActionTab({
           {disabledActionReason}
         </div>
       ) : null}
-      {actions.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => setSelectedActionId(action.id)}
-              className={buttonVariants({
-                variant: selectedActionId === action.id ? "default" : "outline",
-                size: "sm",
-                className: "h-7 rounded-lg px-2 text-xs",
-              })}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
+      {actions.length > 1 ? (
+        <label className="mt-2 block space-y-1.5">
+          <span className="text-sm font-medium text-foreground">Action</span>
+          <select
+            value={selectedActionId ?? ""}
+            onChange={(event) => setSelectedActionId(event.target.value)}
+            className={cn(
+              selectClassName,
+              "rounded-xl border-border/70 bg-background/80 text-sm",
+            )}
+          >
+            {actions.map((action) => (
+              <option key={action.id} value={action.id}>
+                {action.label}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
       {fields.length > 0 ? (
         <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -399,7 +401,7 @@ function ActionTab({
             : "This node does not require free-form input."}
         </p>
       )}
-      {actions.length > 0 ? (
+      {hasActionPayload ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -412,7 +414,7 @@ function ActionTab({
               className: "h-8 rounded-lg px-3 text-xs",
             })}
           >
-            {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send action"}
+            {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
           </button>
           {submitDisabledReason ? (
             <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
@@ -449,10 +451,14 @@ function ConfigurationTab({
 export function TaskWorkspaceNodeDetailPanel({
   detail,
   selectedNodes,
+  preferredTab,
+  onPreferredTabApplied,
   onDispatchExecutionAction,
 }: {
   detail: NodeDetailPanelState;
   selectedNodes: PlanNodeDataModel[];
+  preferredTab?: NodeDetailPanelState["tabs"][number] | null;
+  onPreferredTabApplied?: () => void;
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
@@ -469,12 +475,29 @@ export function TaskWorkspaceNodeDetailPanel({
   );
 
   useEffect(() => {
-    setActiveTab(detail.tabs[0] ?? "result");
     setSelectedActionId(currentNode ? pickDefaultWorkspaceAction(currentNode) : null);
     setFieldValues(
       buildDefaultWorkspaceActionFields(currentNode?.interactiveFields ?? []),
     );
-  }, [currentNode, detail.tabs]);
+  }, [currentNode?.id]);
+
+  useEffect(() => {
+    if (preferredTab && detail.tabs.includes(preferredTab)) {
+      if (preferredTab !== activeTab) {
+        setActiveTab(preferredTab);
+      }
+      onPreferredTabApplied?.();
+      return;
+    }
+
+    const nextTab = detail.tabs.includes(activeTab)
+      ? activeTab
+      : detail.tabs[0] ?? "result";
+
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [activeTab, detail.tabs, onPreferredTabApplied, preferredTab]);
 
   if (!currentNode) return <EmptyDetailState />;
 

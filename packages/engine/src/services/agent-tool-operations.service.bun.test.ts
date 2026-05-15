@@ -173,21 +173,21 @@ describe("agent tool operations service", () => {
       data: {
         taskId: task.id,
         runtimeName: "hermes",
-        sessionKey: "chrona:hermes:task:task-1:execute",
+        sessionKey: "chrona:task:task-1:execute",
         label: "Execution session",
       },
     });
 
     const agentTools = service();
     const resolved = await agentTools.resolveInputContext({
-      sessionId: "chrona:hermes:task:task-1:execute",
+      sessionId: "chrona:task:task-1:execute",
       actorType: "agent",
     });
 
     expect(resolved).toMatchObject({
       workspaceId: workspace.id,
       taskId: task.id,
-      sessionId: "chrona:hermes:task:task-1:execute",
+      sessionId: "chrona:task:task-1:execute",
     });
 
     await expect(agentTools.resolveInputContext({
@@ -327,7 +327,7 @@ describe("agent tool operations service", () => {
           sessionId: "session-1",
           actorType: "agent",
           idempotencyKey: "node-result-complete-1",
-          payload: { status: "complete", summary: "Done", output: { ok: true } },
+          payload: { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -363,18 +363,16 @@ describe("agent tool operations service", () => {
     expect(agentTools.calls.dispatchActions).toEqual([
       {
         action: "complete_manual_node",
-        sessionId: "session-1",
+        nodeId: "node-1",
         summary: "Done",
         output: { ok: true },
       },
       {
         action: "block_current_node",
-        sessionId: "session-1",
         reason: "Waiting on dependency",
       },
       {
         action: "fail_current_node",
-        sessionId: "session-1",
         error: "Command failed",
       },
     ]);

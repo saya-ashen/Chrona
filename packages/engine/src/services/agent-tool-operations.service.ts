@@ -22,6 +22,7 @@ import {
 } from "./agent-tool-result";
 import { affectedFrom, summarizeUnknownState } from "./agent-tool-state-summary";
 import { ENGINE_ERROR_CODES, isEngineError } from "../errors";
+import { createLogger } from "@chrona/shared/logger";
 
 type AgentToolOperationsDeps = {
   tasks: ReturnType<typeof createTasksService>;
@@ -47,6 +48,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
 };
 
 const idempotentResults = new Map<string, ChronaToolResult>();
+const logger = createLogger("engine.agent-tools");
 
 function operationId() {
   return crypto.randomUUID();
@@ -154,6 +156,11 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
       const raw = asInputRecord(input);
       const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
       if (!sessionId && raw.taskId) {
+        logger.info("context.resolve.explicit_task", {
+          toolName: typeof raw.toolName === "string" ? raw.toolName : undefined,
+          taskId: raw.taskId,
+          workspaceId: raw.workspaceId,
+        });
         return chronaToolInputSchema.parse(raw);
       }
 
@@ -167,6 +174,39 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
             },
           })
         : null;
+      const runtimeRun = !session && sessionId
+        ? await db.run.findFirst({
+            where: {
+              OR: [{ runtimeSessionRef: sessionId }, { runtimeRunRef: sessionId }],
+            },
+            select: {
+              id: true,
+              taskId: true,
+              taskSessionId: true,
+              runtimeName: true,
+              runtimeSessionRef: true,
+              runtimeRunRef: true,
+              status: true,
+              updatedAt: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          })
+        : null;
+      logger.info("context.resolve.session_lookup", {
+        sessionId: sessionId || null,
+        hasRawTaskId: typeof raw.taskId === "string",
+        rawTaskId: typeof raw.taskId === "string" ? raw.taskId : null,
+        rawWorkspaceId: typeof raw.workspaceId === "string" ? raw.workspaceId : null,
+        matchedTaskSession: session
+          ? {
+              id: session.id,
+              sessionKey: session.sessionKey,
+              taskId: session.task.id,
+              workspaceId: session.task.workspaceId,
+            }
+          : null,
+        matchedRuntimeRun: runtimeRun,
+      });
       const workspaceId = typeof raw.workspaceId === "string"
         ? raw.workspaceId
         : session?.task.workspaceId ?? (await getDefaultWorkspace()).id;
@@ -366,25 +406,26 @@ async function executeValidatedTool(
         status: "complete" | "blocked" | "failed";
         summary?: string;
         output?: unknown;
+        nodeId?: string;
         reason?: string;
         error?: string;
       };
       const action = body.status === "complete"
         ? {
             action: "complete_manual_node" as const,
-            sessionId: input.sessionId,
+            nodeId: body.nodeId,
             summary: body.summary,
             output: body.output,
           }
         : body.status === "blocked"
           ? {
               action: "block_current_node" as const,
-              sessionId: input.sessionId,
+              nodeId: body.nodeId,
               reason: body.reason!,
             }
           : {
               action: "fail_current_node" as const,
-              sessionId: input.sessionId,
+              nodeId: body.nodeId,
               error: body.error!,
             };
       return deps.execution.dispatch({

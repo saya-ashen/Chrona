@@ -58,6 +58,7 @@ export function TaskWorkspacePlanSection({
   const [nodePanelHeight, setNodePanelHeight] = useState(
     DEFAULT_NODE_PANEL_HEIGHT,
   );
+  const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
@@ -84,6 +85,7 @@ export function TaskWorkspacePlanSection({
         handleSelectedPlanNodeChange(node, [node]);
       }
     }
+    setPreferredNodeDetailTab("action");
 
     document
       .getElementById("task-workspace-node-actions")
@@ -221,6 +223,8 @@ export function TaskWorkspacePlanSection({
           <TaskWorkspaceNodeDetailPanel
             detail={consoleView.nodeDetail}
             selectedNodes={selectedPlanNodes}
+            preferredTab={preferredNodeDetailTab}
+            onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
             onDispatchExecutionAction={onDispatchExecutionAction}
           />
         </div>

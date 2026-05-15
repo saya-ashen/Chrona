@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { taskPlanExecution } from "@/modules/plan-execution";
 import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
-import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
+import type { CheckpointConfig, CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 async function resetDb() {
   await db.taskAssistantMessage.deleteMany();
@@ -184,6 +184,45 @@ function makeSingleBlockedConditionPlan(): CompiledPlan {
   };
 }
 
+function makeInputCheckpointPlan(): CompiledPlan {
+  const config: CheckpointConfig = {
+    checkpointType: "input",
+    prompt: "Provide poem constraints",
+    required: true,
+    inputFields: [
+      { name: "theme", label: "主题", required: true },
+      { name: "genre", label: "体裁与风格", required: true },
+    ],
+  };
+
+  return {
+    id: "compiled_input_checkpoint",
+    editablePlanId: "graph_input_checkpoint",
+    sourceVersion: 1,
+    title: "Input checkpoint",
+    goal: "Collect user input before continuing",
+    assumptions: [],
+    nodes: [
+      {
+        id: "checkpoint_input",
+        localId: "checkpoint_input",
+        type: "checkpoint",
+        title: "Collect writing constraints",
+        description: "User provides structured poem constraints",
+        config,
+        dependencies: [],
+        dependents: [],
+      },
+    ],
+    edges: [],
+    entryNodeIds: ["checkpoint_input"],
+    terminalNodeIds: ["checkpoint_input"],
+    topologicalOrder: ["checkpoint_input"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, compiledPlan: CompiledPlan) {
   await saveCompiledPlan({
     workspaceId,
@@ -309,6 +348,54 @@ describe("plan-runner native execution actions", () => {
       scope: "execution_session",
       actionRequired: "Check execution status",
     });
+  });
+
+  it("completes input checkpoints with submitted input", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner input checkpoint");
+    const compiledPlan = makeInputCheckpointPlan();
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const initial = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(initial.status).toBe("waiting_for_user");
+    expect(initial.currentNodeId).toBe("checkpoint_input");
+
+    const resumed = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: {
+        action: "resume_with_input",
+        nodeId: "checkpoint_input",
+        inputText: "主题: 夏天\n体裁与风格: 现代诗\n其他要求: 无",
+      },
+    });
+
+    expect(resumed.status).toBe("completed");
+    expect(resumed.currentNodeId).toBeNull();
+    expect(resumed.executedNodeIds).toContain("checkpoint_input");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
+      ["checkpoint_input", "obsolete", "user_input"],
+      ["checkpoint_input", "current", undefined],
+    ]);
+    expect(persisted?.results[1]?.outputs).toContainEqual({
+      kind: "json",
+      value: { feedback: "主题: 夏天\n体裁与风格: 现代诗\n其他要求: 无" },
+    });
+    expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded", "succeeded"]);
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).toBe("Completed");
+    expect(session.currentNodeId).toBeNull();
+    expect(session.completedNodeIds).toBe(JSON.stringify(["checkpoint_input"]));
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.Completed);
   });
 
   it("cancels paused execution session and marks task cancelled", async () => {

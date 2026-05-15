@@ -107,7 +107,7 @@ describe("createTask", () => {
     expect(storedTask.defaultSessionId).toBeTruthy();
     expect(storedTask.sessions).toHaveLength(1);
     expect(storedTask.sessions[0]?.sessionKey).toBe(
-      `chrona:openclaw:task:${storedTask.id}:default`,
+      `chrona:task:${storedTask.id}:default`,
     );
     expect(storedTask.projection).not.toBeNull();
     expect(createdEvent?.payload).toEqual(

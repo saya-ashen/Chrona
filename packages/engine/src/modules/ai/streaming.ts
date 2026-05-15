@@ -512,7 +512,7 @@ function buildSuggestScope(request: SmartSuggestRequest): string {
     return request.sessionKey.trim();
   }
   if (request.taskId?.trim()) {
-    return `chrona:openclaw:task:${request.taskId.trim()}:default`;
+    return `chrona:task:${request.taskId.trim()}:default`;
   }
   const workspace = asciiSlug(request.workspaceId ?? "default", 24);
   const normalizedInput = request.input.trim();

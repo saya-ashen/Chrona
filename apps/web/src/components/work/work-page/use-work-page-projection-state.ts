@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
 import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
@@ -87,6 +88,29 @@ export function useWorkPageProjectionState(initialData: WorkPageData, copy: Work
 
     return () => window.clearInterval(interval);
   }, [data, isPending, refresh]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    void fetchJsonEventSource(`/api/work/${data.taskShell.id}/events`, {
+      method: "GET",
+      signal: abortController.signal,
+      headers: {
+        Accept: "text/event-stream",
+      },
+      onEvent({ event }) {
+        if (event === "task_projection_updated") {
+          void refresh({ silent: true });
+        }
+      },
+    }).catch((error) => {
+      if (!abortController.signal.aborted) {
+        console.warn("Work page event stream closed", error);
+      }
+    });
+
+    return () => abortController.abort();
+  }, [data.taskShell.id, refresh]);
 
   const resetComposer = useCallback(() => {
     composerValueRef.current = "";

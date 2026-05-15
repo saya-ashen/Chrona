@@ -52,10 +52,33 @@ describe("task workspace actions", () => {
     })).toMatchObject({ action: "resume_with_approval", nodeId: "node-1", decision: "reject" });
 
     expect(buildWorkspaceActionInput({
+      node: node({ interactionType: "confirm" }),
+      selectedAction: { id: "confirm", label: "审批", kind: "approve" },
+      fields: [{ key: "checkpoint:decision", label: "审批决策", value: "", control: "approval" }],
+      values: { "checkpoint:decision": "Approve" },
+    })).toMatchObject({ action: "resume_with_approval", nodeId: "node-1", decision: "approve" });
+
+    expect(buildWorkspaceActionInput({
       node: node({ interactionType: "execute", executionMode: "manual" }),
       selectedAction: { id: "done", label: "Mark done", kind: "trigger" },
       fields: [{ key: "summary", label: "Summary", value: "" }],
       values: { summary: "Completed outside Chrona" },
     })).toMatchObject({ action: "complete_manual_node", nodeId: "node-1", summary: "Summary: Completed outside Chrona" });
+  });
+
+  it("maps field-only input nodes to resume_with_input", () => {
+    expect(buildWorkspaceActionInput({
+      node: node({ nextAction: "Collect missing information" }),
+      selectedAction: null,
+      fields: [
+        { key: "city", label: "默认城市", value: "", required: true },
+        { key: "extra", label: "额外需求", value: "" },
+      ],
+      values: { city: "北京", extra: "无" },
+    })).toEqual({
+      action: "resume_with_input",
+      nodeId: "node-1",
+      inputText: "默认城市: 北京\n额外需求: 无",
+    });
   });
 });

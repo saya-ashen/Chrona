@@ -282,6 +282,9 @@ describe("plan-runner task executor approval flows", () => {
 
   it("forwards runtime events from task node execution", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      expect(input.mainSession.sessionKey).toBe(
+        `chrona:task:${input.taskId}:plan-${input.planId}`,
+      );
       await input.onRuntimeEvent?.({
         type: "text_delta",
         provider: "hermes",
@@ -289,6 +292,11 @@ describe("plan-runner task executor approval flows", () => {
         sequence: 0,
         text: "working",
       });
+      const activeSession = await db.executionSession.findFirstOrThrow({
+        where: { taskId: input.taskId },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(activeSession.currentNodeId).toBe("task_node");
       return {
         status: "started",
         summary: "Hermes run started",
@@ -302,7 +310,7 @@ describe("plan-runner task executor approval flows", () => {
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const runtimeEvents: unknown[] = [];
-    await taskPlanExecution.dispatch({
+    const result = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
       onRuntimeEvent(event) {
@@ -310,6 +318,8 @@ describe("plan-runner task executor approval flows", () => {
       },
     });
 
+    expect(result.status).toBe("running");
+    expect(result.currentNodeId).toBe("task_node");
     expect(runtimeEvents).toEqual([
       {
         nodeId: "task_node",
@@ -324,6 +334,129 @@ describe("plan-runner task executor approval flows", () => {
         },
       },
     ]);
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.currentNodeId).toBe("task_node");
+  });
+
+  it("does not let a provider started result overwrite an external node result", async () => {
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const activeSession = await db.executionSession.findFirstOrThrow({
+        where: { taskId: input.taskId },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(activeSession.currentNodeId).toBe("task_node");
+
+      const externalResult = await taskPlanExecution.dispatch({
+        taskId: input.taskId,
+        action: {
+          action: "complete_manual_node",
+          summary: "Hermes completed externally",
+          output: { source: "hermes" },
+        },
+      });
+      expect(externalResult.status).toBe("completed");
+
+      return {
+        status: "started",
+        summary: "Hermes run started before external completion was observed",
+        evidence: { sessionId: input.mainSession.id },
+        output: { runtimeRunRef: "hermes-run-stale" },
+      } satisfies NodeExecutionResult;
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner preserves external result");
+    const compiledPlan = makeSingleTaskPlan("graph_task_external_result_race");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.currentNodeId).toBeNull();
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results).toHaveLength(1);
+    expect(persisted?.results[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "current",
+      outputSummary: "Hermes completed externally",
+    });
+    expect(persisted?.attempts).toHaveLength(1);
+    expect(persisted?.attempts[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "succeeded",
+    });
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).toBe("Completed");
+    expect(session.currentNodeId).toBeNull();
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.Completed);
+  });
+
+  it("does not let a provider started result overwrite an external blocked result", async () => {
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const externalResult = await taskPlanExecution.dispatch({
+        taskId: input.taskId,
+        action: {
+          action: "block_current_node",
+          reason: "Hermes blocked externally",
+        },
+      });
+      expect(externalResult.status).toBe("blocked");
+
+      return {
+        status: "started",
+        summary: "Hermes run started before external block was observed",
+        evidence: { sessionId: input.mainSession.id },
+        output: { runtimeRunRef: "hermes-run-stale-blocked" },
+      } satisfies NodeExecutionResult;
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner preserves external block");
+    const compiledPlan = makeSingleTaskPlan("graph_task_external_block_race");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.currentNodeId).toBe("task_node");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results).toHaveLength(1);
+    expect(persisted?.results[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "current",
+      error: "Hermes blocked externally",
+      waitKind: "manual_action",
+    });
+    expect(persisted?.attempts).toHaveLength(1);
+    expect(persisted?.attempts[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "failed",
+    });
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).toBe("Paused");
+    expect(session.currentNodeId).toBe("task_node");
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.Blocked);
   });
 
   it("persists detailed runtime failure context for a failed task node", async () => {
@@ -545,6 +678,45 @@ describe("plan-runner task executor approval flows", () => {
     });
     expect(session.status).toBe("Paused");
     expect(session.pauseReason).toBe("approval");
+  });
+
+  it("ignores late node result reports after execution completed", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "done",
+      summary: "Task completed",
+      evidence: { sessionId: "main-session", runId: "run_complete" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner late node result");
+    const compiledPlan = makeSingleTaskPlan("graph_late_node_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const completed = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(completed.status).toBe("completed");
+
+    const lateBlocked = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: {
+        action: "block_current_node",
+        reason: "MCP session binding fallback after verified completion",
+      },
+    });
+
+    expect(lateBlocked.status).toBe("completed");
+    expect(lateBlocked.message).toBe("Execution already completed; node result ignored.");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.map((result) => [result.nodeId, result.status, result.error])).toEqual([
+      ["task_node", "current", undefined],
+    ]);
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.Completed);
+    expect(updatedTask.blockReason).toBeNull();
   });
 
   it("runs a full plan execution chain through task, user condition, approval, wait, and final task", async () => {

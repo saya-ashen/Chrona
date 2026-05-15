@@ -90,6 +90,7 @@ export const chronaToolContextSchema = z.object({
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const nodeResultPayloadSchema = z.object({
   status: z.enum(["complete", "blocked", "failed"]),
+  nodeId: z.string().min(1).optional(),
   summary: z.string().optional(),
   output: z.unknown().optional(),
   reason: z.string().min(1, "reason is required").optional(),
