@@ -1,5 +1,6 @@
 import type {
   GeneratePlanSSEEvent,
+  PlanBlueprint,
   TaskPlanGenerationSessionReadModel,
   TaskPlanReadModel,
 } from "@chrona/contracts";
@@ -9,6 +10,7 @@ import {
   engineErrorFromUnknown,
 } from "../errors";
 import { taskPlanning } from "../modules/plans";
+import { materializeGeneratedTaskPlan } from "../modules/plans/materialize-generated-task-plan";
 import { TaskPlanGenerationInFlightError } from "../modules/plans/task-plan-generation-registry";
 
 export type TaskPlanService = {
@@ -47,6 +49,13 @@ export type TaskPlanService = {
     emit: (event: GeneratePlanSSEEvent) => void;
     finish: () => void;
   };
+  materialize(input: {
+    taskId: string;
+    workspaceId: string;
+    blueprint: PlanBlueprint;
+    planningPrompt?: string | null;
+    generatedBy?: string | null;
+  }): Promise<TaskPlanReadModel>;
   stopGeneration(input: { taskId: string }): {
     taskId: string;
     stopped: boolean;
@@ -120,6 +129,23 @@ export function createTaskPlanService(): TaskPlanService {
           cause,
           ENGINE_ERROR_CODES.VALIDATION_FAILED,
           "Failed to generate task plan",
+        );
+      }
+    },
+    async materialize(input: {
+      taskId: string;
+      workspaceId: string;
+      blueprint: PlanBlueprint;
+      planningPrompt?: string | null;
+      generatedBy?: string | null;
+    }) {
+      try {
+        return await materializeGeneratedTaskPlan(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.VALIDATION_FAILED,
+          "Failed to persist generated task plan",
         );
       }
     },

@@ -243,7 +243,7 @@ function structuredPayload<T>(input: {
     ok: false,
     error:
       structured?.error ??
-      `OpenClaw did not return ${input.featureSpec.structuredOutputSchema.name}`,
+      `OpenClaw did not return ${input.featureSpec.structuredOutputSchema?.name ?? input.featureSpec.feature}`,
     validationIssues: structured?.validationIssues,
   };
 }

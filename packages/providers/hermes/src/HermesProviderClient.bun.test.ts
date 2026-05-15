@@ -194,13 +194,15 @@ describe("HermesProviderClient", () => {
   });
 
   it("streams Hermes SSE events and ignores keepalive comments", async () => {
-    globalThis.fetch = mockFetch(async (url) => {
+    let seenHeaders: Headers | undefined;
+    globalThis.fetch = mockFetch(async (url, init) => {
       expect(String(url)).toBe("http://127.0.0.1:8642/v1/runs/run-1/events");
+      seenHeaders = new Headers(init?.headers);
       return new Response([
         ": keepalive\n\n",
         'data: {"type":"message.delta","delta":"Hi "}\n\n',
         'data: {"type":"tool.started","tool":"shell","preview":"ls","input":{"cmd":"ls"}}\n\n',
-        'data: {"type":"tool.completed","tool":"shell"}\n\n',
+        'data: {"type":"tool.completed","tool":"shell","error":false}\n\n',
         ": stream closed\n\n",
         'data: {"type":"run.completed","output":"done","usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}\n\n',
         'data: {"type":"message.delta","delta":"ignored"}\n\n',
@@ -227,6 +229,7 @@ describe("HermesProviderClient", () => {
       { type: "tool_completed", text: undefined, toolName: "shell", output: undefined },
       { type: "run_completed", text: undefined, toolName: undefined, output: { text: "done" } },
     ]);
+    expect(seenHeaders?.get("Accept")).toBe("text/event-stream");
   });
 
   it("maps failed and cancelled terminal stream events", async () => {

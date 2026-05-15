@@ -119,13 +119,12 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
             input: asRecord(evt.input),
           };
     case "tool_completed":
-      return evt.error
-        ? {
-            type: "tool_result",
-            tool: evt.toolName ?? "unknown",
-            result: evt.error.message,
-          }
-        : null;
+      return {
+        type: "tool_result",
+        tool: evt.toolName ?? "unknown",
+        result: evt.error?.message ?? "completed",
+        error: Boolean(evt.error),
+      };
     case "run_failed":
       return { type: "error", message: evt.error };
     case "run_completed":
@@ -174,6 +173,7 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
         type: event.type,
         tool: event.tool,
         result: previewDebugValue(event.result, 800),
+        error: event.error ?? false,
       };
     case "result":
       return { type: event.type, value: previewDebugValue(event, 1200) };
@@ -579,139 +579,4 @@ export async function* suggestStream(
 
     yield event;
   }
-}
-
-export function extractPreferredPlanGraphFromStructured(
-  structured:
-    | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
-    | null
-    | undefined,
-): Record<string, unknown> | null {
-  void structured;
-  return null;
-}
-
-function previewText(value: string, maxLength: number): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.length <= maxLength
-    ? trimmed
-    : `${trimmed.slice(0, maxLength - 1)}…`;
-}
-
-export function describeGeneratePlanFailure(params: {
-  text: string;
-  structured:
-    | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
-    | null
-    | undefined;
-  latestToolInput: Record<string, unknown> | null;
-  structuredToolGraph: Record<string, unknown> | null;
-  validationErrors?: Array<{ path: string; message: string }>;
-}): string {
-  const parts: string[] = [
-    "OpenClaw did not return a usable generate_task_plan_graph result.",
-  ];
-
-  if (params.latestToolInput) {
-    parts.push(
-      "A live tool_call was seen, but its payload could not be normalized into a valid plan.",
-    );
-  } else if (params.structuredToolGraph) {
-    parts.push(
-      "A structured bridge tool payload existed, but no live tool_call event was emitted.",
-    );
-  } else {
-    parts.push(
-      "No generate_task_plan_graph tool payload was found in either streamed tool_call events or the final structured result.",
-    );
-  }
-
-  const structuredRecord = params.structured as
-    | {
-        ok?: boolean;
-        error?: string | null;
-        toolName?: string | null;
-        source?: string | null;
-      }
-    | null
-    | undefined;
-
-  if (
-    typeof structuredRecord?.error === "string" &&
-    structuredRecord.error.trim()
-  ) {
-    parts.push(`Structured error: ${structuredRecord.error.trim()}`);
-  }
-  if (
-    typeof structuredRecord?.toolName === "string" &&
-    structuredRecord.toolName.trim()
-  ) {
-    parts.push(`Structured toolName: ${structuredRecord.toolName.trim()}`);
-  }
-  if (
-    typeof structuredRecord?.source === "string" &&
-    structuredRecord.source.trim()
-  ) {
-    parts.push(`Structured source: ${structuredRecord.source.trim()}`);
-  }
-  const textPreview = previewText(params.text, 240);
-  if (textPreview) {
-    parts.push(`Raw output preview: ${textPreview}`);
-  }
-
-  if (params.validationErrors && params.validationErrors.length > 0) {
-    parts.push(
-      `Validation errors: ${params.validationErrors
-        .slice(0, 3)
-        .map((error) => `${error.path || "<root>"}: ${error.message}`)
-        .join(" | ")}`,
-    );
-  }
-
-  return parts.join(" ");
-}
-
-export function buildGeneratePlanDiagnostics(params: {
-  text: string;
-  structured:
-    | NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]>
-    | null
-    | undefined;
-  latestToolInput: Record<string, unknown> | null;
-  structuredToolGraph: Record<string, unknown> | null;
-  validationErrors?: Array<{ path: string; message: string }>;
-  validationWarnings?: Array<{ path: string; message: string }>;
-}): Record<string, unknown> {
-  const structuredRecord = params.structured as
-    | {
-        ok?: boolean;
-        error?: string | null;
-        feature?: string | null;
-        toolName?: string | null;
-        source?: string | null;
-        sessionId?: string | null;
-        runId?: string | null;
-      }
-    | null
-    | undefined;
-
-  return {
-    hasLiveToolCall: Boolean(params.latestToolInput),
-    hasStructuredToolGraph: Boolean(params.structuredToolGraph),
-    rawTextPreview: previewText(params.text, 400),
-    validationErrors: params.validationErrors ?? [],
-    validationWarnings: params.validationWarnings ?? [],
-    structured: structuredRecord
-      ? {
-          ok: structuredRecord.ok ?? null,
-          error: structuredRecord.error ?? null,
-          feature: structuredRecord.feature ?? null,
-          toolName: structuredRecord.toolName ?? null,
-          source: structuredRecord.source ?? null,
-          sessionId: structuredRecord.sessionId ?? null,
-          runId: structuredRecord.runId ?? null,
-        }
-      : null,
-  };
 }

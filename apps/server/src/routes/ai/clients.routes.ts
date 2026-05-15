@@ -103,12 +103,13 @@ export function createClientsRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { clientId } = c.req.valid("param");
-          const { name, config, isDefault, enabled } = c.req.valid("json");
+          const { name, type, config, isDefault, enabled } = c.req.valid("json");
 
           const updated = await engine.aiClients.update({
             clientId,
             data: {
               name,
+              type,
               config,
               isDefault,
               enabled,

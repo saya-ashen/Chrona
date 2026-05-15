@@ -90,11 +90,11 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
     def test_schema_conversion_preserves_chrona_input_schema(self):
         schema = tools.schema_for_chrona_tool(SAMPLE_CHRONA_TOOLS[1])
 
-        self.assertEqual(schema["name"], "chrona.task.update")
+        self.assertEqual(schema["name"], "chrona_task_update")
         self.assertEqual(schema["description"], "Update task fields through Chrona validation.")
         self.assertEqual(schema["parameters"], SAMPLE_INPUT_SCHEMA)
 
-    def test_register_exposes_real_chrona_tools_not_wrappers(self):
+    def test_register_exposes_hermes_safe_chrona_tools_not_wrappers(self):
         tools.list_chrona_tools = lambda: SAMPLE_CHRONA_TOOLS
         ctx = FakeHermesContext()
 
@@ -102,9 +102,10 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
 
         registered_names = [tool["name"] for tool in ctx.tools]
         self.assertEqual([hook["name"] for hook in ctx.hooks], ["pre_llm_call"])
-        self.assertEqual(registered_names, ["chrona.task.read", "chrona.task.update"])
+        self.assertEqual(registered_names, ["chrona_task_read", "chrona_task_update"])
         self.assertNotIn("chrona_tools_list", registered_names)
         self.assertNotIn("chrona_tool_call", registered_names)
+        self.assertTrue(all("." not in name for name in registered_names))
         self.assertTrue(all(tool["toolset"] == "chrona" for tool in ctx.tools))
 
     def test_handler_forwards_call_with_session_context(self):
@@ -172,6 +173,8 @@ def run_live_smoke():
         raise RuntimeError(f"Chrona MCP returned unexpected tool names: {names}")
     for tool in chrona_tools:
         schema = tools.schema_for_chrona_tool(tool)
+        if "." in schema.get("name", ""):
+            raise RuntimeError(f"Tool {tool.get('name')} was not converted for Hermes")
         if not isinstance(schema.get("parameters"), dict):
             raise RuntimeError(f"Tool {tool.get('name')} has invalid schema")
 

@@ -12,7 +12,7 @@ def register(ctx):
         if not isinstance(name, str) or not name:
             continue
         ctx.register_tool(
-            name=name,
+            name=tools.hermes_tool_name(name),
             toolset="chrona",
             schema=tools.schema_for_chrona_tool(tool),
             handler=tools.handler_for_chrona_tool(name),

@@ -232,7 +232,6 @@ export {
   buildSuggestFeatureSpec,
   buildSuggestTimeslotsFeatureSpec,
   dispatchNextTaskActionToolSpec,
-  generatePlanBlueprintToolSpec,
   suggestTaskCompletionsToolSpec,
   suggestTaskTimeslotsToolSpec,
   validatePreparedFeaturePayload,

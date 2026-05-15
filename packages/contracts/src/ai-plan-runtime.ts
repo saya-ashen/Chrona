@@ -794,7 +794,7 @@ export interface GeneratePlanPartialEvent {
 
 export interface GeneratePlanToolCallEvent {
   type: "tool_call";
-  tool: "generate_task_plan_graph";
+  tool: "chrona_plan_generate";
   input: PlanBlueprint;
 }
 

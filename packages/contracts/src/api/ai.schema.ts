@@ -21,6 +21,7 @@ export const testAiClientSchema = z.object({
 export const updateAiClientParamSchema = z.object({ clientId: z.string().min(1) });
 export const updateAiClientBodySchema = z.object({
   name: z.string().optional(),
+  type: z.enum(["openclaw", "llm", "hermes"]).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   isDefault: z.boolean().optional(),
   enabled: z.boolean().optional(),

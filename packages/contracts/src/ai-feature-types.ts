@@ -300,7 +300,7 @@ export class AiClientError extends Error {
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "tool_call"; tool: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool: string; result: string }
+  | { type: "tool_result"; tool: string; result: string; error?: boolean }
   | { type: "partial"; text: string }
   | { type: "result"; suggestions: SmartSuggestResponse }
   | { type: "result"; plan: GenerateTaskPlanResponse; taskSessionKey?: string }

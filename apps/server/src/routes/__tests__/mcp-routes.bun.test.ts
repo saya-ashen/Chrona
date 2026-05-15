@@ -20,24 +20,19 @@ function app(rejected = false) {
       execute: async (operation: unknown) => {
         const toolName = (operation as { toolName: string }).toolName;
         const input = (operation as { input: { idempotencyKey?: string; taskId?: string } }).input;
-        const missingIdempotency = toolName === "chrona.task.update" && !input.idempotencyKey;
         return {
           operationId: rejected ? "op-rejected" : "op-1",
           toolName,
-          status: rejected || missingIdempotency ? "rejected" : "accepted",
+          status: rejected ? "rejected" : "accepted",
           reasonCode: rejected
             ? "STALE_STATE"
-            : missingIdempotency
-              ? "VALIDATION_ERROR"
-              : null,
+            : null,
           message: rejected
             ? "Expected state is stale."
-            : missingIdempotency
-              ? "idempotencyKey is required for mutating Chrona tool calls."
-              : "Tool executed.",
+            : "Tool executed.",
           affected: { taskId: input.taskId ?? "task-1" },
-          state: { taskStatus: "Ready" },
-          idempotency: rejected || missingIdempotency ? "new" : "not_applicable",
+          state: { taskStatus: "Ready", idempotencyKey: input.idempotencyKey },
+          idempotency: rejected ? "new" : "not_applicable",
           auditRef: rejected ? "op-rejected" : null,
           recovery: rejected ? { nextTool: "chrona.task.read" } : null,
           completedAt: new Date().toISOString(),
@@ -91,37 +86,76 @@ describe("MCP routes", () => {
     const response = await postRpc(rpc("tools/list"));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      result: { tools: [{ name: "chrona.task.read" }, { name: "chrona.task.update" }] },
-    });
+    const body = await response.json();
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_task_read");
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_plan_read");
   });
 
-  it("lists tool-specific payload schemas derived from Chrona contracts", async () => {
+  it("lists minimal external tool schemas with descriptions", async () => {
     const response = await postRpc(rpc("tools/list"));
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    const taskRead = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona.task.read",
+    const planRead = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_plan_read",
     );
-    const taskUpdate = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona.task.update",
+    const planMutate = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_plan_mutate",
     );
 
-    expect(taskRead.inputSchema.required ?? []).not.toContain("workspaceId");
-    expect(taskRead.inputSchema.properties.sessionId).toMatchObject({ type: "string" });
-    expect(taskRead.inputSchema.properties.payload).toMatchObject({ type: "object" });
-    expect(taskUpdate.inputSchema.properties.payload.properties).toMatchObject({
-      title: { type: "string" },
-      status: { type: "string" },
+    expect(planRead.description).toBe("Read the accepted plan graph state for a task.");
+    expect(planRead.inputSchema.required).toBeUndefined();
+    expect(Object.keys(planRead.inputSchema.properties)).toEqual([]);
+    expect(planRead.inputSchema.properties.sessionId).toBeUndefined();
+    const planGenerate = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_plan_generate",
+    );
+
+    expect(planGenerate.description).toBe("Persist a complete Hermes-generated plan graph for the session task.");
+    expect(planGenerate.inputSchema.required).toEqual(["title", "goal", "nodes"]);
+    expect(Object.keys(planGenerate.inputSchema.properties).sort()).toEqual([
+      "assumptions",
+      "edges",
+      "goal",
+      "nodes",
+      "title",
+    ]);
+    expect(planMutate.inputSchema.required).toEqual(["reason", "operations"]);
+    expect(planMutate.inputSchema.properties).toMatchObject({
+      operations: { type: "array", description: "Plan graph mutation operations." },
     });
+    expect(planMutate.inputSchema.properties.expectedRevision).toBeUndefined();
+    expect(planMutate.inputSchema.properties.evidence).toBeUndefined();
+    expect(planMutate.inputSchema.properties.idempotencyKey).toBeUndefined();
+  });
+
+  it("registers the full external Chrona MCP tool surface", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
+      "chrona_execution_dispatch",
+      "chrona_execution_read",
+      "chrona_plan_generate",
+      "chrona_plan_mutate",
+      "chrona_plan_read",
+      "chrona_schedule_clear",
+      "chrona_schedule_propose",
+      "chrona_schedule_read",
+      "chrona_schedule_set",
+      "chrona_task_create",
+      "chrona_task_read",
+      "chrona_task_update",
+    ]);
   });
 
   it("dispatches Chrona tools through tools/call", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona.task.read",
-        arguments: { workspaceId: "workspace-1", taskId: "task-1" },
+        name: "chrona_task_read",
+        arguments: {},
+        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
       }),
     );
 
@@ -134,11 +168,27 @@ describe("MCP routes", () => {
     });
   });
 
+  it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_task_update",
+        arguments: { title: "Updated" },
+        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result.structuredContent.status).toBe("accepted");
+    expect(body.result.structuredContent.state.idempotencyKey).toContain("chrona.task.update:");
+  });
+
   it("resolves injected sessionId before dispatching Chrona tools", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona.task.read",
-        arguments: { sessionId: "chrona:hermes:task:task-1:plan-graph" },
+        name: "chrona_task_read",
+        arguments: {},
+        _meta: { sessionId: "chrona:hermes:task:task-1:plan-graph" },
       }),
     );
 
@@ -156,13 +206,12 @@ describe("MCP routes", () => {
   it("returns rejected Chrona results as MCP tool errors with structured content", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona.task.update",
+        name: "chrona_task_update",
         arguments: {
-          workspaceId: "workspace-1",
-          taskId: "task-1",
           idempotencyKey: "stale-update",
-          payload: { title: "Updated" },
+          title: "Updated",
         },
+        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
       }),
       true,
     );
@@ -180,29 +229,19 @@ describe("MCP routes", () => {
     });
   });
 
-  it("returns structured validation errors for mutating calls missing idempotency", async () => {
+  it("does not expose idempotency fields in mutating tool schemas", async () => {
     const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona.task.update",
-        arguments: {
-          workspaceId: "workspace-1",
-          taskId: "task-1",
-          payload: { title: "Updated" },
-        },
-      }),
+      rpc("tools/list"),
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          status: "rejected",
-          reasonCode: "VALIDATION_ERROR",
-          message: "idempotencyKey is required for mutating Chrona tool calls.",
-        },
-      },
-    });
+    const body = await response.json();
+    const taskUpdate = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_task_update",
+    );
+    expect(taskUpdate.inputSchema.properties.idempotencyKey).toBeUndefined();
+    expect(taskUpdate.inputSchema.properties.evidence).toBeUndefined();
+    expect(taskUpdate.inputSchema.properties.expectedRevision).toBeUndefined();
   });
 
   it("removes the obsolete custom task-tools endpoint", async () => {

@@ -11,7 +11,7 @@ import {
 } from "./ai";
 
 describe("generate_plan feature spec", () => {
-  it("builds a provider-agnostic feature spec with structured output schema", () => {
+  it("builds a provider-agnostic feature spec that delegates persistence to MCP", () => {
     const spec = buildGeneratePlanFeatureSpec({
       taskId: "task-1",
       title: "制作一个汉堡",
@@ -21,11 +21,10 @@ describe("generate_plan feature spec", () => {
 
     expect(spec).toMatchObject({
       feature: "generate_plan",
-      structuredOutputSchema: {
-        name: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
-      },
     });
-    expect(spec.instructions).toContain("You MUST call the business tool generate_task_plan_graph.");
+    expect(spec.structuredOutputSchema).toBeUndefined();
+    expect(GENERATE_PLAN_BLUEPRINT_TOOL_NAME).toBe("chrona_plan_generate");
+    expect(spec.instructions).toContain("You MUST call the Chrona MCP tool chrona_plan_generate.");
     expect(spec.inputText).toContain("Title: 制作一个汉堡");
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
   });
@@ -54,52 +53,12 @@ describe("generate_plan feature spec", () => {
     ).toMatchObject({ ok: false });
   });
 
-  it("derives generate_plan tool schema from the strict PlanBlueprint zod schema", () => {
+  it("does not expose provider structured output schema for generate_plan", () => {
     const spec = buildGeneratePlanFeatureSpec({
       title: "制作一个汉堡",
     });
 
-    const parameters = spec.structuredOutputSchema.schema as {
-      additionalProperties?: unknown;
-      properties?: {
-        nodes?: {
-          items?: {
-            oneOf?: Array<Record<string, unknown>>;
-          };
-        };
-      };
-    };
-
-    expect(parameters.additionalProperties).toBe(false);
-
-    const nodeVariants = parameters.properties?.nodes?.items?.oneOf;
-    expect(Array.isArray(nodeVariants)).toBe(true);
-    expect(nodeVariants).toHaveLength(4);
-
-    const conditionVariant = nodeVariants?.find(
-      (variant) =>
-        (variant.properties as { type?: { const?: string } } | undefined)?.type
-          ?.const === "condition",
-    ) as {
-      additionalProperties?: unknown;
-      properties?: Record<string, unknown>;
-    } | undefined;
-
-    expect(conditionVariant?.additionalProperties).toBe(false);
-    expect(conditionVariant?.properties?.branches).toBeTruthy();
-    expect(conditionVariant?.properties?.executor).toBeUndefined();
-  });
-
-  it("omits provider-incompatible metaschema declarations from generate_plan tool schema", () => {
-    const spec = buildGeneratePlanFeatureSpec({
-      title: "制作一个汉堡",
-    });
-
-    const parameters = spec.structuredOutputSchema.schema as {
-      $schema?: unknown;
-    };
-
-    expect(parameters.$schema).toBeUndefined();
+    expect(spec.structuredOutputSchema).toBeUndefined();
   });
 });
 

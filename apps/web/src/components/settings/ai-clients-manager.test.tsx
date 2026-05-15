@@ -144,6 +144,65 @@ describe("AiClientsManager", () => {
     });
   });
 
+  it("updates an existing OpenClaw client to Hermes", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        clients: [
+          {
+            id: "client_openclaw",
+            name: "Runtime Client",
+            type: "openclaw",
+            config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
+            isDefault: true,
+            enabled: true,
+            bindings: [],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("Runtime Client");
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
+      target: { value: "hermes" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
+      target: { value: "http://localhost:8642" },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_openclaw", type: "hermes" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients/client_openclaw",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+
+    const updateCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_openclaw" && call[1]?.method === "PATCH");
+    expect(JSON.parse(updateCall?.[1]?.body as string)).toMatchObject({
+      name: "Runtime Client",
+      type: "hermes",
+      config: {
+        baseUrl: "http://localhost:8642",
+        timeoutMs: 120000,
+      },
+    });
+  });
+
   it("allows testing an existing client card and shows the returned failure reason", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

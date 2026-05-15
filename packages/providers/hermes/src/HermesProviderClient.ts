@@ -26,10 +26,7 @@ import {
   mapSnapshot,
 } from "./normalizers";
 import { parseSseData } from "./sse";
-import {
-  HermesProviderError,
-  type HermesProviderConfig,
-} from "./types";
+import { HermesProviderError, type HermesProviderConfig } from "./types";
 
 type HermesInputMessage = {
   role?: string;
@@ -198,6 +195,7 @@ export class HermesProviderClient implements AgentProviderClient {
       `/v1/runs/${encodeURIComponent(runId)}/events`,
       {
         method: "GET",
+        headers: { Accept: "text/event-stream" },
         signal: input.signal,
       },
     );
