@@ -106,7 +106,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   automationEmpty: "No automation candidates right now.",
   automationRunNow: "Run now",
   automationUnsupportedRuntime: "This runtime cannot be auto-executed from Chrona.",
-  automationBackendOnlyHint: "Chrona only sends execution requests to backend-managed runtimes such as OpenClaw.",
+  automationBackendOnlyHint: "Chrona only sends execution requests to backend-managed runtimes.",
   cockpitReviewSuggestions: "Review suggestions",
   cockpitReviewSuggestionsHint: "Open the cockpit sidebar and triage the queue.",
   cockpitAutoArrange: "Auto arrange",
@@ -185,4 +185,3 @@ export function getSchedulePageCopy(
     ...(messages ?? {}),
   };
 }
-

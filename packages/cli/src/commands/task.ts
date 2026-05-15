@@ -13,10 +13,9 @@ function buildExecutionConfig(prompt?: string): Record<string, unknown> | undefi
   return prompt ? { prompt } : undefined;
 }
 
-function parseExecutionRuntime(value?: string): "openclaw" | "research" | undefined {
-  if (value === undefined || value === "") return undefined;
-  if (value === "openclaw" || value === "research") return value;
-  throw new Error(`--runtime must be one of: openclaw, research`);
+function parseExecutionRuntime(value?: string): string | undefined {
+  const runtime = value?.trim();
+  return runtime || undefined;
 }
 
 export function registerTaskCommands(program: Command, getClient: ClientResolver): void {
@@ -59,7 +58,7 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       .requiredOption("--title <title>", "Task title")
       .option("--description <text>", "Task description")
       .option("--priority <priority>", "Task priority")
-      .option("--runtime <runtime>", "Execution runtime: openclaw or research")
+      .option("--runtime <runtime>", "Execution runtime key")
       .option("--prompt <text>", "Execution prompt")
       .action(async (options: CommonCommandOptions & {
         workspaceId: string;
@@ -93,7 +92,7 @@ export function registerTaskCommands(program: Command, getClient: ClientResolver
       .option("--title <title>", "Task title")
       .option("--description <text>", "Task description")
       .option("--priority <priority>", "Task priority")
-      .option("--runtime <runtime>", "Execution runtime: openclaw or research")
+      .option("--runtime <runtime>", "Execution runtime key")
       .option("--prompt <text>", "Execution prompt")
       .action(async (options: CommonCommandOptions & {
         taskId: string;

@@ -1,7 +1,5 @@
 import { api } from "./rpc-client";
 
-type ExecutionRuntime = "openclaw" | "research";
-
 async function parseActionResponse(response: {
   ok: boolean;
   json: () => Promise<unknown>;
@@ -23,7 +21,7 @@ export function createTaskFromSchedule(input: {
   title: string;
   description?: string | null;
   priority?: string;
-  executionRuntime?: ExecutionRuntime;
+  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   parentTaskId?: string | null;
 }) {
@@ -52,7 +50,7 @@ export function updateTaskConfigFromSchedule(input: {
   title?: string;
   description?: string | null;
   priority?: string;
-  executionRuntime?: ExecutionRuntime;
+  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
 }) {
   return api.tasks[":taskId"]

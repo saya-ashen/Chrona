@@ -19,25 +19,6 @@ function deriveLocalRunnability(input: {
   executionConfig?: unknown;
   hasAcceptedPlan: boolean;
 }) {
-  const config =
-    input.executionConfig &&
-    typeof input.executionConfig === "object" &&
-    !Array.isArray(input.executionConfig)
-      ? input.executionConfig
-      : {};
-  const prompt = typeof (config as { prompt?: unknown }).prompt === "string"
-    ? (config as { prompt: string }).prompt.trim()
-    : "";
-  const requiresPrompt = input.executionRuntime === "research";
-
-  if (requiresPrompt && prompt.length === 0) {
-    return {
-      isRunnable: false,
-      state: "missing_required_config",
-      summary: "Missing required config: prompt",
-    };
-  }
-
   if (!input.hasAcceptedPlan) {
     return {
       isRunnable: false,

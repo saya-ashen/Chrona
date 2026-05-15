@@ -1,11 +1,41 @@
 import { z } from "zod";
-import { EXECUTION_RUNTIMES } from "../task";
 import {
   taskIdParam,
   taskPriorityEnum,
   taskStatusEnum,
   workspaceId,
 } from "./common";
+
+function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
+  const schema = z.string().trim().min(1, "executionRuntime is required");
+
+  if (!supportedRuntimes) {
+    return schema;
+  }
+
+  return schema.refine(
+    (runtime) => supportedRuntimes.includes(runtime),
+    {
+      message: `Unsupported executionRuntime. Supported runtimes: ${supportedRuntimes.join(", ")}`,
+    },
+  );
+}
+
+export function createTaskBodySchemaForSupportedRuntimes(
+  supportedRuntimes: readonly string[],
+) {
+  return createTaskBodySchema.extend({
+    executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
+  });
+}
+
+export function updateTaskBodySchemaForSupportedRuntimes(
+  supportedRuntimes: readonly string[],
+) {
+  return updateTaskBodySchema.extend({
+    executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
+  });
+}
 
 // ── GET /tasks ──
 export const listTasksQuerySchema = z.object({
@@ -28,7 +58,7 @@ export const createTaskBodySchema = z.object({
   title: z.string().min(1, "title is required"),
   description: z.string().optional(),
   priority: taskPriorityEnum.optional(),
-  executionRuntime: z.enum(EXECUTION_RUNTIMES).optional(),
+  executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
 });
@@ -43,7 +73,7 @@ export const updateTaskBodySchema = z.object({
   description: z.string().optional(),
   priority: taskPriorityEnum.optional(),
   status: taskStatusEnum.optional(),
-  executionRuntime: z.enum(EXECUTION_RUNTIMES).optional(),
+  executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
 });
 

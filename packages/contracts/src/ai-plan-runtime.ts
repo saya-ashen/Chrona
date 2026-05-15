@@ -879,7 +879,7 @@ export type TaskUpdatePatch = {
   scheduledStartAt?: string | null;
   scheduledEndAt?: string | null;
   scheduleStatus?: string | null;
-  executionRuntime?: "openclaw" | "research" | null;
+  executionRuntime?: string | null;
   executionConfig?: Record<string, unknown> | null;
 };
 
@@ -903,7 +903,7 @@ export interface TaskWorkspaceChatRequest {
     scheduledStartAt: string | null;
     scheduledEndAt: string | null;
     scheduleStatus: string;
-    executionRuntime: "openclaw" | "research";
+    executionRuntime: string;
     executionConfig: unknown;
     status: string;
   };
