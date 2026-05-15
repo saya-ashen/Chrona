@@ -298,6 +298,36 @@ function edgeMinLength(sourceNode: TaskPlanGraphPlan["nodes"][number] | undefine
   return 1;
 }
 
+function edgeRoute(
+  sourceNode: LayoutNodePosition | undefined,
+  targetNode: LayoutNodePosition | undefined,
+  graphIsHorizontal: boolean,
+) {
+  if (!sourceNode || !targetNode) {
+    return graphIsHorizontal
+      ? { sourceHandle: "right-source", targetHandle: "left-target", orientation: "horizontal" as const }
+      : { sourceHandle: "bottom-source", targetHandle: "top-target", orientation: "vertical" as const };
+  }
+
+  const sourceCenterX = sourceNode.x + sourceNode.width / 2;
+  const sourceCenterY = sourceNode.y + sourceNode.height / 2;
+  const targetCenterX = targetNode.x + targetNode.width / 2;
+  const targetCenterY = targetNode.y + targetNode.height / 2;
+  const horizontalDelta = targetCenterX - sourceCenterX;
+  const verticalDelta = targetCenterY - sourceCenterY;
+  const useHorizontal = graphIsHorizontal || Math.abs(horizontalDelta) >= Math.abs(verticalDelta);
+
+  if (useHorizontal) {
+    return horizontalDelta >= 0
+      ? { sourceHandle: "right-source", targetHandle: "left-target", orientation: "horizontal" as const }
+      : { sourceHandle: "left-source", targetHandle: "right-target", orientation: "horizontal" as const };
+  }
+
+  return verticalDelta >= 0
+    ? { sourceHandle: "bottom-source", targetHandle: "top-target", orientation: "vertical" as const }
+    : { sourceHandle: "top-source", targetHandle: "bottom-target", orientation: "vertical" as const };
+}
+
 function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, LayoutNodePosition>, metadata: HybridLayoutMetadata): FlowLayout {
   let minLeft = Number.POSITIVE_INFINITY;
   let minTop = Number.POSITIVE_INFINITY;
@@ -386,6 +416,7 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
     const isHorizontalEdge = graphIsHorizontal || metadata.horizontalEdgeIds.has(edge.id);
     const baseStyle = buildEdgeStyle(edge.kind ?? "sequential", edge.emphasis ?? "normal");
     const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(from), nodeById.get(to));
+    const route = edgeRoute(layoutNodes.get(from), layoutNodes.get(to), isHorizontalEdge);
 
     const runtimeStyle = runtimeEdgeState === "active"
       ? { stroke: "rgba(14, 165, 233, 0.9)", strokeWidth: 2.35, strokeDasharray: undefined }
@@ -402,8 +433,8 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       source: from,
       target: to,
       type: "taskPlanEdge",
-      sourceHandle: isHorizontalEdge ? "right-source" : "bottom-source",
-      targetHandle: isHorizontalEdge ? "left-target" : "top-target",
+      sourceHandle: route.sourceHandle,
+      targetHandle: route.targetHandle,
       selectable: false,
       reconnectable: false,
       animated: runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input",
@@ -423,7 +454,7 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       },
       data: {
         stableLabel: edge.label ?? undefined,
-        orientation: isHorizontalEdge ? "horizontal" : "vertical",
+        orientation: route.orientation,
         fanOut: (sourceCountByNodeId.get(from) ?? 0) > 1,
         fanIn: (targetCountByNodeId.get(to) ?? 0) > 1,
         routeOffset: edgeMinLength(nodeById.get(from), nodeById.get(to)) > 1 ? EDGE_OFFSET + 10 : 0,

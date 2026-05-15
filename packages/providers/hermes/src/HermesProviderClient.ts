@@ -210,7 +210,9 @@ export class HermesProviderClient implements AgentProviderClient {
 
     const includeRaw = "include" in input && input.include?.rawEvents === true;
     for await (const rawEvent of parseSseData(response.body)) {
+      console.log("[hermes:streamRun:rawEvent]", JSON.stringify(rawEvent));
       const event = mapHermesEvent(rawEvent, runId, includeRaw);
+      console.log("[hermes:streamRun:mappedEvent]", event ? JSON.stringify(event) : "null");
       if (!event) {
         continue;
       }

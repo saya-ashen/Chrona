@@ -111,7 +111,7 @@ describe("generatePlanStream", () => {
     } as unknown as EngineAiClient;
 
     const { dispatchStream } = await import("../streaming");
-    const events = [] as Array<{ type: string; text?: string; structured?: unknown }>;
+    const events = [] as Array<{ type: string; text?: string; structured?: unknown; tool?: string; input?: Record<string, unknown> }>;
     for await (const event of dispatchStream(client, "generate_plan", {
       scope: "task-1",
       instructions: "Generate plan",
@@ -129,7 +129,7 @@ describe("generatePlanStream", () => {
       } as never,
       userMessage: "Build plan",
     })) {
-      events.push(event as { type: string; text?: string; structured?: unknown });
+      events.push(event as { type: string; text?: string; structured?: unknown; tool?: string; input?: Record<string, unknown> });
     }
 
     expect(createSessionMock).toHaveBeenCalledTimes(1);
@@ -144,6 +144,57 @@ describe("generatePlanStream", () => {
     expect(events).toEqual([
       { type: "partial", text: "hello" },
       { type: "done", text: "hello", structured: null },
+    ]);
+  });
+
+  it("keeps Hermes preview-only tool events in the stream", async () => {
+    const createSessionMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      sessionId: "session-1",
+    }));
+    const startRunMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      runId: "run-1",
+      sessionId: "session-1",
+    }));
+    const streamRunMock = mock(async function* () {
+      yield { type: "tool_started" as const, toolName: "skill_view", preview: "writing-plans" };
+      yield { type: "tool_completed" as const, toolName: "skill_view" };
+    });
+
+    const client = {
+      record: {
+        id: "client-3",
+        name: "Hermes",
+        type: "hermes",
+        config: { baseUrl: "" },
+        isDefault: true,
+        enabled: true,
+      },
+      providerClient: {
+        provider: "hermes",
+        createSession: createSessionMock,
+        startRun: startRunMock,
+        streamRun: streamRunMock,
+      },
+    } as unknown as EngineAiClient;
+
+    const { dispatchStream } = await import("../streaming");
+    const events = [] as Array<{ type: string; tool?: string; input?: Record<string, unknown>; result?: string; error?: boolean; text?: string; structured?: unknown }>;
+    for await (const event of dispatchStream(client, "generate_plan", {
+      scope: "task-1",
+      instructions: "Generate plan",
+      inputText: "Build plan",
+      input: { title: "Build plan" },
+      userMessage: "Build plan",
+    })) {
+      events.push(event as { type: string; tool?: string; input?: Record<string, unknown>; result?: string; error?: boolean; text?: string; structured?: unknown });
+    }
+
+    expect(events).toEqual([
+      { type: "tool_call", tool: "skill_view", input: { preview: "writing-plans" } },
+      { type: "tool_result", tool: "skill_view", result: "completed", error: false },
+      { type: "done", text: "", structured: null },
     ]);
   });
 });
