@@ -122,6 +122,7 @@ export const startRunInputSchema = z
     instructions: z.string().min(1),
     input: providerRunInputSchema,
     structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
+    terminalToolName: z.string().min(1).optional(),
     previousResponseId: z.string().min(1).optional(),
     maxOutputTokens: z.number().int().positive().optional(),
     timeoutMs: z.number().int().positive().optional(),
@@ -176,6 +177,17 @@ export const providerRunRefSchema = z
   })
   .strict();
 
+const providerRunEventMetadataShape = {
+  provider: z.string().min(1).optional(),
+  runId: z.string().min(1).optional(),
+  nativeRunId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
+  sequence: z.number().int().nonnegative().optional(),
+  timestamp: z.string().optional(),
+  rawEventType: z.string().min(1).optional(),
+  durationMs: z.number().nonnegative().optional(),
+};
+
 export const streamRunInputSchema = z.union([
   startRunInputSchema.extend({
     runId: z.string().min(1).optional(),
@@ -187,18 +199,21 @@ export const streamRunInputSchema = z.union([
 export const providerRunEventSchema = z.discriminatedUnion("type", [
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("run_started"),
       run: providerRunRefSchema,
     })
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("text_delta"),
       text: z.string(),
     })
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("tool_call"),
       tool: z.string().min(1),
       callId: z.string().min(1),
@@ -208,6 +223,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("tool_started"),
       toolName: z.string().min(1),
       preview: z.unknown().optional(),
@@ -217,6 +233,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("tool_completed"),
       toolName: z.string().min(1).optional(),
       error: z
@@ -232,6 +249,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("tool_result"),
       tool: z.string().min(1).optional(),
       callId: z.string().min(1).optional(),
@@ -240,6 +258,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("reasoning_delta"),
       text: z.string(),
       raw: z.unknown().optional(),
@@ -247,6 +266,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("approval_required"),
       approval: unknownRecordSchema,
       raw: z.unknown().optional(),
@@ -254,6 +274,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("run_completed"),
       run: providerRunRefSchema,
       outputText: z.string().optional(),
@@ -270,6 +291,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("run_failed"),
       run: providerRunRefSchema.optional(),
       error: z.string().min(1),
@@ -278,6 +300,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("run_cancelled"),
       run: providerRunRefSchema.optional(),
       raw: z.unknown().optional(),
@@ -285,6 +308,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
+      ...providerRunEventMetadataShape,
       type: z.literal("raw_event"),
       raw: z.unknown(),
     })

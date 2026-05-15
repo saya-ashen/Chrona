@@ -75,6 +75,7 @@ export interface OpenClawGatewayRequest {
   instructions: string;
   input: unknown;
   structuredOutputSchema?: AiFeatureStructuredOutputSchema;
+  terminalToolName?: string;
   stream?: boolean;
   maxOutputTokens?: number;
   timeoutSeconds?: number;

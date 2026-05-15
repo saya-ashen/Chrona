@@ -159,6 +159,7 @@ function buildBridgeRequest(input: StartRunInput): BridgeRequest {
     instructions: input.instructions,
     input: input.input,
     structuredOutputSchema: input.structuredOutputSchema,
+    terminalToolName: input.terminalToolName,
     stream: input.stream ?? false,
     maxOutputTokens: input.maxOutputTokens,
     timeoutSeconds: input.timeoutMs
@@ -222,13 +223,52 @@ function buildRunSnapshot(input: {
           output: outputText,
           toolCalls,
           error,
-          requestedToolName: resolveRequestedFunctionToolName(input.request),
+          requestedToolName: input.request.terminalToolName ?? resolveRequestedFunctionToolName(input.request),
         })
       : undefined,
     usage: mapUsage(input.response),
     error,
     raw: input.response,
   };
+}
+
+function buildTerminalToolResponse(input: {
+  request: BridgeRequest;
+  toolCall: OpenClawToolCall;
+  responseId?: string;
+}): Record<string, unknown> {
+  const id = input.responseId ?? `terminal-${crypto.randomUUID()}`;
+  return {
+    id,
+    status: "completed",
+    output: [
+      {
+        type: "function_call",
+        id: input.toolCall.callId,
+        call_id: input.toolCall.callId,
+        name: input.toolCall.tool,
+        arguments: JSON.stringify(input.toolCall.input),
+      },
+      {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: `${input.toolCall.tool} accepted; current Chrona node run stopped.`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function isTerminalToolCall(request: BridgeRequest, event: OpenClawGatewayStreamEvent) {
+  return Boolean(
+    request.terminalToolName &&
+    (event.type === "tool_call" || event.type === "tool_result") &&
+    event.toolCall?.tool === request.terminalToolName,
+  );
 }
 
 async function createOpenClawDump(input: {
@@ -573,6 +613,18 @@ export class OpenClawClient implements AgentProviderClient {
         }
         if (event.streamEvent) {
           yield event.streamEvent;
+          if (isTerminalToolCall(input.request, event.streamEvent)) {
+            state.finalResponse = buildTerminalToolResponse({
+              request: input.request,
+              toolCall: event.streamEvent.toolCall!,
+            });
+            await dump?.write({
+              type: "terminal_tool_stop",
+              timestamp: new Date().toISOString(),
+              tool: event.streamEvent.toolCall?.tool,
+            });
+            return;
+          }
         }
       }
     } finally {

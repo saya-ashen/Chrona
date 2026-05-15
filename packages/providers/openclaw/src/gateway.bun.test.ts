@@ -7,14 +7,14 @@ describe("buildGatewayBody", () => {
       {
         sessionId: "sess-1",
         sessionKey: "sess-1",
-        instructions: "Return one execute_task_node_result call.",
+        instructions: "Advance the current task node through Chrona MCP tools.",
         input: {
           nodeId: "node-1",
           objective: "Produce a hello world message",
         },
         structuredOutputSchema: {
-          name: "execute_task_node_result",
-          description: "Return the minimal task node execution result.",
+          name: "chrona_plan_mutate",
+          description: "Persist Chrona plan execution progress.",
           schema: {
             type: "object",
             properties: {
@@ -36,7 +36,7 @@ describe("buildGatewayBody", () => {
     expect(body).toEqual({
       model: "openclaw",
       user: "sess-1",
-      instructions: "Return one execute_task_node_result call.",
+      instructions: "Advance the current task node through Chrona MCP tools.",
       input: [
         {
           type: "message",
@@ -54,8 +54,8 @@ describe("buildGatewayBody", () => {
       tools: [
         {
           type: "function",
-          name: "execute_task_node_result",
-          description: "Return the minimal task node execution result.",
+          name: "chrona_plan_mutate",
+          description: "Persist Chrona plan execution progress.",
           parameters: {
             type: "object",
             properties: {

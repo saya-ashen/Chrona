@@ -134,6 +134,72 @@ describe("OpenClawClient", () => {
     ]);
   });
 
+  it("stops execute-task-node streams after terminal node result tool call", async () => {
+    globalThis.fetch = (async () => {
+      const sse = [
+        'event: response.output_text.delta\n',
+        'data: {"delta":"Working ","type":"response.output_text.delta"}\n\n',
+        'event: response.output_item.done\n',
+        'data: {"item":{"type":"function_call","name":"chrona_node_result","call_id":"call-node-result","arguments":"{\\"status\\":\\"complete\\",\\"summary\\":\\"Done\\"}"}}\n\n',
+        'event: response.output_text.delta\n',
+        'data: {"delta":"should-not-stream","type":"response.output_text.delta"}\n\n',
+      ].join("");
+
+      return new Response(sse, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new OpenClawClient({
+      gatewayUrl: "http://gateway.local",
+      gatewayToken: "secret",
+    });
+
+    const events = [] as Array<{
+      type: string;
+      text?: string;
+      toolCall?: { tool: string; callId: string };
+      structuredToolName?: string | null;
+    }>;
+    for await (const event of client.streamRun({
+      sessionId: "sess-node",
+      sessionKey: "sess-node",
+      instructions: "execute current node",
+      input: { node: { title: "Do work" } },
+      terminalToolName: "chrona_node_result",
+      timeoutMs: 5_000,
+      stream: true,
+    })) {
+      events.push({
+        type: event.type,
+        text: event.type === "text_delta" ? event.text : undefined,
+        toolCall: event.type === "tool_call"
+          ? { tool: event.tool, callId: event.callId }
+          : undefined,
+        structuredToolName: event.type === "run_completed" && event.structuredPayload && typeof event.structuredPayload === "object"
+          ? (event.structuredPayload as { toolName?: string | null }).toolName ?? null
+          : undefined,
+      });
+    }
+
+    expect(events).toEqual([
+      { type: "text_delta", text: "Working ", toolCall: undefined, structuredToolName: undefined },
+      {
+        type: "tool_call",
+        toolCall: { tool: "chrona_node_result", callId: "call-node-result" },
+        text: undefined,
+        structuredToolName: undefined,
+      },
+      {
+        type: "run_completed",
+        text: undefined,
+        toolCall: undefined,
+        structuredToolName: "chrona_node_result",
+      },
+    ]);
+  });
+
   it("aggregates streamed responses in startRun using the same SSE path", async () => {
     let seenStream: unknown;
     let seenModel: unknown;

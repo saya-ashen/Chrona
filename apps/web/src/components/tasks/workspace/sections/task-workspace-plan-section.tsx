@@ -11,6 +11,7 @@ import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
+import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
   TaskPageData,
   TaskPlanGenerationStatus,
@@ -31,6 +32,7 @@ type TaskWorkspacePlanSectionProps = {
   canAcceptPlan: boolean;
   isAcceptingPlan: boolean;
   acceptPlanError: string | null;
+  runtimeEvents: WorkspaceRuntimeEvent[];
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void;
   onDispatchExecutionAction: (
@@ -47,6 +49,7 @@ export function TaskWorkspacePlanSection({
   canAcceptPlan,
   isAcceptingPlan,
   acceptPlanError,
+  runtimeEvents,
   onAcceptPlan,
   onGeneratePlan,
   onDispatchExecutionAction,
@@ -222,15 +225,96 @@ export function TaskWorkspacePlanSection({
           />
         </div>
 
-        <TaskWorkspaceExecutionOverview
-          readiness={consoleView.readiness}
-          latestResult={consoleView.latestResult}
-          attention={consoleView.attention}
-          artifacts={consoleView.artifacts}
-          activity={consoleView.activity}
-          onAction={focusNodeActions}
-        />
+        <div className="min-h-0 space-y-1.5 overflow-y-auto">
+          <RuntimeActivityPanel events={runtimeEvents} />
+          <TaskWorkspaceExecutionOverview
+            readiness={consoleView.readiness}
+            latestResult={consoleView.latestResult}
+            attention={consoleView.attention}
+            artifacts={consoleView.artifacts}
+            activity={consoleView.activity}
+            onAction={focusNodeActions}
+          />
+        </div>
       </div>
     </section>
   );
+}
+
+function RuntimeActivityPanel({ events }: { events: WorkspaceRuntimeEvent[] }) {
+  if (events.length === 0) return null;
+
+  const assistantText = events
+    .map((event) => event.event.type === "assistant_text_delta" ? event.event.text : "")
+    .join("")
+    .trim();
+  const reasoningText = events
+    .map((event) => event.event.type === "reasoning_delta" ? event.event.text : "")
+    .join("")
+    .trim();
+  const activityEvents = events
+    .filter((event) => event.event.type !== "assistant_text_delta" && event.event.type !== "reasoning_delta")
+    .slice(-12);
+
+  return (
+    <section className="rounded-[1rem] border border-blue-200/70 bg-blue-50/60 p-3" aria-label="Runtime activity">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Runtime activity</p>
+          <p className="text-xs text-muted-foreground">Provider stream, Chrona state remains authoritative.</p>
+        </div>
+        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-blue-800">
+          {events.at(-1)?.provider ?? "runtime"}
+        </span>
+      </div>
+      {assistantText ? (
+        <p className="mt-2 whitespace-pre-wrap rounded-lg border border-white/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-foreground">
+          {assistantText}
+        </p>
+      ) : null}
+      {reasoningText ? (
+        <details className="mt-2 rounded-lg border border-white/80 bg-white/70 px-2.5 py-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">Reasoning</summary>
+          <p className="mt-1 whitespace-pre-wrap leading-5">{reasoningText}</p>
+        </details>
+      ) : null}
+      {activityEvents.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {activityEvents.map((event, index) => (
+            <RuntimeActivityRow key={`${event.sequence ?? index}:${event.event.type}:${event.rawEventType ?? "event"}`} event={event} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RuntimeActivityRow({ event }: { event: WorkspaceRuntimeEvent }) {
+  const value = event.event;
+  if (value.type === "tool_started") {
+    return (
+      <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs">
+        <span className="font-medium text-foreground">{value.label}</span>
+        {typeof value.preview === "string" && value.preview ? <span className="ml-1 text-muted-foreground">{value.preview}</span> : null}
+      </div>
+    );
+  }
+  if (value.type === "tool_completed") {
+    return (
+      <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs">
+        <span className={value.error ? "font-medium text-red-700" : "font-medium text-emerald-700"}>
+          {value.error ? `${value.label} failed` : `${value.label} completed`}
+        </span>
+        {value.durationMs !== undefined ? <span className="ml-1 text-muted-foreground">{Math.round(value.durationMs)}ms</span> : null}
+        {value.error ? <span className="ml-1 text-red-700">{value.error.message}</span> : null}
+      </div>
+    );
+  }
+  if (value.type === "approval_required") {
+    return <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900">Approval required</div>;
+  }
+  if (value.type === "run_status") {
+    return <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs text-muted-foreground">{value.message ?? value.status}</div>;
+  }
+  return <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs text-muted-foreground">{value.type === "raw_event" ? value.rawEventType ?? "Raw provider event" : value.type}</div>;
 }

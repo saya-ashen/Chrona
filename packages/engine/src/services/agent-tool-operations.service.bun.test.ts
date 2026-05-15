@@ -8,6 +8,7 @@ function service() {
     planGenerate: 0,
     planPatch: 0,
     taskUpdate: 0,
+    dispatchActions: [] as unknown[],
   };
   const task = {
     id: "task-1",
@@ -66,7 +67,10 @@ function service() {
       decideProposal: async () => ({ proposalId: "proposal-1" }),
     },
     execution: {
-      dispatch: async () => ({ result: { status: "running", sessionId: "session-1" } }),
+      dispatch: async (input: unknown) => {
+        calls.dispatchActions.push((input as { action?: unknown }).action);
+        return { result: { status: "running", sessionId: "session-1" } };
+      },
       syncRuntimeResult: async () => ({}),
     },
   } as unknown as Parameters<typeof createAgentToolOperationsService>[0]) as ReturnType<typeof createAgentToolOperationsService> & { calls: typeof calls };
@@ -309,6 +313,71 @@ describe("agent tool operations service", () => {
       }),
     ).resolves.toMatchObject({ status: "accepted", state: { planRevision: 1 } });
     expect(agentTools.calls.planGenerate).toBe(1);
+  });
+
+  it("maps node result statuses to execution dispatch without model-supplied node ids", async () => {
+    const agentTools = service();
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.node.result",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          sessionId: "session-1",
+          actorType: "agent",
+          idempotencyKey: "node-result-complete-1",
+          payload: { status: "complete", summary: "Done", output: { ok: true } },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.node.result",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          sessionId: "session-1",
+          actorType: "agent",
+          idempotencyKey: "node-result-block-1",
+          payload: { status: "blocked", reason: "Waiting on dependency" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.node.result",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          sessionId: "session-1",
+          actorType: "agent",
+          idempotencyKey: "node-result-fail-1",
+          payload: { status: "failed", error: "Command failed" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    expect(agentTools.calls.dispatchActions).toEqual([
+      {
+        action: "complete_manual_node",
+        sessionId: "session-1",
+        summary: "Done",
+        output: { ok: true },
+      },
+      {
+        action: "block_current_node",
+        sessionId: "session-1",
+        reason: "Waiting on dependency",
+      },
+      {
+        action: "fail_current_node",
+        sessionId: "session-1",
+        error: "Command failed",
+      },
+    ]);
   });
 
   it("replays duplicate mutating operations without duplicate side effects", async () => {

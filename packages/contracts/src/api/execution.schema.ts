@@ -50,9 +50,23 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("complete_manual_node"),
     sessionId: sessionIdSchema.optional(),
-    nodeId: nodeIdSchema,
+    nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  }),
+  z.object({
+    action: z.literal("block_current_node"),
+    sessionId: sessionIdSchema.optional(),
+    nodeId: nodeIdSchema.optional(),
+    reason: z.string().min(1, "reason is required"),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  }),
+  z.object({
+    action: z.literal("fail_current_node"),
+    sessionId: sessionIdSchema.optional(),
+    nodeId: nodeIdSchema.optional(),
+    error: z.string().min(1, "error is required"),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({

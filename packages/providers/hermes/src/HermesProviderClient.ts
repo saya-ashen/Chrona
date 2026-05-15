@@ -209,10 +209,16 @@ export class HermesProviderClient implements AgentProviderClient {
     }
 
     const includeRaw = "include" in input && input.include?.rawEvents === true;
+    const strictUnknown = shouldThrowOnUnknownStreamEvent();
+    let sequence = 0;
     for await (const rawEvent of parseSseData(response.body)) {
-      console.log("[hermes:streamRun:rawEvent]", JSON.stringify(rawEvent));
-      const event = mapHermesEvent(rawEvent, runId, includeRaw);
-      console.log("[hermes:streamRun:mappedEvent]", event ? JSON.stringify(event) : "null");
+      const event = mapHermesEvent(rawEvent, runId, {
+        includeRaw,
+        strictUnknown,
+        sequence: sequence++,
+      });
+      console.log("event", { rawEvent, mappedEvent: event });
+
       if (!event) {
         continue;
       }
@@ -255,6 +261,13 @@ export class HermesProviderClient implements AgentProviderClient {
     );
     return mapSnapshot(await ensureHermesOk(response, "cancel run"), true);
   }
+}
+
+function shouldThrowOnUnknownStreamEvent(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS !== "0"
+  );
 }
 
 function buildRunBody(input: StartRunInput): HermesRunBody {

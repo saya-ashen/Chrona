@@ -76,6 +76,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     isAiWorkspaceOpen,
     setIsAiWorkspaceOpen,
     requestGenerationKey,
+    runtimeEvents,
     acceptPlanById,
     handleAcceptPlan,
     dispatchExecutionAction,
@@ -158,6 +159,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         canAcceptPlan={canAcceptPlan}
         isAcceptingPlan={isAcceptingPlan}
         acceptPlanError={acceptPlanError}
+        runtimeEvents={runtimeEvents}
         onAcceptPlan={handleAcceptPlan}
         onGeneratePlan={handleGeneratePlanFromHeader}
         onDispatchExecutionAction={dispatchExecutionAction}

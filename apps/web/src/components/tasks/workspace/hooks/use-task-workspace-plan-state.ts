@@ -16,7 +16,9 @@ import {
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
 import type { TaskData } from "../model/task-workspace-types";
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, PlanExecutionSSEEvent } from "@chrona/contracts/ai";
+
+export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
   if (isGenerationRunning) {
@@ -59,6 +61,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
   const [isAiWorkspaceOpen, setIsAiWorkspaceOpen] = useState(false);
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
+  const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
 
   useEffect(() => {
     if (!planState) return;
@@ -210,7 +213,12 @@ export function useTaskWorkspacePlanState(task: TaskData) {
   }, []);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
+    setRuntimeEvents([]);
     const result = await dispatchTaskExecutionAction(task.id, action, (event) => {
+      if (event.type === "runtime_event") {
+        setRuntimeEvents((current) => [...current.slice(-99), event]);
+        return;
+      }
       if (event.type !== "state") return;
       queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
         if (!current?.savedPlan) return current;
@@ -294,6 +302,7 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     isAiWorkspaceOpen,
     setIsAiWorkspaceOpen,
     requestGenerationKey,
+    runtimeEvents,
     acceptPlanById,
     handleAcceptPlan,
     dispatchExecutionAction,

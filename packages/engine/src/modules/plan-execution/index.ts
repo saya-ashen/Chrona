@@ -14,6 +14,7 @@ export {
   TaskPlanExecution,
   createPlanRunFromCompiledPlan,
   taskPlanExecution,
+  type PlanExecutionRuntimeEvent,
 } from "./task-plan-execution";
 
 export type {

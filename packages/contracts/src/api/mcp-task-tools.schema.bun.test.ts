@@ -140,5 +140,18 @@ describe("MCP task tool contracts", () => {
         idempotencyKey: "agent:start:1",
       }),
     ).toMatchObject({ action: "start_manual" });
+
+    expect(
+      parseChronaToolPayload("chrona.execution.dispatch", {
+        action: "complete_manual_node",
+        summary: "Completed without model-supplied node id",
+      }),
+    ).toMatchObject({ action: "complete_manual_node" });
+
+    expect(parseChronaToolPayload("chrona.node.result", { status: "complete", summary: "Done" })).toEqual({ status: "complete", summary: "Done" });
+    expect(parseChronaToolPayload("chrona.node.result", { status: "blocked", reason: "Waiting on API" })).toEqual({ status: "blocked", reason: "Waiting on API" });
+    expect(parseChronaToolPayload("chrona.node.result", { status: "failed", error: "Command failed" })).toEqual({ status: "failed", error: "Command failed" });
+    expect(() => parseChronaToolPayload("chrona.node.result", { status: "blocked" })).toThrow("reason is required");
+    expect(() => parseChronaToolPayload("chrona.node.result", { status: "failed" })).toThrow("error is required");
   });
 });

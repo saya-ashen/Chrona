@@ -43,6 +43,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.schedule.clear": "Clear accepted schedule state.",
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
+  "chrona.node.result": "Report the current execution node result.",
 };
 
 const idempotentResults = new Map<string, ChronaToolResult>();
@@ -360,6 +361,37 @@ async function executeValidatedTool(
         taskId: requireTaskId(input),
         action: payload as Parameters<typeof deps.execution.dispatch>[0]["action"],
       });
+    case "chrona.node.result": {
+      const body = payload as {
+        status: "complete" | "blocked" | "failed";
+        summary?: string;
+        output?: unknown;
+        reason?: string;
+        error?: string;
+      };
+      const action = body.status === "complete"
+        ? {
+            action: "complete_manual_node" as const,
+            sessionId: input.sessionId,
+            summary: body.summary,
+            output: body.output,
+          }
+        : body.status === "blocked"
+          ? {
+              action: "block_current_node" as const,
+              sessionId: input.sessionId,
+              reason: body.reason!,
+            }
+          : {
+              action: "fail_current_node" as const,
+              sessionId: input.sessionId,
+              error: body.error!,
+            };
+      return deps.execution.dispatch({
+        taskId: requireTaskId(input),
+        action,
+      });
+    }
   }
 }
 
@@ -442,6 +474,6 @@ function readCurrentStateForMutation(
 function readToolFor(toolName: ChronaToolName): ChronaToolName {
   if (toolName.startsWith("chrona.plan.")) return "chrona.plan.read";
   if (toolName.startsWith("chrona.schedule.")) return "chrona.schedule.read";
-  if (toolName.startsWith("chrona.execution.")) return "chrona.execution.read";
+  if (toolName.startsWith("chrona.execution.") || toolName.startsWith("chrona.node.")) return "chrona.execution.read";
   return "chrona.task.read";
 }

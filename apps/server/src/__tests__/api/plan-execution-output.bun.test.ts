@@ -11,7 +11,6 @@ import {
   MemoryStatus,
   RunStatus,
 } from "@chrona/db/generated/prisma/client";
-import type { TaskNodeAiResult } from "@chrona/contracts";
 import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type {
   AgentProviderClient,
@@ -29,7 +28,6 @@ type TestOpenClawResponseClient = AgentProviderClient;
 function createMockOpenClawClient(input: {
   outputMessages: string[];
   runStarted?: boolean;
-  structuredResult?: TaskNodeAiResult | null;
 }): TestOpenClawResponseClient {
   const messages: Array<{ role: string; content: string }> = [];
 
@@ -97,9 +95,6 @@ function createMockOpenClawClient(input: {
         type: "run_completed" as const,
         run,
         outputText: input.outputMessages.at(-1) ?? "",
-        structuredPayload: input.structuredResult
-          ? { ok: true, parsed: input.structuredResult, source: "business_tool" }
-          : undefined,
       };
     },
     async getRun(): Promise<ProviderRunSnapshot> {
@@ -119,12 +114,93 @@ function createMockOpenClawClient(input: {
   };
 }
 
+function createMockHermesClient(input: {
+  outputContent: string;
+}) {
+  const calls = {
+    startRun: [] as Array<Parameters<AgentProviderClient["startRun"]>[0]>,
+    streamRun: [] as Array<Parameters<AgentProviderClient["streamRun"]>[0]>,
+  };
+
+  const client: TestOpenClawResponseClient = {
+    provider: "hermes",
+    getCapabilities(): ProviderCapabilities {
+      return {
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+      };
+    },
+    async checkHealth(): Promise<ProviderHealth> {
+      return {
+        provider: "hermes",
+        ok: true,
+        checkedAt: new Date().toISOString(),
+      };
+    },
+    async createSession(): Promise<ProviderSessionRef> {
+      return {
+        provider: "hermes",
+        sessionId: "hermes-session-key",
+        createdAt: new Date().toISOString(),
+      };
+    },
+    async startRun(request): Promise<ProviderRunRef> {
+      calls.startRun.push(request);
+      return {
+        provider: "hermes",
+        runId: "hermes-run-1",
+        sessionId: request.sessionId,
+        status: "running",
+      };
+    },
+    async *streamRun(request) {
+      calls.streamRun.push(request);
+      if (!("runId" in request) || request.runId !== "hermes-run-1") {
+        throw new Error("Mock Hermes streamRun requires runId");
+      }
+      yield {
+        type: "run_completed" as const,
+        run: {
+          provider: "hermes",
+          runId: "hermes-run-1",
+          sessionId: "hermes-session-key",
+          status: "completed" as const,
+        },
+        outputText: input.outputContent,
+      };
+    },
+    async getRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "hermes",
+        runId: "hermes-run-1",
+        status: "completed",
+      };
+    },
+    async cancelRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "hermes",
+        runId: "hermes-run-1",
+        status: "cancelled",
+      };
+    },
+  };
+
+  return { client, calls };
+}
+
 const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
 
-function installMockRegistryClient(openClawClient: TestOpenClawResponseClient) {
+function installMockRegistryClient(
+  openClawClient: TestOpenClawResponseClient,
+  clientType: "openclaw" | "hermes" = "openclaw",
+) {
   aiClientRegistry.get = (async () =>
     ({
-      record: { type: "openclaw" },
+      record: { type: clientType },
       providerClient: openClawClient,
     }) as any) as typeof aiClientRegistry.get;
 }
@@ -137,14 +213,6 @@ function extractUserText(request: OpenClawGatewayRequest): string {
     parts.push(String(request.input));
   }
   return parts.filter(Boolean).join("\n\n");
-}
-
-function completedTaskResult(outputContent: string): TaskNodeAiResult {
-  return {
-    outcome: "completed",
-    summary: outputContent,
-    outputs: [{ kind: "text", content: outputContent }],
-  };
 }
 
 function createAiRuntimeInvoker() {
@@ -263,7 +331,6 @@ describe("executeTaskNodeCapability output persistence", () => {
     const node = planGraph.nodes[0];
     const openClawClient = createMockOpenClawClient({
       outputMessages: [outputContent],
-      structuredResult: completedTaskResult(outputContent),
     });
     installMockRegistryClient(openClawClient);
 
@@ -276,7 +343,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
-    expect(result.status).toBe("done");
+    expect(result.status).toBe("started");
 
     const entries = await db.conversationEntry.findMany({
       where: { runId: result.evidence?.runId },
@@ -296,15 +363,14 @@ describe("executeTaskNodeCapability output persistence", () => {
       where: { taskId },
       orderBy: { createdAt: "desc" },
     });
-    expect(run.status).toBe(RunStatus.Completed);
+    expect(run.status).toBe(RunStatus.Running);
     expect(run.runtimeRunRef).not.toBeNull();
   });
 
-  it("sets run status to Failed when the provider produces no output", async () => {
+  it("keeps the node running when the provider produces no output", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
-      structuredResult: null,
     });
     installMockRegistryClient(openClawClient);
 
@@ -317,11 +383,10 @@ describe("executeTaskNodeCapability output persistence", () => {
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
-    expect(result.status).toBe("failed");
+    expect(result.status).toBe("started");
 
-    const failedResult = result as Extract<typeof result, { status: "failed" }>;
     const entries = await db.conversationEntry.findMany({
-      where: { runId: failedResult.evidence?.runId },
+      where: { runId: result.evidence?.runId },
     });
     expect(entries.length).toBe(1);
     expect(entries[0].role).toBe("user");
@@ -330,14 +395,13 @@ describe("executeTaskNodeCapability output persistence", () => {
       where: { taskId },
       orderBy: { createdAt: "desc" },
     });
-    expect(run.status).toBe(RunStatus.Failed);
+    expect(run.status).toBe(RunStatus.Running);
   });
 
-  it("treats successful structured output as assistant output when text output is empty", async () => {
+  it("does not require structured output when text output is empty", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
-      structuredResult: completedTaskResult("Structured task complete."),
     });
     installMockRegistryClient(openClawClient);
 
@@ -350,28 +414,26 @@ describe("executeTaskNodeCapability output persistence", () => {
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
-    expect(result.status).toBe("done");
+    expect(result.status).toBe("started");
 
     const entries = await db.conversationEntry.findMany({
       where: { runId: result.evidence?.runId },
       orderBy: { sequence: "asc" },
     });
-    expect(entries.length).toBe(2);
-    expect(entries[1].role).toBe("assistant");
-    expect(entries[1].content).toBe("Structured task complete.");
+    expect(entries.length).toBe(1);
+    expect((result as { summary: string }).summary).toContain("Runtime run");
 
     const run = await db.run.findFirstOrThrow({
       where: { taskId },
       orderBy: { createdAt: "desc" },
     });
-    expect(run.status).toBe(RunStatus.Completed);
+    expect(run.status).toBe(RunStatus.Running);
   });
 
-  it("does not let final structured output override Chrona task state", async () => {
+  it("does not let provider completion override Chrona task state", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
-      structuredResult: completedTaskResult("Provider claims execution finished."),
     });
     installMockRegistryClient(openClawClient);
 
@@ -384,7 +446,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
-    expect(result.status).toBe("done");
+    expect(result.status).toBe("started");
 
     const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
     expect(task.status).toBe("Ready");
@@ -395,7 +457,6 @@ describe("executeTaskNodeCapability output persistence", () => {
     const openClawClient = createMockOpenClawClient({
       outputMessages: [],
       runStarted: false,
-      structuredResult: null,
     });
     installMockRegistryClient(openClawClient);
 
@@ -421,7 +482,6 @@ describe("executeTaskNodeCapability output persistence", () => {
         "Step 1 done.",
         "Final answer: task complete.",
       ],
-      structuredResult: completedTaskResult("Final answer: task complete."),
     });
     installMockRegistryClient(openClawClient);
 
@@ -434,7 +494,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
-    expect(result.status).toBe("done");
+    expect(result.status).toBe("started");
 
     const entries = await db.conversationEntry.findMany({
       where: { runId: result.evidence?.runId },
@@ -445,5 +505,51 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(entries[0].role).toBe("user");
     expect(entries[1].role).toBe("assistant");
     expect(entries[1].content).toBe("Final answer: task complete.");
+  });
+
+  it("starts Hermes runs before streaming run events", async () => {
+    const outputContent = "Hermes completed the task.";
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { client, calls } = createMockHermesClient({
+      outputContent,
+    });
+    installMockRegistryClient(client, "hermes");
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0] as any,
+      plan: planGraph as any,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("started");
+    expect(calls.startRun).toHaveLength(1);
+    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+  });
+
+  it("does not require structured tool result for Hermes task execution", async () => {
+    const outputContent = "Hermes advanced the node through Chrona MCP.";
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { client, calls } = createMockHermesClient({
+      outputContent,
+    });
+    installMockRegistryClient(client, "hermes");
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0] as any,
+      plan: planGraph as any,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("started");
+    expect((result as { summary: string }).summary).toBe(outputContent);
+    expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
+    expect(calls.startRun[0].instructions).toContain("Chrona MCP tools");
+    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
   });
 });

@@ -12,11 +12,11 @@ import {
   type EffectivePlanNode,
   type PreparedAiFeatureSpec,
   type TaskConfig,
-  type TaskNodeAiResult,
   validatePreparedFeaturePayload,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker";
 import type { NodeExecutionResult } from "./node-executors/types";
+import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
@@ -57,6 +57,7 @@ export type NodeAiCapabilityInput = {
   plan: EffectivePlanGraph;
   runtimeName: string;
   aiRuntimeInvoker: AiRuntimeInvoker;
+  onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
 };
 
 function completedNodeTitles(plan: EffectivePlanGraph): string[] {
@@ -272,6 +273,7 @@ async function runNodeFeature<T>(
       instructions: input.featureSpec.instructions,
       featureSpec: input.featureSpec,
       triggeredBy: "system",
+      onRuntimeEvent: input.onRuntimeEvent,
     });
 
     const evidence: NodeExecutionEvidence = {
@@ -349,6 +351,87 @@ async function runNodeFeature<T>(
   }
 }
 
+async function runTaskNodeFeature(
+  input: NodeAiCapabilityInput & {
+    featureSpec: PreparedAiFeatureSpec;
+    providerInput: Record<string, unknown>;
+  },
+): Promise<NodeExecutionResult> {
+  try {
+    const invocation = await input.aiRuntimeInvoker.invoke({
+      taskId: input.taskId,
+      taskSessionId: input.mainSession.id,
+      runtimeName: input.runtimeName,
+      runtimeSessionKey: input.mainSession.sessionKey,
+      runtimeInput: input.providerInput,
+      instructions: input.featureSpec.instructions,
+      featureSpec: input.featureSpec,
+      triggeredBy: "system",
+      onRuntimeEvent: input.onRuntimeEvent,
+    });
+
+    const evidence: NodeExecutionEvidence = {
+      sessionId: input.mainSession.id,
+      runId: invocation.runId,
+      runtimeName: input.runtimeName,
+      runtimeRunRef: invocation.runtimeRunRef,
+      conversationEntryIds: invocation.conversationEntryIds,
+    };
+
+    if (invocation.response.error) {
+      const message = `Runtime provider failed while executing node ${input.node.id}: ${invocation.response.error}`;
+      return {
+        status: "failed",
+        error: message,
+        evidence,
+        details: buildFailureDetails({
+          node: input.node,
+          runtimeName: input.runtimeName,
+          runtimeRunRef: invocation.runtimeRunRef,
+          runId: invocation.runId,
+          runtimeSessionKey: invocation.runtimeSessionKey,
+          message,
+        }),
+      };
+    }
+
+    const nodeResult: NodeExecutionResult = {
+      status: "started",
+      summary:
+        invocation.response.outputText?.trim() ||
+        `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} started`,
+      evidence,
+      output: {
+        runtimeRunRef: invocation.runtimeRunRef,
+        runtimeName: input.runtimeName,
+        provider: invocation.response.provider,
+      },
+    };
+    await updateInvocationRunFromNodeResult(invocation, nodeResult);
+    return nodeResult;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to run node AI capability";
+    const fullMessage = `Failed to execute AI capability for node ${input.node.id}: ${message}`;
+    return {
+      status: "failed",
+      error: fullMessage,
+      evidence: {
+        sessionId: input.mainSession.id,
+        runtimeName: input.runtimeName,
+      },
+      details: buildFailureDetails({
+        node: input.node,
+        runtimeName: input.runtimeName,
+        runtimeSessionKey: input.mainSession.sessionKey,
+        message: fullMessage,
+      }),
+    };
+  }
+}
+
 async function updateInvocationRunFromNodeResult(
   invocation: AiRuntimeInvocation,
   result: NodeExecutionResult,
@@ -414,57 +497,14 @@ export async function executeTaskNodeCapability(
     instructions,
   });
 
-  const result = await runNodeFeature<TaskNodeAiResult>({
+  return runTaskNodeFeature({
     ...input,
-    featureSpec,
+    featureSpec: {
+      ...featureSpec,
+      structuredOutputSchema: undefined,
+    },
     providerInput: buildTaskNodeProviderInput(input),
   });
-  if (!result.ok) return result.result;
-
-  let nodeResult: NodeExecutionResult;
-  switch (result.parsed.outcome) {
-    case "completed":
-      nodeResult = {
-        status: "done",
-        summary: result.parsed.summary,
-        output: result.parsed.outputs,
-        evidence: result.evidence,
-      };
-      break;
-    case "external_running":
-      nodeResult = {
-        status: "started",
-        summary: result.parsed.summary,
-        output: result.parsed.outputs,
-        evidence: result.evidence,
-      };
-      break;
-    case "needs_input":
-      nodeResult = {
-        status: "waiting_for_user",
-        prompt:
-          result.parsed.prompt ?? result.parsed.reason ?? "Input required",
-        reason: result.parsed.reason ?? result.parsed.summary,
-        evidence: result.evidence,
-      };
-      break;
-    case "blocked":
-      nodeResult = {
-        status: "blocked",
-        reason: result.parsed.reason ?? result.parsed.summary,
-        evidence: result.evidence,
-      };
-      break;
-    case "failed":
-      nodeResult = {
-        status: "failed",
-        error: result.parsed.reason ?? result.parsed.summary,
-        evidence: result.evidence,
-      };
-      break;
-  }
-  await updateInvocationRunFromNodeResult(result.invocation, nodeResult);
-  return nodeResult;
 }
 
 export async function evaluateConditionNodeCapability(

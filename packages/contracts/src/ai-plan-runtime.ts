@@ -616,6 +616,8 @@ export type ExecutionActionType =
   | "resume_with_approval"
   | "resume_after_unblock"
   | "complete_manual_node"
+  | "block_current_node"
+  | "fail_current_node"
   | "retry_node"
   | "cancel_session";
 
@@ -657,9 +659,23 @@ export type ExecutionActionInput =
   | {
       action: "complete_manual_node";
       sessionId?: string;
-      nodeId: string;
+      nodeId?: string;
       summary?: string;
       output?: unknown;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "block_current_node";
+      sessionId?: string;
+      nodeId?: string;
+      reason: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "fail_current_node";
+      sessionId?: string;
+      nodeId?: string;
+      error: string;
       idempotencyKey?: string;
     }
   | {
@@ -699,6 +715,43 @@ export type PlanExecutionResult = {
   errorDetails?: unknown;
 };
 
+export type PlanExecutionRuntimeDisplayEvent =
+  | {
+      type: "assistant_text_delta";
+      text: string;
+    }
+  | {
+      type: "reasoning_delta";
+      text: string;
+    }
+  | {
+      type: "tool_started";
+      toolName: string;
+      label: string;
+      preview?: unknown;
+      input?: unknown;
+    }
+  | {
+      type: "tool_completed";
+      toolName?: string;
+      label: string;
+      durationMs?: number;
+      error?: { message: string; code?: string };
+    }
+  | {
+      type: "approval_required";
+      approval: Record<string, unknown>;
+    }
+  | {
+      type: "run_status";
+      status: "started" | "completed" | "failed" | "cancelled";
+      message?: string;
+    }
+  | {
+      type: "raw_event";
+      rawEventType?: string;
+    };
+
 export type PlanExecutionSSEEvent =
   | {
       type: "status";
@@ -716,6 +769,20 @@ export type PlanExecutionSSEEvent =
   | {
       type: "state";
       effectivePlan: EffectivePlanGraph;
+    }
+  | {
+      type: "runtime_event";
+      action: ExecutionActionType;
+      nodeId?: string;
+      nodeTitle?: string;
+      runtimeName: string;
+      provider: string;
+      runId?: string;
+      nativeRunId?: string;
+      sequence?: number;
+      timestamp?: string;
+      rawEventType?: string;
+      event: PlanExecutionRuntimeDisplayEvent;
     }
   | {
       type: "result";

@@ -2,9 +2,15 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { HermesProviderClient, HermesProviderError } from "./index";
 
 const realFetch = globalThis.fetch;
+const realStrictUnknownEvents = process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  if (realStrictUnknownEvents === undefined) {
+    delete process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
+  } else {
+    process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS = realStrictUnknownEvents;
+  }
 });
 
 describe("HermesProviderClient", () => {
@@ -249,6 +255,38 @@ describe("HermesProviderClient", () => {
     }
 
     expect(terminalEvents).toEqual(["run_failed", "run_cancelled"]);
+  });
+
+  it("throws on unknown stream events during development", async () => {
+    delete process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
+    globalThis.fetch = mockFetch(async () => new Response(
+      'data: {"type":"run.mystery","value":1}\n\n',
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ));
+
+    const client = new HermesProviderClient();
+
+    await expect(async () => {
+      for await (const _event of client.streamRun({ runId: "run-1" })) {
+        // Unknown events should abort before yielding.
+      }
+    }).toThrow(/Unknown Hermes stream event type: run\.mystery/);
+  });
+
+  it("allows unknown stream events when strict handling is disabled", async () => {
+    process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS = "0";
+    globalThis.fetch = mockFetch(async () => new Response(
+      'data: {"type":"run.mystery","value":1}\n\n',
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ));
+
+    const client = new HermesProviderClient();
+    const events = [] as string[];
+    for await (const event of client.streamRun({ runId: "run-1", include: { rawEvents: true } })) {
+      events.push(event.type);
+    }
+
+    expect(events).toEqual(["raw_event"]);
   });
 
   it("maps completed run output and usage", async () => {
