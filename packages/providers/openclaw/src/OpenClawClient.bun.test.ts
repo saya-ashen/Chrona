@@ -29,7 +29,7 @@ describe("OpenClawClient", () => {
         'event: response.output_text.delta\n',
         'data: {"delta":"Planning ","type":"response.output_text.delta"}\n\n',
         'event: response.output_item.done\n',
-        'data: {"item":{"type":"function_call","name":"generate_task_plan_graph","call_id":"call-1","arguments":"{\\"title\\":\\"Plan ready\\",\\"goal\\":\\"Produce the requested plan\\",\\"summary\\":\\"Plan ready\\",\\"nodes\\":[],\\"edges\\":[]}"}}\n\n',
+        'data: {"item":{"type":"function_call","name":"chrona_plan_generate","call_id":"call-1","arguments":"{\\"title\\":\\"Plan ready\\",\\"goal\\":\\"Produce the requested plan\\",\\"summary\\":\\"Plan ready\\",\\"nodes\\":[],\\"edges\\":[]}"}}\n\n',
         'event: response.output_text.delta\n',
         'data: {"delta":"done","type":"response.output_text.delta"}\n\n',
       ].join("");
@@ -52,7 +52,7 @@ describe("OpenClawClient", () => {
       instructions: "plan this task",
       input: { prompt: "Write docs" },
       structuredOutputSchema: {
-        name: "generate_task_plan_graph",
+        name: "chrona_plan_generate",
         description: "Return a generated plan graph.",
         schema: { type: "object" },
       },
@@ -72,7 +72,7 @@ describe("OpenClawClient", () => {
       { type: "text_delta", text: "Planning ", toolCall: undefined },
       {
         type: "tool_call",
-        toolCall: { tool: "generate_task_plan_graph", callId: "call-1" },
+        toolCall: { tool: "chrona_plan_generate", callId: "call-1" },
         text: undefined,
       },
       { type: "text_delta", text: "done", toolCall: undefined },
@@ -86,7 +86,7 @@ describe("OpenClawClient", () => {
         'event: response.output_text.delta\n',
         'data: {"delta":"Planning ","type":"response.output_text.delta"}\n\n',
         'event: response.completed\n',
-        'data: {"response":{"id":"resp-1","status":"completed","output":[{"type":"function_call","name":"generate_task_plan_graph","call_id":"call-2","arguments":"{\\"title\\":\\"Plan ready\\",\\"goal\\":\\"Produce the requested plan\\",\\"summary\\":\\"Plan ready\\",\\"nodes\\":[],\\"edges\\":[]}"}]}}\n\n',
+        'data: {"response":{"id":"resp-1","status":"completed","output":[{"type":"function_call","name":"chrona_plan_generate","call_id":"call-2","arguments":"{\\"title\\":\\"Plan ready\\",\\"goal\\":\\"Produce the requested plan\\",\\"summary\\":\\"Plan ready\\",\\"nodes\\":[],\\"edges\\":[]}"}]}}\n\n',
       ].join("");
 
       return new Response(sse, {
@@ -107,7 +107,7 @@ describe("OpenClawClient", () => {
       instructions: "plan this task",
       input: { prompt: "Write docs" },
       structuredOutputSchema: {
-        name: "generate_task_plan_graph",
+        name: "chrona_plan_generate",
         description: "Return a generated plan graph.",
         schema: { type: "object" },
       },
@@ -127,7 +127,7 @@ describe("OpenClawClient", () => {
       { type: "text_delta", text: "Planning ", toolCall: undefined },
       {
         type: "tool_call",
-        toolCall: { tool: "generate_task_plan_graph", callId: "call-2" },
+        toolCall: { tool: "chrona_plan_generate", callId: "call-2" },
         text: undefined,
       },
       { type: "run_completed", text: undefined, toolCall: undefined },
@@ -208,7 +208,7 @@ describe("OpenClawClient", () => {
       instructions: "plan this task",
       input: { prompt: "Write docs" },
       structuredOutputSchema: {
-        name: "generate_task_plan_graph",
+        name: "chrona_plan_generate",
         description: "Return a generated plan graph.",
         schema: { type: "object" },
       },

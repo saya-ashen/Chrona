@@ -6,8 +6,10 @@ import {
   chronaToolNames,
   isChronaToolMutating,
   parseChronaToolPayload,
+  type PlanBlueprint,
 } from "@chrona/contracts";
 import { db } from "@/lib/db";
+import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 import type { createTaskExecutionService } from "./task-execution.service";
 import type { createTaskPlanService } from "./task-plan.service";
 import type { createTaskScheduleService } from "./task-schedule.service";
@@ -33,6 +35,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.task.create": "Create a task through Chrona validation.",
   "chrona.task.update": "Update task fields through Chrona validation.",
   "chrona.plan.read": "Read accepted plan state.",
+  "chrona.plan.generate": "Generate a draft plan for the session task.",
   "chrona.plan.mutate": "Apply a plan graph mutation.",
   "chrona.schedule.read": "Read task schedule state.",
   "chrona.schedule.propose": "Create a schedule proposal.",
@@ -149,22 +152,28 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
     async resolveInputContext(input: unknown) {
       const raw = asInputRecord(input);
       const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
-      if (!sessionId || (raw.workspaceId && raw.taskId)) {
+      if (!sessionId && raw.taskId) {
         return chronaToolInputSchema.parse(raw);
       }
 
-      const session = await db.taskSession.findUnique({
-        where: { sessionKey: sessionId },
-        include: {
-          task: { select: { id: true, workspaceId: true } },
-        },
-      });
+      const session = sessionId
+        ? await db.taskSession.findFirst({
+            where: {
+              OR: [{ id: sessionId }, { sessionKey: sessionId }],
+            },
+            include: {
+              task: { select: { id: true, workspaceId: true } },
+            },
+          })
+        : null;
+      const workspaceId = typeof raw.workspaceId === "string"
+        ? raw.workspaceId
+        : session?.task.workspaceId ?? (await getDefaultWorkspace()).id;
 
       return chronaToolInputSchema.parse({
         ...raw,
         taskId: typeof raw.taskId === "string" ? raw.taskId : session?.task.id,
-        workspaceId:
-          typeof raw.workspaceId === "string" ? raw.workspaceId : session?.task.workspaceId,
+        workspaceId,
       });
     },
 
@@ -290,10 +299,7 @@ async function executeValidatedTool(
     case "chrona.task.read":
       return deps.tasks.getPage({ taskId: requireTaskId(input) });
     case "chrona.task.create":
-      return deps.tasks.create({
-        ...(payload as Parameters<typeof deps.tasks.create>[0]),
-        workspaceId: requireWorkspaceId(input),
-      });
+      return createTaskForTool(deps, input, payload);
     case "chrona.task.update":
       return deps.tasks.update({
         ...(payload as Omit<Parameters<typeof deps.tasks.update>[0], "taskId">),
@@ -302,6 +308,8 @@ async function executeValidatedTool(
       });
     case "chrona.plan.read":
       return deps.plan.getState({ taskId: requireTaskId(input) });
+    case "chrona.plan.generate":
+      return generatePlanForTool(deps, input, payload);
     case "chrona.plan.mutate":
       return deps.plan.mutate({
         taskId: requireTaskId(input),
@@ -353,6 +361,56 @@ async function executeValidatedTool(
         action: payload as Parameters<typeof deps.execution.dispatch>[0]["action"],
       });
   }
+}
+
+async function createTaskForTool(
+  deps: AgentToolOperationsDeps,
+  input: ChronaToolOperation["input"],
+  payload: unknown,
+) {
+  const result = await deps.tasks.create({
+    ...(payload as Parameters<typeof deps.tasks.create>[0]),
+    workspaceId: requireWorkspaceId(input),
+  });
+  const sessionId = input.sessionId?.trim();
+  if (sessionId && "taskId" in result && typeof result.taskId === "string") {
+    const existingSession = await db.taskSession.findUnique({ where: { sessionKey: sessionId } });
+    if (!existingSession) {
+      const task = await db.task.findUnique({
+        where: { id: result.taskId },
+        select: { title: true, executionRuntime: true },
+      });
+      await db.taskSession.create({
+        data: {
+          taskId: result.taskId,
+          runtimeName: task?.executionRuntime ?? "unknown",
+          sessionKey: sessionId,
+          label: `${task?.title ?? "Task"} · Creation session`,
+          createdByFramework: true,
+        },
+      });
+    }
+  }
+  return result;
+}
+
+async function generatePlanForTool(
+  deps: AgentToolOperationsDeps,
+  input: ChronaToolOperation["input"],
+  payload: unknown,
+) {
+  const taskId = requireTaskId(input);
+  const workspaceId = requireWorkspaceId(input);
+  const savedPlan = await deps.plan.materialize({
+    taskId,
+    workspaceId,
+    blueprint: payload as PlanBlueprint,
+    generatedBy: input.actorId ?? "hermes",
+  });
+  return {
+    taskId,
+    savedPlan,
+  };
 }
 
 async function ensureFreshBeforeMutation(

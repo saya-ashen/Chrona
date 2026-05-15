@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { planBlueprintSchema } from "../ai-plan-blueprint";
 import {
   createTaskBodySchema,
   updateTaskBodySchema,
@@ -15,6 +16,7 @@ export const chronaToolNames = [
   "chrona.task.create",
   "chrona.task.update",
   "chrona.plan.read",
+  "chrona.plan.generate",
   "chrona.plan.mutate",
   "chrona.schedule.read",
   "chrona.schedule.propose",
@@ -74,13 +76,13 @@ export const chronaToolContextSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional(),
   evidence: chronaToolEvidenceSchema.optional(),
 }).superRefine((value, ctx) => {
-  if (value.workspaceId || value.sessionId) {
+  if (value.taskId || value.sessionId) {
     return;
   }
   ctx.addIssue({
     code: z.ZodIssueCode.custom,
-    path: ["workspaceId"],
-    message: "workspaceId or sessionId is required",
+    path: ["sessionId"],
+    message: "sessionId or resolved taskId is required",
   });
 });
 
@@ -91,6 +93,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.task.create": createTaskBodySchema.omit({ workspaceId: true }),
   "chrona.task.update": updateTaskBodySchema.omit({ workspaceId: true }),
   "chrona.plan.read": readPayloadSchema,
+  "chrona.plan.generate": planBlueprintSchema,
   "chrona.plan.mutate": planMutationBodySchema,
   "chrona.schedule.read": readPayloadSchema,
   "chrona.schedule.propose": scheduleProposalBodySchema.omit({ workspaceId: true }),

@@ -391,7 +391,7 @@ async function openclawFeaturePayloadFull<T>(
       feature: getStructuredString(result.structuredPayload, "feature") ?? featureSpec?.feature ?? null,
       toolName:
         getStructuredString(result.structuredPayload, "toolName") ??
-        featureSpec?.structuredOutputSchema.name ??
+        featureSpec?.structuredOutputSchema?.name ??
         null,
       sessionId: getStructuredString(result.structuredPayload, "sessionId") ?? result.sessionId,
       runId: getStructuredString(result.structuredPayload, "runId") ?? result.runId,

@@ -80,7 +80,7 @@ function _normalizePriority(value: unknown): "Low" | "Medium" | "High" | "Urgent
 
 function parseGraphResponse(raw: string) {
   const toolJsonMatch = raw.match(
-    /```(?:json|tool)?\s*\n?(?:generate_task_plan_graph\s*\n)?([\s\S]*?)```/,
+    /```(?:json|tool)?\s*\n?(?:chrona_plan_generate\s*\n)?([\s\S]*?)```/,
   );
   const candidate = toolJsonMatch?.[1]?.trim() || raw;
   const parsed = extractJSON(candidate) as {

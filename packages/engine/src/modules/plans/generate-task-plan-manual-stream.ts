@@ -2,27 +2,33 @@ import { db } from "@/lib/db";
 import { aiGeneratePlanStream } from "@/modules/ai/runtime/ai-service";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
-import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
+import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import type { GeneratePlanSSEEvent, PlanBlueprint } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
-import { createLogger } from "@/lib/logger";
 
-const logger = createLogger("command.generate-task-plan-manual-stream");
+const PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
+const INTERNAL_PLAN_GENERATE_TOOL_NAME = "chrona.plan.generate";
 
-function hasNonEmptyPlanBlueprint(
-  plan: unknown,
-): plan is { blueprint: PlanBlueprint; source: string } {
-  if (!plan || typeof plan !== "object") {
-    return false;
+function isPlanGenerateTool(tool: string | undefined): boolean {
+  return tool === PLAN_GENERATE_TOOL_NAME ||
+    tool === INTERNAL_PLAN_GENERATE_TOOL_NAME;
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readSavedPlanAfterToolCompletion(input: {
+  taskId: string;
+  signal?: AbortSignal;
+}) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (input.signal?.aborted) return null;
+    const savedPlan = await getLatestTaskPlanReadModel(input.taskId);
+    if (savedPlan) return savedPlan;
+    if (attempt < 4) await wait(100);
   }
-
-  const blueprint = (plan as { blueprint?: unknown }).blueprint;
-  if (!blueprint || typeof blueprint !== "object") {
-    return false;
-  }
-
-  return Array.isArray((blueprint as { nodes?: unknown }).nodes)
-    && (blueprint as { nodes: unknown[] }).nodes.length > 0;
+  return null;
 }
 
 function summarizeGeneratePlanEvent(event: GeneratePlanSSEEvent) {
@@ -59,8 +65,8 @@ function summarizeGeneratePlanEvent(event: GeneratePlanSSEEvent) {
 
 /**
  * Manual plan generation stream — the only engine entry point for generating
- * a plan. Orchestrates provider streaming, extracts the authoritative tool
- * payload, materializes the plan, and emits canonical SSE events.
+  * a plan. Orchestrates provider streaming, waits for the Chrona MCP plan
+  * generation tool to persist a plan, then emits canonical SSE events.
  *
  * No cached/saved branch — always generates fresh. No legacy compatibility shapes.
  */
@@ -158,7 +164,7 @@ export async function* generateTaskPlanManualStream(input: {
   await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(requestingEvent) });
   yield requestingEvent;
 
-  let hasToolPayload = false;
+  let hasPlanGenerateToolCall = false;
 
   if (input.signal?.aborted) {
     const event: GeneratePlanSSEEvent = { type: "cancelled" };
@@ -193,9 +199,9 @@ export async function* generateTaskPlanManualStream(input: {
       case "status":
         {
           const statusEvent: GeneratePlanSSEEvent = {
-          type: "status",
-          phase: "streaming",
-          message: event.message,
+            type: "status",
+            phase: "streaming",
+            message: event.message,
           };
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(statusEvent) });
           yield statusEvent;
@@ -203,17 +209,17 @@ export async function* generateTaskPlanManualStream(input: {
         break;
 
       case "tool_call":
-        if (event.tool === "generate_task_plan_graph") {
-          hasToolPayload = true;
+        if (isPlanGenerateTool(event.tool)) {
+          hasPlanGenerateToolCall = true;
           const toolEvent: GeneratePlanSSEEvent = {
             type: "tool_call",
-            tool: "generate_task_plan_graph",
+            tool: PLAN_GENERATE_TOOL_NAME,
             input: event.input as unknown as PlanBlueprint,
           };
           await dump?.write({
             type: "state",
-            field: "hasToolPayload",
-            value: hasToolPayload,
+            field: "hasPlanGenerateToolCall",
+            value: hasPlanGenerateToolCall,
           });
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(toolEvent) });
           yield toolEvent;
@@ -228,79 +234,73 @@ export async function* generateTaskPlanManualStream(input: {
         }
         break;
 
+      case "tool_result":
+        if (isPlanGenerateTool(event.tool)) {
+          if (event.error) {
+            const errorEvent: GeneratePlanSSEEvent = {
+              type: "error",
+              code: "PROVIDER_ERROR",
+              message: `${PLAN_GENERATE_TOOL_NAME} failed: ${event.result}`,
+            };
+            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(errorEvent) });
+            yield errorEvent;
+            await dump?.close();
+            return;
+          }
+
+          const savingEvent: GeneratePlanSSEEvent = {
+            type: "status",
+            phase: "saving",
+            message: "Reading saved plan...",
+          };
+          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(savingEvent) });
+          yield savingEvent;
+
+          const savedPlan = await readSavedPlanAfterToolCompletion({
+            taskId: task.id,
+            signal: input.signal,
+          });
+
+          if (!savedPlan) {
+            const errorEvent: GeneratePlanSSEEvent = {
+              type: "error",
+              code: "INTERNAL_ERROR",
+              message: `${PLAN_GENERATE_TOOL_NAME} completed but no saved plan was found.`,
+            };
+            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(errorEvent) });
+            yield errorEvent;
+            await dump?.close();
+            return;
+          }
+
+          const completedEvent: GeneratePlanSSEEvent = {
+            type: "status",
+            phase: "completed",
+            message: "Plan generated.",
+          };
+          const resultEvent: GeneratePlanSSEEvent = {
+            type: "result",
+            result: savedPlan,
+            taskSessionKey,
+          };
+          const doneEvent: GeneratePlanSSEEvent = { type: "done" };
+          await dump?.write({ type: "saved_plan", result: previewDebugValue(savedPlan, 1200) });
+          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(completedEvent) });
+          yield completedEvent;
+          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(resultEvent) });
+          yield resultEvent;
+          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(doneEvent) });
+          yield doneEvent;
+          await dump?.close();
+          return;
+        }
+        break;
+
       case "partial":
         {
           const partialEvent: GeneratePlanSSEEvent = { type: "partial", text: event.text };
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(partialEvent) });
           yield partialEvent;
-        }
-        break;
-
-      case "result":
-        if ("plan" in event) {
-          const plan = event.plan;
-          if (!hasNonEmptyPlanBlueprint(plan)) {
-            const errorEvent: GeneratePlanSSEEvent = {
-              type: "error",
-              code: "INVALID_TOOL_PAYLOAD",
-              message:
-                "AI returned an invalid task plan payload: missing blueprint.nodes or zero nodes.",
-            };
-            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(errorEvent) });
-            yield errorEvent;
-            await dump?.close();
-            return;
-          }
-
-          const compilingEvent: GeneratePlanSSEEvent = {
-            type: "status",
-            phase: "compiling",
-            message: "Compiling plan blueprint...",
-          };
-          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(compilingEvent) });
-          yield compilingEvent;
-
-          try {
-            await dump?.write({
-              type: "materialize_start",
-              taskId: task.id,
-              workspaceId: task.workspaceId,
-              blueprint: previewDebugValue(plan.blueprint, 1200),
-            });
-            const readModel = await materializeGeneratedTaskPlan({
-              taskId: task.id,
-              workspaceId: task.workspaceId,
-              blueprint: plan.blueprint,
-              planningPrompt,
-              generatedBy: plan.source,
-            });
-
-            const resultEvent: GeneratePlanSSEEvent = { type: "result", result: readModel, taskSessionKey };
-            await dump?.write({ type: "materialize_result", result: previewDebugValue(readModel, 1200) });
-            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(resultEvent) });
-            yield resultEvent;
-          } catch (error) {
-            logger.error("materialize_failed", {
-              taskId: task.id,
-              error: error instanceof Error ? error.message : String(error),
-            });
-            const errorEvent: GeneratePlanSSEEvent = {
-              type: "error",
-              code: "INTERNAL_ERROR",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Failed to persist generated plan.",
-            };
-            await dump?.write({
-              type: "materialize_error",
-              message: error instanceof Error ? error.message : String(error),
-            });
-            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(errorEvent) });
-            yield errorEvent;
-            await dump?.close();
-            return;
-          }
         }
         break;
 
@@ -323,19 +323,19 @@ export async function* generateTaskPlanManualStream(input: {
       }
 
       case "done":
-        if (!hasToolPayload) {
+        if (!hasPlanGenerateToolCall) {
           const errorEvent: GeneratePlanSSEEvent = {
             type: "error",
             code: "INVALID_TOOL_PAYLOAD",
             message:
-              "Provider completed without a generate_task_plan_graph tool payload.",
+              `Provider completed without calling ${PLAN_GENERATE_TOOL_NAME}.`,
           };
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(errorEvent) });
           yield errorEvent;
           await dump?.close();
           return;
         }
-        await dump?.write({ type: "provider_done", hasToolPayload });
+        await dump?.write({ type: "provider_done", hasPlanGenerateToolCall });
         break;
     }
 

@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 import type {
   SmartSuggestResponse,
   SmartSuggestion,
-  GenerateTaskPlanResponse,
   ChatRequest,
   ChatResponse,
   StructuredDebugInfo,
@@ -16,17 +15,6 @@ import { AiClientError } from "@chrona/contracts";
 import { dispatch, extractJSON } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
-import { planBlueprintSchema } from "@chrona/contracts/ai";
-import type { ZodIssue } from "zod";
-
-function formatZodIssues(
-  issues: ZodIssue[],
-): Array<{ path: string; message: string }> {
-  return issues.map((issue) => ({
-    path: issue.path.join("."),
-    message: issue.message,
-  }));
-}
 
 function ensureObject(
   value: unknown,
@@ -64,51 +52,6 @@ export function normalizeSuggestResponse(input: {
     source: input.source,
     requestId: randomUUID(),
     structured: input.structured ?? undefined,
-  };
-}
-
-export function normalizeGeneratePlanResponse(input: {
-  parsed: unknown;
-  source: string;
-  structured?: StructuredDebugInfo | null;
-}): {
-  plan: GenerateTaskPlanResponse;
-  validationErrors: Array<{ path: string; message: string }>;
-  validationWarnings: Array<{ path: string; message: string }>;
-} {
-  const defaultResult = {
-    blueprint: { title: "", goal: "", nodes: [], edges: [] },
-    source: input.source,
-    structured: input.structured ?? undefined,
-  };
-
-  if (!input.parsed || typeof input.parsed !== "object") {
-    return {
-      plan: defaultResult,
-      validationErrors: [
-        { path: "", message: "generate_plan payload must be an object" },
-      ],
-      validationWarnings: [],
-    };
-  }
-
-  const parsed = planBlueprintSchema.safeParse(input.parsed);
-  if (!parsed.success) {
-    return {
-      plan: defaultResult,
-      validationErrors: formatZodIssues(parsed.error.issues),
-      validationWarnings: [],
-    };
-  }
-
-  return {
-    plan: {
-      blueprint: parsed.data,
-      source: input.source,
-      structured: input.structured ?? undefined,
-    },
-    validationErrors: [],
-    validationWarnings: [],
   };
 }
 

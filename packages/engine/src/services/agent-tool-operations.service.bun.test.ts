@@ -5,6 +5,7 @@ import { createAgentToolOperationsService } from "./agent-tool-operations.servic
 
 function service() {
   const calls = {
+    planGenerate: 0,
     planPatch: 0,
     taskUpdate: 0,
   };
@@ -37,6 +38,16 @@ function service() {
       subscribeToActiveGeneration: () => null,
       subscribeToGeneration: () => null,
       accept: async () => ({ savedPlan: null }),
+      materialize: async (input: Record<string, unknown>) => {
+        calls.planGenerate += 1;
+        return {
+          id: "plan-generated",
+          planId: "plan-generated",
+          revision: 1,
+          status: "draft",
+          summary: (input.blueprint as { title?: string }).title,
+        };
+      },
       generate: () => { throw new Error("unused"); },
       stopGeneration: () => ({ taskId: task.id, stopped: false }),
       patch: async (input: Record<string, unknown>) => {
@@ -115,7 +126,7 @@ describe("agent tool operations service", () => {
   });
 
   it("returns registry metadata", () => {
-    expect(service().registry().tools.map((tool) => tool.name)).toContain("chrona.execution.dispatch");
+    expect(service().registry().tools.map((tool) => tool.name)).toContain("chrona.plan.generate");
   });
 
   it("executes read and mutating task tools through Chrona services", async () => {
@@ -173,6 +184,30 @@ describe("agent tool operations service", () => {
       workspaceId: workspace.id,
       taskId: task.id,
       sessionId: "chrona:hermes:task:task-1:execute",
+    });
+
+    await expect(agentTools.resolveInputContext({
+      sessionId: resolved.taskId ? (await db.taskSession.findFirstOrThrow()).id : "missing",
+      actorType: "agent",
+    })).resolves.toMatchObject({
+      workspaceId: workspace.id,
+      taskId: task.id,
+    });
+  });
+
+  it("uses the default workspace for task creation without model-supplied workspaceId", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Default MCP Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+
+    const resolved = await service().resolveInputContext({
+      sessionId: "chrona:hermes:create:task",
+      actorType: "agent",
+    });
+
+    expect(resolved).toMatchObject({
+      workspaceId: workspace.id,
+      sessionId: "chrona:hermes:create:task",
     });
   });
 
@@ -245,6 +280,35 @@ describe("agent tool operations service", () => {
       }),
     ).resolves.toMatchObject({ status: "accepted", state: { planRevision: 3 } });
     expect(agentTools.calls.planPatch).toBe(1);
+  });
+
+  it("persists Hermes-generated plan graphs through the plan service", async () => {
+    const agentTools = service();
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.plan.generate",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "plan-generate-1",
+          payload: {
+            title: "Generated MCP plan",
+            goal: "Save complete plan graph",
+            nodes: [
+              {
+                id: "first_step",
+                type: "task",
+                title: "First step",
+              },
+            ],
+            edges: [],
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted", state: { planRevision: 1 } });
+    expect(agentTools.calls.planGenerate).toBe(1);
   });
 
   it("replays duplicate mutating operations without duplicate side effects", async () => {

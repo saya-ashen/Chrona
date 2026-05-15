@@ -121,6 +121,7 @@ function createAiClientRouter() {
         where: { id: clientId },
         data: {
           ...(body.name !== undefined && { name: body.name }),
+          ...(body.type !== undefined && { type: body.type }),
           ...(body.config !== undefined && { config: body.config }),
           ...(body.isDefault !== undefined && { isDefault: body.isDefault }),
           ...(body.enabled !== undefined && { enabled: body.enabled }),
@@ -271,6 +272,30 @@ describe("AI Client CRUD", () => {
     }>(res);
     expect(body.client.name).toBe("New Name");
     expect(body.client.config).toEqual({ key: "value" });
+  });
+
+  it("PATCH /ai/clients/:id updates client type", async () => {
+    const createRes = await createClient({ name: "Runtime", type: "openclaw" });
+    const created = await json<{ client: { id: string } }>(createRes);
+
+    const res = await app().request(
+      `http://local/api/ai/clients/${created.client.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "hermes",
+          config: { baseUrl: "http://127.0.0.1:8642", timeoutMs: 30000 },
+        }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await json<{
+      client: { type: string; config: Record<string, unknown> };
+    }>(res);
+    expect(body.client.type).toBe("hermes");
+    expect(body.client.config).toMatchObject({ baseUrl: "http://127.0.0.1:8642", timeoutMs: 30000 });
   });
 
   it("PATCH /ai/clients/:id sets enabled=false", async () => {

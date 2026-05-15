@@ -123,7 +123,9 @@ export function mapHermesEvent(
       return {
         type: "tool_completed",
         toolName: stringValue(body.tool),
-        error: error === undefined ? undefined : normalizeError(error),
+        error: error === undefined || error === null || error === false
+          ? undefined
+          : normalizeError(error),
         raw: includeRaw ? event : undefined,
       };
     }
@@ -181,11 +183,33 @@ function normalizeError(error: unknown): { message: string; code?: string; raw?:
     return { message: error };
   }
   const record = asRecord(error);
+  const message = extractErrorMessage(record) ?? "Hermes tool failed";
   return {
-    message: stringValue(record.message) ?? stringValue(record.error) ?? "Hermes tool failed",
+    message,
     code: stringValue(record.code),
     raw: error,
   };
+}
+
+function extractErrorMessage(record: Record<string, unknown>): string | undefined {
+  const direct = stringValue(record.message) ?? stringValue(record.error);
+  if (direct) return direct;
+
+  const error = asRecord(record.error);
+  const nested = stringValue(error.message) ?? stringValue(error.error);
+  if (nested) return nested;
+
+  const structuredContent = asRecord(record.structuredContent);
+  const structuredMessage = stringValue(structuredContent.message);
+  if (structuredMessage) return structuredMessage;
+
+  const content = Array.isArray(record.content) ? record.content : [];
+  for (const entry of content) {
+    const text = stringValue(asRecord(entry).text);
+    if (text) return text;
+  }
+
+  return undefined;
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {

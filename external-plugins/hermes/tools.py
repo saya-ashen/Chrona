@@ -64,6 +64,11 @@ def list_chrona_tools():
     return tools
 
 
+def hermes_tool_name(chrona_tool_name):
+    """Convert a Chrona MCP tool name into a Hermes-safe tool name."""
+    return chrona_tool_name.replace(".", "_")
+
+
 def schema_for_chrona_tool(tool):
     """Convert one MCP tool description into the Hermes tool schema shape."""
     name = tool.get("name")
@@ -74,7 +79,7 @@ def schema_for_chrona_tool(tool):
     }
 
     return {
-        "name": name,
+        "name": hermes_tool_name(name) if isinstance(name, str) else name,
         "description": description,
         "parameters": parameters,
     }
@@ -147,4 +152,3 @@ def _inject_session_context(arguments, kwargs):
         enriched["evidence"] = evidence
 
     return enriched
-

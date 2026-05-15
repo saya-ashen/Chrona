@@ -1,9 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 
 import { db } from "@/lib/db";
-import type { GenerateTaskPlanResponse } from "@chrona/contracts";
+import type { PlanBlueprint } from "@chrona/contracts";
 
 import { getLatestTaskPlanGraph } from "@/modules/plan-execution/compat";
+import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
 
 async function generateTaskPlanForTask(input: { taskId: string; forceRefresh?: boolean }) {
   const { generateTaskPlanManualStream } = await import("@/modules/plans/generate-task-plan-manual-stream");
@@ -19,27 +20,42 @@ async function generateTaskPlanForTask(input: { taskId: string; forceRefresh?: b
   return result;
 }
 
-const aiGeneratePlanMock = mock(async (request: { title: string; description?: string }): Promise<GenerateTaskPlanResponse> => ({
-  source: "test-ai",
-  blueprint: {
-    title: `Plan for ${request.title}`,
-    goal: request.description ?? request.title,
-    nodes: [
-      {
-        id: "handle_task",
-        type: "task" as const,
-        title: `Handle ${request.title}`,
-        expectedOutput: request.description ?? request.title,
-      },
-    ],
-    edges: [],
-  },
+const aiGeneratePlanMock = mock(async (request: { title: string; description?: string }): Promise<PlanBlueprint> => ({
+  title: `Plan for ${request.title}`,
+  goal: request.description ?? request.title,
+  nodes: [
+    {
+      id: "handle_task",
+      type: "task" as const,
+      title: `Handle ${request.title}`,
+      expectedOutput: request.description ?? request.title,
+    },
+  ],
+  edges: [],
 }));
 
-async function* aiGeneratePlanStreamMock(request: { title: string; description?: string }) {
-  const plan = await aiGeneratePlanMock(request);
-  yield { type: "tool_call" as const, tool: "generate_task_plan_graph", input: plan.blueprint };
-  yield { type: "result" as const, plan };
+async function* aiGeneratePlanStreamMock(request: { taskId: string; title: string; description?: string }) {
+  const blueprint = await aiGeneratePlanMock(request);
+  yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: blueprint };
+
+  if (blueprint.nodes.length === 0) {
+    yield {
+      type: "tool_result" as const,
+      tool: "chrona_plan_generate",
+      result: "Plan blueprint must contain at least one node.",
+      error: true,
+    };
+    return;
+  }
+
+  const task = await db.task.findUniqueOrThrow({ where: { id: request.taskId } });
+  await materializeGeneratedTaskPlan({
+    taskId: request.taskId,
+    workspaceId: task.workspaceId,
+    blueprint,
+    generatedBy: "test-ai",
+  });
+  yield { type: "tool_result" as const, tool: "chrona_plan_generate", result: "completed" };
   yield { type: "done" as const, text: "done" };
 }
 
@@ -154,13 +170,10 @@ describe("generateTaskPlanForTask", () => {
 
   it("does not save an empty generated blueprint", async () => {
     aiGeneratePlanMock.mockImplementationOnce(async () => ({
-      source: "test-ai",
-      blueprint: {
-        title: "",
-        goal: "",
-        nodes: [],
-        edges: [],
-      },
+      title: "",
+      goal: "",
+      nodes: [],
+      edges: [],
     }));
 
     const workspace = await db.workspace.create({
@@ -185,38 +198,35 @@ describe("generateTaskPlanForTask", () => {
 
   it("enriches compiled nodes and derives runtime dependencies", async () => {
     aiGeneratePlanMock.mockImplementationOnce(async () => ({
-      source: "test-ai",
-      blueprint: {
-        title: "Enriched plan",
-        goal: "Test compiled enrichment",
-        nodes: [
-          {
-            id: "auto_step",
-            type: "task" as const,
-            title: "Auto step",
-            executor: "ai" as const,
-            mode: "auto" as const,
-          },
-          {
-            id: "approve_step",
-            type: "checkpoint" as const,
-            title: "Approve it",
-            checkpointType: "approve" as const,
-            prompt: "Approve before continuing",
-          },
-          {
-            id: "manual_step",
-            type: "task" as const,
-            title: "Manual step",
-            executor: "user" as const,
-            mode: "manual" as const,
-          },
-        ],
-        edges: [
-          { from: "auto_step", to: "approve_step" },
-          { from: "approve_step", to: "manual_step" },
-        ],
-      },
+      title: "Enriched plan",
+      goal: "Test compiled enrichment",
+      nodes: [
+        {
+          id: "auto_step",
+          type: "task" as const,
+          title: "Auto step",
+          executor: "ai" as const,
+          mode: "auto" as const,
+        },
+        {
+          id: "approve_step",
+          type: "checkpoint" as const,
+          title: "Approve it",
+          checkpointType: "approve" as const,
+          prompt: "Approve before continuing",
+        },
+        {
+          id: "manual_step",
+          type: "task" as const,
+          title: "Manual step",
+          executor: "user" as const,
+          mode: "manual" as const,
+        },
+      ],
+      edges: [
+        { from: "auto_step", to: "approve_step" },
+        { from: "approve_step", to: "manual_step" },
+      ],
     }));
 
     const workspace = await db.workspace.create({

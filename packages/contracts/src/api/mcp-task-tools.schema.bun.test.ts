@@ -12,7 +12,7 @@ describe("MCP task tool contracts", () => {
     expect(
       chronaToolOperationSchema.parse({
         toolName: "chrona.task.read",
-        input: { workspaceId: "workspace-1", taskId: "task-1" },
+        input: { sessionId: "chrona:hermes:task:task-1:execute" },
       }),
     ).toMatchObject({ toolName: "chrona.task.read" });
 
@@ -46,7 +46,7 @@ describe("MCP task tool contracts", () => {
     expect(isChronaToolMutating("chrona.task.update")).toBe(true);
   });
 
-  it("accepts session-scoped tool input before Chrona resolves workspace context", () => {
+  it("accepts session-scoped tool input before Chrona resolves task context", () => {
     expect(
       chronaToolInputSchema.parse({
         sessionId: "chrona:hermes:task:task-1:execute",
@@ -55,7 +55,7 @@ describe("MCP task tool contracts", () => {
     ).toMatchObject({ sessionId: "chrona:hermes:task:task-1:execute" });
 
     expect(() => chronaToolInputSchema.parse({ payload: {} })).toThrow(
-      "workspaceId or sessionId is required",
+      "sessionId or resolved taskId is required",
     );
   });
 
@@ -91,6 +91,23 @@ describe("MCP task tool contracts", () => {
     ).toMatchObject({ title: "Updated release notes" });
 
     expect(parseChronaToolPayload("chrona.plan.read", undefined)).toEqual({});
+
+    expect(
+      parseChronaToolPayload("chrona.plan.generate", {
+        title: "Generated MCP plan",
+        goal: "Persist a complete graph",
+        nodes: [
+          {
+            id: "first_step",
+            type: "task",
+            title: "First step",
+          },
+        ],
+        edges: [],
+      }),
+    ).toMatchObject({ title: "Generated MCP plan", nodes: [{ id: "first_step" }] });
+
+    expect(() => parseChronaToolPayload("chrona.plan.generate", undefined)).toThrow();
 
     expect(() =>
       parseChronaToolPayload("chrona.plan.mutate", {
