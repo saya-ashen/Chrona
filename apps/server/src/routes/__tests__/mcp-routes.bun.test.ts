@@ -139,7 +139,7 @@ describe("MCP routes", () => {
     ]);
     expect(nodeResult.description).toBe("Report the current execution node result. Chrona resolves the active node from the session.");
     expect(nodeResult.inputSchema.required).toEqual(["status"]);
-    expect(nodeResult.inputSchema.properties.nodeId).toBeUndefined();
+    expect(nodeResult.inputSchema.properties.nodeId).toMatchObject({ type: "string" });
     expect(nodeResult.inputSchema.properties.idempotencyKey).toBeUndefined();
     expect(nodeResult.inputSchema.properties.evidence).toBeUndefined();
   });
@@ -161,7 +161,7 @@ describe("MCP routes", () => {
       rpc("tools/call", {
         name: "chrona_execution_read",
         arguments: {},
-        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
     );
 
@@ -175,7 +175,7 @@ describe("MCP routes", () => {
   });
 
   it("dispatches every exposed Chrona MCP tool to the expected internal operation", async () => {
-    const sessionId = "chrona:hermes:task:task-1:execute";
+    const sessionId = "chrona:task:task-1:execute";
     const planBlueprint = {
       title: "Generated MCP plan",
       goal: "Persist a complete graph",
@@ -185,7 +185,7 @@ describe("MCP routes", () => {
     const cases = [
       ["chrona_plan_generate", "chrona.plan.generate", planBlueprint, planBlueprint],
       ["chrona_execution_read", "chrona.execution.read", {}, {}],
-      ["chrona_node_result", "chrona.node.result", { status: "complete", summary: "Done", output: { ok: true } }, { status: "complete", summary: "Done", output: { ok: true } }],
+      ["chrona_node_result", "chrona.node.result", { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } }, { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } }],
       ["chrona_node_result", "chrona.node.result", { status: "blocked", reason: "Waiting on API" }, { status: "blocked", reason: "Waiting on API" }],
       ["chrona_node_result", "chrona.node.result", { status: "failed", error: "Command failed" }, { status: "failed", error: "Command failed" }],
     ] as const;
@@ -209,7 +209,7 @@ describe("MCP routes", () => {
           payload: expectedPayload,
         },
       });
-      expect(operations[0].input.payload?.nodeId).toBeUndefined();
+      expect(operations[0].input.payload).toEqual(expectedPayload);
     }
   });
 
@@ -218,7 +218,7 @@ describe("MCP routes", () => {
       rpc("tools/call", {
         name: "chrona_node_result",
         arguments: { status: "complete", summary: "Done" },
-        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
     );
 
@@ -233,7 +233,7 @@ describe("MCP routes", () => {
       rpc("tools/call", {
         name: "chrona_execution_read",
         arguments: {},
-        _meta: { sessionId: "chrona:hermes:task:task-1:plan-graph" },
+        _meta: { sessionId: "chrona:task:task-1:plan-graph" },
       }),
     );
 
@@ -257,7 +257,7 @@ describe("MCP routes", () => {
           status: "complete",
           summary: "Done",
         },
-        _meta: { sessionId: "chrona:hermes:task:task-1:execute" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
       true,
     );

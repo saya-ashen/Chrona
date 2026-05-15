@@ -314,6 +314,100 @@ function errorDetailsFromOutcome(outcome: GraphDispatchOutcome): unknown {
   return failedAttempt?.error?.details;
 }
 
+function toEffectivePlanGraph(input: {
+  graph: PlanGraph;
+  attempts: NodeAttempt[];
+  results: NodeResult[];
+}): EffectivePlanGraph {
+  return resolveEffectivePlanGraph({
+    graph: input.graph,
+    attempts: input.attempts,
+    results: input.results,
+  }) as unknown as EffectivePlanGraph;
+}
+
+function hasCurrentNodeResult(input: {
+  results: NodeResult[];
+  nodeId: string;
+}) {
+  return input.results.some(
+    (result) =>
+      result.nodeId === input.nodeId &&
+      (result.status === "current" || result.status === "rejected"),
+  );
+}
+
+async function committedStateIfNodeAdvanced(input: {
+  taskId: string;
+  planId: string;
+  nodeId: string | null;
+  results: NodeResult[];
+}) {
+  if (!input.nodeId || hasCurrentNodeResult({ results: input.results, nodeId: input.nodeId })) {
+    return null;
+  }
+
+  const committed = await getPlanRun(input.taskId, input.planId);
+  if (!committed?.graph) return null;
+  if (!hasCurrentNodeResult({ results: committed.results, nodeId: input.nodeId })) {
+    return null;
+  }
+
+  return committed;
+}
+
+async function committedStateIfRunningNodeAdvanced(input: {
+  taskId: string;
+  planId: string;
+  state: GraphExecutionState;
+}) {
+  const runningNodeId = [...(input.state.attempts as unknown as NodeAttempt[])]
+    .reverse()
+    .find((attempt) => attempt.status === "running")?.nodeId ?? null;
+
+  return committedStateIfNodeAdvanced({
+    taskId: input.taskId,
+    planId: input.planId,
+    nodeId: runningNodeId,
+    results: input.state.results as unknown as NodeResult[],
+  });
+}
+
+function buildExecutionResponseFromCommittedState(input: {
+  taskId: string;
+  planId: string;
+  mainSessionId: string;
+  committed: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
+  fallbackMessage: string;
+}): PlanExecutionResult {
+  if (!input.committed.graph) {
+    throw new Error("Plan runtime graph missing");
+  }
+  const effective = toEffectivePlanGraph({
+    graph: input.committed.graph,
+    attempts: input.committed.attempts,
+    results: input.committed.results,
+  });
+  const status = mapTerminalReasonToStatus(effective);
+  const currentNodeId =
+    status === "completed"
+      ? null
+      : currentNodeFromEffective(effective)?.id ??
+        input.committed.attempts.findLast((attempt) => attempt.status === "failed")?.nodeId ??
+        null;
+
+  return buildExecutionResponse({
+    taskId: input.taskId,
+    planId: input.planId,
+    mainSessionId: input.mainSessionId,
+    status,
+    effective,
+    currentNodeId,
+    executedNodeIds: effective.completedNodeIds,
+    message: input.fallbackMessage,
+  });
+}
+
 async function persistRuntimeState(input: {
   workspaceId: string;
   taskId: string;
@@ -539,15 +633,33 @@ function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
 function currentNodeFromOutcome(outcome: GraphDispatchOutcome): string | null {
   return (
     outcome.currentNodeId ??
-    outcome.effective.nodes.find(
+    currentNodeFromEffective(outcome.effective as unknown as EffectivePlanGraph)?.id ??
+    null
+  );
+}
+
+function currentNodeFromEffective(effective: EffectivePlanGraph) {
+  return (
+    effective.nodes.find((node) => node.status === "running") ??
+    effective.nodes.find(
       (node) =>
         node.status === "waiting_for_user" ||
         node.status === "waiting_for_approval" ||
         node.status === "blocked" ||
         node.status === "failed",
-    )?.id ??
+    ) ??
     null
   );
+}
+
+function latestStartedNodeId(events: GraphExecutionEvent[]): string | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event?.type === "node_started") {
+      return event.node.id;
+    }
+  }
+  return null;
 }
 
 function currentNodeFromState(input: {
@@ -728,10 +840,48 @@ async function advancePlanExecution(input: {
     runtimeName,
     policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS },
     callbacks: {
-      onEvent: input.onGraphEvent,
-      onStateChange: input.onStateChange
-        ? (state) => input.onStateChange?.(resolveEffectivePlanGraph(state))
-        : undefined,
+      onEvent: async (event) => {
+        if (event.type === "node_started") {
+          await setExecutionSessionState({
+            sessionId: input.executionSession.id,
+            status: "Active",
+            currentNodeId: event.node.id,
+          });
+          await db.task.update({
+            where: { id: input.taskId },
+            data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
+          });
+          await rebuildTaskProjection(input.taskId);
+        }
+        await input.onGraphEvent?.(event);
+      },
+      onStateChange: async (state) => {
+        const committed = await committedStateIfRunningNodeAdvanced({
+          taskId: input.taskId,
+          planId: runtime.planId,
+          state,
+        });
+        if (committed?.graph) {
+          await input.onStateChange?.(toEffectivePlanGraph({
+            graph: committed.graph,
+            attempts: committed.attempts,
+            results: committed.results,
+          }));
+          return;
+        }
+        await persistRuntimeState({
+          workspaceId: runtime.workspaceId,
+          taskId: input.taskId,
+          planId: runtime.planId,
+          compiledPlan: runtime.compiledPlan,
+          graph: state.graph as unknown as PlanGraph,
+          attempts: state.attempts as unknown as NodeAttempt[],
+          results: state.results as unknown as NodeResult[],
+          executionContextSnapshots: state.executionContextSnapshots as unknown as ExecutionContextSnapshot[],
+          existingRun: runtime.persisted.planRun,
+        });
+        await input.onStateChange?.(resolveEffectivePlanGraph(state));
+      },
       executeNode: async (executorInput) => {
         const engineNode = executorInput.node as unknown as EffectivePlanNode;
         const enginePlan = executorInput.plan as unknown as EffectivePlanGraph;
@@ -761,13 +911,32 @@ async function advancePlanExecution(input: {
     },
   });
   const command = input.command;
+  const effectiveBeforeCommand = command && (
+    command.type === "complete_manual_node" ||
+    command.type === "block_current_node" ||
+    command.type === "fail_current_node"
+  )
+    ? resolveEffectivePlanGraph(state)
+    : null;
+  if (command && effectiveBeforeCommand && mapTerminalReasonToStatus(effectiveBeforeCommand) === "completed") {
+    return buildExecutionResponse({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      mainSessionId: input.mainSession.id,
+      status: "completed",
+      effective: effectiveBeforeCommand,
+      currentNodeId: null,
+      executedNodeIds: effectiveBeforeCommand.completedNodeIds,
+      message: "Execution already completed; node result ignored.",
+    });
+  }
   const commandNode = command && (
     command.type === "complete_manual_node" ||
     command.type === "block_current_node" ||
     command.type === "fail_current_node"
   )
     ? currentNodeFromState({
-        effective: resolveEffectivePlanGraph(state),
+        effective: effectiveBeforeCommand!,
         executionSession: input.executionSession,
         nodeId: command.nodeId,
       })
@@ -898,6 +1067,34 @@ async function advancePlanExecution(input: {
           }
         : { type: "start" as const, state, trigger: input.trigger, context };
   const outcome = await graphRuntime.dispatch(dispatchCommand);
+  const staleRunningNodeId =
+    outcome.status === "running"
+      ? currentNodeFromOutcome(outcome) ?? latestStartedNodeId(outcome.events)
+      : null;
+  const committed = outcome.status === "running"
+    ? await committedStateIfNodeAdvanced({
+        taskId: input.taskId,
+        planId: runtime.planId,
+        nodeId: staleRunningNodeId,
+        results: outcome.state.results as unknown as NodeResult[],
+      })
+    : null;
+
+  if (committed) {
+    await appendGraphRuntimeEvents({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      sessionId: input.mainSession.id,
+      events: outcome.events,
+    });
+    return buildExecutionResponseFromCommittedState({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      mainSessionId: input.mainSession.id,
+      committed,
+      fallbackMessage: outcome.message,
+    });
+  }
 
   await persistRuntimeState({
     workspaceId: runtime.workspaceId,
@@ -957,10 +1154,11 @@ async function advancePlanExecution(input: {
   }
 
   if (outcome.status === "running") {
+    const currentNodeId = currentNodeFromOutcome(outcome) ?? latestStartedNodeId(outcome.events);
     await setExecutionSessionState({
       sessionId: input.executionSession.id,
       status: "Active",
-      currentNodeId: currentNodeFromOutcome(outcome),
+      currentNodeId,
       pauseReason: null,
       completedNodeIds: outcome.effective.completedNodeIds,
     });
@@ -975,7 +1173,7 @@ async function advancePlanExecution(input: {
       mainSessionId: input.mainSession.id,
       status: "running",
       effective: outcome.effective as unknown as EffectivePlanGraph,
-      currentNodeId: currentNodeFromOutcome(outcome),
+      currentNodeId,
       executedNodeIds: outcome.executedNodeIds,
       message: outcome.message,
     });

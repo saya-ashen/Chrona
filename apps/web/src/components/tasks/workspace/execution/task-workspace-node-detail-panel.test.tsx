@@ -75,7 +75,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
     expect(screen.getByText("Action required")).toBeInTheDocument();
-    expect(screen.getAllByText("Accept").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Send Accept" })).toBeDisabled();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Approve" } });
@@ -91,6 +91,39 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Review patch safety")).toBeInTheDocument();
     expect(screen.getByText("Research current task workspace")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
+  });
+
+  it("submits free-form input nodes without requiring a predefined action", async () => {
+    const dispatchAction = vi.fn().mockResolvedValue({ message: "Input sent" });
+    const node = createTaskWorkspaceFixtureNode({
+      id: "input-node",
+      title: "Collect city",
+      status: "waiting_for_user",
+      interactionType: "input",
+      availableActions: [],
+      interactiveFields: [
+        { key: "city", label: "默认城市", value: "", required: true },
+        { key: "extra", label: "额外需求", value: "" },
+      ],
+      nextAction: "Provide missing task details",
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed" })} selectedNodes={[node]} onDispatchExecutionAction={dispatchAction} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Action" }));
+
+    const submit = screen.getByRole("button", { name: "Send input" });
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/默认城市/), { target: { value: "北京" } });
+    fireEvent.change(screen.getByLabelText(/额外需求/), { target: { value: "无" } });
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith({
+      action: "resume_with_input",
+      nodeId: "input-node",
+      inputText: "默认城市: 北京\n额外需求: 无",
+    }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Input sent");
   });
 
   it("copies result text through the clipboard API", async () => {

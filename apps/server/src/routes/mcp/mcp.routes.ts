@@ -4,6 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { CallToolResult, ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { ChronaEngine } from "@chrona/engine";
+import { createLogger } from "@chrona/shared/logger";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { chronaToolInputSchema, type ChronaToolName } from "@chrona/contracts/api";
@@ -11,12 +12,15 @@ import { planBlueprintSchema } from "@chrona/contracts";
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
+const logger = createLogger("apps.server.mcp");
+
 const optionalString = z.string().min(1).optional();
 const requiredString = (description: string) => z.string().min(1).describe(description);
 
 const baseReadSchema = z.object({}).passthrough();
 const nodeResultSchema = z.object({
   status: z.enum(["complete", "blocked", "failed"]).describe("Current node result status."),
+  nodeId: optionalString.describe("Optional execution node id to complete when the session has multiple active records."),
   summary: optionalString.describe("Short completion summary when status is complete."),
   output: z.unknown().optional().describe("Structured result produced by the current node when status is complete."),
   reason: optionalString.describe("Why the current node is blocked when status is blocked."),
@@ -129,12 +133,40 @@ async function callChronaTool(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
 ): Promise<CallToolResult> {
   const chronaInput = toChronaInput(toolName, input, extra);
+  logger.info("tool.call.received", {
+    toolName,
+    externalSessionId: sessionIdFrom(input, extra) ?? null,
+    inputSessionId: typeof input.sessionId === "string" ? input.sessionId : null,
+    inputMetaSessionId: input._meta && typeof input._meta === "object"
+      ? (input._meta as Record<string, unknown>).sessionId ?? null
+      : null,
+    extraSessionId: extra?.sessionId ?? null,
+    extraMetaSessionId: extra?._meta && typeof extra._meta === "object"
+      ? (extra._meta as Record<string, unknown>).sessionId ?? null
+      : null,
+    payloadKeys: Object.keys(input).filter((key) => key !== "_meta"),
+  });
   const resolvedInput = "resolveInputContext" in engine.agentTools
     ? await engine.agentTools.resolveInputContext(chronaInput)
     : chronaToolInputSchema.parse(chronaInput);
+  logger.info("tool.call.resolved", {
+    toolName,
+    sessionId: resolvedInput.sessionId ?? null,
+    taskId: resolvedInput.taskId ?? null,
+    workspaceId: resolvedInput.workspaceId ?? null,
+    hasIdempotencyKey: Boolean(resolvedInput.idempotencyKey),
+  });
   const result = await engine.agentTools.execute({
     toolName,
     input: resolvedInput,
+  });
+  logger.info("tool.call.result", {
+    toolName,
+    sessionId: resolvedInput.sessionId ?? null,
+    taskId: resolvedInput.taskId ?? null,
+    status: result.status,
+    reasonCode: "reasonCode" in result ? result.reasonCode : undefined,
+    message: result.message,
   });
   return {
     content: [{ type: "text", text: result.message }],

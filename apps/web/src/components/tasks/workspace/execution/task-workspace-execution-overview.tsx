@@ -98,10 +98,7 @@ function AttentionCard({ card, readiness, onAction }: { card: ExecutionOverviewC
       {card.actionLabel && onAction ? (
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" className={buttonVariants({ variant: "default", size: "sm", className: "h-7 rounded-lg px-2 text-xs" })} onClick={() => onAction(card.actionNodeId)}>
-            Review and approve
-          </button>
-          <button type="button" className={buttonVariants({ variant: "outline", size: "sm", className: "h-7 rounded-lg bg-white/70 px-2 text-xs" })} onClick={() => onAction(card.actionNodeId)}>
-            Supplement info
+            {card.actionLabel}
           </button>
         </div>
       ) : null}

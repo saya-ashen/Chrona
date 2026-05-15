@@ -30,7 +30,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Artifacts (0)")).toBeInTheDocument();
     expect(screen.getByText("Execution activity", { selector: "p" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Review and approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resolve in node panel" }));
     expect(onAction).toHaveBeenCalledWith("approval");
   });
 

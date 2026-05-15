@@ -257,9 +257,24 @@ function buildInteractiveFields(node: {
       key: "checkpoint:decision",
       label: "决策",
       value: "",
-      control: "select",
+      control: "approval",
       required: Boolean(node.metadata.required),
       options: node.metadata.options,
+    });
+  }
+
+  if (
+    node.kind === "checkpoint" &&
+    (node.metadata.checkpointType === "approve" || node.metadata.checkpointType === "confirm") &&
+    !fields.some((field) => field.key === "checkpoint:decision")
+  ) {
+    fields.push({
+      key: "checkpoint:decision",
+      label: "审批决策",
+      value: "",
+      control: "approval",
+      required: node.metadata.required ?? true,
+      options: ["Approve", "Reject"],
     });
   }
 
@@ -297,8 +312,8 @@ function buildAvailableActions(node: {
   if (node.interactionType === "confirm") {
     actions.push({
       id: `${node.id}:confirm`,
-      label: "确认",
-      kind: "confirm",
+      label: "审批",
+      kind: "approve",
       emphasis: "primary",
     });
     return actions;

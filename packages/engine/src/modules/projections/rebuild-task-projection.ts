@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
+import { publishTaskProjectionEvent } from "./task-projection-events";
 
 export async function rebuildTaskProjection(taskId: string) {
   const task = await db.task.findUniqueOrThrow({
@@ -87,7 +88,7 @@ export async function rebuildTaskProjection(taskId: string) {
     data: updateData as never,
   });
 
-  return db.taskProjection.upsert({
+  const projection = await db.taskProjection.upsert({
     where: { taskId: task.id },
     update: {
       workspaceId: task.workspaceId,
@@ -139,4 +140,14 @@ export async function rebuildTaskProjection(taskId: string) {
       lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
     },
   });
+
+  publishTaskProjectionEvent({
+    type: "task_projection_updated",
+    taskId: projection.taskId,
+    workspaceId: projection.workspaceId,
+    persistedStatus: projection.persistedStatus,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return projection;
 }

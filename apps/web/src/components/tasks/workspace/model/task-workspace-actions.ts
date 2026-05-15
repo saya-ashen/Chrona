@@ -51,7 +51,11 @@ export function buildWorkspaceActionInput(input: {
   const inputText = buildWorkspaceInputText(input.fields, input.values);
   const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
 
-  if (kind === "approve" || input.node.interactionType === "approve") {
+  if (
+    kind === "approve" ||
+    input.node.interactionType === "approve" ||
+    input.node.interactionType === "confirm"
+  ) {
     return {
       action: "resume_with_approval",
       nodeId: input.node.id,
@@ -95,7 +99,7 @@ export function buildWorkspaceActionInput(input: {
   return {
     action: "resume_with_input",
     nodeId: input.node.id,
-    inputText: inputText || input.selectedAction?.label || input.node.nextAction || "Continue",
+    inputText: inputText || input.node.nextAction || "Continue",
   };
 }
 
