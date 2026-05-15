@@ -14,6 +14,32 @@ function isPlanGenerateTool(tool: string | undefined): boolean {
     tool === INTERNAL_PLAN_GENERATE_TOOL_NAME;
 }
 
+function isPlanBlueprint(value: Record<string, unknown>): value is PlanBlueprint {
+  return typeof value.title === "string" &&
+    typeof value.goal === "string" &&
+    Array.isArray(value.nodes) &&
+    Array.isArray(value.edges);
+}
+
+function getToolDisplayName(tool: string | undefined) {
+  switch (tool) {
+    case PLAN_GENERATE_TOOL_NAME:
+    case INTERNAL_PLAN_GENERATE_TOOL_NAME:
+      return "生成计划结构";
+    case "skill_view":
+      return "读取规划技能";
+    default:
+      return tool ?? "AI 工具";
+  }
+}
+
+function getToolPreview(input: Record<string, unknown>) {
+  const preview = input.preview;
+  return typeof preview === "string" && preview.trim().length > 0
+    ? `：${preview}`
+    : "";
+}
+
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -211,23 +237,34 @@ export async function* generateTaskPlanManualStream(input: {
       case "tool_call":
         if (isPlanGenerateTool(event.tool)) {
           hasPlanGenerateToolCall = true;
-          const toolEvent: GeneratePlanSSEEvent = {
-            type: "tool_call",
-            tool: PLAN_GENERATE_TOOL_NAME,
-            input: event.input as unknown as PlanBlueprint,
-          };
           await dump?.write({
             type: "state",
             field: "hasPlanGenerateToolCall",
             value: hasPlanGenerateToolCall,
           });
-          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(toolEvent) });
-          yield toolEvent;
+
+          if (isPlanBlueprint(event.input)) {
+            const toolEvent: GeneratePlanSSEEvent = {
+              type: "tool_call",
+              tool: PLAN_GENERATE_TOOL_NAME,
+              input: event.input,
+            };
+            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(toolEvent) });
+            yield toolEvent;
+          } else {
+            const statusEvent: GeneratePlanSSEEvent = {
+              type: "status",
+              phase: "streaming",
+              message: `正在${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
+            };
+            await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(statusEvent) });
+            yield statusEvent;
+          }
         } else {
           const statusEvent: GeneratePlanSSEEvent = {
             type: "status",
             phase: "streaming",
-            message: `Tool call: ${event.tool}`,
+            message: `正在${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
           };
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(statusEvent) });
           yield statusEvent;
@@ -293,6 +330,15 @@ export async function* generateTaskPlanManualStream(input: {
           yield doneEvent;
           await dump?.close();
           return;
+        }
+        {
+          const statusEvent: GeneratePlanSSEEvent = {
+            type: "status",
+            phase: "streaming",
+            message: `${getToolDisplayName(event.tool)}已完成。`,
+          };
+          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(statusEvent) });
+          yield statusEvent;
         }
         break;
 

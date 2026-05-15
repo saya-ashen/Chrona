@@ -91,6 +91,12 @@ function toLlmStreamRequest(
   };
 }
 
+function asToolCallInput(evt: Extract<ProviderRunEvent, { type: "tool_started" }>) {
+  if (evt.input !== undefined) return asRecord(evt.input);
+  if (evt.preview !== undefined) return { preview: evt.preview };
+  return {};
+}
+
 function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
   switch (evt.type) {
     case "text_delta":
@@ -111,13 +117,11 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
             : JSON.stringify(evt.result),
       };
     case "tool_started":
-      return evt.input === undefined
-        ? null
-        : {
-            type: "tool_call",
-            tool: evt.toolName,
-            input: asRecord(evt.input),
-          };
+      return {
+        type: "tool_call",
+        tool: evt.toolName,
+        input: asToolCallInput(evt),
+      };
     case "tool_completed":
       return {
         type: "tool_result",

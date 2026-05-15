@@ -143,6 +143,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
     <div className="relative" style={{ width: NODE_WIDTH }}>
       <Handle id="top-target" type="target" position={Position.Top} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
       <Handle id="left-target" type="target" position={Position.Left} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="top-source" type="source" position={Position.Top} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="left-source" type="source" position={Position.Left} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
       <button
         type="button"
         onClick={() => onSelect(node.id)}
@@ -214,6 +216,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
           </div>
         </div>
       </button>
+      <Handle id="right-target" type="target" position={Position.Right} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="bottom-target" type="target" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
       <Handle id="right-source" type="source" position={Position.Right} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
       <Handle id="bottom-source" type="source" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
     </div>
