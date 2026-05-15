@@ -102,80 +102,120 @@ export function mapSnapshot(raw: unknown, includeRaw = false): ProviderRunSnapsh
 export function mapHermesEvent(
   event: unknown,
   runId: string,
-  includeRaw: boolean,
+  options: { includeRaw: boolean; strictUnknown?: boolean; sequence?: number },
 ): ProviderRunEvent | undefined {
   const body = asRecord(event);
   const type = stringValue(body.type) ?? stringValue(body.event);
+  const metadata = buildEventMetadata({
+    body,
+    fallbackRunId: runId,
+    sequence: options.sequence,
+  });
+  const raw = options.includeRaw ? event : undefined;
 
   switch (type) {
     case "message.delta":
-      return { type: "text_delta", text: stringValue(body.delta) ?? "" };
+      return {
+        ...metadata,
+        type: "text_delta",
+        text: stringValue(body.delta) ?? "",
+      };
     case "tool.started":
       return {
+        ...metadata,
         type: "tool_started",
         toolName: stringValue(body.tool) ?? "unknown",
         preview: body.preview,
         input: body.input,
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     case "tool.completed": {
       const error = body.error;
       return {
+        ...metadata,
         type: "tool_completed",
         toolName: stringValue(body.tool),
         error: error === undefined || error === null || error === false
           ? undefined
           : normalizeError(error),
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     }
     case "reasoning.available":
       return {
+        ...metadata,
         type: "reasoning_delta",
         text: stringValue(body.text) ?? "",
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     case "approval.request":
       return {
+        ...metadata,
         type: "approval_required",
         approval: {
-          runId,
+          runId: metadata.runId ?? runId,
           choices: body.choices,
           raw: event,
         },
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     case "run.completed": {
       const outputText = stringValue(body.output);
       return {
+        ...metadata,
         type: "run_completed",
         run: {
           provider: "hermes",
-          runId,
+          runId: metadata.runId ?? runId,
           sessionId: stringValue(body.session_id) ?? "unknown",
-          providerRunId: runId,
+          providerRunId: metadata.runId ?? runId,
           status: "completed",
         },
         outputText,
         output: outputText === undefined ? undefined : { text: outputText },
         usage: mapUsage(body.usage),
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     }
     case "run.failed":
       return {
+        ...metadata,
         type: "run_failed",
         error: stringValue(body.error) ?? "Hermes run failed",
-        raw: includeRaw ? event : undefined,
+        raw,
       };
     case "run.cancelled":
       return {
+        ...metadata,
         type: "run_cancelled",
-        raw: includeRaw ? event : undefined,
+        raw,
       };
-    default:
-      return includeRaw ? { type: "raw_event", raw: event } : undefined;
+    default: {
+      if (options.strictUnknown) {
+        throw new Error(`Unknown Hermes stream event type: ${type ?? "<missing>"}`);
+      }
+      return options.includeRaw ? { ...metadata, type: "raw_event", raw: event } : undefined;
+    }
   }
+}
+
+function buildEventMetadata(input: {
+  body: Record<string, unknown>;
+  fallbackRunId: string;
+  sequence?: number;
+}) {
+  const rawEventType = stringValue(input.body.type) ?? stringValue(input.body.event);
+  const timestampValue = stringValue(input.body.timestamp) ?? stringValue(input.body.time);
+  const durationMs = numberValue(input.body.duration);
+  return {
+    provider: "hermes",
+    runId: stringValue(input.body.run_id) ?? input.fallbackRunId,
+    sessionId: stringValue(input.body.session_id),
+    sequence: input.sequence,
+    timestamp: timestampValue,
+    rawEventType,
+    durationMs,
+  } satisfies Partial<ProviderRunEvent>;
 }
 
 function normalizeError(error: unknown): { message: string; code?: string; raw?: unknown } {

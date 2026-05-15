@@ -15,133 +15,20 @@ const optionalString = z.string().min(1).optional();
 const requiredString = (description: string) => z.string().min(1).describe(description);
 
 const baseReadSchema = z.object({}).passthrough();
-const baseMutationSchema = baseReadSchema;
-
-const taskCreateSchema = z.object({
-  title: requiredString("Task title."),
-  description: optionalString.describe("Task description."),
-  priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional().describe("Task priority."),
-  executionRuntime: optionalString.describe("Runtime used when executing this task."),
-  executionConfig: z.record(z.string(), z.unknown()).optional().describe("Runtime-specific execution config."),
-  parentTaskId: z.string().nullable().optional().describe("Optional parent task id."),
+const nodeResultSchema = z.object({
+  status: z.enum(["complete", "blocked", "failed"]).describe("Current node result status."),
+  summary: optionalString.describe("Short completion summary when status is complete."),
+  output: z.unknown().optional().describe("Structured result produced by the current node when status is complete."),
+  reason: optionalString.describe("Why the current node is blocked when status is blocked."),
+  error: optionalString.describe("Why the current node failed when status is failed."),
 }).passthrough();
 
-const taskUpdateSchema = baseMutationSchema.extend({
-  title: optionalString.describe("New task title."),
-  description: optionalString.describe("New task description."),
-  priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional().describe("New task priority."),
-  status: optionalString.describe("New task lifecycle status."),
-  executionRuntime: optionalString.describe("New execution runtime."),
-  executionConfig: z.record(z.string(), z.unknown()).optional().describe("New runtime-specific execution config."),
-});
-
-const planMutateSchema = baseMutationSchema.extend({
-  expectedGraphId: optionalString.describe("Known current plan graph id."),
-  reason: requiredString("Reason for changing the plan graph."),
-  scope: z.enum(["future_only", "from_node", "entire_graph"]).optional().describe("Mutation scope."),
-  operations: z.array(z.record(z.string(), z.unknown())).min(1).describe("Plan graph mutation operations."),
-});
-
-const scheduleProposalSchema = baseMutationSchema.extend({
-  source: optionalString.describe("Proposal source."),
-  proposedBy: optionalString.describe("Actor proposing this schedule."),
-  summary: optionalString.describe("Short proposal summary."),
-  dueAt: z.string().nullable().optional().describe("Proposed due time as ISO string, or null."),
-  scheduledStartAt: z.string().nullable().optional().describe("Proposed start time as ISO string, or null."),
-  scheduledEndAt: z.string().nullable().optional().describe("Proposed end time as ISO string, or null."),
-});
-
-const scheduleSetSchema = baseMutationSchema.extend({
-  scheduledStartAt: requiredString("Scheduled start time as ISO string."),
-  scheduledEndAt: requiredString("Scheduled end time as ISO string."),
-  dueAt: z.string().nullable().optional().describe("Due time as ISO string, or null."),
-  scheduleSource: z.enum(["human", "ai", "system"]).optional().describe("Source of the accepted schedule."),
-});
-
-const executionDispatchSchema = baseMutationSchema.extend({
-  action: z.enum([
-    "start_manual",
-    "start_scheduled",
-    "resume_with_input",
-    "resume_with_approval",
-    "resume_after_unblock",
-    "complete_manual_node",
-    "retry_node",
-    "cancel_session",
-  ]).describe("Execution lifecycle action to dispatch."),
-  prompt: optionalString.describe("Optional prompt for start or retry actions."),
-  workBlockId: optionalString.describe("Work block id for scheduled/manual start."),
-  nodeId: optionalString.describe("Execution node id for node-scoped actions."),
-  inputText: optionalString.describe("Human or agent input for resume_with_input."),
-  decision: z.enum(["approve", "reject", "request_changes"]).optional().describe("Approval decision for resume_with_approval."),
-  feedback: optionalString.describe("Optional approval feedback."),
-  editedContent: optionalString.describe("Optional edited approval content."),
-  note: optionalString.describe("Optional note for resume_after_unblock."),
-  summary: optionalString.describe("Optional manual node completion summary."),
-  output: z.unknown().optional().describe("Optional manual node output."),
-  reason: optionalString.describe("Optional cancellation reason."),
-});
-
 const externalTools = {
-  chrona_task_read: {
-    internalName: "chrona.task.read",
-    title: "Chrona Task Read",
-    description: "Read a task's current Chrona lifecycle state.",
-    inputSchema: baseReadSchema,
-  },
-  chrona_task_create: {
-    internalName: "chrona.task.create",
-    title: "Chrona Task Create",
-    description: "Create a Chrona task in a workspace.",
-    inputSchema: taskCreateSchema,
-  },
-  chrona_task_update: {
-    internalName: "chrona.task.update",
-    title: "Chrona Task Update",
-    description: "Update task fields through Chrona validation.",
-    inputSchema: taskUpdateSchema,
-  },
-  chrona_plan_read: {
-    internalName: "chrona.plan.read",
-    title: "Chrona Plan Read",
-    description: "Read the accepted plan graph state for a task.",
-    inputSchema: baseReadSchema,
-  },
   chrona_plan_generate: {
     internalName: "chrona.plan.generate",
     title: "Chrona Plan Generate",
     description: "Persist a complete Hermes-generated plan graph for the session task.",
     inputSchema: planBlueprintSchema.passthrough(),
-  },
-  chrona_plan_mutate: {
-    internalName: "chrona.plan.mutate",
-    title: "Chrona Plan Mutate",
-    description: "Apply plan graph mutations with stale-write protection.",
-    inputSchema: planMutateSchema,
-  },
-  chrona_schedule_read: {
-    internalName: "chrona.schedule.read",
-    title: "Chrona Schedule Read",
-    description: "Read task schedule and pending proposal state.",
-    inputSchema: baseReadSchema,
-  },
-  chrona_schedule_propose: {
-    internalName: "chrona.schedule.propose",
-    title: "Chrona Schedule Propose",
-    description: "Propose schedule timing for a task.",
-    inputSchema: scheduleProposalSchema,
-  },
-  chrona_schedule_set: {
-    internalName: "chrona.schedule.set",
-    title: "Chrona Schedule Set",
-    description: "Set the accepted schedule for a task.",
-    inputSchema: scheduleSetSchema,
-  },
-  chrona_schedule_clear: {
-    internalName: "chrona.schedule.clear",
-    title: "Chrona Schedule Clear",
-    description: "Clear the accepted schedule for a task.",
-    inputSchema: baseMutationSchema,
   },
   chrona_execution_read: {
     internalName: "chrona.execution.read",
@@ -149,11 +36,11 @@ const externalTools = {
     description: "Read execution session state and supported next actions.",
     inputSchema: baseReadSchema,
   },
-  chrona_execution_dispatch: {
-    internalName: "chrona.execution.dispatch",
-    title: "Chrona Execution Dispatch",
-    description: "Dispatch an execution lifecycle action for a task.",
-    inputSchema: executionDispatchSchema,
+  chrona_node_result: {
+    internalName: "chrona.node.result",
+    title: "Chrona Node Result",
+    description: "Report the current execution node result. Chrona resolves the active node from the session.",
+    inputSchema: nodeResultSchema,
   },
 } as const satisfies Record<string, {
   internalName: ChronaToolName;

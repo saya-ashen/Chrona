@@ -280,6 +280,52 @@ describe("plan-runner task executor approval flows", () => {
     expect(updatedTask.status).toBe(TaskStatus.Blocked);
   });
 
+  it("forwards runtime events from task node execution", async () => {
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      await input.onRuntimeEvent?.({
+        type: "text_delta",
+        provider: "hermes",
+        runId: "hermes-run-1",
+        sequence: 0,
+        text: "working",
+      });
+      return {
+        status: "started",
+        summary: "Hermes run started",
+        evidence: { sessionId: input.mainSession.id },
+        output: { runtimeRunRef: "hermes-run-1" },
+      } satisfies NodeExecutionResult;
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner forwards runtime event");
+    const compiledPlan = makeSingleTaskPlan("graph_task_runtime_event");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const runtimeEvents: unknown[] = [];
+    await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+      onRuntimeEvent(event) {
+        runtimeEvents.push(event);
+      },
+    });
+
+    expect(runtimeEvents).toEqual([
+      {
+        nodeId: "task_node",
+        nodeTitle: "Execute mocked task node",
+        runtimeName: "openclaw",
+        event: {
+          type: "text_delta",
+          provider: "hermes",
+          runId: "hermes-run-1",
+          sequence: 0,
+          text: "working",
+        },
+      },
+    ]);
+  });
+
   it("persists detailed runtime failure context for a failed task node", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "failed",

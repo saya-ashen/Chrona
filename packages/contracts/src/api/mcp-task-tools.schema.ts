@@ -24,6 +24,7 @@ export const chronaToolNames = [
   "chrona.schedule.clear",
   "chrona.execution.read",
   "chrona.execution.dispatch",
+  "chrona.node.result",
 ] as const;
 
 export const chronaToolNameSchema = z.enum(chronaToolNames);
@@ -87,6 +88,28 @@ export const chronaToolContextSchema = z.object({
 });
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
+const nodeResultPayloadSchema = z.object({
+  status: z.enum(["complete", "blocked", "failed"]),
+  summary: z.string().optional(),
+  output: z.unknown().optional(),
+  reason: z.string().min(1, "reason is required").optional(),
+  error: z.string().min(1, "error is required").optional(),
+}).passthrough().superRefine((value, ctx) => {
+  if (value.status === "blocked" && !value.reason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reason"],
+      message: "reason is required when status is blocked",
+    });
+  }
+  if (value.status === "failed" && !value.error) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["error"],
+      message: "error is required when status is failed",
+    });
+  }
+});
 
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
@@ -101,6 +124,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.schedule.clear": readPayloadSchema,
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
+  "chrona.node.result": nodeResultPayloadSchema,
 } as const;
 
 /**

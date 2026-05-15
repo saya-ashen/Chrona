@@ -35,6 +35,7 @@ import type {
   PlanRun,
   WaitKind,
 } from "@chrona/contracts/ai";
+import type { ProviderRunEvent } from "@chrona/providers-foundation";
 import type { NodeExecutor } from "./node-executors/types";
 import { TaskNodeExecutor } from "./node-executors/task-executor";
 import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
@@ -46,7 +47,15 @@ type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
 
 type PlanExecutionObserver = {
   onGraphEvent?: (event: GraphExecutionEvent) => Promise<void> | void;
+  onRuntimeEvent?: (event: PlanExecutionRuntimeEvent) => Promise<void> | void;
   onStateChange?: (effectivePlan: EffectivePlanGraph) => Promise<void> | void;
+};
+
+export type PlanExecutionRuntimeEvent = {
+  nodeId: string;
+  nodeTitle: string;
+  runtimeName: string;
+  event: ProviderRunEvent;
 };
 
 type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
@@ -488,10 +497,12 @@ type AdvanceRuntimeCommand =
   | { type: "resume_after_unblock"; nodeId?: string }
   | {
       type: "complete_manual_node";
-      nodeId: string;
+      nodeId?: string;
       summary?: string;
       output?: unknown;
     }
+  | { type: "block_current_node"; nodeId?: string; reason: string }
+  | { type: "fail_current_node"; nodeId?: string; error: string }
   | {
       type: "resume_with_approval";
       nodeId: string;
@@ -535,6 +546,30 @@ function currentNodeFromOutcome(outcome: GraphDispatchOutcome): string | null {
         node.status === "blocked" ||
         node.status === "failed",
     )?.id ??
+    null
+  );
+}
+
+function currentNodeFromState(input: {
+  effective: EffectivePlanGraph;
+  executionSession: ExecutionSessionRow;
+  nodeId?: string;
+}) {
+  return (
+    (input.nodeId
+      ? input.effective.nodes.find((node) => node.id === input.nodeId)
+      : null) ??
+    input.effective.nodes.find(
+      (node) => node.id === input.executionSession.currentNodeId,
+    ) ??
+    input.effective.nodes.find((node) => node.status === "running") ??
+    input.effective.nodes.find(
+      (node) =>
+        node.status === "waiting_for_user" ||
+        node.status === "waiting_for_approval" ||
+        node.status === "blocked" ||
+        node.status === "failed",
+    ) ??
     null
   );
 }
@@ -713,11 +748,37 @@ async function advancePlanExecution(input: {
           trigger: executorInput.trigger,
           runtimeName,
           userInput: executorInput.userInput,
+          onRuntimeEvent: input.onRuntimeEvent
+            ? (event) => input.onRuntimeEvent?.({
+                nodeId: engineNode.id,
+                nodeTitle: engineNode.title,
+                runtimeName,
+                event,
+              })
+            : undefined,
         }) as ReturnType<typeof executor.execute>;
       },
     },
   });
   const command = input.command;
+  const commandNode = command && (
+    command.type === "complete_manual_node" ||
+    command.type === "block_current_node" ||
+    command.type === "fail_current_node"
+  )
+    ? currentNodeFromState({
+        effective: resolveEffectivePlanGraph(state),
+        executionSession: input.executionSession,
+        nodeId: command.nodeId,
+      })
+    : null;
+  if (command && (
+    command.type === "complete_manual_node" ||
+    command.type === "block_current_node" ||
+    command.type === "fail_current_node"
+  ) && !commandNode) {
+    throw new Error("No current execution node found for node result tool.");
+  }
   const dispatchCommand = command
     ? command.type === "resume_with_input"
       ? {
@@ -759,14 +820,38 @@ async function advancePlanExecution(input: {
                 trigger: input.trigger,
                 context,
                 externalResult: {
-                  nodeId: command.nodeId,
+                  nodeId: commandNode!.id,
                   status: "done" as const,
                   summary:
                     command.summary ??
-                    `Manual node ${command.nodeId} completed`,
+                    `Manual node ${commandNode?.id ?? "current"} completed`,
                   output: command.output,
                 },
               }
+            : command.type === "block_current_node"
+              ? {
+                  type: "sync_external_result" as const,
+                  state,
+                  trigger: input.trigger,
+                  context,
+                  externalResult: {
+                    nodeId: commandNode!.id,
+                    status: "blocked" as const,
+                    reason: command.reason,
+                  },
+                }
+              : command.type === "fail_current_node"
+                ? {
+                    type: "sync_external_result" as const,
+                    state,
+                    trigger: input.trigger,
+                    context,
+                    externalResult: {
+                      nodeId: commandNode!.id,
+                      status: "failed" as const,
+                      error: command.error,
+                    },
+                  }
             : command.type === "retry_node"
             ? {
                 type: "retry_node" as const,
@@ -959,6 +1044,7 @@ async function startPlanExecution(input: {
     mainSession,
     executionSession,
     onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
   });
 }
@@ -1036,6 +1122,7 @@ async function continuePlanExecution(input: {
     forcedNodeId: waitingNode?.id,
     forcedReplaceStatus: "obsolete",
     onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
   });
 }
@@ -1124,6 +1211,7 @@ async function resumePlanExecutionWithApproval(input: {
       feedback: input.feedback,
     },
     onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
   });
 }
@@ -1139,6 +1227,7 @@ async function dispatchExecutionAction(input: {
         trigger: "manual",
         prompt: input.action.prompt,
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     case "start_scheduled":
@@ -1146,6 +1235,7 @@ async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         trigger: "scheduler",
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     case "resume_with_input":
@@ -1156,6 +1246,7 @@ async function dispatchExecutionAction(input: {
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     case "resume_with_approval":
@@ -1166,6 +1257,7 @@ async function dispatchExecutionAction(input: {
         approved: input.action.decision === "approve",
         feedback: input.action.feedback ?? input.action.editedContent,
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     case "resume_after_unblock":
@@ -1176,6 +1268,7 @@ async function dispatchExecutionAction(input: {
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     case "complete_manual_node": {
@@ -1218,6 +1311,93 @@ async function dispatchExecutionAction(input: {
           output: input.action.output,
         },
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+    }
+    case "block_current_node": {
+      const runtime = await ensureNativePlanRun(input.taskId);
+      if (!runtime) {
+        return {
+          taskId: input.taskId,
+          planId: null,
+          mainSessionId: input.action.sessionId ?? null,
+          status: "no_plan",
+          currentNodeId: null,
+          executedNodeIds: [],
+          waitingNodeIds: [],
+          blockedNodeIds: [],
+          message:
+            "No accepted plan. Create or accept a plan before execution.",
+        };
+      }
+
+      const executionSession = await ensureExecutionSession({
+        workspaceId: runtime.workspaceId,
+        taskId: input.taskId,
+        planId: runtime.planId,
+        trigger: "manual",
+        sessionId: input.action.sessionId,
+      });
+      const mainSession = await ensurePlanMainSession({
+        taskId: input.taskId,
+        planId: runtime.planId,
+      });
+      return advancePlanExecution({
+        taskId: input.taskId,
+        trigger: "manual",
+        mainSession,
+        executionSession,
+        command: {
+          type: "block_current_node",
+          nodeId: input.action.nodeId,
+          reason: input.action.reason,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+    }
+    case "fail_current_node": {
+      const runtime = await ensureNativePlanRun(input.taskId);
+      if (!runtime) {
+        return {
+          taskId: input.taskId,
+          planId: null,
+          mainSessionId: input.action.sessionId ?? null,
+          status: "no_plan",
+          currentNodeId: null,
+          executedNodeIds: [],
+          waitingNodeIds: [],
+          blockedNodeIds: [],
+          message:
+            "No accepted plan. Create or accept a plan before execution.",
+        };
+      }
+
+      const executionSession = await ensureExecutionSession({
+        workspaceId: runtime.workspaceId,
+        taskId: input.taskId,
+        planId: runtime.planId,
+        trigger: "manual",
+        sessionId: input.action.sessionId,
+      });
+      const mainSession = await ensurePlanMainSession({
+        taskId: input.taskId,
+        planId: runtime.planId,
+      });
+      return advancePlanExecution({
+        taskId: input.taskId,
+        trigger: "manual",
+        mainSession,
+        executionSession,
+        command: {
+          type: "fail_current_node",
+          nodeId: input.action.nodeId,
+          error: input.action.error,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     }
@@ -1261,6 +1441,7 @@ async function dispatchExecutionAction(input: {
           userInput: input.action.prompt,
         },
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     }
@@ -1302,6 +1483,7 @@ async function dispatchExecutionAction(input: {
           reason: input.action.reason ?? "Execution cancelled",
         },
         onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
     }

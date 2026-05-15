@@ -3,6 +3,7 @@ import type {
   EffectivePlanGraph,
   PlanPatch,
 } from "@chrona/contracts/ai";
+import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
 type NodeExecutionEvidence = {
   sessionId?: string;
@@ -77,4 +78,5 @@ export interface NodeExecutorInput {
   trigger: "manual" | "scheduler" | "system" | "auto";
   runtimeName: string;
   userInput?: string;
+  onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
 }

@@ -6,6 +6,7 @@ import type {
   OpenClawGatewayRequest,
 } from "@chrona/openclaw";
 import type {
+  ProviderRunEvent,
   ProviderRunSnapshot,
   ProviderRunInput,
   StartRunInput,
@@ -22,6 +23,7 @@ export type AiRuntimeInvocationInput = {
   featureSpec: PreparedAiFeatureSpec;
   triggeredBy: "system" | "user";
   clientId?: string | null;
+  onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
 };
 
 export type AiRuntimeInvocation = {
@@ -64,7 +66,9 @@ export class AiRuntimeInvoker {
         taskId: input.taskId,
         executionRuntime: input.runtimeName,
       });
-      const response = await runProviderRequest(client.providerClient, request);
+      const response = await runProviderRequest(client.providerClient, request, {
+        onRuntimeEvent: input.onRuntimeEvent,
+      });
       const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
       const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
       const conversationEntryIds = await persistRuntimeHistory({
@@ -119,15 +123,45 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
 async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
   request: OpenClawGatewayRequest,
+  options: { onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void } = {},
+): Promise<ProviderRunSnapshot> {
+  const startInput = toStartRunInput(request);
+  if (providerClient.provider !== "openclaw") {
+    const run = await providerClient.startRun(startInput);
+    return collectProviderRunSnapshot(
+      providerClient.provider,
+      providerClient.streamRun({ runId: run.runId }),
+      run.sessionId,
+      run,
+      options,
+    );
+  }
+
+  return collectProviderRunSnapshot(
+    providerClient.provider,
+    providerClient.streamRun({
+      ...startInput,
+      stream: true,
+    }),
+    request.sessionId,
+    undefined,
+    options,
+  );
+}
+
+async function collectProviderRunSnapshot(
+  provider: string,
+  events: AsyncIterable<ProviderRunEvent>,
+  fallbackSessionId: string,
+  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string },
+  options: { onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void } = {},
 ): Promise<ProviderRunSnapshot> {
   let snapshot: ProviderRunSnapshot | null = null;
-  for await (const event of providerClient.streamRun({
-    ...toStartRunInput(request),
-    stream: true,
-  })) {
+  for await (const event of events) {
+    await options.onRuntimeEvent?.(event);
     if (event.type === "run_completed") {
       snapshot = {
-        provider: providerClient.provider,
+        provider,
         runId: event.run.runId,
         nativeRunId: event.run.nativeRunId,
         sessionId: event.run.sessionId,
@@ -140,11 +174,12 @@ async function runProviderRequest(
       };
     }
     if (event.type === "run_failed") {
+      const run = event.run ?? fallbackRun;
       snapshot = {
-        provider: providerClient.provider,
-        runId: event.run?.runId ?? crypto.randomUUID(),
-        nativeRunId: event.run?.nativeRunId,
-        sessionId: event.run?.sessionId ?? request.sessionId,
+        provider,
+        runId: run?.runId ?? crypto.randomUUID(),
+        nativeRunId: run?.nativeRunId,
+        sessionId: run?.sessionId ?? fallbackSessionId,
         status: "failed",
         error: event.error,
         raw: event.raw,
@@ -191,6 +226,7 @@ function buildExecutionGatewayRequest(input: {
     instructions: input.featureSpec.instructions ?? parts.join("\n\n"),
     input: aiInput,
     structuredOutputSchema: input.featureSpec.structuredOutputSchema,
+    terminalToolName: input.featureSpec.terminalToolName,
     maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
   };
 }

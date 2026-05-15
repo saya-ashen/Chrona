@@ -38,6 +38,7 @@ export type PreparedAiFeatureSpec = {
   instructions: string;
   inputText?: string;
   structuredOutputSchema?: AiFeatureStructuredOutputSchema;
+  terminalToolName?: string;
 };
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_NAME = "suggest_task_completions";
@@ -46,8 +47,8 @@ export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME =
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "chrona_plan_generate";
+export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "chrona_node_result";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
-export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "execute_task_node_result";
 export const EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME =
   "evaluate_condition_node_result";
 export const REVIEW_CHECKPOINT_NODE_RESULT_TOOL_NAME =
@@ -68,11 +69,11 @@ export const DISPATCH_NEXT_TASK_ACTION_TOOL_DESCRIPTION =
 export const GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION =
   "Persist the complete Chrona plan graph through the Chrona MCP tool.";
 
+export const EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION =
+  "Report the current Chrona execution node result, then stop the current node run.";
+
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
-
-export const EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION =
-  "Return the minimal result of executing one Chrona task node.";
 
 export const EVALUATE_CONDITION_NODE_RESULT_TOOL_DESCRIPTION =
   "Return the selected branch for one Chrona condition node.";
@@ -267,19 +268,18 @@ Rules:
 export const EXECUTE_TASK_NODE_SYSTEM_PROMPT = `
 You are Chrona's task-node worker.
 Execute or assess only the task node described in the input.
-You MUST call the business tool execute_task_node_result.
+Use Chrona MCP tools exposed by the provider to read context and persist node progress.
+The chrona_node_result MCP tool is the authoritative and terminal way to complete, block, or fail the node.
+After chrona_node_result succeeds, stop immediately: do not call more tools, do not continue downstream nodes, and do not produce extra assistant work.
 
 Rules:
-1. Return outcome "completed" only when the task objective is satisfied.
-2. Return "needs_input" only when a specific user answer is required; include prompt.
-3. Return "blocked" when progress depends on an external condition or unavailable capability; include reason.
-4. Return "external_running" only when work has started but cannot complete in this turn.
+1. Complete the current node only when the task objective is satisfied, by calling chrona_node_result with status "complete" and concise result data.
+2. Ask for user input only when a specific user answer is required.
+3. Block the node by calling chrona_node_result with status "blocked" when progress depends on an external condition or unavailable capability.
+4. Fail the node by calling chrona_node_result with status "failed" when the node cannot be completed because of an unrecoverable error.
 5. Do not propose plan patches or graph traversal.
 6. Keep summary concise and evidence-based.
-7. Put user-visible results in outputs, never only in summary.
-8. Use output kind "file" for created/modified files with exact path, title, language, and description.
-9. Use "json" for structured data, "markdown" for rich text, "command" for commands and important stdout/stderr, "link" for URLs, and "artifact" for persisted artifacts.
-10. Use input.planContext to understand predecessor/successor relationships, but execute only the current node. Do not mark downstream or sibling nodes as completed early.
+7. Use input.planContext to understand predecessor/successor relationships, but execute only the current node. Do not mark downstream or sibling nodes as completed early.
 `.trim();
 
 export const EVALUATE_CONDITION_NODE_SYSTEM_PROMPT = `
@@ -536,13 +536,6 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
   parameters: toProviderJsonSchema(planPatchSchema),
 };
 
-export const executeTaskNodeResultToolSpec: AiFeatureToolSpec = {
-  type: "function",
-  name: EXECUTE_TASK_NODE_RESULT_TOOL_NAME,
-  description: EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION,
-  parameters: toProviderJsonSchema(taskNodeAiResultSchema),
-};
-
 export const evaluateConditionNodeResultToolSpec: AiFeatureToolSpec = {
   type: "function",
   name: EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME,
@@ -687,7 +680,7 @@ export function buildTaskNodeExecutionFeatureInputText(
   input: TaskNodeExecutionFeatureInput,
 ): string {
   return [
-    "Execute the current Chrona task node and return only the structured tool result.",
+    "Execute or advance the current Chrona task node through provider-exposed Chrona MCP tools.",
     "",
     `Task ID: ${input.taskId}`,
     input.planTitle ? `Plan: ${input.planTitle}` : "",
@@ -720,7 +713,7 @@ export function buildTaskNodeExecutionFeatureSpec(
     feature: "execute_task_node",
     instructions: EXECUTE_TASK_NODE_SYSTEM_PROMPT,
     inputText: buildTaskNodeExecutionFeatureInputText(input),
-    structuredOutputSchema: toStructuredOutputSchema(executeTaskNodeResultToolSpec),
+    terminalToolName: EXECUTE_TASK_NODE_RESULT_TOOL_NAME,
   };
 }
 
