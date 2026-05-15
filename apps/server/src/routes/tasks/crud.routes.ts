@@ -3,10 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
   listTasksQuerySchema,
-  createTaskBodySchema,
+  createTaskBodySchemaForSupportedRuntimes,
   taskDetailParamSchema,
   updateTaskParamSchema,
-  updateTaskBodySchema,
+  updateTaskBodySchemaForSupportedRuntimes,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
 } from "@chrona/contracts/api";
@@ -14,6 +14,14 @@ import {
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
 export function createTasksRoutes(engine: ChronaEngine) {
+  const supportedExecutionRuntimes = engine.runtime.listExecutionRuntimes();
+  const supportedCreateTaskBodySchema = createTaskBodySchemaForSupportedRuntimes(
+    supportedExecutionRuntimes,
+  );
+  const supportedUpdateTaskBodySchema = updateTaskBodySchemaForSupportedRuntimes(
+    supportedExecutionRuntimes,
+  );
+
   return new Hono()
     .get("/tasks", zValidator("query", listTasksQuerySchema), async (c) => {
       try {
@@ -39,7 +47,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
         );
       }
     })
-    .post("/tasks", zValidator("json", createTaskBodySchema), async (c) => {
+    .post("/tasks", zValidator("json", supportedCreateTaskBodySchema), async (c) => {
       try {
         const body = c.req.valid("json");
 
@@ -90,7 +98,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
     .patch(
       "/tasks/:taskId",
       zValidator("param", updateTaskParamSchema),
-      zValidator("json", updateTaskBodySchema),
+      zValidator("json", supportedUpdateTaskBodySchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");

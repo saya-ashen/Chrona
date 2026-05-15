@@ -19,19 +19,15 @@ export const TASK_PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
 
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
-export const EXECUTION_RUNTIMES = ["openclaw", "research"] as const;
+export type ExecutionRuntime = string;
 
-export type ExecutionRuntime = (typeof EXECUTION_RUNTIMES)[number];
-
-export type OpenClawExecutionConfig = {
+export type TaskExecutionConfig = {
   prompt?: string;
   temperature?: number;
   approvalPolicy?: "never" | "on-request" | "always";
   toolMode?: "read-only" | "workspace-write" | "full-access";
   sessionStrategy?: "shared" | "per_subtask";
 };
-
-export type TaskExecutionConfig = OpenClawExecutionConfig;
 
 export type TaskRuntimeFields = {
   executionRuntime: ExecutionRuntime;

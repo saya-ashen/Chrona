@@ -71,24 +71,11 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("research adapter still requires prompt", () => {
+  it("returns runnable for custom adapter with no prompt", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "research",
+        executionRuntime: "custom-runtime",
         executionConfig: {},
-      }),
-    ).toMatchObject({
-      isRunnable: false,
-      state: "missing_prompt",
-      missingFields: ["prompt"],
-    });
-  });
-
-  it("research adapter is runnable with prompt", () => {
-    expect(
-      deriveTaskRunnability({
-        executionRuntime: "research",
-        executionConfig: { prompt: "Do a deep research" },
       }),
     ).toMatchObject({
       isRunnable: true,

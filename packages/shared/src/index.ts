@@ -7,34 +7,16 @@ import type {
 
 type RunnabilityResult = {
   isRunnable: boolean;
-  state: "ready_to_run" | "missing_prompt";
+  state: "ready_to_run";
   summary: string;
   missingFields: string[];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
 
 export function deriveTaskRunnability(input: {
   executionRuntime?: string | null;
   executionConfig?: unknown;
 }): RunnabilityResult {
-  const executionRuntime = input.executionRuntime ?? "openclaw";
-  const executionConfig = isRecord(input.executionConfig)
-    ? input.executionConfig
-    : {};
-  const prompt =
-    typeof executionConfig.prompt === "string" ? executionConfig.prompt.trim() : "";
-
-  if (executionRuntime === "research" && prompt.length === 0) {
-    return {
-      isRunnable: false,
-      state: "missing_prompt",
-      summary: "Missing required config: prompt",
-      missingFields: ["prompt"],
-    };
-  }
+  void input;
 
   return {
     isRunnable: true,

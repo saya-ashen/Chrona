@@ -348,7 +348,7 @@ export async function handleCreateTaskBlockAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
-      executionRuntime: input.executionRuntime as "openclaw" | "research",
+      executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
     })) as { taskId: string };
 
@@ -442,7 +442,7 @@ export async function handleTaskConfigSaveAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
-      executionRuntime: input.executionRuntime as "openclaw" | "research",
+      executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
     });
 

@@ -3,7 +3,7 @@ interface CreateTaskInput {
   title: string;
   description?: string;
   priority?: string;
-  executionRuntime?: "openclaw" | "research";
+  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
 }
 
@@ -11,7 +11,7 @@ interface UpdateTaskInput {
   title?: string;
   description?: string;
   priority?: string;
-  executionRuntime?: "openclaw" | "research";
+  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
 }
 
