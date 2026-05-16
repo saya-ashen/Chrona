@@ -109,6 +109,24 @@ Descriptive source labels for `search(source: "label")`.
 - Do NOT hand-roll SSE parsing with `ReadableStream#getReader()`, `TextDecoder`, or manual `event:` / `data:` splitting in React components or hooks.
 - Route SSE calls through a shared helper (`apps/web/src/lib/fetch-json-event-source.ts`) so headers, error handling, JSON parsing, and non-stream fallbacks stay consistent.
 
+## Frontend development principles
+
+- Use `agent-browser` for every frontend UX change.
+- Before editing UI, run browser observation with an `agent-browser` snapshot and
+  screenshots.
+- After editing UI, rerun browser verification with `agent-browser`.
+- Preserve existing Chrona product behavior unless the spec explicitly changes it.
+- Do not change backend APIs for visual or interaction polish unless justified in
+  the plan.
+- Do not put business logic in React components.
+- Keep user-facing strings in i18n message files.
+- Validate desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
+- Mobile views must not horizontally scroll.
+- Current task, active node, blocked/review state, and primary action must be
+  visually obvious.
+- Required checks: `bun run typecheck`, `bun run lint`, `bun run test`.
+- Run `bun run test:e2e` when task, schedule, or navigation flows are affected.
+
 ## Session Continuity
 
 Skills, roles, and decisions persist for the entire session. Do not abandon them
@@ -143,7 +161,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/006-test-coverage/plan.md`
+`specs/007-improve-workspace-ux/plan.md`
 
 <!-- SPECKIT END -->
 

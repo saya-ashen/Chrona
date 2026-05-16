@@ -3,6 +3,7 @@ import {
   getOpenClawTaskConfigSpec,
   validateOpenClawTaskConfig,
 } from "@chrona/openclaw";
+import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
@@ -10,6 +11,15 @@ import type {
 } from "@chrona/runtime-core";
 
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
+  [
+    HERMES_EXECUTION_RUNTIME,
+    {
+      key: HERMES_EXECUTION_RUNTIME,
+      inputVersion: getOpenClawTaskConfigSpec().version,
+      getTaskConfigSpec: getOpenClawTaskConfigSpec,
+      validateTaskConfig: validateOpenClawTaskConfig,
+    },
+  ],
   [
     OPENCLAW_EXECUTION_RUNTIME,
     {
@@ -44,7 +54,7 @@ export function resolveExecutionRuntime(input: {
   return (
     input.executionRuntime?.trim() ||
     input.workspaceDefaultRuntime?.trim() ||
-    OPENCLAW_EXECUTION_RUNTIME
+    HERMES_EXECUTION_RUNTIME
   );
 }
 

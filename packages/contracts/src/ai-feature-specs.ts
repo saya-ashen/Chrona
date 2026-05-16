@@ -47,12 +47,9 @@ export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME =
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "chrona_plan_generate";
-export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "chrona_node_result";
+export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "chrona_task_complete";
+export const CONDITION_NODE_SELECT_TOOL_NAME = "chrona_condition_select";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
-export const EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME =
-  "evaluate_condition_node_result";
-export const REVIEW_CHECKPOINT_NODE_RESULT_TOOL_NAME =
-  "review_checkpoint_node_result";
 
 export const SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION =
   "Return Chrona task suggestions as structured tool arguments.";
@@ -74,12 +71,6 @@ export const EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION =
 
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
-
-export const EVALUATE_CONDITION_NODE_RESULT_TOOL_DESCRIPTION =
-  "Return the selected branch for one Chrona condition node.";
-
-export const REVIEW_CHECKPOINT_NODE_RESULT_TOOL_DESCRIPTION =
-  "Return a recommendation for one Chrona checkpoint node.";
 
 export interface TaskNodeExecutionFeatureInput {
   graphId: string;
@@ -268,15 +259,15 @@ Rules:
 export const EXECUTE_TASK_NODE_SYSTEM_PROMPT = `
 You are Chrona's task-node worker.
 Execute or assess only the task node described in the input.
-Use Chrona MCP tools exposed by the provider to read context and persist node progress.
-The chrona_node_result MCP tool is the authoritative and terminal way to complete, block, or fail the node.
-After chrona_node_result succeeds, stop immediately: do not call more tools, do not continue downstream nodes, and do not produce extra assistant work.
+Use Chrona MCP tools only to read Chrona state and submit terminal node state.
+The chrona_task_complete MCP tool is the authoritative terminal success tool for task nodes.
+After a Chrona terminal MCP tool succeeds, stop immediately: do not call more tools, do not continue downstream nodes, and do not produce extra assistant work.
 
 Rules:
-1. Complete the current node only when the task objective is satisfied, by calling chrona_node_result with status "complete" and concise result data.
+1. Complete the current node only when the task objective is satisfied, by calling chrona_task_complete with concise result data.
 2. Ask for user input only when a specific user answer is required.
-3. Block the node by calling chrona_node_result with status "blocked" when progress depends on an external condition or unavailable capability.
-4. Fail the node by calling chrona_node_result with status "failed" when the node cannot be completed because of an unrecoverable error.
+3. Block the node by calling chrona_node_block when progress depends on an external condition or unavailable capability.
+4. Fail the node by calling chrona_node_fail when the node cannot be completed because of an unrecoverable error.
 5. Do not propose plan patches or graph traversal.
 6. Keep summary concise and evidence-based.
 7. Use input.planContext to understand predecessor/successor relationships, but execute only the current node. Do not mark downstream or sibling nodes as completed early.
@@ -285,25 +276,31 @@ Rules:
 export const EVALUATE_CONDITION_NODE_SYSTEM_PROMPT = `
 You are Chrona's condition evaluator.
 Evaluate only the condition node described in the input.
-You MUST call the business tool evaluate_condition_node_result.
+Use Chrona MCP tools only to read Chrona state and submit terminal node state.
+The chrona_condition_select MCP tool is the authoritative terminal success tool for condition nodes.
+When completing the node, include branchRef from input.branchOptions. Never include nextNodeId.
+After a Chrona terminal MCP tool succeeds, stop immediately: do not call more tools, do not continue downstream nodes, and do not produce extra assistant work.
 
 Rules:
-1. Pick exactly one provided branch label.
-2. Use the default branch only when no explicit branch matches.
-3. Do not invent branch labels or next node ids.
-4. Provide a short reason and confidence from 0 to 1.
+1. Pick exactly one provided branchRef.
+2. Never use a default branch from missing fields, natural language, incomplete JSON, or outputs without explicit branchRef.
+3. Do not invent branch refs, branch labels, node IDs, or next node IDs.
+4. Call chrona_condition_select only after selecting a valid branchRef.
+5. Call chrona_node_block when no branch can be selected safely.
 `.trim();
 
 export const REVIEW_CHECKPOINT_NODE_SYSTEM_PROMPT = `
 You are Chrona's checkpoint reviewer.
 Review only the checkpoint node described in the input.
-You MUST call the business tool review_checkpoint_node_result.
+Use Chrona MCP tools only to read Chrona state, block the node while waiting for user action, or fail on unrecoverable errors.
+Do not submit checkpoint decisions through MCP. Checkpoint submission is performed by the user in the frontend.
+After a Chrona terminal MCP tool succeeds, stop immediately: do not call more tools, do not continue downstream nodes, and do not produce extra assistant work.
 
 Rules:
-1. Recommend "approve" only when the checkpoint criteria are satisfied.
-2. Recommend "request_changes" when user edits or clarification are needed.
-3. Recommend "block" when approval would be unsafe or impossible.
-4. Do not approve on behalf of the user; provide a recommendation only.
+1. Never call or invent a checkpoint submit MCP tool.
+2. Block the node by calling chrona_node_block when user input or approval is required.
+3. Fail the node by calling chrona_node_fail only when checkpoint review cannot continue.
+4. Do not approve, reject, complete, or request changes on behalf of the user.
 `.trim();
 
 export const GENERATE_PLAN_SYSTEM_PROMPT = `
@@ -538,16 +535,16 @@ export const editPlanPatchToolSpec: AiFeatureToolSpec = {
 
 export const evaluateConditionNodeResultToolSpec: AiFeatureToolSpec = {
   type: "function",
-  name: EVALUATE_CONDITION_NODE_RESULT_TOOL_NAME,
-  description: EVALUATE_CONDITION_NODE_RESULT_TOOL_DESCRIPTION,
-  parameters: toProviderJsonSchema(conditionNodeAiResultSchema),
+  name: EXECUTE_TASK_NODE_RESULT_TOOL_NAME,
+  description: EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(taskNodeAiResultSchema),
 };
 
 export const reviewCheckpointNodeResultToolSpec: AiFeatureToolSpec = {
   type: "function",
-  name: REVIEW_CHECKPOINT_NODE_RESULT_TOOL_NAME,
-  description: REVIEW_CHECKPOINT_NODE_RESULT_TOOL_DESCRIPTION,
-  parameters: toProviderJsonSchema(checkpointNodeAiResultSchema),
+  name: EXECUTE_TASK_NODE_RESULT_TOOL_NAME,
+  description: EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION,
+  parameters: toProviderJsonSchema(taskNodeAiResultSchema),
 };
 
 function toStructuredOutputSchema(
@@ -681,14 +678,9 @@ export function buildTaskNodeExecutionFeatureInputText(
 ): string {
   return [
     "Execute or advance the current Chrona task node through provider-exposed Chrona MCP tools.",
+    "Backend task, graph, node, layer, attempt, and snapshot IDs are intentionally omitted. Use runtime refs only when provided by the node runtime.",
     "",
-    `Task ID: ${input.taskId}`,
     input.planTitle ? `Plan: ${input.planTitle}` : "",
-    `Graph ID: ${input.graphId}`,
-    `Node ID: ${input.nodeId}`,
-    `Node layer ID: ${input.nodeLayerId}`,
-    `Attempt ID: ${input.attemptId}`,
-    `Context snapshot ID: ${input.contextSnapshotId}`,
     `Node title: ${input.nodeTitle}`,
     `Objective: ${input.nodeObjective}`,
     input.expectedOutput ? `Expected output: ${input.expectedOutput}` : "",
@@ -721,20 +713,13 @@ export function buildConditionNodeEvaluationFeatureInputText(
   input: ConditionNodeEvaluationFeatureInput,
 ): string {
   return [
-    "Evaluate the current Chrona condition node and return only the selected branch.",
+    "Evaluate the current Chrona condition node and return only the selected branch ref provided by the node runtime.",
+    "Backend task, graph, node, layer, and next-node IDs are intentionally omitted. Never infer routing from labels or default branches.",
     "",
-    `Task ID: ${input.taskId}`,
     input.planTitle ? `Plan: ${input.planTitle}` : "",
-    `Graph ID: ${input.graphId}`,
-    `Node ID: ${input.nodeId}`,
-    `Node layer ID: ${input.nodeLayerId}`,
     `Node title: ${input.nodeTitle}`,
     `Condition: ${input.condition}`,
-    "Branches:",
-    ...input.branches.map(
-      (branch) => `  - ${branch.label} -> ${branch.nextNodeId}`,
-    ),
-    input.defaultNextNodeId ? `Default next node: ${input.defaultNextNodeId}` : "",
+    "Branches are exposed as branchRef values in runtime input, not as next node IDs.",
     input.completedNodeTitles.length > 0
       ? `Already completed: ${input.completedNodeTitles.join(", ")}`
       : "Already completed: none",
@@ -753,7 +738,7 @@ export function buildConditionNodeEvaluationFeatureSpec(
     feature: "evaluate_condition_node",
     instructions: EVALUATE_CONDITION_NODE_SYSTEM_PROMPT,
     inputText: buildConditionNodeEvaluationFeatureInputText(input),
-    structuredOutputSchema: toStructuredOutputSchema(evaluateConditionNodeResultToolSpec),
+    terminalToolName: CONDITION_NODE_SELECT_TOOL_NAME,
   };
 }
 
@@ -762,12 +747,9 @@ export function buildCheckpointNodeReviewFeatureInputText(
 ): string {
   return [
     "Review the current Chrona checkpoint node and return only the recommendation.",
+    "Backend task, graph, node, and layer IDs are intentionally omitted. Use runtime refs only when provided by the node runtime.",
     "",
-    `Task ID: ${input.taskId}`,
     input.planTitle ? `Plan: ${input.planTitle}` : "",
-    `Graph ID: ${input.graphId}`,
-    `Node ID: ${input.nodeId}`,
-    `Node layer ID: ${input.nodeLayerId}`,
     `Node title: ${input.nodeTitle}`,
     `Checkpoint type: ${input.checkpointType}`,
     `Prompt: ${input.prompt}`,
@@ -790,7 +772,6 @@ export function buildCheckpointNodeReviewFeatureSpec(
     feature: "review_checkpoint_node",
     instructions: REVIEW_CHECKPOINT_NODE_SYSTEM_PROMPT,
     inputText: buildCheckpointNodeReviewFeatureInputText(input),
-    structuredOutputSchema: toStructuredOutputSchema(reviewCheckpointNodeResultToolSpec),
   };
 }
 

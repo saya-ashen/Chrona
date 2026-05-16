@@ -134,13 +134,13 @@ describe("OpenClawClient", () => {
     ]);
   });
 
-  it("stops execute-task-node streams after terminal node result tool call", async () => {
+  it("stops execute-task-node streams after terminal task completion tool call", async () => {
     globalThis.fetch = (async () => {
       const sse = [
         'event: response.output_text.delta\n',
         'data: {"delta":"Working ","type":"response.output_text.delta"}\n\n',
         'event: response.output_item.done\n',
-        'data: {"item":{"type":"function_call","name":"chrona_node_result","call_id":"call-node-result","arguments":"{\\"status\\":\\"complete\\",\\"summary\\":\\"Done\\"}"}}\n\n',
+        'data: {"item":{"type":"function_call","name":"chrona_task_complete","call_id":"call-task-complete","arguments":"{\\"summary\\":\\"Done\\"}"}}\n\n',
         'event: response.output_text.delta\n',
         'data: {"delta":"should-not-stream","type":"response.output_text.delta"}\n\n',
       ].join("");
@@ -167,7 +167,7 @@ describe("OpenClawClient", () => {
       sessionKey: "sess-node",
       instructions: "execute current node",
       input: { node: { title: "Do work" } },
-      terminalToolName: "chrona_node_result",
+      terminalToolName: "chrona_task_complete",
       timeoutMs: 5_000,
       stream: true,
     })) {
@@ -187,7 +187,7 @@ describe("OpenClawClient", () => {
       { type: "text_delta", text: "Working ", toolCall: undefined, structuredToolName: undefined },
       {
         type: "tool_call",
-        toolCall: { tool: "chrona_node_result", callId: "call-node-result" },
+        toolCall: { tool: "chrona_task_complete", callId: "call-task-complete" },
         text: undefined,
         structuredToolName: undefined,
       },
@@ -195,7 +195,7 @@ describe("OpenClawClient", () => {
         type: "run_completed",
         text: undefined,
         toolCall: undefined,
-        structuredToolName: "chrona_node_result",
+        structuredToolName: "chrona_task_complete",
       },
     ]);
   });

@@ -101,6 +101,12 @@ export type ProgressSummary = {
 
 export type TaskWorkspaceUserStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked";
 
+export type WorkspaceStateTreatment = {
+  label: string;
+  tone: ExecutionOverviewTone;
+  guidance: string;
+};
+
 export type TaskHeaderAction = {
   id: "start" | "pause" | "stop" | "more";
   label: string;
@@ -262,5 +268,6 @@ export type TaskWorkspaceExecutionConsoleView = {
     isStale: boolean;
     isPermissionLimited: boolean;
     errorMessage: string | null;
+    treatment: WorkspaceStateTreatment;
   };
 };

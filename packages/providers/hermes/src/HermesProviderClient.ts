@@ -74,10 +74,44 @@ export class HermesProviderClient implements AgentProviderClient {
       ? ["/health/detailed", "/health"]
       : ["/health", "/v1/health"];
     let lastReason = "Hermes health check failed";
+    let healthRaw: unknown;
 
     for (const path of paths) {
       try {
         const response = await this.http.request(path, {
+          method: "GET",
+          signal: input.signal,
+          timeoutMs: input.timeoutMs,
+        });
+        const raw = await readJson(response);
+        const latencyMs = Date.now() - started;
+        if (response.ok) {
+          if (input.deep) {
+            healthRaw = raw;
+            break;
+          }
+          return {
+            provider: this.provider,
+            ok: true,
+            checkedAt,
+            latencyMs,
+            status: "ok",
+            raw,
+          };
+        }
+        if (response.status === 401 || response.status === 403) {
+          return misconfiguredHealth(checkedAt, latencyMs, response.status, "health check", raw);
+        }
+        lastReason = `Hermes health check returned HTTP ${response.status}`;
+      } catch (error) {
+        lastReason =
+          error instanceof Error ? error.message : "Hermes network error";
+      }
+    }
+
+    if (input.deep && healthRaw !== undefined) {
+      try {
+        const response = await this.http.request("/v1/capabilities", {
           method: "GET",
           signal: input.signal,
           timeoutMs: input.timeoutMs,
@@ -91,24 +125,16 @@ export class HermesProviderClient implements AgentProviderClient {
             checkedAt,
             latencyMs,
             status: "ok",
-            raw,
+            raw: { health: healthRaw, capabilities: raw },
           };
         }
         if (response.status === 401 || response.status === 403) {
-          return {
-            provider: this.provider,
-            ok: false,
-            checkedAt,
-            latencyMs,
-            status: "misconfigured",
-            reason: `Hermes health check returned HTTP ${response.status}`,
-            raw,
-          };
+          return misconfiguredHealth(checkedAt, latencyMs, response.status, "capabilities check", raw);
         }
-        lastReason = `Hermes health check returned HTTP ${response.status}`;
+        lastReason = `Hermes capabilities check returned HTTP ${response.status}`;
       } catch (error) {
         lastReason =
-          error instanceof Error ? error.message : "Hermes network error";
+          error instanceof Error ? error.message : "Hermes capabilities check failed";
       }
     }
 
@@ -261,6 +287,24 @@ export class HermesProviderClient implements AgentProviderClient {
     );
     return mapSnapshot(await ensureHermesOk(response, "cancel run"), true);
   }
+}
+
+function misconfiguredHealth(
+  checkedAt: string,
+  latencyMs: number,
+  status: number,
+  operation: string,
+  raw: unknown,
+): ProviderHealth {
+  return {
+    provider: "hermes",
+    ok: false,
+    checkedAt,
+    latencyMs,
+    status: "misconfigured",
+    reason: `Hermes ${operation} returned HTTP ${status}. Check Hermes API token.`,
+    raw,
+  };
 }
 
 function shouldThrowOnUnknownStreamEvent(): boolean {

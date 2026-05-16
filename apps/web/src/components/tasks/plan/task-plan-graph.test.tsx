@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
+import { TaskPlanGraphInspector } from "@/components/tasks/plan/task-plan-graph/inspector";
 import { buildFlowLayout } from "@/components/tasks/plan/task-plan-graph/layout";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
@@ -256,12 +257,27 @@ describe("TaskPlanGraph", () => {
     expect(node).toHaveTextContent(longTitle);
     expect(node).toHaveAttribute("data-node-workspace-status", "blocked");
     expect(node).toHaveClass("overflow-hidden");
+    expect(screen.getByText(longTitle)).toHaveClass("break-words");
 
     fireEvent.click(node);
     expect(screen.getAllByText(longObjective).length).toBeGreaterThan(0);
     const errorText = screen.getByText(longError);
     expect(errorText).toBeInTheDocument();
     expect(errorText.closest("aside")).toHaveClass("overflow-hidden");
+    expect(screen.getByText(/Next:/)).toBeInTheDocument();
+    expect(screen.getAllByText("Retry after checking checkpoint evidence and provider logs").length).toBeGreaterThan(0);
+  });
+
+  it("shows inspector guidance when no graph node is selected", () => {
+    render(
+      <TaskPlanGraphInspector
+        graphCopy={DEFAULT_GRAPH_COPY}
+        node={null}
+      />,
+    );
+
+    expect(screen.getByText("No node selected")).toBeInTheDocument();
+    expect(screen.getByText(/Select a plan node to inspect its goal/)).toBeInTheDocument();
   });
 
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", () => {
@@ -852,25 +868,25 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByTestId("task-plan-graph-legend")).not.toBeInTheDocument();
     expect(screen.queryByTestId("task-plan-graph-scroll")).not.toBeInTheDocument();
 
-    expect(screen.getByText("当前推进")).toBeInTheDocument();
-    expect(screen.getByText("待处理 / 阻塞")).toBeInTheDocument();
-    expect(screen.getByText("后续摘要")).toBeInTheDocument();
+    expect(screen.getByText("Current progress")).toBeInTheDocument();
+    expect(screen.getByText("Action / blocked")).toBeInTheDocument();
+    expect(screen.getByText("Next summary")).toBeInTheDocument();
 
     const currentOutlineNode = screen.getByTestId("task-plan-outline-node-node-current");
     expect(currentOutlineNode.getAttribute("data-node-current")).toBe("true");
-    expect(currentOutlineNode).toHaveTextContent("当前节点");
+    expect(currentOutlineNode).toHaveTextContent("Current node");
 
     const waitingOutlineNode = screen.getByTestId("task-plan-outline-node-node-waiting");
     expect(waitingOutlineNode.getAttribute("data-node-tone")).toBe("waiting");
-    expect(waitingOutlineNode).toHaveTextContent("需处理");
+    expect(waitingOutlineNode).toHaveTextContent("Needs action");
 
     const childOutlineNode = screen.getByTestId("task-plan-outline-node-node-child");
-    expect(childOutlineNode).toHaveTextContent("已关联任务");
-    expect(childOutlineNode).toHaveTextContent("1 个前置");
-    expect(childOutlineNode).toHaveTextContent("1 个后续");
+    expect(childOutlineNode).toHaveTextContent("Linked task");
+    expect(childOutlineNode).toHaveTextContent("1 upstream");
+    expect(childOutlineNode).toHaveTextContent("1 downstream");
 
     const deliverableOutlineNode = screen.getByTestId("task-plan-outline-node-node-deliverable");
-    expect(deliverableOutlineNode).toHaveTextContent("1 个前置");
+    expect(deliverableOutlineNode).toHaveTextContent("1 upstream");
 
     const compactRail = screen.getByTestId("task-plan-compact-groups");
     expect(compactRail.className).toContain("border-l");

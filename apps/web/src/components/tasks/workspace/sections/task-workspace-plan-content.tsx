@@ -84,13 +84,13 @@ export function TaskWorkspacePlanContent({
         <SurfaceCard
           variant="inset"
           padding="sm"
-          className="flex h-[420px] min-w-0 flex-col rounded-[1rem] border-border/50 bg-background/65 shadow-none ring-0 md:h-[560px] xl:h-full"
+          className="flex h-[420px] min-w-0 max-w-full flex-col rounded-[1rem] border-border/50 bg-background/65 shadow-none ring-0 md:h-[560px] xl:h-full"
         >
           <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">{label}</p>
             {generatePlanButton}
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center rounded-[1rem] border border-dashed border-border/60 bg-background/40 px-5 text-center text-sm text-muted-foreground">
+          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1rem] border border-dashed border-border/60 bg-background/40 px-5 text-center text-sm text-muted-foreground">
             The plan graph will appear here once AI generates a plan.
           </div>
         </SurfaceCard>

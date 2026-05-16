@@ -13,14 +13,32 @@ type CapturedToolOperation = {
   };
 };
 
+const hiddenContextFieldNames = [
+  "workspaceId",
+  "taskId",
+  "sessionId",
+  "actorType",
+  "actorId",
+  "idempotencyKey",
+  "expectedState",
+  "expectedRevision",
+  "evidence",
+] as const;
+
+const hiddenContextArguments = {
+  sessionId: "chrona:task:task-1:plan-graph",
+  actorType: "agent",
+  actorId: "hermes",
+  evidence: { providerText: "generated plan" },
+};
+
 function app(rejected = false, operations: CapturedToolOperation[] = []) {
   const engine = {
     agentTools: {
       registry: () => ({
         tools: [
-          { name: "chrona.plan.generate", mutates: true, description: "Generate plan." },
           { name: "chrona.execution.read", mutates: false, description: "Read execution." },
-          { name: "chrona.node.result", mutates: true, description: "Report node result." },
+          { name: "chrona.node.task_complete", mutates: true, description: "Complete task node." },
         ],
       }),
       resolveInputContext: async (input: unknown) => ({
@@ -112,8 +130,11 @@ describe("MCP routes", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_execution_read");
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_condition_select");
     expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_plan_generate");
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_node_result");
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain("chrona_checkpoint_submit");
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain("chrona_node_result");
   });
 
   it("lists minimal external tool schemas with descriptions", async () => {
@@ -121,27 +142,51 @@ describe("MCP routes", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
+    const conditionSelect = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_condition_select",
+    );
+
+    expect(conditionSelect.description).toBe("Select the current condition branch by branchRef. Does not accept backend node IDs.");
+    expect(conditionSelect.inputSchema.required).toEqual(["branchRef", "summary"]);
+    expect(conditionSelect.inputSchema.properties.branchRef).toMatchObject({ type: "string" });
+    expect(conditionSelect.inputSchema.properties.nodeId).toBeUndefined();
+    expect(conditionSelect.inputSchema.properties.nextNodeId).toBeUndefined();
+    expect(conditionSelect.inputSchema.properties.idempotencyKey).toBeUndefined();
+    expect(conditionSelect.inputSchema.properties.evidence).toBeUndefined();
+  });
+
+  it("does not expose hidden context fields in plan generation schema", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
     const planGenerate = body.result.tools.find(
       (tool: { name: string }) => tool.name === "chrona_plan_generate",
     );
-    const nodeResult = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_node_result",
-    );
 
-    expect(planGenerate.description).toBe("Persist a complete Hermes-generated plan graph for the session task.");
     expect(planGenerate.inputSchema.required).toEqual(["title", "goal", "nodes"]);
-    expect(Object.keys(planGenerate.inputSchema.properties).sort()).toEqual([
-      "assumptions",
-      "edges",
-      "goal",
-      "nodes",
-      "title",
-    ]);
-    expect(nodeResult.description).toBe("Report the current execution node result. Chrona resolves the active node from the session.");
-    expect(nodeResult.inputSchema.required).toEqual(["status"]);
-    expect(nodeResult.inputSchema.properties.nodeId).toMatchObject({ type: "string" });
-    expect(nodeResult.inputSchema.properties.idempotencyKey).toBeUndefined();
-    expect(nodeResult.inputSchema.properties.evidence).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.title).toMatchObject({ type: "string" });
+    expect(planGenerate.inputSchema.properties.goal).toMatchObject({ type: "string" });
+    expect(planGenerate.inputSchema.properties.nodes).toMatchObject({ type: "array" });
+    expect(planGenerate.inputSchema.properties.sessionId).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.actorType).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.actorId).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.idempotencyKey).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.evidence).toBeUndefined();
+    expect(planGenerate.inputSchema.properties.expectedRevision).toBeUndefined();
+  });
+
+  it("does not expose hidden context fields in any public tool schema", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    for (const tool of body.result.tools as { inputSchema: { properties: Record<string, unknown> } }[]) {
+      for (const fieldName of hiddenContextFieldNames) {
+        expect(tool.inputSchema.properties[fieldName]).toBeUndefined();
+      }
+    }
   });
 
   it("registers the minimal external Chrona MCP tool surface", async () => {
@@ -150,9 +195,15 @@ describe("MCP routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
+      "chrona_condition_select",
       "chrona_execution_read",
-      "chrona_node_result",
+      "chrona_node_block",
+      "chrona_node_fail",
+      "chrona_node_read",
       "chrona_plan_generate",
+      "chrona_plan_read",
+      "chrona_task_complete",
+      "chrona_wait_complete",
     ]);
   });
 
@@ -176,18 +227,26 @@ describe("MCP routes", () => {
 
   it("dispatches every exposed Chrona MCP tool to the expected internal operation", async () => {
     const sessionId = "chrona:task:task-1:execute";
-    const planBlueprint = {
-      title: "Generated MCP plan",
-      goal: "Persist a complete graph",
-      nodes: [{ id: "first_step", type: "task", title: "First step" }],
-      edges: [],
-    };
     const cases = [
-      ["chrona_plan_generate", "chrona.plan.generate", planBlueprint, planBlueprint],
       ["chrona_execution_read", "chrona.execution.read", {}, {}],
-      ["chrona_node_result", "chrona.node.result", { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } }, { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } }],
-      ["chrona_node_result", "chrona.node.result", { status: "blocked", reason: "Waiting on API" }, { status: "blocked", reason: "Waiting on API" }],
-      ["chrona_node_result", "chrona.node.result", { status: "failed", error: "Command failed" }, { status: "failed", error: "Command failed" }],
+      ["chrona_plan_read", "chrona.plan.read", {}, {}],
+      ["chrona_plan_generate", "chrona.plan.generate", {
+        title: "Generated MCP plan",
+        goal: "Persist a complete graph",
+        nodes: [{ id: "first_step", type: "task", title: "First step" }],
+        edges: [],
+      }, {
+        title: "Generated MCP plan",
+        goal: "Persist a complete graph",
+        nodes: [{ id: "first_step", type: "task", title: "First step" }],
+        edges: [],
+      }],
+      ["chrona_node_read", "chrona.node.read", {}, {}],
+      ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
+      ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_node_block", "chrona.node.block", { reason: "Waiting on API" }, { reason: "Waiting on API" }],
+      ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
 
     for (const [externalName, internalName, args, expectedPayload] of cases) {
@@ -216,8 +275,8 @@ describe("MCP routes", () => {
   it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_node_result",
-        arguments: { status: "complete", summary: "Done" },
+        name: "chrona_task_complete",
+        arguments: { summary: "Done" },
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
     );
@@ -225,7 +284,82 @@ describe("MCP routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.result.structuredContent.status).toBe("accepted");
-    expect(body.result.structuredContent.state.idempotencyKey).toContain("chrona.node.result:");
+    expect(body.result.structuredContent.state.idempotencyKey).toContain("chrona.node.task_complete:");
+  });
+
+  it("accepts hidden context injected into plan generation arguments", async () => {
+    const blueprint = {
+      title: "Generated MCP plan",
+      goal: "Persist a complete graph",
+      nodes: [{ id: "first_step", type: "task", title: "First step" }],
+      edges: [],
+    };
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_plan_generate",
+        arguments: {
+          ...blueprint,
+          ...hiddenContextArguments,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      toolName: "chrona.plan.generate",
+      input: {
+        sessionId: "chrona:task:task-1:plan-graph",
+        taskId: "task-from-session",
+        payload: blueprint,
+      },
+    });
+    expect(operations[0].input.payload).toEqual(blueprint);
+  });
+
+  it("accepts hidden context injected into every public tool call", async () => {
+    const cases = [
+      ["chrona_execution_read", "chrona.execution.read", {}, {}],
+      ["chrona_plan_read", "chrona.plan.read", {}, {}],
+      ["chrona_plan_generate", "chrona.plan.generate", {
+        title: "Generated MCP plan",
+        goal: "Persist a complete graph",
+        nodes: [{ id: "first_step", type: "task", title: "First step" }],
+        edges: [],
+      }, {
+        title: "Generated MCP plan",
+        goal: "Persist a complete graph",
+        nodes: [{ id: "first_step", type: "task", title: "First step" }],
+        edges: [],
+      }],
+      ["chrona_node_read", "chrona.node.read", {}, {}],
+      ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
+      ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_node_block", "chrona.node.block", { reason: "Waiting on API" }, { reason: "Waiting on API" }],
+      ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
+    ] as const;
+
+    for (const [externalName, internalName, args, expectedPayload] of cases) {
+      const { response, operations } = await postRpcWithOperations(
+        rpc("tools/call", {
+          name: externalName,
+          arguments: { ...args, ...hiddenContextArguments },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(operations).toHaveLength(1);
+      expect(operations[0]).toMatchObject({
+        toolName: internalName,
+        input: {
+          sessionId: hiddenContextArguments.sessionId,
+          taskId: "task-from-session",
+          payload: expectedPayload,
+        },
+      });
+      expect(operations[0].input.payload).toEqual(expectedPayload);
+    }
   });
 
   it("resolves injected sessionId before dispatching Chrona tools", async () => {
@@ -251,12 +385,8 @@ describe("MCP routes", () => {
   it("returns rejected Chrona results as MCP tool errors with structured content", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_node_result",
-        arguments: {
-          idempotencyKey: "stale-update",
-          status: "complete",
-          summary: "Done",
-        },
+        name: "chrona_execution_read",
+        arguments: {},
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
       true,
@@ -282,12 +412,26 @@ describe("MCP routes", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    const nodeResult = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_node_result",
+    const taskComplete = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_task_complete",
     );
-    expect(nodeResult.inputSchema.properties.idempotencyKey).toBeUndefined();
-    expect(nodeResult.inputSchema.properties.evidence).toBeUndefined();
-    expect(nodeResult.inputSchema.properties.expectedRevision).toBeUndefined();
+    expect(taskComplete.inputSchema.properties.idempotencyKey).toBeUndefined();
+    expect(taskComplete.inputSchema.properties.evidence).toBeUndefined();
+    expect(taskComplete.inputSchema.properties.expectedRevision).toBeUndefined();
+  });
+
+  it("rejects backend IDs in public condition terminal schema", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_condition_select",
+        arguments: { branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No ids" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).toContain("nextNodeId");
   });
 
   it("removes the obsolete custom task-tools endpoint", async () => {

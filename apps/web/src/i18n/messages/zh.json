@@ -69,7 +69,21 @@
       "recentApprovalsTitle": "最近审批",
       "noRecentApprovals": "暂无最近审批。",
       "recentArtifactsTitle": "最近产物",
-      "noArtifacts": "暂无产物。"
+      "noArtifacts": "暂无产物。",
+      "workspaceState": "工作区状态",
+      "currentState": "当前状态",
+      "nextAction": "下一步动作",
+      "stateRunning": "运行中",
+      "stateBlocked": "阻塞中",
+      "stateReviewRequired": "需要审核",
+      "stateIdle": "空闲",
+      "stateEmpty": "尚无计划",
+      "stateCompleted": "已完成",
+      "guidanceBlocked": "先解决阻塞项，再继续执行。",
+      "guidanceReviewRequired": "完成当前节点动作后才能继续。",
+      "guidanceEmpty": "生成并接受计划后才能使用执行控制。",
+      "guidanceCompleted": "关闭任务前请检查最新结果和产物。",
+      "primaryActionCue": "使用主操作继续推进此任务。"
     },
     "scheduleTaskList": {
       "title": "日程列表视图",

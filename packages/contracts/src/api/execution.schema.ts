@@ -53,6 +53,11 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
+    selectedBranch: z.object({
+      label: z.string().min(1),
+      nextNodeId: z.string().min(1),
+      source: z.enum(["user", "ai", "system", "default"]),
+    }).optional(),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({

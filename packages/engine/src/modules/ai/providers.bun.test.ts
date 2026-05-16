@@ -22,4 +22,38 @@ describe("AI provider availability", () => {
     expect(result).toEqual({ available: true, reason: "Gateway is reachable" });
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe("http://127.0.0.1:8642/v1/health");
   });
+
+  it("tests Hermes token against an authenticated endpoint", async () => {
+    const fetchMock = mock((url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("Authorization")).toBe("Bearer bad-token");
+      if (String(url).endsWith("/v1/capabilities")) {
+        return Promise.resolve(new Response(JSON.stringify({ error: "invalid token" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await testAiClientAvailability({
+      type: "hermes",
+      config: {
+        baseUrl: "http://hermes.local",
+        apiKey: "bad-token",
+      },
+    });
+
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain("401");
+    expect(result.reason).toContain("token");
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "http://hermes.local/health/detailed",
+      "http://hermes.local/v1/capabilities",
+    ]);
+  });
 });

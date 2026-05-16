@@ -38,6 +38,9 @@ const DEFAULT_COPY = {
   recentArtifactsTitle: "Recent Artifacts",
   noArtifacts: "No artifacts yet.",
   via: "via",
+  workspaceState: "Workspace state",
+  currentState: "Current state",
+  nextAction: "Next action",
 };
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
@@ -109,8 +112,27 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       setSaveError,
     });
   return (
-    <div className="space-y-1.5 pb-14">
+    <div className="min-w-0 space-y-2 pb-14">
       <div className="space-y-1">
+        <section
+          aria-label={copy.workspaceState}
+          className="rounded-[0.9rem] border border-primary/15 bg-primary/5 px-3 py-2 text-sm"
+        >
+          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                {copy.currentState}
+              </p>
+              <p className="break-words text-base font-semibold text-foreground">
+                {consoleView.states.treatment.label}
+              </p>
+            </div>
+            <p className="min-w-0 break-words text-sm leading-5 text-muted-foreground sm:max-w-[58ch] sm:text-right">
+              <span className="font-medium text-foreground">{copy.nextAction}: </span>
+              {consoleView.states.treatment.guidance}
+            </p>
+          </div>
+        </section>
         <TaskWorkspaceHeaderCard
           task={consoleView.task}
           header={consoleView.header}

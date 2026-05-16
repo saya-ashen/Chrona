@@ -199,7 +199,7 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
               <span className="truncate">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
             </div>
 
-            <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">{node.title}</p>
+            <p className="mt-1 break-words text-[13px] font-semibold leading-snug text-foreground line-clamp-2">{node.title}</p>
 
             <div className="mt-1.5 flex items-center gap-2">
               {runtimeSpotlight ? (

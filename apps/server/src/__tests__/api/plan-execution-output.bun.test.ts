@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   AiRuntimeInvoker,
+  evaluateConditionNodeCapability,
   executeTaskNodeCapability,
+  reviewCheckpointNodeCapability,
 } from "@chrona/engine/modules/plan-execution";
 import { aiClientRegistry } from "@chrona/engine/modules/ai/runtime/client-registry";
 import { db } from "@chrona/db";
@@ -550,6 +552,72 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect((result as { summary: string }).summary).toBe(outputContent);
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
     expect(calls.startRun[0].instructions).toContain("Chrona MCP tools");
+    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+  });
+
+  it("does not require legacy condition structured output for Hermes condition execution", async () => {
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { client, calls } = createMockHermesClient({
+      outputContent: "Hermes will select the branch through Chrona MCP.",
+    });
+    installMockRegistryClient(client, "hermes");
+
+    const conditionNode = {
+      ...planGraph.nodes[0],
+      type: "condition",
+      title: "Choose branch",
+      config: {
+        condition: "Is the task ready?",
+        branches: [{ label: "yes", nextNodeId: "node-2" }],
+      },
+    };
+
+    const result = await evaluateConditionNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: conditionNode as any,
+      plan: planGraph as any,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("started");
+    expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
+    expect(calls.startRun[0].instructions).toContain("Chrona MCP tools");
+    expect(calls.startRun[0].instructions).not.toContain("evaluate_condition_node_result");
+    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+  });
+
+  it("does not require legacy checkpoint structured output for Hermes checkpoint execution", async () => {
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { client, calls } = createMockHermesClient({
+      outputContent: "Hermes will review the checkpoint through Chrona MCP.",
+    });
+    installMockRegistryClient(client, "hermes");
+
+    const checkpointNode = {
+      ...planGraph.nodes[0],
+      type: "checkpoint",
+      title: "Review checkpoint",
+      config: {
+        checkpointType: "approve",
+        prompt: "Approve continuing?",
+      },
+    };
+
+    const result = await reviewCheckpointNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: checkpointNode as any,
+      plan: planGraph as any,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("started");
+    expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
+    expect(calls.startRun[0].instructions).toContain("Chrona MCP tools");
+    expect(calls.startRun[0].instructions).not.toContain("review_checkpoint_node_result");
     expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
   });
 });

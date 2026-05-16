@@ -89,6 +89,7 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
       <h1>{task.title}</h1>
       <p>header-status:{task.status}</p>
       <p>workspace-status:{header.status}</p>
+      <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
       <button type="button">Edit</button>
       {header.actions.filter((action) => action.id !== "more").map((action) => (
         <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
@@ -126,6 +127,8 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
           <p>detail-step:{consoleView.nodeDetail.stepPosition}</p>
           <p>detail-refresh:{consoleView.nodeDetail.autoRefreshEnabled ? "on" : "off"}</p>
           <p>detail-disabled:{consoleView.nodeDetail.disabledActionReason ?? "none"}</p>
+          <p>workspace-treatment:{consoleView.states.treatment.label}</p>
+          <p>workspace-guidance:{consoleView.states.treatment.guidance}</p>
           <p>nav-brand:{consoleView.navigation.brandName}</p>
           <p>nav-active:{consoleView.navigation.activeSection}</p>
           <p>nav-member:{consoleView.navigation.memberIdentity}</p>
@@ -272,6 +275,21 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
   });
 
+  it("renders dominant task identity, state treatment, and ranked primary action", () => {
+    const fixture = taskWorkspaceStateFixtures.running;
+    mocks.planGenerationStatus = "accepted";
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByRole("region", { name: "Workspace state" })).toBeInTheDocument();
+    expect(screen.getByText("Current state")).toBeInTheDocument();
+    expect(screen.getByText("Running")).toBeInTheDocument();
+    expect(screen.getByText(/Next action:/)).toBeInTheDocument();
+    expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
+  });
+
   it("keeps generated plans reviewable before acceptance", () => {
     mocks.planGenerationStatus = "waiting_acceptance";
     mocks.plan = { id: "plan-1", status: "draft" };
@@ -378,6 +396,40 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
   });
 
+  it("renders loading, empty, and error workspace page treatments", () => {
+    const cases = [
+      { fixture: taskWorkspaceStateFixtures.loading, planStatus: "generating", label: "Idle" },
+      { fixture: taskWorkspaceStateFixtures.empty, planStatus: "idle", label: "No plan yet" },
+      {
+        fixture: {
+          ...taskWorkspaceStateFixtures.staleError,
+          pageData: {
+            ...taskWorkspaceStateFixtures.staleError.pageData,
+            latestRunSummary: { id: "run-1", status: "Running", startedAt: null, syncStatus: "stale" },
+          },
+        },
+        planStatus: "accepted",
+        label: "Sync stale",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      mocks.planGenerationStatus = testCase.planStatus;
+      mocks.plan = testCase.planStatus === "idle" ? null : { id: `plan-${testCase.label}`, status: "accepted" };
+      mocks.graphPlan = testCase.fixture.graphPlan;
+
+      render(<TaskWorkspacePage data={testCase.fixture.pageData} />);
+
+      expect(screen.getByText(`workspace-treatment:${testCase.label}`)).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Workspace state" })).toBeInTheDocument();
+
+      cleanup();
+      mocks.plan = null;
+      mocks.graphPlan = null;
+      mocks.planGenerationStatus = "idle";
+    }
+  });
+
   it("keeps task-level actions visible for permission-limited workspaces", () => {
     const fixture = taskWorkspaceStateFixtures.permissionLimited;
     mocks.plan = { id: "plan-1", status: "accepted" };
@@ -390,6 +442,21 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+  });
+
+  it("keeps long mobile fixture content visible without dropping workspace regions", () => {
+    const fixture = taskWorkspaceStateFixtures.longContentMobile;
+    mocks.plan = { id: "plan-1", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText(fixture.pageData.task.title)).toBeInTheDocument();
+    expect(screen.getByText("workspace-treatment:Review required")).toBeInTheDocument();
+    expect(screen.getAllByText(/Confirm evidence and provide launch approval notes/).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Execution flow")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current node details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
   });
 
   it("updates node detail context when a different plan node is selected", () => {

@@ -148,10 +148,14 @@ describe("MCP task tool contracts", () => {
       }),
     ).toMatchObject({ action: "complete_manual_node" });
 
-    expect(parseChronaToolPayload("chrona.node.result", { status: "complete", nodeId: "node-1", summary: "Done" })).toEqual({ status: "complete", nodeId: "node-1", summary: "Done" });
-    expect(parseChronaToolPayload("chrona.node.result", { status: "blocked", reason: "Waiting on API" })).toEqual({ status: "blocked", reason: "Waiting on API" });
-    expect(parseChronaToolPayload("chrona.node.result", { status: "failed", error: "Command failed" })).toEqual({ status: "failed", error: "Command failed" });
-    expect(() => parseChronaToolPayload("chrona.node.result", { status: "blocked" })).toThrow("reason is required");
-    expect(() => parseChronaToolPayload("chrona.node.result", { status: "failed" })).toThrow("error is required");
+    expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
+    expect(parseChronaToolPayload("chrona.node.task_complete", { summary: "Done" })).toEqual({ summary: "Done" });
+    expect(parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Condition met" })).toEqual({ branchRef: "B20260516-01-A", summary: "Condition met" });
+    expect(parseChronaToolPayload("chrona.node.block", { reason: "Waiting on API" })).toEqual({ reason: "Waiting on API" });
+    expect(parseChronaToolPayload("chrona.node.fail", { error: "Command failed" })).toEqual({ error: "Command failed" });
+    expect(parseChronaToolPayload("chrona.node.wait_complete", { summary: "Event observed" })).toEqual({ summary: "Event observed" });
+    expect(() => parseChronaToolPayload("chrona.node.task_complete", { nodeId: "node-1", summary: "Done" })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.condition_select", { summary: "Missing ref" })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No ids" })).toThrow();
   });
 });

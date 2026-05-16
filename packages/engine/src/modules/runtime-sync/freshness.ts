@@ -1,6 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
+import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 import type { OpenClawRuntimeSyncClient } from "@/modules/runtime-sync/sync-run";
 
 import { SYNC_STALE_MS } from "../../constants";
@@ -14,7 +14,7 @@ const ACTIVE_RUN_STATUSES = [
 
 async function markSyncDegraded(run: { id: string; runtimeName: string | null }, message: string) {
   const now = new Date();
-  const runtimeName = run.runtimeName ?? OPENCLAW_EXECUTION_RUNTIME;
+  const runtimeName = run.runtimeName ?? HERMES_EXECUTION_RUNTIME;
 
   await db.run.update({
     where: { id: run.id },

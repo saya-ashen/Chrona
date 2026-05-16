@@ -100,9 +100,19 @@
 - Define the code quality constraints that MUST be preserved, including layer
   boundaries, ownership, and any simplicity expectations.
 - Define the automated test coverage that MUST ship with the feature, including
-  the required test levels for changed behavior.
+  the required test levels for changed behavior and whether `bun run test:e2e`
+  is required for task, schedule, or navigation flows.
 - Define the UX consistency rules the feature MUST follow, including existing
-  patterns, terminology, and loading/empty/success/error states.
+  Chrona product behavior, patterns, terminology, i18n message requirements, and
+  loading/empty/success/error states.
+- For frontend visual or interaction changes, define the required
+  `agent-browser` pre-edit observation and post-edit verification evidence,
+  including desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
+- Define whether current task, active node, blocked/review state, and primary
+  action must be visible, and how the feature will prevent mobile horizontal
+  scrolling.
+- State whether backend APIs remain unchanged. If an API change is required for
+  visual or interaction polish, explain why it is necessary.
 - Define measurable performance requirements or explicitly state why no material
   performance risk exists.
 

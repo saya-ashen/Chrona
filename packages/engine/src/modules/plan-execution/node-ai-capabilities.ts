@@ -1,50 +1,18 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import {
-  buildCheckpointNodeReviewFeatureSpec,
-  buildConditionNodeEvaluationFeatureSpec,
-  buildTaskNodeExecutionFeatureSpec,
-  type CheckpointConfig,
-  type CheckpointNodeAiResult,
-  type ConditionConfig,
-  type ConditionNodeAiResult,
   type EffectivePlanGraph,
   type EffectivePlanNode,
   type PreparedAiFeatureSpec,
-  type TaskConfig,
-  validatePreparedFeaturePayload,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker";
 import type { NodeExecutionResult } from "./node-executors/types";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
+import { buildNodeRuntimePrompt } from "./node-runtime-prompts";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
 >;
-
-type PlanContextNode = {
-  id: string;
-  title: string;
-  type: EffectivePlanNode["type"];
-  status: EffectivePlanNode["status"];
-  objective: string;
-  dependencies: string[];
-  dependents: string[];
-};
-
-type PlanContextEdge = {
-  from: string;
-  to: string;
-  label?: string;
-};
-
-type PlanExecutionContext = {
-  currentNodeId: string;
-  entryNodeIds: string[];
-  terminalNodeIds: string[];
-  nodes: PlanContextNode[];
-  edges: PlanContextEdge[];
-};
 
 export type NodeAiCapabilityInput = {
   taskId: string;
@@ -59,134 +27,6 @@ export type NodeAiCapabilityInput = {
   aiRuntimeInvoker: AiRuntimeInvoker;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
 };
-
-function completedNodeTitles(plan: EffectivePlanGraph): string[] {
-  return plan.nodes
-    .filter((node) => node.status === "completed" || node.status === "skipped")
-    .map((node) => node.title);
-}
-
-function getNodeObjective(node: EffectivePlanNode): string {
-  const nodeConfig =
-    node.config && typeof node.config === "object"
-      ? (node.config as Record<string, unknown>)
-      : {};
-  const definitionObjective =
-    node.definition && typeof node.definition === "object"
-      ? node.definition.objective
-      : undefined;
-  const legacyNode = node as unknown as Record<string, unknown>;
-  const legacyObjective =
-    typeof legacyNode.objective === "string" ? legacyNode.objective : undefined;
-  return typeof nodeConfig.objective === "string"
-    ? nodeConfig.objective
-    : typeof definitionObjective === "string"
-      ? definitionObjective
-      : typeof legacyObjective === "string"
-        ? legacyObjective
-        : node.title;
-}
-
-function buildAttemptId(input: NodeAiCapabilityInput): string {
-  return `${input.plan.graphId}:${input.node.id}:${input.node.attempts + 1}`;
-}
-
-function buildContextSnapshotId(input: NodeAiCapabilityInput): string {
-  return `${input.plan.graphId}:${input.plan.resolvedVersion}:${input.node.id}`;
-}
-
-function buildPlanExecutionContext(input: NodeAiCapabilityInput): PlanExecutionContext {
-  return {
-    currentNodeId: input.node.id,
-    entryNodeIds: input.plan.entryNodeIds,
-    terminalNodeIds: input.plan.terminalNodeIds,
-    nodes: input.plan.nodes.map((node) => ({
-      id: node.id,
-      title: node.title,
-      type: node.type,
-      status: node.status,
-      objective: getNodeObjective(node),
-      dependencies: node.dependencies,
-      dependents: node.dependents,
-    })),
-    edges: input.plan.edges.map((edge) => ({
-      from: edge.from,
-      to: edge.to,
-      ...(edge.label ? { label: edge.label } : {}),
-    })),
-  };
-}
-
-function buildInstructions(input: NodeAiCapabilityInput): string {
-  return [
-    `Task: ${input.plan.planId}`,
-    `Current node: [${input.node.id}] ${input.node.title}`,
-    `Objective: ${getNodeObjective(input.node)}`,
-    "Plan context: use input.planContext for the graph nodes and logical relationships; execute only the current node and do not complete unrelated downstream nodes early.",
-    completedNodeTitles(input.plan).length > 0
-      ? `Already completed: ${completedNodeTitles(input.plan).join(", ")}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function buildTaskNodeProviderInput(
-  input: NodeAiCapabilityInput,
-): Record<string, unknown> {
-  const config = input.node.config as TaskConfig;
-  return {
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    attemptId: buildAttemptId(input),
-    contextSnapshotId: buildContextSnapshotId(input),
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    nodeObjective: getNodeObjective(input.node),
-    expectedOutput: config.expectedOutput,
-    completionCriteria: config.completionCriteria,
-    completedNodeTitles: completedNodeTitles(input.plan),
-    planContext: buildPlanExecutionContext(input),
-  };
-}
-
-function buildConditionNodeProviderInput(
-  input: NodeAiCapabilityInput,
-): Record<string, unknown> {
-  const config = input.node.config as ConditionConfig;
-  return {
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    condition: config.condition,
-    branches: config.branches,
-    defaultNextNodeId: config.defaultNextNodeId,
-    completedNodeTitles: completedNodeTitles(input.plan),
-  };
-}
-
-function buildCheckpointNodeProviderInput(
-  input: NodeAiCapabilityInput,
-): Record<string, unknown> {
-  const config = input.node.config as CheckpointConfig;
-  return {
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    checkpointType: config.checkpointType,
-    prompt: config.prompt,
-    options: config.options,
-    completedNodeTitles: completedNodeTitles(input.plan),
-  };
-}
 
 function buildFailureDetails(input: {
   node: EffectivePlanNode;
@@ -207,148 +47,6 @@ function buildFailureDetails(input: {
     runtimeSessionKey: input.runtimeSessionKey ?? null,
     message: input.message,
   };
-}
-
-function structuredPayload<T>(input: {
-  featureSpec: PreparedAiFeatureSpec;
-  response: {
-    structuredPayload?: unknown;
-  };
-}):
-  | { ok: true; parsed: T }
-  | { ok: false; error: string; validationIssues?: unknown } {
-  const structured = input.response.structuredPayload as {
-    ok?: boolean;
-    parsed?: T | null;
-    error?: string | null;
-    validationIssues?: unknown;
-  } | null;
-  const parsedFromStructured = structured?.ok ? structured.parsed : null;
-  const parsed = parsedFromStructured;
-
-  if (parsed != null) {
-    const validation = validatePreparedFeaturePayload(
-      input.featureSpec,
-      parsed,
-    );
-    if (validation.ok) {
-      return { ok: true, parsed: parsed as T };
-    }
-    return {
-      ok: false,
-      error: validation.error,
-      validationIssues: structured?.validationIssues,
-    };
-  }
-  return {
-    ok: false,
-    error:
-      structured?.error ??
-      `OpenClaw did not return ${input.featureSpec.structuredOutputSchema?.name ?? input.featureSpec.feature}`,
-    validationIssues: structured?.validationIssues,
-  };
-}
-
-async function runNodeFeature<T>(
-  input: NodeAiCapabilityInput & {
-    featureSpec: PreparedAiFeatureSpec;
-    providerInput: Record<string, unknown>;
-  },
-): Promise<
-  | {
-      ok: true;
-      parsed: T;
-      evidence: NodeExecutionEvidence;
-      invocation: AiRuntimeInvocation;
-    }
-  | { ok: false; result: NodeExecutionResult }
-> {
-  try {
-    const invocation = await input.aiRuntimeInvoker.invoke({
-      taskId: input.taskId,
-      taskSessionId: input.mainSession.id,
-      runtimeName: input.runtimeName,
-      runtimeSessionKey: input.mainSession.sessionKey,
-      runtimeInput: input.providerInput,
-      instructions: input.featureSpec.instructions,
-      featureSpec: input.featureSpec,
-      triggeredBy: "system",
-      onRuntimeEvent: input.onRuntimeEvent,
-    });
-
-    const evidence: NodeExecutionEvidence = {
-      sessionId: input.mainSession.id,
-      runId: invocation.runId,
-      runtimeName: input.runtimeName,
-      runtimeRunRef: invocation.runtimeRunRef,
-      conversationEntryIds: invocation.conversationEntryIds,
-    };
-
-    if (invocation.response.error) {
-      const message = `Runtime provider failed while executing node ${input.node.id}: ${invocation.response.error}`;
-      return {
-        ok: false,
-        result: {
-          status: "failed",
-          error: message,
-          evidence,
-          details: buildFailureDetails({
-            node: input.node,
-            runtimeName: input.runtimeName,
-            runtimeRunRef: invocation.runtimeRunRef,
-            runId: invocation.runId,
-            runtimeSessionKey: invocation.runtimeSessionKey,
-            message,
-          }),
-        },
-      };
-    }
-
-    const payload = structuredPayload<T>({
-      featureSpec: input.featureSpec,
-      response: invocation.response,
-    });
-    if (!payload.ok) {
-      await db.run.update({
-        where: { id: invocation.runId },
-        data: { status: RunStatus.Failed, errorSummary: payload.error },
-      });
-      return {
-        ok: false,
-        result: {
-          status: "failed",
-          error: payload.error,
-          evidence,
-          details: { validationIssues: payload.validationIssues },
-        },
-      };
-    }
-
-    return { ok: true, parsed: payload.parsed, evidence, invocation };
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to run node AI capability";
-    const fullMessage = `Failed to execute AI capability for node ${input.node.id}: ${message}`;
-    return {
-      ok: false,
-      result: {
-        status: "failed",
-        error: fullMessage,
-        evidence: {
-          sessionId: input.mainSession.id,
-          runtimeName: input.runtimeName,
-        },
-        details: buildFailureDetails({
-          node: input.node,
-          runtimeName: input.runtimeName,
-          runtimeSessionKey: input.mainSession.sessionKey,
-          message: fullMessage,
-        }),
-      },
-    };
-  }
 }
 
 async function runTaskNodeFeature(
@@ -479,23 +177,17 @@ function errorSummaryFromNodeResult(result: NodeExecutionResult): string | null 
 export async function executeTaskNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
-  const config = input.node.config as TaskConfig;
-  const instructions = buildInstructions(input);
-  const featureSpec = buildTaskNodeExecutionFeatureSpec({
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    attemptId: buildAttemptId(input),
-    contextSnapshotId: buildContextSnapshotId(input),
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    nodeObjective: getNodeObjective(input.node),
-    expectedOutput: config.expectedOutput,
-    completionCriteria: config.completionCriteria,
-    completedNodeTitles: completedNodeTitles(input.plan),
-    instructions,
-  });
+  const runtime = buildNodeRuntimePrompt(input);
+  const featureSpec: PreparedAiFeatureSpec = {
+    feature: input.node.type === "condition"
+      ? "evaluate_condition_node"
+      : input.node.type === "checkpoint"
+        ? "review_checkpoint_node"
+        : "execute_task_node",
+    instructions: runtime.instructions,
+    inputText: JSON.stringify(runtime.runtimeInput, null, 2),
+    terminalToolName: runtime.runtimeInput.allowedTerminalTools[0],
+  };
 
   return runTaskNodeFeature({
     ...input,
@@ -503,127 +195,18 @@ export async function executeTaskNodeCapability(
       ...featureSpec,
       structuredOutputSchema: undefined,
     },
-    providerInput: buildTaskNodeProviderInput(input),
+    providerInput: runtime.runtimeInput as unknown as Record<string, unknown>,
   });
 }
 
 export async function evaluateConditionNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
-  const config = input.node.config as ConditionConfig;
-  const instructions = buildInstructions(input);
-  const featureSpec = buildConditionNodeEvaluationFeatureSpec({
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    condition: config.condition,
-    branches: config.branches,
-    defaultNextNodeId: config.defaultNextNodeId,
-    completedNodeTitles: completedNodeTitles(input.plan),
-    instructions,
-  });
-
-  const result = await runNodeFeature<ConditionNodeAiResult>({
-    ...input,
-    featureSpec,
-    providerInput: buildConditionNodeProviderInput(input),
-  });
-  if (!result.ok) return result.result;
-
-  const branch = config.branches.find(
-    (candidate) => candidate.label === result.parsed.selectedBranchLabel,
-  );
-  if (!branch) {
-    const nodeResult: NodeExecutionResult = {
-      status: "failed",
-      error: `AI selected unknown branch '${result.parsed.selectedBranchLabel}' for node ${input.node.id}`,
-      evidence: result.evidence,
-      details: {
-        availableBranches: config.branches.map((candidate) => candidate.label),
-      },
-    };
-    await updateInvocationRunFromNodeResult(result.invocation, nodeResult);
-    return nodeResult;
-  }
-
-  const nodeResult: NodeExecutionResult = {
-    status: "done",
-    summary: `Condition resolved to branch: ${branch.label}`,
-    evidence: result.evidence,
-    output: {
-      reason: result.parsed.reason,
-      confidence: result.parsed.confidence,
-    },
-    selectedBranch: {
-      label: branch.label,
-      nextNodeId:
-        input.plan.nodes.find((node) => node.localId === branch.nextNodeId)
-          ?.id ?? branch.nextNodeId,
-      source: "ai",
-    },
-  };
-  await updateInvocationRunFromNodeResult(result.invocation, nodeResult);
-  return nodeResult;
+  return executeTaskNodeCapability(input);
 }
 
 export async function reviewCheckpointNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
-  const config = input.node.config as CheckpointConfig;
-  const instructions = buildInstructions(input);
-  const featureSpec = buildCheckpointNodeReviewFeatureSpec({
-    graphId: input.plan.graphId,
-    nodeId: input.node.id,
-    nodeLayerId: input.node.activeLayerId ?? input.node.id,
-    taskId: input.taskId,
-    planTitle: input.plan.planId,
-    nodeTitle: input.node.title,
-    checkpointType: config.checkpointType,
-    prompt: config.prompt,
-    options: config.options,
-    completedNodeTitles: completedNodeTitles(input.plan),
-    instructions,
-  });
-
-  const result = await runNodeFeature<CheckpointNodeAiResult>({
-    ...input,
-    featureSpec,
-    providerInput: buildCheckpointNodeProviderInput(input),
-  });
-  if (!result.ok) return result.result;
-
-  let nodeResult: NodeExecutionResult;
-  switch (result.parsed.recommendation) {
-    case "approve":
-      nodeResult = {
-        status: "done",
-        summary: result.parsed.summary,
-        output: {
-          reason: result.parsed.reason,
-          recommendation: result.parsed.recommendation,
-        },
-        evidence: result.evidence,
-      };
-      break;
-    case "request_changes":
-      nodeResult = {
-        status: "waiting_for_user",
-        prompt: result.parsed.reason,
-        reason: result.parsed.summary,
-        evidence: result.evidence,
-      };
-      break;
-    case "block":
-      nodeResult = {
-        status: "blocked",
-        reason: result.parsed.reason,
-        evidence: result.evidence,
-      };
-      break;
-  }
-  await updateInvocationRunFromNodeResult(result.invocation, nodeResult);
-  return nodeResult;
+  return executeTaskNodeCapability(input);
 }

@@ -70,10 +70,10 @@ function EmptyDetailState() {
     >
       <div className="rounded-[1.35rem] border border-dashed border-border/60 bg-background px-4 py-5">
         <p className="text-sm font-semibold text-foreground">
-          {DEFAULT_GRAPH_COPY.inspectorTitle}
+          No active node selected
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {DEFAULT_GRAPH_COPY.inspectorEmpty}
+          Select a plan node, generate a plan, or wait for execution to expose the current node details here.
         </p>
       </div>
     </section>
@@ -349,7 +349,7 @@ function ActionTab({
   return (
     <div className="rounded-lg border border-orange-200 bg-orange-50/55 p-2.5">
       <p className="text-sm font-semibold text-foreground">Action required</p>
-      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+      <p className="mt-1 break-words text-sm text-muted-foreground">
         {node.nextAction ??
           node.summary ??
           "Review the current node state before continuing."}
@@ -508,11 +508,11 @@ export function TaskWorkspaceNodeDetailPanel({
     <section
       id="task-workspace-node-actions"
       aria-label="Current node details"
-      className="flex h-[380px] max-h-[calc(100vh-1rem)] scroll-mt-2 flex-col rounded-[0.9rem] border border-border/50 bg-white shadow-none md:h-[360px] xl:h-full xl:max-h-[calc(100vh-1.5rem)]"
+      className="flex h-[380px] max-h-[calc(100vh-1rem)] min-w-0 scroll-mt-2 flex-col rounded-[0.9rem] border border-border/50 bg-white shadow-none md:h-[360px] xl:h-full xl:max-h-[calc(100vh-1.5rem)]"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-2.5 py-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="min-w-0 break-words text-sm font-semibold text-foreground">
             Current node: {detail.title}
           </h2>
           <StatusBadge tone={statusTone(detail.status)}>

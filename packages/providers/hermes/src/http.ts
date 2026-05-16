@@ -80,9 +80,19 @@ export async function ensureHermesOk(response: Response, operation: string): Pro
     });
   }
 
+  if (response.status === 401 || response.status === 403) {
+    throw new HermesProviderError({
+      message: `Hermes ${operation} failed with HTTP ${response.status}. Check Hermes API token.`,
+      code: "misconfigured",
+      status: response.status,
+      retryable: false,
+      raw: body,
+    });
+  }
+
   throw new HermesProviderError({
     message: `Hermes ${operation} failed with HTTP ${response.status}`,
-    code: response.status === 401 || response.status === 403 ? "misconfigured" : "provider_error",
+    code: "provider_error",
     status: response.status,
     retryable: response.status >= 500,
     raw: body,
