@@ -15,7 +15,6 @@ type ExternalChronaToolName = keyof typeof externalTools;
 const logger = createLogger("apps.server.mcp");
 
 const optionalString = z.string().min(1).optional();
-const requiredString = (description: string) => z.string().min(1).describe(description);
 
 const baseReadSchema = z.object({}).passthrough();
 const nodeResultSchema = z.object({

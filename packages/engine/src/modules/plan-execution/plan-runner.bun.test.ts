@@ -486,4 +486,68 @@ describe("plan-runner native execution actions", () => {
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Blocked);
   });
+
+  it("records deterministic execution outcome states across task flow actions", async () => {
+    const inputFlow = await seedWorkspaceAndTask("Runner outcome matrix input");
+    const inputPlan = makeInputCheckpointPlan();
+    await seedAcceptedCompiledPlan(inputFlow.workspace.id, inputFlow.task.id, inputPlan);
+
+    const pendingTask = await db.task.findUniqueOrThrow({ where: { id: inputFlow.task.id } });
+    expect(pendingTask.status).toBe(TaskStatus.Ready);
+
+    const waiting = await taskPlanExecution.dispatch({
+      taskId: inputFlow.task.id,
+      action: { action: "start_manual" },
+    });
+    expect(waiting.status).toBe("waiting_for_user");
+    expect(waiting.waitingNodeIds).toContain("checkpoint_input");
+
+    const completed = await taskPlanExecution.dispatch({
+      taskId: inputFlow.task.id,
+      action: { action: "resume_with_input", nodeId: "checkpoint_input", inputText: "theme: matrix" },
+    });
+    expect(completed.status).toBe("completed");
+    expect(completed.executedNodeIds).toContain("checkpoint_input");
+
+    const completedTask = await db.task.findUniqueOrThrow({ where: { id: inputFlow.task.id } });
+    expect(completedTask.status).toBe(TaskStatus.Completed);
+
+    const completedRun = await getPlanRun(inputFlow.task.id, inputPlan.editablePlanId);
+    expect(completedRun?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded", "succeeded"]);
+
+    const blockedFlow = await seedWorkspaceAndTask("Runner outcome matrix blocked");
+    const blockedPlan = makeSingleBlockedConditionPlan();
+    await seedAcceptedCompiledPlan(blockedFlow.workspace.id, blockedFlow.task.id, blockedPlan);
+
+    const blocked = await taskPlanExecution.dispatch({
+      taskId: blockedFlow.task.id,
+      action: { action: "start_manual" },
+    });
+    expect(blocked.status).toBe("blocked");
+    expect(blocked.blockedNodeIds).toContain("cond_blocked");
+
+    const blockedTask = await db.task.findUniqueOrThrow({ where: { id: blockedFlow.task.id } });
+    expect(blockedTask.status).toBe(TaskStatus.Blocked);
+
+    const blockedRun = await getPlanRun(blockedFlow.task.id, blockedPlan.editablePlanId);
+    expect(blockedRun?.attempts.map((attempt) => attempt.status)).toEqual(["failed"]);
+
+    const cancelFlow = await seedWorkspaceAndTask("Runner outcome matrix cancelled");
+    const cancelPlan = makeSingleUserConditionPlan();
+    await seedAcceptedCompiledPlan(cancelFlow.workspace.id, cancelFlow.task.id, cancelPlan);
+    await taskPlanExecution.dispatch({ taskId: cancelFlow.task.id, action: { action: "start_manual" } });
+
+    const cancelSession = await db.executionSession.findFirstOrThrow({
+      where: { taskId: cancelFlow.task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    const cancelled = await taskPlanExecution.dispatch({
+      taskId: cancelFlow.task.id,
+      action: { action: "cancel_session", sessionId: cancelSession.id, reason: "matrix cancel" },
+    });
+    expect(cancelled.status).toBe("cancelled");
+
+    const cancelledTask = await db.task.findUniqueOrThrow({ where: { id: cancelFlow.task.id } });
+    expect(cancelledTask.status).toBe(TaskStatus.Cancelled);
+  });
 });

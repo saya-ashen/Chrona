@@ -82,6 +82,17 @@ export interface FixtureReviewOutcome {
   feedback: string | null;
 }
 
+export type FixtureCheckpointResultStatus = "success" | "missing_result" | "malformed_result" | "delayed_result";
+
+export interface FixtureCheckpointResultCase {
+  scenarioId: string;
+  nodeId: string;
+  status: FixtureCheckpointResultStatus;
+  payload: unknown;
+  delayMs: number;
+  expectedDiagnostic: string;
+}
+
 // ───────────────────────────────────────────────────
 // Sample plan graphs with rich execution metadata
 // ───────────────────────────────────────────────────
@@ -669,6 +680,53 @@ export const SAMPLE_REVIEW_REQUEST_CHANGES: FixtureReviewOutcome = {
   outcome: "request_changes",
   feedback: "Please add a section on migration strategy from the old platform",
 };
+
+// ───────────────────────────────────────────────────
+// Sample checkpoint result cases
+// ───────────────────────────────────────────────────
+
+export const SAMPLE_CHECKPOINT_RESULT_SUCCESS: FixtureCheckpointResultCase = {
+  scenarioId: "checkpoint-regression-success",
+  nodeId: "n5-review",
+  status: "success",
+  payload: { outcome: "accept", feedback: "Ready to publish" },
+  delayMs: 0,
+  expectedDiagnostic: "checkpoint result accepted",
+};
+
+export const SAMPLE_CHECKPOINT_RESULT_MISSING: FixtureCheckpointResultCase = {
+  scenarioId: "checkpoint-regression-missing-result",
+  nodeId: "n5-review",
+  status: "missing_result",
+  payload: null,
+  delayMs: 0,
+  expectedDiagnostic: "checkpoint result missing without legacy OpenClaw error",
+};
+
+export const SAMPLE_CHECKPOINT_RESULT_MALFORMED: FixtureCheckpointResultCase = {
+  scenarioId: "checkpoint-regression-malformed-result",
+  nodeId: "n5-review",
+  status: "malformed_result",
+  payload: { unexpected: "review payload missing outcome" },
+  delayMs: 0,
+  expectedDiagnostic: "checkpoint result malformed without legacy OpenClaw error",
+};
+
+export const SAMPLE_CHECKPOINT_RESULT_DELAYED: FixtureCheckpointResultCase = {
+  scenarioId: "checkpoint-regression-delayed-result",
+  nodeId: "n5-review",
+  status: "delayed_result",
+  payload: { outcome: "request_changes", feedback: "Need one more evidence pass" },
+  delayMs: 1_500,
+  expectedDiagnostic: "checkpoint result delayed and still diagnosable",
+};
+
+export const SAMPLE_CHECKPOINT_RESULT_CASES: FixtureCheckpointResultCase[] = [
+  SAMPLE_CHECKPOINT_RESULT_SUCCESS,
+  SAMPLE_CHECKPOINT_RESULT_MISSING,
+  SAMPLE_CHECKPOINT_RESULT_MALFORMED,
+  SAMPLE_CHECKPOINT_RESULT_DELAYED,
+];
 
 // ───────────────────────────────────────────────────
 // Fixture persistence helpers

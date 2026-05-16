@@ -221,6 +221,49 @@ describe("TaskPlanGraph", () => {
     expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-requires-action", "true");
   });
 
+  it("keeps long titles, generated plan text, and error summaries contained in graph surfaces", () => {
+    const longTitle = "Investigate an unusually long generated execution node title that should stay clipped inside the graph card without hiding controls";
+    const longObjective = "Generated plan text: collect logs, compare checkpoints, write a diagnostic summary, and include enough detail to reproduce the blocked execution state without expanding the node beyond the graph viewport.";
+    const longError = "Provider timeout while waiting for checkpoint review output after multiple retries; keep this error visible in the inspector without overflowing the modal.";
+
+    render(
+      <TaskPlanGraph
+        mode="full"
+        plan={testPlan({
+          state: "ready",
+          currentStepId: "node-long",
+          steps: [
+            {
+              id: "node-long",
+              title: longTitle,
+              objective: longObjective,
+              summary: longObjective,
+              phase: "diagnostics",
+              status: "blocked",
+              statusLabel: "Retry needed after provider timeout",
+              nextAction: "Retry after checking checkpoint evidence and provider logs",
+              type: "checkpoint",
+              displayType: "checkpoint",
+              metadata: { error: longError },
+            },
+          ],
+          edges: [],
+        })}
+      />,
+    );
+
+    const node = screen.getByTestId("task-plan-node-node-long");
+    expect(node).toHaveTextContent(longTitle);
+    expect(node).toHaveAttribute("data-node-workspace-status", "blocked");
+    expect(node).toHaveClass("overflow-hidden");
+
+    fireEvent.click(node);
+    expect(screen.getAllByText(longObjective).length).toBeGreaterThan(0);
+    const errorText = screen.getByText(longError);
+    expect(errorText).toBeInTheDocument();
+    expect(errorText.closest("aside")).toHaveClass("overflow-hidden");
+  });
+
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", () => {
     render(
       <TaskPlanGraph
