@@ -21,13 +21,7 @@ import {
 } from "@chrona/contracts";
 import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type { EngineAiClient } from "./runtime/client-registry";
-import { aiClientRegistry } from "./runtime/client-registry";
-
-function getOpenClawGatewayUrl(config: OpenClawClientConfig): string | undefined {
-  return typeof config.gatewayUrl === "string" && config.gatewayUrl
-    ? config.gatewayUrl
-    : config.bridgeUrl;
-}
+import { aiClientRegistry, getOpenClawGatewayUrl } from "./runtime/client-registry";
 
 async function checkClientHealth(
   client: AiClientRecord,

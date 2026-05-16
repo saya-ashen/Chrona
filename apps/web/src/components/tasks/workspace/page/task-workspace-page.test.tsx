@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "./task-workspace-page";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import { createTaskWorkspaceUiFixture } from "../test/task-workspace-ui-fixtures";
 import type { TaskPageData, TaskPlanGenerationStatus } from "../model/task-workspace-types";
 
 const mocks = vi.hoisted(() => ({
@@ -444,5 +445,41 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByLabelText("Execution flow")).toBeInTheDocument();
     expect(screen.getByLabelText("Current node details")).toBeInTheDocument();
     expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
+  });
+
+  it("renders fixture-backed loading, planning, execution, blocked, failed, completed, and retry states", () => {
+    const states = [
+      "loading",
+      "empty",
+      "planning",
+      "executing",
+      "blocked",
+      "failed",
+      "completed",
+      "retry",
+    ] as const;
+
+    for (const state of states) {
+      const fixture = createTaskWorkspaceUiFixture(state);
+      mocks.planGenerationStatus = state === "loading" || state === "planning" ? "generating" : "accepted";
+      mocks.plan = { id: `plan-${state}`, status: state === "loading" || state === "planning" ? "draft" : "accepted" };
+      mocks.graphPlan = fixture.graphPlan;
+
+      render(<TaskWorkspacePage data={fixture.pageData} />);
+
+      expect(screen.getByText(`task:${fixture.pageData.task.title}`)).toBeInTheDocument();
+      expect(screen.getByText("nodes:1")).toBeInTheDocument();
+      expect(screen.getByText(`detail-title:${fixture.graphPlan.nodes[0]?.title ?? "No node selected"}`)).toBeInTheDocument();
+      expect(screen.getByLabelText("Execution flow")).toBeInTheDocument();
+      expect(screen.getByLabelText("Current node details")).toBeInTheDocument();
+      expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
+
+      cleanup();
+      mocks.editorTask = null;
+      mocks.plan = null;
+      mocks.graphPlan = null;
+      mocks.planGenerationStatus = "idle";
+      mocks.canAcceptPlan = false;
+    }
   });
 });

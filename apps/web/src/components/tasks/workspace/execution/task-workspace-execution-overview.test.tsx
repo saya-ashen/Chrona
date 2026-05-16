@@ -21,7 +21,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Execution overview")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
     expect(screen.getByText("Execution result overview")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     expect(screen.getByText("Latest result")).toBeInTheDocument();
@@ -93,5 +93,38 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Run is Running").length).toBeGreaterThan(0);
+  });
+
+  it("exposes blocked status, retry progress, and accessible action names", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      ...taskWorkspaceStateFixtures.staleError,
+      pageData: {
+        ...taskWorkspaceStateFixtures.staleError.pageData,
+        task: {
+          ...taskWorkspaceStateFixtures.staleError.pageData.task,
+          isRunnable: true,
+        },
+      },
+    });
+    const onAction = vi.fn();
+
+    render(
+      <TaskWorkspaceExecutionOverview
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        onAction={onAction}
+      />,
+    );
+
+    expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/blocked/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Retry refresh").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Open action controls").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open action controls" }));
+    expect(onAction).toHaveBeenCalledWith("blocked");
   });
 });

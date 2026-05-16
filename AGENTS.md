@@ -143,7 +143,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/005-mcp-task-tools/plan.md`
+`specs/006-test-coverage/plan.md`
 
 <!-- SPECKIT END -->
 

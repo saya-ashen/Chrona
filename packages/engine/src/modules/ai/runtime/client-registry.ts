@@ -55,12 +55,14 @@ function toAiClientRecord(client: StoredAiClient): AiClientRecord {
   };
 }
 
-function getOpenClawGatewayUrl(
-  config: OpenClawClientConfig,
+export function getOpenClawGatewayUrl(
+  config: OpenClawClientConfig & { baseUrl?: string },
 ): string | undefined {
-  return typeof config.gatewayUrl === "string" && config.gatewayUrl
-    ? config.gatewayUrl
-    : config.bridgeUrl;
+  const url = config.gatewayUrl || config.bridgeUrl || config.baseUrl;
+  if (!url) return undefined;
+
+  const trimmed = url.trim().replace(/\/$/, "");
+  return /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
 function createProviderClient(
