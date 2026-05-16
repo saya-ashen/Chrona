@@ -111,14 +111,14 @@ export function TaskWorkspaceHeaderCard({
   }, [showMoreMenu]);
 
   return (
-      <SurfaceCard
-      className="relative z-30 overflow-visible rounded-[0.85rem] border-border/40 bg-background/70 p-1.5 shadow-none backdrop-blur-[2px]"
+    <SurfaceCard
+      className="relative z-30 min-w-0 overflow-visible rounded-[0.85rem] border-border/40 bg-background/70 p-1.5 shadow-none backdrop-blur-[2px]"
       variant="inset"
       padding="none"
     >
       <SurfaceCardHeader className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-          <h1 className="min-w-0 truncate text-base font-semibold tracking-tight lg:max-w-[34vw]">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-2">
+          <h1 className="min-w-0 break-words text-lg font-semibold leading-tight tracking-tight lg:max-w-[38vw]">
             {header.title}
           </h1>
           <div className="flex flex-wrap items-center gap-1">
@@ -140,7 +140,7 @@ export function TaskWorkspaceHeaderCard({
           </span>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-start gap-1 lg:justify-end">
+        <div className="flex w-full flex-wrap items-center justify-start gap-1 sm:w-auto lg:justify-end">
           {visibleActions.map((action) => {
             const Icon = actionIcon(action.id);
             const isPending = pendingActionId === action.id;
@@ -154,7 +154,7 @@ export function TaskWorkspaceHeaderCard({
                 className={buttonVariants({
                   variant: actionVariant(action.id),
                   size: "sm",
-                  className: "rounded-xl",
+                  className: action.id === "start" ? "min-w-24 rounded-xl" : "rounded-xl",
                 })}
               >
                 <Icon className={isPending ? "size-3.5 animate-pulse" : "size-3.5"} />

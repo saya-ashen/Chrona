@@ -51,8 +51,12 @@ describe("HermesProviderClient", () => {
   });
 
   it("returns health ok with latency", async () => {
+    const seenUrls: string[] = [];
     globalThis.fetch = mockFetch(async (url) => {
-      expect(String(url)).toBe("http://127.0.0.1:8642/health/detailed");
+      seenUrls.push(String(url));
+      if (String(url).endsWith("/v1/capabilities")) {
+        return jsonResponse({ features: { run_submission: true } });
+      }
       return jsonResponse({ ok: true });
     });
 
@@ -63,6 +67,33 @@ describe("HermesProviderClient", () => {
     expect(health.status).toBe("ok");
     expect(health.latencyMs).toBeGreaterThanOrEqual(0);
     expect(Date.parse(health.checkedAt)).not.toBeNaN();
+    expect(seenUrls).toEqual([
+      "http://127.0.0.1:8642/health/detailed",
+      "http://127.0.0.1:8642/v1/capabilities",
+    ]);
+  });
+
+  it("checks capabilities auth during deep health checks", async () => {
+    const seenUrls: string[] = [];
+    globalThis.fetch = mockFetch(async (url) => {
+      seenUrls.push(String(url));
+      if (String(url).endsWith("/v1/capabilities")) {
+        return jsonResponse({ error: "invalid token" }, { status: 401 });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const client = new HermesProviderClient({ apiKey: "bad" });
+    const health = await client.checkHealth({ deep: true });
+
+    expect(health.ok).toBe(false);
+    expect(health.status).toBe("misconfigured");
+    expect(health.reason).toContain("401");
+    expect(health.reason).toContain("token");
+    expect(seenUrls).toEqual([
+      "http://127.0.0.1:8642/health/detailed",
+      "http://127.0.0.1:8642/v1/capabilities",
+    ]);
   });
 
   it("maps health 401 to misconfigured", async () => {
@@ -196,6 +227,23 @@ describe("HermesProviderClient", () => {
     })).rejects.toMatchObject({
       code: "rate_limited",
       retryable: true,
+    } satisfies Partial<HermesProviderError>);
+  });
+
+  it("maps start run 401 to token misconfiguration", async () => {
+    globalThis.fetch = mockFetch(async () => jsonResponse({ error: "invalid token" }, { status: 401 }));
+
+    const client = new HermesProviderClient({ apiKey: "bad" });
+
+    await expect(client.startRun({
+      sessionId: "session-1",
+      instructions: "go",
+      input: { type: "text", text: "Hello" },
+    })).rejects.toMatchObject({
+      code: "misconfigured",
+      status: 401,
+      retryable: false,
+      message: expect.stringContaining("token"),
     } satisfies Partial<HermesProviderError>);
   });
 

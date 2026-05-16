@@ -72,7 +72,7 @@ export function TaskWorkspacePlanSection({
       ? consoleView.task.runnabilitySummary
       : null) ??
     (consoleView.states.isStale
-      ? "Execution data may be stale. Refresh before acting on results."
+      ? consoleView.states.treatment.guidance
       : null) ??
     (planGenerationStatus === "generating"
       ? "Generating a fresh plan. The graph will update when the run completes."

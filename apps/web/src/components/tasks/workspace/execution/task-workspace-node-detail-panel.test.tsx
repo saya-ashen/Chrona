@@ -31,8 +31,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     render(<TaskWorkspaceNodeDetailPanel detail={detail()} selectedNodes={[]} onDispatchExecutionAction={vi.fn()} />);
 
     expect(screen.getByRole("region", { name: "Current node details" })).toBeInTheDocument();
-    expect(screen.getByText("节点详情")).toBeInTheDocument();
-    expect(screen.getByText("选择一个节点后查看目标、依赖和后续可操作项。")).toBeInTheDocument();
+    expect(screen.getByText("No active node selected")).toBeInTheDocument();
+    expect(screen.getByText("Select a plan node, generate a plan, or wait for execution to expose the current node details here.")).toBeInTheDocument();
   });
 
   it("renders result, evidence, action, and configuration details for a selected node", async () => {

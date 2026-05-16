@@ -17,6 +17,7 @@ import type {
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
 } from "./task-workspace-types";
+import { buildWorkspaceStateTreatment } from "./task-workspace-actions";
 
 export type TaskExecutionDispatchResult = PlanExecutionResult;
 
@@ -426,6 +427,8 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   const progress = buildProgressSummary(input.graphPlan);
   const attention = buildAttentionCard(pageData, currentNode);
   const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
+  const isStale = pageData.latestRunSummary?.syncStatus === "stale";
+  const errorMessage = input.graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
 
   return {
     task,
@@ -458,9 +461,19 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
     activity: buildActivity(pageData, input.graphPlan),
     states: {
       isEmpty: (input.graphPlan?.nodes.length ?? 0) === 0,
-      isStale: pageData.latestRunSummary?.syncStatus === "stale",
+      isStale,
       isPermissionLimited,
-      errorMessage: input.graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null,
+      errorMessage,
+      treatment: buildWorkspaceStateTreatment({
+        currentNode,
+        hasPlan: (input.graphPlan?.nodes.length ?? 0) > 0,
+        allNodesDone: Boolean(input.graphPlan?.nodes.length) && Boolean(input.graphPlan?.nodes.every((node) => isDoneStatus(node.status))),
+        isBlocked: Boolean(pageData.task.blockReason),
+        isStale,
+        isPermissionLimited,
+        permissionSummary: pageData.task.runnabilitySummary,
+        blockActionRequired: pageData.task.blockReason?.actionRequired,
+      }),
     },
   };
 }

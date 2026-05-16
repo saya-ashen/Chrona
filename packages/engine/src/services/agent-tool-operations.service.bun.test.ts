@@ -315,47 +315,61 @@ describe("agent tool operations service", () => {
     expect(agentTools.calls.planGenerate).toBe(1);
   });
 
-  it("maps node result statuses to execution dispatch without model-supplied node ids", async () => {
+  it("maps node terminal tools to execution dispatch without model-supplied node ids", async () => {
     const agentTools = service();
 
     await expect(
       agentTools.execute({
-        toolName: "chrona.node.result",
+        toolName: "chrona.node.task_complete",
         input: {
           workspaceId: "workspace-1",
           taskId: "task-1",
           sessionId: "session-1",
           actorType: "agent",
-          idempotencyKey: "node-result-complete-1",
-          payload: { status: "complete", nodeId: "node-1", summary: "Done", output: { ok: true } },
+          idempotencyKey: "node-task-complete-1",
+          payload: { summary: "Done", outputs: [{ kind: "json", value: { ok: true } }] },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
 
     await expect(
       agentTools.execute({
-        toolName: "chrona.node.result",
+        toolName: "chrona.node.condition_select",
         input: {
           workspaceId: "workspace-1",
           taskId: "task-1",
           sessionId: "session-1",
           actorType: "agent",
-          idempotencyKey: "node-result-block-1",
-          payload: { status: "blocked", reason: "Waiting on dependency" },
+          idempotencyKey: "node-condition-select-1",
+          payload: { branchRef: "B20260516-01-A", summary: "Condition met" },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
 
     await expect(
       agentTools.execute({
-        toolName: "chrona.node.result",
+        toolName: "chrona.node.block",
         input: {
           workspaceId: "workspace-1",
           taskId: "task-1",
           sessionId: "session-1",
           actorType: "agent",
-          idempotencyKey: "node-result-fail-1",
-          payload: { status: "failed", error: "Command failed" },
+          idempotencyKey: "node-block-1",
+          payload: { reason: "Waiting on dependency" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.node.fail",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          sessionId: "session-1",
+          actorType: "agent",
+          idempotencyKey: "node-fail-1",
+          payload: { error: "Command failed" },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -363,16 +377,26 @@ describe("agent tool operations service", () => {
     expect(agentTools.calls.dispatchActions).toEqual([
       {
         action: "complete_manual_node",
-        nodeId: "node-1",
+        sessionId: "session-1",
         summary: "Done",
-        output: { ok: true },
+        output: [{ kind: "json", value: { ok: true } }],
+        terminalKind: "task",
+      },
+      {
+        action: "complete_manual_node",
+        sessionId: "session-1",
+        summary: "Condition met",
+        terminalKind: "condition",
+        branchRef: "B20260516-01-A",
       },
       {
         action: "block_current_node",
+        sessionId: "session-1",
         reason: "Waiting on dependency",
       },
       {
         action: "fail_current_node",
+        sessionId: "session-1",
         error: "Command failed",
       },
     ]);

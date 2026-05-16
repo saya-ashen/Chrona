@@ -4,6 +4,93 @@ import type {
   PlanNodeDataModel,
   PlanNodeField,
 } from "@/components/tasks/plan/task-plan-graph/types";
+import type { ExecutionOverviewTone, WorkspaceStateTreatment } from "./task-workspace-types";
+
+type WorkspacePresentationInput = {
+  currentNode: PlanNodeDataModel | null;
+  hasPlan: boolean;
+  allNodesDone: boolean;
+  isBlocked?: boolean;
+  isStale?: boolean;
+  isPermissionLimited?: boolean;
+  permissionSummary?: string;
+  blockActionRequired?: string | null;
+};
+
+const workspaceStateToneByLabel = {
+  "Sync stale": "warning",
+  "View only": "warning",
+  "No plan yet": "neutral",
+  Blocked: "critical",
+  "Review required": "warning",
+  Running: "info",
+  Completed: "success",
+  Idle: "neutral",
+} satisfies Record<string, ExecutionOverviewTone>;
+
+export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput): WorkspaceStateTreatment {
+  if (input.isStale) {
+    return {
+      label: "Sync stale",
+      tone: workspaceStateToneByLabel["Sync stale"],
+      guidance: "Refresh before acting on execution results.",
+    };
+  }
+
+  if (input.isPermissionLimited) {
+    return {
+      label: "View only",
+      tone: workspaceStateToneByLabel["View only"],
+      guidance: input.permissionSummary ?? "You can view this task, but cannot run it.",
+    };
+  }
+
+  if (!input.hasPlan) {
+    return {
+      label: "No plan yet",
+      tone: workspaceStateToneByLabel["No plan yet"],
+      guidance: "Generate and accept a plan to unlock execution controls.",
+    };
+  }
+
+  if (input.isBlocked || input.currentNode?.status === "blocked") {
+    return {
+      label: "Blocked",
+      tone: workspaceStateToneByLabel.Blocked,
+      guidance: input.blockActionRequired ?? input.currentNode?.nextAction ?? "Resolve the blocker before continuing execution.",
+    };
+  }
+
+  if (input.currentNode?.status === "waiting_for_user" || input.currentNode?.requiresHumanInput === true) {
+    return {
+      label: "Review required",
+      tone: workspaceStateToneByLabel["Review required"],
+      guidance: input.currentNode.nextAction ?? "Complete the current node action to continue.",
+    };
+  }
+
+  if (input.currentNode?.status === "active" || input.currentNode?.status === "in_progress") {
+    return {
+      label: "Running",
+      tone: workspaceStateToneByLabel.Running,
+      guidance: input.currentNode.nextAction ?? "Monitor current execution progress.",
+    };
+  }
+
+  if (input.allNodesDone) {
+    return {
+      label: "Completed",
+      tone: workspaceStateToneByLabel.Completed,
+      guidance: "Review the latest result and artifacts before closing the task.",
+    };
+  }
+
+  return {
+    label: "Idle",
+    tone: workspaceStateToneByLabel.Idle,
+    guidance: input.currentNode?.nextAction ?? "Select a plan node or start execution when ready.",
+  };
+}
 
 export function buildDefaultWorkspaceActionFields(fields: PlanNodeField[]) {
   return Object.fromEntries(

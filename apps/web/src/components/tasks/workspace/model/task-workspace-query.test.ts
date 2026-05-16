@@ -228,8 +228,14 @@ describe("task workspace execution console view model", () => {
     ]));
   });
 
-  it("covers shared fixture states for empty, artifact, stale, and permission-limited workspaces", () => {
+  it("covers shared fixture states for empty, blocked, review, completed, failed, idle, loading, artifact, stale, and permission-limited workspaces", () => {
     const empty = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const blocked = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.blocked);
+    const review = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
+    const completed = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const failed = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.failed);
+    const idle = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.idle);
+    const loading = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.loading);
     const artifact = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
     const stale = createTaskWorkspaceExecutionConsoleView({
       ...taskWorkspaceStateFixtures.staleError,
@@ -241,9 +247,30 @@ describe("task workspace execution console view model", () => {
     const permissionLimited = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.permissionLimited);
 
     expect(empty.states.isEmpty).toBe(true);
+    expect(empty.states.treatment).toMatchObject({
+      label: "No plan yet",
+      tone: "neutral",
+      guidance: "Generate and accept a plan to unlock execution controls.",
+    });
     expect(artifact.artifacts.length).toBeGreaterThan(0);
+    expect(blocked.states.treatment).toMatchObject({ label: "Blocked", tone: "critical" });
+    expect(review.states.treatment).toMatchObject({ label: "Review required", tone: "warning" });
+    expect(completed.states.treatment).toMatchObject({ label: "Completed", tone: "success" });
+    expect(failed.states.treatment).toMatchObject({ label: "Blocked", tone: "critical" });
+    expect(idle.states.treatment).toMatchObject({ label: "Idle", tone: "neutral" });
+    expect(loading.states.treatment).toMatchObject({ label: "Idle", tone: "neutral" });
     expect(stale.states.isStale).toBe(true);
+    expect(stale.states.treatment).toMatchObject({
+      label: "Sync stale",
+      tone: "warning",
+      guidance: "Refresh before acting on execution results.",
+    });
     expect(permissionLimited.states.isPermissionLimited).toBe(true);
+    expect(permissionLimited.states.treatment).toMatchObject({
+      label: "View only",
+      tone: "warning",
+      guidance: "You can view this task, but cannot run it",
+    });
     expect(permissionLimited.header.actions).toEqual([
       {
         id: "start",
@@ -312,5 +339,34 @@ describe("task workspace execution console view model", () => {
       graphPlan: graph([actionable]),
       selectedNode: actionable,
     }).nodeDetail.disabledActionReason).toBeUndefined();
+  });
+
+  it("assigns clear treatments for running, blocked, review, completed, and idle workspaces", () => {
+    const running = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "active", status: "active", nextAction: "Watch the run" })]),
+    });
+    const blocked = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "blocked", status: "blocked", nextAction: "Retry sync" })]),
+    });
+    const review = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "approval", status: "waiting_for_user", nextAction: "Approve output" })]),
+    });
+    const completed = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "done", status: "done" })]),
+    });
+    const idle = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "ready", status: "ready" })]),
+    });
+
+    expect(running.states.treatment).toMatchObject({ label: "Running", tone: "info", guidance: "Watch the run" });
+    expect(blocked.states.treatment).toMatchObject({ label: "Blocked", tone: "critical", guidance: "Retry sync" });
+    expect(review.states.treatment).toMatchObject({ label: "Review required", tone: "warning", guidance: "Approve output" });
+    expect(completed.states.treatment).toMatchObject({ label: "Completed", tone: "success" });
+    expect(idle.states.treatment).toMatchObject({ label: "Idle", tone: "neutral" });
   });
 });

@@ -87,7 +87,7 @@ describe("getDefaultWorkspace", () => {
       id: DEFAULT_WORKSPACE_ID,
       name: "Default Workspace",
       status: WorkspaceStatus.Active,
-      defaultRuntime: "openclaw",
+      defaultRuntime: "hermes",
     });
 
     const stored = await db.workspace.findUnique({

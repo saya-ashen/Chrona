@@ -36,7 +36,7 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan): {
       const members = ids.map((id) => nodesById.get(id)).filter(Boolean);
       return {
         id: `stage-${rank}`,
-        title: rank === 0 ? "入口" : `阶段 ${rank + 1}`,
+        title: rank === 0 ? "Entry" : `Stage ${rank + 1}`,
         nodeIds: ids,
         activeCount: members.filter((node) => node?.status === "active").length,
         attentionCount: members.filter((node) => node?.status === "waiting" || node?.status === "blocked").length,
@@ -73,8 +73,8 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan): {
       relationLabel:
         upstreamCount > 0 || downstreamCount > 0
           ? [
-              upstreamCount > 0 ? `${upstreamCount} 个前置` : null,
-              downstreamCount > 0 ? `${downstreamCount} 个后续` : null,
+              upstreamCount > 0 ? `${upstreamCount} upstream` : null,
+              downstreamCount > 0 ? `${downstreamCount} downstream` : null,
             ].filter(Boolean).join(" · ")
           : null,
     };
@@ -115,9 +115,9 @@ export function CompactFocusStack({
   return (
     <div className="space-y-2">
       <div className="grid gap-2 border-l border-border/70 pl-3" data-testid="task-plan-compact-groups">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">当前推进</p>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">待处理 / 阻塞</p>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">后续摘要</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current progress</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Action / blocked</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Next summary</p>
       </div>
       {items.map((item) => {
         const toneStyle = TONE_STYLES[item.tone];
@@ -140,13 +140,13 @@ export function CompactFocusStack({
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               <span className={cn("size-2 rounded-full", toneStyle.dot)} />
               <span>{item.statusLabel}</span>
-              {item.isCurrent ? <span>当前节点</span> : null}
-              {item.displayTone === "waiting" ? <span>需处理</span> : null}
-              {item.hasLinkedTask ? <span>已关联任务</span> : null}
+              {item.isCurrent ? <span>Current node</span> : null}
+              {item.displayTone === "waiting" ? <span>Needs action</span> : null}
+              {item.hasLinkedTask ? <span>Linked task</span> : null}
             </div>
-            <p className="mt-1 text-sm font-medium text-foreground">{item.title}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{item.summary}</p>
-            {item.relationLabel ? <p className="mt-1 text-[10px] text-muted-foreground">{item.relationLabel}</p> : null}
+            <p className="mt-1 break-words text-sm font-medium text-foreground">{item.title}</p>
+            <p className="mt-1 break-words text-[11px] text-muted-foreground line-clamp-2">{item.summary}</p>
+            {item.relationLabel ? <p className="mt-1 break-words text-[10px] text-muted-foreground">{item.relationLabel}</p> : null}
           </button>
         );
       })}

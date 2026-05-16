@@ -24,7 +24,12 @@ export const chronaToolNames = [
   "chrona.schedule.clear",
   "chrona.execution.read",
   "chrona.execution.dispatch",
-  "chrona.node.result",
+  "chrona.node.read",
+  "chrona.node.task_complete",
+  "chrona.node.condition_select",
+  "chrona.node.block",
+  "chrona.node.fail",
+  "chrona.node.wait_complete",
 ] as const;
 
 export const chronaToolNameSchema = z.enum(chronaToolNames);
@@ -88,29 +93,44 @@ export const chronaToolContextSchema = z.object({
 });
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
-const nodeResultPayloadSchema = z.object({
-  status: z.enum(["complete", "blocked", "failed"]),
-  nodeId: z.string().min(1).optional(),
-  summary: z.string().optional(),
-  output: z.unknown().optional(),
-  reason: z.string().min(1, "reason is required").optional(),
-  error: z.string().min(1, "error is required").optional(),
-}).passthrough().superRefine((value, ctx) => {
-  if (value.status === "blocked" && !value.reason) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["reason"],
-      message: "reason is required when status is blocked",
-    });
-  }
-  if (value.status === "failed" && !value.error) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["error"],
-      message: "error is required when status is failed",
-    });
-  }
-});
+const nodeResultOutputSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), content: z.string().min(1), title: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("markdown"), content: z.string().min(1), title: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("json"), value: z.unknown(), title: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("file"), path: z.string().min(1), title: z.string().optional(), language: z.string().optional(), description: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("artifact"), artifactId: z.string().min(1), title: z.string().min(1), description: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("command"), command: z.string().min(1), title: z.string().optional(), exitCode: z.number().int().optional(), stdout: z.string().optional(), stderr: z.string().optional() }).strict(),
+  z.object({ kind: z.literal("link"), href: z.string().min(1), title: z.string().min(1), description: z.string().optional() }).strict(),
+]);
+const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
+const taskCompletePayloadSchema = z.object({
+  summary: z.string().min(1),
+  outputs: z.array(nodeResultOutputSchema).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
+const conditionSelectPayloadSchema = z.object({
+  branchRef: z.string().min(1),
+  summary: z.string().min(1),
+  outputs: z.array(nodeResultOutputSchema).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
+const blockPayloadSchema = z.object({
+  reason: z.string().min(1),
+  requiredInput: z.string().min(1).optional(),
+  retryable: z.boolean().optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
+const failPayloadSchema = z.object({
+  error: z.string().min(1),
+  retryable: z.boolean().optional(),
+  diagnostics: z.unknown().optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
+const waitCompletePayloadSchema = z.object({
+  summary: z.string().min(1),
+  outputs: z.array(nodeResultOutputSchema).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
@@ -125,7 +145,12 @@ export const chronaToolPayloadSchemas = {
   "chrona.schedule.clear": readPayloadSchema,
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
-  "chrona.node.result": nodeResultPayloadSchema,
+  "chrona.node.read": readPayloadSchema,
+  "chrona.node.task_complete": taskCompletePayloadSchema,
+  "chrona.node.condition_select": conditionSelectPayloadSchema,
+  "chrona.node.block": blockPayloadSchema,
+  "chrona.node.fail": failPayloadSchema,
+  "chrona.node.wait_complete": waitCompletePayloadSchema,
 } as const;
 
 /**

@@ -69,7 +69,21 @@
       "recentApprovalsTitle": "Recent Approvals",
       "noRecentApprovals": "No recent approvals.",
       "recentArtifactsTitle": "Recent Artifacts",
-      "noArtifacts": "No artifacts yet."
+      "noArtifacts": "No artifacts yet.",
+      "workspaceState": "Workspace state",
+      "currentState": "Current state",
+      "nextAction": "Next action",
+      "stateRunning": "Running",
+      "stateBlocked": "Blocked",
+      "stateReviewRequired": "Review required",
+      "stateIdle": "Idle",
+      "stateEmpty": "No plan yet",
+      "stateCompleted": "Completed",
+      "guidanceBlocked": "Resolve the blocker before continuing execution.",
+      "guidanceReviewRequired": "Complete the current node action to continue.",
+      "guidanceEmpty": "Generate and accept a plan to unlock execution controls.",
+      "guidanceCompleted": "Review the latest result and artifacts before closing the task.",
+      "primaryActionCue": "Use the primary action to move this task forward."
     },
     "scheduleTaskList": {
       "title": "Schedule List View",

@@ -129,6 +129,43 @@ export const taskWorkspaceStateFixtures = {
       createTaskWorkspaceFixtureNode({ id: "approval", status: "waiting_for_user", requiresHumanInput: true, nextAction: "Approve result" }),
     ], "approval"),
   },
+  blocked: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: {
+        status: "Blocked",
+        isRunnable: false,
+        runnabilitySummary: "Resolve blocker before running",
+        blockReason: { blockType: "blocked", actionRequired: "Review provider timeout" },
+      },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "blocked", status: "blocked", nextAction: "Review provider timeout" }),
+    ], "blocked"),
+  },
+  completed: {
+    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Done" } }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "complete", status: "done", completionSummary: "Workspace complete" }),
+    ], "complete"),
+  },
+  failed: {
+    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Failed", runnabilitySummary: "Retry is available" } }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "failed", status: "blocked", statusLabel: "Failed", nextAction: "Retry failed node" }),
+    ], "failed"),
+  },
+  idle: {
+    pageData: createTaskWorkspaceFixturePageData(),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution when ready" }),
+    ], "ready"),
+  },
+  loading: {
+    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Planning" } }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "loading", status: "pending", statusLabel: "Loading" }),
+    ], "loading"),
+  },
   empty: {
     pageData: createTaskWorkspaceFixturePageData(),
     graphPlan: createTaskWorkspaceFixtureGraph([]),
@@ -156,5 +193,31 @@ export const taskWorkspaceStateFixtures = {
     graphPlan: createTaskWorkspaceFixtureGraph([
       createTaskWorkspaceFixtureNode({ id: "view-only", status: "ready", availableActions: [] }),
     ], "view-only"),
+  },
+  longContentMobile: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: {
+        title: "Coordinate launch readiness across compliance-review-security-and-operations-without-losing-current-execution-context",
+        description: "Long mobile-safe task content used to verify workspace panels wrap instead of forcing horizontal overflow.",
+        runnabilitySummary: "Ready to run after compliance-review-security-and-operations sign off",
+      },
+      artifacts: [{
+        id: "artifact-long-title",
+        title: "Extremely long artifact title that should wrap inside the execution overview instead of widening the viewport",
+        type: "markdown-report-with-long-classification",
+        uri: "file://long-report.md",
+      }],
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({
+        id: "long-current-node",
+        title: "Review cross-functional launch evidence and decide whether the workspace can continue safely",
+        objective: "Keep active node identity visible on narrow screens with long content.",
+        summary: "Long current-node summary should wrap across several lines without hiding actions or causing horizontal scroll.",
+        status: "waiting_for_user",
+        requiresHumanInput: true,
+        nextAction: "Confirm evidence and provide launch approval notes before continuing.",
+      }),
+    ], "long-current-node"),
   },
 };

@@ -1,22 +1,22 @@
 <!--
 Sync Impact Report
-Version change: template -> 1.0.0
+Version change: 1.0.0 -> 1.1.0
 Modified principles:
-- Initialized from template placeholders -> I. Code Quality Is a Release Gate
-- Initialized from template placeholders -> II. Tests Prove Behavior
-- Initialized from template placeholders -> III. User Experience Must Stay Consistent
-- Initialized from template placeholders -> IV. Performance Budgets Are Requirements
+- I. Code Quality Is a Release Gate -> I. Code Quality Is a Release Gate
+- II. Tests Prove Behavior -> II. Tests Prove Behavior
+- III. User Experience Must Stay Consistent -> III. Frontend UX Changes Need Browser Evidence
+- IV. Performance Budgets Are Requirements -> IV. Performance Budgets Are Requirements
 Added sections:
-- Engineering Standards
-- Delivery Workflow
+- Frontend Development Principles
 Removed sections:
-- Template fifth core principle slot
+- None
 Templates requiring updates:
 - ✅ updated .specify/templates/plan-template.md
 - ✅ updated .specify/templates/spec-template.md
 - ✅ updated .specify/templates/tasks-template.md
 - ✅ verified no command templates exist under .specify/templates/commands/
-- ✅ verified runtime guidance references in README.md, docs/README.md, and docs/en/quick-start.md need no changes
+- ✅ updated AGENTS.md runtime guidance
+- ✅ verified README.md, docs/README.md, and docs/en/quick-start.md need no changes
 Follow-up TODOs:
 - None
 -->
@@ -35,18 +35,21 @@ keeps Chrona safe to evolve across frontend, server, runtime, and CLI surfaces.
 ### II. Tests Prove Behavior
 Every behavior change MUST include automated tests at the narrowest effective
 level, with integration or end-to-end coverage added whenever behavior crosses
-layer, API, database, or UI boundaries. Bug fixes MUST add a regression test when
-feasible, and `bun run typecheck`, `bun run lint`, and `bun run test` MUST pass
-before merge unless an exception is documented and approved. Rationale: shipping
-without proof of behavior turns regressions into user-visible defects.
+layer, API, database, task, schedule, navigation, or UI boundaries. Bug fixes
+MUST add a regression test when feasible. `bun run typecheck`, `bun run lint`,
+and `bun run test` MUST pass before merge unless an exception is documented and
+approved. `bun run test:e2e` MUST pass when task, schedule, or navigation flows
+are affected. Rationale: shipping without proof of behavior turns regressions
+into user-visible defects.
 
-### III. User Experience Must Stay Consistent
-User-facing changes MUST reuse established interaction patterns, terminology,
-visual structure, and state handling unless the design system itself is being
-intentionally revised. New or changed flows MUST define loading, empty, success,
-and error states, and MUST preserve keyboard accessibility and clear feedback.
-Rationale: consistent experiences reduce user confusion and make AI-assisted
-workflows trustworthy.
+### III. Frontend UX Changes Need Browser Evidence
+Every frontend visual or interaction change MUST use `agent-browser`. Before
+editing UI, the implementer MUST capture browser observation with an
+`agent-browser` snapshot and screenshots. After editing UI, the implementer MUST
+rerun browser verification and validate desktop `1440x900`, tablet `1024x768`,
+and mobile `390x844`. Mobile verification MUST show no horizontal scrolling.
+Rationale: Chrona UX quality depends on observed behavior, not code inspection
+or assumptions.
 
 ### IV. Performance Budgets Are Requirements
 Work that can affect latency, rendering, startup, query count, memory, or bundle
@@ -54,6 +57,21 @@ size MUST define measurable budgets in the specification or plan before
 implementation begins. Changes MUST not regress agreed budgets without explicit
 approval, updated documentation, and validation evidence. Rationale: performance
 is part of product correctness, not a post-release cleanup task.
+
+## Frontend Development Principles
+
+- Chrona product behavior MUST be preserved unless the specification explicitly
+  changes it.
+- Backend APIs MUST NOT be changed for visual or interaction polish unless the
+  implementation plan justifies why an API change is necessary.
+- Business logic MUST NOT live in React components; components MUST delegate
+  business rules to domain, state, service, or shared library code.
+- User-facing strings MUST live in i18n message files, not inline component code.
+- Current task, active node, blocked or review state, and primary action MUST be
+  visually obvious in affected task, schedule, navigation, and execution views.
+- Frontend plans MUST identify the existing UI patterns, product behavior,
+  responsive breakpoints, i18n messages, and browser evidence required before
+  implementation starts.
 
 ## Engineering Standards
 
@@ -69,11 +87,14 @@ is part of product correctness, not a post-release cleanup task.
 ## Delivery Workflow
 
 - Every specification MUST describe user-visible acceptance scenarios, required
-  test coverage, UX consistency expectations, and measurable performance goals.
+  test coverage, UX consistency expectations, responsive viewport expectations,
+  i18n requirements, and measurable performance goals.
 - Every implementation plan MUST record the constitution checks for code quality,
-  testing, UX consistency, and performance budgets before implementation starts.
+  testing, frontend browser evidence, product behavior preservation, API scope,
+  UX clarity, and performance budgets before implementation starts.
 - Every task list MUST include the validation work needed to satisfy this
-  constitution, including automated tests, UX state verification, and
+  constitution, including automated tests, pre-edit browser observation,
+  post-edit browser verification, viewport checks, UX state verification, and
   performance validation when applicable.
 - Code review and release decisions MUST treat constitution violations as blockers
   unless an approved exception is documented with scope, rationale, and expiry.
@@ -92,4 +113,4 @@ is part of product correctness, not a post-release cleanup task.
   review. Any temporary exception MUST identify an owner, justification, and
   removal date.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-03 | **Last Amended**: 2026-05-03
+**Version**: 1.1.0 | **Ratified**: 2026-05-03 | **Last Amended**: 2026-05-16

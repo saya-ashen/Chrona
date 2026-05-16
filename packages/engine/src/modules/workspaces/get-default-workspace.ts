@@ -1,6 +1,6 @@
 import { WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
+import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 
 export const DEFAULT_WORKSPACE_ID = "ws_default";
 
@@ -59,7 +59,7 @@ export async function getDefaultWorkspace(): Promise<DefaultWorkspace> {
         id: DEFAULT_WORKSPACE_ID,
         name: "Default Workspace",
         description: "Auto-created primary workspace for the control plane.",
-        defaultRuntime: OPENCLAW_EXECUTION_RUNTIME,
+        defaultRuntime: HERMES_EXECUTION_RUNTIME,
         status: WorkspaceStatus.Active,
       },
       select: defaultWorkspaceSelect,

@@ -7,8 +7,8 @@ import type { ChronaEngine } from "@chrona/engine";
 import { createLogger } from "@chrona/shared/logger";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { chronaToolInputSchema, type ChronaToolName } from "@chrona/contracts/api";
 import { planBlueprintSchema } from "@chrona/contracts";
+import { chronaToolInputSchema, type ChronaToolName } from "@chrona/contracts/api";
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
@@ -17,33 +17,115 @@ const logger = createLogger("apps.server.mcp");
 const optionalString = z.string().min(1).optional();
 
 const baseReadSchema = z.object({}).passthrough();
-const nodeResultSchema = z.object({
-  status: z.enum(["complete", "blocked", "failed"]).describe("Current node result status."),
-  nodeId: optionalString.describe("Optional execution node id to complete when the session has multiple active records."),
-  summary: optionalString.describe("Short completion summary when status is complete."),
-  output: z.unknown().optional().describe("Structured result produced by the current node when status is complete."),
-  reason: optionalString.describe("Why the current node is blocked when status is blocked."),
-  error: optionalString.describe("Why the current node failed when status is failed."),
-}).passthrough();
+const outputsSchema = z.array(z.unknown()).optional();
+const taskCompleteSchema = z.object({
+  summary: z.string().min(1).describe("Short completion summary for the current task node."),
+  outputs: outputsSchema.describe("Optional structured outputs produced by the current node."),
+}).strict();
+const conditionSelectSchema = z.object({
+  branchRef: z.string().min(1).describe("AI-visible branch ref from chrona_node_read or runtime input."),
+  summary: z.string().min(1).describe("Short reason for selecting this branch."),
+  outputs: outputsSchema,
+}).strict();
+const blockSchema = z.object({
+  reason: z.string().min(1),
+  requiredInput: optionalString,
+  retryable: z.boolean().optional(),
+}).strict();
+const failSchema = z.object({
+  error: z.string().min(1),
+  retryable: z.boolean().optional(),
+  diagnostics: z.unknown().optional(),
+}).strict();
+const waitCompleteSchema = z.object({
+  summary: z.string().min(1),
+  outputs: outputsSchema,
+}).strict();
+
+const hiddenContextKeys = new Set([
+  "workspaceId",
+  "taskId",
+  "sessionId",
+  "actorType",
+  "actorId",
+  "idempotencyKey",
+  "expectedState",
+  "expectedRevision",
+  "evidence",
+  "_meta",
+]);
+
+function publicToolSchema(schema: z.ZodObject) {
+  const visibleKeys = new Set(Object.keys(schema.shape));
+  return schema.passthrough().superRefine((value, ctx) => {
+    const unrecognizedKeys = Object.keys(value).filter((key) =>
+      !visibleKeys.has(key) && !hiddenContextKeys.has(key)
+    );
+
+    if (unrecognizedKeys.length === 0) return;
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.unrecognized_keys,
+      keys: unrecognizedKeys,
+      message: `Unrecognized key${unrecognizedKeys.length === 1 ? "" : "s"}: ${unrecognizedKeys.map((key) => `\"${key}\"`).join(", ")}`,
+    });
+  });
+}
 
 const externalTools = {
-  chrona_plan_generate: {
-    internalName: "chrona.plan.generate",
-    title: "Chrona Plan Generate",
-    description: "Persist a complete Hermes-generated plan graph for the session task.",
-    inputSchema: planBlueprintSchema.passthrough(),
-  },
   chrona_execution_read: {
     internalName: "chrona.execution.read",
     title: "Chrona Execution Read",
     description: "Read execution session state and supported next actions.",
-    inputSchema: baseReadSchema,
+    inputSchema: publicToolSchema(baseReadSchema),
   },
-  chrona_node_result: {
-    internalName: "chrona.node.result",
-    title: "Chrona Node Result",
-    description: "Report the current execution node result. Chrona resolves the active node from the session.",
-    inputSchema: nodeResultSchema,
+  chrona_plan_read: {
+    internalName: "chrona.plan.read",
+    title: "Chrona Plan Read",
+    description: "Read accepted plan state through AI-visible refs.",
+    inputSchema: publicToolSchema(baseReadSchema),
+  },
+  chrona_plan_generate: {
+    internalName: "chrona.plan.generate",
+    title: "Chrona Plan Generate",
+    description: "Generate a draft plan for the session task from a complete plan blueprint.",
+    inputSchema: publicToolSchema(planBlueprintSchema),
+  },
+  chrona_node_read: {
+    internalName: "chrona.node.read",
+    title: "Chrona Node Read",
+    description: "Read current execution node state through AI-visible refs.",
+    inputSchema: publicToolSchema(baseReadSchema),
+  },
+  chrona_task_complete: {
+    internalName: "chrona.node.task_complete",
+    title: "Chrona Task Complete",
+    description: "Complete the current task node. Chrona resolves the active node from the session.",
+    inputSchema: publicToolSchema(taskCompleteSchema),
+  },
+  chrona_condition_select: {
+    internalName: "chrona.node.condition_select",
+    title: "Chrona Condition Select",
+    description: "Select the current condition branch by branchRef. Does not accept backend node IDs.",
+    inputSchema: publicToolSchema(conditionSelectSchema),
+  },
+  chrona_node_block: {
+    internalName: "chrona.node.block",
+    title: "Chrona Node Block",
+    description: "Block the current node with a reason. Chrona resolves the active node from the session.",
+    inputSchema: publicToolSchema(blockSchema),
+  },
+  chrona_node_fail: {
+    internalName: "chrona.node.fail",
+    title: "Chrona Node Fail",
+    description: "Fail the current node with an unrecoverable error. Chrona resolves the active node from the session.",
+    inputSchema: publicToolSchema(failSchema),
+  },
+  chrona_wait_complete: {
+    internalName: "chrona.node.wait_complete",
+    title: "Chrona Wait Complete",
+    description: "Complete the current wait node when the wait condition is explicitly satisfied.",
+    inputSchema: publicToolSchema(waitCompleteSchema),
   },
 } as const satisfies Record<string, {
   internalName: ChronaToolName;
@@ -107,7 +189,7 @@ function toChronaInput(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
 ) {
   const payload = { ...input };
-  for (const key of ["workspaceId", "taskId", "sessionId", "idempotencyKey", "expectedRevision", "evidence", "actorType", "actorId", "_meta"]) {
+  for (const key of hiddenContextKeys) {
     delete payload[key];
   }
   const meta = metaFrom(input, extra);

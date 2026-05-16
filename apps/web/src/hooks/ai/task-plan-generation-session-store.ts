@@ -355,6 +355,7 @@ export async function startTaskPlanGenerationSession(taskId: string, forceRefres
 
   const controller = new AbortController();
   entry.streamController = controller;
+  let sawTerminalError = false;
 
   patchState(taskId, (state) => ({
     ...createIdleState(taskId),
@@ -377,11 +378,15 @@ export async function startTaskPlanGenerationSession(taskId: string, forceRefres
       body: JSON.stringify({ forceRefresh }),
       signal: controller.signal,
       onEvent({ event, data }) {
+        if (event === "error") {
+          sawTerminalError = true;
+        }
         applyStreamEvent(taskId, event, data);
       },
     });
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) {
+      sawTerminalError = true;
       patchState(taskId, (state) => ({
         ...state,
         sessionStatus: "failed",
@@ -397,10 +402,12 @@ export async function startTaskPlanGenerationSession(taskId: string, forceRefres
       current.streamController = null;
     }
 
-    try {
-      await fetchActiveSnapshot(taskId);
-    } catch {
-      // Leave current state in place when reconciliation fetch fails.
+    if (!sawTerminalError) {
+      try {
+        await fetchActiveSnapshot(taskId);
+      } catch {
+        // Leave current state in place when reconciliation fetch fails.
+      }
     }
 
     ensureActiveSubscription(taskId);

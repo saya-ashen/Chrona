@@ -35,9 +35,20 @@
   smallest correct design, and lists any justified complexity in Complexity
   Tracking.
 - **Testing**: List required automated coverage by level: unit, integration,
-  contract, end-to-end, and the commands that will prove the behavior.
-- **User Experience Consistency**: Identify the existing UI patterns, copy, and
-  state handling this feature must preserve or intentionally revise.
+  contract, end-to-end, and the commands that will prove the behavior. Include
+  `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run test:e2e`
+  when task, schedule, or navigation flows are affected.
+- **Frontend UX Evidence**: For frontend visual or interaction changes, record
+  the required pre-edit `agent-browser` snapshot/screenshots and post-edit
+  verification evidence.
+- **Product Behavior & API Scope**: Identify the existing Chrona behavior that
+  must be preserved. Confirm backend APIs are unchanged for visual/interaction
+  polish, or justify the API change here.
+- **UX Clarity & Responsiveness**: Identify the existing UI patterns, copy, state
+  handling, i18n messages, and desktop `1440x900`, tablet `1024x768`, and mobile
+  `390x844` checks. Confirm mobile has no horizontal scrolling and that current
+  task, active node, blocked/review state, and primary action are visually
+  obvious when applicable.
 - **Performance Budgets**: Define measurable budgets for latency, rendering,
   startup, memory, query count, or bundle size when applicable, plus how they
   will be validated.

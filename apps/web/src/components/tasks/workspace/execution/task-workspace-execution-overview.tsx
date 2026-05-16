@@ -68,8 +68,8 @@ function LatestResultCard({ card, onAction }: { card: ExecutionOverviewCard; onA
         </div>
         {card.statusLabel ? <span className="text-xs text-muted-foreground">{card.statusLabel}</span> : null}
       </div>
-      <p className="mt-1 line-clamp-2 text-[13px] leading-[1.35] text-foreground">{card.description}</p>
-      <div className="mt-1.5 line-clamp-2 rounded-md bg-muted/35 px-2 py-1.5 text-xs leading-[1.35] text-muted-foreground">
+      <p className="mt-1 line-clamp-2 break-words text-[13px] leading-[1.35] text-foreground">{card.description}</p>
+      <div className="mt-1.5 line-clamp-2 break-words rounded-md bg-muted/35 px-2 py-1.5 text-xs leading-[1.35] text-muted-foreground">
         {card.description === "No execution result yet."
           ? "Result summary will appear here after the current node finishes."
           : card.description}
@@ -93,8 +93,8 @@ function AttentionCard({ card, readiness, onAction }: { card: ExecutionOverviewC
         </div>
         {card.statusLabel ? <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs text-orange-700">{card.statusLabel}</span> : null}
       </div>
-      <p className="mt-1 line-clamp-2 text-[13px] leading-[1.35] text-foreground">{card.description}</p>
-      <p className="mt-1 text-xs text-muted-foreground">Readiness: {readiness.description}</p>
+      <p className="mt-1 line-clamp-2 break-words text-[13px] leading-[1.35] text-foreground">{card.description}</p>
+      <p className="mt-1 break-words text-xs text-muted-foreground">Readiness: {readiness.description}</p>
       {card.actionLabel && onAction ? (
         <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" className={buttonVariants({ variant: "default", size: "sm", className: "h-7 rounded-lg px-2 text-xs" })} onClick={() => onAction(card.actionNodeId)}>
@@ -125,8 +125,8 @@ function ArtifactsCard({ artifacts, onAction }: { artifacts: WorkspaceArtifactIt
                 <FileText className="size-3.5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{artifact.title}</p>
-                <p className="text-xs text-muted-foreground">{artifact.type}</p>
+                <p className="break-words text-sm font-medium text-foreground">{artifact.title}</p>
+                <p className="break-words text-xs text-muted-foreground">{artifact.type}</p>
               </div>
               {artifact.sourceNodeId && onAction ? (
                 <button type="button" className="text-xs font-medium text-primary" onClick={() => onAction(artifact.sourceNodeId)}>
@@ -168,9 +168,9 @@ function ActivityCard({ activity }: { activity: WorkspaceActivityItem[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   {item.timestamp ? <span className="text-xs text-muted-foreground">{item.timestamp.slice(11, 16)}</span> : null}
-                  <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="break-words text-sm font-medium text-foreground">{item.title}</p>
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-[1.35] text-muted-foreground">{item.description}</p>
+                <p className="mt-0.5 line-clamp-2 break-words text-xs leading-[1.35] text-muted-foreground">{item.description}</p>
               </div>
             </div>
           ))}

@@ -5,7 +5,7 @@ import {
   ensurePlanMainSession,
   appendMainSessionEvent,
 } from "./plan-state-store";
-import { OPENCLAW_EXECUTION_RUNTIME } from "@chrona/openclaw";
+import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 import {
   createPlanGraphFromCompiledPlan,
   getPlanRun,
@@ -42,6 +42,7 @@ import { CheckpointNodeExecutor } from "./node-executors/checkpoint-executor";
 import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
 import { AiRuntimeInvoker } from "./ai-runtime-invoker";
+import { branchBindingForRef } from "./node-runtime-refs";
 
 type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
 
@@ -144,7 +145,7 @@ async function getRuntimeName(taskId: string): Promise<string> {
     where: { id: taskId },
     select: { executionRuntime: true },
   });
-  return task.executionRuntime ?? OPENCLAW_EXECUTION_RUNTIME;
+  return task.executionRuntime ?? HERMES_EXECUTION_RUNTIME;
 }
 
 async function activateWorkBlock(taskId: string, workBlockId?: string | null) {
@@ -594,6 +595,12 @@ type AdvanceRuntimeCommand =
       nodeId?: string;
       summary?: string;
       output?: unknown;
+      selectedBranch?: NodeResult["selectedBranch"];
+      terminalKind?: "task" | "condition" | "checkpoint" | "wait";
+      branchRef?: string;
+      decision?: "approved" | "rejected" | "needs_input" | "completed";
+      feedback?: string;
+      prompt?: string;
     }
   | { type: "block_current_node"; nodeId?: string; reason: string }
   | { type: "fail_current_node"; nodeId?: string; error: string }
@@ -650,6 +657,71 @@ function currentNodeFromEffective(effective: EffectivePlanGraph) {
     ) ??
     null
   );
+}
+
+function summaryForTerminalCommand(input: {
+  command: Extract<AdvanceRuntimeCommand, { type: "complete_manual_node" }>;
+  node: EffectivePlanNode;
+}): string {
+  const summary = input.command.summary?.trim();
+  if (summary) return summary;
+  if (input.command.terminalKind === "checkpoint") {
+    return `Checkpoint ${input.command.decision ?? "completed"}: ${input.node.title}`;
+  }
+  return `Manual node ${input.node.id} completed`;
+}
+
+function selectedBranchForTerminalCommand(input: {
+  plan: EffectivePlanGraph;
+  node: EffectivePlanNode;
+  command: Extract<AdvanceRuntimeCommand, { type: "complete_manual_node" }>;
+}): NodeResult["selectedBranch"] | undefined {
+  if (input.command.terminalKind !== "condition") {
+    return input.command.selectedBranch;
+  }
+  if (!input.command.branchRef) {
+    throw new Error("condition branchRef is required");
+  }
+  const binding = branchBindingForRef({
+    plan: input.plan,
+    node: input.node,
+    branchRef: input.command.branchRef,
+  });
+  return {
+    ref: binding.ref,
+    key: binding.branchKey,
+    label: binding.label,
+    nextNodeId: binding.nextNodeId!,
+    resolvedNextNodeId: binding.nextNodeId,
+    resolvedNextNodeLayerId: binding.nextNodeLayerId ?? null,
+    refVersion: binding.version,
+    source: "ai",
+  };
+}
+
+function validateTerminalCommand(input: {
+  plan: EffectivePlanGraph;
+  node: EffectivePlanNode;
+  command: Extract<AdvanceRuntimeCommand, { type: "complete_manual_node" }>;
+}) {
+  const kind = input.command.terminalKind;
+  if (!kind) return;
+  if (input.node.type !== kind) {
+    throw new Error(`chrona ${kind} terminal tool cannot complete current ${input.node.type} node`);
+  }
+  if (kind === "condition") {
+    selectedBranchForTerminalCommand(input);
+  }
+  if (kind === "checkpoint") {
+    const decision = input.command.decision;
+    if (!decision) throw new Error("checkpoint decision is required");
+    if (decision === "needs_input" && !input.command.feedback && !input.command.prompt) {
+      throw new Error("checkpoint needs_input requires feedback or prompt");
+    }
+    if (decision === "completed" && !input.command.summary) {
+      throw new Error("checkpoint completed requires summary");
+    }
+  }
 }
 
 function latestStartedNodeId(events: GraphExecutionEvent[]): string | null {
@@ -948,6 +1020,13 @@ async function advancePlanExecution(input: {
   ) && !commandNode) {
     throw new Error("No current execution node found for node result tool.");
   }
+  if (command?.type === "complete_manual_node" && commandNode && effectiveBeforeCommand) {
+    validateTerminalCommand({
+      plan: effectiveBeforeCommand,
+      node: commandNode,
+      command,
+    });
+  }
   const dispatchCommand = command
     ? command.type === "resume_with_input"
       ? {
@@ -988,15 +1067,21 @@ async function advancePlanExecution(input: {
                 state,
                 trigger: input.trigger,
                 context,
-                externalResult: {
-                  nodeId: commandNode!.id,
-                  status: "done" as const,
-                  summary:
-                    command.summary ??
-                    `Manual node ${commandNode?.id ?? "current"} completed`,
-                  output: command.output,
-                },
-              }
+                  externalResult: {
+                    nodeId: commandNode!.id,
+                    status: "done" as const,
+                    summary: summaryForTerminalCommand({
+                      command,
+                      node: commandNode!,
+                    }),
+                    output: command.output,
+                    selectedBranch: selectedBranchForTerminalCommand({
+                      plan: effectiveBeforeCommand!,
+                      node: commandNode!,
+                      command,
+                    }),
+                  },
+                }
             : command.type === "block_current_node"
               ? {
                   type: "sync_external_result" as const,
@@ -1507,6 +1592,12 @@ async function dispatchExecutionAction(input: {
           nodeId: input.action.nodeId,
           summary: input.action.summary,
           output: input.action.output,
+          selectedBranch: input.action.selectedBranch,
+          terminalKind: input.action.terminalKind,
+          branchRef: input.action.branchRef,
+          decision: input.action.decision,
+          feedback: input.action.feedback,
+          prompt: input.action.prompt,
         },
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,

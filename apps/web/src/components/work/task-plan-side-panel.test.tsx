@@ -135,8 +135,8 @@ describe("TaskPlanSidePanel", () => {
     expect(graph).toHaveAttribute("data-graph-mode", "compact");
     expect(screen.getByText("物化可执行子任务")).toBeInTheDocument();
     expect(screen.getByTestId("task-plan-outline-node-step-linked").getAttribute("data-node-tone")).toBe("child-task");
-    expect(screen.getByText("需处理")).toBeInTheDocument();
-    expect(screen.getByText("当前推进")).toBeInTheDocument();
+    expect(screen.getByText("Needs action")).toBeInTheDocument();
+    expect(screen.getByText("Current progress")).toBeInTheDocument();
     expect(screen.queryByText("已关联子任务")).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import {
   buildDefaultWorkspaceActionFields,
+  buildWorkspaceStateTreatment,
   buildWorkspaceActionInput,
   getMissingWorkspaceActionFields,
   getWorkspaceActionDisabledReason,
@@ -21,6 +22,26 @@ function node(overrides: Partial<PlanNodeDataModel> = {}): PlanNodeDataModel {
 }
 
 describe("task workspace actions", () => {
+  it("derives shared workspace presentation treatment", () => {
+    expect(buildWorkspaceStateTreatment({
+      currentNode: node({ status: "active", nextAction: "Monitor run" }),
+      hasPlan: true,
+      allNodesDone: false,
+    })).toEqual({ label: "Running", tone: "info", guidance: "Monitor run" });
+
+    expect(buildWorkspaceStateTreatment({
+      currentNode: node({ status: "blocked", nextAction: "Retry node" }),
+      hasPlan: true,
+      allNodesDone: false,
+    })).toEqual({ label: "Blocked", tone: "critical", guidance: "Retry node" });
+
+    expect(buildWorkspaceStateTreatment({
+      currentNode: null,
+      hasPlan: false,
+      allNodesDone: false,
+    })).toMatchObject({ label: "No plan yet", tone: "neutral" });
+  });
+
   it("selects the primary action and builds default field values", () => {
     const fields = [{ key: "comment", label: "Comment", value: "Looks good" }];
     const selected = pickDefaultWorkspaceAction(node({

@@ -63,7 +63,6 @@ export class AiRuntimeInvoker {
         featureSpec: input.featureSpec,
         sessionKey: input.runtimeSessionKey,
         sessionId: input.runtimeSessionKey,
-        taskId: input.taskId,
         executionRuntime: input.runtimeName,
       });
       const response = await runProviderRequest(client.providerClient, request, {
@@ -198,17 +197,14 @@ function buildExecutionGatewayRequest(input: {
   featureSpec: PreparedAiFeatureSpec;
   sessionKey: string;
   sessionId: string;
-  taskId: string;
   executionRuntime: string;
 }): OpenClawGatewayRequest {
   const aiInput = buildExecutionAiInput({
-    taskId: input.taskId,
     executionRuntime: input.executionRuntime,
     runtimeInput: input.runtimeInput,
     featureSpec: input.featureSpec,
   });
   const parts: string[] = [];
-  parts.push(`Task id: ${input.taskId}`);
   parts.push(`Execution runtime: ${input.executionRuntime}`);
   if (Object.keys(input.runtimeInput).length > 0) {
     parts.push(
@@ -232,105 +228,19 @@ function buildExecutionGatewayRequest(input: {
 }
 
 function buildExecutionAiInput(input: {
-  taskId: string;
   executionRuntime: string;
   runtimeInput: Record<string, unknown>;
   featureSpec: PreparedAiFeatureSpec;
 }): string | Record<string, unknown> {
   const runtimeInput = input.runtimeInput;
-  const completedNodeTitles = Array.isArray(runtimeInput.completedNodeTitles)
-    ? runtimeInput.completedNodeTitles.filter(
-        (title): title is string =>
-          typeof title === "string" && title.trim().length > 0,
-      )
-    : [];
 
   switch (input.featureSpec.feature) {
     case "execute_task_node":
-      return {
-        taskId: input.taskId,
-        runtime: input.executionRuntime,
-        planTitle:
-          typeof runtimeInput.planTitle === "string"
-            ? runtimeInput.planTitle
-            : undefined,
-        node: {
-          title:
-            typeof runtimeInput.nodeTitle === "string"
-              ? runtimeInput.nodeTitle
-              : undefined,
-          objective:
-            typeof runtimeInput.nodeObjective === "string"
-              ? runtimeInput.nodeObjective
-              : undefined,
-          expectedOutput:
-            typeof runtimeInput.expectedOutput === "string"
-              ? runtimeInput.expectedOutput
-              : undefined,
-          completionCriteria:
-            typeof runtimeInput.completionCriteria === "string"
-              ? runtimeInput.completionCriteria
-              : undefined,
-        },
-        completedNodeTitles,
-      };
     case "evaluate_condition_node":
-      return {
-        taskId: input.taskId,
-        runtime: input.executionRuntime,
-        planTitle:
-          typeof runtimeInput.planTitle === "string"
-            ? runtimeInput.planTitle
-            : undefined,
-        node: {
-          title:
-            typeof runtimeInput.nodeTitle === "string"
-              ? runtimeInput.nodeTitle
-              : undefined,
-          condition:
-            typeof runtimeInput.condition === "string"
-              ? runtimeInput.condition
-              : undefined,
-          branches: Array.isArray(runtimeInput.branches)
-            ? runtimeInput.branches
-            : undefined,
-          defaultNextNodeId:
-            typeof runtimeInput.defaultNextNodeId === "string"
-              ? runtimeInput.defaultNextNodeId
-              : undefined,
-        },
-        completedNodeTitles,
-      };
     case "review_checkpoint_node":
-      return {
-        taskId: input.taskId,
-        runtime: input.executionRuntime,
-        planTitle:
-          typeof runtimeInput.planTitle === "string"
-            ? runtimeInput.planTitle
-            : undefined,
-        node: {
-          title:
-            typeof runtimeInput.nodeTitle === "string"
-              ? runtimeInput.nodeTitle
-              : undefined,
-          checkpointType:
-            typeof runtimeInput.checkpointType === "string"
-              ? runtimeInput.checkpointType
-              : undefined,
-          prompt:
-            typeof runtimeInput.prompt === "string"
-              ? runtimeInput.prompt
-              : undefined,
-          options: Array.isArray(runtimeInput.options)
-            ? runtimeInput.options
-            : undefined,
-        },
-        completedNodeTitles,
-      };
+      return runtimeInput;
     default:
       return {
-        taskId: input.taskId,
         executionRuntime: input.executionRuntime,
         runtimeInput,
       };

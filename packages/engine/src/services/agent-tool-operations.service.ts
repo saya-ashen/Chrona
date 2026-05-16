@@ -14,6 +14,9 @@ import type { createTaskExecutionService } from "./task-execution.service";
 import type { createTaskPlanService } from "./task-plan.service";
 import type { createTaskScheduleService } from "./task-schedule.service";
 import type { createTasksService } from "./tasks.service";
+import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
+import { buildNodeRuntimeInput, buildSemanticRefHistory, refForNode } from "@/modules/plan-execution/node-runtime-refs";
+import { NODE_RUNTIME_TERMINAL_TOOLS } from "@/modules/plan-execution/node-runtime-prompts";
 import {
   acceptedToolResult,
   duplicateOperationToolResult,
@@ -44,7 +47,12 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.schedule.clear": "Clear accepted schedule state.",
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
-  "chrona.node.result": "Report the current execution node result.",
+  "chrona.node.read": "Read current execution node state.",
+  "chrona.node.task_complete": "Complete the current task node.",
+  "chrona.node.condition_select": "Select the current condition node branch.",
+  "chrona.node.block": "Block the current execution node.",
+  "chrona.node.fail": "Fail the current execution node.",
+  "chrona.node.wait_complete": "Complete the current wait node.",
 };
 
 const idempotentResults = new Map<string, ChronaToolResult>();
@@ -97,6 +105,100 @@ function operationEvidence(input: ChronaToolOperation["input"]) {
     toolOutputs: input.evidence?.toolOutputs,
     structuredOutput: input.evidence?.structuredOutput,
   };
+}
+
+function effectivePlanFrom(value: unknown): EffectivePlanGraph | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const savedPlan = record.savedPlan && typeof record.savedPlan === "object"
+    ? record.savedPlan as Record<string, unknown>
+    : record.task && typeof record.task === "object"
+      ? ((record.task as Record<string, unknown>).savedPlan as Record<string, unknown> | undefined)
+      : null;
+  const effectivePlan = savedPlan?.effectivePlan;
+  if (!effectivePlan || typeof effectivePlan !== "object") return null;
+  return effectivePlan as EffectivePlanGraph;
+}
+
+function currentNodeFromEffective(plan: EffectivePlanGraph): EffectivePlanNode | null {
+  return plan.nodes.find((node) => node.status === "running") ??
+    plan.nodes.find((node) =>
+      node.status === "waiting_for_user" ||
+      node.status === "waiting_for_approval" ||
+      node.status === "blocked" ||
+      node.status === "failed"
+    ) ??
+    plan.nodes.find((node) => plan.readyNodeIds.includes(node.id)) ??
+    null;
+}
+
+function readAiExecutionView(value: unknown) {
+  const plan = effectivePlanFrom(value);
+  if (!plan) return redactBackendIds(value);
+  const history = buildSemanticRefHistory(plan);
+  const currentNode = currentNodeFromEffective(plan);
+  const task = value && typeof value === "object" && "task" in value && typeof (value as { task?: unknown }).task === "object"
+    ? (value as { task: Record<string, unknown> }).task
+    : null;
+  const savedPlan = value && typeof value === "object" && "savedPlan" in value
+    ? (value as { savedPlan?: Record<string, unknown> | null }).savedPlan
+    : task?.savedPlan as Record<string, unknown> | null | undefined;
+
+  return {
+    task: task
+      ? {
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          dueAt: task.dueAt,
+          blockReason: task.blockReason,
+        }
+      : undefined,
+    plan: {
+      ref: history.planRef.ref,
+      status: savedPlan?.status,
+      revision: savedPlan?.revision,
+      summary: savedPlan?.summary,
+    },
+    execution: {
+      currentNode: currentNode
+        ? buildNodeRuntimeInput({
+            plan,
+            node: currentNode,
+            allowedTerminalTools: [...NODE_RUNTIME_TERMINAL_TOOLS[currentNode.type]],
+          }).node
+        : null,
+      readyNodeRefs: plan.readyNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
+      runningNodeRefs: plan.runningNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
+      blockedNodeRefs: plan.blockedNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
+      completedNodeRefs: plan.completedNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
+    },
+    nodes: plan.nodes.map((node) => {
+      const runtime = buildNodeRuntimeInput({
+        plan,
+        node,
+        allowedTerminalTools: [...NODE_RUNTIME_TERMINAL_TOOLS[node.type]],
+      });
+      return {
+        ref: runtime.node.ref,
+        title: runtime.node.title,
+        type: runtime.node.type,
+        status: runtime.node.status,
+        objective: runtime.node.objective,
+        branchOptions: runtime.branchOptions,
+      };
+    }),
+  };
+}
+
+function redactBackendIds(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactBackendIds);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !/^(id|.*Id|.*Ids)$/.test(key))
+      .map(([key, entry]) => [key, redactBackendIds(entry)]),
+  );
 }
 
 function ensureExpectedState(operation: ChronaToolOperation, state: Record<string, unknown>) {
@@ -348,7 +450,7 @@ async function executeValidatedTool(
         workspaceId: requireWorkspaceId(input),
       });
     case "chrona.plan.read":
-      return deps.plan.getState({ taskId: requireTaskId(input) });
+      return readAiExecutionView(await deps.plan.getState({ taskId: requireTaskId(input) }));
     case "chrona.plan.generate":
       return generatePlanForTool(deps, input, payload);
     case "chrona.plan.mutate":
@@ -395,42 +497,69 @@ async function executeValidatedTool(
     case "chrona.schedule.clear":
       return deps.schedule.clear({ taskId: requireTaskId(input) });
     case "chrona.execution.read":
-      return deps.tasks.getPage({ taskId: requireTaskId(input) });
+      return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
     case "chrona.execution.dispatch":
       return deps.execution.dispatch({
         taskId: requireTaskId(input),
         action: payload as Parameters<typeof deps.execution.dispatch>[0]["action"],
       });
-    case "chrona.node.result": {
+    case "chrona.node.read":
+      return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
+    case "chrona.node.task_complete":
+    case "chrona.node.condition_select":
+    case "chrona.node.wait_complete": {
       const body = payload as {
-        status: "complete" | "blocked" | "failed";
         summary?: string;
-        output?: unknown;
-        nodeId?: string;
-        reason?: string;
-        error?: string;
+        outputs?: unknown;
+        branchRef?: string;
+        decision?: "approved" | "rejected" | "needs_input" | "completed";
+        feedback?: string;
+        prompt?: string;
+        input?: unknown;
       };
-      const action = body.status === "complete"
-        ? {
-            action: "complete_manual_node" as const,
-            nodeId: body.nodeId,
-            summary: body.summary,
-            output: body.output,
-          }
-        : body.status === "blocked"
-          ? {
-              action: "block_current_node" as const,
-              nodeId: body.nodeId,
-              reason: body.reason!,
-            }
-          : {
-              action: "fail_current_node" as const,
-              nodeId: body.nodeId,
-              error: body.error!,
-            };
+      const terminalKind = toolName === "chrona.node.condition_select"
+        ? "condition"
+        : toolName === "chrona.node.wait_complete"
+            ? "wait"
+            : "task";
       return deps.execution.dispatch({
         taskId: requireTaskId(input),
-        action,
+        action: {
+          action: "complete_manual_node" as const,
+          sessionId: input.sessionId,
+          summary: body.summary,
+          output: body.outputs ?? body.input,
+          terminalKind,
+          branchRef: body.branchRef,
+          decision: body.decision,
+          feedback: body.feedback,
+          prompt: body.prompt,
+        },
+      });
+    }
+    case "chrona.node.block": {
+      const body = payload as { reason: string; requiredInput?: string };
+      const reason = body.requiredInput
+        ? `${body.reason}\nRequired input: ${body.requiredInput}`
+        : body.reason;
+      return deps.execution.dispatch({
+        taskId: requireTaskId(input),
+        action: {
+          action: "block_current_node" as const,
+          sessionId: input.sessionId,
+          reason,
+        },
+      });
+    }
+    case "chrona.node.fail": {
+      const body = payload as { error: string };
+      return deps.execution.dispatch({
+        taskId: requireTaskId(input),
+        action: {
+          action: "fail_current_node" as const,
+          sessionId: input.sessionId,
+          error: body.error,
+        },
       });
     }
   }
