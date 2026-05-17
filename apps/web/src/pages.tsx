@@ -12,7 +12,6 @@ import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { WorkspaceOverview } from "@/components/workspaces/workspace-overview";
 import type { Locale } from "@/i18n/config";
 import { resolveLocale } from "@/i18n/config";
 import { localizeHref } from "@/i18n/routing";
@@ -27,7 +26,6 @@ export type AppBootData = {
   schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/scheduling/get-schedule-page").getSchedulePage>>;
   inbox: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
   memory: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
-  workspaces: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-workspaces").getWorkspaces>>;
 };
 
 export type TaskPageRouteData = {
@@ -68,15 +66,6 @@ export type WorkPageRouteData = {
   dictionary: Dictionary;
   work: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/work-page/get-work-page").getWorkPage>>;
 };
-
-export type WorkspaceOverviewRouteData = {
-  locale: Locale;
-  dictionary: Dictionary;
-  workspaceId: string;
-  data: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-workspace-overview").getWorkspaceOverview>>;
-};
-
-type WorkspaceListItem = AppBootData["workspaces"][number];
 
 export function LocaleLandingPage() {
   const params = useParams();
@@ -142,7 +131,7 @@ export function MemoryRoutePage() {
 }
 
 export function SettingsRoutePage() {
-  const { locale, workspaces, dictionary } = useAppBootOutletData();
+  const { locale, dictionary } = useAppBootOutletData();
   const [searchParams] = useSearchParams();
   const t = dictionary.pages.settings;
   const panel = searchParams.get("panel");
@@ -191,7 +180,6 @@ export function SettingsRoutePage() {
       <AdvancedSettingsDialog
         isOpen={panel === "advanced"}
         closeHref={`/${locale}/settings`}
-        workspaces={workspaces}
       />
     </>
   );
@@ -207,68 +195,14 @@ export function WorkbenchHubRoutePage() {
   return <WorkbenchHubPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
 }
 
-export function WorkspacesRoutePage() {
-  const { workspaces, dictionary } = useAppBootOutletData();
-  const t = dictionary.pages.workspaces;
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">{t.notice}</div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {workspaces.map((workspace: WorkspaceListItem) => (
-          <LocalizedLink
-            key={workspace.id}
-            href={`/workspaces/${workspace.id}`}
-            className="rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:border-primary/40"
-          >
-            <p className="font-medium text-foreground">{workspace.name}</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {workspace._count.tasks} {workspace._count.tasks === 1 ? t.taskCountOne : t.taskCountOther}
-            </p>
-          </LocalizedLink>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function WorkspaceOverviewRoutePage() {
-  const { dictionary, data } = useLoaderData() as WorkspaceOverviewRouteData;
-  const t = dictionary.pages.workspaceOverview;
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <WorkspaceOverview data={data} />
-    </div>
-  );
-}
-
 export function TaskDetailRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
-  const params = useParams();
-
-  if (params.workspaceId && task.task.workspaceId !== params.workspaceId) {
-    return <Navigate to={`/${task.task.workspaceId}/tasks/${task.task.id}`} replace />;
-  }
 
   return <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />;
 }
 
 export function WorkRoutePage() {
   const { work } = useLoaderData() as WorkPageRouteData;
-  const params = useParams();
-
-  if (params.workspaceId && work.taskShell.workspaceId !== params.workspaceId) {
-    return <Navigate to={`/${work.taskShell.workspaceId}/work/${work.taskShell.id}`} replace />;
-  }
 
   return <WorkPageClient initialData={work as WorkPageData} />;
 }

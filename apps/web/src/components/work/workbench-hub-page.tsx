@@ -238,7 +238,7 @@ export function WorkbenchHubPage({ tasks, workspaceId: _workspaceId }: Props) {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <LocalizedLink
-                          href={`/workspaces/${task.workspaceId}/work/${task.id}`}
+                          href={`/work/${task.id}`}
                           className={buttonVariants({
                             variant: action.variant,
                             size: "default",

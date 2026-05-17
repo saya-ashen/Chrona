@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/client";
 
 type TaskContextLinksProps = {
-  workspaceId: string;
   taskId: string;
   latestRunStatus?: string | null;
   taskLabel?: string;
@@ -17,7 +16,6 @@ type TaskContextLinksProps = {
 };
 
 export function TaskContextLinks({
-  workspaceId,
   taskId,
   latestRunStatus,
   taskLabel,
@@ -30,14 +28,14 @@ export function TaskContextLinks({
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       <LocalizedLink
-        href={`/workspaces/${workspaceId}/tasks/${taskId}`}
+        href={`/tasks/${taskId}`}
         className={buttonVariants({ variant: "outline", size })}
       >
         <ExternalLink className="size-3.5" />
         {taskLabel ?? t("common.openTask")}
       </LocalizedLink>
       <LocalizedLink
-        href={`/workspaces/${workspaceId}/work/${taskId}`}
+        href={`/work/${taskId}`}
         className={buttonVariants({ variant: "secondary", size })}
       >
         <BriefcaseBusiness className="size-3.5" />

@@ -284,7 +284,7 @@ export function ScheduleTaskList({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <LocalizedLink
-                          href={`/workspaces/${item.workspaceId}/tasks/${item.taskId}`}
+                          href={`/tasks/${item.taskId}`}
                           className="text-base font-semibold text-foreground transition-colors hover:text-primary"
                         >
                           {item.title}
@@ -337,7 +337,7 @@ export function ScheduleTaskList({
                   </div>
 
                   <div className="flex w-full shrink-0 flex-col gap-2 lg:w-auto lg:min-w-[220px]">
-                    <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} latestRunStatus={item.latestRunStatus} />
+                    <TaskContextLinks taskId={item.taskId} latestRunStatus={item.latestRunStatus} />
                     <button
                       type="button"
                       disabled={isPending}

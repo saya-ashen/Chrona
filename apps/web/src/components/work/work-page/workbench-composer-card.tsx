@@ -48,7 +48,7 @@ function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
   return true;
 }
 
-function renderActionWorkspace(
+function renderActionPanel(
   currentIntervention: WorkPageData["currentIntervention"],
   currentStepTitle: string | null,
   copy: WorkbenchCopy,
@@ -216,7 +216,7 @@ export function WorkbenchComposerCard({
         <span className="text-xs text-muted-foreground">{copy.keyboardHint}</span>
       </div>
 
-      <div className="mt-4">{renderActionWorkspace(currentIntervention, currentStepTitle, copy)}</div>
+      <div className="mt-4">{renderActionPanel(currentIntervention, currentStepTitle, copy)}</div>
 
       {errorMessage ? (
         <p

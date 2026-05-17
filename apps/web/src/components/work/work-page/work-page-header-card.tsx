@@ -9,7 +9,6 @@ type WorkPageHeaderCardProps = {
   syncLabel: string;
   isStale: boolean;
   description: string;
-  workspaceId: string;
   taskId: string;
 };
 
@@ -20,7 +19,6 @@ export function WorkPageHeaderCard({
   syncLabel,
   isStale,
   description,
-  workspaceId,
   taskId,
 }: WorkPageHeaderCardProps) {
   return (
@@ -45,7 +43,7 @@ export function WorkPageHeaderCard({
               Schedule
             </LocalizedLink>
             <LocalizedLink
-              href={`/workspaces/${workspaceId}/tasks/${taskId}`}
+              href={`/tasks/${taskId}`}
               className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-border/70 bg-background px-3 text-sm font-medium text-muted-foreground hover:bg-muted/40"
             >
               Details

@@ -2,7 +2,6 @@
   "nav": {
     "brandTitle": "Chrona",
     "brandTagline": "把任务变成可执行的 AI 工作",
-    "workspaces": "工作区",
     "schedule": "日程",
     "tasks": "任务",
     "workbench": "工作台",
@@ -70,7 +69,7 @@
       "noRecentApprovals": "暂无最近审批。",
       "recentArtifactsTitle": "最近产物",
       "noArtifacts": "暂无产物。",
-      "workspaceState": "工作区状态",
+      "workspaceState": "执行状态",
       "currentState": "当前状态",
       "nextAction": "下一步动作",
       "stateRunning": "运行中",
@@ -125,19 +124,6 @@
       "quickEdit": "快速编辑",
       "saveTaskConfig": "保存任务配置",
       "saving": "保存中…"
-    },
-    "workspaceOverview": {
-      "runningTasks": "运行中的任务",
-      "waitingForApproval": "等待审批",
-      "blockedOrFailed": "阻塞 / 失败任务",
-      "scheduleRisks": "日程风险",
-      "upcomingDeadlines": "即将到期",
-      "recentlyUpdated": "最近更新的任务",
-      "sectionDescription": "无需逐个打开详情页，也能持续看到最关键的任务。",
-      "noItems": "暂无项目",
-      "noRunYet": "尚未运行",
-      "openTask": "打开任务",
-      "noActivityYet": "暂无活动"
     },
     "inboxList": {
       "risk": "风险",
@@ -369,7 +355,7 @@
       "fallbackNoOperatorInput": "还没有任务记录。启动任务后，这里会按时间显示关键进展，例如开始执行、等待确认或产出更新。",
       "fallbackStartFromTaskPage": "先启动运行，再从这里继续补充要求。",
       "sharedOutput": "最新结果",
-      "sharedOutputDescription": "把最新可用结果放在工作区附近，避免你来回翻日志。",
+      "sharedOutputDescription": "把最新可用结果放在工作台附近，避免你来回翻日志。",
       "usedByNextAction": "下一步会用到",
       "updated": "更新于",
       "openArtifact": "打开产物",
@@ -418,12 +404,12 @@
       "collaborationFlowDescription": "输入后，下面按时间顺序显示对话消息：Agent 在左，你在右。",
       "conversationTab": "协作推进",
       "fullFlowTab": "执行记录",
-      "workbenchViewTabs": "工作区视图切换",
+      "workbenchViewTabs": "工作台视图切换",
       "latestResult": "最新结果",
       "inputArea": "输入区",
       "quickPrompts": "快捷补充",
       "newTask": "新建任务",
-      "workspaceViews": "工作区入口",
+      "workspaceViews": "工作台入口",
       "allTasks": "任务列表",
       "openInbox": "收件箱",
       "openMemory": "记忆库",
@@ -566,7 +552,7 @@
     },
     "runSidePanel": {
       "runSnapshot": "运行快照",
-      "runSnapshotDescription": "这里保持为轻量检查栏：查看运行健康度、审批、产物和工具证据，不占用主工作区。",
+      "runSnapshotDescription": "这里保持为轻量检查栏：查看运行健康度、审批、产物和工具证据，不占用主工作台。",
       "noRun": "暂无运行",
       "sync": "同步",
       "approvalSingular": "条审批",
@@ -579,7 +565,7 @@
       "prompt": "任务安排",
       "noActiveRunYet": "尚无活动运行。",
       "evidence": "依据",
-      "evidenceDescription": "审批、产物和工具输出会作为辅助上下文保留在这里，而不是占据主工作区。",
+      "evidenceDescription": "审批、产物和工具输出会作为辅助上下文保留在这里，而不是占据主工作台。",
       "approvals": "审批",
       "noPendingApprovals": "当前没有待处理审批。",
       "artifacts": "产物",
@@ -864,18 +850,11 @@
       "subtitle": "查看当前生效的记忆记录，并在它们不再适用时停用陈旧指导。",
       "invalidate": "失效"
     },
-    "workspaces": {
-      "title": "工作区",
-      "subtitle": "面向内部或多工作区场景的高级工作区管理。",
-      "notice": "大多数用户应从日程、任务、收件箱和记忆开始；这个页面主要用于更深入的工作区管理。",
-      "taskCountOne": "个任务",
-      "taskCountOther": "个任务"
-    },
     "settings": {
       "title": "设置",
-      "subtitle": "配置 AI Clients，并进入更高级的工作区控制。",
+      "subtitle": "配置 AI Clients，并进入更高级的控制。",
       "advancedTitle": "高级设置",
-      "advancedDescription": "工作区管理和更深层的运行控制放在日常任务流之外。",
+      "advancedDescription": "更深层的运行控制放在日常任务流之外。",
       "openAdvancedSettings": "打开高级设置",
       "aiClientsDescription": "管理 AI 客户端，配置各智能功能使用的 Client",
       "manageAiClients": "管理 AI Clients",
@@ -914,16 +893,7 @@
     },
     "advancedSettings": {
       "title": "高级设置",
-      "subtitle": "保留内部控制能力，但不让它们变成默认工作流。",
-      "workspaceManagementTitle": "工作区管理",
-      "workspaceManagementDescription": "产品现在默认采用单工作区体验。仅在高级或内部场景下使用工作区管理。",
-      "openWorkspaces": "打开工作区",
-      "taskCountOne": "个任务",
-      "taskCountOther": "个任务"
-    },
-    "workspaceOverview": {
-      "title": "工作区概览",
-      "subtitle": "在深入执行细节前，先统一分诊运行状态、审批和日程风险。"
+      "subtitle": "保留内部控制能力，但不让它们变成默认工作流。"
     }
   }
 }

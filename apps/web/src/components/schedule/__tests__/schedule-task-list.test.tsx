@@ -153,7 +153,7 @@ describe("ScheduleTaskList", () => {
   it("renders task title as link", () => {
     render(<ScheduleTaskList {...defaultProps} />);
     const link = screen.getByText("Failed Task").closest("a");
-    expect(link).toHaveAttribute("href", "/workspaces/ws-1/tasks/t-failed");
+    expect(link).toHaveAttribute("href", "/tasks/t-failed");
   });
 
   it("shows task priority and runnability badges", () => {

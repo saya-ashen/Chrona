@@ -13,8 +13,6 @@ import {
   TaskListRoutePage,
   WorkRoutePage,
   WorkbenchHubRoutePage,
-  WorkspaceOverviewRoutePage,
-  WorkspacesRoutePage,
 } from "./pages";
 import { NotFoundPage } from "@/components/not-found-page";
 import {
@@ -23,7 +21,6 @@ import {
   loadTaskPageData,
   loadWorkPageData,
   loadWorkbenchHubData,
-  loadWorkspaceOverviewData,
 } from "./loaders";
 
 function redirectToDefaultLocale(pathname: string, search: string, hash: string) {
@@ -78,21 +75,12 @@ export function createAppRouter() {
           element: <SettingsRoutePage />,
         },
         {
-          path: "workspaces",
-          element: <WorkspacesRoutePage />,
-        },
-        {
-          path: "workspaces/:workspaceId",
-          loader: loadWorkspaceOverviewData,
-          element: <WorkspaceOverviewRoutePage />,
-        },
-        {
-          path: "workspaces/:workspaceId/tasks/:taskId",
+          path: "tasks/:taskId",
           loader: loadTaskPageData,
           element: <TaskDetailRoutePage />,
         },
         {
-          path: "workspaces/:workspaceId/work/:taskId",
+          path: "work/:taskId",
           loader: loadWorkPageData,
           element: <WorkRoutePage />,
         },
