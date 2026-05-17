@@ -19,6 +19,10 @@ function node(input: Partial<PlanNodeDataModel> & { id: string; status: PlanNode
     summary: input.summary,
     statusLabel: input.statusLabel,
     nextAction: input.nextAction,
+    requiresHumanInput: input.requiresHumanInput,
+    interactionType: input.interactionType,
+    interactiveFields: input.interactiveFields,
+    availableActions: input.availableActions,
     completionSummary: input.completionSummary,
     result: input.result,
     resultOutputs: input.resultOutputs,
@@ -290,6 +294,87 @@ describe("task workspace execution console view model", () => {
     expect(view.executionFlow.nodes.find((item) => item.id === "sync")).toMatchObject({
       status: "blocked",
       requiresHumanAction: true,
+    });
+  });
+
+  it("uses the current checkpoint as the primary status and disables Start", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Running",
+          executionSummary: {
+            taskId: "task-1",
+            executionState: "running",
+            stateLabel: "Running",
+            stateReason: "Awaiting checkpoint input",
+            graphVersion: 3,
+            currentNodeId: "checkpoint",
+            primaryAction: { type: "provide_input", label: "Provide input", enabled: true },
+            progress: { completed: 1, total: 2, percent: 50 },
+            readiness: { runnable: true, reason: "Awaiting checkpoint input" },
+            degraded: null,
+            blocking: null,
+            waiting: { nodeId: "checkpoint", reason: "Needs confirmation" },
+            recoveryActions: [],
+          },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "prepare", status: "done" }),
+        node({
+          id: "checkpoint",
+          status: "waiting_for_user",
+          nextAction: "Confirm the deployment window",
+          requiresHumanInput: true,
+          availableActions: [{ id: "continue", label: "Continue", kind: "trigger" }],
+        }),
+      ], "checkpoint"),
+    });
+
+    expect(view.header.status).toBe("approval-needed");
+    expect(view.header.actions.find((action) => action.id === "start")).toMatchObject({
+      disabled: true,
+      disabledReason: "Task is waiting for checkpoint input.",
+    });
+    expect(view.header.actions.find((action) => action.id === "stop")).toMatchObject({ disabled: false });
+    expect(view.states.treatment).toMatchObject({
+      label: "Review required",
+      tone: "warning",
+      guidance: "Confirm the deployment window",
+    });
+  });
+
+  it("does not let a stale task block reason hide the active checkpoint", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Running",
+          blockReason: { blockType: "previous_block", actionRequired: "Old blocker" },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "prepare", status: "done" }),
+        node({
+          id: "checkpoint",
+          status: "waiting_for_approval",
+          nextAction: "Approve the checkpoint",
+          requiresHumanInput: true,
+        }),
+      ], "checkpoint"),
+    });
+
+    expect(view.attention).toMatchObject({
+      title: "Needs handling",
+      description: "Approve the checkpoint",
+      tone: "warning",
+      actionNodeId: "checkpoint",
+    });
+    expect(view.states.treatment).toMatchObject({
+      label: "Approval required",
+      tone: "warning",
+      guidance: "Approve the checkpoint",
     });
   });
 

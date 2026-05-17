@@ -71,7 +71,7 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
     };
   }
 
-  if (input.isBlocked || input.currentNode?.status === "blocked" || input.currentNode?.status === "failed") {
+  if (input.currentNode?.status === "blocked" || input.currentNode?.status === "failed") {
     return {
       label: "Blocked",
       tone: workspaceStateToneByLabel.Blocked,
@@ -92,6 +92,14 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
       label: "Review required",
       tone: workspaceStateToneByLabel["Review required"],
       guidance: input.currentNode.nextAction ?? "Complete the current node action to continue.",
+    };
+  }
+
+  if (input.isBlocked) {
+    return {
+      label: "Blocked",
+      tone: workspaceStateToneByLabel.Blocked,
+      guidance: input.blockActionRequired ?? "Resolve the blocker before continuing execution.",
     };
   }
 

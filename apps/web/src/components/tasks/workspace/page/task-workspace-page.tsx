@@ -8,6 +8,7 @@ import type { TaskPageData } from "../model/task-workspace-types";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { useTaskWorkspaceDeleteFlow } from "../hooks/use-task-workspace-delete-flow";
 import { useTaskWorkspaceEditorState } from "../hooks/use-task-workspace-editor-state";
+import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 
@@ -45,10 +46,10 @@ const DEFAULT_COPY = {
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
+  const { pageData, setTask, refreshWorkspace } = useTaskWorkspacePageState(data);
+  const task = pageData.task;
 
   const {
-    task,
-    setTask,
     hasUnsavedConfigChanges,
     isSaving,
     saveError,
@@ -64,7 +65,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleTaskConfigDraftStateChange,
     persistTaskConfig,
     handleSaveCurrentDraft,
-  } = useTaskWorkspaceEditorState(data.task);
+  } = useTaskWorkspaceEditorState(task, setTask);
 
   const {
     plan,
@@ -86,9 +87,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,
-  } = useTaskWorkspacePlanState(task);
+  } = useTaskWorkspacePlanState(task, refreshWorkspace);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
-    pageData: { ...data, task },
+    pageData,
     graphPlan,
   });
   const {
@@ -105,6 +106,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     setTask,
     setSaveError,
     fetchPlan,
+    refreshWorkspace,
   });
   const { showDeleteConfirm, setShowDeleteConfirm, isDeleting, handleDelete } =
     useTaskWorkspaceDeleteFlow({
@@ -175,7 +177,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
         graphPlan={graphPlan}
-        pageData={{ ...data, task: consoleView.task }}
+        pageData={{ ...pageData, task: consoleView.task }}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}

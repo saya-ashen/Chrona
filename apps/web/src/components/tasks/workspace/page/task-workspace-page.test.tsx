@@ -40,6 +40,15 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", ()
   },
 }));
 
+vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () => ({
+  useTaskWorkspacePageState: (data: TaskPageData) => ({
+    pageData: data,
+    setTask: vi.fn(),
+    refreshWorkspace: vi.fn(),
+    isRefreshing: false,
+  }),
+}));
+
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-plan-state", () => ({
   useTaskWorkspacePlanState: () => ({
     plan: mocks.plan,
