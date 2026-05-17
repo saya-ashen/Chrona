@@ -13,6 +13,7 @@ import {
   runGraphExecution,
   validatePlanGraph,
   analyzeStructuralChangeImpact,
+  resolveEffectivePlanGraph,
 } from "./index";
 import type { CompiledPlan, ConditionConfig, GraphExecutionState } from "./index";
 
@@ -71,6 +72,65 @@ function makeBranchingPlan(): CompiledPlan {
   };
 }
 
+function makeForkedBranchingPlan(): CompiledPlan {
+  return {
+    id: "compiled_forked_branching",
+    editablePlanId: "graph_forked_branching",
+    sourceVersion: 1,
+    nodes: [
+      {
+        id: "choose",
+        localId: "choose",
+        type: "condition",
+        title: "Choose path",
+        description: "User chooses branch",
+        config: makeConditionConfig({
+          condition: "Pick route",
+          evaluationBy: "user",
+          branches: [
+            { label: "needs config", nextNodeId: "configure" },
+            { label: "skip config", nextNodeId: "build" },
+          ],
+        }),
+        dependencies: [],
+        dependents: ["configure", "build"],
+      },
+      {
+        id: "configure",
+        localId: "configure",
+        type: "task",
+        title: "Configure",
+        description: "Skipped branch node",
+        config: { expectedOutput: "Configuration gathered" },
+        dependencies: ["choose"],
+        dependents: ["build"],
+      },
+      {
+        id: "build",
+        localId: "build",
+        type: "task",
+        title: "Build",
+        description: "Selected branch node",
+        config: { expectedOutput: "Build complete" },
+        dependencies: ["choose", "configure"],
+        dependents: [],
+      },
+    ],
+    edges: [
+      { id: "edge_choose_configure", from: "choose", to: "configure", label: "needs config" },
+      { id: "edge_choose_build", from: "choose", to: "build", label: "skip config" },
+      { id: "edge_configure_build", from: "configure", to: "build", label: "after config" },
+    ],
+    entryNodeIds: ["choose"],
+  };
+}
+
+function activeDefinitionLayerId(graph: ReturnType<typeof createPlanGraphFromCompiledPlan>, nodeId: string) {
+  const layer = graph.nodes.find((node) => node.id === nodeId)?.layers.find((candidate) => candidate.type === "definition");
+  if (!layer) throw new Error(`Missing definition layer for ${nodeId}`);
+  return layer.id;
+}
+
 function makeParallelPlan(): CompiledPlan {
   return {
     id: "compiled_parallel",
@@ -104,6 +164,57 @@ function makeParallelPlan(): CompiledPlan {
 }
 
 describe("graph-runtime", () => {
+  it("marks unselected branch subgraphs skipped and keeps them out of active entry nodes", () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeForkedBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    const effective = resolveEffectivePlanGraph({
+      graph,
+      attempts: [
+        {
+          id: "attempt_choose_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: activeDefinitionLayerId(graph, "choose"),
+          executionContextSnapshotId: "snapshot_choose_1",
+          status: "succeeded",
+          attemptNumber: 1,
+          idempotencyKey: "choose:1",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          finishedAt: "2026-01-01T00:00:01.000Z",
+        },
+      ],
+      results: [
+        {
+          id: "result_choose_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: activeDefinitionLayerId(graph, "choose"),
+          attemptId: "attempt_choose_1",
+          status: "current",
+          selectedBranch: { label: "skip config", nextNodeId: "build", source: "system" },
+        },
+      ],
+    });
+
+    const configure = effective.nodes.find((node) => node.id === "configure");
+    const build = effective.nodes.find((node) => node.id === "build");
+
+    expect(configure?.reachable).toBe(false);
+    expect(configure?.status).toBe("skipped");
+    expect(build?.reachable).toBe(true);
+    expect(build?.ready).toBe(true);
+    expect(effective.entryNodeIds).toEqual(["choose"]);
+    expect(effective.readyNodeIds).toEqual(["build"]);
+    expect(effective.pendingNodeIds).not.toContain("configure");
+    expect(effective.completedNodeIds).toContain("configure");
+  });
+
   it("builds, pauses, resumes, and advances a dynamic graph without engine dependencies", async () => {
     const graph = createPlanGraphFromCompiledPlan({
       taskId: "task_1",
@@ -336,6 +447,63 @@ describe("graph-runtime", () => {
       "executable_path_computed",
       "node_started",
       "node_waiting_for_user",
+    ]);
+  });
+
+  it("syncs external results without running downstream execution", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    let tick = 80;
+    const state: GraphExecutionState = {
+      graph,
+      attempts: [],
+      results: [
+        {
+          id: "result_pending_external",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          attemptId: "external_attempt_1",
+          status: "current",
+          waitKind: "external_dependency",
+          outputSummary: "External run started",
+        },
+      ],
+      executionContextSnapshots: [],
+    };
+    const runtime = createGraphRuntime({
+      taskId: "task_1",
+      runtimeName: "test",
+      now: () => tick++,
+      executors: {
+        condition: async ({ node, plan, userInput }) => executeBuiltinGraphNode({ node, plan, userInput }),
+      },
+    });
+
+    const result = await runtime.dispatch({
+      type: "sync_external_result",
+      state,
+      context: null,
+      continueExecution: false,
+      externalResult: {
+        nodeId: "choose",
+        status: "done",
+        summary: "External run completed",
+        selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
+      },
+    });
+
+    expect(result.status).toBe("running");
+    expect(result.state.results.map((entry) => [entry.nodeId, entry.status])).toEqual([
+      ["choose", "obsolete"],
+      ["choose", "current"],
+    ]);
+    expect(result.events.map((event) => event.type)).toEqual([
+      "command_received",
+      "external_result_synced",
     ]);
   });
 

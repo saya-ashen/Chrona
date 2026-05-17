@@ -191,6 +191,26 @@ describe("task workspace execution console view model", () => {
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "done-output-0", sourceNodeId: "done" }));
   });
 
+  it("does not let a stale blocked selection override a completed workspace state", () => {
+    const staleSelection = node({
+      id: "stale-blocked",
+      status: "blocked",
+      nextAction: "Resolve the blocker before continuing execution.",
+    });
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
+      graphPlan: graph([node({ id: "done", status: "completed" })]),
+      selectedNode: staleSelection,
+    });
+
+    expect(view.header.status).toBe("completed");
+    expect(view.states.treatment).toMatchObject({
+      label: "Completed",
+      tone: "success",
+      guidance: "Review the latest result and artifacts before closing the task.",
+    });
+  });
+
   it("surfaces pending approvals, input nodes, artifacts, and activity events for human review", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({

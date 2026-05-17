@@ -43,4 +43,23 @@ describe("deriveTaskState", () => {
       blockReason: null,
     });
   });
+
+  it("does not let stale running runs reopen a completed task", () => {
+    expect(
+      deriveTaskState({
+        task: { status: "Completed", latestRunId: null },
+        runs: [
+          { id: "run_stale", status: "Running", updatedAt: new Date("2026-05-10T12:04:18.454Z") },
+          { id: "run_done", status: "Completed", updatedAt },
+        ],
+        approvals: [],
+        sync: { stale: false },
+        executionSession: null,
+      }),
+    ).toMatchObject({
+      persistedStatus: "Completed",
+      displayState: null,
+      blockReason: null,
+    });
+  });
 });

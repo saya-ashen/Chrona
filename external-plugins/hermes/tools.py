@@ -26,7 +26,7 @@ def _post_json_rpc(method, params=None):
     }
     request = urllib.request.Request(
         _mcp_url(),
-        data=json.dumps(body).encode("utf-8"),
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
         headers={
             "content-type": "application/json",
             "accept": "application/json, text/event-stream",
@@ -56,11 +56,11 @@ def list_chrona_tools():
     """Fetch the current Chrona MCP tool list during Hermes plugin startup."""
     result = _safe_json_rpc("tools/list")
     if "error" in result:
-        raise RuntimeError(f"Unable to list Chrona tools: {json.dumps(result)}")
+        raise RuntimeError(f"Unable to list Chrona tools: {json.dumps(result, ensure_ascii=False)}")
 
     tools = result.get("tools")
     if not isinstance(tools, list):
-        raise RuntimeError(f"Chrona tools/list returned invalid payload: {json.dumps(result)}")
+        raise RuntimeError(f"Chrona tools/list returned invalid payload: {json.dumps(result, ensure_ascii=False)}")
     return tools
 
 
@@ -90,12 +90,13 @@ def handler_for_chrona_tool(name):
 
     def _handler(args, **kwargs):
         if not isinstance(args, dict):
-            return json.dumps({"error": "tool arguments must be an object"})
+            return json.dumps({"error": "tool arguments must be an object"}, ensure_ascii=False)
         return json.dumps(
             _safe_json_rpc(
                 "tools/call",
                 {"name": name, "arguments": _inject_session_context(args, kwargs)},
-            )
+            ),
+            ensure_ascii=False,
         )
 
     return _handler

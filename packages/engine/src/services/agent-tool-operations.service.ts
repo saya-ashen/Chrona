@@ -165,7 +165,7 @@ function readAiExecutionView(value: unknown) {
         ? buildNodeRuntimeInput({
             plan,
             node: currentNode,
-            allowedTerminalTools: [...NODE_RUNTIME_TERMINAL_TOOLS[currentNode.type]],
+            currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS[currentNode.type]],
           }).node
         : null,
       readyNodeRefs: plan.readyNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
@@ -177,14 +177,19 @@ function readAiExecutionView(value: unknown) {
       const runtime = buildNodeRuntimeInput({
         plan,
         node,
-        allowedTerminalTools: [...NODE_RUNTIME_TERMINAL_TOOLS[node.type]],
+        currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS[node.type]],
       });
       return {
         ref: runtime.node.ref,
         title: runtime.node.title,
         type: runtime.node.type,
-        status: runtime.node.status,
+        status: node.status,
         objective: runtime.node.objective,
+        expectedOutput: runtime.node.expectedOutput,
+        completionCriteria: runtime.node.completionCriteria,
+        condition: runtime.node.condition,
+        checkpoint: runtime.node.checkpoint,
+        wait: runtime.node.wait,
         branchOptions: runtime.branchOptions,
       };
     }),
@@ -311,11 +316,16 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
       });
       const workspaceId = typeof raw.workspaceId === "string"
         ? raw.workspaceId
-        : session?.task.workspaceId ?? (await getDefaultWorkspace()).id;
+        : session?.task.workspaceId ?? (runtimeRun?.taskId
+            ? (await db.task.findUnique({
+                where: { id: runtimeRun.taskId },
+                select: { workspaceId: true },
+              }))?.workspaceId
+            : undefined) ?? (await getDefaultWorkspace()).id;
 
       return chronaToolInputSchema.parse({
         ...raw,
-        taskId: typeof raw.taskId === "string" ? raw.taskId : session?.task.id,
+        taskId: typeof raw.taskId === "string" ? raw.taskId : session?.task.id ?? runtimeRun?.taskId,
         workspaceId,
       });
     },
@@ -522,7 +532,7 @@ async function executeValidatedTool(
         : toolName === "chrona.node.wait_complete"
             ? "wait"
             : "task";
-      return deps.execution.dispatch({
+      return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
         action: {
           action: "complete_manual_node" as const,
@@ -542,7 +552,7 @@ async function executeValidatedTool(
       const reason = body.requiredInput
         ? `${body.reason}\nRequired input: ${body.requiredInput}`
         : body.reason;
-      return deps.execution.dispatch({
+      return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
         action: {
           action: "block_current_node" as const,
@@ -553,7 +563,7 @@ async function executeValidatedTool(
     }
     case "chrona.node.fail": {
       const body = payload as { error: string };
-      return deps.execution.dispatch({
+      return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
         action: {
           action: "fail_current_node" as const,

@@ -1,10 +1,13 @@
 import type {
   AiVisibleRefBinding,
+  CheckpointConfig,
   ConditionConfig,
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeRuntimeInput,
   SemanticRefHistory,
+  TaskConfig,
+  WaitConfig,
 } from "@chrona/contracts/ai";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -40,14 +43,120 @@ function outputSummary(node: EffectivePlanNode): string | undefined {
   return typeof summary === "string" && summary.trim() ? summary : undefined;
 }
 
-function publicNodeConfig(node: EffectivePlanNode): EffectivePlanNode["config"] {
-  if (node.type !== "condition") return node.config;
-  const config = node.config as ConditionConfig;
+function textField(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function outputValues(node: EffectivePlanNode): unknown[] | undefined {
+  const outputs = node.result?.outputs;
+  return Array.isArray(outputs) && outputs.length > 0 ? outputs : undefined;
+}
+
+function dependencyIds(node: EffectivePlanNode): Set<string> {
+  return new Set(node.dependencies.filter((id) => typeof id === "string" && id.length > 0));
+}
+
+function matchesDependency(candidate: EffectivePlanNode, ids: Set<string>): boolean {
+  return ids.has(candidate.id) || ids.has(candidate.nodeId) || ids.has(candidate.localId);
+}
+
+function currentNodeResultActionHints(actionNames: string[]): NodeRuntimeInput["currentNodeResultActions"] {
   return {
-    condition: config.condition,
-    evaluationBy: config.evaluationBy,
-    branches: config.branches.map((branch) => ({ label: branch.label })),
-  } as EffectivePlanNode["config"];
+    actionNames,
+    ...(actionNames.includes("chrona_task_complete")
+      ? { completeSchema: { summary: "string", outputs: [{ kind: "json", value: {} }] } }
+      : {}),
+    ...(actionNames.includes("chrona_condition_select")
+      ? { conditionSelectSchema: { branchRef: "branchOptions[].ref", summary: "string" } }
+      : {}),
+    ...(actionNames.includes("chrona_node_block") ? { blockSchema: { reason: "string" } } : {}),
+    ...(actionNames.includes("chrona_node_fail") ? { failSchema: { error: "string" } } : {}),
+    ...(actionNames.includes("chrona_wait_complete") ? { waitCompleteSchema: { summary: "string" } } : {}),
+  };
+}
+
+function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["node"] {
+  switch (node.type) {
+    case "task": {
+      const config = node.config as TaskConfig & Record<string, unknown>;
+      return {
+        ref,
+        type: node.type,
+        title: node.title,
+        objective: nodeObjective(node),
+        expectedOutput: textField(config.expectedOutput),
+        completionCriteria: textField(config.completionCriteria),
+      };
+    }
+    case "condition": {
+      const config = node.config as ConditionConfig;
+      return {
+        ref,
+        type: node.type,
+        title: node.title,
+        objective: nodeObjective(node),
+        condition: config.condition,
+      };
+    }
+    case "checkpoint": {
+      const config = node.config as CheckpointConfig;
+      return {
+        ref,
+        type: node.type,
+        title: node.title,
+        objective: nodeObjective(node),
+        checkpoint: {
+          type: config.checkpointType,
+          prompt: config.prompt,
+          ...(config.options && config.options.length > 0 ? { options: config.options } : {}),
+        },
+      };
+    }
+    case "wait": {
+      const config = node.config as WaitConfig;
+      return {
+        ref,
+        type: node.type,
+        title: node.title,
+        objective: nodeObjective(node),
+        wait: {
+          waitFor: config.waitFor,
+          ...(config.timeout ? { timeout: config.timeout } : {}),
+        },
+      };
+    }
+  }
+}
+
+function compactPreviousResults(input: {
+  plan: EffectivePlanGraph;
+  history: SemanticRefHistory;
+  node: EffectivePlanNode;
+}): NodeRuntimeInput["context"] {
+  const directDependencyIds = dependencyIds(input.node);
+  const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
+  const directDependencies = completed
+    .filter((node) => matchesDependency(node, directDependencyIds))
+    .map((node) => ({
+      nodeRef: refForNode(input.history, node.id).ref,
+      title: node.title,
+      summary: outputSummary(node),
+      outputs: outputValues(node),
+    }));
+  const globalItems = completed
+    .filter((node) => !matchesDependency(node, directDependencyIds))
+    .map((node) => {
+      const summary = outputSummary(node);
+      return summary ? `${node.title}: ${summary}` : node.title;
+    })
+    .filter((item) => item.trim().length > 0);
+
+  return {
+    relevantPreviousResults: directDependencies,
+    ...(globalItems.length > 0
+      ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
+      : {}),
+  };
 }
 
 function resolveBranchTarget(plan: EffectivePlanGraph, nextNodeId: string): EffectivePlanNode | undefined {
@@ -142,7 +251,7 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  allowedTerminalTools: string[];
+  currentNodeResultActionNames: string[];
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -157,24 +266,9 @@ export function buildNodeRuntimeInput(input: {
     : undefined;
 
   return {
-    taskRef: history.taskRef.ref,
-    planRef: history.planRef.ref,
-    node: {
-      ref: currentRef.ref,
-      type: input.node.type,
-      title: input.node.title,
-      objective: nodeObjective(input.node),
-      status: input.node.status,
-      config: publicNodeConfig(input.node),
-    },
+    node: runtimeNode(input.node, currentRef.ref),
+    context: compactPreviousResults({ plan: input.plan, history, node: input.node }),
     branchOptions,
-    previousResults: input.plan.nodes
-      .filter((node) => node.status === "completed" || node.status === "skipped")
-      .map((node) => ({
-        nodeRef: refForNode(history, node.id).ref,
-        title: node.title,
-        summary: outputSummary(node),
-      })),
-    allowedTerminalTools: input.allowedTerminalTools,
+    currentNodeResultActions: currentNodeResultActionHints(input.currentNodeResultActionNames),
   };
 }

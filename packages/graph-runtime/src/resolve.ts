@@ -40,6 +40,7 @@ export function resolveEffectivePlanGraph(
   applyConditionBranchSelections(nodeMap, edgeMap);
   const entryNodeIds = computeGraphEntryNodeIds(nodeMap, edgeMap);
   const reachableNodeIds = computeReachableNodeIds(entryNodeIds, edgeMap);
+  markUnreachableNodesSkipped(nodeMap, reachableNodeIds);
   rebuildDependencies(nodeMap, edgeMap, reachableNodeIds);
 
   return buildEffectiveGraphSummary({
@@ -48,6 +49,7 @@ export function resolveEffectivePlanGraph(
     resolvedVersion: graph.mutations.length,
     nodeMap,
     edgeMap,
+    entryNodeIds,
     reachableNodeIds,
   });
 }
@@ -58,9 +60,9 @@ function buildEffectiveGraphSummary(input: {
   resolvedVersion: number;
   nodeMap: Map<string, EffectivePlanNode>;
   edgeMap: Map<string, EffectivePlanEdge>;
+  entryNodeIds: string[];
   reachableNodeIds: Set<string>;
 }): EffectivePlanGraph {
-  const entryNodeIds = computeGraphEntryNodeIds(input.nodeMap, input.edgeMap);
   const terminalNodeIds: string[] = [];
   const readyNodeIds: string[] = [];
   const blockedNodeIds: string[] = [];
@@ -136,7 +138,7 @@ function buildEffectiveGraphSummary(input: {
     resolvedVersion: input.resolvedVersion,
     nodes: [...input.nodeMap.values()],
     edges: [...input.edgeMap.values()],
-    entryNodeIds,
+    entryNodeIds: input.entryNodeIds,
     terminalNodeIds,
     readyNodeIds,
     blockedNodeIds,
@@ -146,6 +148,18 @@ function buildEffectiveGraphSummary(input: {
     failedNodeIds,
     pendingNodeIds,
   };
+}
+
+function markUnreachableNodesSkipped(
+  nodeMap: Map<string, EffectivePlanNode>,
+  reachableNodeIds: Set<string>,
+): void {
+  for (const [nodeId, node] of nodeMap) {
+    if (reachableNodeIds.has(nodeId)) continue;
+    if (node.status === "pending" || node.status === "ready") {
+      node.status = "skipped";
+    }
+  }
 }
 
 function buildEffectiveNodeFromGraphNode(

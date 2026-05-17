@@ -94,6 +94,51 @@ function makeSingleTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
+function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `Manual task handoff ${editablePlanId}`,
+    goal: "Complete manual node, then continue automatic work",
+    assumptions: [],
+    nodes: [
+      {
+        id: "manual_task",
+        localId: "manual_task",
+        type: "condition",
+        title: "Manual condition",
+        description: "Agent-submitted branch result",
+        config: {
+          condition: "Choose whether to continue",
+          evaluationBy: "user",
+          branches: [{ label: "continue", nextNodeId: "auto_task" }],
+        } satisfies ConditionConfig,
+        dependencies: [],
+        dependents: ["auto_task"],
+      },
+      {
+        id: "auto_task",
+        localId: "auto_task",
+        type: "task",
+        title: "Automatic follow-up",
+        description: "Should run after terminal result is acknowledged",
+        config: { expectedOutput: "Automatic output" } satisfies TaskConfig,
+        dependencies: ["manual_task"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [{ id: "edge_manual_to_auto", from: "manual_task", to: "auto_task" }],
+    entryNodeIds: ["manual_task"],
+    terminalNodeIds: ["auto_task"],
+    topologicalOrder: ["manual_task", "auto_task"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,
@@ -380,6 +425,8 @@ describe("plan-runner task executor approval flows", () => {
     expect(result.currentNodeId).toBeNull();
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.planRun.status).toBe("completed");
+    expect(persisted?.graph?.status).toBe("completed");
     expect(persisted?.results).toHaveLength(1);
     expect(persisted?.results[0]).toMatchObject({
       nodeId: "task_node",
@@ -401,6 +448,46 @@ describe("plan-runner task executor approval flows", () => {
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.persistedStatus).toBe(TaskStatus.Completed);
+
+    const staleRunningRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: task.defaultSessionId,
+        runtimeName: "openclaw",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+    await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    const convergedRun = await db.run.findUniqueOrThrow({ where: { id: staleRunningRun.id } });
+    expect(convergedRun.status).toBe("Completed");
+
+    const reprojection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(reprojection.persistedStatus).toBe(TaskStatus.Completed);
+    expect(reprojection.latestRunStatus).toBe("Completed");
+
+    const events = await db.event.findMany({
+      where: { taskId: task.id },
+      orderBy: { ingestSequence: "asc" },
+      select: { eventType: true, payload: true },
+    });
+    const completionIndex = events.findIndex(
+      (event) => event.eventType === "plan_execution.execution_completed",
+    );
+    expect(completionIndex).toBeGreaterThanOrEqual(0);
+    expect(
+      events.slice(completionIndex + 1).find(
+        (event) => event.eventType === "plan_execution.node_started",
+      ),
+    ).toBeUndefined();
   });
 
   it("does not let a provider started result overwrite an external blocked result", async () => {
@@ -717,6 +804,59 @@ describe("plan-runner task executor approval flows", () => {
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
     expect(updatedTask.blockReason).toBeNull();
+  });
+
+  it("submits terminal node results before continuing downstream execution", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "done",
+      summary: "Automatic follow-up complete",
+      evidence: { sessionId: "main-session", runId: "run_auto" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner nonblocking node result");
+    const compiledPlan = makeManualThenTaskPlan("graph_nonblocking_node_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const waiting = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(waiting.status).toBe("waiting_for_user");
+    expect(waiting.currentNodeId).toBe("manual_task");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(0);
+
+    const submitted = await taskPlanExecution.submitNodeResult({
+      taskId: task.id,
+      action: {
+        action: "complete_manual_node",
+        summary: "Manual task complete",
+        output: { ok: true },
+        selectedBranch: { label: "continue", nextNodeId: "auto_task", source: "user" },
+      },
+    });
+
+    expect(submitted.status).toBe("running");
+    expect(submitted.currentNodeId).toBeNull();
+    expect(submitted.message).toBe("External result accepted. Continuation pending.");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(0);
+
+    for (let attempt = 0; attempt < 20 && executeTaskNodeCapabilityMock.mock.calls.length === 0; attempt += 1) {
+      if (executeTaskNodeCapabilityMock.mock.calls.length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
+      ["manual_task", "obsolete", undefined],
+      ["manual_task", "current", "Manual task complete"],
+      ["auto_task", "current", "Automatic follow-up complete"],
+    ]);
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.Completed);
   });
 
   it("runs a full plan execution chain through task, user condition, approval, wait, and final task", async () => {

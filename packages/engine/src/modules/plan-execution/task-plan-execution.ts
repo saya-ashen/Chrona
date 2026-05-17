@@ -1,4 +1,4 @@
-import { Prisma, TaskStatus } from "@/generated/prisma/client";
+import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
@@ -43,6 +43,7 @@ import { ConditionNodeExecutor } from "./node-executors/condition-executor";
 import { WaitNodeExecutor } from "./node-executors/wait-executor";
 import { AiRuntimeInvoker } from "./ai-runtime-invoker";
 import { branchBindingForRef } from "./node-runtime-refs";
+import { createLogger } from "@chrona/shared/logger";
 
 type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
 
@@ -62,6 +63,13 @@ export type PlanExecutionRuntimeEvent = {
 type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
 
 const DEFAULT_MAX_STEPS = 10;
+const logger = createLogger("engine.plan-execution");
+const ACTIVE_RUN_STATUSES = [
+  RunStatus.Pending,
+  RunStatus.Running,
+  RunStatus.WaitingForApproval,
+  RunStatus.WaitingForInput,
+] as const;
 
 function createNodeExecutors(input: {
   aiRuntimeInvoker: AiRuntimeInvoker;
@@ -140,6 +148,38 @@ function mapTerminalReasonToStatus(
   return "blocked";
 }
 
+function planRunStatusForExecutionStatus(status: PlanExecutionStatus): PlanRun["status"] {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "running":
+      return "running";
+    case "cancelled":
+      return "cancelled";
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "blocked":
+      return "paused";
+    default:
+      return "pending";
+  }
+}
+
+function graphStatusForExecutionStatus(status: PlanExecutionStatus): PlanGraph["status"] {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "blocked":
+      return "paused";
+    default:
+      return "active";
+  }
+}
+
 async function getRuntimeName(taskId: string): Promise<string> {
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -183,15 +223,25 @@ async function ensureExecutionSession(input: {
   workBlockId?: string | null;
   sessionId?: string;
 }) {
-  const existing = input.sessionId
-    ? await db.executionSession.findUnique({ where: { id: input.sessionId } })
-    : await db.executionSession.findFirst({
+  const explicitSession = input.sessionId
+    ? await db.executionSession.findFirst({
+        where: { id: input.sessionId, taskId: input.taskId },
+      })
+    : null;
+  const candidates = explicitSession
+    ? []
+    : await db.executionSession.findMany({
         where: {
           taskId: input.taskId,
           status: { in: ["Active", "Paused"] },
         },
         orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        take: 10,
       });
+  const existing = explicitSession ??
+    candidates.find((candidate) => candidate.currentNodeId) ??
+    candidates[0] ??
+    null;
 
   if (existing) {
     return db.executionSession.update({
@@ -240,6 +290,46 @@ async function setExecutionSessionState(input: {
           : null,
     },
   });
+}
+
+async function markExecutionNodeActive(input: {
+  taskId: string;
+  sessionId?: string | null;
+  currentNodeId: string | null;
+  completedNodeIds?: string[];
+}) {
+  const now = new Date();
+  const sessionUpdate = input.sessionId
+    ? await db.executionSession.updateMany({
+        where: {
+          id: input.sessionId,
+          status: { notIn: ["Completed", "Abandoned"] },
+        },
+        data: {
+          status: "Active",
+          currentNodeId: input.currentNodeId,
+          pauseReason: null,
+          completedNodeIds: input.completedNodeIds
+            ? JSON.stringify(input.completedNodeIds)
+            : undefined,
+          pausedAt: null,
+          completedAt: null,
+          updatedAt: now,
+        },
+      })
+    : { count: 0 };
+  const taskUpdate = await db.task.updateMany({
+    where: {
+      id: input.taskId,
+      completedAt: null,
+      status: { notIn: [TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled] },
+    },
+    data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
+  });
+
+  if (taskUpdate.count > 0 || sessionUpdate.count > 0) {
+    await rebuildTaskProjection(input.taskId);
+  }
 }
 
 async function ensureNativePlanRun(taskId: string) {
@@ -310,6 +400,10 @@ function buildExecutionResponse(input: {
   };
 }
 
+function completedExecutionNodeIds(effective: EffectivePlanGraph) {
+  return effective.nodes.filter((node) => node.status === "completed").map((node) => node.id);
+}
+
 function errorDetailsFromOutcome(outcome: GraphDispatchOutcome): unknown {
   const failedAttempt = outcome.state.attempts.find((attempt) => attempt.status === "failed" && attempt.error?.details);
   return failedAttempt?.error?.details;
@@ -374,13 +468,16 @@ async function committedStateIfRunningNodeAdvanced(input: {
   });
 }
 
-function buildExecutionResponseFromCommittedState(input: {
+async function convergeExecutionToCommittedState(input: {
   taskId: string;
   planId: string;
   mainSessionId: string;
+  session: ExecutionSessionRow;
+  workspaceId: string;
+  compiledPlan: CompiledPlan;
   committed: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
   fallbackMessage: string;
-}): PlanExecutionResult {
+}): Promise<PlanExecutionResult> {
   if (!input.committed.graph) {
     throw new Error("Plan runtime graph missing");
   }
@@ -391,18 +488,56 @@ function buildExecutionResponseFromCommittedState(input: {
   });
   const status = mapTerminalReasonToStatus(effective);
   const currentNodeId =
-    status === "completed"
-      ? null
-      : currentNodeFromEffective(effective)?.id ??
-        input.committed.attempts.findLast((attempt) => attempt.status === "failed")?.nodeId ??
-        null;
+    currentNodeFromEffective(effective)?.id ??
+    input.committed.attempts.findLast((attempt) => attempt.status === "failed")?.nodeId ??
+    "";
 
-  return buildExecutionResponse({
+  if (status === "completed") {
+    return completeExecution({
+      taskId: input.taskId,
+      planId: input.planId,
+      session: input.session,
+      workspaceId: input.workspaceId,
+      compiledPlan: input.compiledPlan,
+      persisted: input.committed,
+      mainSessionId: input.mainSessionId,
+      effective,
+      executedNodeIds: effective.completedNodeIds,
+      message: input.fallbackMessage,
+    });
+  }
+
+  if (status === "running") {
+    await markExecutionNodeActive({
+      taskId: input.taskId,
+      sessionId: input.session.id,
+      currentNodeId: currentNodeId || null,
+      completedNodeIds: effective.completedNodeIds,
+    });
+    return buildExecutionResponse({
+      taskId: input.taskId,
+      planId: input.planId,
+      mainSessionId: input.mainSessionId,
+      status,
+      effective,
+      currentNodeId: currentNodeId || null,
+      executedNodeIds: effective.completedNodeIds,
+      message: input.fallbackMessage,
+    });
+  }
+
+  return pauseExecution({
     taskId: input.taskId,
     planId: input.planId,
     mainSessionId: input.mainSessionId,
-    status,
+    session: input.session,
     effective,
+    waitKind:
+      status === "waiting_for_user"
+        ? "user_input"
+        : status === "waiting_for_approval"
+          ? "approval"
+          : "manual_action",
     currentNodeId,
     executedNodeIds: effective.completedNodeIds,
     message: input.fallbackMessage,
@@ -433,6 +568,62 @@ async function persistRuntimeState(input: {
   });
 }
 
+async function persistTerminalRuntimeState(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  compiledPlan: CompiledPlan;
+  persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
+  effective: EffectivePlanGraph;
+  status: PlanExecutionStatus;
+}) {
+  const now = new Date().toISOString();
+  const graph = input.persisted.graph
+    ? {
+        ...input.persisted.graph,
+        status: graphStatusForExecutionStatus(input.status),
+        updatedAt: now,
+      }
+    : null;
+  if (!graph) return;
+
+  await savePlanRun({
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    planId: input.planId,
+    run: {
+      ...input.persisted.planRun,
+      status: planRunStatusForExecutionStatus(input.status),
+      nodeStates: Object.fromEntries(
+        input.effective.nodes.map((node) => {
+          const existing = input.persisted.planRun.nodeStates[node.id];
+          const attempts = input.persisted.attempts.filter(
+            (attempt) => attempt.nodeId === node.id,
+          );
+          return [
+            node.id,
+            {
+              ...existing,
+              nodeId: node.id,
+              status: node.status,
+              attempts: attempts.length,
+              ...(node.status === "completed" ? { completedAt: now } : {}),
+              ...(node.status === "running" ? { startedAt: now } : {}),
+            },
+          ];
+        }),
+      ),
+      startedAt: input.persisted.planRun.startedAt ?? now,
+      completedAt: input.status === "completed" ? now : input.persisted.planRun.completedAt,
+    },
+    compiledPlan: input.compiledPlan,
+    graph,
+    attempts: input.persisted.attempts,
+    results: input.persisted.results,
+    executionContextSnapshots: input.persisted.executionContextSnapshots,
+  });
+}
+
 async function pauseExecution(input: {
   taskId: string;
   planId: string;
@@ -450,7 +641,7 @@ async function pauseExecution(input: {
     status: "Paused",
     currentNodeId: input.currentNodeId,
     pauseReason: input.waitKind ?? "manual_action",
-    completedNodeIds: input.effective.completedNodeIds,
+    completedNodeIds: completedExecutionNodeIds(input.effective),
   });
 
   const taskStatus =
@@ -493,16 +684,51 @@ async function pauseExecution(input: {
   });
 }
 
+async function completeActiveRunsForTask(taskId: string) {
+  const now = new Date();
+  await db.run.updateMany({
+    where: {
+      taskId,
+      status: { in: [...ACTIVE_RUN_STATUSES] },
+    },
+    data: {
+      status: RunStatus.Completed,
+      endedAt: now,
+      errorSummary: null,
+      retryable: false,
+      resumeSupported: false,
+      pendingInputPrompt: null,
+      lastSyncedAt: now,
+      syncStatus: "healthy",
+      mappingPartial: false,
+    },
+  });
+}
+
 async function completeExecution(input: {
   taskId: string;
   planId: string;
   session: ExecutionSessionRow;
+  workspaceId?: string;
+  compiledPlan?: CompiledPlan;
+  persisted?: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
   mainSessionId: string;
   effective: EffectivePlanGraph;
   executedNodeIds: string[];
   message: string;
 }) {
   const status = mapTerminalReasonToStatus(input.effective);
+  if (input.workspaceId && input.compiledPlan && input.persisted) {
+    await persistTerminalRuntimeState({
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      planId: input.planId,
+      compiledPlan: input.compiledPlan,
+      persisted: input.persisted,
+      effective: input.effective,
+      status,
+    });
+  }
   await setExecutionSessionState({
     sessionId: input.session.id,
     status: status === "completed" ? "Completed" : "Paused",
@@ -515,8 +741,12 @@ async function completeExecution(input: {
           : status === "blocked"
             ? "manual_action"
             : null,
-    completedNodeIds: input.effective.completedNodeIds,
+    completedNodeIds: completedExecutionNodeIds(input.effective),
   });
+
+  if (status === "completed") {
+    await completeActiveRunsForTask(input.taskId);
+  }
 
   await db.task.update({
     where: { id: input.taskId },
@@ -601,6 +831,7 @@ type AdvanceRuntimeCommand =
       decision?: "approved" | "rejected" | "needs_input" | "completed";
       feedback?: string;
       prompt?: string;
+      continueExecution?: boolean;
     }
   | { type: "block_current_node"; nodeId?: string; reason: string }
   | { type: "fail_current_node"; nodeId?: string; error: string }
@@ -612,6 +843,12 @@ type AdvanceRuntimeCommand =
     }
   | { type: "retry_node"; nodeId: string; reason?: string; userInput?: string }
   | { type: "cancel_session"; reason?: string };
+
+type ExecutionActionWithContinuation =
+  | Exclude<ExecutionActionInput, { action: "complete_manual_node" }>
+  | (Extract<ExecutionActionInput, { action: "complete_manual_node" }> & {
+      continueExecution?: boolean;
+    });
 
 function toGraphExecutionState(
   persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>,
@@ -638,6 +875,9 @@ function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
 }
 
 function currentNodeFromOutcome(outcome: GraphDispatchOutcome): string | null {
+  if (outcome.status === "running" && outcome.currentNodeId === null) {
+    return null;
+  }
   return (
     outcome.currentNodeId ??
     currentNodeFromEffective(outcome.effective as unknown as EffectivePlanGraph)?.id ??
@@ -914,16 +1154,11 @@ async function advancePlanExecution(input: {
     callbacks: {
       onEvent: async (event) => {
         if (event.type === "node_started") {
-          await setExecutionSessionState({
+          await markExecutionNodeActive({
+            taskId: input.taskId,
             sessionId: input.executionSession.id,
-            status: "Active",
             currentNodeId: event.node.id,
           });
-          await db.task.update({
-            where: { id: input.taskId },
-            data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
-          });
-          await rebuildTaskProjection(input.taskId);
         }
         await input.onGraphEvent?.(event);
       },
@@ -1081,6 +1316,7 @@ async function advancePlanExecution(input: {
                       command,
                     }),
                   },
+                  continueExecution: command.continueExecution,
                 }
             : command.type === "block_current_node"
               ? {
@@ -1166,16 +1402,13 @@ async function advancePlanExecution(input: {
     : null;
 
   if (committed) {
-    await appendGraphRuntimeEvents({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      sessionId: input.mainSession.id,
-      events: outcome.events,
-    });
-    return buildExecutionResponseFromCommittedState({
+    return convergeExecutionToCommittedState({
       taskId: input.taskId,
       planId: runtime.planId,
       mainSessionId: input.mainSession.id,
+      session: input.executionSession,
+      workspaceId: runtime.workspaceId,
+      compiledPlan: runtime.compiledPlan,
       committed,
       fallbackMessage: outcome.message,
     });
@@ -1231,6 +1464,9 @@ async function advancePlanExecution(input: {
       taskId: input.taskId,
       planId: runtime.planId,
       session: input.executionSession,
+      workspaceId: runtime.workspaceId,
+      compiledPlan: runtime.compiledPlan,
+      persisted: await getPlanRun(input.taskId, runtime.planId) ?? runtime.persisted,
       mainSessionId: input.mainSession.id,
       effective: outcome.effective as unknown as EffectivePlanGraph,
       executedNodeIds: outcome.executedNodeIds,
@@ -1240,18 +1476,12 @@ async function advancePlanExecution(input: {
 
   if (outcome.status === "running") {
     const currentNodeId = currentNodeFromOutcome(outcome) ?? latestStartedNodeId(outcome.events);
-    await setExecutionSessionState({
+    await markExecutionNodeActive({
+      taskId: input.taskId,
       sessionId: input.executionSession.id,
-      status: "Active",
       currentNodeId,
-      pauseReason: null,
       completedNodeIds: outcome.effective.completedNodeIds,
     });
-    await db.task.update({
-      where: { id: input.taskId },
-      data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
-    });
-    await rebuildTaskProjection(input.taskId);
     return buildExecutionResponse({
       taskId: input.taskId,
       planId: runtime.planId,
@@ -1338,6 +1568,7 @@ async function continuePlanExecution(input: {
   userInput?: string;
   sessionId?: string;
   nodeId?: string;
+  resumeReadyNode?: boolean;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -1395,6 +1626,9 @@ async function continuePlanExecution(input: {
         node.status === "blocked",
     ) ??
     null;
+  const readyNode = input.resumeReadyNode
+    ? effective.nodes.find((node) => node.ready)
+    : null;
 
   return advancePlanExecution({
     taskId: input.taskId,
@@ -1402,7 +1636,7 @@ async function continuePlanExecution(input: {
     mainSession,
     executionSession,
     userInput: input.userInput,
-    forcedNodeId: waitingNode?.id,
+    forcedNodeId: readyNode?.id ?? waitingNode?.id,
     forcedReplaceStatus: "obsolete",
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
@@ -1501,7 +1735,7 @@ async function resumePlanExecutionWithApproval(input: {
 
 async function dispatchExecutionAction(input: {
   taskId: string;
-  action: ExecutionActionInput;
+  action: ExecutionActionWithContinuation;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   switch (input.action.action) {
     case "start_manual":
@@ -1598,6 +1832,7 @@ async function dispatchExecutionAction(input: {
           decision: input.action.decision,
           feedback: input.action.feedback,
           prompt: input.action.prompt,
+          continueExecution: input.action.continueExecution,
         },
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
@@ -1785,6 +2020,40 @@ async function dispatchExecutionAction(input: {
   }
 }
 
+async function submitTerminalNodeResult(input: {
+  taskId: string;
+  action: Extract<ExecutionActionInput, {
+    action: "complete_manual_node" | "block_current_node" | "fail_current_node";
+  }>;
+}): Promise<PlanExecutionResult> {
+  const result = await dispatchExecutionAction({
+    taskId: input.taskId,
+    action: input.action.action === "complete_manual_node"
+      ? { ...input.action, continueExecution: false }
+      : input.action,
+  });
+
+  if (input.action.action === "complete_manual_node" && result.status === "running") {
+    const sessionId = input.action.sessionId;
+    queueMicrotask(() => {
+      void continuePlanExecution({
+        taskId: input.taskId,
+        reason: "terminal_result_continuation",
+        sessionId,
+        resumeReadyNode: true,
+      }).catch((cause) => {
+        logger.error("terminal_result.continuation_failed", {
+          taskId: input.taskId,
+          sessionId: sessionId ?? null,
+          message: cause instanceof Error ? cause.message : String(cause),
+        });
+      });
+    });
+  }
+
+  return result;
+}
+
 async function syncPlanRunRuntimeResult(
   input: SyncPlanRunRuntimeResultInput,
 ): Promise<void> {
@@ -1895,6 +2164,9 @@ async function syncPlanRunRuntimeResult(
         taskId: input.taskId,
         planId: runtime.planId,
         session: executionSession,
+        workspaceId: runtime.workspaceId,
+        compiledPlan: runtime.compiledPlan,
+        persisted: await getPlanRun(input.taskId, runtime.planId) ?? runtime.persisted,
         mainSessionId: mainSession.id,
         effective: outcome.effective as unknown as EffectivePlanGraph,
         executedNodeIds: outcome.executedNodeIds,
@@ -1916,20 +2188,12 @@ async function syncPlanRunRuntimeResult(
   }
 
   if (outcome.status === "running") {
-    if (executionSession) {
-      await setExecutionSessionState({
-        sessionId: executionSession.id,
-        status: "Active",
-        currentNodeId: currentNodeFromOutcome(outcome),
-        pauseReason: null,
-        completedNodeIds: outcome.effective.completedNodeIds,
-      });
-    }
-    await db.task.update({
-      where: { id: input.taskId },
-      data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
+    await markExecutionNodeActive({
+      taskId: input.taskId,
+      sessionId: executionSession?.id,
+      currentNodeId: currentNodeFromOutcome(outcome),
+      completedNodeIds: outcome.effective.completedNodeIds,
     });
-    await rebuildTaskProjection(input.taskId);
     return;
   }
 
@@ -1966,6 +2230,10 @@ export class TaskPlanExecution {
 
   async dispatch(input: Parameters<typeof dispatchExecutionAction>[0]) {
     return dispatchExecutionAction(input);
+  }
+
+  async submitNodeResult(input: Parameters<typeof submitTerminalNodeResult>[0]) {
+    return submitTerminalNodeResult(input);
   }
 
   async syncRuntimeResult(input: Parameters<typeof syncPlanRunRuntimeResult>[0]) {

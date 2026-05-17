@@ -53,6 +53,14 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
     };
   }
 
+  if (input.allNodesDone) {
+    return {
+      label: "Completed",
+      tone: workspaceStateToneByLabel.Completed,
+      guidance: "Review the latest result and artifacts before closing the task.",
+    };
+  }
+
   if (input.isBlocked || input.currentNode?.status === "blocked") {
     return {
       label: "Blocked",
@@ -74,14 +82,6 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
       label: "Running",
       tone: workspaceStateToneByLabel.Running,
       guidance: input.currentNode.nextAction ?? "Monitor current execution progress.",
-    };
-  }
-
-  if (input.allNodesDone) {
-    return {
-      label: "Completed",
-      tone: workspaceStateToneByLabel.Completed,
-      guidance: "Review the latest result and artifacts before closing the task.",
     };
   }
 

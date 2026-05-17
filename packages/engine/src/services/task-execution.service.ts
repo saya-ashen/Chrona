@@ -11,6 +11,14 @@ export function createTaskExecutionService() {
       }
     },
 
+    async submitNodeResult(input: Parameters<typeof taskPlanExecution.submitNodeResult>[0]) {
+      try {
+        return await taskPlanExecution.submitNodeResult(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to submit execution node result");
+      }
+    },
+
     async syncRuntimeResult(input: Parameters<typeof taskPlanExecution.syncRuntimeResult>[0]) {
       try {
         return await taskPlanExecution.syncRuntimeResult(input);
