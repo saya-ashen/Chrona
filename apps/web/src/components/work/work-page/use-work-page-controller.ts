@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
+import type { WorkCopy, WorkPageData } from "./work-page-types";
 import { useWorkPageActions } from "./use-work-page-actions";
 import { useWorkPageProjectionState } from "./use-work-page-projection-state";
 
 export function useWorkPageController(
   initialData: WorkPageData,
-  copy: WorkbenchCopy,
+  copy: WorkCopy,
 ) {
   const [heroErrorMessage, setHeroErrorMessage] = useState<string | null>(null);
   const [resultErrorMessage, setResultErrorMessage] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function useWorkPageController(
     beginRefreshEpoch,
   } = useWorkPageProjectionState(initialData, copy, isPending);
   const {
-    submitWorkbenchInput,
+    submitWorkInput,
     actions,
   } = useWorkPageActions({
     data,
@@ -51,7 +51,7 @@ export function useWorkPageController(
 
     refresh,
     resetComposer,
-    submitWorkbenchInput,
+    submitWorkInput,
     actions,
   };
 }

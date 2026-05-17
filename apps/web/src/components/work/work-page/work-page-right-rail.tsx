@@ -1,10 +1,10 @@
 import { CheckCircle2, Clock3 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { WorkPageSectionFrame } from "./work-page-section-frame";
-import type { WorkbenchCopy } from "./work-page-types";
+import type { WorkCopy } from "./work-page-types";
 
 type WorkPageRightRailProps = {
-  copy: WorkbenchCopy;
+  copy: WorkCopy;
   suggestedAction: string;
   syncLabel: string;
   riskSummary: string;

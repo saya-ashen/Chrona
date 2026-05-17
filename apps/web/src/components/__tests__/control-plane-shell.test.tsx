@@ -31,10 +31,9 @@ vi.mock("@/i18n/client", () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         "nav.brandTitle": "Chrona",
-        "nav.brandTagline": "Human-AI task workbench",
+        "nav.brandTagline": "Human-AI task work",
         "nav.schedule": "Schedule",
         "nav.tasks": "Tasks",
-        "nav.workbench": "Workbench",
         "nav.settings": "Settings",
         "nav.newTask": "New Task",
       };
@@ -48,7 +47,7 @@ import { ControlPlaneShell } from "@/components/control-plane-shell";
 const defaultWorkspace = { id: "ws-1", name: "Default" };
 
 describe("ControlPlaneShell", () => {
-  it("renders simplified navigation with Schedule, Tasks, Workbench, and Settings", () => {
+  it("renders simplified navigation with Schedule, Tasks, and Settings", () => {
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
         <div>Workspace body</div>
@@ -60,7 +59,6 @@ describe("ControlPlaneShell", () => {
     expect(chronaLinks[0]).toHaveAttribute("href", "/en/schedule");
     expect(screen.getAllByRole("link", { name: "Schedule" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/en/tasks");
-    expect(screen.getByRole("link", { name: "Workbench" })).toHaveAttribute("href", "/en/workbench");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/en/settings");
     expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("aria-current", "page");
 

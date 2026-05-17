@@ -16,7 +16,7 @@ import {
   getPassiveHeroGuidance,
   getQuickPrompts,
   getTaskSummary,
-  getWorkbenchComposer,
+  getWorkComposer,
 } from "./work-page/work-page-selectors";
 import type { WorkPageClientProps } from "./work-page/work-page-types";
 
@@ -61,14 +61,14 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     isPending,
     heroErrorMessage,
     composerResetKey,
-    submitWorkbenchInput,
+    submitWorkInput,
     actions,
   } = useWorkPageController(initialData, copy);
 
   const currentRun = data.currentRun;
   const currentException = getCurrentException(data, copy);
   const taskSummary = getTaskSummary(data, copy);
-  const workbenchComposer = getWorkbenchComposer(
+  const workComposer = getWorkComposer(
     currentRun,
     data.currentIntervention,
     data.closure,
@@ -78,17 +78,17 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan, copy);
   const currentPlanStep = data.taskPlan.nodes.find((step) => step.id === data.taskPlan.analytics.activeNodeIds[0]) ?? null;
-  const quickPrompts = workbenchComposer
-    ? getQuickPrompts(workbenchComposer, currentRun, data.currentIntervention, copy)
+  const quickPrompts = workComposer
+    ? getQuickPrompts(workComposer, currentRun, data.currentIntervention, copy)
     : [];
   const passiveHeroGuidance = getPassiveHeroGuidance(currentRun, data.closure, copy);
 
-  const [composerValue, setComposerValue] = useState(workbenchComposer?.defaultValue ?? "");
+  const [composerValue, setComposerValue] = useState(workComposer?.defaultValue ?? "");
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
 
   useEffect(() => {
-    setComposerValue(workbenchComposer?.defaultValue ?? "");
-  }, [workbenchComposer?.defaultValue, workbenchComposer?.mode, currentRun?.id]);
+    setComposerValue(workComposer?.defaultValue ?? "");
+  }, [workComposer?.defaultValue, workComposer?.mode, currentRun?.id]);
 
   const syncLabel = getSyncStatusLabel(data.reliability.syncStatus, copy) ?? copy.noValue;
   const blockerSummary =
@@ -120,7 +120,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const dockSummary =
     data.currentIntervention?.actionLabel ??
     currentPlanStep?.title ??
-    workbenchComposer?.statusHint ??
+    workComposer?.statusHint ??
     passiveHeroGuidance.description;
 
   const [activeTab, setActiveTab] = useState<"latest" | "plan" | "timeline" | "info">("latest");
@@ -162,12 +162,12 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         isComposerExpanded={isComposerExpanded}
         onExpandChange={setIsComposerExpanded}
         dockSummary={dockSummary}
-        workbenchComposer={workbenchComposer}
+        workComposer={workComposer}
         data={data}
         currentStepTitle={currentPlanStep?.title ?? null}
         composerValue={composerValue}
         onComposerChange={setComposerValue}
-        onSubmit={submitWorkbenchInput}
+        onSubmit={submitWorkInput}
         quickPrompts={quickPrompts}
         errorMessage={heroErrorMessage}
         isPending={isPending}

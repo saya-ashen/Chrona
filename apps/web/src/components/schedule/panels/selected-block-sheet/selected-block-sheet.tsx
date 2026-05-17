@@ -68,7 +68,6 @@ export function SelectedBlockSheet({
             item={item}
             locale={locale}
             copy={copy}
-            workLabel={t("common.openWorkbench")}
             onClose={onClose}
           />
 

@@ -337,7 +337,7 @@ export function ScheduleTaskList({
                   </div>
 
                   <div className="flex w-full shrink-0 flex-col gap-2 lg:w-auto lg:min-w-[220px]">
-                    <TaskContextLinks taskId={item.taskId} latestRunStatus={item.latestRunStatus} />
+                    <TaskContextLinks taskId={item.taskId} />
                     <button
                       type="button"
                       disabled={isPending}

@@ -173,7 +173,7 @@ export type WorkPageClientProps = {
   };
 };
 
-export type WorkbenchComposer = {
+export type WorkComposer = {
   mode: "start" | "response" | "note" | "continue" | "retry";
   description: string;
   inputLabel: string;
@@ -184,7 +184,7 @@ export type WorkbenchComposer = {
   submitVariant?: "default" | "outline" | "secondary";
 };
 
-export type WorkbenchCopy = {
+export type WorkCopy = {
   [Key in keyof typeof DEFAULT_WORK_PAGE_COPY]: string;
 };
 export type WorkPageData = WorkPageClientProps["initialData"];

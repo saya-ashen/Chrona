@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { formatDateTime } from "./work-page-formatters";
 import { WorkPageSectionFrame } from "./work-page-section-frame";
-import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
+import type { WorkCopy, WorkPageData } from "./work-page-types";
 
 type NodeViewStatus = "completed" | "running" | "waiting" | "blocked" | "pending";
 
@@ -21,7 +21,7 @@ function getNodeViewStatus(
   return "pending";
 }
 
-function getNodeStatusMeta(status: NodeViewStatus, copy: WorkbenchCopy) {
+function getNodeStatusMeta(status: NodeViewStatus, copy: WorkCopy) {
   switch (status) {
     case "completed":
       return { label: copy.doneStep, tone: "success" as const };
@@ -45,7 +45,7 @@ const bottomTabs = [
 
 type WorkPageMainTabsProps = {
   data: WorkPageData;
-  copy: WorkbenchCopy;
+  copy: WorkCopy;
   currentRunId: string | null;
   activeTab: (typeof bottomTabs)[number]["id"];
   onTabChange: (tab: (typeof bottomTabs)[number]["id"]) => void;

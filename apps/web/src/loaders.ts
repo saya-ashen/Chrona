@@ -8,7 +8,6 @@ import type {
   AppBootData,
   TaskListRouteData,
   TaskPageRouteData,
-  WorkbenchHubRouteData,
   WorkPageRouteData,
 } from "./pages";
 
@@ -54,28 +53,6 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
   const workspaceId = workspace.id;
 
   const result = await apiJson<{ tasks: TaskListRouteData["tasks"]; count: number }>(
-    `${origin}/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`,
-  );
-
-  return {
-    locale,
-    dictionary,
-    tasks: result.tasks,
-    workspaceId,
-  };
-}
-
-export async function loadWorkbenchHubData({ params, request }: LoaderFunctionArgs): Promise<WorkbenchHubRouteData> {
-  const locale = await resolveRouteLocale(params);
-  const dictionary = await getDictionary(locale);
-  const origin = getOrigin(request);
-
-  const workspace = await apiJson<{ id: string }>(
-    `${origin}/api/workspaces/default`,
-  );
-  const workspaceId = workspace.id;
-
-  const result = await apiJson<{ tasks: WorkbenchHubRouteData["tasks"]; count: number }>(
     `${origin}/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`,
   );
 

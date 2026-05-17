@@ -4,7 +4,6 @@ import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import { TaskListPage } from "@/components/tasks/task-list-page";
-import { WorkbenchHubPage } from "@/components/work/workbench-hub-page";
 import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
@@ -51,13 +50,6 @@ export type TaskListRouteData = {
       isRunnable: boolean;
     } | null;
   }[];
-  workspaceId: string;
-};
-
-export type WorkbenchHubRouteData = {
-  locale: Locale;
-  dictionary: Dictionary;
-  tasks: TaskListRouteData["tasks"];
   workspaceId: string;
 };
 
@@ -188,11 +180,6 @@ export function SettingsRoutePage() {
 export function TaskListRoutePage() {
   const { tasks, workspaceId, dictionary } = useLoaderData() as TaskListRouteData;
   return <TaskListPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
-}
-
-export function WorkbenchHubRoutePage() {
-  const { tasks, workspaceId, dictionary } = useLoaderData() as WorkbenchHubRouteData;
-  return <WorkbenchHubPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
 }
 
 export function TaskDetailRoutePage() {

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  PanelRightOpen,
   ExternalLink,
 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -106,7 +105,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId }: Props) {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
         <p className="text-sm text-muted-foreground">
-          Manage all tasks — review status, priority, and open the workbench to advance execution.
+          Manage all tasks — review status, priority, and task details.
         </p>
       </div>
 
@@ -162,18 +161,11 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId }: Props) {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <LocalizedLink
-                  href={`/work/${task.id}`}
-                  className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
-                >
-                  <PanelRightOpen className="size-3.5" />
-                  <span className="hidden sm:inline">Workbench</span>
-                </LocalizedLink>
-                <LocalizedLink
                   href={`/tasks/${task.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
+                  className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shadow-sm" })}
                 >
                   <ExternalLink className="size-3.5" />
-                  <span className="hidden sm:inline">Details</span>
+                  <span>View Details</span>
                 </LocalizedLink>
               </div>
             </div>

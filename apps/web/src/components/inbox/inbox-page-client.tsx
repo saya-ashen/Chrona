@@ -24,9 +24,9 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
             <LocalizedLink href="/schedule" className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
               {copy?.openSchedule ?? "Open Schedule"}
             </LocalizedLink>
-          ) : item.kind === "approval" ? null : (
-            <LocalizedLink href={`/work/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
-              {copy?.openWorkbench ?? "Open Workbench"}
+           ) : item.kind === "approval" ? null : (
+            <LocalizedLink href={`/tasks/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+              {copy?.openTask ?? "Open Task"}
             </LocalizedLink>
           ),
       }))}

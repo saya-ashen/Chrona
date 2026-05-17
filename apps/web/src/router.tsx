@@ -12,7 +12,6 @@ import {
   TaskDetailRoutePage,
   TaskListRoutePage,
   WorkRoutePage,
-  WorkbenchHubRoutePage,
 } from "./pages";
 import { NotFoundPage } from "@/components/not-found-page";
 import {
@@ -20,7 +19,6 @@ import {
   loadTaskListData,
   loadTaskPageData,
   loadWorkPageData,
-  loadWorkbenchHubData,
 } from "./loaders";
 
 function redirectToDefaultLocale(pathname: string, search: string, hash: string) {
@@ -64,11 +62,6 @@ export function createAppRouter() {
           path: "tasks",
           loader: loadTaskListData,
           element: <TaskListRoutePage />,
-        },
-        {
-          path: "workbench",
-          loader: loadWorkbenchHubData,
-          element: <WorkbenchHubRoutePage />,
         },
         {
           path: "settings",
