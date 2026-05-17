@@ -386,6 +386,11 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   Workspace: 'Workspace',
   Task: 'Task',
+  SchedulerLease: 'SchedulerLease',
+  GraphVersion: 'GraphVersion',
+  GraphMutationRecord: 'GraphMutationRecord',
+  ReconciliationEvent: 'ReconciliationEvent',
+  SchedulerEvent: 'SchedulerEvent',
   TaskSession: 'TaskSession',
   TaskDependency: 'TaskDependency',
   TaskPlan: 'TaskPlan',
@@ -421,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
+    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -570,6 +575,376 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TaskCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TaskCountAggregateOutputType> | number
+        }
+      }
+    }
+    SchedulerLease: {
+      payload: Prisma.$SchedulerLeasePayload<ExtArgs>
+      fields: Prisma.SchedulerLeaseFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SchedulerLeaseFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SchedulerLeaseFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        findFirst: {
+          args: Prisma.SchedulerLeaseFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SchedulerLeaseFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        findMany: {
+          args: Prisma.SchedulerLeaseFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>[]
+        }
+        create: {
+          args: Prisma.SchedulerLeaseCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        createMany: {
+          args: Prisma.SchedulerLeaseCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SchedulerLeaseCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>[]
+        }
+        delete: {
+          args: Prisma.SchedulerLeaseDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        update: {
+          args: Prisma.SchedulerLeaseUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        deleteMany: {
+          args: Prisma.SchedulerLeaseDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SchedulerLeaseUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SchedulerLeaseUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>[]
+        }
+        upsert: {
+          args: Prisma.SchedulerLeaseUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerLeasePayload>
+        }
+        aggregate: {
+          args: Prisma.SchedulerLeaseAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSchedulerLease>
+        }
+        groupBy: {
+          args: Prisma.SchedulerLeaseGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SchedulerLeaseGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SchedulerLeaseCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SchedulerLeaseCountAggregateOutputType> | number
+        }
+      }
+    }
+    GraphVersion: {
+      payload: Prisma.$GraphVersionPayload<ExtArgs>
+      fields: Prisma.GraphVersionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GraphVersionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GraphVersionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        findFirst: {
+          args: Prisma.GraphVersionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GraphVersionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        findMany: {
+          args: Prisma.GraphVersionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>[]
+        }
+        create: {
+          args: Prisma.GraphVersionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        createMany: {
+          args: Prisma.GraphVersionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GraphVersionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>[]
+        }
+        delete: {
+          args: Prisma.GraphVersionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        update: {
+          args: Prisma.GraphVersionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        deleteMany: {
+          args: Prisma.GraphVersionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GraphVersionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GraphVersionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>[]
+        }
+        upsert: {
+          args: Prisma.GraphVersionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphVersionPayload>
+        }
+        aggregate: {
+          args: Prisma.GraphVersionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGraphVersion>
+        }
+        groupBy: {
+          args: Prisma.GraphVersionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GraphVersionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GraphVersionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GraphVersionCountAggregateOutputType> | number
+        }
+      }
+    }
+    GraphMutationRecord: {
+      payload: Prisma.$GraphMutationRecordPayload<ExtArgs>
+      fields: Prisma.GraphMutationRecordFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GraphMutationRecordFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GraphMutationRecordFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        findFirst: {
+          args: Prisma.GraphMutationRecordFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GraphMutationRecordFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        findMany: {
+          args: Prisma.GraphMutationRecordFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>[]
+        }
+        create: {
+          args: Prisma.GraphMutationRecordCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        createMany: {
+          args: Prisma.GraphMutationRecordCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GraphMutationRecordCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>[]
+        }
+        delete: {
+          args: Prisma.GraphMutationRecordDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        update: {
+          args: Prisma.GraphMutationRecordUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        deleteMany: {
+          args: Prisma.GraphMutationRecordDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GraphMutationRecordUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GraphMutationRecordUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>[]
+        }
+        upsert: {
+          args: Prisma.GraphMutationRecordUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GraphMutationRecordPayload>
+        }
+        aggregate: {
+          args: Prisma.GraphMutationRecordAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGraphMutationRecord>
+        }
+        groupBy: {
+          args: Prisma.GraphMutationRecordGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GraphMutationRecordGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GraphMutationRecordCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GraphMutationRecordCountAggregateOutputType> | number
+        }
+      }
+    }
+    ReconciliationEvent: {
+      payload: Prisma.$ReconciliationEventPayload<ExtArgs>
+      fields: Prisma.ReconciliationEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ReconciliationEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ReconciliationEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        findFirst: {
+          args: Prisma.ReconciliationEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ReconciliationEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        findMany: {
+          args: Prisma.ReconciliationEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>[]
+        }
+        create: {
+          args: Prisma.ReconciliationEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        createMany: {
+          args: Prisma.ReconciliationEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ReconciliationEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>[]
+        }
+        delete: {
+          args: Prisma.ReconciliationEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        update: {
+          args: Prisma.ReconciliationEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.ReconciliationEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ReconciliationEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ReconciliationEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.ReconciliationEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReconciliationEventPayload>
+        }
+        aggregate: {
+          args: Prisma.ReconciliationEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateReconciliationEvent>
+        }
+        groupBy: {
+          args: Prisma.ReconciliationEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReconciliationEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ReconciliationEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReconciliationEventCountAggregateOutputType> | number
+        }
+      }
+    }
+    SchedulerEvent: {
+      payload: Prisma.$SchedulerEventPayload<ExtArgs>
+      fields: Prisma.SchedulerEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SchedulerEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SchedulerEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        findFirst: {
+          args: Prisma.SchedulerEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SchedulerEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        findMany: {
+          args: Prisma.SchedulerEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>[]
+        }
+        create: {
+          args: Prisma.SchedulerEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        createMany: {
+          args: Prisma.SchedulerEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SchedulerEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>[]
+        }
+        delete: {
+          args: Prisma.SchedulerEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        update: {
+          args: Prisma.SchedulerEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.SchedulerEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SchedulerEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SchedulerEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.SchedulerEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SchedulerEventPayload>
+        }
+        aggregate: {
+          args: Prisma.SchedulerEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSchedulerEvent>
+        }
+        groupBy: {
+          args: Prisma.SchedulerEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SchedulerEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SchedulerEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SchedulerEventCountAggregateOutputType> | number
         }
       }
     }
@@ -2124,6 +2499,79 @@ export const TaskScalarFieldEnum = {
 export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
 
 
+export const SchedulerLeaseScalarFieldEnum = {
+  name: 'name',
+  ownerId: 'ownerId',
+  expiresAt: 'expiresAt',
+  heartbeatAt: 'heartbeatAt',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SchedulerLeaseScalarFieldEnum = (typeof SchedulerLeaseScalarFieldEnum)[keyof typeof SchedulerLeaseScalarFieldEnum]
+
+
+export const GraphVersionScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  version: 'version',
+  graph: 'graph',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt'
+} as const
+
+export type GraphVersionScalarFieldEnum = (typeof GraphVersionScalarFieldEnum)[keyof typeof GraphVersionScalarFieldEnum]
+
+
+export const GraphMutationRecordScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  baseGraphVersion: 'baseGraphVersion',
+  operation: 'operation',
+  status: 'status',
+  payload: 'payload',
+  validationResult: 'validationResult',
+  affectedNodeIds: 'affectedNodeIds',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  appliedAt: 'appliedAt'
+} as const
+
+export type GraphMutationRecordScalarFieldEnum = (typeof GraphMutationRecordScalarFieldEnum)[keyof typeof GraphMutationRecordScalarFieldEnum]
+
+
+export const ReconciliationEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  graphVersion: 'graphVersion',
+  executionState: 'executionState',
+  currentNodeId: 'currentNodeId',
+  issues: 'issues',
+  repairActions: 'repairActions',
+  createdAt: 'createdAt'
+} as const
+
+export type ReconciliationEventScalarFieldEnum = (typeof ReconciliationEventScalarFieldEnum)[keyof typeof ReconciliationEventScalarFieldEnum]
+
+
+export const SchedulerEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  graphVersion: 'graphVersion',
+  eventType: 'eventType',
+  reason: 'reason',
+  payload: 'payload',
+  createdAt: 'createdAt'
+} as const
+
+export type SchedulerEventScalarFieldEnum = (typeof SchedulerEventScalarFieldEnum)[keyof typeof SchedulerEventScalarFieldEnum]
+
+
 export const TaskSessionScalarFieldEnum = {
   id: 'id',
   taskId: 'taskId',
@@ -2572,6 +3020,20 @@ export type EnumTaskPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
 
 
 /**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'GraphMutationStatus'
+ */
+export type EnumGraphMutationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GraphMutationStatus'>
+    
+
+
+/**
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
@@ -2582,13 +3044,6 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
  * Reference to a field of type 'TaskDependencyType'
  */
 export type EnumTaskDependencyTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaskDependencyType'>
-    
-
-
-/**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
     
 
 
@@ -2801,6 +3256,11 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   workspace?: Prisma.WorkspaceOmit
   task?: Prisma.TaskOmit
+  schedulerLease?: Prisma.SchedulerLeaseOmit
+  graphVersion?: Prisma.GraphVersionOmit
+  graphMutationRecord?: Prisma.GraphMutationRecordOmit
+  reconciliationEvent?: Prisma.ReconciliationEventOmit
+  schedulerEvent?: Prisma.SchedulerEventOmit
   taskSession?: Prisma.TaskSessionOmit
   taskDependency?: Prisma.TaskDependencyOmit
   taskPlan?: Prisma.TaskPlanOmit

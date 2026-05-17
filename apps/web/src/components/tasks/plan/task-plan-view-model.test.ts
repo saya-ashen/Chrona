@@ -103,7 +103,7 @@ describe("task-plan-view-model", () => {
     });
   });
 
-  it("uses effective plan runtime status and active labeled edges from read model", () => {
+  it("uses effective plan runtime status and preserves inactive labeled edges from read model", () => {
     const readModel: TaskPlanReadModel = {
       id: "plan-1",
       status: "accepted",
@@ -192,6 +192,12 @@ describe("task-plan-view-model", () => {
         terminalNodeIds: ["task-yes"],
         readyNodeIds: ["task-yes"],
         blockedNodeIds: [],
+        waitingNodeIds: [],
+        waitingForUserNodeIds: [],
+        waitingForApprovalNodeIds: [],
+        degradedNodeIds: [],
+        skippedNodeIds: [],
+        cancelledNodeIds: [],
         completedNodeIds: ["condition-1"],
         runningNodeIds: [],
         invalidatedNodeIds: [],
@@ -202,7 +208,7 @@ describe("task-plan-view-model", () => {
 
     const graphPlan = taskPlanReadModelToGraphPlan(readModel);
 
-    expect(graphPlan?.currentStepId).toBe(null);
+    expect(graphPlan?.currentStepId).toBe("task-yes");
     expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.status).toBe("done");
     expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultOutputs).toEqual([
       { kind: "json", value: { selectedBranch: "是" } },
@@ -219,10 +225,125 @@ describe("task-plan-view-model", () => {
         from: "condition-1",
         to: "task-yes",
         label: "是",
+        active: true,
         kind: "branch_option",
         emphasis: "normal",
       },
+      {
+        id: "edge-no",
+        from: "condition-1",
+        to: "task-no",
+        label: "否",
+        active: false,
+        kind: "branch_option",
+        emphasis: "inactive",
+      },
     ]);
+  });
+
+  it("preserves explicit attention states and current node from effective plan summaries", () => {
+    const readModel: TaskPlanReadModel = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      prompt: null,
+      summary: "Runtime status plan",
+      updatedAt: "2026-05-07T10:00:00.000Z",
+      generatedBy: "ai",
+      blueprint: {
+        title: "Runtime status plan",
+        goal: "Expose explicit node status",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan,
+      effectivePlan: {
+        graphId: "graph-1",
+        planId: "plan-1",
+        basePlanId: "compiled-plan-1",
+        resolvedAt: "2026-05-07T10:00:00.000Z",
+        resolvedVersion: 3,
+        nodes: [
+          {
+            id: "approval",
+            nodeId: "approval",
+            activeLayerId: null,
+            semanticKey: "approval",
+            localId: "approval_local",
+            type: "checkpoint",
+            title: "Approve launch",
+            definition: { title: "Approve launch", objective: "Approve launch", semantics: { type: "checkpoint" } },
+            config: { checkpointType: "approve", prompt: "Approve launch?", required: true },
+            dependencies: [],
+            dependents: [],
+            status: "waiting_for_approval",
+            invalidated: false,
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: false,
+            reachable: true,
+            blockedReason: "Approval required",
+          },
+          {
+            id: "sync",
+            nodeId: "sync",
+            activeLayerId: null,
+            semanticKey: "sync",
+            localId: "sync_local",
+            type: "task",
+            title: "Sync runtime",
+            definition: { title: "Sync runtime", objective: "Sync runtime", semantics: { type: "task" } },
+            config: { expectedOutput: "Runtime synced" },
+            dependencies: ["approval"],
+            dependents: [],
+            status: "degraded",
+            invalidated: false,
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: false,
+            ready: false,
+            reachable: true,
+            lastError: "Runtime sync timed out",
+          },
+        ],
+        edges: [{ id: "approval-sync", from: "approval", to: "sync", active: true }],
+        entryNodeIds: ["approval"],
+        terminalNodeIds: ["sync"],
+        readyNodeIds: [],
+        blockedNodeIds: [],
+        waitingNodeIds: ["approval"],
+        waitingForUserNodeIds: [],
+        waitingForApprovalNodeIds: ["approval"],
+        degradedNodeIds: ["sync"],
+        skippedNodeIds: [],
+        cancelledNodeIds: [],
+        completedNodeIds: [],
+        runningNodeIds: [],
+        invalidatedNodeIds: [],
+        failedNodeIds: [],
+        pendingNodeIds: [],
+      },
+    };
+
+    const graphPlan = taskPlanReadModelToGraphPlan(readModel);
+
+    expect(graphPlan?.currentStepId).toBe("approval");
+    expect(graphPlan?.steps.find((step) => step.id === "approval")).toMatchObject({
+      status: "waiting_for_approval",
+      readiness: "blocked",
+      blocked: true,
+      actionable: true,
+    });
+    expect(graphPlan?.steps.find((step) => step.id === "sync")).toMatchObject({
+      status: "degraded",
+      readiness: "blocked",
+      blocked: true,
+      actionable: true,
+    });
+    expect(graphPlan?.analytics.attentionNodeIds).toEqual(["approval", "sync"]);
+    expect(graphPlan?.analytics.blockedNodeIds).toEqual(["approval", "sync"]);
   });
 
   it("keeps completed input checkpoints read-only while preserving fields for display", () => {
@@ -286,6 +407,12 @@ describe("task-plan-view-model", () => {
         terminalNodeIds: ["input-1"],
         readyNodeIds: [],
         blockedNodeIds: [],
+        waitingNodeIds: [],
+        waitingForUserNodeIds: [],
+        waitingForApprovalNodeIds: [],
+        degradedNodeIds: [],
+        skippedNodeIds: [],
+        cancelledNodeIds: [],
         completedNodeIds: ["input-1"],
         runningNodeIds: [],
         invalidatedNodeIds: [],
@@ -383,6 +510,12 @@ describe("task-plan-view-model", () => {
         terminalNodeIds: ["condition-1"],
         readyNodeIds: [],
         blockedNodeIds: [],
+        waitingNodeIds: [],
+        waitingForUserNodeIds: [],
+        waitingForApprovalNodeIds: [],
+        degradedNodeIds: [],
+        skippedNodeIds: ["task-yes"],
+        cancelledNodeIds: [],
         completedNodeIds: ["condition-1", "task-yes"],
         runningNodeIds: [],
         invalidatedNodeIds: [],
@@ -394,7 +527,17 @@ describe("task-plan-view-model", () => {
     const graphPlan = taskPlanReadModelToGraphPlan(readModel);
 
     expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.status).toBe("skipped");
+    expect(graphPlan?.edges).toContainEqual({
+      id: "edge-yes",
+      from: "condition-1",
+      to: "task-yes",
+      label: "是",
+      active: false,
+      kind: "branch_option",
+      emphasis: "inactive",
+    });
     expect(graphPlan?.analytics.entryNodeIds).toEqual(["condition-1"]);
     expect(graphPlan?.analytics.entryNodeIds).not.toContain("task-yes");
+    expect(graphPlan?.analytics.terminalNodeIds).toEqual(["condition-1"]);
   });
 });

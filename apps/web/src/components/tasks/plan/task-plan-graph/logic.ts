@@ -5,15 +5,17 @@ import type {
   NodeLegendItem,
   NodeShape,
   NodeTone,
+  PlanEdgeEmphasis,
   PlanEdgeKind,
   PlanNodeDataModel,
 } from "./types";
 
 export function getNodeTone(node: PlanNodeDataModel): NodeTone {
-  if (node.status === "blocked") return "blocked";
+  if (node.status === "blocked" || node.status === "failed" || node.status === "degraded") return "blocked";
   if (node.status === "active" || node.status === "in_progress") return "active";
-  if (node.status === "waiting" || node.status === "waiting_for_user") return "attention";
-  if (node.status === "done" || node.status === "completed" || node.status === "skipped") return "done";
+  if (node.status === "waiting" || node.status === "waiting_for_user" || node.status === "waiting_for_approval") return "attention";
+  if (node.status === "skipped") return "skipped";
+  if (node.status === "done" || node.status === "completed" || node.status === "cancelled" || node.status === "invalidated") return "done";
   if (node.status === "ready") return "upcoming";
   return "idle";
 }
@@ -49,6 +51,13 @@ export const TONE_STYLES: Record<
     ring: "ring-slate-300/30",
     dot: "bg-slate-400",
     text: "text-slate-800 dark:text-slate-100",
+  },
+  skipped: {
+    border: "border-slate-300/45 border-dashed",
+    bg: "bg-slate-100/62 dark:bg-slate-900/28",
+    ring: "ring-slate-300/18",
+    dot: "bg-slate-400/55",
+    text: "text-slate-600 dark:text-slate-300",
   },
   upcoming: {
     border: "border-violet-400/38",
@@ -116,8 +125,9 @@ export function interactionLabel(
 
 function edgeStroke(
   kind: PlanEdgeKind,
-  emphasis: "normal" | "active" | "blocked",
+  emphasis: PlanEdgeEmphasis,
 ) {
+  if (emphasis === "inactive") return "rgba(100, 116, 139, 0.44)";
   if (emphasis === "blocked") return "rgba(225, 29, 72, 0.72)";
   if (emphasis === "active") return "rgba(14, 165, 233, 0.82)";
   switch (kind) {
@@ -136,7 +146,8 @@ function edgeStroke(
   }
 }
 
-export function edgeDash(kind: PlanEdgeKind) {
+export function edgeDash(kind: PlanEdgeKind, emphasis: PlanEdgeEmphasis = "normal") {
+  if (emphasis === "inactive") return "3 6";
   if (kind === "dependency") return "7 4";
   if (kind === "resume") return "4 4";
   return undefined;
@@ -144,8 +155,9 @@ export function edgeDash(kind: PlanEdgeKind) {
 
 export function edgeWidth(
   kind: PlanEdgeKind,
-  emphasis: "normal" | "active" | "blocked",
+  emphasis: PlanEdgeEmphasis,
 ) {
+  if (emphasis === "inactive") return 1.45;
   if (emphasis !== "normal") return 2.1;
   if (kind === "sequential") return 1.55;
   return 1.35;
@@ -153,12 +165,12 @@ export function edgeWidth(
 
 export function buildEdgeStyle(
   kind: PlanEdgeKind,
-  emphasis: "normal" | "active" | "blocked",
+  emphasis: PlanEdgeEmphasis,
 ) {
   return {
     stroke: edgeStroke(kind, emphasis),
     strokeWidth: edgeWidth(kind, emphasis),
-    strokeDasharray: edgeDash(kind),
+    strokeDasharray: edgeDash(kind, emphasis),
   };
 }
 
@@ -184,6 +196,12 @@ export function buildEdgeLegend(graphCopy: GraphCopy): EdgeLegendItem[] {
       label: graphCopy.edgeBranch,
       stroke: edgeStroke("branch_option", "normal"),
       width: 1.8,
+    },
+    {
+      label: graphCopy.statusSkipped,
+      stroke: edgeStroke("branch_option", "inactive"),
+      dash: edgeDash("branch_option", "inactive"),
+      width: 1.6,
     },
     {
       label: graphCopy.statusBlocked,
@@ -218,6 +236,7 @@ export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
     { label: graphCopy.statusReady, shape: "rounded", tone: "upcoming" },
     { label: graphCopy.statusBlocked, shape: "diamond", tone: "blocked" },
     { label: graphCopy.statusDone, shape: "pill", tone: "done" },
+    { label: graphCopy.statusSkipped, shape: "rounded", tone: "skipped" },
   ];
 }
 

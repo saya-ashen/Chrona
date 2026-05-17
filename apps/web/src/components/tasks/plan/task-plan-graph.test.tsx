@@ -350,6 +350,7 @@ describe("TaskPlanGraph", () => {
     expect(legend).toHaveTextContent("检查点");
     expect(legend).toHaveTextContent("条件判断");
     expect(legend).toHaveTextContent("等待");
+    expect(legend).toHaveTextContent("已跳过");
     expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
@@ -661,6 +662,41 @@ describe("TaskPlanGraph", () => {
     expect(approval?.position.y).not.toBeCloseTo(left?.position.y ?? 0, 0);
     expect(approval?.position.y).not.toBeCloseTo(right?.position.y ?? 0, 0);
     expect(layout.contentWidth).toBeGreaterThan(360);
+  });
+
+  it("keeps inactive condition branches visible as skipped paths", () => {
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "branch-selected",
+      steps: [
+        { id: "choice", title: "Choose path", objective: "Pick branch", phase: "decision", status: "done", type: "condition", displayType: "condition" },
+        { id: "branch-selected", title: "Selected branch", objective: "Run this path", phase: "run", status: "active", type: "task", displayType: "task", reachable: true },
+        { id: "branch-skipped", title: "Skipped branch", objective: "Not selected", phase: "skip", status: "skipped", type: "task", displayType: "task", reachable: false },
+      ],
+      edges: [
+        { id: "edge-selected", fromNodeId: "choice", toNodeId: "branch-selected", kind: "branch_option", label: "是", active: true },
+        { id: "edge-skipped", fromNodeId: "choice", toNodeId: "branch-skipped", kind: "branch_option", label: "否", active: false, emphasis: "inactive" },
+      ],
+    });
+    plan.analytics.reachableFromActiveIds = ["choice", "branch-selected"];
+
+    const layout = buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+    const edgeById = new Map(layout.edges.map((edge) => [edge.id, edge]));
+    const skippedEdge = edgeById.get("edge-skipped");
+    const skippedNode = layout.nodes.find((node) => node.id === "branch-skipped");
+
+    expect(skippedEdge).toBeDefined();
+    expect(skippedEdge?.animated).toBe(false);
+    expect(skippedEdge?.style?.strokeDasharray).toBe("3 6");
+    expect(skippedEdge?.style?.opacity).toBe(0.58);
+    expect(skippedEdge?.zIndex).toBe(3);
+    expect(skippedNode?.data.tone).toBe("skipped");
+    expect(skippedNode?.style?.opacity).toBe(0.48);
   });
 
   it("switches mostly linear plans to horizontal layout with side handles", () => {

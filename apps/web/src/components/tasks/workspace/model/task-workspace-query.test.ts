@@ -84,7 +84,9 @@ describe("task workspace execution console view model", () => {
     expect(mapTaskWorkspaceStatus("done")).toBe("completed");
     expect(mapTaskWorkspaceStatus("in_progress")).toBe("running");
     expect(mapTaskWorkspaceStatus("waiting_for_user")).toBe("approval-needed");
+    expect(mapTaskWorkspaceStatus("waiting_for_approval")).toBe("approval-needed");
     expect(mapTaskWorkspaceStatus("blocked")).toBe("blocked");
+    expect(mapTaskWorkspaceStatus("degraded")).toBe("blocked");
     expect(mapTaskWorkspaceStatus("ready")).toBe("waiting");
   });
 
@@ -246,6 +248,49 @@ describe("task workspace execution console view model", () => {
       expect.objectContaining({ id: "artifact-artifact-1", description: "Artifact markdown" }),
       expect.objectContaining({ id: "node-input", description: "waiting_for_user" }),
     ]));
+  });
+
+  it("uses orchestrator execution summary for primary workspace state", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Ready",
+          executionSummary: {
+            taskId: "task-1",
+            executionState: "degraded",
+            stateLabel: "Degraded",
+            stateReason: "Runtime sync timed out",
+            graphVersion: 2,
+            currentNodeId: "sync",
+            primaryAction: { type: "retry_sync", label: "Retry sync", enabled: true },
+            progress: { completed: 1, total: 2, percent: 50 },
+            readiness: { runnable: false, reason: "Runtime sync timed out" },
+            degraded: { reason: "Runtime sync timed out", retryAt: null },
+            blocking: null,
+            waiting: null,
+            recoveryActions: [{ type: "retry_sync", label: "Retry sync", enabled: true }],
+          },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "prepare", status: "done" }),
+        node({ id: "sync", status: "degraded", nextAction: "Retry sync" }),
+      ], "sync"),
+    });
+
+    expect(view.header).toMatchObject({
+      status: "blocked",
+      primaryStateLabel: "Degraded",
+      primaryActionLabel: "Retry sync",
+      currentNodeId: "sync",
+    });
+    expect(view.states.treatment).toMatchObject({ label: "Degraded", tone: "critical", guidance: "Retry sync" });
+    expect(view.attention).toMatchObject({ title: "Needs handling", tone: "critical", actionNodeId: "sync" });
+    expect(view.executionFlow.nodes.find((item) => item.id === "sync")).toMatchObject({
+      status: "blocked",
+      requiresHumanAction: true,
+    });
   });
 
   it("covers shared fixture states for empty, blocked, review, completed, failed, idle, loading, artifact, stale, and permission-limited workspaces", () => {

@@ -5,7 +5,8 @@ import { getShapeClassName, nodeKindLabel, TONE_STYLES } from "./logic";
 import type { FlowGraphNode } from "./types";
 
 function resolveExecutionStatus(node: FlowGraphNode["data"]["node"]) {
-  if (node.status === "done" || node.status === "completed" || node.status === "skipped") return "completed";
+  if (node.status === "skipped") return "skipped";
+  if (node.status === "done" || node.status === "completed") return "completed";
   if (node.status === "active" || node.status === "in_progress") return "running";
   if (node.status === "waiting_for_user" || node.interactionType === "approve" || node.requiresHumanInput) return "approval-needed";
   if (node.status === "blocked") return "blocked";
@@ -55,6 +56,15 @@ function resolveInteractionFrame(node: FlowGraphNode["data"]["node"]) {
 }
 
 function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
+  if (node.status === "skipped") {
+      return {
+        label: node.statusLabel ?? "Skipped",
+        badge: "bg-slate-500/78 text-white",
+        ring: "ring-1 ring-slate-300/28",
+        glow: "bg-transparent",
+      };
+  }
+
   if (node.interactionType === "execute" || node.status === "ready") {
       return {
         label: "Ready",

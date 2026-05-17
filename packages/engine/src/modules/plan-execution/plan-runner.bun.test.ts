@@ -306,7 +306,7 @@ describe("plan-runner native execution actions", () => {
     expect(resumed.status).toBe("blocked");
     expect(resumed.currentNodeId).toBe("cond_system");
     expect(resumed.executedNodeIds).toContain("cond_user");
-    expect(resumed.blockedNodeIds).toContain("cond_system");
+    expect(resumed.waitingNodeIds).toContain("cond_system");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
@@ -472,7 +472,7 @@ describe("plan-runner native execution actions", () => {
 
     expect(retried.status).toBe("blocked");
     expect(retried.currentNodeId).toBe("cond_blocked");
-    expect(retried.blockedNodeIds).toContain("cond_blocked");
+    expect(retried.waitingNodeIds).toContain("cond_blocked");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
@@ -529,7 +529,7 @@ describe("plan-runner native execution actions", () => {
       action: { action: "start_manual" },
     });
     expect(blocked.status).toBe("blocked");
-    expect(blocked.blockedNodeIds).toContain("cond_blocked");
+    expect(blocked.waitingNodeIds).toContain("cond_blocked");
 
     const blockedTask = await db.task.findUniqueOrThrow({ where: { id: blockedFlow.task.id } });
     expect(blockedTask.status).toBe(TaskStatus.Blocked);

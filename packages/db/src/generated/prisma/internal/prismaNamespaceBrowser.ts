@@ -53,6 +53,11 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Workspace: 'Workspace',
   Task: 'Task',
+  SchedulerLease: 'SchedulerLease',
+  GraphVersion: 'GraphVersion',
+  GraphMutationRecord: 'GraphMutationRecord',
+  ReconciliationEvent: 'ReconciliationEvent',
+  SchedulerEvent: 'SchedulerEvent',
   TaskSession: 'TaskSession',
   TaskDependency: 'TaskDependency',
   TaskPlan: 'TaskPlan',
@@ -121,6 +126,79 @@ export const TaskScalarFieldEnum = {
 } as const
 
 export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
+export const SchedulerLeaseScalarFieldEnum = {
+  name: 'name',
+  ownerId: 'ownerId',
+  expiresAt: 'expiresAt',
+  heartbeatAt: 'heartbeatAt',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SchedulerLeaseScalarFieldEnum = (typeof SchedulerLeaseScalarFieldEnum)[keyof typeof SchedulerLeaseScalarFieldEnum]
+
+
+export const GraphVersionScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  version: 'version',
+  graph: 'graph',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt'
+} as const
+
+export type GraphVersionScalarFieldEnum = (typeof GraphVersionScalarFieldEnum)[keyof typeof GraphVersionScalarFieldEnum]
+
+
+export const GraphMutationRecordScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  baseGraphVersion: 'baseGraphVersion',
+  operation: 'operation',
+  status: 'status',
+  payload: 'payload',
+  validationResult: 'validationResult',
+  affectedNodeIds: 'affectedNodeIds',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  appliedAt: 'appliedAt'
+} as const
+
+export type GraphMutationRecordScalarFieldEnum = (typeof GraphMutationRecordScalarFieldEnum)[keyof typeof GraphMutationRecordScalarFieldEnum]
+
+
+export const ReconciliationEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  graphVersion: 'graphVersion',
+  executionState: 'executionState',
+  currentNodeId: 'currentNodeId',
+  issues: 'issues',
+  repairActions: 'repairActions',
+  createdAt: 'createdAt'
+} as const
+
+export type ReconciliationEventScalarFieldEnum = (typeof ReconciliationEventScalarFieldEnum)[keyof typeof ReconciliationEventScalarFieldEnum]
+
+
+export const SchedulerEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  graphVersion: 'graphVersion',
+  eventType: 'eventType',
+  reason: 'reason',
+  payload: 'payload',
+  createdAt: 'createdAt'
+} as const
+
+export type SchedulerEventScalarFieldEnum = (typeof SchedulerEventScalarFieldEnum)[keyof typeof SchedulerEventScalarFieldEnum]
 
 
 export const TaskSessionScalarFieldEnum = {

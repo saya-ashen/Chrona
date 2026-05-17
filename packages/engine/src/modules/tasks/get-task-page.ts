@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
+import { reconcileTaskState } from "@/modules/orchestration/reconcile-task-state";
 import {
   getRuntimeTaskConfigSpec,
   listExecutionRuntimes,
@@ -84,6 +85,14 @@ export async function getTaskPage(taskId: string) {
     executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
     executionConfig: task.executionConfig,
   });
+  const orchestratorState = savedPlan?.effectivePlan
+    ? reconcileTaskState({
+        taskId,
+        graph: savedPlan.effectivePlan,
+        runnable: runnability.isRunnable,
+        readinessReason: runnability.summary,
+      })
+    : null;
 
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
@@ -118,7 +127,10 @@ export async function getTaskPage(taskId: string) {
         dependencyType: dependency.dependencyType,
         dependsOnTask: dependency.dependsOnTask,
       })),
+      executionSummary: orchestratorState?.summary ?? null,
+      graphNodeStates: orchestratorState?.nodes ?? [],
     },
+    reconciliation: orchestratorState?.reconciliation ?? null,
     latestRunSummary: latestRun
       ? {
           id: latestRun.id,

@@ -35,11 +35,16 @@ export const taskWorkspaceQueryKeys = {
 };
 
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
-  return status === "done" || status === "completed" || status === "skipped";
+  return status === "done" || status === "completed" || status === "skipped" || status === "cancelled" || status === "invalidated";
 }
 
 function isAttentionStatus(status: PlanNodeDataModel["status"]) {
-  return status === "waiting" || status === "waiting_for_user" || status === "blocked";
+  return status === "waiting"
+    || status === "waiting_for_user"
+    || status === "waiting_for_approval"
+    || status === "blocked"
+    || status === "failed"
+    || status === "degraded";
 }
 
 function deriveTaskStatusFromGraph(
@@ -53,11 +58,11 @@ function deriveTaskStatusFromGraph(
     return "Running";
   }
 
-  if (nodes.some((node) => node.status === "waiting_for_user")) {
+  if (nodes.some((node) => node.status === "waiting_for_user" || node.status === "waiting_for_approval")) {
     return "WaitingForInput";
   }
 
-  if (nodes.some((node) => node.status === "blocked")) {
+  if (nodes.some((node) => node.status === "blocked" || node.status === "failed" || node.status === "degraded")) {
     return "Blocked";
   }
 
@@ -80,10 +85,10 @@ function buildWorkspaceMemberContext(pageData: TaskPageData, hasAttention: boole
 }
 
 export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {
-  if (["done", "completed", "skipped", "Done", "Completed"].includes(status)) return "completed";
+  if (["done", "completed", "skipped", "cancelled", "invalidated", "Done", "Completed", "Cancelled"].includes(status)) return "completed";
   if (["active", "in_progress", "running", "Running"].includes(status)) return "running";
-  if (["waiting_for_user", "WaitingForInput", "WaitingForApproval"].includes(status)) return "approval-needed";
-  if (["blocked", "Blocked", "Failed"].includes(status)) return "blocked";
+  if (["waiting_for_user", "waiting_for_approval", "WaitingForInput", "WaitingForApproval"].includes(status)) return "approval-needed";
+  if (["blocked", "failed", "degraded", "Blocked", "Failed", "Degraded"].includes(status)) return "blocked";
   return "waiting";
 }
 
@@ -93,7 +98,7 @@ export function isTaskWorkspaceAttentionStatus(status: PlanNodeDataModel["status
 
 function overviewToneForNode(node: PlanNodeDataModel | null): ExecutionOverviewTone {
   if (!node) return "neutral";
-  if (node.status === "blocked") return "critical";
+  if (node.status === "blocked" || node.status === "failed" || node.status === "degraded") return "critical";
   if (isAttentionStatus(node.status)) return "warning";
   if (isDoneStatus(node.status)) return "success";
   if (node.status === "active" || node.status === "in_progress" || node.status === "ready") return "info";
@@ -320,7 +325,9 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
 
 function buildTaskHeaderView(pageData: TaskPageData, progress: ProgressSummary, hasAttention: boolean): TaskHeaderView {
   const memberContext = buildWorkspaceMemberContext(pageData, hasAttention);
-  const workspaceStatus = mapTaskWorkspaceStatus(pageData.task.status);
+  const workspaceStatus = pageData.task.executionSummary
+    ? mapTaskWorkspaceStatus(pageData.task.executionSummary.executionState)
+    : mapTaskWorkspaceStatus(pageData.task.status);
   const hasPlan = progress.totalSteps > 0 || Boolean(pageData.task.savedPlan);
   const cannotStartReason = !hasPlan
     ? "Generate and accept a plan before starting execution."
@@ -350,6 +357,9 @@ function buildTaskHeaderView(pageData: TaskPageData, progress: ProgressSummary, 
       { id: "more", label: "More actions" },
     ],
     memberContext,
+    primaryStateLabel: pageData.task.executionSummary?.stateLabel,
+    primaryActionLabel: pageData.task.executionSummary?.primaryAction.label ?? null,
+    currentNodeId: pageData.task.executionSummary?.currentNodeId ?? null,
   };
 }
 

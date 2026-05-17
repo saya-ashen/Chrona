@@ -11,9 +11,14 @@ export type PlanNodeStatus =
   | "in_progress"
   | "waiting"
   | "waiting_for_user"
+  | "waiting_for_approval"
   | "blocked"
+  | "failed"
+  | "degraded"
   | "done"
   | "completed"
+  | "cancelled"
+  | "invalidated"
   | "skipped";
 
 export type PlanNodeIntent =
@@ -43,6 +48,8 @@ export type PlanEdgeKind =
   | "branch_false"
   | "branch_option"
   | "resume";
+
+export type PlanEdgeEmphasis = "normal" | "active" | "blocked" | "inactive";
 
 export type PlanNodeField = {
   key: string;
@@ -110,7 +117,8 @@ export type PlanEdgeDataModel = {
   type?: string;
   kind?: PlanEdgeKind;
   label?: string | null;
-  emphasis?: "normal" | "active" | "blocked";
+  active?: boolean;
+  emphasis?: PlanEdgeEmphasis;
 };
 
 export type PlanGraphAnalytics = {
@@ -161,6 +169,7 @@ export type NodeTone =
   | "attention"
   | "blocked"
   | "done"
+  | "skipped"
   | "upcoming"
   | "idle";
 

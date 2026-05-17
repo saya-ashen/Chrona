@@ -279,6 +279,10 @@ export type TaskWhereInput = {
   taskPlans?: Prisma.TaskPlanListRelationFilter
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
+  graphVersions?: Prisma.GraphVersionListRelationFilter
+  graphMutations?: Prisma.GraphMutationRecordListRelationFilter
+  reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
+  schedulerEvents?: Prisma.SchedulerEventListRelationFilter
 }
 
 export type TaskOrderByWithRelationInput = {
@@ -315,6 +319,10 @@ export type TaskOrderByWithRelationInput = {
   taskPlans?: Prisma.TaskPlanOrderByRelationAggregateInput
   taskPlanRuns?: Prisma.TaskPlanRunOrderByRelationAggregateInput
   taskPlanLayers?: Prisma.TaskPlanLayerOrderByRelationAggregateInput
+  graphVersions?: Prisma.GraphVersionOrderByRelationAggregateInput
+  graphMutations?: Prisma.GraphMutationRecordOrderByRelationAggregateInput
+  reconciliationEvents?: Prisma.ReconciliationEventOrderByRelationAggregateInput
+  schedulerEvents?: Prisma.SchedulerEventOrderByRelationAggregateInput
 }
 
 export type TaskWhereUniqueInput = Prisma.AtLeast<{
@@ -354,6 +362,10 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   taskPlans?: Prisma.TaskPlanListRelationFilter
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
+  graphVersions?: Prisma.GraphVersionListRelationFilter
+  graphMutations?: Prisma.GraphMutationRecordListRelationFilter
+  reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
+  schedulerEvents?: Prisma.SchedulerEventListRelationFilter
 }, "id">
 
 export type TaskOrderByWithAggregationInput = {
@@ -433,6 +445,10 @@ export type TaskCreateInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateInput = {
@@ -468,6 +484,10 @@ export type TaskUncheckedCreateInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUpdateInput = {
@@ -503,6 +523,10 @@ export type TaskUpdateInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateInput = {
@@ -538,6 +562,10 @@ export type TaskUncheckedUpdateInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyInput = {
@@ -721,6 +749,62 @@ export type EnumTaskPriorityFieldUpdateOperationsInput = {
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
+}
+
+export type TaskCreateNestedOneWithoutGraphVersionsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutGraphVersionsInput, Prisma.TaskUncheckedCreateWithoutGraphVersionsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutGraphVersionsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutGraphVersionsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutGraphVersionsInput, Prisma.TaskUncheckedCreateWithoutGraphVersionsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutGraphVersionsInput
+  upsert?: Prisma.TaskUpsertWithoutGraphVersionsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutGraphVersionsInput, Prisma.TaskUpdateWithoutGraphVersionsInput>, Prisma.TaskUncheckedUpdateWithoutGraphVersionsInput>
+}
+
+export type TaskCreateNestedOneWithoutGraphMutationsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutGraphMutationsInput, Prisma.TaskUncheckedCreateWithoutGraphMutationsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutGraphMutationsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutGraphMutationsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutGraphMutationsInput, Prisma.TaskUncheckedCreateWithoutGraphMutationsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutGraphMutationsInput
+  upsert?: Prisma.TaskUpsertWithoutGraphMutationsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutGraphMutationsInput, Prisma.TaskUpdateWithoutGraphMutationsInput>, Prisma.TaskUncheckedUpdateWithoutGraphMutationsInput>
+}
+
+export type TaskCreateNestedOneWithoutReconciliationEventsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutReconciliationEventsInput, Prisma.TaskUncheckedCreateWithoutReconciliationEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutReconciliationEventsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutReconciliationEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutReconciliationEventsInput, Prisma.TaskUncheckedCreateWithoutReconciliationEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutReconciliationEventsInput
+  upsert?: Prisma.TaskUpsertWithoutReconciliationEventsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutReconciliationEventsInput, Prisma.TaskUpdateWithoutReconciliationEventsInput>, Prisma.TaskUncheckedUpdateWithoutReconciliationEventsInput>
+}
+
+export type TaskCreateNestedOneWithoutSchedulerEventsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutSchedulerEventsInput, Prisma.TaskUncheckedCreateWithoutSchedulerEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutSchedulerEventsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutSchedulerEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutSchedulerEventsInput, Prisma.TaskUncheckedCreateWithoutSchedulerEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutSchedulerEventsInput
+  upsert?: Prisma.TaskUpsertWithoutSchedulerEventsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutSchedulerEventsInput, Prisma.TaskUpdateWithoutSchedulerEventsInput>, Prisma.TaskUncheckedUpdateWithoutSchedulerEventsInput>
 }
 
 export type TaskCreateNestedOneWithoutSessionsInput = {
@@ -981,6 +1065,10 @@ export type TaskCreateWithoutWorkspaceInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkspaceInput = {
@@ -1015,6 +1103,10 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkspaceInput = {
@@ -1064,6 +1156,678 @@ export type TaskScalarWhereInput = {
   completedAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
 }
 
+export type TaskCreateWithoutGraphVersionsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutGraphVersionsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutGraphVersionsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutGraphVersionsInput, Prisma.TaskUncheckedCreateWithoutGraphVersionsInput>
+}
+
+export type TaskUpsertWithoutGraphVersionsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutGraphVersionsInput, Prisma.TaskUncheckedUpdateWithoutGraphVersionsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutGraphVersionsInput, Prisma.TaskUncheckedCreateWithoutGraphVersionsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutGraphVersionsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutGraphVersionsInput, Prisma.TaskUncheckedUpdateWithoutGraphVersionsInput>
+}
+
+export type TaskUpdateWithoutGraphVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutGraphMutationsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutGraphMutationsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutGraphMutationsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutGraphMutationsInput, Prisma.TaskUncheckedCreateWithoutGraphMutationsInput>
+}
+
+export type TaskUpsertWithoutGraphMutationsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutGraphMutationsInput, Prisma.TaskUncheckedUpdateWithoutGraphMutationsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutGraphMutationsInput, Prisma.TaskUncheckedCreateWithoutGraphMutationsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutGraphMutationsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutGraphMutationsInput, Prisma.TaskUncheckedUpdateWithoutGraphMutationsInput>
+}
+
+export type TaskUpdateWithoutGraphMutationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutReconciliationEventsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutReconciliationEventsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutReconciliationEventsInput, Prisma.TaskUncheckedCreateWithoutReconciliationEventsInput>
+}
+
+export type TaskUpsertWithoutReconciliationEventsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutReconciliationEventsInput, Prisma.TaskUncheckedUpdateWithoutReconciliationEventsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutReconciliationEventsInput, Prisma.TaskUncheckedCreateWithoutReconciliationEventsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutReconciliationEventsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutReconciliationEventsInput, Prisma.TaskUncheckedUpdateWithoutReconciliationEventsInput>
+}
+
+export type TaskUpdateWithoutReconciliationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutSchedulerEventsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutSchedulerEventsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutSchedulerEventsInput, Prisma.TaskUncheckedCreateWithoutSchedulerEventsInput>
+}
+
+export type TaskUpsertWithoutSchedulerEventsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutSchedulerEventsInput, Prisma.TaskUncheckedUpdateWithoutSchedulerEventsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutSchedulerEventsInput, Prisma.TaskUncheckedCreateWithoutSchedulerEventsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutSchedulerEventsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutSchedulerEventsInput, Prisma.TaskUncheckedUpdateWithoutSchedulerEventsInput>
+}
+
+export type TaskUpdateWithoutSchedulerEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
 export type TaskCreateWithoutSessionsInput = {
   id?: string
   title: string
@@ -1096,6 +1860,10 @@ export type TaskCreateWithoutSessionsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutSessionsInput = {
@@ -1130,6 +1898,10 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutSessionsInput = {
@@ -1180,6 +1952,10 @@ export type TaskUpdateWithoutSessionsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutSessionsInput = {
@@ -1214,6 +1990,10 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutDependenciesInput = {
@@ -1248,6 +2028,10 @@ export type TaskCreateWithoutDependenciesInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependenciesInput = {
@@ -1282,6 +2066,10 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependenciesInput = {
@@ -1321,6 +2109,10 @@ export type TaskCreateWithoutDependentTasksInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependentTasksInput = {
@@ -1355,6 +2147,10 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependentTasksInput = {
@@ -1405,6 +2201,10 @@ export type TaskUpdateWithoutDependenciesInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependenciesInput = {
@@ -1439,6 +2239,10 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUpsertWithoutDependentTasksInput = {
@@ -1484,6 +2288,10 @@ export type TaskUpdateWithoutDependentTasksInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependentTasksInput = {
@@ -1518,6 +2326,10 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlansInput = {
@@ -1552,6 +2364,10 @@ export type TaskCreateWithoutTaskPlansInput = {
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlansInput = {
@@ -1586,6 +2402,10 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlansInput = {
@@ -1636,6 +2456,10 @@ export type TaskUpdateWithoutTaskPlansInput = {
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlansInput = {
@@ -1670,6 +2494,10 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanRunsInput = {
@@ -1704,6 +2532,10 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
@@ -1738,6 +2570,10 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanRunsInput = {
@@ -1788,6 +2624,10 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
@@ -1822,6 +2662,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanLayersInput = {
@@ -1856,6 +2700,10 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
@@ -1890,6 +2738,10 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanLayersInput = {
@@ -1940,6 +2792,10 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
@@ -1974,6 +2830,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutRunsInput = {
@@ -2008,6 +2868,10 @@ export type TaskCreateWithoutRunsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutRunsInput = {
@@ -2042,6 +2906,10 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutRunsInput = {
@@ -2092,6 +2960,10 @@ export type TaskUpdateWithoutRunsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutRunsInput = {
@@ -2126,6 +2998,10 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutApprovalsInput = {
@@ -2160,6 +3036,10 @@ export type TaskCreateWithoutApprovalsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutApprovalsInput = {
@@ -2194,6 +3074,10 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutApprovalsInput = {
@@ -2244,6 +3128,10 @@ export type TaskUpdateWithoutApprovalsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutApprovalsInput = {
@@ -2278,6 +3166,10 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutArtifactsInput = {
@@ -2312,6 +3204,10 @@ export type TaskCreateWithoutArtifactsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutArtifactsInput = {
@@ -2346,6 +3242,10 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutArtifactsInput = {
@@ -2396,6 +3296,10 @@ export type TaskUpdateWithoutArtifactsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutArtifactsInput = {
@@ -2430,6 +3334,10 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutMemoriesInput = {
@@ -2464,6 +3372,10 @@ export type TaskCreateWithoutMemoriesInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutMemoriesInput = {
@@ -2498,6 +3410,10 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutMemoriesInput = {
@@ -2548,6 +3464,10 @@ export type TaskUpdateWithoutMemoriesInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutMemoriesInput = {
@@ -2582,6 +3502,10 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutEventsInput = {
@@ -2616,6 +3540,10 @@ export type TaskCreateWithoutEventsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutEventsInput = {
@@ -2650,6 +3578,10 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutEventsInput = {
@@ -2700,6 +3632,10 @@ export type TaskUpdateWithoutEventsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutEventsInput = {
@@ -2734,6 +3670,10 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutProjectionInput = {
@@ -2768,6 +3708,10 @@ export type TaskCreateWithoutProjectionInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutProjectionInput = {
@@ -2802,6 +3746,10 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutProjectionInput = {
@@ -2852,6 +3800,10 @@ export type TaskUpdateWithoutProjectionInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutProjectionInput = {
@@ -2886,6 +3838,10 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutScheduleProposalsInput = {
@@ -2920,6 +3876,10 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
@@ -2954,6 +3914,10 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutScheduleProposalsInput = {
@@ -3004,6 +3968,10 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
@@ -3038,6 +4006,10 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutAssistantMessagesInput = {
@@ -3072,6 +4044,10 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
@@ -3106,6 +4082,10 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutAssistantMessagesInput = {
@@ -3156,6 +4136,10 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
@@ -3190,6 +4174,10 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutWorkBlocksInput = {
@@ -3224,6 +4212,10 @@ export type TaskCreateWithoutWorkBlocksInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkBlocksInput = {
@@ -3258,6 +4250,10 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkBlocksInput = {
@@ -3308,6 +4304,10 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
@@ -3342,6 +4342,10 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutExecutionSessionsInput = {
@@ -3376,6 +4380,10 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
@@ -3410,6 +4418,10 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutExecutionSessionsInput = {
@@ -3460,6 +4472,10 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
@@ -3494,6 +4510,10 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyWorkspaceInput = {
@@ -3546,6 +4566,10 @@ export type TaskUpdateWithoutWorkspaceInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkspaceInput = {
@@ -3580,6 +4604,10 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
@@ -3621,6 +4649,10 @@ export type TaskCountOutputType = {
   taskPlans: number
   taskPlanRuns: number
   taskPlanLayers: number
+  graphVersions: number
+  graphMutations: number
+  reconciliationEvents: number
+  schedulerEvents: number
 }
 
 export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3639,6 +4671,10 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   taskPlans?: boolean | TaskCountOutputTypeCountTaskPlansArgs
   taskPlanRuns?: boolean | TaskCountOutputTypeCountTaskPlanRunsArgs
   taskPlanLayers?: boolean | TaskCountOutputTypeCountTaskPlanLayersArgs
+  graphVersions?: boolean | TaskCountOutputTypeCountGraphVersionsArgs
+  graphMutations?: boolean | TaskCountOutputTypeCountGraphMutationsArgs
+  reconciliationEvents?: boolean | TaskCountOutputTypeCountReconciliationEventsArgs
+  schedulerEvents?: boolean | TaskCountOutputTypeCountSchedulerEventsArgs
 }
 
 /**
@@ -3756,6 +4792,34 @@ export type TaskCountOutputTypeCountTaskPlanLayersArgs<ExtArgs extends runtime.T
   where?: Prisma.TaskPlanLayerWhereInput
 }
 
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountGraphVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.GraphVersionWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountGraphMutationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.GraphMutationRecordWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountReconciliationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ReconciliationEventWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountSchedulerEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SchedulerEventWhereInput
+}
+
 
 export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -3791,6 +4855,10 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   taskPlans?: boolean | Prisma.Task$taskPlansArgs<ExtArgs>
   taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
   taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
+  graphVersions?: boolean | Prisma.Task$graphVersionsArgs<ExtArgs>
+  graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
+  reconciliationEvents?: boolean | Prisma.Task$reconciliationEventsArgs<ExtArgs>
+  schedulerEvents?: boolean | Prisma.Task$schedulerEventsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["task"]>
 
@@ -3872,6 +4940,10 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   taskPlans?: boolean | Prisma.Task$taskPlansArgs<ExtArgs>
   taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
   taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
+  graphVersions?: boolean | Prisma.Task$graphVersionsArgs<ExtArgs>
+  graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
+  reconciliationEvents?: boolean | Prisma.Task$reconciliationEventsArgs<ExtArgs>
+  schedulerEvents?: boolean | Prisma.Task$schedulerEventsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3901,6 +4973,10 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     taskPlans: Prisma.$TaskPlanPayload<ExtArgs>[]
     taskPlanRuns: Prisma.$TaskPlanRunPayload<ExtArgs>[]
     taskPlanLayers: Prisma.$TaskPlanLayerPayload<ExtArgs>[]
+    graphVersions: Prisma.$GraphVersionPayload<ExtArgs>[]
+    graphMutations: Prisma.$GraphMutationRecordPayload<ExtArgs>[]
+    reconciliationEvents: Prisma.$ReconciliationEventPayload<ExtArgs>[]
+    schedulerEvents: Prisma.$SchedulerEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -4330,6 +5406,10 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   taskPlans<T extends Prisma.Task$taskPlansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskPlanRuns<T extends Prisma.Task$taskPlanRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskPlanLayers<T extends Prisma.Task$taskPlanLayersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanLayersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanLayerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  graphVersions<T extends Prisma.Task$graphVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$graphVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  graphMutations<T extends Prisma.Task$graphMutationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$graphMutationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphMutationRecordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reconciliationEvents<T extends Prisma.Task$reconciliationEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$reconciliationEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReconciliationEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  schedulerEvents<T extends Prisma.Task$schedulerEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$schedulerEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SchedulerEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5150,6 +6230,102 @@ export type Task$taskPlanLayersArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.TaskPlanLayerScalarFieldEnum | Prisma.TaskPlanLayerScalarFieldEnum[]
+}
+
+/**
+ * Task.graphVersions
+ */
+export type Task$graphVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the GraphVersion
+   */
+  select?: Prisma.GraphVersionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the GraphVersion
+   */
+  omit?: Prisma.GraphVersionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.GraphVersionInclude<ExtArgs> | null
+  where?: Prisma.GraphVersionWhereInput
+  orderBy?: Prisma.GraphVersionOrderByWithRelationInput | Prisma.GraphVersionOrderByWithRelationInput[]
+  cursor?: Prisma.GraphVersionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.GraphVersionScalarFieldEnum | Prisma.GraphVersionScalarFieldEnum[]
+}
+
+/**
+ * Task.graphMutations
+ */
+export type Task$graphMutationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the GraphMutationRecord
+   */
+  select?: Prisma.GraphMutationRecordSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the GraphMutationRecord
+   */
+  omit?: Prisma.GraphMutationRecordOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.GraphMutationRecordInclude<ExtArgs> | null
+  where?: Prisma.GraphMutationRecordWhereInput
+  orderBy?: Prisma.GraphMutationRecordOrderByWithRelationInput | Prisma.GraphMutationRecordOrderByWithRelationInput[]
+  cursor?: Prisma.GraphMutationRecordWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.GraphMutationRecordScalarFieldEnum | Prisma.GraphMutationRecordScalarFieldEnum[]
+}
+
+/**
+ * Task.reconciliationEvents
+ */
+export type Task$reconciliationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ReconciliationEvent
+   */
+  select?: Prisma.ReconciliationEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ReconciliationEvent
+   */
+  omit?: Prisma.ReconciliationEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ReconciliationEventInclude<ExtArgs> | null
+  where?: Prisma.ReconciliationEventWhereInput
+  orderBy?: Prisma.ReconciliationEventOrderByWithRelationInput | Prisma.ReconciliationEventOrderByWithRelationInput[]
+  cursor?: Prisma.ReconciliationEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ReconciliationEventScalarFieldEnum | Prisma.ReconciliationEventScalarFieldEnum[]
+}
+
+/**
+ * Task.schedulerEvents
+ */
+export type Task$schedulerEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SchedulerEvent
+   */
+  select?: Prisma.SchedulerEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SchedulerEvent
+   */
+  omit?: Prisma.SchedulerEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SchedulerEventInclude<ExtArgs> | null
+  where?: Prisma.SchedulerEventWhereInput
+  orderBy?: Prisma.SchedulerEventOrderByWithRelationInput | Prisma.SchedulerEventOrderByWithRelationInput[]
+  cursor?: Prisma.SchedulerEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SchedulerEventScalarFieldEnum | Prisma.SchedulerEventScalarFieldEnum[]
 }
 
 /**

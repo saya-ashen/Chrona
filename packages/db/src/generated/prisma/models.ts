@@ -10,6 +10,11 @@
  */
 export type * from './models/Workspace'
 export type * from './models/Task'
+export type * from './models/SchedulerLease'
+export type * from './models/GraphVersion'
+export type * from './models/GraphMutationRecord'
+export type * from './models/ReconciliationEvent'
+export type * from './models/SchedulerEvent'
 export type * from './models/TaskSession'
 export type * from './models/TaskDependency'
 export type * from './models/TaskPlan'

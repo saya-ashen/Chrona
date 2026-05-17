@@ -1,13 +1,13 @@
 import { createChronaEngine } from "@chrona/engine";
 
-let schedulerStarted = false;
+let orchestratorStarted = false;
 const engine = createChronaEngine();
 
 export function bootstrapServerRuntime() {
-  if (schedulerStarted) {
+  if (orchestratorStarted) {
     return;
   }
 
-  engine.runtime.startAutoStartScheduler();
-  schedulerStarted = true;
+  engine.runtime.startTaskOrchestrator();
+  orchestratorStarted = true;
 }

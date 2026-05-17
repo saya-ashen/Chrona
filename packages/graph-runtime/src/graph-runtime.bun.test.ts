@@ -276,7 +276,7 @@ describe("graph-runtime", () => {
       ["done", "current"],
     ]);
     expect(second.effective.completedNodeIds).toContain("choose");
-    expect(second.effective.blockedNodeIds).toContain("done");
+    expect(second.effective.waitingForUserNodeIds).toContain("done");
   });
 
   it("dispatches start and resume commands through a graph runtime factory", async () => {

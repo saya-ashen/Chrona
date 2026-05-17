@@ -141,6 +141,10 @@ model Workspace {
   taskPlans         TaskPlan[]
   taskPlanRuns      TaskPlanRun[]
   taskPlanLayers    TaskPlanLayer[]
+  graphVersions     GraphVersion[]
+  graphMutations    GraphMutationRecord[]
+  reconciliationEvents ReconciliationEvent[]
+  schedulerEvents   SchedulerEvent[]
 }
 
 model Task {
@@ -177,10 +181,102 @@ model Task {
   taskPlans           TaskPlan[]
   taskPlanRuns        TaskPlanRun[]
   taskPlanLayers      TaskPlanLayer[]
+  graphVersions       GraphVersion[]
+  graphMutations      GraphMutationRecord[]
+  reconciliationEvents ReconciliationEvent[]
+  schedulerEvents     SchedulerEvent[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
   @@index([defaultSessionId])
+}
+
+enum GraphMutationStatus {
+  Pending
+  Applied
+  Rejected
+  Cancelled
+}
+
+model SchedulerLease {
+  name        String   @id
+  ownerId     String
+  expiresAt   DateTime
+  heartbeatAt DateTime
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([expiresAt])
+}
+
+model GraphVersion {
+  id          String    @id @default(cuid())
+  workspaceId String
+  taskId      String
+  version     Int
+  graph       Json
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, version])
+  @@index([workspaceId, taskId, version])
+}
+
+model GraphMutationRecord {
+  id                 String              @id @default(cuid())
+  workspaceId        String
+  taskId             String
+  baseGraphVersion   Int
+  operation          String
+  status             GraphMutationStatus @default(Pending)
+  payload            Json
+  validationResult   Json?
+  affectedNodeIds    Json?
+  createdBy          String
+  createdAt          DateTime            @default(now())
+  appliedAt          DateTime?
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id])
+  task               Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, createdAt])
+  @@index([taskId, baseGraphVersion, status])
+}
+
+model ReconciliationEvent {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  taskId        String
+  graphVersion  Int
+  executionState String
+  currentNodeId String?
+  issues        Json?
+  repairActions Json?
+  createdAt     DateTime @default(now())
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([taskId, graphVersion, createdAt])
+}
+
+model SchedulerEvent {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  taskId       String
+  graphVersion Int?
+  eventType    String
+  reason       String?
+  payload      Json?
+  createdAt    DateTime @default(now())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, eventType, createdAt])
+  @@index([taskId, createdAt])
 }
 
 model TaskSession {
