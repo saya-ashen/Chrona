@@ -1,6 +1,6 @@
 "use client";
 
-import { BriefcaseBusiness, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,18 +8,14 @@ import { useI18n } from "@/i18n/client";
 
 type TaskContextLinksProps = {
   taskId: string;
-  latestRunStatus?: string | null;
   taskLabel?: string;
-  workLabel?: string;
   size?: "xs" | "sm" | "default" | "lg";
   className?: string;
 };
 
 export function TaskContextLinks({
   taskId,
-  latestRunStatus,
   taskLabel,
-  workLabel,
   size = "default",
   className,
 }: TaskContextLinksProps) {
@@ -33,13 +29,6 @@ export function TaskContextLinks({
       >
         <ExternalLink className="size-3.5" />
         {taskLabel ?? t("common.openTask")}
-      </LocalizedLink>
-      <LocalizedLink
-        href={`/work/${taskId}`}
-        className={buttonVariants({ variant: "secondary", size })}
-      >
-        <BriefcaseBusiness className="size-3.5" />
-        {workLabel ?? (latestRunStatus ? t("common.openWorkbench") : t("common.startWork"))}
       </LocalizedLink>
     </div>
   );

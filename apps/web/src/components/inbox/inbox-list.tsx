@@ -31,8 +31,7 @@ const DEFAULT_COPY = {
   risk: "Risk",
   task: "Task",
   run: "Run",
-  openWorkContext: "Open Work Context",
-  openWorkbench: "Open Workbench",
+  openTask: "Open Task",
   approve: "Approve",
   reject: "Reject",
   editAndApprove: "Edit and Approve",
@@ -65,7 +64,6 @@ export function InboxList({ items, copy: copyProp }: InboxListProps) {
           </div>
           <TaskContextLinks
             taskId={item.sourceTaskId}
-            workLabel={item.kind === "schedule_proposal" ? copy.openWorkContext : copy.openWorkbench}
           />
           <div className="flex flex-wrap gap-2">
             {item.actions ?? (

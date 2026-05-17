@@ -4,7 +4,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
-import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
+import type { WorkCopy, WorkPageData } from "./work-page-types";
 
 type RefreshOptions = {
   silent?: boolean;
@@ -24,7 +24,7 @@ function isProjectionActive(data: WorkPageData) {
   return planExecutionActive || runActive;
 }
 
-export function useWorkPageProjectionState(initialData: WorkPageData, copy: WorkbenchCopy, isPending: boolean) {
+export function useWorkPageProjectionState(initialData: WorkPageData, copy: WorkCopy, isPending: boolean) {
   const normalizedInitialData = {
     ...initialData,
     composerValue: initialData.composerValue ?? "",

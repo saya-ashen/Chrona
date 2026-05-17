@@ -20,7 +20,7 @@ type Props = {
 const DEFAULT_COPY = {
   title: "Task Workspace",
   backToSchedule: "Back to Schedule",
-  openWorkbench: "Open Workbench",
+  openWork: "Open Work",
   taskEditorTitle: "Task Information",
   taskEditorDescription:
     "Edit the core task fields. Changes are saved manually.",

@@ -150,7 +150,7 @@ const baseData: WorkPageData = {
       {
         id: "step_2",
         title: "整理页面骨架",
-        objective: "把页面改造成 task 驱动协作工作台",
+        objective: "把页面改造成 task 驱动协作执行页",
         phase: "execution",
         status: "in_progress",
         requiresHumanInput: false,
@@ -215,7 +215,7 @@ describe("WorkPageClient", () => {
       setResultErrorMessage: vi.fn(),
       refresh: vi.fn(),
       resetComposer: vi.fn(),
-      submitWorkbenchInput: vi.fn(),
+      submitWorkInput: vi.fn(),
       actions: {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
@@ -246,7 +246,7 @@ describe("WorkPageClient", () => {
       setResultErrorMessage: vi.fn(),
       refresh: vi.fn(),
       resetComposer: vi.fn(),
-      submitWorkbenchInput: vi.fn(),
+      submitWorkInput: vi.fn(),
       actions: {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
@@ -319,7 +319,7 @@ describe("WorkPageClient", () => {
       setResultErrorMessage: vi.fn(),
       refresh: vi.fn(),
       resetComposer: vi.fn(),
-      submitWorkbenchInput: vi.fn(),
+      submitWorkInput: vi.fn(),
       actions: {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
@@ -335,12 +335,12 @@ describe("WorkPageClient", () => {
     expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
   });
 
-  it("keeps the execution record view scrollable inside the workbench", async () => {
+  it("keeps the execution record view scrollable inside the work page", async () => {
     const _user = userEvent.setup();
     const originalInnerWidth = window.innerWidth;
     const originalInnerHeight = window.innerHeight;
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-      if (this.dataset.slot === "workbench-shell") {
+      if (this.dataset.slot === "work-shell") {
         return {
           x: 0,
           y: 83,
@@ -480,7 +480,7 @@ describe("WorkPageClient", () => {
       setResultErrorMessage: vi.fn(),
       refresh: vi.fn(),
       resetComposer: vi.fn(),
-      submitWorkbenchInput: vi.fn(),
+      submitWorkInput: vi.fn(),
       actions: {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
@@ -522,7 +522,7 @@ describe("WorkPageClient", () => {
         evidence: [
           {
             label: "变更范围",
-            value: "仅调整 work 页面协作工作台",
+            value: "仅调整 work 页面协作执行区",
             tone: "warning",
           },
         ],
@@ -548,7 +548,7 @@ describe("WorkPageClient", () => {
       setResultErrorMessage: vi.fn(),
       refresh: vi.fn(),
       resetComposer: vi.fn(),
-      submitWorkbenchInput: vi.fn(),
+      submitWorkInput: vi.fn(),
       actions: {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),

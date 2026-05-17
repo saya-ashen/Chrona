@@ -1,14 +1,14 @@
 import { Activity, ChevronDown, ChevronUp } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buttonVariants } from "@/components/ui/button";
-import { WorkbenchComposerCard } from "./workbench-composer-card";
-import type { WorkbenchComposer, WorkbenchCopy, WorkPageData } from "./work-page-types";
+import { WorkComposerCard } from "./work-composer-card";
+import type { WorkComposer, WorkCopy, WorkPageData } from "./work-page-types";
 
 type WorkPageComposerDockProps = {
   isComposerExpanded: boolean;
   onExpandChange: (next: boolean) => void;
   dockSummary: string;
-  workbenchComposer: WorkbenchComposer | null;
+  workComposer: WorkComposer | null;
   data: WorkPageData;
   currentStepTitle: string | null;
   composerValue: string;
@@ -19,7 +19,7 @@ type WorkPageComposerDockProps = {
   isPending: boolean;
   passiveDescription: string;
   passiveActions: string;
-  copy: WorkbenchCopy;
+  copy: WorkCopy;
   composerResetKey: number;
   runId: string | null;
   executionStatus: WorkPageData["planExecution"] extends infer T ? T extends { status: infer S } ? S : never : never | string;
@@ -30,7 +30,7 @@ export function WorkPageComposerDock({
   isComposerExpanded,
   onExpandChange,
   dockSummary,
-  workbenchComposer,
+  workComposer,
   data,
   currentStepTitle,
   composerValue,
@@ -67,9 +67,9 @@ export function WorkPageComposerDock({
                   <ChevronDown className="size-4" />
                 </button>
               </div>
-              <WorkbenchComposerCard
+              <WorkComposerCard
                 className="border-border/80 bg-white shadow-none"
-                composer={workbenchComposer}
+                composer={workComposer}
                 currentIntervention={data.currentIntervention}
                 currentStepTitle={currentStepTitle}
                 composerValue={composerValue}
@@ -94,7 +94,7 @@ export function WorkPageComposerDock({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">Add Input</p>
-                  <StatusBadge tone={workbenchComposer ? "warning" : "info"}>{workbenchComposer ? "Needed" : "Standby"}</StatusBadge>
+                  <StatusBadge tone={workComposer ? "warning" : "info"}>{workComposer ? "Needed" : "Standby"}</StatusBadge>
                 </div>
                 <p className="mt-1 truncate text-sm text-muted-foreground">{dockSummary}</p>
               </div>

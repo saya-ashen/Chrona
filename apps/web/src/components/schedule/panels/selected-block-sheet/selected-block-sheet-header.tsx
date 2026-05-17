@@ -10,13 +10,11 @@ export function SelectedBlockSheetHeader({
   item,
   locale,
   copy,
-  workLabel,
   onClose,
 }: {
   item: ScheduledItem;
   locale: string;
   copy: SchedulePageCopy;
-  workLabel: string;
   onClose: () => void;
 }) {
   const timeRange = formatTimeRange(
@@ -46,8 +44,6 @@ export function SelectedBlockSheetHeader({
         <div className="flex flex-wrap items-center justify-end gap-2">
           <TaskContextLinks
             taskId={item.taskId}
-            latestRunStatus={item.latestRunStatus}
-            workLabel={workLabel}
             size="sm"
           />
           <button

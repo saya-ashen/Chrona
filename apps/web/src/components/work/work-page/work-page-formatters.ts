@@ -1,4 +1,4 @@
-import type { WorkbenchCopy } from "./work-page-types";
+import type { WorkCopy } from "./work-page-types";
 
 export function formatDateTime(value: string | null | undefined) {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
@@ -29,7 +29,7 @@ export function getRunStatusLabel(status: string | null | undefined) {
 
 export function getSyncStatusLabel(
   status: string | null | undefined,
-  copy: Pick<WorkbenchCopy, "healthySync" | "staleSync">,
+  copy: Pick<WorkCopy, "healthySync" | "staleSync">,
 ) {
   switch (status) {
     case "healthy":

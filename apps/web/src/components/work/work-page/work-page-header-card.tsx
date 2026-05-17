@@ -26,7 +26,7 @@ export function WorkPageHeaderCard({
       <div className="px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="min-w-0">
-            <p className="text-[11px] text-muted-foreground">{title} / Workbench</p>
+            <p className="text-[11px] text-muted-foreground">{title} / Work</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-[1.35rem]">{title}</h1>
               <StatusBadge tone={executionTone}>{executionStatus}</StatusBadge>

@@ -25,7 +25,7 @@ vi.mock("@/i18n/client", () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         "common.openTask": "Open Task",
-        "common.openWorkbench": "Open Workbench",
+        "common.openWork": "Open Work",
         "common.startWork": "Start Work",
       };
       return map[key] ?? key;
@@ -66,9 +66,9 @@ describe("InboxList", () => {
       "href",
       "/en/tasks/task_1",
     );
-    expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
       "href",
-      "/en/work/task_1",
+      "/en/tasks/task_1",
     );
   });
 });

@@ -1,6 +1,6 @@
 import type {
-  WorkbenchComposer,
-  WorkbenchCopy,
+  WorkComposer,
+  WorkCopy,
   WorkPageClientProps,
 } from "./work-page-types";
 import {
@@ -9,7 +9,7 @@ import {
 } from "./work-page-formatters";
 export function getTaskSummary(
   data: WorkPageClientProps["initialData"],
-  copy: WorkbenchCopy,
+  copy: WorkCopy,
 ) {
   switch (data.currentRun?.status) {
     case "WaitingForApproval":
@@ -28,7 +28,7 @@ export function getTaskSummary(
   }
 }
 
-export function getCurrentException(data: WorkPageClientProps["initialData"], copy: WorkbenchCopy) {
+export function getCurrentException(data: WorkPageClientProps["initialData"], copy: WorkCopy) {
   if (data.reliability.isStale) {
     return copy.syncException;
   }
@@ -71,10 +71,10 @@ export function getCurrentException(data: WorkPageClientProps["initialData"], co
 }
 
 export function getQuickPrompts(
-  workbenchComposer: WorkbenchComposer,
+  workComposer: WorkComposer,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   currentIntervention?: WorkPageClientProps["initialData"]["currentIntervention"] | null,
-  copy?: WorkbenchCopy,
+  copy?: WorkCopy,
 ) {
   switch (currentIntervention?.kind) {
     case "input":
@@ -91,7 +91,7 @@ export function getQuickPrompts(
       break;
   }
 
-  if (workbenchComposer.mode === "start") {
+  if (workComposer.mode === "start") {
     return [copy?.quickPromptStartA ?? "Give a concise plan first", copy?.quickPromptStartB ?? "State key assumptions", copy?.quickPromptStartC ?? "Ask clarifying questions first"];
   }
   if (currentRun?.status === "Running") {
@@ -106,7 +106,7 @@ export function getQuickPrompts(
 export function getCurrentPlanAction(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   taskPlan: WorkPageClientProps["initialData"]["taskPlan"],
-  copy?: WorkbenchCopy,
+  copy?: WorkCopy,
 ) {
   if (taskPlan.state !== "ready" || taskPlan.analytics.activeNodeIds.length === 0) {
     return null;
@@ -136,13 +136,13 @@ export function getCurrentPlanAction(
 function getComposerDefaultValue(
   taskTitle: string,
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
-  copy?: WorkbenchCopy,
+  copy?: WorkCopy,
 ) {
   const prefix = copy?.continueProcessingPrefix ?? "Continue: ";
   return currentRun?.pendingInputPrompt ?? `${prefix}${taskTitle}`;
 }
 
-function getStartRunDefaultValue(taskTitle: string, copy?: WorkbenchCopy) {
+function getStartRunDefaultValue(taskTitle: string, copy?: WorkCopy) {
   const prefix = copy?.continueProcessingPrefix ?? "Continue: ";
   return `${prefix}${taskTitle}`;
 }
@@ -150,7 +150,7 @@ function getStartRunDefaultValue(taskTitle: string, copy?: WorkbenchCopy) {
 export function getPassiveHeroGuidance(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   closure: WorkPageClientProps["initialData"]["closure"],
-  copy: WorkbenchCopy,
+  copy: WorkCopy,
 ) {
   if (currentRun?.status === "Completed") {
     const actions = [
@@ -186,19 +186,19 @@ export function getPassiveHeroGuidance(
   }
 
   return {
-    description: copy.workbenchDescription,
+    description: copy.workDescription,
     actions: copy.latestResult,
   };
 }
 
-export function getWorkbenchComposer(
+export function getWorkComposer(
   currentRun: WorkPageClientProps["initialData"]["currentRun"],
   currentIntervention: WorkPageClientProps["initialData"]["currentIntervention"],
   closure: WorkPageClientProps["initialData"]["closure"],
   taskShell: WorkPageClientProps["initialData"]["taskShell"],
-  copy: WorkbenchCopy,
+  copy: WorkCopy,
   planExecution?: WorkPageClientProps["initialData"]["planExecution"],
-): WorkbenchComposer | null {
+): WorkComposer | null {
   if (planExecution && planExecution.status !== "no_plan" && !currentRun) {
     switch (planExecution.status) {
       case "waiting_for_user":
@@ -253,7 +253,7 @@ export function getWorkbenchComposer(
   if (!currentRun) {
     return {
       mode: "start",
-      description: copy.workbenchDescription,
+      description: copy.workDescription,
       inputLabel: copy.taskArrangement,
       submitLabel: copy.sendAndContinue,
       defaultValue:
@@ -327,7 +327,7 @@ export function getWorkbenchComposer(
     return {
       mode: "retry",
       description:
-        currentIntervention?.description ?? copy.workbenchDescription,
+        currentIntervention?.description ?? copy.workDescription,
       inputLabel: copy.taskArrangement,
       submitLabel: copy.retryRun,
       defaultValue: `${copy.recoverTaskPrefix}${taskShell.title}`,
@@ -338,7 +338,7 @@ export function getWorkbenchComposer(
 
   return {
     mode: "note",
-    description: currentIntervention?.description ?? copy.workbenchDescription,
+    description: currentIntervention?.description ?? copy.workDescription,
     inputLabel: copy.conversationInput,
     submitLabel: copy.sendNoteToAgent,
     defaultValue: "",

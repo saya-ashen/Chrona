@@ -287,8 +287,6 @@ export function QueueCard({
               />
               <TaskContextLinks
                 taskId={item.taskId}
-                latestRunStatus={item.latestRunStatus}
-                workLabel="Open Workbench"
               />
             </div>
           </details>

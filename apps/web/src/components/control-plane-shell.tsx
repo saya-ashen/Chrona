@@ -5,7 +5,6 @@ import {
   ClipboardList,
   Plus,
   Settings,
-  Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -39,15 +38,13 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
     .map((segment) => {
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
-      if (segment === "workbench") return t("nav.workbench");
       if (segment === "settings") return t("nav.settings");
-      if (segment === "work") return "Workbench";
+      if (segment === "work") return t("common.work");
       return segment;
     });
   const navItems: NavEntry[] = [
     { href: "/schedule", label: t("nav.schedule"), icon: CalendarDays, active: pathname.startsWith("/schedule") },
     { href: "/tasks", label: t("nav.tasks"), icon: ClipboardList, active: pathname.startsWith("/tasks") },
-    { href: "/workbench", label: t("nav.workbench"), icon: Sparkles, active: pathname.startsWith("/workbench") || pathname.includes("/work/") },
     { href: "/settings", label: t("nav.settings"), icon: Settings, active: pathname.startsWith("/settings") },
   ];
 

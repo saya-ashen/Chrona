@@ -10,7 +10,7 @@ import {
   startExecution,
   submitExecutionInput,
 } from "@/lib/task-actions-client";
-import type { WorkbenchCopy, WorkPageData } from "./work-page-types";
+import type { WorkCopy, WorkPageData } from "./work-page-types";
 
 type ActionScope = "hero" | "result";
 
@@ -21,7 +21,7 @@ type WorkPageRefresh = (options?: {
 
 type UseWorkPageActionsArgs = {
   data: WorkPageData;
-  copy: WorkbenchCopy;
+  copy: WorkCopy;
   refresh: WorkPageRefresh;
   resetComposer: () => void;
   beginRefreshEpoch: () => number;
@@ -72,7 +72,7 @@ export function useWorkPageActions({
     [beginRefreshEpoch, copy.actionFailed, refresh],
   );
 
-  const submitWorkbenchInput = useCallback(
+  const submitWorkInput = useCallback(
     async (rawInputText: string) => {
       const inputText = rawInputText.trim();
 
@@ -194,7 +194,7 @@ export function useWorkPageActions({
     resultErrorMessage,
     setHeroErrorMessage,
     setResultErrorMessage,
-    submitWorkbenchInput,
+    submitWorkInput,
     actions,
   };
 }

@@ -6,14 +6,14 @@ import { buttonVariants } from "@/components/ui/button";
 import { textareaClassName } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import type {
-  WorkbenchComposer,
-  WorkbenchCopy,
+  WorkComposer,
+  WorkCopy,
   WorkPageData,
 } from "./work-page-types";
 
-type WorkbenchComposerCardProps = {
+type WorkComposerCardProps = {
   className?: string;
-  composer: WorkbenchComposer | null;
+  composer: WorkComposer | null;
   currentIntervention?: WorkPageData["currentIntervention"] | null;
   currentStepTitle?: string | null;
   composerValue: string;
@@ -24,7 +24,7 @@ type WorkbenchComposerCardProps = {
   isPending: boolean;
   passiveDescription: string;
   passiveActions: string;
-  copy: WorkbenchCopy;
+  copy: WorkCopy;
   composerResetKey: number;
   runId?: string | null;
 };
@@ -51,7 +51,7 @@ function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
 function renderActionPanel(
   currentIntervention: WorkPageData["currentIntervention"],
   currentStepTitle: string | null,
-  copy: WorkbenchCopy,
+  copy: WorkCopy,
 ) {
   if (!currentIntervention) {
     return null;
@@ -150,7 +150,7 @@ function renderActionPanel(
   }
 }
 
-export function WorkbenchComposerCard({
+export function WorkComposerCard({
   className,
   composer,
   currentIntervention = null,
@@ -166,7 +166,7 @@ export function WorkbenchComposerCard({
   copy,
   composerResetKey,
   runId,
-}: WorkbenchComposerCardProps) {
+}: WorkComposerCardProps) {
   async function handleSubmit() {
     const inputText = composerValue.trim();
     const didSucceed = await onSubmit(inputText);
@@ -199,7 +199,7 @@ export function WorkbenchComposerCard({
   return (
     <form
       aria-label={copy.inputArea}
-      key={`workbench-${composerResetKey}-${runId ?? "none"}-${composer.mode}`}
+      key={`work-${composerResetKey}-${runId ?? "none"}-${composer.mode}`}
       className={cn(
         "min-w-0 max-h-[min(34vh,360px)] overflow-y-auto rounded-[24px] border border-border/70 bg-card p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)]",
         className,
