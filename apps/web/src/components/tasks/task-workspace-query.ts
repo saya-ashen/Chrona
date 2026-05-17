@@ -2,7 +2,7 @@ export {
   createTaskWorkspaceExecutionConsoleView,
   dispatchTaskExecutionAction,
   fetchTaskPlanState,
-  fetchTaskWorkspaceTask,
+  fetchTaskWorkspacePage,
   isTaskWorkspaceAttentionStatus,
   mapTaskWorkspaceStatus,
   pickWorkspaceCurrentNode,

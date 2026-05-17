@@ -30,7 +30,7 @@ export type TaskPlanState = {
 
 export const taskWorkspaceQueryKeys = {
   all: ["task-workspace"] as const,
-  detail: (taskId: string) => [...taskWorkspaceQueryKeys.all, "detail", taskId] as const,
+  page: (taskId: string) => [...taskWorkspaceQueryKeys.all, "page", taskId] as const,
   planState: (taskId: string) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId] as const,
 };
 
@@ -45,6 +45,10 @@ function isAttentionStatus(status: PlanNodeDataModel["status"]) {
     || status === "blocked"
     || status === "failed"
     || status === "degraded";
+}
+
+function isCheckpointStatus(status: PlanNodeDataModel["status"]) {
+  return status === "waiting" || status === "waiting_for_user" || status === "waiting_for_approval";
 }
 
 function deriveTaskStatusFromGraph(
@@ -181,6 +185,18 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
       tone: "warning",
       actionLabel: "Resolve in node panel",
       actionNodeId: currentNode?.id,
+    };
+  }
+
+  if (currentNode && isCheckpointStatus(currentNode.status)) {
+    return {
+      id: `node-attention-${currentNode.id}`,
+      title: "Needs handling",
+      description: currentNode.nextAction ?? currentNode.summary ?? currentNode.objective,
+      statusLabel: currentNode.statusLabel ?? currentNode.status,
+      tone: overviewToneForNode(currentNode),
+      actionLabel: "Open action controls",
+      actionNodeId: currentNode.id,
     };
   }
 
@@ -323,11 +339,20 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
   return [...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
 }
 
-function buildTaskHeaderView(pageData: TaskPageData, progress: ProgressSummary, hasAttention: boolean): TaskHeaderView {
+function buildTaskHeaderView(
+  pageData: TaskPageData,
+  progress: ProgressSummary,
+  hasAttention: boolean,
+  currentNode: PlanNodeDataModel | null,
+): TaskHeaderView {
   const memberContext = buildWorkspaceMemberContext(pageData, hasAttention);
-  const workspaceStatus = pageData.task.executionSummary
+  const allNodesDone = progress.totalSteps > 0 && progress.completedSteps === progress.totalSteps;
+  const currentNodeStatus = !allNodesDone && currentNode && isAttentionStatus(currentNode.status)
+    ? mapTaskWorkspaceStatus(currentNode.status)
+    : null;
+  const workspaceStatus = currentNodeStatus ?? (pageData.task.executionSummary
     ? mapTaskWorkspaceStatus(pageData.task.executionSummary.executionState)
-    : mapTaskWorkspaceStatus(pageData.task.status);
+    : mapTaskWorkspaceStatus(pageData.task.status));
   const hasPlan = progress.totalSteps > 0 || Boolean(pageData.task.savedPlan);
   const cannotStartReason = !hasPlan
     ? "Generate and accept a plan before starting execution."
@@ -335,9 +360,13 @@ function buildTaskHeaderView(pageData: TaskPageData, progress: ProgressSummary, 
       ? pageData.task.runnabilitySummary
       : workspaceStatus === "running"
         ? "Task is already running."
-        : workspaceStatus === "completed"
-          ? "Task is completed."
-          : undefined;
+        : workspaceStatus === "approval-needed"
+          ? "Task is waiting for checkpoint input."
+          : workspaceStatus === "blocked"
+            ? "Resolve the blocker before starting execution."
+            : workspaceStatus === "completed"
+              ? "Task is completed."
+              : undefined;
   const cannotStopReason = workspaceStatus === "running" || workspaceStatus === "approval-needed"
     ? undefined
     : "No running execution session to stop.";
@@ -442,7 +471,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
 
   return {
     task,
-    header: buildTaskHeaderView(pageData, progress, Boolean(attention)),
+    header: buildTaskHeaderView(pageData, progress, Boolean(attention), currentNode),
     navigation: buildWorkspaceNavigationView(pageData, Boolean(attention)),
     executionFlow: buildExecutionFlowView(input.graphPlan, input.selectedNode ?? currentNode),
     graphPlan: input.graphPlan,
@@ -488,18 +517,17 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   };
 }
 
-export async function fetchTaskWorkspaceTask(taskId: string) {
+export async function fetchTaskWorkspacePage(taskId: string): Promise<TaskPageData> {
   const response = await api.tasks[":taskId"].$get({
     param: { taskId },
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to load task detail" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to load task detail");
+    const err = await response.json().catch(() => ({ error: "Failed to load task workspace" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load task workspace");
   }
 
-  const payload = await response.json() as unknown as { task: TaskData };
-  return payload.task;
+  return await response.json() as unknown as TaskPageData;
 }
 
 export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState> {

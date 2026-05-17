@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type SetStateAction } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import type { TaskConfigDraftState, TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
 import { api } from "@/lib/rpc-client";
 import {
@@ -10,31 +10,16 @@ import {
   taskToEditableTask,
   taskToTaskConfigInitialValues,
 } from "../model/task-workspace-editor-view-model";
-import { fetchTaskWorkspaceTask, taskWorkspaceQueryKeys } from "../model/task-workspace-query";
 import type { TaskData } from "../model/task-workspace-types";
 
-export function useTaskWorkspaceEditorState(initialTask: TaskData) {
-  const queryClient = useQueryClient();
-  const taskQuery = useQuery({
-    queryKey: taskWorkspaceQueryKeys.detail(initialTask.id),
-    queryFn: () => fetchTaskWorkspaceTask(initialTask.id),
-    initialData: initialTask,
-  });
-  const task = taskQuery.data ?? initialTask;
+export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: SetStateAction<TaskData>) => void) {
   const [taskConfigDraft, setTaskConfigDraft] = useState<TaskConfigFormInput | null>(null);
   const [hasUnsavedConfigChanges, setHasUnsavedConfigChanges] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isEditExpanded, setIsEditExpanded] = useState(
-    () => !(["Ready", "Completed", "Done"].includes(initialTask.status) || initialTask.aiPlanGenerationStatus === "accepted"),
+    () => !(["Ready", "Completed", "Done"].includes(task.status) || task.aiPlanGenerationStatus === "accepted"),
   );
-
-  const setTask = useCallback((value: SetStateAction<TaskData>) => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.detail(initialTask.id), (current: TaskData | undefined) => {
-      const previous = current ?? initialTask;
-      return typeof value === "function" ? (value as (prevState: TaskData) => TaskData)(previous) : value;
-    });
-  }, [initialTask, queryClient]);
 
   const taskConfigInitialValues = useMemo(() => taskToTaskConfigInitialValues(task), [
     task.title,

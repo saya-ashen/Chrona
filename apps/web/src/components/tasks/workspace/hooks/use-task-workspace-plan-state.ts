@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
-import { dispatchTaskExecutionAction, fetchTaskPlanState, fetchTaskWorkspaceTask, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { dispatchTaskExecutionAction, fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -15,7 +15,7 @@ import {
   isAcceptingPlanFromFlow,
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
-import type { TaskData } from "../model/task-workspace-types";
+import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import type { ExecutionActionInput, PlanExecutionSSEEvent } from "@chrona/contracts/ai";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
@@ -32,20 +32,61 @@ function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationR
   return savedPlan ? "waiting_acceptance" as const : "idle" as const;
 }
 
-export function useTaskWorkspacePlanState(task: TaskData) {
+function selectWorkspacePlan(
+  pagePlan: TaskData["savedPlan"] | null | undefined,
+  planStatePlan: TaskData["savedPlan"] | null | undefined,
+) {
+  if (!pagePlan) return planStatePlan ?? null;
+  if (!planStatePlan) return pagePlan;
+  return pagePlan.id === planStatePlan.id ? pagePlan : planStatePlan;
+}
+
+function withGeneratedPlanResult(
+  planState: TaskPlanState,
+  generatedPlan: TaskData["savedPlan"] | null | undefined,
+) {
+  if (!generatedPlan?.id) return planState;
+  return {
+    ...planState,
+    savedPlan: generatedPlan,
+    aiPlanGenerationStatus: derivePlanStatus(generatedPlan, false),
+  } satisfies TaskPlanState;
+}
+
+export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () => Promise<void>) {
   const queryClient = useQueryClient();
   const generationSession = useTaskPlanGenerationSession(task.id);
   const previousGenerationStatusRef = useRef(generationSession.sessionStatus);
   const syncTaskDetailPlanFields = useCallback((nextPlanState: TaskPlanState) => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.detail(task.id), (current: TaskData | undefined) => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.page(task.id), (current: TaskPageData | undefined) => {
       if (!current) return current;
       return {
         ...current,
-        savedPlan: nextPlanState.savedPlan,
-        aiPlanGenerationStatus: nextPlanState.aiPlanGenerationStatus,
-      } satisfies TaskData;
+        task: {
+          ...current.task,
+          savedPlan: nextPlanState.savedPlan,
+          aiPlanGenerationStatus: nextPlanState.aiPlanGenerationStatus,
+        },
+      } satisfies TaskPageData;
     });
   }, [queryClient, task.id]);
+  const applyGeneratedPlanResult = useCallback((generatedPlan: TaskData["savedPlan"] | null) => {
+    if (!generatedPlan?.id) return;
+
+    const nextPlanState = queryClient.setQueryData<TaskPlanState>(
+      taskWorkspaceQueryKeys.planState(task.id),
+      (current: TaskPlanState | undefined) => ({
+        taskId: task.id,
+        aiPlanGenerationStatus: derivePlanStatus(generatedPlan, false),
+        savedPlan: generatedPlan,
+        generationSession: current?.generationSession ?? null,
+      } satisfies TaskPlanState),
+    );
+
+    if (nextPlanState) {
+      syncTaskDetailPlanFields(nextPlanState);
+    }
+  }, [queryClient, syncTaskDetailPlanFields, task.id]);
 
   const planStateQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.planState(task.id),
@@ -65,8 +106,8 @@ export function useTaskWorkspacePlanState(task: TaskData) {
 
   useEffect(() => {
     if (!planState) return;
-    syncTaskDetailPlanFields(planState);
-  }, [planState, syncTaskDetailPlanFields]);
+    syncTaskDetailPlanFields(withGeneratedPlanResult(planState, generationSession.result));
+  }, [generationSession.result, planState, syncTaskDetailPlanFields]);
 
   useEffect(() => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
@@ -113,16 +154,21 @@ export function useTaskWorkspacePlanState(task: TaskData) {
 
     // Only refresh persisted plan state once when an active generation session settles.
     if (previousStatus === "running") {
-      void planStateQuery.refetch();
+      applyGeneratedPlanResult(generationSession.result);
+      void Promise.all([
+        planStateQuery.refetch(),
+        refreshWorkspace(),
+      ]);
     }
-  }, [generationSession.hydrated, generationSession.sessionStatus, planStateQuery.refetch]);
+  }, [applyGeneratedPlanResult, generationSession.hydrated, generationSession.result, generationSession.sessionStatus, planStateQuery.refetch, refreshWorkspace]);
 
   useEffect(() => {
     if (!planState) return;
-    setPlanFlow((current) => current.status === "accepting" ? current : createPlanFlowFromSnapshot(planState));
-  }, [planState]);
+    const nextPlanState = withGeneratedPlanResult(planState, generationSession.result);
+    setPlanFlow((current) => current.status === "accepting" ? current : createPlanFlowFromSnapshot(nextPlanState));
+  }, [generationSession.result, planState]);
 
-  const plan = planFlow.savedPlan ?? null;
+  const plan = selectWorkspacePlan(task.savedPlan, planFlow.savedPlan);
   const planGenerationStatus = getPlanGenerationStatusFromFlow(planFlow);
 
   const setPlan = useCallback((value: SetStateAction<TaskData["savedPlan"] | null>) => {
@@ -233,13 +279,10 @@ export function useTaskWorkspacePlanState(task: TaskData) {
     });
     await Promise.all([
       planStateQuery.refetch(),
-      queryClient.fetchQuery({
-        queryKey: taskWorkspaceQueryKeys.detail(task.id),
-        queryFn: () => fetchTaskWorkspaceTask(task.id),
-      }),
+      refreshWorkspace(),
     ]);
     return result;
-  }, [planStateQuery, queryClient, task.id]);
+  }, [planStateQuery, queryClient, refreshWorkspace, task.id]);
 
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;

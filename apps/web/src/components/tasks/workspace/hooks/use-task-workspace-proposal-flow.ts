@@ -20,6 +20,7 @@ type UseTaskWorkspaceProposalFlowInput = {
   setTask: (value: React.SetStateAction<TaskData>) => void;
   setSaveError: (value: string | null) => void;
   fetchPlan: () => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
 };
 
 export function useTaskWorkspaceProposalFlow({
@@ -29,6 +30,7 @@ export function useTaskWorkspaceProposalFlow({
   setTask,
   setSaveError,
   fetchPlan,
+  refreshWorkspace,
 }: UseTaskWorkspaceProposalFlowInput) {
   const [proposalFlow, setProposalFlow] = useState<ProposalFlowState>({ status: "idle" });
 
@@ -98,7 +100,7 @@ export function useTaskWorkspaceProposalFlow({
     },
     onSuccess: async () => {
       setProposalFlow(settleProposalApply());
-      await fetchPlan();
+      await Promise.all([fetchPlan(), refreshWorkspace()]);
       setProposalFlow(resetProposalFlow());
     },
     onError: (cause) => {
