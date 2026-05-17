@@ -13,6 +13,35 @@ export type {
 export { TASK_PRIORITIES, TASK_STATUSES } from "./task";
 
 export type {
+  GraphMutationOperation as TaskOrchestratorGraphMutationOperation,
+  GraphMutationRequest as TaskOrchestratorGraphMutationRequest,
+  GraphMutationResponse as TaskOrchestratorGraphMutationResponse,
+  GraphNodeState,
+  ReconciliationResult,
+  TaskAction,
+  TaskExecutionState,
+  TaskExecutionSummary,
+  TaskNodeState,
+} from "./task-orchestrator";
+
+export {
+  graphMutationOperationSchema,
+  graphMutationRequestSchema,
+  graphMutationResponseSchema,
+  graphMutationStatusSchema,
+  graphNodeStateSchema,
+  reconciliationIssueSchema,
+  reconciliationResultSchema,
+  taskActionSchema,
+  taskExecutionStateSchema,
+  taskExecutionSummarySchema,
+  taskNodeStateSchema,
+  taskPrimaryActionTypeSchema,
+  taskProgressSchema,
+  taskRecoveryActionTypeSchema,
+} from "./task-orchestrator";
+
+export type {
   ChronaToolExpectedState,
   ChronaToolIdempotencyStatus,
   ChronaToolInput,

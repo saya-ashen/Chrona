@@ -22,7 +22,9 @@ const workspaceStateToneByLabel = {
   "View only": "warning",
   "No plan yet": "neutral",
   Blocked: "critical",
+  Degraded: "critical",
   "Review required": "warning",
+  "Approval required": "warning",
   Running: "info",
   Completed: "success",
   Idle: "neutral",
@@ -61,11 +63,27 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
     };
   }
 
-  if (input.isBlocked || input.currentNode?.status === "blocked") {
+  if (input.currentNode?.status === "degraded") {
+    return {
+      label: "Degraded",
+      tone: workspaceStateToneByLabel.Degraded,
+      guidance: input.currentNode.nextAction ?? "Retry sync or repair this node before continuing execution.",
+    };
+  }
+
+  if (input.isBlocked || input.currentNode?.status === "blocked" || input.currentNode?.status === "failed") {
     return {
       label: "Blocked",
       tone: workspaceStateToneByLabel.Blocked,
       guidance: input.blockActionRequired ?? input.currentNode?.nextAction ?? "Resolve the blocker before continuing execution.",
+    };
+  }
+
+  if (input.currentNode?.status === "waiting_for_approval") {
+    return {
+      label: "Approval required",
+      tone: workspaceStateToneByLabel["Approval required"],
+      guidance: input.currentNode.nextAction ?? "Approve or reject the current node to continue.",
     };
   }
 

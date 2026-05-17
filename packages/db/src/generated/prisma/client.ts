@@ -52,6 +52,31 @@ export type Workspace = Prisma.WorkspaceModel
  */
 export type Task = Prisma.TaskModel
 /**
+ * Model SchedulerLease
+ * 
+ */
+export type SchedulerLease = Prisma.SchedulerLeaseModel
+/**
+ * Model GraphVersion
+ * 
+ */
+export type GraphVersion = Prisma.GraphVersionModel
+/**
+ * Model GraphMutationRecord
+ * 
+ */
+export type GraphMutationRecord = Prisma.GraphMutationRecordModel
+/**
+ * Model ReconciliationEvent
+ * 
+ */
+export type ReconciliationEvent = Prisma.ReconciliationEventModel
+/**
+ * Model SchedulerEvent
+ * 
+ */
+export type SchedulerEvent = Prisma.SchedulerEventModel
+/**
  * Model TaskSession
  * 
  */

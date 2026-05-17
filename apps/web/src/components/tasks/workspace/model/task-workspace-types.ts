@@ -1,6 +1,7 @@
 import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -22,6 +23,8 @@ export type TaskData = {
   runnabilitySummary: string;
   runnabilityState?: string;
   savedPlan?: TaskPlanReadModel | null;
+  executionSummary?: TaskExecutionSummary | null;
+  graphNodeStates?: GraphNodeState[];
   aiPlanGenerationStatus?: TaskPlanGenerationStatus;
   blockReason: {
     blockType?: string;
@@ -44,6 +47,7 @@ export type TaskPageData = {
   defaultExecutionRuntime: string;
   executionRuntimes: TaskConfigExecutionRuntime[];
   task: TaskData;
+  reconciliation?: ReconciliationResult | null;
   latestRunSummary: {
     id: string;
     status: string;
@@ -164,6 +168,9 @@ export type TaskHeaderView = {
     memberLabel: string;
     notificationCount: number;
   };
+  primaryStateLabel?: string;
+  primaryActionLabel?: string | null;
+  currentNodeId?: string | null;
 };
 
 export type WorkspaceNavigationView = {

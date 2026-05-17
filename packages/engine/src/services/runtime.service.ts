@@ -1,9 +1,9 @@
-import { taskScheduling } from "../modules/scheduling";
+import { startTaskOrchestrator } from "../modules/orchestration";
 import { listExecutionRuntimes } from "../modules/task-execution/registry";
 
 export function createRuntimeService() {
   return {
     listExecutionRuntimes: () => listExecutionRuntimes(),
-    startAutoStartScheduler: () => taskScheduling.startAutoStartScheduler(),
+    startTaskOrchestrator: () => startTaskOrchestrator(),
   };
 }

@@ -391,9 +391,7 @@ function buildExecutionResponse(input: {
     status: input.status,
     currentNodeId: input.currentNodeId,
     executedNodeIds: input.executedNodeIds,
-    waitingNodeIds: input.effective.nodes
-      .filter((node) => node.status === "waiting_for_user")
-      .map((node) => node.id),
+    waitingNodeIds: input.effective.waitingNodeIds,
     blockedNodeIds: input.effective.blockedNodeIds,
     message: input.message,
     ...(input.errorDetails ? { errorDetails: input.errorDetails } : {}),

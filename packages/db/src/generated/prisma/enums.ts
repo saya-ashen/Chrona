@@ -162,6 +162,16 @@ export const TaskDependencyType = {
 export type TaskDependencyType = (typeof TaskDependencyType)[keyof typeof TaskDependencyType]
 
 
+export const GraphMutationStatus = {
+  Pending: 'Pending',
+  Applied: 'Applied',
+  Rejected: 'Rejected',
+  Cancelled: 'Cancelled'
+} as const
+
+export type GraphMutationStatus = (typeof GraphMutationStatus)[keyof typeof GraphMutationStatus]
+
+
 export const AiClientType = {
   openclaw: 'openclaw',
   llm: 'llm',

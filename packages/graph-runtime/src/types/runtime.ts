@@ -7,6 +7,7 @@ export type NodeRuntimeStatus =
   | "ready"
   | "running"
   | "waiting"
+  | "degraded"
   | "blocked"
   | "waiting_for_user"
   | "waiting_for_approval"

@@ -77,6 +77,8 @@ export function TaskWorkspacePlanSection({
     (planGenerationStatus === "generating"
       ? "Generating a fresh plan. The graph will update when the run completes."
       : null);
+  const recoveryActions = pageData.reconciliation?.repairActions ?? [];
+  const recoveryIssue = pageData.reconciliation?.issues.find((issue) => issue.severity === "error") ?? null;
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
       const node =
@@ -181,6 +183,31 @@ export function TaskWorkspacePlanSection({
           role="status"
         >
           {stateMessage}
+        </div>
+      ) : null}
+
+      {recoveryIssue ? (
+        <div
+          className="mb-1.5 rounded-xl border border-red-300/50 bg-red-50/80 px-3 py-2 text-sm text-red-950"
+          role="alert"
+        >
+          <div className="font-semibold">Recovery needed</div>
+          <div className="mt-0.5">{recoveryIssue.message}</div>
+          {recoveryActions.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {recoveryActions.map((action) => (
+                <button
+                  key={action.type}
+                  type="button"
+                  className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={!action.enabled}
+                  onClick={() => focusNodeActions(pageData.reconciliation?.currentNodeId ?? undefined)}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

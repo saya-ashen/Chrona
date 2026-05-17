@@ -74,15 +74,22 @@
       "nextAction": "Next action",
       "stateRunning": "Running",
       "stateBlocked": "Blocked",
+      "stateDegraded": "Degraded",
+      "stateInvalidated": "Invalidated",
       "stateReviewRequired": "Review required",
       "stateIdle": "Idle",
       "stateEmpty": "No plan yet",
       "stateCompleted": "Completed",
       "guidanceBlocked": "Resolve the blocker before continuing execution.",
+      "guidanceDegraded": "Retry sync or repair this node before continuing execution.",
+      "guidanceInvalidated": "This node was invalidated by a graph change and must be replanned before execution continues.",
       "guidanceReviewRequired": "Complete the current node action to continue.",
       "guidanceEmpty": "Generate and accept a plan to unlock execution controls.",
       "guidanceCompleted": "Review the latest result and artifacts before closing the task.",
-      "primaryActionCue": "Use the primary action to move this task forward."
+      "primaryActionCue": "Use the primary action to move this task forward.",
+      "recoveryNeeded": "Recovery needed",
+      "repairState": "Repair state",
+      "retrySync": "Retry sync"
     },
     "scheduleTaskList": {
       "title": "Schedule List View",

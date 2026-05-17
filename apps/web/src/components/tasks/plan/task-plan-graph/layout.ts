@@ -413,9 +413,10 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
   const edges: FlowGraphEdge[] = input.plan.edges.map((edge) => {
     const from = edge.from ?? edge.fromNodeId ?? "";
     const to = edge.to ?? edge.toNodeId ?? "";
+    const isInactiveEdge = edge.active === false || edge.emphasis === "inactive";
     const isHorizontalEdge = graphIsHorizontal || metadata.horizontalEdgeIds.has(edge.id);
     const baseStyle = buildEdgeStyle(edge.kind ?? "sequential", edge.emphasis ?? "normal");
-    const runtimeEdgeState = resolveRuntimeEdgeState(nodeById.get(from), nodeById.get(to));
+    const runtimeEdgeState = isInactiveEdge ? null : resolveRuntimeEdgeState(nodeById.get(from), nodeById.get(to));
     const route = edgeRoute(layoutNodes.get(from), layoutNodes.get(to), isHorizontalEdge);
 
     const runtimeStyle = runtimeEdgeState === "active"
@@ -437,8 +438,8 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       targetHandle: route.targetHandle,
       selectable: false,
       reconnectable: false,
-      animated: runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input",
-      zIndex: 6,
+      animated: !isInactiveEdge && (runtimeEdgeState === "active" || runtimeEdgeState === "approval" || runtimeEdgeState === "input"),
+      zIndex: isInactiveEdge ? 3 : 6,
       pathOptions: { borderRadius: 0, offset: EDGE_OFFSET },
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -446,7 +447,9 @@ function materializeFlowLayout(input: LayoutInput, layoutNodes: Map<string, Layo
       },
       style: {
         ...(runtimeStyle ?? baseStyle),
-        opacity: runtimeStyle || (edge.emphasis ?? "normal") !== "normal"
+        opacity: isInactiveEdge
+          ? 0.58
+          : runtimeStyle || (edge.emphasis ?? "normal") !== "normal"
           ? 1
           : focusSet.size > 0 && !focusSet.has(from) && !focusSet.has(to)
             ? 0.35

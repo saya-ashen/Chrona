@@ -74,15 +74,22 @@
       "nextAction": "下一步动作",
       "stateRunning": "运行中",
       "stateBlocked": "阻塞中",
+      "stateDegraded": "已降级",
+      "stateInvalidated": "已失效",
       "stateReviewRequired": "需要审核",
       "stateIdle": "空闲",
       "stateEmpty": "尚无计划",
       "stateCompleted": "已完成",
       "guidanceBlocked": "先解决阻塞项，再继续执行。",
+      "guidanceDegraded": "先重试同步或修复此节点，再继续执行。",
+      "guidanceInvalidated": "此节点已被图变更失效，需要重新规划后才能继续执行。",
       "guidanceReviewRequired": "完成当前节点动作后才能继续。",
       "guidanceEmpty": "生成并接受计划后才能使用执行控制。",
       "guidanceCompleted": "关闭任务前请检查最新结果和产物。",
-      "primaryActionCue": "使用主操作继续推进此任务。"
+      "primaryActionCue": "使用主操作继续推进此任务。",
+      "recoveryNeeded": "需要恢复",
+      "repairState": "修复状态",
+      "retrySync": "重试同步"
     },
     "scheduleTaskList": {
       "title": "日程列表视图",

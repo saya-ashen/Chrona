@@ -3,7 +3,7 @@ import { taskPlanExecution } from "@/modules/plan-execution";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 
-type AutoStartScheduledPlanResult = {
+export type AutoStartScheduledPlanResult = {
   started: Array<{ taskId: string; workBlockId: string; runId: string }>;
   skipped: Array<{ taskId: string; workBlockId: string; reason: string }>;
   failed: Array<{ taskId: string; workBlockId: string; error: string }>;

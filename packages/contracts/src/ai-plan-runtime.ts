@@ -272,6 +272,7 @@ export type NodeRuntimeStatus =
   | "ready"
   | "running"
   | "waiting"
+  | "degraded"
   | "blocked"
   | "waiting_for_user"
   | "waiting_for_approval"
@@ -680,6 +681,12 @@ export interface EffectivePlanGraph {
   /** Denormalized subsets for fast runtime lookup */
   readyNodeIds: string[];
   blockedNodeIds: string[];
+  waitingNodeIds: string[];
+  waitingForUserNodeIds: string[];
+  waitingForApprovalNodeIds: string[];
+  degradedNodeIds: string[];
+  skippedNodeIds: string[];
+  cancelledNodeIds: string[];
   completedNodeIds: string[];
   runningNodeIds: string[];
   invalidatedNodeIds: string[];

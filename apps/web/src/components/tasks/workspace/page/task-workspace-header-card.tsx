@@ -122,6 +122,11 @@ export function TaskWorkspaceHeaderCard({
             {header.title}
           </h1>
           <div className="flex flex-wrap items-center gap-1">
+            {header.primaryStateLabel ? (
+              <StatusBadge tone={userStatusTone(header.status)}>
+                {header.primaryStateLabel}
+              </StatusBadge>
+            ) : null}
             <StatusBadge tone={userStatusTone(header.status)}>
               {userStatusLabel(header.status)}
             </StatusBadge>
@@ -137,6 +142,8 @@ export function TaskWorkspaceHeaderCard({
           </div>
           <span className="text-xs text-muted-foreground">
             {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
+            {header.currentNodeId ? ` · current ${header.currentNodeId}` : ""}
+            {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}
           </span>
         </div>
 

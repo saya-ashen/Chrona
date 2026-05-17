@@ -305,6 +305,12 @@ export interface EffectivePlanGraph {
   terminalNodeIds: string[];
   readyNodeIds: string[];
   blockedNodeIds: string[];
+  waitingNodeIds: string[];
+  waitingForUserNodeIds: string[];
+  waitingForApprovalNodeIds: string[];
+  degradedNodeIds: string[];
+  skippedNodeIds: string[];
+  cancelledNodeIds: string[];
   completedNodeIds: string[];
   runningNodeIds: string[];
   invalidatedNodeIds: string[];

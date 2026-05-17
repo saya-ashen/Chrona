@@ -61,16 +61,23 @@ function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined)
     case "running":
       return "active";
     case "waiting_for_approval":
+      return "waiting_for_approval";
     case "waiting_for_user":
-      return "waiting";
+      return "waiting_for_user";
+    case "degraded":
+      return "degraded";
     case "blocked":
-    case "failed":
       return "blocked";
+    case "failed":
+      return "failed";
     case "completed":
       return "done";
     case "cancelled":
+      return "cancelled";
     case "skipped":
       return "skipped";
+    case "invalidated":
+      return "invalidated";
     case "ready":
       return "ready";
     case "pending":
@@ -111,7 +118,7 @@ function inferInteractionType(input: {
   }
 
   if (input.kind === "condition") {
-    return input.status === "waiting" ? "choose" : "observe";
+    return input.status === "waiting" || isAttentionPlanStatus(input.status) ? "choose" : "observe";
   }
 
   if (input.kind === "checkpoint") {
@@ -154,14 +161,26 @@ function statusLabel(status: PlanNodeStatus) {
       return "进行中";
     case "waiting":
       return "待处理";
+    case "waiting_for_user":
+      return "等待输入";
+    case "waiting_for_approval":
+      return "等待审批";
     case "blocked":
       return "阻塞";
+    case "failed":
+      return "失败";
+    case "degraded":
+      return "降级";
     case "done":
       return "已完成";
     case "ready":
       return "就绪";
     case "skipped":
       return "已跳过";
+    case "cancelled":
+      return "已取消";
+    case "invalidated":
+      return "已失效";
     default:
       return "待开始";
   }
@@ -169,14 +188,22 @@ function statusLabel(status: PlanNodeStatus) {
 
 function statusGroup(status: PlanNodeStatus): PlanNodeDataModel["group"] {
   if (status === "active") return "active";
-  if (status === "waiting" || status === "blocked") return "attention";
-  if (status === "done" || status === "skipped") return "done";
+  if (status === "waiting" || status === "waiting_for_user" || status === "waiting_for_approval" || status === "blocked" || status === "failed" || status === "degraded") return "attention";
+  if (status === "done" || status === "skipped" || status === "cancelled" || status === "invalidated") return "done";
   if (status === "ready") return "upcoming";
   return "idle";
 }
 
 function isTerminalStatus(status: PlanNodeStatus) {
-  return status === "done" || status === "skipped";
+  return status === "done" || status === "skipped" || status === "cancelled" || status === "invalidated";
+}
+
+function isAttentionPlanStatus(status: PlanNodeStatus) {
+  return status === "waiting_for_user"
+    || status === "waiting_for_approval"
+    || status === "blocked"
+    || status === "failed"
+    || status === "degraded";
 }
 
 function nodeConfigToMetadata(node: {
@@ -445,7 +472,7 @@ function toPlanNode(node: {
     estimatedMinutes: node.estimatedMinutes ?? null,
     priority: node.priority ?? null,
     linkedTaskId: node.linkedTaskId ?? null,
-    readiness: node.ready ? "ready" : status === "blocked" ? "blocked" : "waiting",
+    readiness: node.ready ? "ready" : isAttentionPlanStatus(status) ? "blocked" : "waiting",
     reachable: node.reachable ?? true,
     dependencies: node.dependencies ?? [],
     requiredInfo,
@@ -458,14 +485,13 @@ function toPlanNode(node: {
     branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `分支 ${index + 1}`) ?? [],
     options: metadata.options ?? [],
     active: status === "active",
-    blocked: status === "blocked",
+    blocked: isAttentionPlanStatus(status),
     actionable:
       !isTerminalStatus(status) && (
         interactiveFields.length > 0
         || status === "ready"
         || status === "active"
-        || status === "waiting"
-        || status === "blocked"
+        || isAttentionPlanStatus(status)
       ),
     interactiveFields,
     availableActions: buildAvailableActions({
@@ -507,6 +533,7 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
   }
 
   for (const edge of edges) {
+    if (edge.active === false) continue;
     const from = edge.from ?? edge.fromNodeId;
     const to = edge.to ?? edge.toNodeId;
     if (!from || !to) continue;
@@ -518,8 +545,8 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
   const entryNodeIds = activeNodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
   const terminalNodeIds = activeNodes.filter((node) => (outgoing.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
   const runningNodeIds = activeNodes.filter((node) => node.status === "active").map((node) => node.id);
-  const attentionNodeIds = nodes.filter((node) => node.status === "waiting" || node.status === "blocked").map((node) => node.id);
-  const blockedNodeIds = nodes.filter((node) => node.status === "blocked").map((node) => node.id);
+  const attentionNodeIds = nodes.filter((node) => node.status === "waiting" || isAttentionPlanStatus(node.status)).map((node) => node.id);
+  const blockedNodeIds = nodes.filter((node) => isAttentionPlanStatus(node.status)).map((node) => node.id);
 
   const indegree = new Map<string, number>();
   for (const node of nodes) indegree.set(node.id, incoming.get(node.id)?.length ?? 0);
@@ -617,6 +644,13 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
   };
 }
 
+function pickCurrentStepId(nodes: PlanNodeDataModel[]) {
+  return nodes.find((node) => node.status === "active")?.id
+    ?? nodes.find((node) => node.status === "waiting" || isAttentionPlanStatus(node.status))?.id
+    ?? nodes.find((node) => node.status === "ready")?.id
+    ?? null;
+}
+
 function buildGraphPlan(input: {
   title?: string | null;
   summary?: string | null;
@@ -624,7 +658,7 @@ function buildGraphPlan(input: {
   generatedBy?: string | null;
   updatedAt?: string | null;
   nodes: PlanNodeDataModel[];
-  rawEdges: Array<{ id: string; from: string; to: string; label?: string | null }>;
+  rawEdges: Array<{ id: string; from: string; to: string; label?: string | null; active?: boolean }>;
 }): TaskPlanGraphPlan {
   const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
   const provisionalEdges = input.rawEdges.map((edge) => {
@@ -634,15 +668,17 @@ function buildGraphPlan(input: {
       from: edge.from,
       to: edge.to,
       label: edge.label ?? null,
+      active: edge.active,
       kind: edgeKindFromLabel(edge.label, source?.kind ?? "task"),
-      emphasis: "normal" as const,
+      emphasis: edge.active === false ? "inactive" as const : "normal" as const,
     };
   });
 
   const analytics = buildAnalytics(input.nodes, provisionalEdges);
   const activeSet = new Set(analytics.activeNodeIds);
   const blockedSet = new Set(analytics.blockedNodeIds);
-  const edgeEmphasisFor = (edge: { from: string; to: string }): PlanEdgeDataModel["emphasis"] => {
+  const edgeEmphasisFor = (edge: { from: string; to: string; active?: boolean }): PlanEdgeDataModel["emphasis"] => {
+    if (edge.active === false) return "inactive";
     if (activeSet.has(edge.from) || activeSet.has(edge.to)) return "active";
     if (blockedSet.has(edge.from) || blockedSet.has(edge.to)) return "blocked";
     return "normal";
@@ -661,7 +697,7 @@ function buildGraphPlan(input: {
     updatedAt: input.updatedAt ?? null,
     nodes: input.nodes,
     edges,
-    currentStepId: null,
+    currentStepId: pickCurrentStepId(input.nodes),
     steps: input.nodes,
     analytics,
   };
@@ -744,14 +780,13 @@ export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null
         config: node.config,
       }),
     ),
-    rawEdges: readModel.effectivePlan.edges
-      .filter((edge) => edge.active !== false)
-      .map((edge) => ({
-        id: edge.id,
-        from: edge.from,
-        to: edge.to,
-        label: edge.label ?? null,
-      })),
+    rawEdges: readModel.effectivePlan.edges.map((edge) => ({
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      label: edge.label ?? null,
+      active: edge.active,
+    })),
   });
 }
 

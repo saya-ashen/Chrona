@@ -66,6 +66,12 @@ function buildEffectiveGraphSummary(input: {
   const terminalNodeIds: string[] = [];
   const readyNodeIds: string[] = [];
   const blockedNodeIds: string[] = [];
+  const waitingNodeIds: string[] = [];
+  const waitingForUserNodeIds: string[] = [];
+  const waitingForApprovalNodeIds: string[] = [];
+  const degradedNodeIds: string[] = [];
+  const skippedNodeIds: string[] = [];
+  const cancelledNodeIds: string[] = [];
   const completedNodeIds: string[] = [];
   const runningNodeIds: string[] = [];
   const invalidatedNodeIds: string[] = [];
@@ -104,23 +110,40 @@ function buildEffectiveGraphSummary(input: {
 
     switch (node.status) {
       case "completed":
+        completedNodeIds.push(nodeId);
+        break;
       case "skipped":
+        skippedNodeIds.push(nodeId);
         completedNodeIds.push(nodeId);
         break;
       case "running":
         runningNodeIds.push(nodeId);
         break;
+      case "degraded":
+        degradedNodeIds.push(nodeId);
+        break;
       case "invalidated":
         invalidatedNodeIds.push(nodeId);
         break;
       case "waiting":
+        waitingNodeIds.push(nodeId);
+        break;
       case "waiting_for_user":
+        waitingNodeIds.push(nodeId);
+        waitingForUserNodeIds.push(nodeId);
+        break;
       case "waiting_for_approval":
+        waitingNodeIds.push(nodeId);
+        waitingForApprovalNodeIds.push(nodeId);
+        break;
       case "blocked":
         blockedNodeIds.push(nodeId);
         break;
       case "failed":
         failedNodeIds.push(nodeId);
+        break;
+      case "cancelled":
+        cancelledNodeIds.push(nodeId);
         break;
       default:
         if (!node.ready) {
@@ -142,6 +165,12 @@ function buildEffectiveGraphSummary(input: {
     terminalNodeIds,
     readyNodeIds,
     blockedNodeIds,
+    waitingNodeIds,
+    waitingForUserNodeIds,
+    waitingForApprovalNodeIds,
+    degradedNodeIds,
+    skippedNodeIds,
+    cancelledNodeIds,
     completedNodeIds,
     runningNodeIds,
     invalidatedNodeIds,
@@ -226,7 +255,7 @@ function buildEffectiveNodeFromGraphNode(
     startedAt: activeAttempt?.startedAt,
     completedAt: activeAttempt?.finishedAt,
     result: currentResult,
-    blockedReason: currentResult?.error ?? latestInvalidation?.reason,
+    blockedReason: currentResult?.error ?? currentResult?.outputSummary ?? latestInvalidation?.reason,
     metadata: {
       ...(semantics.metadata ?? {}),
       ...(activeDefinitionLayer.definition.metadata ?? {}),
@@ -269,6 +298,9 @@ function deriveNodeStatus(input: {
   }
   if (input.result?.waitKind) {
     return mapWaitKindToNodeStatus(input.result.waitKind);
+  }
+  if (input.result?.status === "rejected" && input.result.errorDetails === "degraded") {
+    return "degraded";
   }
   if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
     return "failed";
