@@ -88,6 +88,7 @@ export type PlanNodeDataModel = {
   nextAction?: string | null;
   completionSummary?: string | null;
   result?: NodeResult | null;
+  inputFields?: Record<string, string>;
   resultOutputs?: NodeResultOutput[];
   resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];

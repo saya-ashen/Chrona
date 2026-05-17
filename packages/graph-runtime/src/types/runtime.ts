@@ -99,6 +99,7 @@ export interface NodeResult {
   status?: "current" | "stale" | "obsolete" | "invalidated" | "rejected";
   outputSummary?: string;
   outputs?: NodeResultOutput[];
+  inputFields?: Record<string, string>;
   evidence?: NodeResultEvidence;
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];

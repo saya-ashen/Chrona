@@ -9,8 +9,26 @@ export function useTaskWorkspacePlanSectionState(graphPlan: TaskPlanGraphPlan | 
     if (!graphPlan) {
       setSelectedPlanNode(null);
       setSelectedPlanNodes([]);
+      return;
     }
   }, [graphPlan]);
+
+  useEffect(() => {
+    if (!graphPlan || !selectedPlanNode) return;
+
+    const nextSelectedNode =
+      graphPlan.nodes.find((node) => node.id === selectedPlanNode.id) ?? null;
+    if (!nextSelectedNode) {
+      setSelectedPlanNode(null);
+      setSelectedPlanNodes([]);
+      return;
+    }
+
+    setSelectedPlanNode(nextSelectedNode);
+    setSelectedPlanNodes((current) => current.map((node) => (
+      node.id === nextSelectedNode.id ? nextSelectedNode : node
+    )));
+  }, [graphPlan, selectedPlanNode]);
 
   const handleSelectedPlanNodeChange = useCallback((node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => {
     setSelectedPlanNode((current) => (current === node ? current : node));

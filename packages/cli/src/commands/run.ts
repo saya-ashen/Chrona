@@ -41,7 +41,7 @@ export function registerRunCommands(program: Command, getClient: ClientResolver)
       .requiredOption("--text <text>", "Input text")
       .action(async (options: CommonCommandOptions & { taskId: string; text: string }) => {
         await runCommand(
-          () => getClient().submitExecutionInput(options.taskId, options.text),
+          () => getClient().submitExecutionInput(options.taskId, { message: options.text }),
           options,
           formatRunResult,
         );

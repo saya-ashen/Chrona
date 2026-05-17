@@ -102,6 +102,10 @@ function inferInteractionType(input: {
     return "retry";
   }
 
+  if (isTerminalStatus(input.status)) {
+    return "observe";
+  }
+
   if (input.kind === "wait") {
     return "wait";
   }
@@ -169,6 +173,10 @@ function statusGroup(status: PlanNodeStatus): PlanNodeDataModel["group"] {
   if (status === "done" || status === "skipped") return "done";
   if (status === "ready") return "upcoming";
   return "idle";
+}
+
+function isTerminalStatus(status: PlanNodeStatus) {
+  return status === "done" || status === "skipped";
 }
 
 function nodeConfigToMetadata(node: {
@@ -444,6 +452,7 @@ function toPlanNode(node: {
     nextAction: node.nextAction ?? null,
     completionSummary: node.result?.outputSummary ?? null,
     result: node.result ?? null,
+    inputFields: node.result?.inputFields,
     resultOutputs: node.result?.outputs ?? [],
     resultEvidence: node.result?.evidence ?? null,
     branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `分支 ${index + 1}`) ?? [],
@@ -451,17 +460,19 @@ function toPlanNode(node: {
     active: status === "active",
     blocked: status === "blocked",
     actionable:
-      interactiveFields.length > 0
-      || status === "ready"
-      || status === "active"
-      || status === "waiting"
-      || status === "blocked",
+      !isTerminalStatus(status) && (
+        interactiveFields.length > 0
+        || status === "ready"
+        || status === "active"
+        || status === "waiting"
+        || status === "blocked"
+      ),
     interactiveFields,
     availableActions: buildAvailableActions({
       id: node.id,
       status,
       interactionType,
-      hasInteractiveFields: interactiveFields.length > 0,
+      hasInteractiveFields: !isTerminalStatus(status) && interactiveFields.length > 0,
     }),
     metadata: {
       ...(metadata as Record<string, unknown>),

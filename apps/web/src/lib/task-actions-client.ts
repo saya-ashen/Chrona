@@ -134,12 +134,12 @@ export function retryExecution(input: {
 
 export function submitExecutionInput(input: {
   taskId: string;
-  inputText: string;
+  inputFields: Record<string, string>;
 }) {
   return api.tasks[":taskId"].execution.actions
     .$post({
       param: { taskId: input.taskId },
-      json: { action: "resume_with_input", inputText: input.inputText },
+      json: { action: "resume_with_input", inputFields: input.inputFields },
     })
     .then(parseActionResponse);
 }

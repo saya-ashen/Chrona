@@ -21,13 +21,23 @@ export class CheckpointNodeExecutor implements NodeExecutor {
     });
 
     const config = input.node.config as CheckpointConfig;
-    if (input.userInput) {
+    if (input.inputFields) {
       const action = config.checkpointType === "approve" || config.checkpointType === "confirm"
         ? "approved"
         : "completed";
       return {
         status: "done",
         summary: `Checkpoint ${action}: ${input.node.title}`,
+        output: { inputFields: input.inputFields },
+        inputFields: input.inputFields,
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
+
+    if ((config.checkpointType === "approve" || config.checkpointType === "confirm") && input.userInput) {
+      return {
+        status: "done",
+        summary: `Checkpoint approved: ${input.node.title}`,
         output: { feedback: input.userInput },
         evidence: { sessionId: input.mainSession.id },
       };

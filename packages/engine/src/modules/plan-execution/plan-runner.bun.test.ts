@@ -300,7 +300,7 @@ describe("plan-runner native execution actions", () => {
 
     const resumed = await taskPlanExecution.dispatch({
       taskId: task.id,
-      action: { action: "resume_with_input", inputText: "yes" },
+      action: { action: "resume_with_input", inputFields: { decision: "yes" } },
     });
 
     expect(resumed.status).toBe("blocked");
@@ -328,7 +328,7 @@ describe("plan-runner native execution actions", () => {
     expect(persisted?.executionContextSnapshots).toHaveLength(3);
     expect(
       persisted?.executionContextSnapshots.some(
-        (snapshot) => snapshot.nodeId === "cond_user" && snapshot.refs?.userInput === "yes",
+        (snapshot) => snapshot.nodeId === "cond_user" && (snapshot.refs?.inputFields as Record<string, string> | undefined)?.decision === "yes",
       ),
     ).toBe(true);
 
@@ -367,7 +367,11 @@ describe("plan-runner native execution actions", () => {
       action: {
         action: "resume_with_input",
         nodeId: "checkpoint_input",
-        inputText: "主题: 夏天\n体裁与风格: 现代诗\n其他要求: 无",
+        inputFields: {
+          theme: "夏天",
+          style: "现代诗",
+          notes: "无",
+        },
       },
     });
 
@@ -382,8 +386,9 @@ describe("plan-runner native execution actions", () => {
     ]);
     expect(persisted?.results[1]?.outputs).toContainEqual({
       kind: "json",
-      value: { feedback: "主题: 夏天\n体裁与风格: 现代诗\n其他要求: 无" },
+      value: { inputFields: { theme: "夏天", style: "现代诗", notes: "无" } },
     });
+    expect(persisted?.results[1]?.inputFields).toEqual({ theme: "夏天", style: "现代诗", notes: "无" });
     expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded", "succeeded"]);
 
     const session = await db.executionSession.findFirstOrThrow({
@@ -504,7 +509,7 @@ describe("plan-runner native execution actions", () => {
 
     const completed = await taskPlanExecution.dispatch({
       taskId: inputFlow.task.id,
-      action: { action: "resume_with_input", nodeId: "checkpoint_input", inputText: "theme: matrix" },
+      action: { action: "resume_with_input", nodeId: "checkpoint_input", inputFields: { theme: "matrix" } },
     });
     expect(completed.status).toBe("completed");
     expect(completed.executedNodeIds).toContain("checkpoint_input");

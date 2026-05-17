@@ -136,6 +136,7 @@ export function buildWorkspaceActionInput(input: {
 }): ExecutionActionInput {
   const kind = input.selectedAction?.kind;
   const inputText = buildWorkspaceInputText(input.fields, input.values);
+  const inputFields = buildWorkspaceInputFields(input.fields, input.values);
   const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
 
   if (
@@ -186,8 +187,16 @@ export function buildWorkspaceActionInput(input: {
   return {
     action: "resume_with_input",
     nodeId: input.node.id,
-    inputText: inputText || input.node.nextAction || "Continue",
+    inputFields,
   };
+}
+
+function buildWorkspaceInputFields(fields: PlanNodeField[], values: Record<string, string>) {
+  return Object.fromEntries(
+    fields
+      .map((field) => [field.key, values[field.key]?.trim() ?? ""] as const)
+      .filter(([, value]) => Boolean(value)),
+  );
 }
 
 function buildWorkspaceInputText(fields: PlanNodeField[], values: Record<string, string>) {

@@ -817,6 +817,7 @@ type AdvanceRuntimeCommand =
       type: "resume_with_input";
       nodeId: string;
       value: string;
+      fields: Record<string, string>;
       replaceStatus?: NonNullable<NodeResult["status"]>;
     }
   | { type: "resume_after_unblock"; nodeId?: string }
@@ -872,6 +873,12 @@ function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
   if (outcome.status === "waiting_for_user") return "user_input";
   if (outcome.status === "waiting_for_approval") return "approval";
   return "manual_action";
+}
+
+function formatInputFields(inputFields: Record<string, string>) {
+  return Object.entries(inputFields)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n");
 }
 
 function currentNodeFromOutcome(outcome: GraphDispatchOutcome): string | null {
@@ -1122,6 +1129,7 @@ async function advancePlanExecution(input: {
   maxSteps?: number;
   forcedNodeId?: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   command?: AdvanceRuntimeCommand;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
@@ -1205,6 +1213,7 @@ async function advancePlanExecution(input: {
           trigger: executorInput.trigger,
           runtimeName,
           userInput: executorInput.userInput,
+          inputFields: executorInput.inputFields,
           onRuntimeEvent: input.onRuntimeEvent
             ? (event) => input.onRuntimeEvent?.({
                 nodeId: engineNode.id,
@@ -1272,6 +1281,7 @@ async function advancePlanExecution(input: {
           input: {
             nodeId: command.nodeId,
             value: command.value,
+            fields: command.fields,
             replaceStatus: command.replaceStatus,
           },
         }
@@ -1375,6 +1385,7 @@ async function advancePlanExecution(input: {
           input: {
             nodeId: input.forcedNodeId,
             value: input.userInput,
+            fields: input.inputFields ?? {},
             replaceStatus: input.forcedReplaceStatus ?? "obsolete",
           },
         }
@@ -1566,6 +1577,7 @@ async function continuePlanExecution(input: {
   taskId: string;
   reason: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   sessionId?: string;
   nodeId?: string;
   resumeReadyNode?: boolean;
@@ -1636,6 +1648,7 @@ async function continuePlanExecution(input: {
     mainSession,
     executionSession,
     userInput: input.userInput,
+    inputFields: input.inputFields,
     forcedNodeId: readyNode?.id ?? waitingNode?.id,
     forcedReplaceStatus: "obsolete",
     onGraphEvent: input.onGraphEvent,
@@ -1759,7 +1772,8 @@ async function dispatchExecutionAction(input: {
       return continuePlanExecution({
         taskId: input.taskId,
         reason: "user_input",
-        userInput: input.action.inputText,
+        userInput: formatInputFields(input.action.inputFields),
+        inputFields: input.action.inputFields,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
         onGraphEvent: input.onGraphEvent,

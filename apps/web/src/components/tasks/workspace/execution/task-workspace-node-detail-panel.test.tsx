@@ -121,9 +121,82 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith({
       action: "resume_with_input",
       nodeId: "input-node",
-      inputText: "默认城市: 北京\n额外需求: 无",
+      inputFields: { city: "北京", extra: "无" },
     }));
     expect(await screen.findByRole("status")).toHaveTextContent("Input sent");
+  });
+
+  it("shows submitted input in a read-only form for completed input nodes", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "input-node",
+      title: "Collect city",
+      status: "done",
+      interactionType: "observe",
+      availableActions: [],
+      interactiveFields: [
+        { key: "city", label: "默认城市", value: "", required: true },
+        { key: "extra", label: "额外需求", value: "" },
+      ],
+      inputFields: { city: "北京", extra: "无" },
+      nextAction: "Provide missing task details",
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Action" }));
+
+    expect(screen.getByText("Submitted input")).toBeInTheDocument();
+    expect(screen.getByLabelText(/默认城市/)).toHaveValue("北京");
+    expect(screen.getByLabelText(/额外需求/)).toHaveValue("无");
+    expect(screen.getByLabelText(/默认城市/)).toHaveAttribute("readonly");
+    expect(screen.getByLabelText(/额外需求/)).toHaveAttribute("readonly");
+    expect(screen.getAllByText("submitted")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /Send/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("This node does not require free-form input.")).not.toBeInTheDocument();
+  });
+
+  it("shows structured submitted input values from checkpoint results", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "input-node",
+      title: "Confirm script requirements",
+      status: "done",
+      interactionType: "observe",
+      availableActions: [],
+      interactiveFields: [
+        { key: "location", label: "默认查询地点或地点输入方式", value: "", required: true },
+        { key: "format", label: "输出格式要求", value: "", control: "select", options: ["无", "Markdown", "JSON"] },
+        { key: "runtime", label: "运行环境或语言偏好", value: "" },
+        { key: "missing", label: "未提交字段", value: "" },
+      ],
+      completionSummary: "Checkpoint completed: 确认脚本需求",
+      inputFields: {
+        location: "北京",
+        format: "无",
+        runtime: "无",
+      },
+      resultOutputs: [{
+        kind: "json",
+        value: {
+          inputFields: {
+            location: "北京",
+            format: "无",
+            runtime: "无",
+          },
+        },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Action" }));
+
+    expect(screen.getByLabelText(/默认查询地点或地点输入方式/)).toHaveValue("北京");
+    expect(screen.getByLabelText(/输出格式要求/)).toHaveValue("无");
+    expect(screen.getByLabelText(/运行环境或语言偏好/)).toHaveValue("无");
+    expect(screen.getByLabelText(/未提交字段/)).toHaveValue("");
+    expect(screen.queryByDisplayValue(/Checkpoint completed/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/输出格式要求/)).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Send/ })).not.toBeInTheDocument();
   });
 
   it("copies result text through the clipboard API", async () => {

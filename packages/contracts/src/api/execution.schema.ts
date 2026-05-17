@@ -28,7 +28,10 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     action: z.literal("resume_with_input"),
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
-    inputText: z.string().min(1, "inputText is required"),
+    inputFields: z.record(z.string(), z.string()).refine(
+      (value) => Object.values(value).some((item) => item.trim()),
+      "inputFields must include at least one value",
+    ),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({

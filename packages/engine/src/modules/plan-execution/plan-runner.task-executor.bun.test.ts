@@ -888,7 +888,7 @@ describe("plan-runner task executor approval flows", () => {
 
     const afterBranchSelection = await taskPlanExecution.dispatch({
       taskId: task.id,
-      action: { action: "resume_with_input", inputText: "approve" },
+      action: { action: "resume_with_input", inputFields: { decision: "approve" } },
     });
 
     expect(afterBranchSelection.status).toBe("waiting_for_approval");
@@ -952,7 +952,7 @@ describe("plan-runner task executor approval flows", () => {
     ]);
     expect(
       persisted?.executionContextSnapshots.some(
-        (snapshot) => snapshot.nodeId === "route_condition" && snapshot.refs?.userInput === "approve",
+        (snapshot) => snapshot.nodeId === "route_condition" && (snapshot.refs?.inputFields as Record<string, string> | undefined)?.decision === "approve",
       ),
     ).toBe(true);
     expect(

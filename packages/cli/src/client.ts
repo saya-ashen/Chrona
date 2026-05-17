@@ -158,13 +158,13 @@ export class ApiClient {
     );
   }
 
-  submitExecutionInput(taskId: string, inputText: string) {
+  submitExecutionInput(taskId: string, inputFields: Record<string, string>) {
     return this.request<unknown>(
       "POST",
       `/api/tasks/${encodeURIComponent(taskId)}/execution/actions`,
       {
         action: "resume_with_input",
-        inputText,
+        inputFields,
       },
     );
   }

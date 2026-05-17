@@ -218,10 +218,12 @@ function RunField({
   field,
   value,
   onChange,
+  readOnly = false,
 }: {
   field: PlanNodeField;
   value: string;
   onChange: (value: string) => void;
+  readOnly?: boolean;
 }) {
   const label = (
     <div className="flex items-center gap-2">
@@ -229,6 +231,11 @@ function RunField({
       {field.required ? (
         <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
           required
+        </span>
+      ) : null}
+      {readOnly ? (
+        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800">
+          submitted
         </span>
       ) : null}
     </div>
@@ -241,10 +248,12 @@ function RunField({
         <textarea
           rows={3}
           value={value}
+          readOnly={readOnly}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             textareaClassName,
             "rounded-xl border-border/70 bg-background/80 text-sm",
+            readOnly && "bg-muted/50 text-muted-foreground",
           )}
         />
       </label>
@@ -252,25 +261,31 @@ function RunField({
   }
 
   if (field.control === "select" || field.control === "approval") {
+    const options = field.options ?? ["Approve", "Reject", "Needs changes"];
+    const shouldShowSubmittedOption = readOnly && value && !options.includes(value);
+
     return (
       <label className="space-y-1.5">
         {label}
         <select
           value={value}
+          disabled={readOnly}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             selectClassName,
             "rounded-xl border-border/70 bg-background/80 text-sm",
+            readOnly && "bg-muted/50 text-muted-foreground opacity-100",
           )}
         >
           <option value="">Select...</option>
-          {(field.options ?? ["Approve", "Reject", "Needs changes"]).map(
-            (option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ),
-          )}
+          {shouldShowSubmittedOption ? (
+            <option value={value}>{value}</option>
+          ) : null}
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
         </select>
       </label>
     );
@@ -282,14 +297,24 @@ function RunField({
       <input
         type="text"
         value={value}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
           inputClassName,
           "rounded-xl border-border/70 bg-background/80 text-sm",
+          readOnly && "bg-muted/50 text-muted-foreground",
         )}
       />
     </label>
   );
+}
+
+function isTerminalStatus(status: PlanNodeDataModel["status"]) {
+  return status === "done" || status === "skipped";
+}
+
+function hasSubmittedInputFields(inputFields: Record<string, string> | undefined) {
+  return Boolean(inputFields && Object.values(inputFields).some((value) => value.trim()));
 }
 
 function ActionTab({
@@ -316,7 +341,9 @@ function ActionTab({
   const actions = node.availableActions ?? [];
   const fields = node.interactiveFields ?? [];
   const selectedAction = actions.find((action) => action.id === selectedActionId) ?? null;
-  const hasActionPayload = actions.length > 0 || fields.length > 0;
+  const submittedFields = node.inputFields;
+  const isReadOnlySubmittedInput = fields.length > 0 && isTerminalStatus(node.status) && hasSubmittedInputFields(submittedFields);
+  const hasActionPayload = actions.length > 0 || (fields.length > 0 && !isReadOnlySubmittedInput);
   const [isDispatching, setIsDispatching] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const submitDisabledReason = getWorkspaceActionDisabledReason({
@@ -379,20 +406,28 @@ function ActionTab({
         </label>
       ) : null}
       {fields.length > 0 ? (
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {fields.map((field) => (
-            <RunField
-              key={field.key}
-              field={field}
-              value={fieldValues[field.key] ?? ""}
-              onChange={(value) =>
-                setFieldValues((current) => ({
-                  ...current,
-                  [field.key]: value,
-                }))
-              }
-            />
-          ))}
+        <div className="mt-3 space-y-2">
+          {isReadOnlySubmittedInput ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+              Submitted input
+            </p>
+          ) : null}
+          <div className="grid gap-2 md:grid-cols-2">
+            {fields.map((field) => (
+              <RunField
+                key={field.key}
+                field={field}
+                value={isReadOnlySubmittedInput ? submittedFields?.[field.key] ?? field.value?.trim() ?? "" : fieldValues[field.key] ?? ""}
+                readOnly={isReadOnlySubmittedInput}
+                onChange={(value) =>
+                  setFieldValues((current) => ({
+                    ...current,
+                    [field.key]: value,
+                  }))
+                }
+              />
+            ))}
+          </div>
         </div>
       ) : (
         <p className="mt-2 rounded-lg border border-border/50 bg-white/75 px-2.5 py-1.5 text-sm text-muted-foreground">

@@ -58,6 +58,7 @@ export type GraphNodeExecutionResult =
       summary: string;
       evidence: GraphNodeExecutionEvidence;
       output?: unknown;
+      inputFields?: Record<string, string>;
       selectedBranch?: NodeResult["selectedBranch"];
     }
   | {
@@ -177,6 +178,7 @@ export type GraphNodeExecutorInput<TContext = unknown> = {
   trigger: GraphExecutionTrigger;
   runtimeName: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   context: TContext;
 };
 
@@ -216,6 +218,7 @@ export type RunGraphExecutionInput<TContext = unknown> = {
   maxSteps?: number;
   forcedNodeId?: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   maxConcurrency?: number;
   now?: () => number;
@@ -237,6 +240,7 @@ export type GraphRuntimeCommand =
       input: {
         nodeId: string;
         value: string;
+        fields: Record<string, string>;
         replaceStatus?: NonNullable<NodeResult["status"]>;
       };
     }
@@ -412,6 +416,7 @@ function appendExecutionResult(input: {
           status: "current",
           outputSummary: input.result.summary,
           outputs: normalizeResultOutputs(input.result.output),
+          inputFields: input.result.inputFields,
           evidence,
           selectedBranch: input.result.selectedBranch,
         },
@@ -636,6 +641,7 @@ export async function runGraphExecution<TContext = unknown>(
         throw new Error(`Effective node ${nextNodeId} is missing active layer`);
       }
       const nodeUserInput = forcedNodeId === nextNodeId ? userInput : undefined;
+      const nodeInputFields = forcedNodeId === nextNodeId ? input.inputFields : undefined;
       forcedNodeId = undefined;
 
       if (nodeUserInput) {
@@ -657,6 +663,7 @@ export async function runGraphExecution<TContext = unknown>(
         graphVersion: state.graph.mutations.length,
         runtimeName: input.runtimeName,
         userInput: nodeUserInput,
+        inputFields: nodeInputFields,
         now,
       });
 
@@ -691,9 +698,10 @@ export async function runGraphExecution<TContext = unknown>(
         plan: effective,
         trigger: input.trigger,
         runtimeName: input.runtimeName,
-        userInput: nodeUserInput,
-        context: input.context,
-      });
+          userInput: nodeUserInput,
+          inputFields: nodeInputFields,
+          context: input.context,
+        });
 
       const finishedAt = new Date(input.now?.() ?? Date.now()).toISOString();
       if (!result) {
@@ -1161,6 +1169,7 @@ export function createGraphRuntime<TContext = unknown>(
             maxConcurrency: options.policies?.maxConcurrency,
             forcedNodeId: command.input.nodeId,
             userInput: command.input.value,
+            inputFields: command.input.fields,
             forcedReplaceStatus: command.input.replaceStatus,
             now: options.now,
             callbacks,
