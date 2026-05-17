@@ -99,7 +99,7 @@ describe("task workspace actions", () => {
     })).toEqual({
       action: "resume_with_input",
       nodeId: "node-1",
-      inputText: "默认城市: 北京\n额外需求: 无",
+      inputFields: { city: "北京", extra: "无" },
     });
   });
 });

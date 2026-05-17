@@ -225,6 +225,92 @@ describe("task-plan-view-model", () => {
     ]);
   });
 
+  it("keeps completed input checkpoints read-only while preserving fields for display", () => {
+    const readModel: TaskPlanReadModel = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      prompt: null,
+      summary: "午餐计划",
+      updatedAt: "2026-05-07T10:00:00.000Z",
+      generatedBy: "ai",
+      blueprint: {
+        title: "做汉堡",
+        goal: "完成午餐",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan,
+      effectivePlan: {
+        graphId: "graph-1",
+        planId: "plan-1",
+        basePlanId: "compiled-plan-1",
+        resolvedAt: "2026-05-07T10:00:00.000Z",
+        resolvedVersion: 3,
+        nodes: [
+          {
+            id: "input-1",
+            nodeId: "input-1",
+            activeLayerId: null,
+            semanticKey: "input-1",
+            localId: "input_local",
+            type: "checkpoint",
+            title: "收集城市",
+            definition: { title: "收集城市", objective: "获取默认城市", semantics: { type: "checkpoint" } },
+            config: {
+              checkpointType: "input",
+              prompt: "默认城市是什么？",
+              required: true,
+              inputFields: [{ key: "city", label: "默认城市", required: true }],
+            },
+            dependencies: [],
+            dependents: [],
+            status: "completed",
+            invalidated: false,
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: false,
+            reachable: true,
+            result: {
+              outputSummary: "默认城市: 北京",
+              inputFields: { city: "北京" },
+              outputs: [{ kind: "json", value: { inputFields: { city: "北京" } } }],
+            },
+            requiredInfo: ["默认城市"],
+          } as TaskPlanReadModel["effectivePlan"]["nodes"][number] & { requiredInfo: string[] },
+        ],
+        edges: [],
+        entryNodeIds: ["input-1"],
+        terminalNodeIds: ["input-1"],
+        readyNodeIds: [],
+        blockedNodeIds: [],
+        completedNodeIds: ["input-1"],
+        runningNodeIds: [],
+        invalidatedNodeIds: [],
+        failedNodeIds: [],
+        pendingNodeIds: [],
+      },
+    };
+
+    const graphPlan = taskPlanReadModelToGraphPlan(readModel);
+    const inputStep = graphPlan?.steps.find((step) => step.id === "input-1");
+
+    expect(inputStep).toMatchObject({
+      status: "done",
+      interactionType: "observe",
+      completionSummary: "默认城市: 北京",
+      inputFields: { city: "北京" },
+      availableActions: [],
+      actionable: false,
+    });
+    expect(inputStep?.interactiveFields).toEqual([
+      expect.objectContaining({ key: "required:默认城市", label: "默认城市", required: true }),
+      expect.objectContaining({ key: "city", label: "默认城市", required: true }),
+    ]);
+  });
+
   it("keeps skipped runtime branch nodes out of entry analytics", () => {
     const readModel: TaskPlanReadModel = {
       id: "plan-1",

@@ -93,6 +93,7 @@ export function createExecutionContextSnapshot(input: {
   graphVersion: number;
   runtimeName: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   now?: number;
 }): ExecutionContextSnapshot {
   const now = input.now ?? Date.now();
@@ -103,7 +104,10 @@ export function createExecutionContextSnapshot(input: {
     nodeId: input.nodeId,
     nodeLayerId: input.nodeLayerId,
     graphSignature: `${input.graphId}:${input.graphVersion}:${input.nodeLayerId}`,
-    refs: input.userInput ? { userInput: input.userInput } : undefined,
+    refs: input.userInput || input.inputFields ? {
+      ...(input.userInput ? { userInput: input.userInput } : {}),
+      ...(input.inputFields ? { inputFields: input.inputFields } : {}),
+    } : undefined,
     runtimeSnapshot: { runtimeName: input.runtimeName },
     createdAt,
   };

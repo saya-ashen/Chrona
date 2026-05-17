@@ -259,6 +259,7 @@ describe("graph-runtime", () => {
       forcedNodeId: "choose",
       forcedReplaceStatus: "obsolete",
       userInput: "yes",
+      inputFields: { decision: "yes" },
       now: () => 2,
       callbacks: {
         executeNode: async ({ node, plan, userInput }) =>
@@ -320,7 +321,7 @@ describe("graph-runtime", () => {
       type: "resume_with_input",
       state: first.state,
       context: null,
-      input: { nodeId: "choose", value: "yes", replaceStatus: "obsolete" },
+      input: { nodeId: "choose", value: "yes", fields: { decision: "yes" }, replaceStatus: "obsolete" },
     });
 
     expect(second.status).toBe("waiting_for_user");

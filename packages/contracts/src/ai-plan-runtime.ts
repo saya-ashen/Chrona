@@ -490,6 +490,7 @@ export interface NodeResult {
   status?: "current" | "stale" | "obsolete" | "invalidated" | "rejected";
   outputSummary?: string;
   outputs?: NodeResultOutput[];
+  inputFields?: Record<string, string>;
   evidence?: NodeResultEvidence;
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];
@@ -720,7 +721,7 @@ export type ExecutionActionInput =
       action: "resume_with_input";
       sessionId?: string;
       nodeId?: string;
-      inputText: string;
+      inputFields: Record<string, string>;
       idempotencyKey?: string;
     }
   | {

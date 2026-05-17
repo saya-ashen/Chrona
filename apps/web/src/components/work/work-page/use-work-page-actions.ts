@@ -109,7 +109,7 @@ export function useWorkPageActions({
         ) {
           await submitExecutionInput({
             taskId: data.taskShell.id,
-            inputText,
+            inputFields: { message: inputText },
           });
           return;
         }

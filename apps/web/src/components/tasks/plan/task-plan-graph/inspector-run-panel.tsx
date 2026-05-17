@@ -350,6 +350,14 @@ function buildInputText(fields: PlanNodeField[], values: Record<string, string>)
   return parts.join("\n");
 }
 
+function buildInputFields(fields: PlanNodeField[], values: Record<string, string>) {
+  return Object.fromEntries(
+    fields
+      .map((field) => [field.key, values[field.key]?.trim() ?? ""] as const)
+      .filter(([, value]) => value.length > 0),
+  );
+}
+
 function buildExecutionAction(input: {
   node: PlanNodeDataModel;
   selectedAction: PlanNodeAction | null;
@@ -358,6 +366,7 @@ function buildExecutionAction(input: {
 }): ExecutionActionInput {
   const kind = input.selectedAction?.kind;
   const inputText = buildInputText(input.fields, input.values);
+  const inputFields = buildInputFields(input.fields, input.values);
   const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
 
   if (kind === "approve" || input.node.interactionType === "approve") {
@@ -404,7 +413,7 @@ function buildExecutionAction(input: {
   return {
     action: "resume_with_input",
     nodeId: input.node.id,
-    inputText: inputText || input.selectedAction?.label || input.node.nextAction || "Continue",
+    inputFields,
   };
 }
 

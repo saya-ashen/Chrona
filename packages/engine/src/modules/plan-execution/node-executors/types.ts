@@ -27,6 +27,7 @@ export type NodeExecutionResult =
       summary: string;
       evidence: NodeExecutionEvidence;
       output?: unknown;
+      inputFields?: Record<string, string>;
       selectedBranch?: {
         label: string;
         nextNodeId: string;
@@ -78,5 +79,6 @@ export interface NodeExecutorInput {
   trigger: "manual" | "scheduler" | "system" | "auto";
   runtimeName: string;
   userInput?: string;
+  inputFields?: Record<string, string>;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
 }
