@@ -2,25 +2,15 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { AdvancedSettingsPanel } from "@/components/settings/advanced-settings-panel";
 import { useI18n } from "@/i18n/client";
 import { useAppRouter } from "@/lib/router";
-
-type WorkspaceSummary = {
-  id: string;
-  name: string;
-  _count: {
-    tasks: number;
-  };
-};
 
 type AdvancedSettingsDialogProps = {
   isOpen: boolean;
   closeHref: string;
-  workspaces: WorkspaceSummary[];
 };
 
-export function AdvancedSettingsDialog({ isOpen, closeHref, workspaces }: AdvancedSettingsDialogProps) {
+export function AdvancedSettingsDialog({ isOpen, closeHref }: AdvancedSettingsDialogProps) {
   const { t } = useI18n();
   const router = useAppRouter();
 
@@ -74,17 +64,10 @@ export function AdvancedSettingsDialog({ isOpen, closeHref, workspaces }: Advanc
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <AdvancedSettingsPanel
-            compact
-            title={t("pages.advancedSettings.title")}
-            subtitle={t("pages.advancedSettings.subtitle")}
-            workspaceManagementTitle={t("pages.advancedSettings.workspaceManagementTitle")}
-            workspaceManagementDescription={t("pages.advancedSettings.workspaceManagementDescription")}
-            openWorkspaces={t("pages.advancedSettings.openWorkspaces")}
-            taskCountOne={t("pages.advancedSettings.taskCountOne")}
-            taskCountOther={t("pages.advancedSettings.taskCountOther")}
-            workspaces={workspaces}
-          />
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">{t("pages.advancedSettings.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("pages.advancedSettings.subtitle")}</p>
+          </div>
         </div>
       </section>
     </>

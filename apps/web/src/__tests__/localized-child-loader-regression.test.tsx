@@ -27,14 +27,6 @@ const bootData: AppBootData = {
         advancedDescription: "advanced desc",
         openAdvancedSettings: "open",
       },
-      workspaces: {
-        title: "Workspaces",
-        subtitle: "subtitle",
-        notice: "notice",
-        taskCountOne: "task",
-        taskCountOther: "tasks",
-      },
-      workspaceOverview: { title: "Overview", subtitle: "subtitle" },
     },
     components: {
       inboxList: {},
@@ -80,7 +72,6 @@ const bootData: AppBootData = {
   } as unknown as AppBootData["schedule"])) as unknown as AppBootData["schedule"],
   inbox: {} as AppBootData["inbox"],
   memory: {} as AppBootData["memory"],
-  workspaces: [] as AppBootData["workspaces"],
 };
 
 describe("localized child pages under /:lang", () => {

@@ -162,14 +162,14 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId }: Props) {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <LocalizedLink
-                  href={`/workspaces/${task.workspaceId}/work/${task.id}`}
+                  href={`/work/${task.id}`}
                   className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
                 >
                   <PanelRightOpen className="size-3.5" />
                   <span className="hidden sm:inline">Workbench</span>
                 </LocalizedLink>
                 <LocalizedLink
-                  href={`/workspaces/${task.workspaceId}/tasks/${task.id}`}
+                  href={`/tasks/${task.id}`}
                   className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
                 >
                   <ExternalLink className="size-3.5" />

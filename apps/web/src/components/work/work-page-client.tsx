@@ -134,7 +134,6 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
         syncLabel={syncLabel}
         isStale={data.reliability.isStale}
         description={passiveHeroGuidance.description || taskSummary}
-        workspaceId={data.taskShell.workspaceId}
         taskId={data.taskShell.id}
       />
 

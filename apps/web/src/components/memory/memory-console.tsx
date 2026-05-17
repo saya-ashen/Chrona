@@ -51,7 +51,7 @@ export function MemoryConsole({ items, copy: copyProp }: MemoryConsoleProps) {
           </div>
           <div className="flex flex-wrap gap-2">
             {item.taskId ? (
-              <TaskContextLinks workspaceId={item.workspaceId} taskId={item.taskId} workLabel={copy.openWorkbench} />
+              <TaskContextLinks taskId={item.taskId} workLabel={copy.openWorkbench} />
             ) : null}
             {item.actions ?? <button type="button" className={buttonVariants({ variant: "outline" })}>{copy.invalidate}</button>}
           </div>

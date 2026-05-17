@@ -64,7 +64,6 @@ export function InboxList({ items, copy: copyProp }: InboxListProps) {
             <p>{item.consequence}</p>
           </div>
           <TaskContextLinks
-            workspaceId={item.workspaceId}
             taskId={item.sourceTaskId}
             workLabel={item.kind === "schedule_proposal" ? copy.openWorkContext : copy.openWorkbench}
           />

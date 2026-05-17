@@ -61,11 +61,11 @@ describe("MemoryConsole", () => {
     expect(screen.getByText(/run_projection/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
       "href",
-      "/en/workspaces/ws_1/tasks/task_1",
+      "/en/tasks/task_1",
     );
     expect(screen.getByRole("link", { name: "Open Workbench" })).toHaveAttribute(
       "href",
-      "/en/workspaces/ws_1/work/task_1",
+      "/en/work/task_1",
     );
   });
 });

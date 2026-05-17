@@ -25,7 +25,7 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
               {copy?.openSchedule ?? "Open Schedule"}
             </LocalizedLink>
           ) : item.kind === "approval" ? null : (
-            <LocalizedLink href={`/workspaces/${item.workspaceId}/work/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
+            <LocalizedLink href={`/work/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
               {copy?.openWorkbench ?? "Open Workbench"}
             </LocalizedLink>
           ),

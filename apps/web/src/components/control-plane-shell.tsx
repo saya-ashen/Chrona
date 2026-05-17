@@ -41,7 +41,6 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
       if (segment === "tasks") return t("nav.tasks");
       if (segment === "workbench") return t("nav.workbench");
       if (segment === "settings") return t("nav.settings");
-      if (segment === "workspaces") return t("nav.workspaces");
       if (segment === "work") return "Workbench";
       return segment;
     });

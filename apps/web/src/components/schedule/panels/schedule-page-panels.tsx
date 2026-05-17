@@ -286,7 +286,6 @@ export function QueueCard({
                 onSaveTaskConfigAction={onSaveTaskConfigAction}
               />
               <TaskContextLinks
-                workspaceId={item.workspaceId}
                 taskId={item.taskId}
                 latestRunStatus={item.latestRunStatus}
                 workLabel="Open Workbench"

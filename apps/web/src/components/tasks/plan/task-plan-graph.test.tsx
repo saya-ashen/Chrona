@@ -212,13 +212,13 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-workspace-status", "completed");
+    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-execution-status", "completed");
     expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-has-artifacts", "true");
-    expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute("data-node-workspace-status", "running");
-    expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute("data-node-workspace-status", "waiting");
-    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-workspace-status", "approval-needed");
+    expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute("data-node-execution-status", "running");
+    expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute("data-node-execution-status", "waiting");
+    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-execution-status", "approval-needed");
     expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-requires-action", "true");
-    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-workspace-status", "blocked");
+    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-execution-status", "blocked");
     expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-requires-action", "true");
   });
 
@@ -255,7 +255,7 @@ describe("TaskPlanGraph", () => {
 
     const node = screen.getByTestId("task-plan-node-node-long");
     expect(node).toHaveTextContent(longTitle);
-    expect(node).toHaveAttribute("data-node-workspace-status", "blocked");
+    expect(node).toHaveAttribute("data-node-execution-status", "blocked");
     expect(node).toHaveClass("overflow-hidden");
     expect(screen.getByText(longTitle)).toHaveClass("break-words");
 

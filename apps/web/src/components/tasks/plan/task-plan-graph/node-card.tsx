@@ -4,7 +4,7 @@ import { NODE_WIDTH } from "./constants";
 import { getShapeClassName, nodeKindLabel, TONE_STYLES } from "./logic";
 import type { FlowGraphNode } from "./types";
 
-function resolveWorkspaceStatus(node: FlowGraphNode["data"]["node"]) {
+function resolveExecutionStatus(node: FlowGraphNode["data"]["node"]) {
   if (node.status === "done" || node.status === "completed" || node.status === "skipped") return "completed";
   if (node.status === "active" || node.status === "in_progress") return "running";
   if (node.status === "waiting_for_user" || node.interactionType === "approve" || node.requiresHumanInput) return "approval-needed";
@@ -136,8 +136,8 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const runtimeSpotlight = resolveRuntimeSpotlight(node);
   const interactionFrame = resolveInteractionFrame(node);
   const durationLabel = formatEstimatedMinutes(node.estimatedMinutes ?? null);
-  const workspaceStatus = resolveWorkspaceStatus(node);
-  const requiresAction = node.status === "blocked" || workspaceStatus === "approval-needed";
+  const executionStatus = resolveExecutionStatus(node);
+  const requiresAction = node.status === "blocked" || executionStatus === "approval-needed";
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
@@ -157,7 +157,7 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         data-node-requires-action={requiresAction ? "true" : "false"}
         data-node-selected={isSelected ? "true" : "false"}
         data-node-step={stepNumber}
-        data-node-workspace-status={workspaceStatus}
+        data-node-execution-status={executionStatus}
         className={cn(
           "rf-node-button group relative w-full overflow-hidden border px-3 py-2 text-left transition-colors duration-150",
           "before:absolute before:inset-y-3 before:left-0 before:w-px before:rounded-r-full before:content-['']",

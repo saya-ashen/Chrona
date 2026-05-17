@@ -2,7 +2,6 @@
   "nav": {
     "brandTitle": "Chrona",
     "brandTagline": "Turn tasks into executable AI work",
-    "workspaces": "Workspaces",
     "schedule": "Schedule",
     "tasks": "Tasks",
     "workbench": "Workbench",
@@ -70,7 +69,7 @@
       "noRecentApprovals": "No recent approvals.",
       "recentArtifactsTitle": "Recent Artifacts",
       "noArtifacts": "No artifacts yet.",
-      "workspaceState": "Workspace state",
+      "workspaceState": "Execution state",
       "currentState": "Current state",
       "nextAction": "Next action",
       "stateRunning": "Running",
@@ -125,19 +124,6 @@
       "quickEdit": "Quick edit",
       "saveTaskConfig": "Save task config",
       "saving": "Saving…"
-    },
-    "workspaceOverview": {
-      "runningTasks": "Running Tasks",
-      "waitingForApproval": "Waiting for Approval",
-      "blockedOrFailed": "Blocked / Failed Tasks",
-      "scheduleRisks": "Schedule Risks",
-      "upcomingDeadlines": "Upcoming Deadlines",
-      "recentlyUpdated": "Recently Updated Tasks",
-      "sectionDescription": "Keep the highest-value tasks visible without opening every detail page.",
-      "noItems": "No items",
-      "noRunYet": "No run yet",
-      "openTask": "Open task",
-      "noActivityYet": "No activity yet"
     },
     "inboxList": {
       "risk": "Risk",
@@ -442,12 +428,12 @@
       "collaborationFlowDescription": "After input, messages appear in chronological order below: Agent on the left, you on the right.",
       "conversationTab": "Collaborative progress",
       "fullFlowTab": "Execution record",
-      "workbenchViewTabs": "Workspace view tabs",
+      "workbenchViewTabs": "Workbench view tabs",
       "latestResult": "Latest result",
       "inputArea": "Input area",
       "quickPrompts": "Quick prompts",
       "newTask": "New task",
-      "workspaceViews": "Workspace views",
+      "workspaceViews": "Workbench views",
       "allTasks": "Task list",
       "openInbox": "Inbox",
       "openMemory": "Memory",
@@ -864,18 +850,11 @@
       "subtitle": "Review active memory records and deactivate stale guidance when it no longer applies.",
       "invalidate": "Invalidate"
     },
-    "workspaces": {
-      "title": "Workspaces",
-      "subtitle": "Advanced workspace management for internal or multi-workspace operations.",
-      "notice": "Most people should start from Schedule, Tasks, Inbox, and Memory. This page is mainly for deeper workspace administration.",
-      "taskCountOne": "task",
-      "taskCountOther": "tasks"
-    },
     "settings": {
       "title": "Settings",
-      "subtitle": "Configure AI clients and access advanced workspace controls.",
+      "subtitle": "Configure AI clients and advanced controls.",
       "advancedTitle": "Advanced",
-      "advancedDescription": "Workspace management and deeper operational controls live outside the daily task flow.",
+      "advancedDescription": "Deeper operational controls live outside the daily task flow.",
       "openAdvancedSettings": "Open Advanced Settings",
       "aiClientsDescription": "Manage AI clients and configure which client each feature uses",
       "manageAiClients": "Manage AI Clients",
@@ -914,16 +893,7 @@
     },
     "advancedSettings": {
       "title": "Advanced Settings",
-      "subtitle": "Internal controls that stay available without becoming the default workflow.",
-      "workspaceManagementTitle": "Workspace management",
-      "workspaceManagementDescription": "The product now defaults into a single-workspace UX. Use workspace management only for advanced or internal operations.",
-      "openWorkspaces": "Open Workspaces",
-      "taskCountOne": "task",
-      "taskCountOther": "tasks"
-    },
-    "workspaceOverview": {
-      "title": "Workspace Overview",
-      "subtitle": "Triage runs, approvals, and schedule risks before diving into execution detail."
+      "subtitle": "Internal controls that stay available without becoming the default workflow."
     }
   }
 }

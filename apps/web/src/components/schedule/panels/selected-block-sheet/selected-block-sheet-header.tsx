@@ -45,7 +45,6 @@ export function SelectedBlockSheetHeader({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <TaskContextLinks
-            workspaceId={item.workspaceId}
             taskId={item.taskId}
             latestRunStatus={item.latestRunStatus}
             workLabel={workLabel}
