@@ -224,4 +224,91 @@ describe("task-plan-view-model", () => {
       },
     ]);
   });
+
+  it("keeps skipped runtime branch nodes out of entry analytics", () => {
+    const readModel: TaskPlanReadModel = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      prompt: null,
+      summary: "午餐计划",
+      updatedAt: "2026-05-07T10:00:00.000Z",
+      generatedBy: "ai",
+      blueprint: {
+        title: "做汉堡",
+        goal: "完成午餐",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan,
+      effectivePlan: {
+        graphId: "graph-1",
+        planId: "plan-1",
+        basePlanId: "compiled-plan-1",
+        resolvedAt: "2026-05-07T10:00:00.000Z",
+        resolvedVersion: 3,
+        nodes: [
+          {
+            id: "condition-1",
+            nodeId: "condition-1",
+            activeLayerId: null,
+            semanticKey: "condition-1",
+            localId: "condition_local",
+            type: "condition",
+            title: "是否加芝士",
+            definition: { title: "是否加芝士", objective: "用户是否要芝士", semantics: { type: "condition" } },
+            config: compiledPlan.nodes[0]!.config,
+            dependencies: [],
+            dependents: ["task-yes"],
+            status: "completed",
+            invalidated: false,
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: false,
+            reachable: true,
+          },
+          {
+            id: "task-yes",
+            nodeId: "task-yes",
+            activeLayerId: null,
+            semanticKey: "task-yes",
+            localId: "task_add_cheese",
+            type: "task",
+            title: "加芝士",
+            definition: { title: "加芝士", objective: "加好芝士", semantics: { type: "task" } },
+            config: { expectedOutput: "加好芝士" },
+            dependencies: ["condition-1"],
+            dependents: [],
+            status: "skipped",
+            invalidated: false,
+            attempts: 0,
+            metadata: {},
+            dependenciesSatisfied: false,
+            ready: false,
+            reachable: false,
+          },
+        ],
+        edges: [
+          { id: "edge-yes", from: "condition-1", to: "task-yes", label: "是", active: false },
+        ],
+        entryNodeIds: ["condition-1"],
+        terminalNodeIds: ["condition-1"],
+        readyNodeIds: [],
+        blockedNodeIds: [],
+        completedNodeIds: ["condition-1", "task-yes"],
+        runningNodeIds: [],
+        invalidatedNodeIds: [],
+        failedNodeIds: [],
+        pendingNodeIds: [],
+      },
+    };
+
+    const graphPlan = taskPlanReadModelToGraphPlan(readModel);
+
+    expect(graphPlan?.steps.find((step) => step.id === "task-yes")?.status).toBe("skipped");
+    expect(graphPlan?.analytics.entryNodeIds).toEqual(["condition-1"]);
+    expect(graphPlan?.analytics.entryNodeIds).not.toContain("task-yes");
+  });
 });

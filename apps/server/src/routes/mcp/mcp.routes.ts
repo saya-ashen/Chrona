@@ -7,40 +7,16 @@ import type { ChronaEngine } from "@chrona/engine";
 import { createLogger } from "@chrona/shared/logger";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { planBlueprintSchema } from "@chrona/contracts";
-import { chronaToolInputSchema, type ChronaToolName } from "@chrona/contracts/api";
+import {
+  chronaPublicToolPayloadSchemas,
+  chronaToolInputSchema,
+  type ChronaToolName,
+  type ChronaToolResult,
+} from "@chrona/contracts/api";
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
 const logger = createLogger("apps.server.mcp");
-
-const optionalString = z.string().min(1).optional();
-
-const baseReadSchema = z.object({}).passthrough();
-const outputsSchema = z.array(z.unknown()).optional();
-const taskCompleteSchema = z.object({
-  summary: z.string().min(1).describe("Short completion summary for the current task node."),
-  outputs: outputsSchema.describe("Optional structured outputs produced by the current node."),
-}).strict();
-const conditionSelectSchema = z.object({
-  branchRef: z.string().min(1).describe("AI-visible branch ref from chrona_node_read or runtime input."),
-  summary: z.string().min(1).describe("Short reason for selecting this branch."),
-  outputs: outputsSchema,
-}).strict();
-const blockSchema = z.object({
-  reason: z.string().min(1),
-  requiredInput: optionalString,
-  retryable: z.boolean().optional(),
-}).strict();
-const failSchema = z.object({
-  error: z.string().min(1),
-  retryable: z.boolean().optional(),
-  diagnostics: z.unknown().optional(),
-}).strict();
-const waitCompleteSchema = z.object({
-  summary: z.string().min(1),
-  outputs: outputsSchema,
-}).strict();
 
 const hiddenContextKeys = new Set([
   "workspaceId",
@@ -67,7 +43,7 @@ function publicToolSchema(schema: z.ZodObject) {
     ctx.addIssue({
       code: z.ZodIssueCode.unrecognized_keys,
       keys: unrecognizedKeys,
-      message: `Unrecognized key${unrecognizedKeys.length === 1 ? "" : "s"}: ${unrecognizedKeys.map((key) => `\"${key}\"`).join(", ")}`,
+      message: `Unrecognized key${unrecognizedKeys.length === 1 ? "" : "s"}: ${unrecognizedKeys.map((key) => `"${key}"`).join(", ")}`,
     });
   });
 }
@@ -77,55 +53,55 @@ const externalTools = {
     internalName: "chrona.execution.read",
     title: "Chrona Execution Read",
     description: "Read execution session state and supported next actions.",
-    inputSchema: publicToolSchema(baseReadSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.execution.read"]),
   },
   chrona_plan_read: {
     internalName: "chrona.plan.read",
     title: "Chrona Plan Read",
     description: "Read accepted plan state through AI-visible refs.",
-    inputSchema: publicToolSchema(baseReadSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.read"]),
   },
   chrona_plan_generate: {
     internalName: "chrona.plan.generate",
     title: "Chrona Plan Generate",
     description: "Generate a draft plan for the session task from a complete plan blueprint.",
-    inputSchema: publicToolSchema(planBlueprintSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.generate"]),
   },
   chrona_node_read: {
     internalName: "chrona.node.read",
     title: "Chrona Node Read",
     description: "Read current execution node state through AI-visible refs.",
-    inputSchema: publicToolSchema(baseReadSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.read"]),
   },
   chrona_task_complete: {
     internalName: "chrona.node.task_complete",
     title: "Chrona Task Complete",
     description: "Complete the current task node. Chrona resolves the active node from the session.",
-    inputSchema: publicToolSchema(taskCompleteSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.task_complete"]),
   },
   chrona_condition_select: {
     internalName: "chrona.node.condition_select",
     title: "Chrona Condition Select",
     description: "Select the current condition branch by branchRef. Does not accept backend node IDs.",
-    inputSchema: publicToolSchema(conditionSelectSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.condition_select"]),
   },
   chrona_node_block: {
     internalName: "chrona.node.block",
     title: "Chrona Node Block",
     description: "Block the current node with a reason. Chrona resolves the active node from the session.",
-    inputSchema: publicToolSchema(blockSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.block"]),
   },
   chrona_node_fail: {
     internalName: "chrona.node.fail",
     title: "Chrona Node Fail",
     description: "Fail the current node with an unrecoverable error. Chrona resolves the active node from the session.",
-    inputSchema: publicToolSchema(failSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.fail"]),
   },
   chrona_wait_complete: {
     internalName: "chrona.node.wait_complete",
     title: "Chrona Wait Complete",
     description: "Complete the current wait node when the wait condition is explicitly satisfied.",
-    inputSchema: publicToolSchema(waitCompleteSchema),
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.wait_complete"]),
   },
 } as const satisfies Record<string, {
   internalName: ChronaToolName;
@@ -181,6 +157,21 @@ function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaTool
     return `${toolName}:${hash}`;
   }
   return undefined;
+}
+
+function aiVisibleToolResult(toolName: ChronaToolName, result: ChronaToolResult): Record<string, unknown> {
+  if (result.status === "accepted") {
+    return toolName.endsWith(".read")
+      ? { status: result.status, message: result.message, state: result.state }
+      : { status: result.status, message: result.message, next: "stop" };
+  }
+
+  return {
+    status: result.status,
+    message: result.message,
+    reasonCode: result.reasonCode,
+    recovery: result.recovery,
+  };
 }
 
 function toChronaInput(
@@ -251,7 +242,7 @@ async function callChronaTool(
   });
   return {
     content: [{ type: "text", text: result.message }],
-    structuredContent: result,
+    structuredContent: aiVisibleToolResult(toolName, result),
     isError: result.status === "rejected",
   };
 }

@@ -100,7 +100,13 @@ export class HermesProviderClient implements AgentProviderClient {
           };
         }
         if (response.status === 401 || response.status === 403) {
-          return misconfiguredHealth(checkedAt, latencyMs, response.status, "health check", raw);
+          return misconfiguredHealth(
+            checkedAt,
+            latencyMs,
+            response.status,
+            "health check",
+            raw,
+          );
         }
         lastReason = `Hermes health check returned HTTP ${response.status}`;
       } catch (error) {
@@ -129,12 +135,20 @@ export class HermesProviderClient implements AgentProviderClient {
           };
         }
         if (response.status === 401 || response.status === 403) {
-          return misconfiguredHealth(checkedAt, latencyMs, response.status, "capabilities check", raw);
+          return misconfiguredHealth(
+            checkedAt,
+            latencyMs,
+            response.status,
+            "capabilities check",
+            raw,
+          );
         }
         lastReason = `Hermes capabilities check returned HTTP ${response.status}`;
       } catch (error) {
         lastReason =
-          error instanceof Error ? error.message : "Hermes capabilities check failed";
+          error instanceof Error
+            ? error.message
+            : "Hermes capabilities check failed";
       }
     }
 
@@ -166,6 +180,7 @@ export class HermesProviderClient implements AgentProviderClient {
     input: StartRunInput & { idempotencyKey?: string },
   ): Promise<ProviderRunRef> {
     const body = buildRunBody(input);
+    console.log("startRun body", body);
     const response = await this.http.request("/v1/runs", {
       method: "POST",
       body: JSON.stringify(body),

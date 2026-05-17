@@ -544,27 +544,53 @@ export interface SemanticRefHistory {
 }
 
 export interface NodeRuntimeInput {
-  taskRef: string;
-  planRef: string;
   node: {
     ref: string;
     type: "task" | "checkpoint" | "condition" | "wait";
     title: string;
     objective?: string;
-    status: NodeRuntimeStatus;
-    config?: unknown;
+    expectedOutput?: string;
+    completionCriteria?: string;
+    condition?: string;
+    checkpoint?: {
+      type: string;
+      prompt: string;
+      options?: string[];
+    };
+    wait?: {
+      waitFor: string;
+      timeout?: WaitConfig["timeout"];
+    };
+  };
+  context: {
+    taskTitle?: string;
+    relevantPreviousResults: Array<{
+      nodeRef: string;
+      title: string;
+      summary?: string;
+      outputs?: unknown[];
+    }>;
+    globalSummary?: string;
   };
   branchOptions?: Array<{
     ref: string;
     key: string;
     label: string;
   }>;
-  previousResults: Array<{
-    nodeRef: string;
-    title: string;
-    summary?: string;
-  }>;
-  allowedTerminalTools: string[];
+  currentNodeResultActions: {
+    actionNames: string[];
+    completeSchema?: {
+      summary: "string";
+      outputs: Array<{ kind: "json"; value: Record<string, unknown> }>;
+    };
+    conditionSelectSchema?: {
+      branchRef: "branchOptions[].ref";
+      summary: "string";
+    };
+    blockSchema?: { reason: "string" };
+    failSchema?: { error: "string" };
+    waitCompleteSchema?: { summary: "string" };
+  };
 }
 
 export interface ResultLayer {

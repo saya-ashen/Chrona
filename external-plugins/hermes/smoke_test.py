@@ -137,6 +137,21 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
         self.assertEqual(result["arguments"]["evidence"]["hermes"]["model"], "hermes-model")
         self.assertEqual(result["arguments"]["evidence"]["hermes"]["platform"], "cli")
 
+    def test_handler_preserves_non_ascii_tool_results(self):
+        tools._safe_json_rpc = lambda method, params=None: {
+            "status": "accepted",
+            "message": "工具已执行。",
+            "state": {"taskTitle": "制作一个汉堡"},
+        }
+        handler = tools.handler_for_chrona_tool("chrona.task.read")
+
+        raw = handler({"taskId": "task-1"})
+        result = json.loads(raw)
+
+        self.assertIn("制作一个汉堡", raw)
+        self.assertNotIn("\\u5236", raw)
+        self.assertEqual(result["state"]["taskTitle"], "制作一个汉堡")
+
     def test_explicit_actor_and_evidence_are_preserved(self):
         enriched = tools._inject_session_context(
             {

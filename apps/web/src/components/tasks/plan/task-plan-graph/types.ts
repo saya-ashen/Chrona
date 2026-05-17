@@ -81,6 +81,7 @@ export type PlanNodeDataModel = {
   priority?: string | null;
   linkedTaskId?: string | null;
   readiness?: "ready" | "blocked" | "waiting";
+  reachable?: boolean;
   requiresHumanInput?: boolean;
   dependencies?: string[];
   requiredInfo?: string[];

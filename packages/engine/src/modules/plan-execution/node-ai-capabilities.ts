@@ -186,7 +186,7 @@ export async function executeTaskNodeCapability(
         : "execute_task_node",
     instructions: runtime.instructions,
     inputText: JSON.stringify(runtime.runtimeInput, null, 2),
-    terminalToolName: runtime.runtimeInput.allowedTerminalTools[0],
+    terminalToolName: runtime.runtimeInput.currentNodeResultActions.actionNames[0],
   };
 
   return runTaskNodeFeature({

@@ -220,9 +220,31 @@ describe("MCP routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       result: {
         content: [{ type: "text", text: "Tool executed." }],
-        structuredContent: { status: "accepted", state: { taskStatus: "Ready" } },
+        structuredContent: { status: "accepted", message: "Tool executed.", state: { taskStatus: "Ready" } },
       },
     });
+  });
+
+  it("returns slim accepted mutating tool results to the model", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_task_complete",
+        arguments: { summary: "Done" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result.structuredContent).toEqual({
+      status: "accepted",
+      message: "Tool executed.",
+      next: "stop",
+    });
+    expect(JSON.stringify(body.result.structuredContent)).not.toContain("operationId");
+    expect(JSON.stringify(body.result.structuredContent)).not.toContain("affected");
+    expect(JSON.stringify(body.result.structuredContent)).not.toContain("auditRef");
+    expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotency");
   });
 
   it("dispatches every exposed Chrona MCP tool to the expected internal operation", async () => {
@@ -284,7 +306,8 @@ describe("MCP routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.result.structuredContent.status).toBe("accepted");
-    expect(body.result.structuredContent.state.idempotencyKey).toContain("chrona.node.task_complete:");
+    expect(body.result.structuredContent.next).toBe("stop");
+    expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotencyKey");
   });
 
   it("accepts hidden context injected into plan generation arguments", async () => {
@@ -376,7 +399,8 @@ describe("MCP routes", () => {
       result: {
         structuredContent: {
           status: "accepted",
-          affected: { taskId: "task-from-session" },
+          message: "Tool executed.",
+          state: { taskStatus: "Ready" },
         },
       },
     });
@@ -418,6 +442,56 @@ describe("MCP routes", () => {
     expect(taskComplete.inputSchema.properties.idempotencyKey).toBeUndefined();
     expect(taskComplete.inputSchema.properties.evidence).toBeUndefined();
     expect(taskComplete.inputSchema.properties.expectedRevision).toBeUndefined();
+  });
+
+  it("exposes the same structured output contract used to validate task completion", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const taskComplete = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_task_complete",
+    );
+
+    expect(taskComplete.inputSchema.properties.outputs).toMatchObject({
+      type: "array",
+      items: {
+        oneOf: expect.arrayContaining([
+          expect.objectContaining({
+            required: expect.arrayContaining(["kind", "value"]),
+            properties: expect.objectContaining({
+              kind: expect.objectContaining({ const: "json" }),
+              value: expect.any(Object),
+            }),
+          }),
+          expect.objectContaining({
+            required: expect.arrayContaining(["kind", "content"]),
+            properties: expect.objectContaining({
+              kind: expect.objectContaining({ const: "text" }),
+              content: expect.objectContaining({ type: "string" }),
+            }),
+          }),
+        ]),
+      },
+    });
+  });
+
+  it("rejects task completion outputs that pass the old loose public schema", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_task_complete",
+        arguments: {
+          summary: "Done",
+          outputs: [{ type: "script_spec", value: { ok: true } }],
+        },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).toContain("kind");
+    expect(JSON.stringify(body)).toContain("Invalid discriminator value");
   });
 
   it("rejects backend IDs in public condition terminal schema", async () => {

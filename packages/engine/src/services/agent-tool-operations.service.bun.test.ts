@@ -9,6 +9,7 @@ function service() {
     planPatch: 0,
     taskUpdate: 0,
     dispatchActions: [] as unknown[],
+    submittedNodeResults: [] as unknown[],
   };
   const task = {
     id: "task-1",
@@ -71,6 +72,10 @@ function service() {
         calls.dispatchActions.push((input as { action?: unknown }).action);
         return { result: { status: "running", sessionId: "session-1" } };
       },
+      submitNodeResult: async (input: unknown) => {
+        calls.submittedNodeResults.push((input as { action?: unknown }).action);
+        return { result: { status: "running", sessionId: "session-1" } };
+      },
       syncRuntimeResult: async () => ({}),
     },
   } as unknown as Parameters<typeof createAgentToolOperationsService>[0]) as ReturnType<typeof createAgentToolOperationsService> & { calls: typeof calls };
@@ -108,6 +113,9 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
     },
     execution: {
       dispatch: async () => {
+        throw new EngineError(ENGINE_ERROR_CODES[code], "Mapped failure");
+      },
+      submitNodeResult: async () => {
         throw new EngineError(ENGINE_ERROR_CODES[code], "Mapped failure");
       },
       syncRuntimeResult: async () => ({}),
@@ -196,6 +204,41 @@ describe("agent tool operations service", () => {
     })).resolves.toMatchObject({
       workspaceId: workspace.id,
       taskId: task.id,
+    });
+  });
+
+  it("resolves runtime run refs to task and workspace context", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Runtime Ref Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Runtime mapped task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "hermes-run-1",
+        runtimeSessionRef: "hermes-session-1",
+        status: "Running",
+        triggeredBy: "agent",
+      },
+    });
+
+    await expect(service().resolveInputContext({
+      sessionId: "hermes-run-1",
+      actorType: "agent",
+    })).resolves.toMatchObject({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      sessionId: "hermes-run-1",
     });
   });
 
@@ -374,7 +417,8 @@ describe("agent tool operations service", () => {
       }),
     ).resolves.toMatchObject({ status: "accepted" });
 
-    expect(agentTools.calls.dispatchActions).toEqual([
+    expect(agentTools.calls.dispatchActions).toEqual([]);
+    expect(agentTools.calls.submittedNodeResults).toEqual([
       {
         action: "complete_manual_node",
         sessionId: "session-1",

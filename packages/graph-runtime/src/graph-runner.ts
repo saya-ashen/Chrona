@@ -292,6 +292,7 @@ export type GraphRuntimeCommand =
       trigger?: GraphExecutionTrigger;
       context: unknown;
       externalResult: GraphExternalSyncResult;
+      continueExecution?: boolean;
     };
 
 export type GraphRuntimePolicies = {
@@ -1325,25 +1326,32 @@ export function createGraphRuntime<TContext = unknown>(
             nodeId: command.externalResult.nodeId,
             status: command.externalResult.status,
           });
-          if (command.externalResult.status !== "done") {
+          if (command.externalResult.status !== "done" || command.continueExecution === false) {
             const effective = resolveEffectivePlanGraph(syncedState);
             const waitKind =
               command.externalResult.status === "blocked"
                 ? "manual_action"
                 : undefined;
+            const terminalStatus = mapTerminalReasonToGraphStatus(effective);
             return {
               status:
-                command.externalResult.status === "blocked"
+                command.externalResult.status === "done"
+                  ? terminalStatus === "completed"
+                    ? "completed"
+                    : "running"
+                  : command.externalResult.status === "blocked"
                   ? "blocked"
                   : "blocked",
-              currentNodeId: command.externalResult.nodeId,
+              currentNodeId: command.externalResult.status === "done" ? null : command.externalResult.nodeId,
               executedNodeIds: [],
               effective,
               state: syncedState,
               events,
               waitKind,
               message:
-                command.externalResult.status === "failed"
+                command.externalResult.status === "done"
+                  ? "External result accepted. Continuation pending."
+                  : command.externalResult.status === "failed"
                   ? command.externalResult.error
                   : command.externalResult.status === "cancelled"
                     ? (command.externalResult.reason ??

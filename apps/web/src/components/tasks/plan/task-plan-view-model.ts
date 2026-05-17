@@ -69,6 +69,7 @@ function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined)
     case "completed":
       return "done";
     case "cancelled":
+    case "skipped":
       return "skipped";
     case "ready":
       return "ready";
@@ -393,6 +394,7 @@ function toPlanNode(node: {
   requiredInfo?: string[];
   status?: EffectivePlanNode["status"] | null;
   ready?: boolean;
+  reachable?: boolean;
   result?: EffectivePlanNode["result"] | null;
   nextAction?: string | null;
   config: NodeConfig;
@@ -436,6 +438,7 @@ function toPlanNode(node: {
     priority: node.priority ?? null,
     linkedTaskId: node.linkedTaskId ?? null,
     readiness: node.ready ? "ready" : status === "blocked" ? "blocked" : "waiting",
+    reachable: node.reachable ?? true,
     dependencies: node.dependencies ?? [],
     requiredInfo,
     nextAction: node.nextAction ?? null,
@@ -482,6 +485,8 @@ function edgeKindFromLabel(label: string | null | undefined, sourceKind: PlanNod
 
 function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]): PlanGraphAnalytics {
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const activeNodes = nodes.filter((node) => node.reachable !== false && node.status !== "skipped");
+  const activeNodeIds = new Set(activeNodes.map((node) => node.id));
   const incoming = new Map<string, string[]>();
   const outgoing = new Map<string, string[]>();
 
@@ -494,13 +499,14 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
     const from = edge.from ?? edge.fromNodeId;
     const to = edge.to ?? edge.toNodeId;
     if (!from || !to) continue;
+    if (!activeNodeIds.has(from) || !activeNodeIds.has(to)) continue;
     incoming.get(to)?.push(from);
     outgoing.get(from)?.push(to);
   }
 
-  const entryNodeIds = nodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
-  const terminalNodeIds = nodes.filter((node) => (outgoing.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
-  const activeNodeIds = nodes.filter((node) => node.status === "active").map((node) => node.id);
+  const entryNodeIds = activeNodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
+  const terminalNodeIds = activeNodes.filter((node) => (outgoing.get(node.id)?.length ?? 0) === 0).map((node) => node.id);
+  const runningNodeIds = activeNodes.filter((node) => node.status === "active").map((node) => node.id);
   const attentionNodeIds = nodes.filter((node) => node.status === "waiting" || node.status === "blocked").map((node) => node.id);
   const blockedNodeIds = nodes.filter((node) => node.status === "blocked").map((node) => node.id);
 
@@ -557,7 +563,7 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
       for (const next of outgoing.get(current) ?? []) pending.push(next);
     }
   };
-  walk(activeNodeIds.length > 0 ? activeNodeIds : entryNodeIds);
+  walk(runningNodeIds.length > 0 ? runningNodeIds : entryNodeIds);
 
   const distance = new Map<string, number>();
   for (const nodeId of topo) {
@@ -588,7 +594,7 @@ function buildAnalytics(nodes: PlanNodeDataModel[], edges: PlanEdgeDataModel[]):
   return {
     entryNodeIds,
     terminalNodeIds,
-    activeNodeIds,
+    activeNodeIds: runningNodeIds,
     reachableFromActiveIds: [...reachable],
     criticalPathNodeIds,
     attentionNodeIds,
@@ -721,6 +727,7 @@ export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null
         requiredInfo: readRuntimeArray(node, "requiredInfo"),
         status: node.status,
         ready: node.ready,
+        reachable: node.reachable,
         result: node.result,
         nextAction: readRuntimeString(node, "nextAction"),
         config: node.config,

@@ -33,6 +33,24 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
+  if (input.task.status === "Completed" && input.executionSession?.status !== "Paused") {
+    return {
+      persistedStatus: "Completed",
+      displayState: input.sync.stale ? "Sync Stale" : null,
+      blockReason: input.sync.stale
+        ? {
+            blockType: "sync_stale",
+            scope: "run",
+            actionRequired: "Re-sync",
+          }
+        : null,
+      blockSince: input.sync.stale
+        ? [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0]
+          ?.updatedAt ?? null
+        : null,
+    };
+  }
+
   const activeRun =
     input.runs.find((run) => run.id === input.task.latestRunId) ??
     [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0] ??
