@@ -27,6 +27,23 @@ function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPl
   };
 }
 
+function expectNoNodeOverlap(
+  nodes: Array<{ id: string; position: { x: number; y: number }; width?: number; height?: number }>,
+) {
+  for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+      const left = nodes[leftIndex];
+      const right = nodes[rightIndex];
+      const overlaps =
+        left.position.x < right.position.x + (right.width ?? 0) &&
+        left.position.x + (left.width ?? 0) > right.position.x &&
+        left.position.y < right.position.y + (right.height ?? 0) &&
+        left.position.y + (left.height ?? 0) > right.position.y;
+      expect(overlaps, `${left.id} overlaps ${right.id}`).toBe(false);
+    }
+  }
+}
+
 vi.mock("@/i18n/client", () => ({
   useI18n: () => ({ messages: {} }),
 }));
@@ -97,7 +114,7 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
   });
 
-  it("presents pending and accepted nodes with selectable execution-console states", () => {
+  it("presents pending and accepted nodes with selectable execution-console states", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -137,7 +154,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const pendingNode = screen.getByTestId("task-plan-node-node-pending");
+    const pendingNode = await screen.findByTestId("task-plan-node-node-pending");
     const acceptedNode = screen.getByTestId("task-plan-node-node-accepted");
     expect(pendingNode).toHaveTextContent("Ready");
     expect(pendingNode).toHaveAttribute("data-node-current", "true");
@@ -149,7 +166,7 @@ describe("TaskPlanGraph", () => {
     expect(acceptedNode).toHaveAttribute("data-node-shape", "parallelogram");
   });
 
-  it("maps user-facing execution states to stable node markers", () => {
+  it("maps user-facing execution states to stable node markers", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -212,7 +229,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-execution-status", "completed");
+    expect(await screen.findByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-execution-status", "completed");
     expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-has-artifacts", "true");
     expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute("data-node-execution-status", "running");
     expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute("data-node-execution-status", "waiting");
@@ -222,7 +239,7 @@ describe("TaskPlanGraph", () => {
     expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-requires-action", "true");
   });
 
-  it("keeps long titles, generated plan text, and error summaries contained in graph surfaces", () => {
+  it("keeps long titles, generated plan text, and error summaries contained in graph surfaces", async () => {
     const longTitle = "Investigate an unusually long generated execution node title that should stay clipped inside the graph card without hiding controls";
     const longObjective = "Generated plan text: collect logs, compare checkpoints, write a diagnostic summary, and include enough detail to reproduce the blocked execution state without expanding the node beyond the graph viewport.";
     const longError = "Provider timeout while waiting for checkpoint review output after multiple retries; keep this error visible in the inspector without overflowing the modal.";
@@ -253,7 +270,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const node = screen.getByTestId("task-plan-node-node-long");
+    const node = await screen.findByTestId("task-plan-node-node-long");
     expect(node).toHaveTextContent(longTitle);
     expect(node).toHaveAttribute("data-node-execution-status", "blocked");
     expect(node).toHaveClass("overflow-hidden");
@@ -280,7 +297,7 @@ describe("TaskPlanGraph", () => {
     expect(screen.getByText(/Select a plan node to inspect its goal/)).toBeInTheDocument();
   });
 
-  it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", () => {
+  it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -325,11 +342,11 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const graph = screen.getByLabelText("任务计划图");
+    const graph = await screen.findByLabelText("任务计划图");
     expect(graph).toBeInTheDocument();
     expect(graph).toHaveAttribute("data-renderer", "react-flow");
-    expect(graph).toHaveAttribute("data-layout-engine", "d3-dag-sugiyama");
-    expect(graph).toHaveAttribute("data-layout-direction", "LR");
+    expect(graph).toHaveAttribute("data-layout-engine", "elk-layered");
+    expect(graph).toHaveAttribute("data-layout-direction", "TB");
     expect(graph).toHaveAttribute("data-graph-interactive", "true");
     expect(graph).toHaveAttribute("data-graph-editable", "false");
     expect(graph).toHaveAttribute("data-canvas-pan", "true");
@@ -338,8 +355,14 @@ describe("TaskPlanGraph", () => {
     expect(graph.querySelector(".react-flow__pane.draggable")).not.toBeNull();
     expect(graph.querySelector(".react-flow__edges")).not.toBeNull();
     const currentFlowNode = graph.querySelector(".react-flow__node[data-id='node-current']") as HTMLElement | null;
-    expect(currentFlowNode?.querySelector("[data-handleid='right-source']")).not.toBeNull();
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-source']")?.style.opacity).toBe("0");
+    expect(currentFlowNode?.querySelector("[data-handleid='bottom-source']")).not.toBeNull();
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-source']")?.style.opacity).toBe("0");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-center-source']")?.style.left).toBe("50%");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='top-center-target']")?.style.left).toBe("50%");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-source']")?.style.left).toBe("56%");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-target']")?.style.left).toBe("44%");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-source']")?.style.top).toBe("56%");
+    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-target']")?.style.top).toBe("44%");
     expect(graph.querySelector("marker")).not.toBeNull();
     expect(graph.querySelector(".react-flow__edgelabel-renderer")?.childElementCount ?? 0).toBe(0);
 
@@ -355,17 +378,26 @@ describe("TaskPlanGraph", () => {
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
     expect(legendOverlay?.className).toContain("absolute");
-    expect(legendOverlay?.className).toContain("bottom-0");
+    expect(legendOverlay?.className).toContain("bottom-4");
     expect(legendOverlay?.className).toContain("justify-center");
 
     const scrollShell = within(graph).getByTestId("task-plan-graph-scroll");
-    expect(scrollShell.className).toContain("overflow-auto");
+    expect(scrollShell.className).toContain("overflow-hidden");
+    expect(scrollShell).toHaveAttribute("data-wheel-pan", "scroll");
+    expect(scrollShell).toHaveAttribute("data-wheel-zoom", "modifier-or-pinch");
     expect(scrollShell.contains(legend)).toBe(false);
 
     const canvas = within(graph).getByTestId("task-plan-graph-canvas");
-    expect(Number.parseInt(canvas.style.height, 10)).toBeGreaterThanOrEqual(260);
-    expect(Number.parseInt(canvas.style.height, 10)).toBeLessThanOrEqual(540);
-    expect(Number.parseInt(canvas.style.minWidth, 10)).toBeLessThan(296 * 2 + 64);
+    expect(Number.parseInt(scrollShell.style.height, 10)).toBeGreaterThanOrEqual(260);
+    expect(Number.parseInt(scrollShell.style.height, 10)).toBeLessThanOrEqual(620);
+    expect(canvas.style.height).toBe("100%");
+    expect(canvas.style.minWidth).toBe("100%");
+
+    const wheelHint = within(graph).getByTestId("task-plan-graph-wheel-hint");
+    expect(wheelHint).toHaveTextContent("按住 Ctrl/⌘ 并滚动可缩放画布");
+    expect(wheelHint.className).toContain("opacity-0");
+    fireEvent.wheel(scrollShell, { deltaY: 120 });
+    expect(wheelHint.className).toContain("opacity-100");
 
     const currentNode = screen.getByTestId("task-plan-node-node-current");
     expect(currentNode.getAttribute("data-node-current")).toBe("true");
@@ -381,7 +413,7 @@ describe("TaskPlanGraph", () => {
     expect(childNode.getAttribute("data-node-display-type")).toBe("task");
   });
 
-  it("exposes graph flow controls and preserves selected node while controls are used", () => {
+  it("exposes graph flow controls and preserves selected node while controls are used", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -413,7 +445,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const selectedNode = screen.getByTestId("task-plan-node-node-next");
+    const selectedNode = await screen.findByTestId("task-plan-node-node-next");
     fireEvent.click(selectedNode);
 
     expect(selectedNode).toHaveAttribute("data-node-selected", "true");
@@ -437,7 +469,7 @@ describe("TaskPlanGraph", () => {
     expect(within(dialog).getByTestId("task-plan-node-node-next")).toHaveAttribute("data-node-selected", "true");
   });
 
-  it("keeps nodes clickable in read-only mode and keeps the expanded node above others within the visible graph frame", () => {
+  it("keeps nodes clickable in read-only mode and keeps the expanded node above others within the visible graph frame", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -492,8 +524,8 @@ describe("TaskPlanGraph", () => {
       />
     );
 
-    const graph = screen.getByLabelText("任务计划图");
-    const deliverableNode = screen.getByTestId("task-plan-node-node-deliverable");
+    const graph = await screen.findByLabelText("任务计划图");
+    const deliverableNode = await screen.findByTestId("task-plan-node-node-deliverable");
 
     fireEvent.click(deliverableNode);
 
@@ -513,11 +545,10 @@ describe("TaskPlanGraph", () => {
     expect(flowNodeWrapper?.style.zIndex).toBe("1000");
 
     const canvas = within(graph).getByTestId("task-plan-graph-canvas");
-    const scrollShell = within(graph).getByTestId("task-plan-graph-scroll");
-    expect(Number.parseInt(canvas.style.height, 10)).toBeGreaterThanOrEqual(Number.parseInt(scrollShell.style.height || "0", 10));
+    expect(canvas.style.height).toBe("100%");
   });
 
-  it("maps semantic node types to flowchart-like shapes", () => {
+  it("maps semantic node types to flowchart-like shapes", async () => {
     render(
       <TaskPlanGraph
         mode="full"
@@ -572,12 +603,12 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-node-condition")).toHaveAttribute("data-node-shape", "diamond");
+    expect(await screen.findByTestId("task-plan-node-node-condition")).toHaveAttribute("data-node-shape", "diamond");
     expect(screen.getByTestId("task-plan-node-node-task")).toHaveAttribute("data-node-shape", "rounded");
     expect(screen.getByTestId("task-plan-node-node-checkpoint")).toHaveAttribute("data-node-shape", "parallelogram");
   });
 
-  it("uses hybrid lanes for branch and sidecar nodes instead of a single vertical rail", () => {
+  it("uses hybrid lanes for branch and sidecar nodes instead of a single vertical rail", async () => {
     const plan = testPlan({
       state: "ready",
       currentStepId: "start",
@@ -640,8 +671,9 @@ describe("TaskPlanGraph", () => {
     });
     plan.analytics.criticalPathNodeIds = ["start", "choice"];
     plan.analytics.rankByNodeId = { start: 0, choice: 1, "branch-left": 2, "branch-right": 2, approval: 2 };
+    plan.analytics.laneByNodeId = { start: 0, choice: 0, "branch-left": -1, "branch-right": 1, approval: 2 };
 
-    const layout = buildFlowLayout({
+    const layout = await buildFlowLayout({
       plan,
       selectedNodeId: null,
       graphCopy: DEFAULT_GRAPH_COPY,
@@ -653,18 +685,25 @@ describe("TaskPlanGraph", () => {
     const left = nodeById.get("branch-left");
     const right = nodeById.get("branch-right");
     const approval = nodeById.get("approval");
+    const leftEdge = layout.edges.find((edge) => edge.id === "edge-choice-left");
+    const rightEdge = layout.edges.find((edge) => edge.id === "edge-choice-right");
 
     expect(choice?.data.layoutRole).toBe("primary");
     expect(left?.data.layoutRole).toBe("branch");
     expect(right?.data.layoutRole).toBe("branch");
     expect(approval?.data.layoutRole).toBe("sidecar");
-    expect(left?.position.y).not.toBeCloseTo(right?.position.y ?? 0, 0);
-    expect(approval?.position.y).not.toBeCloseTo(left?.position.y ?? 0, 0);
-    expect(approval?.position.y).not.toBeCloseTo(right?.position.y ?? 0, 0);
+    expect((left?.position.x ?? 0)).toBeLessThan(right?.position.x ?? 0);
+    expect(approval?.position.x ?? 0).toBeGreaterThan(choice?.position.x ?? 0);
+    expect(approval?.position.y ?? 0).toBeGreaterThan(choice?.position.y ?? 0);
+    expect(left?.position.x).not.toBeCloseTo(right?.position.x ?? 0, 0);
+    expect(Math.abs((right?.position.x ?? 0) - (left?.position.x ?? 0))).toBeGreaterThan(260);
+    expect(approval?.position.x).not.toBeCloseTo(choice?.position.x ?? 0, 0);
+    expect(leftEdge?.data?.orientation).toBe("vertical");
+    expect(rightEdge?.data?.orientation).toBe("vertical");
     expect(layout.contentWidth).toBeGreaterThan(360);
   });
 
-  it("keeps inactive condition branches visible as skipped paths", () => {
+  it("keeps inactive condition branches visible as skipped paths", async () => {
     const plan = testPlan({
       state: "ready",
       currentStepId: "branch-selected",
@@ -680,7 +719,7 @@ describe("TaskPlanGraph", () => {
     });
     plan.analytics.reachableFromActiveIds = ["choice", "branch-selected"];
 
-    const layout = buildFlowLayout({
+    const layout = await buildFlowLayout({
       plan,
       selectedNodeId: null,
       graphCopy: DEFAULT_GRAPH_COPY,
@@ -699,7 +738,7 @@ describe("TaskPlanGraph", () => {
     expect(skippedNode?.style?.opacity).toBe(0.48);
   });
 
-  it("switches mostly linear plans to horizontal layout with side handles", () => {
+  it("lays out long linear plans with ELK layered coordinates", async () => {
     const steps = Array.from({ length: 6 }, (_, index) => ({
       id: `node-${index + 1}`,
       title: `Step ${index + 1}`,
@@ -721,7 +760,7 @@ describe("TaskPlanGraph", () => {
       })),
     });
 
-    const layout = buildFlowLayout({
+    const layout = await buildFlowLayout({
       plan,
       selectedNodeId: null,
       graphCopy: DEFAULT_GRAPH_COPY,
@@ -729,16 +768,141 @@ describe("TaskPlanGraph", () => {
     });
     const nodeById = new Map(layout.nodes.map((node) => [node.id, node]));
 
-    expect(layout.layoutDirection).toBe("LR");
-    expect(nodeById.get("node-1")?.sourcePosition).toBe("right");
-    expect(nodeById.get("node-2")?.targetPosition).toBe("left");
-    expect(nodeById.get("node-2")?.position.x ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.x ?? 0) + 168);
-    expect(nodeById.get("node-6")?.position.x).toBeGreaterThan(nodeById.get("node-1")?.position.x ?? 0);
-    expect(layout.edges.every((edge) => edge.sourceHandle === "right-source" && edge.targetHandle === "left-target")).toBe(true);
-    expect(layout.edges.every((edge) => edge.data?.orientation === "horizontal")).toBe(true);
+    expect(layout.layoutDirection).toBe("TB");
+    expect(nodeById.get("node-1")?.sourcePosition).toBe("bottom");
+    expect(nodeById.get("node-2")?.targetPosition).toBe("top");
+    expect(nodeById.get("node-2")?.position.y ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.y ?? 0) + 100);
+    expect(nodeById.get("node-6")?.position.y ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.y ?? 0) + 500);
+    expectNoNodeOverlap(layout.nodes);
+    expect(layout.edges.some((edge) => edge.sourceHandle === "bottom-center-source" && edge.targetHandle === "top-center-target")).toBe(true);
+    expect(layout.edges.some((edge) => edge.data?.orientation === "vertical")).toBe(true);
   });
 
-  it("keeps branched plans horizontal while preserving branch roles", () => {
+  it("keeps condition branches and completed checkpoints separated with ELK", async () => {
+    const steps = [
+      { id: "need", title: "Confirm need", objective: "Scope", phase: "plan", status: "done" as const, type: "checkpoint" as const, displayType: "checkpoint" as const },
+      { id: "design", title: "Design script", objective: "Plan", phase: "plan", status: "done" as const, type: "task" as const, displayType: "task" as const },
+      { id: "build", title: "Build script", objective: "Implement", phase: "work", status: "done" as const, type: "task" as const, displayType: "task" as const },
+      { id: "verify", title: "Verify script", objective: "Test", phase: "verify", status: "done" as const, type: "task" as const, displayType: "task" as const },
+      { id: "choice", title: "Check result", objective: "Branch", phase: "decision", status: "done" as const, type: "condition" as const, displayType: "condition" as const },
+      { id: "blocked-summary", title: "Summarize blockers", objective: "Skipped", phase: "skip", status: "skipped" as const, type: "task" as const, displayType: "task" as const, reachable: false },
+      { id: "deliver", title: "Prepare delivery", objective: "Package", phase: "deliver", status: "done" as const, type: "task" as const, displayType: "task" as const },
+      { id: "confirm-write", title: "Confirm write scope", objective: "Manual checkpoint", phase: "review", status: "done" as const, requiresHumanInput: true, type: "checkpoint" as const, displayType: "checkpoint" as const },
+      { id: "write", title: "Write file", objective: "Persist", phase: "write", status: "done" as const, type: "task" as const, displayType: "task" as const },
+    ];
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "write",
+      steps,
+      edges: [
+        { id: "edge-need-design", fromNodeId: "need", toNodeId: "design", type: "sequential" },
+        { id: "edge-design-build", fromNodeId: "design", toNodeId: "build", type: "sequential" },
+        { id: "edge-build-verify", fromNodeId: "build", toNodeId: "verify", type: "sequential" },
+        { id: "edge-verify-choice", fromNodeId: "verify", toNodeId: "choice", type: "sequential" },
+        { id: "edge-choice-blocked", fromNodeId: "choice", toNodeId: "blocked-summary", kind: "branch_option", active: false, emphasis: "inactive" },
+        { id: "edge-choice-deliver", fromNodeId: "choice", toNodeId: "deliver", kind: "branch_option", active: true },
+        { id: "edge-deliver-confirm", fromNodeId: "deliver", toNodeId: "confirm-write", type: "sequential" },
+        { id: "edge-confirm-write", fromNodeId: "confirm-write", toNodeId: "write", type: "sequential" },
+      ],
+    });
+
+    const layout = await buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+    const nodeById = new Map(layout.nodes.map((node) => [node.id, node]));
+
+    expectNoNodeOverlap(layout.nodes);
+    expect(nodeById.get("confirm-write")?.data.layoutRole).toBe("primary");
+    expect(layout.edges.find((edge) => edge.id === "edge-choice-blocked")?.style?.strokeDasharray).toBe("3 6");
+  });
+
+  it("keeps wide task fan-out flowing top-to-bottom through branch nodes", async () => {
+    const branchIds = ["branch-a", "branch-b", "branch-c", "branch-d", "branch-e"];
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "start",
+      steps: [
+        { id: "start", title: "Start", objective: "Begin", phase: "start", status: "done", type: "task", displayType: "task" },
+        ...branchIds.map((id) => ({
+          id,
+          title: id,
+          objective: "Branch work",
+          phase: "branch",
+          status: "pending" as const,
+          type: "task" as const,
+          displayType: "task" as const,
+        })),
+        { id: "join", title: "Join", objective: "Merge", phase: "join", status: "pending", type: "checkpoint", displayType: "checkpoint" },
+      ],
+      edges: [
+        ...branchIds.map((id) => ({ id: `edge-start-${id}`, fromNodeId: "start", toNodeId: id, type: "sequential" })),
+        ...branchIds.map((id) => ({ id: `edge-${id}-join`, fromNodeId: id, toNodeId: "join", type: "resume" })),
+      ],
+    });
+
+    const layout = await buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+
+    expectNoNodeOverlap(layout.nodes);
+    for (const id of branchIds) {
+      const incoming = layout.edges.find((edge) => edge.id === `edge-start-${id}`);
+      const outgoing = layout.edges.find((edge) => edge.id === `edge-${id}-join`);
+      expect(incoming?.sourceHandle).toBe("bottom-center-source");
+      expect(incoming?.targetHandle).toBe("top-center-target");
+      expect(outgoing?.sourceHandle).toBe("bottom-center-source");
+      expect(outgoing?.targetHandle).toBe("top-center-target");
+    }
+  });
+
+  it("keeps parallel diamond lanes entering from top and exiting from bottom", async () => {
+    const laneIds = ["api", "ui", "docs"];
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "start",
+      steps: [
+        { id: "start", title: "Start", objective: "Begin", phase: "start", status: "done", type: "task", displayType: "task" },
+        { id: "api", title: "API", objective: "Implement API", phase: "branch", status: "pending", type: "task", displayType: "task" },
+        { id: "ui", title: "UI", objective: "Implement UI", phase: "branch", status: "pending", type: "task", displayType: "task" },
+        { id: "docs", title: "Docs", objective: "Update docs", phase: "branch", status: "pending", type: "task", displayType: "task" },
+        { id: "join", title: "Join", objective: "Review", phase: "join", status: "pending", type: "checkpoint", displayType: "checkpoint" },
+        { id: "ship", title: "Ship", objective: "Release", phase: "ship", status: "pending", type: "task", displayType: "task" },
+      ],
+      edges: [
+        ...laneIds.map((id) => ({ id: `edge-start-${id}`, fromNodeId: "start", toNodeId: id, type: "sequential" })),
+        ...laneIds.map((id) => ({ id: `edge-${id}-join`, fromNodeId: id, toNodeId: "join", type: "resume" })),
+        { id: "edge-join-ship", fromNodeId: "join", toNodeId: "ship", type: "sequential" },
+      ],
+    });
+
+    const layout = await buildFlowLayout({
+      plan,
+      selectedNodeId: null,
+      graphCopy: DEFAULT_GRAPH_COPY,
+      onSelect: vi.fn(),
+    });
+
+    expectNoNodeOverlap(layout.nodes);
+    for (const id of laneIds) {
+      const incoming = layout.edges.find((edge) => edge.id === `edge-start-${id}`);
+      const outgoing = layout.edges.find((edge) => edge.id === `edge-${id}-join`);
+      expect(incoming?.sourceHandle).toBe("bottom-center-source");
+      expect(incoming?.targetHandle).toBe("top-center-target");
+      expect(incoming?.data?.orientation).toBe("vertical");
+      expect(outgoing?.sourceHandle).toBe("bottom-center-source");
+      expect(outgoing?.targetHandle).toBe("top-center-target");
+      expect(outgoing?.data?.orientation).toBe("vertical");
+    }
+    expect(layout.edges.find((edge) => edge.id === "edge-join-ship")?.sourceHandle).toBe("bottom-center-source");
+  });
+
+  it("keeps branched plans vertical while preserving branch roles", async () => {
     const plan = testPlan({
       state: "ready",
       currentStepId: "start",
@@ -766,7 +930,7 @@ describe("TaskPlanGraph", () => {
     plan.analytics.criticalPathNodeIds = ["start", "join"];
     plan.analytics.rankByNodeId = { start: 0, "branch-a": 1, "branch-b": 1, join: 2, "tail-1": 3, "tail-2": 4, "tail-3": 5, "tail-4": 6 };
 
-    const layout = buildFlowLayout({
+    const layout = await buildFlowLayout({
       plan,
       selectedNodeId: null,
       graphCopy: DEFAULT_GRAPH_COPY,
@@ -774,15 +938,15 @@ describe("TaskPlanGraph", () => {
     });
     const nodeById = new Map(layout.nodes.map((node) => [node.id, node]));
 
-    expect(layout.layoutDirection).toBe("LR");
+    expect(layout.layoutDirection).toBe("TB");
     expect(nodeById.get("branch-a")?.data.layoutRole).toBe("branch");
     expect(nodeById.get("branch-b")?.data.layoutRole).toBe("branch");
     expect(nodeById.get("tail-1")?.data.layoutRole).toBe("chain");
-    expect(layout.edges.find((edge) => edge.id === "edge-join-tail-1")?.data?.orientation).toBe("horizontal");
-    expect(layout.edges.every((edge) => edge.sourceHandle === "right-source" && edge.targetHandle === "left-target")).toBe(true);
+    expect(layout.edges.find((edge) => edge.id === "edge-join-tail-1")?.data?.orientation).toBe("vertical");
+    expect(layout.edges.some((edge) => edge.sourceHandle === "bottom-center-source" && edge.targetHandle === "top-center-target")).toBe(true);
   });
 
-  it("automatically switches to full mode when enough width is available", () => {
+  it("automatically switches to full mode when enough width is available", async () => {
     render(
       <div style={{ width: "960px" }} data-testid="wide-graph-host">
         <TaskPlanGraph
@@ -827,12 +991,12 @@ describe("TaskPlanGraph", () => {
     const host = screen.getByTestId("wide-graph-host");
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 960 });
 
-    const graph = screen.getByLabelText("任务计划图");
+    const graph = await screen.findByLabelText("任务计划图");
     expect(graph).toHaveAttribute("data-graph-mode", "full");
     expect(graph.querySelector(".react-flow")).not.toBeNull();
   });
 
-  it("renders a compact outline mode for sidebar usage with grouped nodes and no full graph chrome", () => {
+  it("renders a compact outline mode for sidebar usage with grouped nodes and no full graph chrome", async () => {
     render(
       <TaskPlanGraph
         mode="compact"
@@ -932,9 +1096,10 @@ describe("TaskPlanGraph", () => {
 
     const dialog = screen.getByRole("dialog", { name: "完整任务计划图" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(within(dialog).getByTestId("task-plan-graph-full-dialog")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("task-plan-graph-full-dialog")).toHaveAttribute("data-renderer", "react-flow");
-    expect(within(dialog).getByTestId("task-plan-graph-full-dialog")).toHaveAttribute("data-graph-mode", "full");
+    const dialogGraph = await within(dialog).findByTestId("task-plan-graph-full-dialog");
+    expect(dialogGraph).toBeInTheDocument();
+    expect(dialogGraph).toHaveAttribute("data-renderer", "react-flow");
+    expect(dialogGraph).toHaveAttribute("data-graph-mode", "full");
     expect(within(dialog).getByTestId("task-plan-graph-legend")).toBeInTheDocument();
   });
 });

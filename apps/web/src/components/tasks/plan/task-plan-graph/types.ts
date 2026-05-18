@@ -193,6 +193,7 @@ export type GraphCopy = {
   fitGraph: string;
   centerCurrentNode: string;
   expandGraph: string;
+  wheelZoomHint: string;
   openFullGraph: string;
   compactTitle: string;
   compactDescription: string;
@@ -266,6 +267,8 @@ export type FlowEdgeData = {
   stableLabel?: string;
   routeOffset?: number;
   orientation?: "vertical" | "horizontal";
+  elkPath?: string;
+  elkLabelPoint?: { x: number; y: number };
   fanIn?: boolean;
   fanOut?: boolean;
 };

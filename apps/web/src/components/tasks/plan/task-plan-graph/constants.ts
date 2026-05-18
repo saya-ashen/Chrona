@@ -3,10 +3,10 @@ import type { GraphCopy } from "./types";
 export const AUTO_FULL_MODE_MIN_WIDTH = 760;
 export const NODE_WIDTH = 198;
 export const NODE_HEIGHT = 100;
-export const LAYOUT_DIRECTION = "LR";
+export const LAYOUT_DIRECTION = "TB";
 export const LAYOUT_PADDING = 32;
-export const LAYOUT_NODE_SEP = 34;
-export const LAYOUT_RANK_SEP = 96;
+export const LAYOUT_NODE_SEP = 28;
+export const LAYOUT_RANK_SEP = 56;
 export const EDGE_OFFSET = 24;
 export const MAX_VIEWPORT_HEIGHT = 620;
 export const MIN_VIEWPORT_HEIGHT = 360;
@@ -29,6 +29,7 @@ export const DEFAULT_GRAPH_COPY: GraphCopy = {
   fitGraph: "Fit graph",
   centerCurrentNode: "Center current node",
   expandGraph: "Expand graph",
+  wheelZoomHint: "按住 Ctrl/⌘ 并滚动可缩放画布",
   openFullGraph: "查看完整图",
   compactTitle: "流程摘要",
   compactDescription: "按阶段和关键路径展示当前执行图。",

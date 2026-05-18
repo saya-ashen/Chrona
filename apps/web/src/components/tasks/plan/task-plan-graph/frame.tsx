@@ -1,6 +1,6 @@
-import type { MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 import { Maximize2, Minus, Plus, Scan, LocateFixed } from "lucide-react";
-import { ReactFlow, type NodeMouseHandler } from "@xyflow/react";
+import { PanOnScrollMode, ReactFlow, type NodeMouseHandler, type ReactFlowInstance } from "@xyflow/react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { edgeTypes } from "./edge";
@@ -13,6 +13,11 @@ import type {
   GraphCopy,
   NodeLegendItem,
 } from "./types";
+
+const READABLE_INITIAL_ZOOM = 1;
+const INITIAL_VIEWPORT_TOP_PADDING = 44;
+const NODE_FALLBACK_WIDTH = 198;
+const NODE_FALLBACK_HEIGHT = 100;
 
 export function TaskPlanGraphFrame({
   graphCopy,
@@ -32,6 +37,7 @@ export function TaskPlanGraphFrame({
   onFitGraph,
   onZoomIn,
   onZoomOut,
+  currentNodeId,
   testId = "task-plan-graph",
 }: {
   graphCopy: GraphCopy;
@@ -56,14 +62,142 @@ export function TaskPlanGraphFrame({
   onFitGraph: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  currentNodeId?: string | null;
   testId?: string;
 }) {
+  const flowRef = useRef<ReactFlowInstance<FlowGraphNode, FlowGraphEdge> | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const lastInitialFitKey = useRef<string | null>(null);
+  const wheelHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wheelHintShown = useRef(false);
+  const [showWheelZoomHint, setShowWheelZoomHint] = useState(false);
   const hasOverview = Boolean(overview);
+  const initialFitKey = useMemo(
+    () => `${layout.contentWidth}:${layout.contentHeight}:${nodes.map((node) => node.id).join("|")}`,
+    [layout.contentHeight, layout.contentWidth, nodes],
+  );
   const controlClassName = buttonVariants({
     variant: "ghost",
     size: "icon",
     className: "size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60",
   });
+
+  const fitGraph = useCallback((duration = 220) => {
+    const flow = flowRef.current;
+    if (!flow) {
+      onFitGraph();
+      return;
+    }
+    void flow.fitView({ duration, maxZoom: 1, padding: 0.18 });
+  }, [onFitGraph]);
+
+  const focusInitialView = useCallback((duration = 220) => {
+    const flow = flowRef.current;
+    if (!flow) {
+      onFitGraph();
+      return;
+    }
+
+    const viewport = viewportRef.current;
+    const flowNodes = flow.getNodes();
+    if (!viewport || flowNodes.length === 0) {
+      void flow.fitView({ duration, maxZoom: 1, padding: 0.18 });
+      return;
+    }
+
+    const graphBounds = flowNodes.reduce(
+      (bounds, node) => {
+        const width = node.measured?.width ?? node.width ?? NODE_FALLBACK_WIDTH;
+        const height = node.measured?.height ?? node.height ?? NODE_FALLBACK_HEIGHT;
+        return {
+          minX: Math.min(bounds.minX, node.position.x),
+          minY: Math.min(bounds.minY, node.position.y),
+          maxX: Math.max(bounds.maxX, node.position.x + width),
+          maxY: Math.max(bounds.maxY, node.position.y + height),
+        };
+      },
+      { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+    );
+    if (!Number.isFinite(graphBounds.minX) || !Number.isFinite(graphBounds.minY)) {
+      void flow.fitView({ duration, maxZoom: 1, padding: 0.18 });
+      return;
+    }
+
+    const graphCenterX = (graphBounds.minX + graphBounds.maxX) / 2;
+    void flow.setViewport({
+      x: viewport.clientWidth / 2 - graphCenterX * READABLE_INITIAL_ZOOM,
+      y: INITIAL_VIEWPORT_TOP_PADDING - graphBounds.minY * READABLE_INITIAL_ZOOM,
+      zoom: READABLE_INITIAL_ZOOM,
+    }, {
+      duration,
+    });
+  }, [onFitGraph]);
+
+  const handleInit = useCallback((flow: ReactFlowInstance<FlowGraphNode, FlowGraphEdge>) => {
+    flowRef.current = flow;
+    requestAnimationFrame(() => focusInitialView(0));
+  }, [focusInitialView]);
+
+  useEffect(() => {
+    if (!flowRef.current || lastInitialFitKey.current === initialFitKey) {
+      return;
+    }
+    lastInitialFitKey.current = initialFitKey;
+    const frame = requestAnimationFrame(() => focusInitialView(0));
+    return () => cancelAnimationFrame(frame);
+  }, [focusInitialView, initialFitKey]);
+
+  useEffect(() => {
+    return () => {
+      if (wheelHintTimer.current) {
+        clearTimeout(wheelHintTimer.current);
+      }
+    };
+  }, []);
+
+  const handleWheelCapture = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    if (wheelHintShown.current || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    wheelHintShown.current = true;
+    setShowWheelZoomHint(true);
+    wheelHintTimer.current = setTimeout(() => setShowWheelZoomHint(false), 2400);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    const flow = flowRef.current;
+    if (!flow) {
+      onZoomIn();
+      return;
+    }
+    void flow.zoomIn({ duration: 180 });
+  }, [onZoomIn]);
+
+  const handleZoomOut = useCallback(() => {
+    const flow = flowRef.current;
+    if (!flow) {
+      onZoomOut();
+      return;
+    }
+    void flow.zoomOut({ duration: 180 });
+  }, [onZoomOut]);
+
+  const handleCenterCurrentNode = useCallback(() => {
+    const flow = flowRef.current;
+    const currentNode = currentNodeId ? flow?.getNode(currentNodeId) : null;
+    if (!flow || !currentNode) {
+      onCenterCurrentNode();
+      return;
+    }
+
+    const width = currentNode.measured?.width ?? currentNode.width ?? NODE_FALLBACK_WIDTH;
+    const height = currentNode.measured?.height ?? currentNode.height ?? NODE_FALLBACK_HEIGHT;
+    void flow.setCenter(currentNode.position.x + width / 2, currentNode.position.y + height / 2, {
+      duration: 220,
+      zoom: Math.max(flow.getZoom(), 1),
+    });
+  }, [currentNodeId, onCenterCurrentNode]);
 
   return (
     <div
@@ -78,7 +212,7 @@ export function TaskPlanGraphFrame({
       data-graph-interactive="true"
       data-graph-mode="full"
       data-layout-direction={layout.layoutDirection}
-      data-layout-engine="d3-dag-sugiyama"
+      data-layout-engine="elk-layered"
       data-renderer="react-flow"
       data-testid={testId}
     >
@@ -88,20 +222,24 @@ export function TaskPlanGraphFrame({
         {overview ? <div className="absolute inset-x-3 top-3 z-[7]">{overview}</div> : null}
         <div
           className={cn(
-            "w-full min-w-0 max-w-full overflow-auto",
+            "w-full min-w-0 max-w-full overflow-hidden",
             hasOverview ? "pt-[5.75rem] sm:pt-[5rem]" : "px-0 pb-3 pt-3",
             fillHeight && "h-full min-h-0 flex-1",
           )}
           data-testid="task-plan-graph-scroll"
+          data-wheel-pan="scroll"
+          data-wheel-zoom="modifier-or-pinch"
+          onWheelCapture={handleWheelCapture}
+          ref={viewportRef}
           style={fillHeight ? undefined : { height: `${layout.viewportHeight}px` }}
         >
           <div
             className="min-w-full"
             data-testid="task-plan-graph-canvas"
             style={{
-              height: `${layout.contentHeight + (hasOverview ? 64 : 28)}px`,
-              minWidth: `${layout.contentWidth}px`,
-              width: "max-content",
+              height: "100%",
+              minWidth: "100%",
+              width: "100%",
             }}
           >
             <ReactFlow
@@ -113,6 +251,7 @@ export function TaskPlanGraphFrame({
               onNodeDragStart={handleNodeDragStart}
               onNodeDrag={handleNodeDrag}
               onNodeDragStop={handleNodeDragStop}
+              onInit={handleInit}
               noPanClassName="rf-node-button"
               nodesDraggable={false}
               nodesConnectable={false}
@@ -120,18 +259,18 @@ export function TaskPlanGraphFrame({
               elementsSelectable={false}
               selectNodesOnDrag={false}
               panOnDrag
-              zoomOnScroll
+              panOnScroll
+              panOnScrollMode={PanOnScrollMode.Free}
+              panOnScrollSpeed={0.9}
+              zoomActivationKeyCode={["Control", "Meta"]}
+              zoomOnScroll={false}
               zoomOnPinch
               zoomOnDoubleClick={false}
-              preventScrolling={false}
+              preventScrolling
               attributionPosition="bottom-left"
               proOptions={{ hideAttribution: true }}
               defaultEdgeOptions={{ zIndex: 6 }}
               className="bg-transparent"
-              translateExtent={[
-                [0, 0],
-                [layout.contentWidth, layout.contentHeight],
-              ]}
             />
           </div>
         </div>
@@ -142,16 +281,25 @@ export function TaskPlanGraphFrame({
           placement={hasOverview ? "bottom" : "top"}
         />
         <div className="absolute bottom-3 right-3 top-auto z-[7] flex flex-wrap justify-end gap-1.5 rounded-[18px] border border-white/10 bg-slate-950/62 p-1.5 shadow-[0_18px_50px_rgba(2,6,23,0.32)] backdrop-blur-xl sm:top-3 sm:bottom-auto" aria-label={graphCopy.controlPanel} data-testid="task-plan-graph-controls">
-          <button type="button" aria-label={graphCopy.zoomIn} className={controlClassName} onClick={onZoomIn}>
+          <span
+            className={cn(
+              "pointer-events-none basis-full px-2 text-right text-[0.68rem] font-medium text-cyan-100/78 transition-opacity duration-200 sm:basis-auto sm:self-center",
+              showWheelZoomHint ? "opacity-100" : "opacity-0",
+            )}
+            data-testid="task-plan-graph-wheel-hint"
+          >
+            {graphCopy.wheelZoomHint}
+          </span>
+          <button type="button" aria-label={graphCopy.zoomIn} className={controlClassName} onClick={handleZoomIn}>
             <Plus className="size-4" />
           </button>
-          <button type="button" aria-label={graphCopy.zoomOut} className={controlClassName} onClick={onZoomOut}>
+          <button type="button" aria-label={graphCopy.zoomOut} className={controlClassName} onClick={handleZoomOut}>
             <Minus className="size-4" />
           </button>
-          <button type="button" aria-label={graphCopy.fitGraph} className={controlClassName} onClick={onFitGraph}>
+          <button type="button" aria-label={graphCopy.fitGraph} className={controlClassName} onClick={() => fitGraph()}>
             <Scan className="size-4" />
           </button>
-          <button type="button" aria-label={graphCopy.centerCurrentNode} className={controlClassName} onClick={onCenterCurrentNode}>
+          <button type="button" aria-label={graphCopy.centerCurrentNode} className={controlClassName} onClick={handleCenterCurrentNode}>
             <LocateFixed className="size-4" />
           </button>
           <button type="button" aria-label={graphCopy.expandGraph} className={controlClassName} onClick={onExpandGraph}>

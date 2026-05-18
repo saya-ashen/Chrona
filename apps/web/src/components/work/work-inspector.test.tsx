@@ -110,7 +110,7 @@ const labels = {
 };
 
 describe("WorkInspector", () => {
-  it("surfaces graph-native plan groupings in the plan tab", () => {
+  it("surfaces graph-native plan groupings in the plan tab", async () => {
     render(
       <WorkInspector
         plan={testPlan({
@@ -195,7 +195,7 @@ describe("WorkInspector", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Task plan graph")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Task plan graph")).toBeInTheDocument();
     expect(screen.getByTestId("task-plan-node-linked-node").getAttribute("data-node-tone")).toBe("child-task");
     expect(screen.queryByText("等待你处理")).not.toBeInTheDocument();
     expect(screen.queryByText("已关联子任务")).not.toBeInTheDocument();

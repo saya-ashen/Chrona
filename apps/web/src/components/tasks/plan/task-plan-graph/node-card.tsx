@@ -32,6 +32,21 @@ const HIDDEN_HANDLE_STYLE = {
   background: "transparent",
 };
 
+const TARGET_HANDLE_OFFSET = "44%";
+const SOURCE_HANDLE_OFFSET = "56%";
+const CENTER_HANDLE_OFFSET = "50%";
+
+function sideHandleStyle(side: "top" | "right" | "bottom" | "left", type: "source" | "target") {
+  const offset = type === "target" ? TARGET_HANDLE_OFFSET : SOURCE_HANDLE_OFFSET;
+  return side === "top" || side === "bottom"
+    ? { ...HIDDEN_HANDLE_STYLE, left: offset }
+    : { ...HIDDEN_HANDLE_STYLE, top: offset };
+}
+
+function centerHandleStyle() {
+  return { ...HIDDEN_HANDLE_STYLE, left: CENTER_HANDLE_OFFSET };
+}
+
 function resolveInteractionFrame(node: FlowGraphNode["data"]["node"]) {
   switch (node.interactionType) {
     case "execute":
@@ -154,10 +169,12 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
-      <Handle id="top-target" type="target" position={Position.Top} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="left-target" type="target" position={Position.Left} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="top-source" type="source" position={Position.Top} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="left-source" type="source" position={Position.Left} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="top-target" type="target" position={Position.Top} style={sideHandleStyle("top", "target")} className="!bg-transparent" />
+      <Handle id="top-center-target" type="target" position={Position.Top} style={centerHandleStyle()} className="!bg-transparent" />
+      <Handle id="left-target" type="target" position={Position.Left} style={sideHandleStyle("left", "target")} className="!bg-transparent" />
+      <Handle id="top-source" type="source" position={Position.Top} style={sideHandleStyle("top", "source")} className="!bg-transparent" />
+      <Handle id="top-center-source" type="source" position={Position.Top} style={centerHandleStyle()} className="!bg-transparent" />
+      <Handle id="left-source" type="source" position={Position.Left} style={sideHandleStyle("left", "source")} className="!bg-transparent" />
       <button
         type="button"
         onClick={() => onSelect(node.id)}
@@ -233,10 +250,12 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
           </div>
         </div>
       </button>
-      <Handle id="right-target" type="target" position={Position.Right} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="bottom-target" type="target" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="right-source" type="source" position={Position.Right} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
-      <Handle id="bottom-source" type="source" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} className="!bg-transparent" />
+      <Handle id="right-target" type="target" position={Position.Right} style={sideHandleStyle("right", "target")} className="!bg-transparent" />
+      <Handle id="bottom-target" type="target" position={Position.Bottom} style={sideHandleStyle("bottom", "target")} className="!bg-transparent" />
+      <Handle id="bottom-center-target" type="target" position={Position.Bottom} style={centerHandleStyle()} className="!bg-transparent" />
+      <Handle id="right-source" type="source" position={Position.Right} style={sideHandleStyle("right", "source")} className="!bg-transparent" />
+      <Handle id="bottom-source" type="source" position={Position.Bottom} style={sideHandleStyle("bottom", "source")} className="!bg-transparent" />
+      <Handle id="bottom-center-source" type="source" position={Position.Bottom} style={centerHandleStyle()} className="!bg-transparent" />
     </div>
   );
 }

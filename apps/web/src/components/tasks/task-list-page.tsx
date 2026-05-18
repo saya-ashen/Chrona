@@ -101,7 +101,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
         <p className="text-sm text-muted-foreground">
@@ -132,7 +132,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId }: Props) {
           No tasks match the current filter.
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {filtered.map((task) => (
             <div
               key={task.id}
