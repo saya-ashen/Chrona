@@ -193,7 +193,7 @@ function formatJson(value: unknown) {
   }
 }
 
-function MarkdownContent({ content }: { content: string }) {
+function MarkdownContent({ content, disableInternalScroll = false }: { content: string; disableInternalScroll?: boolean }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -206,9 +206,18 @@ function MarkdownContent({ content }: { content: string }) {
         li: ({ children }) => <li className="pl-1 marker:text-muted-foreground">{children}</li>,
         ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ol>,
         p: ({ children }) => <p className="text-sm leading-6 text-foreground">{children}</p>,
-        pre: ({ children }) => <pre className="my-2 max-h-72 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-50">{children}</pre>,
+        pre: ({ children }) => (
+          <pre className={cn(
+            "my-2 whitespace-pre-wrap break-words rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-50",
+            !disableInternalScroll && "max-h-72 overflow-auto",
+          )}>{children}</pre>
+        ),
         strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-        table: ({ children }) => <div className="my-2 overflow-auto rounded-xl border border-border/60"><table className="w-full border-collapse text-sm">{children}</table></div>,
+        table: ({ children }) => (
+          <div className={cn("my-2 rounded-xl border border-border/60", !disableInternalScroll && "overflow-auto")}>
+            <table className="w-full border-collapse text-sm">{children}</table>
+          </div>
+        ),
         td: ({ children }) => <td className="border-t border-border/60 px-2 py-1.5 align-top text-foreground">{children}</td>,
         th: ({ children }) => <th className="bg-muted/60 px-2 py-1.5 text-left font-semibold text-foreground">{children}</th>,
         ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ul>,
@@ -224,7 +233,7 @@ function outputTitle(output: NodeResultOutput, fallback: string) {
   return fallback;
 }
 
-export function ResultOutputCard({ output }: { output: NodeResultOutput }) {
+export function ResultOutputCard({ output, disableInternalScroll = false }: { output: NodeResultOutput; disableInternalScroll?: boolean }) {
   switch (output.kind) {
     case "text":
       return (
@@ -238,7 +247,7 @@ export function ResultOutputCard({ output }: { output: NodeResultOutput }) {
         <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{outputTitle(output, "markdown")}</p>
           <div className="mt-2">
-            <MarkdownContent content={output.content} />
+            <MarkdownContent content={output.content} disableInternalScroll={disableInternalScroll} />
           </div>
         </div>
       );
@@ -246,7 +255,10 @@ export function ResultOutputCard({ output }: { output: NodeResultOutput }) {
       return (
         <div className="rounded-xl border border-border/60 bg-slate-950 px-3 py-2 text-slate-50">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">{output.title ?? "JSON"}</p>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-5">{formatJson(output.value)}</pre>
+          <pre className={cn(
+            "mt-2 whitespace-pre-wrap break-words text-xs leading-5",
+            !disableInternalScroll && "max-h-64 overflow-auto",
+          )}>{formatJson(output.value)}</pre>
         </div>
       );
     case "file":
@@ -279,9 +291,18 @@ export function ResultOutputCard({ output }: { output: NodeResultOutput }) {
             <p className="text-sm font-semibold">{output.title ?? "Command"}</p>
             {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-zinc-400">exit {output.exitCode}</span> : null}
           </div>
-          <pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs leading-5 text-zinc-100">{output.command}</pre>
-          {output.stdout ? <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-zinc-800 pt-2 text-xs text-emerald-200">{output.stdout}</pre> : null}
-          {output.stderr ? <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-zinc-800 pt-2 text-xs text-rose-200">{output.stderr}</pre> : null}
+          <pre className={cn(
+            "mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-zinc-100",
+            !disableInternalScroll && "overflow-auto",
+          )}>{output.command}</pre>
+          {output.stdout ? <pre className={cn(
+            "mt-2 whitespace-pre-wrap break-words border-t border-zinc-800 pt-2 text-xs text-emerald-200",
+            !disableInternalScroll && "max-h-40 overflow-auto",
+          )}>{output.stdout}</pre> : null}
+          {output.stderr ? <pre className={cn(
+            "mt-2 whitespace-pre-wrap break-words border-t border-zinc-800 pt-2 text-xs text-rose-200",
+            !disableInternalScroll && "max-h-40 overflow-auto",
+          )}>{output.stderr}</pre> : null}
         </div>
       );
     case "link":

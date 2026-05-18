@@ -6,6 +6,49 @@ import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
 import type { WorkCopy, WorkPageData } from "./work-page-types";
 
+function normalizeWorkPageData(data: WorkPageData): WorkPageData {
+  const nodes = Array.isArray(data.taskPlan?.nodes) ? data.taskPlan.nodes : [];
+  const edges = Array.isArray(data.taskPlan?.edges) ? data.taskPlan.edges : [];
+  const analytics = data.taskPlan?.analytics ?? {
+    entryNodeIds: [],
+    terminalNodeIds: [],
+    activeNodeIds: [],
+    reachableFromActiveIds: [],
+    criticalPathNodeIds: [],
+    attentionNodeIds: [],
+    blockedNodeIds: [],
+    rankByNodeId: {},
+    laneByNodeId: {},
+    upstreamByNodeId: {},
+    downstreamByNodeId: {},
+  };
+
+  return {
+    ...data,
+    composerValue: data.composerValue ?? "",
+    taskPlan: {
+      ...data.taskPlan,
+      state: data.taskPlan?.state ?? (nodes.length > 0 ? "ready" : "empty"),
+      nodes,
+      edges,
+      steps: Array.isArray(data.taskPlan?.steps) ? data.taskPlan.steps : nodes,
+      analytics: {
+        entryNodeIds: analytics.entryNodeIds ?? [],
+        terminalNodeIds: analytics.terminalNodeIds ?? [],
+        activeNodeIds: analytics.activeNodeIds ?? [],
+        reachableFromActiveIds: analytics.reachableFromActiveIds ?? [],
+        criticalPathNodeIds: analytics.criticalPathNodeIds ?? [],
+        attentionNodeIds: analytics.attentionNodeIds ?? [],
+        blockedNodeIds: analytics.blockedNodeIds ?? [],
+        rankByNodeId: analytics.rankByNodeId ?? {},
+        laneByNodeId: analytics.laneByNodeId ?? {},
+        upstreamByNodeId: analytics.upstreamByNodeId ?? {},
+        downstreamByNodeId: analytics.downstreamByNodeId ?? {},
+      },
+    },
+  };
+}
+
 type RefreshOptions = {
   silent?: boolean;
   epoch?: number;
@@ -25,10 +68,7 @@ function isProjectionActive(data: WorkPageData) {
 }
 
 export function useWorkPageProjectionState(initialData: WorkPageData, copy: WorkCopy, isPending: boolean) {
-  const normalizedInitialData = {
-    ...initialData,
-    composerValue: initialData.composerValue ?? "",
-  };
+  const normalizedInitialData = normalizeWorkPageData(initialData);
   const router = useAppRouter();
   const [data, setData] = useState<WorkPageData>(normalizedInitialData);
   const [composerResetKey, setComposerResetKey] = useState(0);
@@ -51,7 +91,7 @@ export function useWorkPageProjectionState(initialData: WorkPageData, copy: Work
           throw new Error(copy.actionFailed);
         }
 
-        const next = (await response.json()) as unknown as WorkPageData;
+        const next = normalizeWorkPageData((await response.json()) as unknown as WorkPageData);
 
         if (epoch !== refreshEpochRef.current) {
           return true;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Ellipsis, Pause, Pencil, Play, Square, Trash2 } from "lucide-react";
+import { Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -52,6 +52,15 @@ type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
   header: TaskHeaderView;
   backToScheduleLabel: string;
+  workspaceStateLabel?: string;
+  workspaceStateGuidance?: string;
+  planAction?: {
+    label: string;
+    placement: "primary" | "menu";
+    isLoading?: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+  };
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
   onEdit: () => void;
   showDeleteConfirm: boolean;
@@ -65,6 +74,9 @@ export function TaskWorkspaceHeaderCard({
   task,
   header,
   backToScheduleLabel,
+  workspaceStateLabel,
+  workspaceStateGuidance,
+  planAction,
   onAction,
   onEdit,
   showDeleteConfirm,
@@ -78,6 +90,8 @@ export function TaskWorkspaceHeaderCard({
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
+  const primaryStatusLabel = header.primaryStateLabel ?? userStatusLabel(header.status);
+  const showTaskStatus = task.status !== primaryStatusLabel;
 
   const handleAction = async (action: TaskHeaderAction) => {
     if (action.disabled || pendingActionId) return;
@@ -112,42 +126,63 @@ export function TaskWorkspaceHeaderCard({
 
   return (
     <SurfaceCard
-      className="relative z-30 min-w-0 overflow-visible rounded-[0.85rem] border-border/40 bg-background/70 p-1.5 shadow-none backdrop-blur-[2px]"
+      className="relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-slate-200/80 bg-white/88 p-1 shadow-sm backdrop-blur"
       variant="inset"
       padding="none"
     >
-      <SurfaceCardHeader className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-2">
-          <h1 className="min-w-0 break-words text-lg font-semibold leading-tight tracking-tight lg:max-w-[38vw]">
-            {header.title}
-          </h1>
-          <div className="flex flex-wrap items-center gap-1">
-            {header.primaryStateLabel ? (
-              <StatusBadge tone={userStatusTone(header.status)}>
-                {header.primaryStateLabel}
-              </StatusBadge>
+      <SurfaceCardHeader className="flex flex-col gap-1.5 px-2.5 py-1.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {workspaceStateLabel ? (
+              <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+                {workspaceStateLabel}
+              </span>
             ) : null}
+            <h1 className="min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-slate-950 lg:max-w-[42vw]">
+              {header.title}
+            </h1>
             <StatusBadge tone={userStatusTone(header.status)}>
-              {userStatusLabel(header.status)}
+              {primaryStatusLabel}
             </StatusBadge>
-            <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge>
+            {showTaskStatus ? <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge> : null}
             <StatusBadge tone={priorityTone(task.priority)}>
               {task.priority}
             </StatusBadge>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {task.runnabilityState ? (
               <StatusBadge tone={task.isRunnable ? "success" : "warning"}>
                 {task.runnabilitySummary}
               </StatusBadge>
             ) : null}
+            <span>
+              {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
+              {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}
+            </span>
+            {workspaceStateGuidance ? (
+              <span className="min-w-0 truncate lg:max-w-[44vw]">
+              {workspaceStateGuidance}
+              </span>
+            ) : null}
           </div>
-          <span className="text-xs text-muted-foreground">
-            {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
-            {header.currentNodeId ? ` · current ${header.currentNodeId}` : ""}
-            {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}
-          </span>
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-1 sm:w-auto lg:justify-end">
+          {planAction?.placement === "primary" ? (
+            <button
+              type="button"
+              disabled={planAction.disabled || planAction.isLoading}
+              onClick={planAction.onClick}
+              className={buttonVariants({
+                variant: "default",
+                size: "sm",
+                className: "min-w-28 rounded-xl",
+              })}
+            >
+              {planAction.isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              {planAction.label}
+            </button>
+          ) : null}
           {visibleActions.map((action) => {
             const Icon = actionIcon(action.id);
             const isPending = pendingActionId === action.id;
@@ -202,6 +237,20 @@ export function TaskWorkspaceHeaderCard({
                   <Ellipsis className="size-3.5" />
                   {backToScheduleLabel}
                 </LocalizedLink>
+                {planAction?.placement === "menu" ? (
+                  <button
+                    type="button"
+                    disabled={planAction.disabled || planAction.isLoading}
+                    onClick={() => {
+                      planAction.onClick();
+                      setShowMoreMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {planAction.isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    {planAction.label}
+                  </button>
+                ) : null}
                 {!showDeleteConfirm ? (
                   <button
                     type="button"

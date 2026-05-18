@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, Maximize2, Minimize2 } from "lucide-react";
 import type { ExecutionActionInput, NodeResultOutput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
@@ -37,6 +37,9 @@ const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
   configuration: "Configuration",
 };
 
+type NodeDetailVariant = "panel" | "rail" | "drawer";
+type NodeDrawerSize = "collapsed" | "half" | "expanded";
+
 const TAB_ORDER: NodeDetailPanelState["tabs"][number][] = [
   "result",
   "action",
@@ -54,10 +57,10 @@ function statusTone(status: NodeDetailPanelState["status"]) {
 
 function tabClassName(active: boolean) {
   return cn(
-    "border-b-2 px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     active
-      ? "border-primary text-primary"
-      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
+      ? "bg-slate-950 text-white shadow-sm"
+      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
   );
 }
 
@@ -68,11 +71,11 @@ function EmptyDetailState() {
       aria-label="Current node details"
       className="scroll-mt-4"
     >
-      <div className="rounded-[1.35rem] border border-dashed border-border/60 bg-background px-4 py-5">
-        <p className="text-sm font-semibold text-foreground">
+      <div className="rounded-[1.35rem] border border-dashed border-slate-300 bg-white/75 px-4 py-5 shadow-sm backdrop-blur">
+        <p className="text-sm font-semibold text-slate-950">
           No active node selected
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-slate-500">
           Select a plan node, generate a plan, or wait for execution to expose the current node details here.
         </p>
       </div>
@@ -108,10 +111,10 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
   }
 
   return (
-    <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px]">
-      <div className="rounded-lg border border-border/50 bg-white p-2.5">
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="text-sm font-semibold text-slate-950">
             Result summary
           </p>
           {runResult || outputs.length > 0 ? (
@@ -121,7 +124,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
               className={buttonVariants({
                 variant: "outline",
                 size: "sm",
-                className: "h-7 rounded-lg px-2 text-xs",
+                className: "h-8 rounded-full px-3 text-xs",
               })}
             >
               <Copy className="size-3.5" />
@@ -130,7 +133,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
           ) : null}
         </div>
         {copyStatus ? (
-          <p className="mb-2 text-xs text-muted-foreground" role="status">
+          <p className="mb-2 text-xs text-slate-500" role="status">
             {copyStatus}
           </p>
         ) : null}
@@ -141,19 +144,20 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
         ) : outputs.length > 0 ? (
           <div className="space-y-2">
             {runResult ? (
-              <p className="text-sm leading-5 text-foreground">{runResult}</p>
+              <p className="text-sm leading-5 text-slate-800">{runResult}</p>
             ) : null}
             {outputs.map((output, index) => (
               <ResultOutputCard
                 key={`${output.kind}:${index}`}
                 output={output}
+                disableInternalScroll
               />
             ))}
           </div>
         ) : runResult ? (
-          <p className="text-sm leading-5 text-foreground">{runResult}</p>
+          <p className="text-sm leading-5 text-slate-800">{runResult}</p>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-slate-500">
             No run result yet for this node.
           </p>
         )}
@@ -170,21 +174,21 @@ function EvidenceSummary({ node }: { node: PlanNodeDataModel }) {
   );
 
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/55 p-2.5">
-      <p className="text-sm font-semibold text-foreground">Key evidence</p>
+    <div className="rounded-[1rem] border border-cyan-100 bg-cyan-50/60 p-3 shadow-sm">
+      <p className="text-sm font-semibold text-slate-950">Key evidence</p>
       {evidence.length > 0 ? (
         <div className="mt-1.5 space-y-1">
           {evidence.slice(0, 4).map((line) => (
             <div
               key={line}
-              className="rounded-md bg-white/80 px-2 py-1 text-xs text-muted-foreground"
+              className="rounded-lg border border-cyan-100/70 bg-white/85 px-2 py-1.5 text-xs text-slate-600"
             >
               {line}
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-slate-500">
           No evidence or runtime metadata is attached to this node yet.
         </p>
       )}
@@ -199,14 +203,14 @@ function EvidenceTab({ node }: { node: PlanNodeDataModel }) {
   );
 
   return (
-    <div className="rounded-lg border border-border/50 bg-white p-2.5">
-      <p className="text-sm font-semibold text-foreground">Evidence</p>
+    <div className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
+      <p className="text-sm font-semibold text-slate-950">Evidence</p>
       {evidence.length > 0 ? (
-        <pre className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+        <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-950/[0.035] p-3 text-xs leading-5 text-slate-600">
           {evidence.join("\n")}
         </pre>
       ) : (
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-slate-500">
           No evidence or runtime metadata is attached to this node yet.
         </p>
       )}
@@ -227,7 +231,7 @@ function RunField({
 }) {
   const label = (
     <div className="flex items-center gap-2">
-      <span className="text-sm font-medium text-foreground">{field.label}</span>
+      <span className="text-sm font-medium text-slate-800">{field.label}</span>
       {field.required ? (
         <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
           required
@@ -252,7 +256,7 @@ function RunField({
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             textareaClassName,
-            "rounded-xl border-border/70 bg-background/80 text-sm",
+            "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
             readOnly && "bg-muted/50 text-muted-foreground",
           )}
         />
@@ -273,7 +277,7 @@ function RunField({
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             selectClassName,
-            "rounded-xl border-border/70 bg-background/80 text-sm",
+            "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
             readOnly && "bg-muted/50 text-muted-foreground opacity-100",
           )}
         >
@@ -301,7 +305,7 @@ function RunField({
         onChange={(event) => onChange(event.target.value)}
         className={cn(
           inputClassName,
-          "rounded-xl border-border/70 bg-background/80 text-sm",
+          "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
           readOnly && "bg-muted/50 text-muted-foreground",
         )}
       />
@@ -374,9 +378,9 @@ function ActionTab({
   }
 
   return (
-    <div className="rounded-lg border border-orange-200 bg-orange-50/55 p-2.5">
-      <p className="text-sm font-semibold text-foreground">Action required</p>
-      <p className="mt-1 break-words text-sm text-muted-foreground">
+    <div className="rounded-[1rem] border border-orange-200 bg-orange-50/70 p-3 shadow-sm">
+      <p className="text-sm font-semibold text-slate-950">Action required</p>
+      <p className="mt-1 break-words text-sm text-slate-600">
         {node.nextAction ??
           node.summary ??
           "Review the current node state before continuing."}
@@ -388,13 +392,13 @@ function ActionTab({
       ) : null}
       {actions.length > 1 ? (
         <label className="mt-2 block space-y-1.5">
-          <span className="text-sm font-medium text-foreground">Action</span>
+          <span className="text-sm font-medium text-slate-800">Action</span>
           <select
             value={selectedActionId ?? ""}
             onChange={(event) => setSelectedActionId(event.target.value)}
             className={cn(
               selectClassName,
-              "rounded-xl border-border/70 bg-background/80 text-sm",
+              "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
             )}
           >
             {actions.map((action) => (
@@ -430,7 +434,7 @@ function ActionTab({
           </div>
         </div>
       ) : (
-        <p className="mt-2 rounded-lg border border-border/50 bg-white/75 px-2.5 py-1.5 text-sm text-muted-foreground">
+        <p className="mt-2 rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-sm text-slate-600">
           {node.interactionType === "wait"
             ? "This node is waiting on an external event, so there is no manual form to fill here."
             : "This node does not require free-form input."}
@@ -446,18 +450,18 @@ function ActionTab({
             className={buttonVariants({
               variant: "default",
               size: "sm",
-              className: "h-8 rounded-lg px-3 text-xs",
+              className: "h-8 rounded-full px-3 text-xs shadow-sm",
             })}
           >
             {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
           </button>
           {submitDisabledReason ? (
-            <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
+            <span className="text-xs text-slate-500">{submitDisabledReason}</span>
           ) : null}
         </div>
       ) : null}
       {actionStatus ? (
-        <p className="mt-2 rounded-lg border border-border/50 bg-white/80 px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
+        <p className="mt-2 rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-1.5 text-sm text-slate-600" role="status">
           {actionStatus}
         </p>
       ) : null}
@@ -473,7 +477,7 @@ function ConfigurationTab({
   nodes: PlanNodeDataModel[];
 }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-white p-2.5">
+    <div className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
       <TaskPlanGraphInspectorDetails
         node={node}
         graphCopy={DEFAULT_GRAPH_COPY}
@@ -486,12 +490,18 @@ function ConfigurationTab({
 export function TaskWorkspaceNodeDetailPanel({
   detail,
   selectedNodes,
+  variant = "panel",
+  drawerSize = "half",
+  onDrawerSizeChange,
   preferredTab,
   onPreferredTabApplied,
   onDispatchExecutionAction,
 }: {
   detail: NodeDetailPanelState;
   selectedNodes: PlanNodeDataModel[];
+  variant?: NodeDetailVariant;
+  drawerSize?: NodeDrawerSize;
+  onDrawerSizeChange?: (size: NodeDrawerSize) => void;
   preferredTab?: NodeDetailPanelState["tabs"][number] | null;
   onPreferredTabApplied?: () => void;
   onDispatchExecutionAction: (
@@ -538,31 +548,91 @@ export function TaskWorkspaceNodeDetailPanel({
 
   const node = currentNode;
   const orderedTabs = TAB_ORDER.filter((tab) => detail.tabs.includes(tab));
+  const isDrawer = variant === "drawer";
+  const isCollapsedDrawer = isDrawer && drawerSize === "collapsed";
+  const drawerHeightClass =
+    drawerSize === "expanded"
+      ? "h-[min(62vh,560px)]"
+      : drawerSize === "half"
+        ? "h-[340px]"
+        : "h-[52px]";
+  const nextPrimaryDrawerSize: NodeDrawerSize =
+    drawerSize === "collapsed" ? "half" : "collapsed";
 
   return (
     <section
       id="task-workspace-node-actions"
       aria-label="Current node details"
-      className="flex h-[380px] max-h-[calc(100vh-1rem)] min-w-0 scroll-mt-2 flex-col rounded-[0.9rem] border border-border/50 bg-white shadow-none md:h-[360px] xl:h-full xl:max-h-[calc(100vh-1.5rem)]"
+      data-node-detail-drawer={isDrawer ? "true" : undefined}
+      className={cn(
+        "flex min-w-0 scroll-mt-2 flex-col overflow-hidden backdrop-blur",
+        variant === "rail"
+          ? "h-[420px] max-h-[55vh] rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
+          : isDrawer
+            ? cn(
+              "pointer-events-auto w-full transition-[height,transform,opacity] duration-200 ease-out",
+              drawerHeightClass,
+              isCollapsedDrawer
+                ? "rounded-t-[1.1rem] border border-white/10 bg-slate-950/94 shadow-[0_-12px_42px_rgba(15,23,42,0.22)]"
+                : "rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)]",
+            )
+          : "h-[380px] max-h-[calc(100vh-1rem)] rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)] md:h-[340px] xl:h-full xl:max-h-[calc(100vh-1.5rem)]",
+      )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-2.5 py-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h2 className="min-w-0 break-words text-sm font-semibold text-foreground">
-            Current node: {detail.title}
+      {isCollapsedDrawer ? (
+        <button
+          type="button"
+          className="mx-auto mt-1 h-1 w-10 rounded-full bg-slate-300/90 transition-colors hover:bg-slate-500"
+          aria-label={drawerSize === "collapsed" ? "Open selected node drawer" : "Collapse selected node drawer"}
+          onClick={() => onDrawerSizeChange?.(nextPrimaryDrawerSize)}
+        />
+      ) : null}
+      <div className={cn(
+        "flex flex-wrap items-center justify-between gap-2 border-b px-2.5",
+        isCollapsedDrawer
+          ? "border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(8,47,73,0.92))] py-1 text-slate-100"
+          : "border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] py-1.5",
+      )}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className={cn("shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em]", isCollapsedDrawer ? "text-cyan-200" : "text-cyan-700")}>
+            Node
+          </p>
+          <h2 className={cn("min-w-0 truncate text-sm font-semibold", isCollapsedDrawer ? "text-white" : "text-slate-950")}>
+            {detail.title}
           </h2>
           <StatusBadge tone={statusTone(detail.status)}>
             {detail.status ?? "waiting"}
           </StatusBadge>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+          <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", isCollapsedDrawer ? "border-white/10 bg-white/10 text-slate-300" : "border-slate-200 bg-white/80 text-slate-500")}>
             Step {detail.stepPosition}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Auto-refresh</span>
+        <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+          {isDrawer ? (
+            <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-0.5 shadow-sm">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950"
+                onClick={() => onDrawerSizeChange?.(nextPrimaryDrawerSize)}
+              >
+                {drawerSize === "collapsed" ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {drawerSize === "collapsed" ? "Open" : "Hide"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950"
+                onClick={() => onDrawerSizeChange?.(drawerSize === "expanded" ? "half" : "expanded")}
+              >
+                {drawerSize === "expanded" ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                {drawerSize === "expanded" ? "Half" : "Expand"}
+              </button>
+            </div>
+          ) : null}
+          <span className="hidden sm:inline">Auto-refresh</span>
           <span
             className={cn(
               "h-5 w-9 rounded-full p-0.5",
-              detail.autoRefreshEnabled ? "bg-primary" : "bg-muted",
+              detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
             )}
           >
             <span
@@ -575,8 +645,9 @@ export function TaskWorkspaceNodeDetailPanel({
         </div>
       </div>
 
+      {isCollapsedDrawer ? null : (
       <div
-        className="flex gap-1 border-b border-border/50 px-2.5"
+        className="flex gap-1 border-b border-slate-200/80 bg-white/70 px-2.5 py-1.5"
         role="tablist"
         aria-label="Node detail tabs"
       >
@@ -593,11 +664,16 @@ export function TaskWorkspaceNodeDetailPanel({
           </button>
         ))}
       </div>
+      )}
 
+      {isCollapsedDrawer ? null : (
       <div
         role="tabpanel"
         aria-label={`${TAB_LABELS[activeTab]} tab`}
-        className="min-h-0 flex-1 overflow-y-auto bg-white p-2"
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2",
+          variant === "rail" && "max-h-none",
+        )}
       >
         {activeTab === "result" ? <ResultTab node={node} /> : null}
         {activeTab === "evidence" ? <EvidenceTab node={node} /> : null}
@@ -616,6 +692,7 @@ export function TaskWorkspaceNodeDetailPanel({
           <ConfigurationTab node={node} nodes={selectedNodes} />
         ) : null}
       </div>
+      )}
 
     </section>
   );

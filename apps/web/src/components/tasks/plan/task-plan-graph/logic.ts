@@ -25,53 +25,53 @@ export const TONE_STYLES: Record<
   { border: string; bg: string; ring: string; dot: string; text: string }
 > = {
   active: {
-    border: "border-sky-500/35",
-    bg: "bg-sky-100/90 dark:bg-sky-950/40",
-    ring: "ring-sky-400/30",
-    dot: "bg-sky-500",
-    text: "text-sky-900 dark:text-sky-100",
+    border: "border-cyan-300/75",
+    bg: "bg-cyan-400/14",
+    ring: "ring-cyan-300/45",
+    dot: "bg-cyan-300",
+    text: "text-cyan-50",
   },
   attention: {
-    border: "border-amber-500/35",
-    bg: "bg-amber-100/90 dark:bg-amber-950/40",
-    ring: "ring-amber-400/30",
-    dot: "bg-amber-500",
-    text: "text-amber-900 dark:text-amber-100",
+    border: "border-fuchsia-300/70",
+    bg: "bg-fuchsia-400/13",
+    ring: "ring-fuchsia-300/40",
+    dot: "bg-fuchsia-300",
+    text: "text-fuchsia-50",
   },
   blocked: {
-    border: "border-rose-500/40",
-    bg: "bg-rose-100/90 dark:bg-rose-950/40",
-    ring: "ring-rose-400/30",
-    dot: "bg-rose-500",
-    text: "text-rose-900 dark:text-rose-100",
+    border: "border-rose-300/80",
+    bg: "bg-rose-500/14",
+    ring: "ring-rose-300/45",
+    dot: "bg-rose-300",
+    text: "text-rose-50",
   },
   done: {
-    border: "border-slate-300/55",
-    bg: "bg-slate-100/92 dark:bg-slate-900/45",
-    ring: "ring-slate-300/30",
-    dot: "bg-slate-400",
-    text: "text-slate-800 dark:text-slate-100",
+    border: "border-emerald-300/50",
+    bg: "bg-emerald-400/9",
+    ring: "ring-emerald-300/25",
+    dot: "bg-emerald-300",
+    text: "text-emerald-50",
   },
   skipped: {
-    border: "border-slate-300/45 border-dashed",
-    bg: "bg-slate-100/62 dark:bg-slate-900/28",
-    ring: "ring-slate-300/18",
+    border: "border-slate-500/45 border-dashed",
+    bg: "bg-slate-700/18",
+    ring: "ring-slate-400/15",
     dot: "bg-slate-400/55",
-    text: "text-slate-600 dark:text-slate-300",
+    text: "text-slate-300",
   },
   upcoming: {
-    border: "border-violet-400/38",
-    bg: "bg-violet-100/92 dark:bg-violet-950/40",
-    ring: "ring-violet-400/30",
-    dot: "bg-violet-500",
-    text: "text-violet-900 dark:text-violet-100",
+    border: "border-violet-300/62",
+    bg: "bg-violet-400/12",
+    ring: "ring-violet-300/32",
+    dot: "bg-violet-300",
+    text: "text-violet-50",
   },
   idle: {
-    border: "border-slate-300/50",
-    bg: "bg-slate-100/85 dark:bg-slate-900/35",
-    ring: "ring-border/20",
-    dot: "bg-slate-500/60",
-    text: "text-slate-900 dark:text-slate-100",
+    border: "border-slate-500/45",
+    bg: "bg-slate-800/42",
+    ring: "ring-white/10",
+    dot: "bg-slate-300/70",
+    text: "text-slate-100",
   },
 };
 
@@ -127,22 +127,22 @@ function edgeStroke(
   kind: PlanEdgeKind,
   emphasis: PlanEdgeEmphasis,
 ) {
-  if (emphasis === "inactive") return "rgba(100, 116, 139, 0.44)";
-  if (emphasis === "blocked") return "rgba(225, 29, 72, 0.72)";
-  if (emphasis === "active") return "rgba(14, 165, 233, 0.82)";
+  if (emphasis === "inactive") return "rgba(100, 116, 139, 0.42)";
+  if (emphasis === "blocked") return "rgba(251, 113, 133, 0.9)";
+  if (emphasis === "active") return "rgba(103, 232, 249, 0.95)";
   switch (kind) {
     case "dependency":
-      return "rgba(168, 85, 247, 0.82)";
+      return "rgba(196, 181, 253, 0.8)";
     case "branch_true":
-      return "rgba(16, 185, 129, 0.82)";
+      return "rgba(110, 231, 183, 0.84)";
     case "branch_false":
-      return "rgba(249, 115, 22, 0.82)";
+      return "rgba(251, 146, 60, 0.84)";
     case "branch_option":
-      return "rgba(234, 179, 8, 0.82)";
+      return "rgba(232, 121, 249, 0.78)";
     case "resume":
-      return "rgba(59, 130, 246, 0.82)";
+      return "rgba(96, 165, 250, 0.82)";
     default:
-      return "rgba(100, 116, 139, 0.66)";
+      return "rgba(148, 163, 184, 0.68)";
   }
 }
 
@@ -219,14 +219,6 @@ export function buildEdgeLegend(graphCopy: GraphCopy): EdgeLegendItem[] {
 
 export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
   return [
-    { label: graphCopy.nodeTypeTask, shape: "rounded", tone: "idle" },
-    {
-      label: graphCopy.nodeTypeCheckpoint,
-      shape: "parallelogram",
-      tone: "attention",
-    },
-    { label: graphCopy.nodeTypeCondition, shape: "diamond", tone: "blocked" },
-    { label: graphCopy.nodeTypeWait, shape: "pill", tone: "done" },
     { label: graphCopy.statusActive, shape: "rounded", tone: "active" },
     {
       label: graphCopy.statusWaiting,
@@ -236,6 +228,10 @@ export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
     { label: graphCopy.statusReady, shape: "rounded", tone: "upcoming" },
     { label: graphCopy.statusBlocked, shape: "diamond", tone: "blocked" },
     { label: graphCopy.statusDone, shape: "pill", tone: "done" },
+    { label: graphCopy.nodeTypeTask, shape: "rounded", tone: "idle" },
+    { label: graphCopy.nodeTypeCheckpoint, shape: "parallelogram", tone: "active" },
+    { label: graphCopy.nodeTypeCondition, shape: "diamond", tone: "attention" },
+    { label: graphCopy.nodeTypeWait, shape: "pill", tone: "upcoming" },
     { label: graphCopy.statusSkipped, shape: "rounded", tone: "skipped" },
   ];
 }
