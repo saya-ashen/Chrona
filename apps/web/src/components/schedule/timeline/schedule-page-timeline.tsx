@@ -127,6 +127,8 @@ export function DayTimeline({
   const [viewportMinHeight, setViewportMinHeight] = useState(0);
   const effectiveTimelineHeight = Math.max(timelineHeight, viewportMinHeight);
   const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
+  const workdayStartMinute = 8 * 60;
+  const workdayEndMinute = 18 * 60;
 
   function mapMinuteToY(minute: number) {
     const clamped = Math.min(Math.max(minute, 0), 24 * 60);
@@ -547,8 +549,8 @@ export function DayTimeline({
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-[28px] border-border/55 bg-white/75">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-border/55 bg-white/80 p-3">
+    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-[28px] border-border/55 bg-white/80 p-2 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-[24px] border border-border/55 bg-white/90 p-3 shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
         <div>
           <h3 className="text-base font-semibold text-foreground">
             {formatDayHeading(dayDate, locale, copy)}
@@ -558,20 +560,19 @@ export function DayTimeline({
             {items.length} {items.length === 1 ? copy.blockSingular : copy.blockPlural}
           </p>
         </div>
-        <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em]">
+        <div className="rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
             {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
           </p>
-          {" "}
         </div>
       </div>
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto rounded-3xl border border-border/55 bg-gradient-to-b from-white/88 to-slate-50/85 p-2 pr-0"
+        className="flex-1 overflow-y-auto rounded-3xl border border-border/55 bg-gradient-to-b from-white/92 via-white/88 to-slate-50/90 p-1.5 pr-0 sm:p-2"
       >
-        <div className="flex gap-2">
-          <div className="sticky left-0 top-0 hidden w-20 shrink-0 self-start rounded-2xl border border-border/40 bg-white/90 py-3 pl-2 sm:block">
+        <div className="flex min-w-0 gap-1.5 sm:gap-2">
+          <div className="sticky left-0 z-20 w-14 shrink-0 self-start rounded-2xl border border-border/40 bg-white/95 py-3 pl-1 shadow-[8px_0_18px_rgba(15,23,42,0.04)] sm:w-20 sm:pl-2">
             <div className="relative" style={{ height: `${effectiveTimelineHeight}px` }}>
               {hours.map((hour) => (
                 <div
@@ -579,7 +580,7 @@ export function DayTimeline({
                   className="absolute left-0 right-0"
                   style={{ top: `${mapMinuteToY(hour * 60)}px` }}
                 >
-                  <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                  <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground sm:px-1.5 sm:text-[11px]">
                     {formatTime(new Date(2026, 0, 1, hour, 0), locale)}
                   </span>
                 </div>
@@ -588,7 +589,7 @@ export function DayTimeline({
                 className="absolute left-0 right-0"
                 style={{ top: `${effectiveTimelineHeight}px` }}
               >
-                <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground sm:px-1.5 sm:text-[11px]">
                   11:59 PM
                 </span>
               </div>
@@ -607,11 +608,18 @@ export function DayTimeline({
             }}
             onClick={handleTimelineClick}
             className={cn(
-              "relative flex-1 rounded-2xl border border-border/60 bg-white/80 outline-none transition-colors",
-              draggedItem && "border-primary/50 bg-primary/[0.08]",
+              "relative min-w-0 flex-1 touch-manipulation rounded-2xl border border-border/60 bg-white/82 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/35",
+              draggedItem && "border-primary/50 bg-primary/[0.08] shadow-[inset_0_0_0_1px_rgba(99,88,233,0.12)]",
             )}
             style={{ height: `${effectiveTimelineHeight}px` }}
           >
+            <div
+              className="pointer-events-none absolute inset-x-1 rounded-[22px] border border-primary/10 bg-primary/[0.035]"
+              style={{
+                top: `${mapMinuteToY(workdayStartMinute)}px`,
+                height: `${mapMinuteToY(workdayEndMinute) - mapMinuteToY(workdayStartMinute)}px`,
+              }}
+            />
             {hours.map((hour) => (
               <div
                 key={hour}
@@ -622,6 +630,9 @@ export function DayTimeline({
                 }}
               >
                 <div className="absolute inset-x-0 top-0 border-t border-border/35" />
+                {hour >= workdayStartMinute / 60 && hour < workdayEndMinute / 60 ? (
+                  <div className="pointer-events-none absolute inset-x-2 top-2 h-px bg-primary/10" />
+                ) : null}
               </div>
             ))}
             <div
@@ -643,13 +654,13 @@ export function DayTimeline({
             {currentTimeMarker ? (
               <div
                 aria-label={`Current time ${currentTimeMarker.label}`}
-                className="pointer-events-none absolute inset-x-0 z-10"
+                className="pointer-events-none absolute inset-x-0 z-20"
                 style={{ top: `${currentTimeMarker.top}px` }}
               >
-                <div className="flex items-center gap-2 -translate-y-1/2 px-3">
-                  <span className="size-2 rounded-full bg-primary" />
+                <div className="flex -translate-y-1/2 items-center gap-2 px-2 sm:px-3">
+                  <span className="size-2.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(99,88,233,0.14)]" />
                   <div className="h-px flex-1 bg-primary/80" />
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                  <span className="rounded-full border border-primary/20 bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm">
                     {currentTimeMarker.label}
                   </span>
                 </div>
@@ -693,6 +704,7 @@ export function DayTimeline({
             ) : null}
 
             {items.map((item) => {
+              const now = Date.now();
               const start = item.scheduledStartAt
                 ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes()
                 : 0;
@@ -705,6 +717,16 @@ export function DayTimeline({
                 mapMinuteToY(safeEnd) - top,
                 56,
               );
+              const isCurrent = Boolean(
+                isToday &&
+                  item.scheduledStartAt &&
+                  item.scheduledEndAt &&
+                  item.scheduledStartAt.getTime() <= now &&
+                  item.scheduledEndAt.getTime() >= now,
+              );
+              const isPast = Boolean(
+                isToday && item.scheduledEndAt && item.scheduledEndAt.getTime() < now,
+              );
 
               return (
                 <ScheduledTimelineBlock
@@ -714,6 +736,8 @@ export function DayTimeline({
                   top={top}
                   height={height}
                   isSelected={selectedTaskId === item.taskId}
+                  isCurrent={isCurrent}
+                  isPast={isPast}
                   hasConflict={conflictTaskIds?.has(item.taskId) ?? false}
                   isPending={isPending}
                   isHidden={interactionMode === "resizing" && resizeDraft?.taskId === item.taskId}

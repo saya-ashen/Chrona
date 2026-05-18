@@ -82,6 +82,8 @@ export function ScheduledTimelineBlock({
   top,
   height,
   isSelected,
+  isCurrent,
+  isPast,
   hasConflict,
   isPending,
   isHidden,
@@ -95,6 +97,8 @@ export function ScheduledTimelineBlock({
   top: number;
   height: number;
   isSelected: boolean;
+  isCurrent?: boolean;
+  isPast?: boolean;
   hasConflict?: boolean;
   isPending: boolean;
   isHidden?: boolean;
@@ -140,12 +144,15 @@ export function ScheduledTimelineBlock({
       }}
       aria-label={item.title}
       className={cn(
-        "absolute left-3 right-3 rounded-2xl border bg-white/98 p-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] transition-all hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "absolute left-2 right-2 rounded-2xl border bg-white/98 p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] transition-all hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:left-3 sm:right-3 sm:p-3",
         hasConflict
           ? "border-red-400 bg-red-50/80 ring-1 ring-red-300/50"
+          : isCurrent
+            ? "border-primary bg-primary-soft/85 ring-2 ring-primary/20 shadow-[0_16px_34px_rgba(79,70,229,0.22)]"
           : isSelected
             ? "border-primary ring-1 ring-primary/30 shadow-[0_14px_28px_rgba(79,70,229,0.2)]"
             : "border-border",
+        isPast && !isSelected && !isCurrent && "opacity-70",
         isHidden && "opacity-40",
       )}
       style={{
@@ -155,14 +162,19 @@ export function ScheduledTimelineBlock({
       }}
     >
       <div className="flex h-full gap-3 overflow-hidden">
-        <div className={`w-1 shrink-0 rounded-full ${accent}`} />
+        <div className={cn("w-1 shrink-0 rounded-full", isCurrent ? "bg-primary" : accent)} />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <Move className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <Move className={cn("size-3.5 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} aria-hidden="true" />
               <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
             </div>
             <div className="flex items-center gap-1">
+              {isCurrent ? (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+                  {copy.quickCreateStartNowLabel}
+                </span>
+              ) : null}
               {hasConflict ? (
                 <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700" title={copy.conflictPreviewLabel}>
                   <AlertTriangle className="size-3" aria-hidden="true" />
