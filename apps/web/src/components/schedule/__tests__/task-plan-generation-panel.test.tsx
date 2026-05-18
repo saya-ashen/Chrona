@@ -177,7 +177,7 @@ describe("TaskPlanGenerationPanel", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("renders an incoming saved plan without requesting generation", () => {
+  it("renders an incoming saved plan without requesting generation", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
@@ -192,7 +192,7 @@ describe("TaskPlanGenerationPanel", () => {
     );
 
     expect(screen.queryByText(/No plan yet/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(await screen.findByLabelText("任务计划图")).toBeInTheDocument();
     expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
     expect(screen.getByText("120 min")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -241,7 +241,7 @@ describe("TaskPlanGenerationPanel", () => {
       );
     });
 
-    expect(screen.getByLabelText("任务计划图")).toBeInTheDocument();
+    expect(await screen.findByLabelText("任务计划图")).toBeInTheDocument();
     expect(screen.getByText("Review existing documentation")).toBeInTheDocument();
   });
 

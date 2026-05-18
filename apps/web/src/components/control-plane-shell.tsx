@@ -137,7 +137,7 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-6 xl:px-7 xl:overflow-hidden">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6 xl:px-7">
            {children}
          </main>
       </div>

@@ -22,7 +22,7 @@ function TaskPlanGraphEdge({
   data,
 }: EdgeProps<FlowGraphEdge>) {
   const routeOffset = typeof data?.routeOffset === "number" ? data.routeOffset : 0;
-  const [path, labelX, labelY] = getSmoothStepPath({
+  const [smoothPath, smoothLabelX, smoothLabelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -32,6 +32,9 @@ function TaskPlanGraphEdge({
     borderRadius: data?.fanIn || data?.fanOut ? 18 : 12,
     offset: routeOffset > 0 ? routeOffset : 24,
   });
+  const path = data?.elkPath ?? smoothPath;
+  const labelX = data?.elkLabelPoint?.x ?? smoothLabelX;
+  const labelY = data?.elkLabelPoint?.y ?? smoothLabelY;
 
   const label = data?.stableLabel?.trim();
   const stroke = typeof style?.stroke === "string" ? style.stroke : "rgba(148, 163, 184, 0.7)";

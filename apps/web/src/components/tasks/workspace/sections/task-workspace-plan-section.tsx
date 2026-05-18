@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import type { PointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { TaskWorkspaceExecutionOverview } from "../execution/task-workspace-execution-overview";
@@ -21,6 +20,18 @@ import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 function isCompletedGraphNode(status: string) {
   return status === "done" || status === "completed" || status === "skipped";
+}
+
+function isNodeDetailDrawerTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return Boolean(target.closest("[data-node-detail-drawer]"));
+}
+
+function isPlanGraphTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return Boolean(target.closest(".react-flow__node,.react-flow__edge,.react-flow__controls"));
 }
 
 type TaskWorkspacePlanSectionProps = {
@@ -50,6 +61,7 @@ export function TaskWorkspacePlanSection({
 }: TaskWorkspacePlanSectionProps) {
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
   const [nodeDrawerSize, setNodeDrawerSize] = useState<"collapsed" | "half" | "expanded">("collapsed");
+  const shouldAutoOpenDrawerRef = useRef(false);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
@@ -85,9 +97,10 @@ export function TaskWorkspacePlanSection({
     nodes: PlanNodeDataModel[],
   ) => {
     handleSelectedPlanNodeChange(node, nodes);
-    if (node && nodeDrawerSize === "collapsed") {
+    if (node && nodeDrawerSize === "collapsed" && shouldAutoOpenDrawerRef.current) {
       setNodeDrawerSize("half");
     }
+    shouldAutoOpenDrawerRef.current = false;
   };
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
@@ -104,23 +117,24 @@ export function TaskWorkspacePlanSection({
       .getElementById("task-workspace-node-actions")
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
-  const handleWorkspacePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (nodeDrawerSize === "collapsed") return;
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (isNodeDetailDrawerTarget(event.target)) return;
+      if (isPlanGraphTarget(event.target)) {
+        shouldAutoOpenDrawerRef.current = true;
+        return;
+      }
 
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
+      shouldAutoOpenDrawerRef.current = false;
+      setNodeDrawerSize((currentSize) => currentSize === "collapsed" ? currentSize : "collapsed");
+    };
 
-    const interactiveTarget = target.closest(
-      "button,a,input,select,textarea,[role='button'],[role='tab'],[data-node-detail-drawer],.react-flow__node,.react-flow__edge,.react-flow__controls",
-    );
-    if (interactiveTarget) return;
+    document.addEventListener("click", handleDocumentClick, { capture: true });
 
-    const clickedPane = Boolean(target.closest(".react-flow__pane"));
-    const clickedWorkspaceBackground = event.target === event.currentTarget;
-    if (clickedPane || clickedWorkspaceBackground) {
-      setNodeDrawerSize("collapsed");
-    }
-  };
+    return () => {
+      document.removeEventListener("click", handleDocumentClick, { capture: true });
+    };
+  }, []);
 
   return (
     <section
@@ -162,10 +176,7 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div
-        className="relative flex min-h-[700px] flex-1 flex-col gap-2 xl:min-h-0"
-        onPointerDown={handleWorkspacePointerDown}
-      >
+      <div className="relative flex min-h-[700px] flex-1 flex-col gap-2 xl:min-h-0">
         <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
           <section aria-label="Execution flow" className="min-h-0 min-w-0">
             <TaskWorkspacePlanContent
@@ -179,7 +190,10 @@ export function TaskWorkspacePlanSection({
             />
           </section>
 
-          <aside className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-slate-200/80 bg-white/82 p-2 shadow-[0_14px_45px_rgba(15,23,42,0.07)] backdrop-blur" aria-label="Task command center">
+          <aside
+            className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-slate-200/80 bg-white/82 p-2 shadow-[0_14px_45px_rgba(15,23,42,0.07)] backdrop-blur"
+            aria-label="Task command center"
+          >
             <TaskWorkspaceExecutionOverview
               readiness={consoleView.readiness}
               latestResult={consoleView.latestResult}
