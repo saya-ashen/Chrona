@@ -73,8 +73,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     fetchPlan,
     planGenerationStatus,
     graphPlan,
-    canAcceptPlan,
-    isAcceptingPlan,
     acceptPlanError,
     setAcceptPlanError,
     isAiWorkspaceOpen,
@@ -82,7 +80,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     requestGenerationKey,
     runtimeEvents,
     acceptPlanById,
-    handleAcceptPlan,
     dispatchExecutionAction,
     handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
@@ -92,6 +89,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     pageData,
     graphPlan,
   });
+  const isGeneratingPlan = planGenerationStatus === "generating";
   const {
     currentProposal,
     setCurrentProposal,
@@ -114,31 +112,25 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       setSaveError,
     });
   return (
-    <div className="min-w-0 space-y-2 pb-14">
-      <div className="space-y-1">
-        <section
-          aria-label={copy.workspaceState}
-          className="rounded-[0.9rem] border border-primary/15 bg-primary/5 px-3 py-2 text-sm"
-        >
-          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                {copy.currentState}
-              </p>
-              <p className="break-words text-base font-semibold text-foreground">
-                {consoleView.states.treatment.label}
-              </p>
-            </div>
-            <p className="min-w-0 break-words text-sm leading-5 text-muted-foreground sm:max-w-[58ch] sm:text-right">
-              <span className="font-medium text-foreground">{copy.nextAction}: </span>
-              {consoleView.states.treatment.guidance}
-            </p>
-          </div>
-        </section>
+    <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col gap-2 xl:overflow-hidden">
+      <div className="shrink-0 space-y-1">
         <TaskWorkspaceHeaderCard
           task={consoleView.task}
           header={consoleView.header}
           backToScheduleLabel={copy.backToSchedule}
+          workspaceStateLabel={consoleView.states.treatment.label}
+          workspaceStateGuidance={`${copy.nextAction}: ${consoleView.states.treatment.guidance}`}
+          planAction={{
+            label: isGeneratingPlan
+              ? "Generating..."
+              : plan
+                ? "Regenerate plan"
+                : "Generate plan",
+            placement: plan ? "menu" : "primary",
+            isLoading: isGeneratingPlan,
+            disabled: isGeneratingPlan,
+            onClick: handleGeneratePlanFromHeader,
+          }}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
@@ -180,11 +172,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         pageData={{ ...pageData, task: consoleView.task }}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
-        canAcceptPlan={canAcceptPlan}
-        isAcceptingPlan={isAcceptingPlan}
         acceptPlanError={acceptPlanError}
         runtimeEvents={runtimeEvents}
-        onAcceptPlan={handleAcceptPlan}
         onGeneratePlan={handleGeneratePlanFromHeader}
         onDispatchExecutionAction={dispatchExecutionAction}
       />

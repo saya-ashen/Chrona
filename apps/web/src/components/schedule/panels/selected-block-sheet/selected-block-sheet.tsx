@@ -24,7 +24,7 @@ export function SelectedBlockSheet({
 }: SelectedBlockSheetProps) {
   const [isMounted, setIsMounted] = useState(false);
   const locale = useLocale();
-  const { messages, t } = useI18n();
+  const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const {
     displayedSavedPlan,

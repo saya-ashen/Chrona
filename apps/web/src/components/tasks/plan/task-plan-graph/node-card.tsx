@@ -35,23 +35,25 @@ const HIDDEN_HANDLE_STYLE = {
 function resolveInteractionFrame(node: FlowGraphNode["data"]["node"]) {
   switch (node.interactionType) {
     case "execute":
-      return { accent: "before:bg-violet-500/75" };
+      return { accent: "from-cyan-300 via-sky-400 to-blue-500", label: "Execute" };
     case "confirm":
-      return { accent: "before:bg-indigo-500/75" };
+      return { accent: "from-indigo-300 via-violet-400 to-fuchsia-500", label: "Confirm" };
     case "choose":
-      return { accent: "before:bg-amber-500/75" };
+      return { accent: "from-amber-200 via-orange-300 to-fuchsia-400", label: "Choose" };
     case "input":
-      return { accent: "before:bg-amber-500/75" };
+      return { accent: "from-amber-200 via-orange-300 to-rose-400", label: "Input" };
     case "edit":
-      return { accent: "before:bg-emerald-500/75" };
+      return { accent: "from-emerald-200 via-teal-300 to-cyan-400", label: "Edit" };
     case "approve":
-      return { accent: "before:bg-fuchsia-500/75" };
+      return { accent: "from-fuchsia-200 via-pink-400 to-rose-400", label: "Approve" };
     case "retry":
-      return { accent: "before:bg-rose-500/75" };
+      return { accent: "from-rose-200 via-red-400 to-orange-400", label: "Retry" };
     case "wait":
-      return { accent: "before:bg-slate-500/65" };
+      return { accent: "from-slate-400 via-slate-500 to-slate-600", label: "Wait" };
+    case "observe":
+      return { accent: "from-sky-300 via-cyan-400 to-blue-500", label: "View" };
     default:
-      return { accent: "before:bg-sky-500/70" };
+      return { accent: "from-slate-300 via-slate-400 to-slate-500", label: "View" };
   }
 }
 
@@ -59,8 +61,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.status === "skipped") {
       return {
         label: node.statusLabel ?? "Skipped",
-        badge: "bg-slate-500/78 text-white",
-        ring: "ring-1 ring-slate-300/28",
+        badge: "border-slate-500/55 bg-slate-800/80 text-slate-300",
+        ring: "ring-1 ring-slate-500/25",
         glow: "bg-transparent",
       };
   }
@@ -68,26 +70,26 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.interactionType === "execute" || node.status === "ready") {
       return {
         label: "Ready",
-        badge: "bg-violet-500 text-white",
-        ring: "ring-1 ring-violet-400/45",
-        glow: "bg-violet-300/18",
+        badge: "border-violet-300/45 bg-violet-400/18 text-violet-100",
+        ring: "ring-1 ring-violet-300/45",
+        glow: "bg-violet-400/16",
       };
   }
 
   if (node.status === "active") {
       return {
         label: "Running",
-        badge: "bg-sky-500 text-white",
-        ring: "ring-1 ring-sky-400/45",
-        glow: "bg-sky-400/18",
+        badge: "border-cyan-200/55 bg-cyan-300/18 text-cyan-50",
+        ring: "ring-2 ring-cyan-200/55",
+        glow: "bg-cyan-300/18",
       };
   }
 
   if (node.interactionType === "approve") {
       return {
         label: "Approve",
-        badge: "bg-fuchsia-500 text-white",
-        ring: "ring-1 ring-fuchsia-400/45",
+        badge: "border-fuchsia-200/55 bg-fuchsia-300/18 text-fuchsia-50",
+        ring: "ring-1 ring-fuchsia-300/45",
         glow: "bg-fuchsia-400/16",
       };
   }
@@ -95,8 +97,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.interactionType === "confirm") {
       return {
         label: "Confirm",
-        badge: "bg-indigo-500 text-white",
-        ring: "ring-1 ring-indigo-400/45",
+        badge: "border-indigo-200/55 bg-indigo-300/18 text-indigo-50",
+        ring: "ring-1 ring-indigo-300/45",
         glow: "bg-indigo-300/16",
       };
   }
@@ -104,8 +106,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.interactionType === "choose") {
       return {
         label: "Choose",
-        badge: "bg-amber-500 text-white",
-        ring: "ring-1 ring-amber-400/45",
+        badge: "border-amber-200/60 bg-amber-300/18 text-amber-50",
+        ring: "ring-1 ring-amber-300/45",
         glow: "bg-amber-300/18",
       };
   }
@@ -113,8 +115,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.interactionType === "edit") {
       return {
         label: "Edit",
-        badge: "bg-emerald-500 text-white",
-        ring: "ring-1 ring-emerald-400/45",
+        badge: "border-emerald-200/55 bg-emerald-300/18 text-emerald-50",
+        ring: "ring-1 ring-emerald-300/45",
         glow: "bg-emerald-300/16",
       };
   }
@@ -122,8 +124,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.interactionType === "input") {
       return {
         label: "Input",
-        badge: "bg-amber-500 text-white",
-        ring: "ring-1 ring-amber-400/45",
+        badge: "border-amber-200/60 bg-amber-300/18 text-amber-50",
+        ring: "ring-1 ring-amber-300/45",
         glow: "bg-amber-300/18",
       };
   }
@@ -131,8 +133,8 @@ function resolveRuntimeSpotlight(node: FlowGraphNode["data"]["node"]) {
   if (node.status === "blocked") {
       return {
         label: "Retry",
-        badge: "bg-rose-500 text-white",
-        ring: "ring-1 ring-rose-400/45",
+        badge: "border-rose-200/60 bg-rose-300/18 text-rose-50",
+        ring: "ring-1 ring-rose-300/45",
         glow: "bg-rose-300/16",
       };
   }
@@ -148,6 +150,7 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
   const durationLabel = formatEstimatedMinutes(node.estimatedMinutes ?? null);
   const executionStatus = resolveExecutionStatus(node);
   const requiresAction = node.status === "blocked" || executionStatus === "approval-needed";
+  const estimatedLabel = durationLabel ?? (node.priority ? `${node.priority} priority` : null);
 
   return (
     <div className="relative" style={{ width: NODE_WIDTH }}>
@@ -169,22 +172,23 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         data-node-step={stepNumber}
         data-node-execution-status={executionStatus}
         className={cn(
-          "rf-node-button group relative w-full overflow-hidden border px-3 py-2 text-left transition-colors duration-150",
-          "before:absolute before:inset-y-3 before:left-0 before:w-px before:rounded-r-full before:content-['']",
-          "shadow-none hover:border-foreground/18",
+          "rf-node-button group relative w-full overflow-hidden border px-3 py-2.5 text-left text-slate-100 transition duration-200",
+          "shadow-[0_18px_45px_rgba(2,6,23,0.28)] backdrop-blur hover:-translate-y-0.5 hover:border-white/28 hover:shadow-[0_22px_60px_rgba(8,47,73,0.34)]",
           getShapeClassName(shape),
           styles.border,
           styles.bg,
           styles.text,
-          interactionFrame.accent,
-          isSelected && "ring-1 ring-foreground/18",
+          isSelected && "ring-2 ring-white/55",
+          isCurrent && "shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_24px_80px_rgba(34,211,238,0.25)]",
           runtimeSpotlight?.ring,
-          !isFocus && "saturate-50",
+          !isFocus && "opacity-70 saturate-50",
         )}
       >
         {runtimeSpotlight ? (
           <span aria-hidden="true" className={cn("pointer-events-none absolute inset-0 animate-pulse", runtimeSpotlight.glow, getShapeClassName(shape))} />
         ) : null}
+        <span aria-hidden="true" className={cn("pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r", interactionFrame.accent)} />
+        <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 size-24 rounded-full bg-white/7 blur-2xl transition group-hover:bg-cyan-200/13" />
         {shape === "diamond" ? (
           <span
             aria-hidden="true"
@@ -199,28 +203,31 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
             style={{ clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" }}
           />
         ) : null}
-        <div className="relative grid grid-cols-[1.35rem_minmax(0,1fr)] items-start gap-2">
-          <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[7px] bg-background/65 text-[10px] font-semibold text-muted-foreground ring-1 ring-border/35">
+        <div className="relative grid grid-cols-[1.55rem_minmax(0,1fr)] items-start gap-2">
+          <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-[9px] border border-white/12 bg-white/10 text-[10px] font-semibold text-slate-100 shadow-inner shadow-white/5">
             {stepNumber}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              <span className={cn("size-2 rounded-full", styles.dot)} />
+            <div className="flex min-w-0 items-center gap-1.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <span className={cn("size-2 rounded-full shadow-[0_0_14px_currentColor]", styles.dot)} />
               <span className="truncate">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
             </div>
 
-            <p className="mt-1 break-words text-[13px] font-semibold leading-snug text-foreground line-clamp-2">{node.title}</p>
+            <p className="mt-1.5 break-words text-[13px] font-semibold leading-snug text-slate-50 line-clamp-2">{node.title}</p>
 
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-300">
+                {interactionFrame.label}
+              </span>
               {runtimeSpotlight ? (
-                <span className={cn("rounded-[7px] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em]", runtimeSpotlight.badge)}>
+                <span className={cn("rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em]", runtimeSpotlight.badge)}>
                   {runtimeSpotlight.label}
                 </span>
               ) : (
-                <span className="rounded-[7px] bg-muted px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{node.statusLabel ?? node.status}</span>
+                <span className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-300">{node.statusLabel ?? node.status}</span>
               )}
-              {durationLabel ? (
-                <span className="truncate text-[11px] font-medium text-muted-foreground">{durationLabel}</span>
+              {estimatedLabel ? (
+                <span className="truncate rounded-full border border-white/8 bg-slate-950/35 px-2 py-0.5 text-[10px] font-medium text-slate-300">{estimatedLabel}</span>
               ) : null}
             </div>
           </div>

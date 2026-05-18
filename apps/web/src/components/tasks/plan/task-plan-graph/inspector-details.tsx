@@ -33,9 +33,9 @@ function resolveDependencyNames(node: PlanNodeDataModel, nodes: PlanNodeDataMode
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/80 px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm text-slate-100">{value}</p>
     </div>
   );
 }
@@ -46,10 +46,10 @@ function ActionChip({ action }: { action: PlanNodeAction }) {
       className={cn(
         "rounded-full px-2 py-1 text-[10px] font-medium",
         action.emphasis === "primary"
-          ? "bg-primary/12 text-primary"
+          ? "border border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
           : action.emphasis === "warning"
-            ? "bg-amber-100 text-amber-800"
-            : "bg-foreground/6 text-muted-foreground",
+            ? "border border-amber-300/20 bg-amber-300/10 text-amber-100"
+            : "border border-white/10 bg-white/[0.06] text-slate-300",
       )}
     >
       {action.label}
@@ -59,20 +59,20 @@ function ActionChip({ action }: { action: PlanNodeAction }) {
 
 function FieldCard({ field }: { field: PlanNodeField }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/80 px-3 py-2.5">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">{field.label}</p>
-        {field.required ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">required</span> : null}
+        <p className="text-sm font-medium text-slate-100">{field.label}</p>
+        {field.required ? <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-1.5 py-0.5 text-[10px] text-amber-100">required</span> : null}
       </div>
-      <p className="mt-1 text-[11px] text-muted-foreground">control: {field.control ?? "text"}</p>
-      {field.options?.length ? <p className="mt-1 text-[11px] text-muted-foreground">options: {field.options.join(", ")}</p> : null}
+      <p className="mt-1 text-[11px] text-slate-400">control: {field.control ?? "text"}</p>
+      {field.options?.length ? <p className="mt-1 text-[11px] text-slate-400">options: {field.options.join(", ")}</p> : null}
     </div>
   );
 }
 
 function DependencyChip({ title }: { title: string }) {
   return (
-    <span className="inline-flex min-h-8 items-center rounded-2xl border border-violet-200/70 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-900 shadow-sm dark:border-violet-400/20 dark:bg-violet-500/10 dark:text-violet-100">
+    <span className="inline-flex min-h-8 items-center rounded-2xl border border-violet-300/20 bg-violet-300/10 px-3 py-1.5 text-xs font-medium text-violet-100 shadow-sm">
       {title}
     </span>
   );
@@ -92,17 +92,17 @@ export function TaskPlanGraphInspectorDetails({
   return (
     <>
       <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorWhy}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/85">{graphCopy.inspectorWhy}</p>
         <InfoRow label={graphCopy.detailObjective} value={node.objective} />
         <InfoRow label={graphCopy.detailNextAction} value={node.nextAction ?? null} />
         <InfoRow label={graphCopy.detailReadiness} value={node.readiness ?? null} />
       </section>
 
       <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorDependencies}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/85">{graphCopy.inspectorDependencies}</p>
         {dependencyNames.length > 0 ? (
-          <div className="rounded-2xl border border-border/60 bg-background/80 px-3 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{graphCopy.detailDependencies}</p>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{graphCopy.detailDependencies}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {dependencyNames.map((dependencyName) => (
                 <DependencyChip key={dependencyName} title={dependencyName} />
@@ -114,7 +114,7 @@ export function TaskPlanGraphInspectorDetails({
       </section>
 
       <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorExecution}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/85">{graphCopy.inspectorExecution}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           <InfoRow label={graphCopy.detailPhase} value={node.phase} />
           <InfoRow label={graphCopy.detailExecutionMode} value={node.executionMode ?? null} />
@@ -125,7 +125,7 @@ export function TaskPlanGraphInspectorDetails({
       </section>
 
       <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorOutcomes}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/85">{graphCopy.inspectorOutcomes}</p>
         <InfoRow label={graphCopy.detailCompletionSummary} value={node.completionSummary ?? null} />
         <InfoRow label="Branches" value={(node.branchLabels ?? []).join(", ") || null} />
         <InfoRow label="Options" value={(node.options ?? []).join(", ") || null} />
@@ -140,7 +140,7 @@ export function TaskPlanGraphInspectorDetails({
 
       {(node.interactiveFields ?? []).length > 0 ? (
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{graphCopy.inspectorFields}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/85">{graphCopy.inspectorFields}</p>
           <div className="space-y-2">
             {(node.interactiveFields ?? []).map((field) => (
               <FieldCard key={field.key} field={field} />

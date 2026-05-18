@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
+import { useState } from "react";
+import type { PointerEvent } from "react";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
-import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { TaskWorkspaceExecutionOverview } from "../execution/task-workspace-execution-overview";
 import { TaskWorkspaceNodeDetailPanel } from "../execution/task-workspace-node-detail-panel";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
@@ -19,9 +19,9 @@ import type {
 import { useTaskWorkspacePlanSectionState } from "../hooks/use-task-workspace-plan-section-state";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
-const DEFAULT_NODE_PANEL_HEIGHT = 360;
-const MIN_NODE_PANEL_HEIGHT = 100;
-const MIN_FLOW_PANEL_HEIGHT = 100;
+function isCompletedGraphNode(status: string) {
+  return status === "done" || status === "completed" || status === "skipped";
+}
 
 type TaskWorkspacePlanSectionProps = {
   label: string;
@@ -29,11 +29,8 @@ type TaskWorkspacePlanSectionProps = {
   pageData: TaskPageData;
   plan: TaskPlanReadModel | null;
   planGenerationStatus: TaskPlanGenerationStatus;
-  canAcceptPlan: boolean;
-  isAcceptingPlan: boolean;
   acceptPlanError: string | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
-  onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void;
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
@@ -46,19 +43,13 @@ export function TaskWorkspacePlanSection({
   pageData,
   plan,
   planGenerationStatus,
-  canAcceptPlan,
-  isAcceptingPlan,
   acceptPlanError,
   runtimeEvents,
-  onAcceptPlan,
   onGeneratePlan,
   onDispatchExecutionAction,
 }: TaskWorkspacePlanSectionProps) {
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
-  const [nodePanelHeight, setNodePanelHeight] = useState(
-    DEFAULT_NODE_PANEL_HEIGHT,
-  );
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
+  const [nodeDrawerSize, setNodeDrawerSize] = useState<"collapsed" | "half" | "expanded">("collapsed");
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
@@ -79,12 +70,32 @@ export function TaskWorkspacePlanSection({
       : null);
   const recoveryActions = pageData.reconciliation?.repairActions ?? [];
   const recoveryIssue = pageData.reconciliation?.issues.find((issue) => issue.severity === "error") ?? null;
+  const graphNodes = graphPlan?.nodes ?? [];
+  const completedNodeCount = graphNodes.filter((node) =>
+    isCompletedGraphNode(node.status),
+  ).length;
+  const totalNodeCount = graphNodes.length;
+  const progressLabel =
+    totalNodeCount > 0
+      ? `${completedNodeCount}/${totalNodeCount}`
+      : consoleView.progress.label;
+  const completionLabel = totalNodeCount > 0 ? `${progressLabel} steps` : consoleView.progress.label;
+  const handlePlanNodeChange = (
+    node: PlanNodeDataModel | null,
+    nodes: PlanNodeDataModel[],
+  ) => {
+    handleSelectedPlanNodeChange(node, nodes);
+    if (node && nodeDrawerSize === "collapsed") {
+      setNodeDrawerSize("half");
+    }
+  };
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
       const node =
         graphPlan.nodes.find((candidate) => candidate.id === nodeId) ?? null;
       if (node) {
         handleSelectedPlanNodeChange(node, [node]);
+        if (nodeDrawerSize === "collapsed") setNodeDrawerSize("half");
       }
     }
     setPreferredNodeDetailTab("action");
@@ -93,93 +104,33 @@ export function TaskWorkspacePlanSection({
       .getElementById("task-workspace-node-actions")
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
+  const handleWorkspacePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (nodeDrawerSize === "collapsed") return;
 
-  const resizeNodePanel = useCallback((clientY: number) => {
-    const container = splitContainerRef.current;
-    if (!container) return;
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
 
-    const rect = container.getBoundingClientRect();
-    const requestedHeight = rect.bottom - clientY;
-    const maxNodePanelHeight = Math.max(
-      MIN_NODE_PANEL_HEIGHT,
-      rect.height - MIN_FLOW_PANEL_HEIGHT,
+    const interactiveTarget = target.closest(
+      "button,a,input,select,textarea,[role='button'],[role='tab'],[data-node-detail-drawer],.react-flow__node,.react-flow__edge,.react-flow__controls",
     );
-    setNodePanelHeight(
-      Math.min(
-        Math.max(requestedHeight, MIN_NODE_PANEL_HEIGHT),
-        maxNodePanelHeight,
-      ),
-    );
-  }, []);
+    if (interactiveTarget) return;
 
-  const updateNodePanelHeight = useCallback(
-    (getNextHeight: (height: number) => number) => {
-      const container = splitContainerRef.current;
-      const maxNodePanelHeight = container
-        ? Math.max(
-            MIN_NODE_PANEL_HEIGHT,
-            container.getBoundingClientRect().height - MIN_FLOW_PANEL_HEIGHT,
-          )
-        : DEFAULT_NODE_PANEL_HEIGHT;
-
-      setNodePanelHeight((height) => {
-        const nextHeight = getNextHeight(height);
-        return Math.min(
-          Math.max(nextHeight, MIN_NODE_PANEL_HEIGHT),
-          maxNodePanelHeight,
-        );
-      });
-    },
-    [],
-  );
-
-  const handleResizePointerDown = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      resizeNodePanel(event.clientY);
-    },
-    [resizeNodePanel],
-  );
-
-  const handleResizePointerMove = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
-      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-      resizeNodePanel(event.clientY);
-    },
-    [resizeNodePanel],
-  );
-
-  const handleResizeKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLButtonElement>) => {
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        updateNodePanelHeight((height) => height + 24);
-      } else if (event.key === "ArrowDown") {
-        event.preventDefault();
-        updateNodePanelHeight((height) => height - 24);
-      } else if (event.key === "Home") {
-        event.preventDefault();
-        updateNodePanelHeight(() => MIN_NODE_PANEL_HEIGHT);
-      } else if (event.key === "End") {
-        event.preventDefault();
-        updateNodePanelHeight(() => DEFAULT_NODE_PANEL_HEIGHT);
-      }
-    },
-    [updateNodePanelHeight],
-  );
-
-  const splitStyle = {
-    "--task-node-panel-height": `${nodePanelHeight}px`,
-  } as CSSProperties;
+    const clickedPane = Boolean(target.closest(".react-flow__pane"));
+    const clickedWorkspaceBackground = event.target === event.currentTarget;
+    if (clickedPane || clickedWorkspaceBackground) {
+      setNodeDrawerSize("collapsed");
+    }
+  };
 
   return (
     <section
       aria-label="Task execution workspace"
-      className="min-h-0 rounded-[1rem] border border-border/35 bg-[linear-gradient(180deg,hsl(var(--muted)/0.12),transparent_18%),hsl(var(--background))] p-1"
+      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-slate-200/80 bg-[radial-gradient(circle_at_18%_0%,rgba(14,165,233,0.14),transparent_34%),radial-gradient(circle_at_82%_6%,rgba(99,102,241,0.10),transparent_30%),linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.9)_46%,rgba(255,255,255,0.98))] p-2 pb-0 shadow-[0_22px_70px_rgba(15,23,42,0.10)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-32 rounded-full bg-cyan-300/18 blur-3xl" />
       {stateMessage ? (
         <div
-          className="mb-1.5 rounded-xl border border-amber-300/45 bg-amber-50/70 px-3 py-2 text-sm text-amber-900"
+          className="relative mb-2 rounded-xl border border-amber-300/45 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 shadow-sm"
           role="status"
         >
           {stateMessage}
@@ -188,7 +139,7 @@ export function TaskWorkspacePlanSection({
 
       {recoveryIssue ? (
         <div
-          className="mb-1.5 rounded-xl border border-red-300/50 bg-red-50/80 px-3 py-2 text-sm text-red-950"
+          className="relative mb-2 rounded-xl border border-red-300/50 bg-red-50/85 px-3 py-2 text-sm text-red-950 shadow-sm"
           role="alert"
         >
           <div className="font-semibold">Recovery needed</div>
@@ -211,61 +162,54 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="grid min-h-0 gap-1.5 xl:h-[calc(100dvh-6.25rem)] xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div
-          ref={splitContainerRef}
-          className="grid min-h-0 gap-1 xl:grid-rows-[minmax(0,1fr)_10px_minmax(0,var(--task-node-panel-height))]"
-          style={splitStyle}
-        >
+      <div
+        className="relative flex min-h-[700px] flex-1 flex-col gap-2 xl:min-h-0"
+        onPointerDown={handleWorkspacePointerDown}
+      >
+        <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
           <section aria-label="Execution flow" className="min-h-0 min-w-0">
             <TaskWorkspacePlanContent
               label={label}
               graphPlan={graphPlan}
               plan={plan}
-              canAcceptPlan={canAcceptPlan}
-              isAcceptingPlan={isAcceptingPlan}
               acceptPlanError={acceptPlanError}
               planGenerationStatus={planGenerationStatus}
               onGeneratePlan={onGeneratePlan}
-              onAcceptPlan={onAcceptPlan}
-              onSelectedNodeChange={handleSelectedPlanNodeChange}
+              onSelectedNodeChange={handlePlanNodeChange}
             />
           </section>
 
-          <button
-            type="button"
-            aria-label="Resize execution flow and current node panels"
-            aria-orientation="horizontal"
-            aria-valuemin={MIN_NODE_PANEL_HEIGHT}
-            aria-valuenow={Math.round(nodePanelHeight)}
-            role="separator"
-            className="hidden cursor-row-resize touch-none items-center justify-center rounded-md outline-none transition-colors hover:bg-border/40 focus-visible:bg-border/50 focus-visible:ring-2 focus-visible:ring-ring xl:flex"
-            onPointerDown={handleResizePointerDown}
-            onPointerMove={handleResizePointerMove}
-            onKeyDown={handleResizeKeyDown}
-          >
-            <span className="h-px w-16 rounded-full bg-border" />
-          </button>
-
-          <TaskWorkspaceNodeDetailPanel
-            detail={consoleView.nodeDetail}
-            selectedNodes={selectedPlanNodes}
-            preferredTab={preferredNodeDetailTab}
-            onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
-            onDispatchExecutionAction={onDispatchExecutionAction}
-          />
+          <aside className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-slate-200/80 bg-white/82 p-2 shadow-[0_14px_45px_rgba(15,23,42,0.07)] backdrop-blur" aria-label="Task command center">
+            <TaskWorkspaceExecutionOverview
+              readiness={consoleView.readiness}
+              latestResult={consoleView.latestResult}
+              attention={consoleView.attention}
+              artifacts={consoleView.artifacts}
+              activity={consoleView.activity}
+              progressLabel={completionLabel}
+              taskStatus={consoleView.header.primaryStateLabel ?? pageData.task.status}
+              nextAction={consoleView.latestResult.description}
+              onAction={focusNodeActions}
+            />
+          <RuntimeActivityPanel events={runtimeEvents} />
+          </aside>
         </div>
 
-        <div className="min-h-0 space-y-1.5 overflow-y-auto">
-          <RuntimeActivityPanel events={runtimeEvents} />
-          <TaskWorkspaceExecutionOverview
-            readiness={consoleView.readiness}
-            latestResult={consoleView.latestResult}
-            attention={consoleView.attention}
-            artifacts={consoleView.artifacts}
-            activity={consoleView.activity}
-            onAction={focusNodeActions}
-          />
+        <div className="pointer-events-none relative z-20 grid h-[52px] shrink-0 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
+          <div className="relative min-w-0">
+            <div className="absolute inset-x-0 bottom-0">
+              <TaskWorkspaceNodeDetailPanel
+                detail={consoleView.nodeDetail}
+                selectedNodes={selectedPlanNodes}
+                variant="drawer"
+                drawerSize={nodeDrawerSize}
+                onDrawerSizeChange={setNodeDrawerSize}
+                preferredTab={preferredNodeDetailTab}
+                onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
+                onDispatchExecutionAction={onDispatchExecutionAction}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -288,24 +232,24 @@ function RuntimeActivityPanel({ events }: { events: WorkspaceRuntimeEvent[] }) {
     .slice(-12);
 
   return (
-    <section className="rounded-[1rem] border border-blue-200/70 bg-blue-50/60 p-3" aria-label="Runtime activity">
+    <section className="rounded-[1.1rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.9),rgba(239,246,255,0.72))] p-3 shadow-sm" aria-label="Runtime activity">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-foreground">Runtime activity</p>
-          <p className="text-xs text-muted-foreground">Provider stream, Chrona state remains authoritative.</p>
+          <p className="text-sm font-semibold text-slate-950">Runtime activity</p>
+          <p className="text-xs text-slate-500">Provider stream, Chrona state remains authoritative.</p>
         </div>
-        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-blue-800">
+        <span className="rounded-full border border-cyan-200/70 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
           {events.at(-1)?.provider ?? "runtime"}
         </span>
       </div>
       {assistantText ? (
-        <p className="mt-2 whitespace-pre-wrap rounded-lg border border-white/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-foreground">
+        <p className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-slate-800 shadow-inner">
           {assistantText}
         </p>
       ) : null}
       {reasoningText ? (
-        <details className="mt-2 rounded-lg border border-white/80 bg-white/70 px-2.5 py-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer font-medium text-foreground">Reasoning</summary>
+        <details className="mt-2 rounded-xl border border-slate-200/80 bg-white/70 px-2.5 py-2 text-xs text-slate-500">
+          <summary className="cursor-pointer font-medium text-slate-800">Reasoning</summary>
           <p className="mt-1 whitespace-pre-wrap leading-5">{reasoningText}</p>
         </details>
       ) : null}
@@ -324,28 +268,28 @@ function RuntimeActivityRow({ event }: { event: WorkspaceRuntimeEvent }) {
   const value = event.event;
   if (value.type === "tool_started") {
     return (
-      <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs">
-        <span className="font-medium text-foreground">{value.label}</span>
-        {typeof value.preview === "string" && value.preview ? <span className="ml-1 text-muted-foreground">{value.preview}</span> : null}
+      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
+        <span className="font-medium text-slate-900">{value.label}</span>
+        {typeof value.preview === "string" && value.preview ? <span className="ml-1 text-slate-500">{value.preview}</span> : null}
       </div>
     );
   }
   if (value.type === "tool_completed") {
     return (
-      <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs">
+      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
         <span className={value.error ? "font-medium text-red-700" : "font-medium text-emerald-700"}>
           {value.error ? `${value.label} failed` : `${value.label} completed`}
         </span>
-        {value.durationMs !== undefined ? <span className="ml-1 text-muted-foreground">{Math.round(value.durationMs)}ms</span> : null}
+        {value.durationMs !== undefined ? <span className="ml-1 text-slate-500">{Math.round(value.durationMs)}ms</span> : null}
         {value.error ? <span className="ml-1 text-red-700">{value.error.message}</span> : null}
       </div>
     );
   }
   if (value.type === "approval_required") {
-    return <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900">Approval required</div>;
+    return <div className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 shadow-sm">Approval required</div>;
   }
   if (value.type === "run_status") {
-    return <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs text-muted-foreground">{value.message ?? value.status}</div>;
+    return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.message ?? value.status}</div>;
   }
-  return <div className="rounded-lg border border-white/80 bg-white/75 px-2.5 py-1.5 text-xs text-muted-foreground">{value.type === "raw_event" ? value.rawEventType ?? "Raw provider event" : value.type}</div>;
+  return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.type === "raw_event" ? value.rawEventType ?? "Raw provider event" : value.type}</div>;
 }

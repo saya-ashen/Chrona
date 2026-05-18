@@ -1,19 +1,29 @@
 import type { GraphCopy } from "./types";
 
-export const AUTO_FULL_MODE_MIN_WIDTH = 820;
-export const NODE_WIDTH = 168;
-export const NODE_HEIGHT = 88;
+export const AUTO_FULL_MODE_MIN_WIDTH = 760;
+export const NODE_WIDTH = 198;
+export const NODE_HEIGHT = 100;
 export const LAYOUT_DIRECTION = "LR";
-export const LAYOUT_PADDING = 28;
+export const LAYOUT_PADDING = 32;
 export const LAYOUT_NODE_SEP = 34;
-export const LAYOUT_RANK_SEP = 128;
-export const EDGE_OFFSET = 30;
-export const MAX_VIEWPORT_HEIGHT = 520;
-export const MIN_VIEWPORT_HEIGHT = 300;
+export const LAYOUT_RANK_SEP = 96;
+export const EDGE_OFFSET = 24;
+export const MAX_VIEWPORT_HEIGHT = 620;
+export const MIN_VIEWPORT_HEIGHT = 360;
 export const SELECTED_NODE_Z_INDEX = 1000;
 
 export const DEFAULT_GRAPH_COPY: GraphCopy = {
   ariaLabel: "任务计划图",
+  overviewTitle: "Execution Console",
+  controlPanel: "Graph controls",
+  currentNode: "Current",
+  selectedNode: "Selected",
+  needsAction: "Needs action",
+  criticalPath: "Critical path",
+  primaryPath: "Primary path",
+  inactivePath: "Inactive path",
+  graphStageMap: "Stage map",
+  fullScreen: "Full screen",
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
   fitGraph: "Fit graph",

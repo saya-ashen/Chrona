@@ -162,6 +162,7 @@ export type TaskPlanGraphProps = {
   inspectorPlacement?: "overlay" | "none";
   onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
   dismissSelectionOnOutsideClick?: boolean;
+  showOverview?: boolean;
 };
 
 export type NodeTone =
@@ -177,6 +178,16 @@ export type NodeShape = "rounded" | "diamond" | "pill" | "parallelogram";
 
 export type GraphCopy = {
   ariaLabel: string;
+  overviewTitle: string;
+  controlPanel: string;
+  currentNode: string;
+  selectedNode: string;
+  needsAction: string;
+  criticalPath: string;
+  primaryPath: string;
+  inactivePath: string;
+  graphStageMap: string;
+  fullScreen: string;
   zoomIn: string;
   zoomOut: string;
   fitGraph: string;
