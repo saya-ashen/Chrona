@@ -138,7 +138,7 @@ export function SchedulePage({
   const dialogDefaults = getQuickCreateDefaults(data);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-[30px] border border-border/55 bg-white/60 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -160,7 +160,7 @@ export function SchedulePage({
         </div>
       ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.8fr)_minmax(0,1.45fr)_minmax(260px,1fr)] gap-4 overflow-hidden rounded-[24px] bg-slate-50/55 p-3">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-visible rounded-[24px] bg-slate-50/70 p-2 lg:gap-4 lg:p-3 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.7fr)_minmax(260px,0.9fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}

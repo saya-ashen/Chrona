@@ -46,7 +46,7 @@ export function ScheduleLeftSidebar({
   const selectedDay = viewModel.calendarDays.find((day) => day.isSelected);
 
   return (
-    <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+    <aside className="flex min-h-0 flex-col gap-3 overflow-visible xl:overflow-y-auto xl:pr-1">
       <ScheduleMiniCalendar
         monthLabel={viewModel.calendarMonthLabel}
         days={viewModel.calendarDays.map((day) => ({
@@ -120,13 +120,13 @@ export function ScheduleRightSidebar({
   onDeleteTask: (taskId: string) => Promise<void>;
 }) {
   return (
-    <aside className="min-h-0 overflow-y-auto pl-1">
-      <SurfaceCard padding="sm" className="sticky top-0">
+    <aside className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1">
+      <SurfaceCard padding="sm" className="xl:sticky xl:top-0">
         <SurfaceCardHeader>
           <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
           <SurfaceCardDescription>{copy.unscheduledQueueDescription}</SurfaceCardDescription>
         </SurfaceCardHeader>
-        <div className="mt-3 max-h-[calc(100vh-19rem)] space-y-2 overflow-y-auto pr-1">
+        <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 xl:max-h-[calc(100vh-19rem)]">
           {viewData.unscheduled.length === 0 ? (
             <EmptyState>{copy.noUnscheduledWork}</EmptyState>
           ) : (

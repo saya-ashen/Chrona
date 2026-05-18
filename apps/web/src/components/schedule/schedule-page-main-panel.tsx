@@ -173,8 +173,8 @@ export function SchedulePageMainPanel({
   ) => Promise<void>;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <SurfaceCard variant="highlight" className="flex min-h-0 flex-1 flex-col rounded-[30px]">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden xl:min-h-0">
+      <SurfaceCard variant="highlight" className="flex min-h-[34rem] flex-1 flex-col rounded-[30px] p-3 sm:p-4 xl:min-h-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -190,7 +190,7 @@ export function SchedulePageMainPanel({
           </div>
         </div>
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/55 bg-background/70 p-3">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[26px] border border-border/55 bg-background/80 p-2 sm:p-3">
           {activeView === "timeline" ? (
             activeGroup ? (
               <DayTimeline
