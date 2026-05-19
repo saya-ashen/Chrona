@@ -53,6 +53,32 @@ function withGeneratedPlanResult(
   } satisfies TaskPlanState;
 }
 
+function samePlanState(left: TaskPlanState, right: TaskPlanState) {
+  return left.taskId === right.taskId
+    && left.aiPlanGenerationStatus === right.aiPlanGenerationStatus
+    && left.savedPlan === right.savedPlan
+    && left.generationSession === right.generationSession;
+}
+
+function samePlanFlowSnapshot(
+  left: ReturnType<typeof createPlanFlowFromSnapshot>,
+  right: ReturnType<typeof createPlanFlowFromSnapshot>,
+) {
+  if (left.status !== right.status || left.savedPlan !== right.savedPlan) {
+    return false;
+  }
+
+  if (left.status === "accepting" && right.status === "accepting") {
+    return left.planId === right.planId;
+  }
+
+  if (left.status === "failed" && right.status === "failed") {
+    return left.planId === right.planId && left.error === right.error;
+  }
+
+  return true;
+}
+
 export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () => Promise<void>) {
   const queryClient = useQueryClient();
   const generationSession = useTaskPlanGenerationSession(task.id);
@@ -108,7 +134,9 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
 
   useEffect(() => {
     if (!planState) return;
-    syncTaskDetailPlanFields(withGeneratedPlanResult(planState, generationSession.result));
+    const nextPlanState = withGeneratedPlanResult(planState, generationSession.result);
+    if (samePlanState(planState, nextPlanState)) return;
+    syncTaskDetailPlanFields(nextPlanState);
   }, [generationSession.result, planState, syncTaskDetailPlanFields]);
 
   useEffect(() => {
@@ -167,7 +195,13 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   useEffect(() => {
     if (!planState) return;
     const nextPlanState = withGeneratedPlanResult(planState, generationSession.result);
-    setPlanFlow((current) => current.status === "accepting" ? current : createPlanFlowFromSnapshot(nextPlanState));
+    const nextPlanFlow = createPlanFlowFromSnapshot(nextPlanState);
+    setPlanFlow((current) => {
+      if (current.status === "accepting" || samePlanFlowSnapshot(current, nextPlanFlow)) {
+        return current;
+      }
+      return nextPlanFlow;
+    });
   }, [generationSession.result, planState]);
 
   const plan = selectWorkspacePlan(task.savedPlan, planFlow.savedPlan);

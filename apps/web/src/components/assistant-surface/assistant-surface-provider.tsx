@@ -150,6 +150,21 @@ function createSurfaceState(context: AiSidebarPageContextSummary, actions: AiSid
   };
 }
 
+function assistantSurfaceContextSignature(surface: AssistantSurfaceState) {
+  return JSON.stringify({
+    pageType: surface.pageType,
+    fingerprint: surface.fingerprint,
+    title: surface.title,
+    primaryObjectLabel: surface.primaryObjectLabel,
+    status: surface.status,
+    topSummary: surface.topSummary,
+    summaries: surface.summaries,
+    quickActions: surface.quickActions,
+    requestInputEnabled: surface.requestInputEnabled,
+    unavailableReason: surface.unavailableReason,
+  });
+}
+
 function createSchedulePreview(selectedDate: string): ScheduleGhostBlockPreview {
   const start = new Date(`${selectedDate}T09:00:00`);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
@@ -204,6 +219,9 @@ function reducer(state: State, action: Action): State {
     case "set-input":
       return { ...state, input: action.input };
     case "set-surface":
+      if (assistantSurfaceContextSignature(state.surface) === assistantSurfaceContextSignature(action.surface)) {
+        return state;
+      }
       return { ...state, surface: action.surface };
     case "set-proposal":
       return { ...state, pendingProposal: action.proposal };

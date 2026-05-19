@@ -553,19 +553,19 @@ export function DayTimeline({
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" className="flex min-h-0 flex-1 flex-col rounded-[28px] border-border/55 bg-white/80 p-2 sm:p-4">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-[24px] border border-border/55 bg-white/90 p-3 shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/45 px-3 py-2 sm:px-4">
         <div>
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-sm font-semibold text-foreground">
             {formatDayHeading(dayDate, locale, copy)}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             <DayTimelineSummary items={items} dayDate={dayDate} /> · {" "}
             {items.length} {items.length === 1 ? copy.blockSingular : copy.blockPlural}
           </p>
         </div>
-        <div className="rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+        <div className="rounded-full border border-border/45 bg-white/75 px-2.5 py-1 text-right text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="font-semibold uppercase">
             {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
           </p>
         </div>
@@ -573,7 +573,7 @@ export function DayTimeline({
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto rounded-3xl border border-border/55 bg-gradient-to-b from-white/92 via-white/88 to-slate-50/90 p-1.5 pr-0 sm:p-2"
+        className="flex-1 overflow-y-auto bg-gradient-to-b from-white/92 via-white/88 to-slate-50/90 p-1.5 pr-0 sm:p-2"
       >
         <div className="flex min-w-0 gap-1.5 sm:gap-2">
           <div className="sticky left-0 z-20 w-14 shrink-0 self-start rounded-2xl border border-border/40 bg-white/95 py-3 pl-1 shadow-[8px_0_18px_rgba(15,23,42,0.04)] sm:w-20 sm:pl-2">
@@ -757,6 +757,6 @@ export function DayTimeline({
           </div>
         </div>
       </div>
-    </SurfaceCard>
+    </div>
   );
 }
