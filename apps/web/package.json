@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@chrona/contracts": "workspace:*",
+    "@chrona/domain": "workspace:*",
     "@chrona/i18n": "workspace:*",
     "@chrona/runtime-core": "workspace:*",
     "@chrona/server": "workspace:*",

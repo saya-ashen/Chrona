@@ -1,0 +1,278 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from "react";
+import type {
+  AiProposalPreview,
+  AiSidebarMessage,
+  AiSidebarPageContextSummary,
+  AiSidebarQuickAction,
+  AiSidebarScheduleContextSummary,
+} from "@chrona/contracts";
+import { syncProposalConfirmability } from "@chrona/domain";
+
+type AiSidebarStatus = "idle" | "loading" | "applying" | "success" | "error" | "unavailable";
+
+type AiSidebarState = {
+  isOpen: boolean;
+  context: AiSidebarPageContextSummary;
+  messages: AiSidebarMessage[];
+  pendingProposal: AiProposalPreview | null;
+  status: AiSidebarStatus;
+  errorMessage: string | null;
+};
+
+type AiSidebarHandlers = {
+  onConfirmProposal?: (proposal: AiProposalPreview) => Promise<void> | void;
+  onDismissProposal?: (proposal: AiProposalPreview) => void;
+};
+
+type AiSidebarContextValue = AiSidebarState & {
+  actions: AiSidebarQuickAction[];
+  open: () => void;
+  close: () => void;
+  setPageContext: (context: AiSidebarPageContextSummary, actions: AiSidebarQuickAction[]) => void;
+  registerHandlers: (handlers: AiSidebarHandlers) => () => void;
+  runQuickAction: (action: AiSidebarQuickAction) => void;
+  submitFollowUp: (message: string) => void;
+  confirmProposal: () => Promise<void>;
+  dismissProposal: () => void;
+  refineProposal: () => void;
+};
+
+type State = AiSidebarState & {
+  actions: AiSidebarQuickAction[];
+};
+
+type Action =
+  | { type: "open" }
+  | { type: "close" }
+  | { type: "set-context"; context: AiSidebarPageContextSummary; actions: AiSidebarQuickAction[] }
+  | { type: "add-message"; message: AiSidebarMessage }
+  | { type: "set-proposal"; proposal: AiProposalPreview | null }
+  | { type: "set-status"; status: AiSidebarStatus; errorMessage?: string | null };
+
+const unsupportedContext: AiSidebarPageContextSummary = {
+  type: "unsupported",
+  fingerprint: "unsupported",
+  title: "General page",
+  primaryObjectLabel: "Chrona",
+  highlights: [{ label: "Mode", value: "Informational" }],
+  capabilities: ["general-help"],
+};
+
+const initialState: State = {
+  isOpen: false,
+  context: unsupportedContext,
+  actions: [{
+    id: "general-help",
+    label: "Ask about this page",
+    description: "Get non-mutating guidance for the current page.",
+    kind: "informational",
+    enabled: true,
+  }],
+  messages: [],
+  pendingProposal: null,
+  status: "idle",
+  errorMessage: null,
+};
+
+const fallbackContextValue: AiSidebarContextValue = {
+  ...initialState,
+  open: () => undefined,
+  close: () => undefined,
+  setPageContext: () => undefined,
+  registerHandlers: () => () => undefined,
+  runQuickAction: () => undefined,
+  submitFollowUp: () => undefined,
+  confirmProposal: async () => undefined,
+  dismissProposal: () => undefined,
+  refineProposal: () => undefined,
+};
+
+function createMessage(content: string, responseKind: AiSidebarMessage["responseKind"]): AiSidebarMessage {
+  return {
+    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role: "assistant",
+    createdAt: new Date().toISOString(),
+    content,
+    status: responseKind === "error" ? "error" : "complete",
+    responseKind,
+  };
+}
+
+function createTaskProposal(context: AiSidebarPageContextSummary, action: AiSidebarQuickAction, now: Date): AiProposalPreview {
+  return {
+    id: `proposal-${now.getTime()}`,
+    contextFingerprint: context.fingerprint,
+    createdAt: now.toISOString(),
+    kind: "task",
+    summary: action.label,
+    affectedAreas: ["Task plan", "Active node"],
+    riskLevel: "low",
+    explanation: "Preview task changes before routing confirmation through task apply ownership.",
+    confirmability: "confirmable",
+    taskPreview: {
+      taskId: context.type === "task" ? context.taskId : "unsupported",
+      changeType: action.id === "retry-node" ? "retry-node" : action.id === "add-step" ? "add-step" : "plan-modification",
+      affectedNodes: context.type === "task" && context.activeNodeId ? [context.activeNodeId] : [],
+      addedSteps: action.id === "add-step" ? ["Add a guarded follow-up step"] : [],
+      planDiffSummary: "Proposed changes remain unapplied until confirmed.",
+      blockerChange: context.type === "task" ? context.blockReason ?? undefined : undefined,
+      requiresReview: context.type === "task" ? Boolean(context.reviewState) : false,
+    },
+    schedulePreview: null,
+  };
+}
+
+function createScheduleProposal(context: AiSidebarScheduleContextSummary, action: AiSidebarQuickAction, now: Date): AiProposalPreview {
+  const start = new Date(`${context.selectedDate}T09:00:00`);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+  return {
+    id: `proposal-${now.getTime()}`,
+    contextFingerprint: context.fingerprint,
+    createdAt: now.toISOString(),
+    kind: "schedule",
+    summary: action.label,
+    affectedAreas: ["Schedule timeline", "Unscheduled queue"],
+    riskLevel: context.conflictCount > 0 ? "medium" : "low",
+    explanation: "Preview ghost blocks before applying changes to the schedule.",
+    confirmability: "confirmable",
+    taskPreview: null,
+    schedulePreview: {
+      selectedDate: context.selectedDate,
+      placements: [{
+        taskId: "preview-placement",
+        title: context.unscheduledCount > 0 ? "Next queued task" : "Focus block",
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        reason: "Largest available opening in the current day.",
+        confidence: 0.72,
+      }],
+      unplacedItems: context.unscheduledCount > 1
+        ? [{ taskId: "remaining-queue", title: "Remaining queue", reason: "Needs a larger opening." }]
+        : [],
+      conflictsResolved: context.conflictCount > 0 ? ["Preview resolves one detected conflict."] : [],
+      conflictsRemaining: context.conflictCount > 1 ? ["Some conflicts need manual review."] : [],
+    },
+  };
+}
+
+function createProposal(context: AiSidebarPageContextSummary, action: AiSidebarQuickAction): AiProposalPreview {
+  const now = new Date();
+  if (context.type === "schedule") return createScheduleProposal(context, action, now);
+  return createTaskProposal(context, action, now);
+}
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "open":
+      return { ...state, isOpen: true };
+    case "close":
+      return { ...state, isOpen: false };
+    case "set-context":
+      return {
+        ...state,
+        context: action.context,
+        actions: action.actions,
+        pendingProposal: syncProposalConfirmability(state.pendingProposal, action.context),
+      };
+    case "add-message":
+      return { ...state, messages: [...state.messages, action.message] };
+    case "set-proposal":
+      return { ...state, pendingProposal: action.proposal };
+    case "set-status":
+      return { ...state, status: action.status, errorMessage: action.errorMessage ?? null };
+  }
+}
+
+const AiSidebarContext = createContext<AiSidebarContextValue>(fallbackContextValue);
+
+export function GlobalAiSidebarProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const handlersRef = useRef<AiSidebarHandlers>({});
+
+  const open = useCallback(() => dispatch({ type: "open" }), []);
+  const close = useCallback(() => dispatch({ type: "close" }), []);
+  const setPageContext = useCallback((context: AiSidebarPageContextSummary, actions: AiSidebarQuickAction[]) => {
+    dispatch({ type: "set-context", context, actions });
+  }, []);
+  const registerHandlers = useCallback((handlers: AiSidebarHandlers) => {
+      handlersRef.current = handlers;
+      return () => {
+        handlersRef.current = {};
+      };
+  }, []);
+  const runQuickAction = useCallback((action: AiSidebarQuickAction) => {
+      if (!action.enabled) return;
+      if (action.kind === "informational") {
+        dispatch({ type: "add-message", message: createMessage(`${action.label}: ${action.description}`, "informational") });
+        dispatch({ type: "set-status", status: "success" });
+        return;
+      }
+
+      const proposal = createProposal(state.context, action);
+      dispatch({ type: "set-proposal", proposal });
+      dispatch({ type: "add-message", message: { ...createMessage(proposal.summary, "proposal"), relatedProposalId: proposal.id } });
+      dispatch({ type: "set-status", status: "success" });
+  }, [state.context]);
+  const submitFollowUp = useCallback((message: string) => {
+      if (!message.trim()) return;
+      dispatch({ type: "add-message", message: { ...createMessage(message.trim(), "informational"), role: "user" } });
+      dispatch({ type: "add-message", message: createMessage("I can explain context or replace the current preview with a refined proposal.", "informational") });
+  }, []);
+  const confirmProposal = useCallback(async () => {
+      const proposal = state.pendingProposal;
+      if (!proposal || proposal.confirmability !== "confirmable") return;
+      dispatch({ type: "set-proposal", proposal: { ...proposal, confirmability: "applying" } });
+      dispatch({ type: "set-status", status: "applying" });
+      try {
+        await handlersRef.current.onConfirmProposal?.(proposal);
+        dispatch({ type: "set-proposal", proposal: { ...proposal, confirmability: "applied" } });
+        dispatch({ type: "set-status", status: "success" });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Apply failed";
+        dispatch({ type: "set-proposal", proposal: { ...proposal, confirmability: "failed" } });
+        dispatch({ type: "set-status", status: "error", errorMessage });
+      }
+  }, [state.pendingProposal]);
+  const dismissProposal = useCallback(() => {
+      if (state.pendingProposal) handlersRef.current.onDismissProposal?.(state.pendingProposal);
+      dispatch({ type: "set-proposal", proposal: null });
+      dispatch({ type: "set-status", status: "idle" });
+  }, [state.pendingProposal]);
+  const refineProposal = useCallback(() => {
+      const mutatingAction = state.actions.find((action) => action.kind === "mutating-preview" && action.enabled);
+      if (mutatingAction) {
+        const proposal = createProposal(state.context, mutatingAction);
+        dispatch({ type: "set-proposal", proposal: { ...proposal, summary: `${proposal.summary} (refined)` } });
+      }
+  }, [state.actions, state.context]);
+
+  const value: AiSidebarContextValue = useMemo(() => ({
+    ...state,
+    open,
+    close,
+    setPageContext,
+    registerHandlers,
+    runQuickAction,
+    submitFollowUp,
+    confirmProposal,
+    dismissProposal,
+    refineProposal,
+  }), [close, confirmProposal, dismissProposal, open, refineProposal, registerHandlers, runQuickAction, setPageContext, state, submitFollowUp]);
+
+  return <AiSidebarContext.Provider value={value}>{children}</AiSidebarContext.Provider>;
+}
+
+export function useGlobalAiSidebar() {
+  return useContext(AiSidebarContext);
+}

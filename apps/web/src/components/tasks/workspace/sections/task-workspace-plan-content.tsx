@@ -10,6 +10,7 @@ import type { TaskPlanGenerationStatus } from "../model/task-workspace-types";
 type TaskWorkspacePlanContentProps = {
   label: string;
   graphPlan: TaskPlanGraphPlan | null;
+  isGraphPlanPending: boolean;
   plan: TaskPlanReadModel | null;
   acceptPlanError: string | null;
   planGenerationStatus: TaskPlanGenerationStatus;
@@ -20,6 +21,7 @@ type TaskWorkspacePlanContentProps = {
 export function TaskWorkspacePlanContent({
   label,
   graphPlan,
+  isGraphPlanPending,
   plan,
   acceptPlanError,
   planGenerationStatus,
@@ -68,10 +70,10 @@ export function TaskWorkspacePlanContent({
         >
           <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">{label}</p>
-            {generatePlanButton}
+            {isGraphPlanPending ? null : generatePlanButton}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-300 bg-slate-50/70 px-5 text-center text-sm text-slate-500">
-            The plan graph will appear here once AI generates a plan.
+            {isGraphPlanPending ? "Preparing plan graph..." : "The plan graph will appear here once AI generates a plan."}
           </div>
         </SurfaceCard>
       )}

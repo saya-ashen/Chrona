@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
@@ -103,6 +103,8 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
+  const [graphPlan, setGraphPlan] = useState(() => taskPlanReadModelToGraphPlan(null));
+  const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
 
   useEffect(() => {
     if (!planState) return;
@@ -171,6 +173,30 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   const plan = selectWorkspacePlan(task.savedPlan, planFlow.savedPlan);
   const planGenerationStatus = getPlanGenerationStatusFromFlow(planFlow);
 
+  useEffect(() => {
+    if (!plan) {
+      setGraphPlan(null);
+      setIsGraphPlanPending(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsGraphPlanPending(true);
+    const timeoutId = window.setTimeout(() => {
+      const nextGraphPlan = taskPlanReadModelToGraphPlan(plan);
+      if (cancelled) return;
+      startTransition(() => {
+        setGraphPlan(nextGraphPlan);
+        setIsGraphPlanPending(false);
+      });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [plan]);
+
   const setPlan = useCallback((value: SetStateAction<TaskData["savedPlan"] | null>) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
       const previous = current ?? {
@@ -199,8 +225,6 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       setIsAiWorkspaceOpen(true);
     }
   }, [planGenerationStatus]);
-
-  const graphPlan = useMemo(() => taskPlanReadModelToGraphPlan(plan), [plan]);
 
   const canAcceptPlan = canAcceptPlanFromFlow(planFlow);
   const acceptPlanError = getAcceptPlanErrorFromFlow(planFlow);
@@ -338,6 +362,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     planGenerationStatus,
     planFlowStatus: planFlow.status,
     graphPlan,
+    isGraphPlanPending,
     canAcceptPlan,
     isAcceptingPlan: isAcceptingPlanFromFlow(planFlow),
     acceptPlanError,

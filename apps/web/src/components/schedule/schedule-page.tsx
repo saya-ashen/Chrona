@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useGlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar-provider";
 import type {
   SchedulePageProps,
 } from "@/components/schedule/schedule-page-types";
@@ -22,6 +23,7 @@ import { localizeHref } from "@/i18n/routing";
 import { useAppRouter } from "@/lib/router";
 import { useSchedulePageActions } from "./use-schedule-page-actions";
 import { useSchedulePageState } from "./use-schedule-page-state";
+import { createScheduleAiSidebarContext } from "./adapters/schedule-ai-sidebar-adapter";
 
 type SchedulePageRouteProps = SchedulePageProps & {
   selectedDay?: string;
@@ -37,6 +39,7 @@ export function SchedulePage({
   selectedView,
   showNewTask,
 }: SchedulePageRouteProps) {
+  const { pendingProposal, registerHandlers, setPageContext } = useGlobalAiSidebar();
   const router = useAppRouter();
   const locale = useLocale();
   const { messages } = useI18n();
@@ -137,6 +140,19 @@ export function SchedulePage({
 
   const dialogDefaults = getQuickCreateDefaults(data);
 
+  useEffect(() => {
+    const { context, actions } = createScheduleAiSidebarContext({
+      workspaceId,
+      data: viewData,
+      selectedDate: viewModel.activeDay,
+      activeView,
+    });
+    setPageContext(context, actions);
+    return registerHandlers({
+      onConfirmProposal: refreshProjection,
+    });
+  }, [activeView, refreshProjection, registerHandlers, setPageContext, viewData, viewModel.activeDay, workspaceId]);
+
   return (
     <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
       <p className="sr-only" aria-live="polite">
@@ -177,6 +193,7 @@ export function SchedulePage({
           activeSelectedTaskId={viewModel.activeSelectedTaskId}
           conflictTaskIds={viewModel.conflictTaskIds}
           listItems={viewData.listItems}
+          ghostPreview={pendingProposal?.kind === "schedule" ? pendingProposal.schedulePreview ?? null : null}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
           isPending={isPending}

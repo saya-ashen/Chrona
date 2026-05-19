@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useGlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar-provider";
 import { TaskWorkspaceAiSection } from "../sections/task-workspace-ai-section";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
@@ -11,6 +13,7 @@ import { useTaskWorkspaceEditorState } from "../hooks/use-task-workspace-editor-
 import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
+import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
 
 type Props = {
   data: TaskPageData;
@@ -46,6 +49,7 @@ const DEFAULT_COPY = {
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
+  const { registerHandlers, setPageContext } = useGlobalAiSidebar();
   const { pageData, setTask, refreshWorkspace } = useTaskWorkspacePageState(data);
   const task = pageData.task;
 
@@ -73,6 +77,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     fetchPlan,
     planGenerationStatus,
     graphPlan,
+    isGraphPlanPending,
     acceptPlanError,
     setAcceptPlanError,
     isAiWorkspaceOpen,
@@ -111,6 +116,22 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       taskId: task.id,
       setSaveError,
     });
+
+  useEffect(() => {
+    const { context, actions } = createTaskAiSidebarContext(task);
+    setPageContext(context, actions);
+    return registerHandlers({
+      onConfirmProposal: async (proposal) => {
+        await handleApplyProposal({
+          summary: proposal.summary,
+          confidence: proposal.riskLevel === "high" ? "low" : "medium",
+          requiresConfirmation: true,
+        });
+      },
+      onDismissProposal: handleCancelProposal,
+    });
+  }, [handleApplyProposal, handleCancelProposal, registerHandlers, setPageContext, task]);
+
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col gap-2 xl:overflow-hidden">
       <div className="shrink-0 space-y-1">
@@ -169,6 +190,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
         graphPlan={graphPlan}
+        isGraphPlanPending={isGraphPlanPending}
         pageData={{ ...pageData, task: consoleView.task }}
         plan={plan}
         planGenerationStatus={planGenerationStatus}

@@ -27,6 +27,28 @@
     "description": "Chrona helps you turn tasks into plans, place them on your schedule, and move work forward with AI."
   },
   "components": {
+    "globalAiSidebar": {
+      "entryLabel": "Open Chrona AI sidebar",
+      "entry": "Ask Chrona",
+      "quickActions": "Quick actions",
+      "previewRequired": "Preview",
+      "infoOnly": "Info",
+      "conversation": "Conversation",
+      "emptyConversation": "Ask for context, blockers, or a safe proposal.",
+      "followUpPlaceholder": "Ask Chrona what to do next...",
+      "send": "Send",
+      "preview": "Preview",
+      "noPreview": "Choose a quick action to generate a preview before anything changes.",
+      "staleWarning": "This preview is stale because the page context changed. Refine it before confirming.",
+      "panelLabel": "Chrona AI sidebar",
+      "eyebrow": "Context-aware AI",
+      "title": "Ask Chrona",
+      "close": "Close AI sidebar",
+      "applying": "Applying...",
+      "confirm": "Confirm",
+      "dismiss": "Dismiss",
+      "refine": "Refine"
+    },
     "taskPage": {
       "eyebrow": "Secondary task detail",
       "fallbackDescription": "Use this page for reference, deep links, and heavier context that would clutter Schedule.",
