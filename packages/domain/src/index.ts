@@ -5,3 +5,6 @@ export * from "./task/validate-schedule-window";
 export * from "./plan";
 export * from "./ai-sidebar/proposal-state";
 export * from "./ai-sidebar/summarize-context";
+export * from "./assistant-surface/action-mapping";
+export * from "./assistant-surface/proposal-routing";
+export * from "./assistant-surface/summary-priority";

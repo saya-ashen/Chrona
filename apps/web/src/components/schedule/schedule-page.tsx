@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useGlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar-provider";
+import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import type {
   SchedulePageProps,
 } from "@/components/schedule/schedule-page-types";
@@ -39,7 +39,7 @@ export function SchedulePage({
   selectedView,
   showNewTask,
 }: SchedulePageRouteProps) {
-  const { pendingProposal, registerHandlers, setPageContext } = useGlobalAiSidebar();
+  const { pendingProposal, registerHandlers, setPageContext } = useAssistantSurface();
   const router = useAppRouter();
   const locale = useLocale();
   const { messages } = useI18n();

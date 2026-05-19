@@ -161,7 +161,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/009-global-ai-sidebar/plan.md`
+`specs/010-ai-dropdown-surface/plan.md`
 
 <!-- SPECKIT END -->
 

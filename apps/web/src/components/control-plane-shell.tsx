@@ -7,9 +7,9 @@ import {
   Settings,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
+import { AssistantSurfaceTrigger } from "@/components/assistant-surface/assistant-surface-trigger";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { GlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar";
-import { GlobalAiSidebarEntry } from "@/components/global-ai-sidebar/global-ai-sidebar-entry";
 import { useAppPathname } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { buttonVariants } from "@/components/ui/button";
@@ -103,8 +103,8 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border/60 bg-white/92 supports-[backdrop-filter]:backdrop-blur">
-          <div className="flex w-full items-center justify-between gap-3 px-4 py-1.5 sm:px-6 xl:px-7">
+        <header className="relative z-50 border-b border-border/60 bg-white/92 supports-[backdrop-filter]:backdrop-blur">
+          <div className="relative flex w-full items-center justify-between gap-3 px-4 py-1.5 sm:px-6 xl:px-7">
             <LocalizedLink
               href="/schedule"
               aria-label={t("nav.brandTitle")}
@@ -119,12 +119,15 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
               <span className="block truncate text-sm font-semibold tracking-tight text-foreground">{t("nav.brandTitle")}</span>
             </LocalizedLink>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 pr-2">
                <p className="truncate text-xs text-muted-foreground">{breadcrumb.join(" / ") || t("nav.schedule")}</p>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-              <GlobalAiSidebarEntry />
+            <div className="absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+              <AssistantSurfaceTrigger />
+            </div>
+
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <LocalizedLink
                 href="/schedule?new=1"
                 className={buttonVariants({
@@ -138,13 +141,13 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
               </LocalizedLink>
               <LocaleSwitcher />
             </div>
+            <AssistantSurfaceDropdown />
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6 xl:px-7">
             {children}
           </main>
       </div>
-      <GlobalAiSidebar />
     </div>
   );
 }

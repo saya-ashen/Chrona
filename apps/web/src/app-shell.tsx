@@ -1,7 +1,7 @@
 import { Outlet, useLoaderData } from "react-router-dom";
 
+import { AssistantSurfaceProvider } from "@/components/assistant-surface/assistant-surface-provider";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
-import { GlobalAiSidebarProvider } from "@/components/global-ai-sidebar/global-ai-sidebar-provider";
 import { I18nProvider } from "@/i18n/client";
 
 import type { AppBootData } from "./pages";
@@ -12,11 +12,11 @@ export function AppShell() {
 
   return (
     <I18nProvider locale={locale} messages={dictionary}>
-      <GlobalAiSidebarProvider>
+      <AssistantSurfaceProvider>
         <ControlPlaneShell defaultWorkspace={data.defaultWorkspace}>
           <Outlet context={data} />
         </ControlPlaneShell>
-      </GlobalAiSidebarProvider>
+      </AssistantSurfaceProvider>
     </I18nProvider>
   );
 }

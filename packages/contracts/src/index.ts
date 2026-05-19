@@ -1,5 +1,19 @@
 // AI plan contracts — new architecture
 export type {
+  AssistantActionRequest,
+  AssistantActionResult,
+  AssistantPreviewSurface,
+  AssistantProposalRoute,
+  AssistantQuickAction,
+  AssistantQuickActionId,
+  AssistantQuickActionKind,
+  AssistantStatusSummary,
+  AssistantSurfacePageType,
+  AssistantSurfaceSeverity,
+  AssistantSurfaceState,
+} from "./assistant-surface";
+
+export type {
   AiProposalConfirmability,
   AiProposalPreview,
   AiSidebarCapabilityId,
