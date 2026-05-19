@@ -7,6 +7,7 @@ import type {
   TaskPlanGenerationSessionReadModel,
   TaskPlanReadModel,
 } from "@chrona/contracts/ai";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 
 type StreamToolCall = {
@@ -279,7 +280,10 @@ function applyStreamEvent(taskId: string, event: string, data: Record<string, un
 }
 
 async function fetchActiveSnapshot(taskId: string) {
-  const response = await fetch(`/api/tasks/${taskId}/plan/generations/active`);
+  const response = await fetch(`/api/tasks/${taskId}/plan/generations/active`, {
+    headers: buildAccessKeyHeaders(),
+  });
+  handleUnauthorizedResponse(response);
   if (!response.ok) {
     if (response.status === 404) {
       applySessionSnapshot(taskId, null);
@@ -427,7 +431,11 @@ export async function stopTaskPlanGenerationSession(taskId: string) {
     connected: false,
   }));
 
-  const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop`, { method: "POST" });
+  const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop`, {
+    method: "POST",
+    headers: buildAccessKeyHeaders(),
+  });
+  handleUnauthorizedResponse(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error((errorBody as { error?: string }).error ?? `Failed to stop generation (${response.status})`);

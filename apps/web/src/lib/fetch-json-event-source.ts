@@ -4,6 +4,8 @@ import {
   type FetchEventSourceInit,
 } from "@microsoft/fetch-event-source";
 
+import { buildAccessKeyHeaderRecord, handleUnauthorizedResponse } from "@/lib/access-key";
+
 type JsonEventSourcePayload = Record<string, unknown>;
 
 type JsonEventSourceEvent = {
@@ -40,11 +42,14 @@ export async function fetchJsonEventSource(
   { onEvent, onInvalidMessage, onNonStreamResponse, ...init }: JsonEventSourceOptions,
 ) {
   try {
+    const headers = buildAccessKeyHeaderRecord(init.headers);
     await fetchEventSource(input, {
       ...init,
+      headers,
       openWhenHidden: true,
       async onopen(response) {
         if (!response.ok) {
+          handleUnauthorizedResponse(response);
           throw new Error(await toErrorMessage(response));
         }
 

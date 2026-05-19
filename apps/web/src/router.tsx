@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { defaultLocale, hasLocale } from "@chrona/i18n";
 
 import { AppShell } from "./app-shell";
+import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
   InboxRoutePage,
   LocaleLandingPage,
@@ -41,6 +42,7 @@ export function createAppRouter() {
         return loadAppBootData({ params, request } as Parameters<typeof loadAppBootData>[0]);
       },
       element: <AppShell />,
+      errorElement: <AccessKeyRouteError />,
       children: [
         {
           index: true,

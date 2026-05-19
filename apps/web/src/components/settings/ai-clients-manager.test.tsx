@@ -37,6 +37,21 @@ const messages = {
   },
 };
 
+const providersResponse = {
+  providers: [
+    {
+      key: "openclaw",
+      label: "LLM (OpenAI Compatible)",
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+    },
+    {
+      key: "hermes",
+      label: "Hermes",
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+    },
+  ],
+};
+
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages }),
 }));
@@ -58,13 +73,14 @@ describe("AiClientsManager", () => {
       ok: true,
       json: async () => ({ clients: [] }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
     await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My OpenClaw Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
       target: { value: "OpenClaw Client" },
     });
 
@@ -92,13 +108,14 @@ describe("AiClientsManager", () => {
       ok: true,
       json: async () => ({ clients: [] }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
     await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My OpenClaw Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
       target: { value: "Local Hermes" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
@@ -122,6 +139,7 @@ describe("AiClientsManager", () => {
       ok: true,
       json: async () => ({ clients: [] }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -162,6 +180,7 @@ describe("AiClientsManager", () => {
         ],
       }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -182,6 +201,7 @@ describe("AiClientsManager", () => {
       ok: true,
       json: async () => ({ clients: [] }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -221,6 +241,7 @@ describe("AiClientsManager", () => {
         ],
       }),
     });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 
     render(<AiClientsManager />);
 

@@ -1,6 +1,7 @@
 import { Outlet, useLoaderData } from "react-router-dom";
 
 import { AssistantSurfaceProvider } from "@/components/assistant-surface/assistant-surface-provider";
+import { AccessKeyGate } from "@/components/access-key-gate";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 import { I18nProvider } from "@chrona/i18n/react";
 
@@ -12,11 +13,13 @@ export function AppShell() {
 
   return (
     <I18nProvider locale={locale} messages={dictionary}>
-      <AssistantSurfaceProvider>
-        <ControlPlaneShell defaultWorkspace={data.defaultWorkspace}>
-          <Outlet context={data} />
-        </ControlPlaneShell>
-      </AssistantSurfaceProvider>
+      <AccessKeyGate>
+        <AssistantSurfaceProvider>
+          <ControlPlaneShell defaultWorkspace={data.defaultWorkspace}>
+            <Outlet context={data} />
+          </ControlPlaneShell>
+        </AssistantSurfaceProvider>
+      </AccessKeyGate>
     </I18nProvider>
   );
 }

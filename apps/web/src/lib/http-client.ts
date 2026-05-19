@@ -1,3 +1,5 @@
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+
 class HttpError extends Error {
   status: number;
   data: unknown;
@@ -21,17 +23,18 @@ async function parseResponse(response: Response) {
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  const headers = buildAccessKeyHeaders(init?.headers);
+  headers.set("content-type", "application/json");
+
   const response = await fetch(input, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 
   const payload = await parseResponse(response);
 
   if (!response.ok) {
+    handleUnauthorizedResponse(response);
     const message =
       payload && typeof payload === "object" && "error" in payload && typeof (payload as { error?: unknown }).error === "string"
         ? (payload as { error: string }).error

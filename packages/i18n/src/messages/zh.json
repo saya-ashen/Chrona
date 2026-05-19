@@ -72,6 +72,16 @@
       "noActions": "当前页面暂无助手操作。",
       "unavailable": "当前页面暂不可用助手操作。"
     },
+    "accessKeyUnlock": {
+      "eyebrow": "本地访问",
+      "title": "解锁 Chrona",
+      "description": "输入 Access Key 继续。这不是账号登录，只用于解锁当前本地 Chrona 服务。",
+      "keyLabel": "Access Key",
+      "keyPlaceholder": "输入 Access Key",
+      "rememberLabel": "记住此设备",
+      "rememberHint": "勾选后会把 key 保存在此浏览器的 localStorage；不勾选则只保存在内存中。",
+      "submit": "解锁 Chrona"
+    },
     "taskPage": {
       "eyebrow": "辅助任务详情",
       "fallbackDescription": "这个页面用于查看参考信息、深链接和较重的上下文，避免把日程页塞得过满。",

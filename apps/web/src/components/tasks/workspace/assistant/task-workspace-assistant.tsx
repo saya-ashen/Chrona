@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, Sparkles, AlertTriangle, Check, X } from "lucide-react";
 import { SurfaceCard } from "@/components/ui/surface-card";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
@@ -69,7 +70,10 @@ type Props = {
 
 async function loadMessages(taskId: string): Promise<ChatHistoryEntry[]> {
   try {
-    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`);
+    const res = await fetch(`/api/tasks/${taskId}/assistant/messages`, {
+      headers: buildAccessKeyHeaders(),
+    });
+    handleUnauthorizedResponse(res);
     if (!res.ok) return [];
     const data = await res.json() as {
       messages: Array<{
@@ -101,11 +105,13 @@ async function saveMessage(
   proposal?: TaskWorkspaceUpdateProposal | null,
 ): Promise<ChatHistoryEntry | null> {
   try {
+    const headers = buildAccessKeyHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`/api/tasks/${taskId}/assistant/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ role, content, proposal }),
     });
+    handleUnauthorizedResponse(res);
     if (!res.ok) return null;
     const data = await res.json() as {
       id: string;
@@ -132,7 +138,9 @@ async function markMessageApplied(taskId: string, messageId: string): Promise<bo
   try {
     const res = await fetch(`/api/tasks/${taskId}/assistant/messages/${messageId}/apply`, {
       method: "PATCH",
+      headers: buildAccessKeyHeaders(),
     });
+    handleUnauthorizedResponse(res);
     return res.ok;
   } catch {
     return false;
@@ -209,7 +217,7 @@ export function TaskWorkspaceAssistant({
 
       const response = await fetch("/api/ai/task-workspace/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAccessKeyHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           taskId,
           message: trimmed,
@@ -218,6 +226,7 @@ export function TaskWorkspaceAssistant({
           history: apiHistory,
         }),
       });
+      handleUnauthorizedResponse(response);
 
       if (!response.ok && response.status !== 503) {
         const err = await response.json().catch(() => ({ error: "Failed to send message" }));
