@@ -41,6 +41,7 @@ type TaskWorkspacePlanSectionProps = {
   pageData: TaskPageData;
   plan: TaskPlanReadModel | null;
   planGenerationStatus: TaskPlanGenerationStatus;
+  canAcceptPlan?: boolean;
   acceptPlanError: string | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
   onGeneratePlan: () => void;

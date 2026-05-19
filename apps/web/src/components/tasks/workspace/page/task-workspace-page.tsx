@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useGlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar-provider";
+import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspaceAiSection } from "../sections/task-workspace-ai-section";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
@@ -49,7 +49,7 @@ const DEFAULT_COPY = {
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
-  const { registerHandlers, setPageContext } = useGlobalAiSidebar();
+  const { registerHandlers, setPageContext } = useAssistantSurface();
   const { pageData, setTask, refreshWorkspace } = useTaskWorkspacePageState(data);
   const task = pageData.task;
 
@@ -77,6 +77,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     fetchPlan,
     planGenerationStatus,
     graphPlan,
+    canAcceptPlan,
     isGraphPlanPending,
     acceptPlanError,
     setAcceptPlanError,
@@ -194,6 +195,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         pageData={{ ...pageData, task: consoleView.task }}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
+        canAcceptPlan={canAcceptPlan}
         acceptPlanError={acceptPlanError}
         runtimeEvents={runtimeEvents}
         onGeneratePlan={handleGeneratePlanFromHeader}
