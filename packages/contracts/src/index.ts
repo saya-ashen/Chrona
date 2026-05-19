@@ -1,5 +1,24 @@
 // AI plan contracts — new architecture
 export type {
+  AiProposalConfirmability,
+  AiProposalPreview,
+  AiSidebarCapabilityId,
+  AiSidebarConfirmationDecision,
+  AiSidebarContextType,
+  AiSidebarHighlight,
+  AiSidebarMessage,
+  AiSidebarPageContextSummary,
+  AiSidebarQuickAction,
+  AiSidebarQuickActionKind,
+  AiSidebarScheduleContextSummary,
+  AiSidebarTaskContextSummary,
+  AiSidebarUnsupportedContextSummary,
+  ScheduleGhostBlockPreview,
+  ScheduleGhostPlacement,
+  TaskChangePreview,
+} from "./ai-sidebar";
+
+export type {
   CreateTaskInput,
   TaskCore,
   TaskPriority,

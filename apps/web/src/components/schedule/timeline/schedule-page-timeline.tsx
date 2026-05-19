@@ -21,6 +21,8 @@ import {
   ScheduledTimelineBlock,
   TimelinePlacementCard,
 } from "@/components/schedule/timeline/schedule-timeline-primitives";
+import { ScheduleGhostBlockLayer } from "@/components/global-ai-sidebar/schedule-ghost-block-layer";
+import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type {
   ScheduledItem,
   TimelineCreateInput,
@@ -88,6 +90,7 @@ export function DayTimeline({
   selectedDay,
   selectedTaskId,
   conflictTaskIds,
+  ghostPreview = null,
   draggedItem,
   executionRuntimes: _executionRuntimes,
   defaultExecutionRuntime,
@@ -102,6 +105,7 @@ export function DayTimeline({
   selectedDay: string;
   selectedTaskId?: string;
   conflictTaskIds?: Set<string>;
+  ghostPreview?: ScheduleGhostBlockPreview | null;
   draggedItem: TimelineDragItem | null;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
@@ -673,6 +677,8 @@ export function DayTimeline({
                 <p className="mt-1">{copy.emptyDayLaneDescription}</p>
               </div>
             ) : null}
+
+            <ScheduleGhostBlockLayer preview={ghostPreview} mapMinuteToY={mapMinuteToY} />
 
             {composerDraft ? (
               <TimelineComposer

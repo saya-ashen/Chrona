@@ -18,6 +18,8 @@ const READABLE_INITIAL_ZOOM = 1;
 const INITIAL_VIEWPORT_TOP_PADDING = 44;
 const NODE_FALLBACK_WIDTH = 198;
 const NODE_FALLBACK_HEIGHT = 100;
+const REACT_FLOW_PRO_OPTIONS = { hideAttribution: true };
+const DEFAULT_EDGE_OPTIONS = { zIndex: 6 };
 
 export function TaskPlanGraphFrame({
   graphCopy,
@@ -268,8 +270,8 @@ export function TaskPlanGraphFrame({
               zoomOnDoubleClick={false}
               preventScrolling
               attributionPosition="bottom-left"
-              proOptions={{ hideAttribution: true }}
-              defaultEdgeOptions={{ zIndex: 6 }}
+              proOptions={REACT_FLOW_PRO_OPTIONS}
+              defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
               className="bg-transparent"
             />
           </div>

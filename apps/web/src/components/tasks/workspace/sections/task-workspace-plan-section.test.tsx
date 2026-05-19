@@ -51,6 +51,7 @@ describe("TaskWorkspacePlanSection", () => {
         <TaskWorkspacePlanSection
           label="Plan"
           graphPlan={graphPlan}
+          isGraphPlanPending={false}
           pageData={createTaskWorkspaceFixturePageData()}
           plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
           planGenerationStatus="idle"

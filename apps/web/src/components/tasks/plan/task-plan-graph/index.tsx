@@ -243,14 +243,19 @@ export function TaskPlanGraph({
   showOverview = true,
 }: TaskPlanGraphProps) {
   const { messages } = useI18n();
-  const graphCopy = useMemo(
-    () =>
-      ({
+  const graphCopyOverrides = messages.components?.taskPlanGraph ?? null;
+  const graphCopySignature = JSON.stringify(graphCopyOverrides ?? {});
+  const graphCopyRef = useRef<{ signature: string; value: GraphCopy } | null>(null);
+  if (!graphCopyRef.current || graphCopyRef.current.signature !== graphCopySignature) {
+    graphCopyRef.current = {
+      signature: graphCopySignature,
+      value: {
         ...DEFAULT_GRAPH_COPY,
-        ...(messages.components?.taskPlanGraph ?? {}),
-      }) as GraphCopy,
-    [messages.components],
-  );
+        ...(graphCopyOverrides ?? {}),
+      } as GraphCopy,
+    };
+  }
+  const graphCopy = graphCopyRef.current.value;
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullDialogOpen, setIsFullDialogOpen] = useState(false);
@@ -259,6 +264,8 @@ export function TaskPlanGraph({
   const [nodes, setNodes] = useNodesState<FlowGraphNode>([]);
   const [edges, setEdges] = useEdgesState<FlowGraphEdge>([]);
   const graphRef = useRef<HTMLDivElement | null>(null);
+  const observedContainerRef = useRef<HTMLDivElement | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const handleSelectNode = useCallback((nodeId: string) => {
     setSelectedNodeId((current) => (current === nodeId ? null : nodeId));
@@ -382,29 +389,25 @@ export function TaskPlanGraph({
   ]);
 
   const containerRef = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return;
-    const readWidth = (element: HTMLElement | null): number => {
-      if (!element) return 0;
-      const direct =
-        element.clientWidth || element.getBoundingClientRect().width || 0;
-      if (direct > 0) return direct;
-      const styled = Number.parseFloat(element.style.width || "0");
-      if (Number.isFinite(styled) && styled > 0) return styled;
-      return readWidth(element.parentElement);
-    };
-    const measure = () => {
-      const nextWidth = readWidth(node);
-      setContainerWidth((current) =>
-        Math.abs(current - nextWidth) < 1 ? current : nextWidth,
-      );
-    };
-    measure();
-    const observer =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(measure)
-        : null;
-    observer?.observe(node);
+    graphRef.current = node;
   }, []);
+
+  const readContainerWidth = useCallback((element: HTMLElement | null): number => {
+    if (!element) return 0;
+    const direct =
+      element.clientWidth || element.getBoundingClientRect().width || 0;
+    if (direct > 0) return direct;
+    const styled = Number.parseFloat(element.style.width || "0");
+    if (Number.isFinite(styled) && styled > 0) return styled;
+    return readContainerWidth(element.parentElement);
+  }, []);
+
+  const measureContainerWidth = useCallback((node: HTMLDivElement) => {
+    const nextWidth = readContainerWidth(node);
+    setContainerWidth((current) =>
+      Math.abs(current - nextWidth) < 1 ? current : nextWidth,
+    );
+  }, [readContainerWidth]);
 
   const resolvedMode: Exclude<TaskPlanGraphMode, "auto"> =
     mode === "auto"
@@ -412,6 +415,27 @@ export function TaskPlanGraph({
         ? "full"
         : "compact"
       : mode;
+
+  useEffect(() => {
+    const node = graphRef.current;
+    if (observedContainerRef.current === node) return;
+
+    resizeObserverRef.current?.disconnect();
+    resizeObserverRef.current = null;
+    observedContainerRef.current = node;
+
+    if (!node) return;
+    measureContainerWidth(node);
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measureContainerWidth(node));
+    observer.observe(node);
+    resizeObserverRef.current = observer;
+  }, [measureContainerWidth, resolvedMode]);
+
+  useEffect(() => {
+    return () => resizeObserverRef.current?.disconnect();
+  }, []);
 
   if (plan.state !== "ready" || plan.nodes.length === 0) return null;
 
@@ -447,10 +471,7 @@ export function TaskPlanGraph({
     return (
       <>
         <div
-          ref={(node) => {
-            containerRef(node);
-            graphRef.current = node;
-          }}
+          ref={containerRef}
           className={cn("min-w-0 w-full max-w-full", className)}
         >
           <div
@@ -587,10 +608,7 @@ export function TaskPlanGraph({
   return (
     <>
       <div
-        ref={(node) => {
-          containerRef(node);
-          graphRef.current = node;
-        }}
+        ref={containerRef}
         className={cn(
           "min-w-0 w-full max-w-full space-y-3",
           fillHeight && "flex h-full min-h-0 flex-col",

@@ -215,7 +215,7 @@ describe("task workspace page synchronization", () => {
     }, { wrapper: createQueryWrapper() });
 
     await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
-    expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Prepare launch");
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Prepare launch"));
     expect(result.current.plan.graphPlan?.nodes[0]?.status).toBe("ready");
 
     await act(async () => {
@@ -289,7 +289,7 @@ describe("task workspace page synchronization", () => {
       { wrapper: createQueryWrapper() },
     );
 
-    expect(result.current.graphPlan?.nodes[0]?.title).toBe("Old plan");
+    await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Old plan"));
 
     mocks.generationSession = {
       ...mocks.generationSession,

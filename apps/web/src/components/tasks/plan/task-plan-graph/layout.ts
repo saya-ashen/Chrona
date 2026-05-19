@@ -872,21 +872,38 @@ export function syncNodeState(
   },
 ) {
   const focusSet = new Set(input.focusNodeIds);
-  return nodes.map((node) => {
+  let changed = false;
+  const nextNodes = nodes.map((node) => {
     const isSelected = node.id === input.selectedNodeId;
     const isFocus =
       focusSet.size === 0 ||
       focusSet.has(node.id) ||
       node.data.node.status === "blocked";
+    const zIndex = isSelected ? SELECTED_NODE_Z_INDEX : 1;
+    const opacity = isFocus ? 1 : 0.48;
+    if (
+      node.draggable === false &&
+      node.selectable === false &&
+      node.zIndex === zIndex &&
+      node.style?.zIndex === zIndex &&
+      node.style?.opacity === opacity &&
+      node.data.isSelected === isSelected &&
+      node.data.isFocus === isFocus &&
+      node.data.graphCopy === input.graphCopy &&
+      node.data.onSelect === input.onSelect
+    ) {
+      return node;
+    }
+    changed = true;
     return {
       ...node,
       draggable: false,
       selectable: false,
-      zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
+      zIndex,
       style: {
         ...node.style,
-        zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
-        opacity: isFocus ? 1 : 0.48,
+        zIndex,
+        opacity,
       },
       sourcePosition: node.sourcePosition,
       targetPosition: node.targetPosition,
@@ -900,4 +917,5 @@ export function syncNodeState(
       },
     };
   });
+  return changed ? nextNodes : nodes;
 }

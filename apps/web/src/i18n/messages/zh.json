@@ -27,6 +27,28 @@
     "description": "Chrona 帮你把任务变成计划，安排进日程，并借助 AI 持续推进执行。"
   },
   "components": {
+    "globalAiSidebar": {
+      "entryLabel": "打开 Chrona AI 侧边栏",
+      "entry": "询问 Chrona",
+      "quickActions": "快捷操作",
+      "previewRequired": "需预览",
+      "infoOnly": "仅信息",
+      "conversation": "对话",
+      "emptyConversation": "询问上下文、阻塞点，或生成安全建议。",
+      "followUpPlaceholder": "询问 Chrona 下一步该做什么...",
+      "send": "发送",
+      "preview": "预览",
+      "noPreview": "选择快捷操作生成预览，确认前不会更改任何内容。",
+      "staleWarning": "页面上下文已变化，此预览已过期。请先细化再确认。",
+      "panelLabel": "Chrona AI 侧边栏",
+      "eyebrow": "上下文感知 AI",
+      "title": "询问 Chrona",
+      "close": "关闭 AI 侧边栏",
+      "applying": "正在应用...",
+      "confirm": "确认",
+      "dismiss": "忽略",
+      "refine": "细化"
+    },
     "taskPage": {
       "eyebrow": "辅助任务详情",
       "fallbackDescription": "这个页面用于查看参考信息、深链接和较重的上下文，避免把日程页塞得过满。",

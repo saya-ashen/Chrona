@@ -3,6 +3,9 @@ import { SurfaceCard } from "@/components/ui/surface-card";
 import { DayTimeline } from "@/components/schedule/timeline/schedule-page-timeline";
 import { ScheduleTaskList } from "@/components/schedule/schedule-task-list";
 import type {
+  ScheduleGhostBlockPreview,
+} from "@chrona/contracts";
+import type {
   SchedulePageData,
   ScheduleViewMode,
   TimelineCreateInput,
@@ -140,6 +143,7 @@ export function SchedulePageMainPanel({
   activeSelectedTaskId,
   conflictTaskIds,
   listItems,
+  ghostPreview,
   executionRuntimes,
   defaultExecutionRuntime,
   isPending,
@@ -156,6 +160,7 @@ export function SchedulePageMainPanel({
   activeSelectedTaskId: string | undefined;
   conflictTaskIds: Set<string>;
   listItems: SchedulePageData["listItems"];
+  ghostPreview: ScheduleGhostBlockPreview | null;
   executionRuntimes: SchedulePageData["executionRuntimes"];
   defaultExecutionRuntime: string;
   isPending: boolean;
@@ -199,6 +204,7 @@ export function SchedulePageMainPanel({
                 selectedDay={activeGroup.key}
                 selectedTaskId={activeSelectedTaskId}
                 conflictTaskIds={conflictTaskIds}
+                ghostPreview={ghostPreview}
                 draggedItem={draggedItem}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}

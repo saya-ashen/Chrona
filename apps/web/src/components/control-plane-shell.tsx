@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { GlobalAiSidebar } from "@/components/global-ai-sidebar/global-ai-sidebar";
+import { GlobalAiSidebarEntry } from "@/components/global-ai-sidebar/global-ai-sidebar-entry";
 import { useAppPathname } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { buttonVariants } from "@/components/ui/button";
@@ -122,6 +124,7 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              <GlobalAiSidebarEntry />
               <LocalizedLink
                 href="/schedule?new=1"
                 className={buttonVariants({
@@ -138,9 +141,10 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6 xl:px-7">
-           {children}
-         </main>
+            {children}
+          </main>
       </div>
+      <GlobalAiSidebar />
     </div>
   );
 }

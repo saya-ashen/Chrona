@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { TaskWorkspaceExecutionOverview } from "../execution/task-workspace-execution-overview";
@@ -37,6 +37,7 @@ function isPlanGraphTarget(target: EventTarget | null) {
 type TaskWorkspacePlanSectionProps = {
   label: string;
   graphPlan: TaskPlanGraphPlan | null;
+  isGraphPlanPending: boolean;
   pageData: TaskPageData;
   plan: TaskPlanReadModel | null;
   planGenerationStatus: TaskPlanGenerationStatus;
@@ -51,6 +52,7 @@ type TaskWorkspacePlanSectionProps = {
 export function TaskWorkspacePlanSection({
   label,
   graphPlan,
+  isGraphPlanPending,
   pageData,
   plan,
   planGenerationStatus,
@@ -92,7 +94,7 @@ export function TaskWorkspacePlanSection({
       ? `${completedNodeCount}/${totalNodeCount}`
       : consoleView.progress.label;
   const completionLabel = totalNodeCount > 0 ? `${progressLabel} steps` : consoleView.progress.label;
-  const handlePlanNodeChange = (
+  const handlePlanNodeChange = useCallback((
     node: PlanNodeDataModel | null,
     nodes: PlanNodeDataModel[],
   ) => {
@@ -101,7 +103,7 @@ export function TaskWorkspacePlanSection({
       setNodeDrawerSize("half");
     }
     shouldAutoOpenDrawerRef.current = false;
-  };
+  }, [handleSelectedPlanNodeChange, nodeDrawerSize]);
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
       const node =
@@ -182,6 +184,7 @@ export function TaskWorkspacePlanSection({
             <TaskWorkspacePlanContent
               label={label}
               graphPlan={graphPlan}
+              isGraphPlanPending={isGraphPlanPending}
               plan={plan}
               acceptPlanError={acceptPlanError}
               planGenerationStatus={planGenerationStatus}
