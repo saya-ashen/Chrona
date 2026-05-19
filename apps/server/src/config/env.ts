@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  HOST: z.string().default("0.0.0.0"),
+  HOST: z.string().default("127.0.0.1"),
   PORT: z
     .string()
     .default("3101")
@@ -11,12 +11,19 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default("file:./prisma/dev.db"),
   ALLOWED_ORIGINS: z.string().default("*"),
   API_KEY: z.string().optional(),
+  CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
   CHRONA_WEB_DIST: z.string().optional(),
 });
 
 type Env = z.output<typeof envSchema>;
 
 let cachedEnv: Env | null = null;
+
+export function resetEnvCacheForTests(): void {
+  if (process.env.NODE_ENV === "test") {
+    cachedEnv = null;
+  }
+}
 
 export function readEnv(): Env {
   if (cachedEnv) return cachedEnv;
@@ -44,3 +51,20 @@ export function resolveAllowedOrigins(env: Env): string[] {
   return env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+export function assertSafeBind(env: Env): void {
+  if (env.HOST !== "0.0.0.0" || env.API_KEY || env.CHRONA_UNSAFE_PUBLIC_BIND === "1") {
+    return;
+  }
+
+  throw new Error(
+    [
+      "Refusing to start Chrona on HOST=0.0.0.0 without API_KEY.",
+      "This exposes your local Chrona API to your network.",
+      "Set API_KEY for protected access, bind to HOST=127.0.0.1, or explicitly set CHRONA_UNSAFE_PUBLIC_BIND=1 to allow unsafe public binding.",
+    ].join(" "),
+  );
+}
+
+export function isUnsafePublicBindOverride(env: Env): boolean {
+  return env.HOST === "0.0.0.0" && !env.API_KEY && env.CHRONA_UNSAFE_PUBLIC_BIND === "1";
+}

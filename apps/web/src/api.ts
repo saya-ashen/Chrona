@@ -1,3 +1,5 @@
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -18,16 +20,17 @@ async function parseJson(response: Response) {
 }
 
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = buildAccessKeyHeaders(init?.headers);
+  headers.set("content-type", "application/json");
+
   const response = await fetch(path, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 
   const payload = await parseJson(response);
   if (!response.ok) {
+    handleUnauthorizedResponse(response);
     const message =
       payload && typeof payload === "object" && "error" in payload && typeof (payload as { error?: unknown }).error === "string"
         ? (payload as { error: string }).error
@@ -37,4 +40,3 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 
   return payload as T;
 }
-

@@ -1,12 +1,13 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
 import { createLogger } from "@chrona/shared/logger";
-import { readEnv, resolvePort } from "./config/env";
+import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolvePort } from "./config/env";
 
 const env = readEnv();
 const log = createLogger("apps.server");
 const host = env.HOST;
 const port = resolvePort(env);
+assertSafeBind(env);
 
 let isShuttingDown = false;
 
@@ -14,6 +15,13 @@ export async function startBunServer() {
   bootstrapServerRuntime();
 
   const app = await createServerApp();
+  if (isUnsafePublicBindOverride(env)) {
+    log.warn("unsafe public bind enabled", {
+      host,
+      port,
+      warning: "HOST=0.0.0.0 without API_KEY exposes Chrona to your network.",
+    });
+  }
   const server = Bun.serve({
     hostname: host,
     port,

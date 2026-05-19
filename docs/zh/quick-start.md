@@ -148,12 +148,17 @@ chrona task list --base-url http://其他机器:3101
 ## 服务器选项
 
 ```bash
-chrona start                     # 默认端口 3101
+chrona start                     # 默认监听 127.0.0.1:3101
 PORT=3100 chrona start           # 自定义端口
-HOST=0.0.0.0 chrona start        # 绑定所有网络接口
+API_KEY=sk-chrona-local chrona start
+HOST=0.0.0.0 API_KEY=sk-chrona-local chrona start  # 绑定所有网络接口并启用 Access Key 保护
 ```
 
 生产模式下，同一端口上的单个服务器同时托管 API 和静态 SPA。
+
+Chrona 默认绑定 `127.0.0.1`，避免个人本地部署被局域网或公网误访问。如需让其他设备访问，请显式设置 `HOST=0.0.0.0`，并强烈建议同时设置 `API_KEY`。设置 `API_KEY` 后，受保护 API 请求必须携带 `Authorization: Bearer <key>`；网页在收到 `401 Unauthorized` 后会显示 Access Key 解锁界面，key 默认只保存在内存中，勾选 **记住此设备** 后会保存在当前浏览器的 localStorage。
+
+为安全起见，`HOST=0.0.0.0` 且未设置 `API_KEY` 时服务端会拒绝启动。如需临时允许这种不安全模式，必须显式设置 `CHRONA_UNSAFE_PUBLIC_BIND=1`。
 
 ## 故障排查
 

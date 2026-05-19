@@ -72,6 +72,16 @@
       "noActions": "No assistant actions for this page yet.",
       "unavailable": "Assistant actions are unavailable for this page."
     },
+    "accessKeyUnlock": {
+      "eyebrow": "Local access",
+      "title": "Unlock Chrona",
+      "description": "Enter Access Key to continue. This is not an account login; it only unlocks this local Chrona server.",
+      "keyLabel": "Access Key",
+      "keyPlaceholder": "Enter Access Key",
+      "rememberLabel": "Remember this device",
+      "rememberHint": "Stores the key in this browser's localStorage. Leave unchecked to keep it in memory only.",
+      "submit": "Unlock Chrona"
+    },
     "taskPage": {
       "eyebrow": "Secondary task detail",
       "fallbackDescription": "Use this page for reference, deep links, and heavier context that would clutter Schedule.",

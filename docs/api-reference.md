@@ -4,6 +4,7 @@ Base URL: `http://localhost:3101/api`
 
 - **Content-Type:** `application/json`
 - **Auth:** Optional `Authorization: Bearer <token>` (when `API_KEY` env var is set)
+- **Default bind:** Chrona listens on `127.0.0.1` by default. Use `HOST=0.0.0.0` only for intentional LAN/public access and set `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
 - **Response envelope:** List endpoints return `{ tasks: [], count: N }`, detail endpoints return the object directly, action endpoints return `{ success: true, ... }`.
 - **Dates:** ISO 8601
 

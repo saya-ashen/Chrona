@@ -150,12 +150,17 @@ When the run completes, review the generated artifacts. Accept the result or cre
 ## Server Options
 
 ```bash
-chrona start                     # Default on port 3101
+chrona start                     # Default on 127.0.0.1:3101
 PORT=3100 chrona start           # Custom port
-HOST=0.0.0.0 chrona start        # Bind to all interfaces
+API_KEY=sk-chrona-local chrona start
+HOST=0.0.0.0 API_KEY=sk-chrona-local chrona start  # Bind to all interfaces with access-key protection
 ```
 
 In production mode, a single server hosts both the API and the static SPA on the same port.
+
+Chrona binds to `127.0.0.1` by default so personal local deployments are not reachable from LAN or public networks. To expose Chrona to another device, set `HOST=0.0.0.0` intentionally and strongly prefer setting `API_KEY` at the same time. When `API_KEY` is set, protected API requests require `Authorization: Bearer <key>`; the web app prompts for an Access Key after a `401 Unauthorized` response and can keep it in memory or, if you choose **Remember this device**, in this browser's localStorage.
+
+For safety, `HOST=0.0.0.0` without `API_KEY` refuses to start. If you need to allow that insecure mode temporarily, set `CHRONA_UNSAFE_PUBLIC_BIND=1` explicitly.
 
 ## Troubleshooting
 
