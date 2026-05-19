@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
-import { defaultLocale, hasLocale } from "@/i18n/config";
+import { defaultLocale, hasLocale } from "@chrona/i18n";
 
 import { AppShell } from "./app-shell";
 import {

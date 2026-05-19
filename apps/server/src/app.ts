@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { createChronaEngine } from "@chrona/engine";
 
-import { defaultLocale, getPreferredLocale, hasLocale } from "@chrona/i18n";
+import { defaultLocale, getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
 import {
@@ -120,7 +120,8 @@ export async function createServerApp() {
       return c.redirect(`/${locale}`, 302);
     }
 
-    return c.json({ error: "Not found" }, 404);
+    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
+    return c.json({ error: messages.notFound }, 404);
   });
 
   app.onError((error, c) => {
@@ -130,7 +131,7 @@ export async function createServerApp() {
 
     return c.json(
       {
-        error: error instanceof Error ? error.message : "Internal server error",
+        error: error instanceof Error ? error.message : getApiMessages(getPreferredLocale(c.req.header("accept-language"))).internalServerError,
       },
       500,
     );

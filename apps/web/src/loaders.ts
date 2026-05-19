@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs, Params } from "react-router-dom";
 
-import { getDictionary } from "@/i18n/get-dictionary";
-import { resolveLocale, type Locale } from "@/i18n/config";
+import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 
 import { apiJson } from "./api";
 import type {

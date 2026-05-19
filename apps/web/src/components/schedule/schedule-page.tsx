@@ -18,8 +18,8 @@ import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-p
 
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import { useI18n, useLocale } from "@/i18n/client";
-import { localizeHref } from "@/i18n/routing";
+import { useI18n, useLocale } from "@chrona/i18n/react";
+import { localizeHref } from "@chrona/i18n";
 import { useAppRouter } from "@/lib/router";
 import { useSchedulePageActions } from "./use-schedule-page-actions";
 import { useSchedulePageState } from "./use-schedule-page-state";

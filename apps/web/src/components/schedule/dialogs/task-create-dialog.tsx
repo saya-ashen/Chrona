@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 
 /* ------------------------------------------------------------------ */
@@ -17,6 +17,29 @@ const priorityBadgeColors: Record<string, string> = {
   High: "bg-orange-100 text-orange-700",
   Urgent: "bg-red-100 text-red-700",
 };
+
+const DEFAULT_DIALOG_COPY = {
+  title: "Add task",
+  close: "Close",
+  titlePlaceholder: "Add title",
+  aiSuggestions: "AI Suggestions",
+  generatingSuggestions: "Generating suggestions...",
+  date: "Date",
+  startTime: "Start time",
+  endTime: "End time",
+  description: "Description (optional)",
+  descriptionPlaceholder: "Add description",
+  priority: "Priority",
+  cancel: "Cancel",
+  save: "Save",
+  saving: "Saving...",
+  priorities: {
+    Low: "Low",
+    Medium: "Medium",
+    High: "High",
+    Urgent: "Urgent",
+  },
+} as const;
 
 type TaskCreateDialogProps = {
   isOpen: boolean;
@@ -50,9 +73,14 @@ export function TaskCreateDialog({
   const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
   const [title, setTitle] = useState(initialTitle);
   const { messages } = useI18n();
+  const localizedDialogCopy = (messages.components as { taskCreateDialog?: Partial<typeof DEFAULT_DIALOG_COPY> } | undefined)?.taskCreateDialog;
   const dialogCopy = {
-    generatingSuggestions: "Generating suggestions...",
-    ...((messages.components as unknown as Record<string, Record<string, string>> | undefined)?.taskCreateDialog ?? {}),
+    ...DEFAULT_DIALOG_COPY,
+    ...localizedDialogCopy,
+    priorities: {
+      ...DEFAULT_DIALOG_COPY.priorities,
+      ...localizedDialogCopy?.priorities,
+    },
   };
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
@@ -73,7 +101,7 @@ export function TaskCreateDialog({
     isLoading: acLoading,
     phase,
     statusMessage,
-    toolCalls,
+    toolCalls = [],
   } = useAutoComplete(
     resolvedAutoSuggestionsEnabled && !suppressRef.current && !isComposing && title.trim().length >= 3 ? title.trim() : null,
   );
@@ -84,7 +112,6 @@ export function TaskCreateDialog({
     !suppressRef.current &&
     !isComposing &&
     title.trim().length >= 3 &&
-    autoCompleteSuggestions != null &&
     autoCompleteSuggestions.length > 0;
 
   const showPanel = resolvedAutoSuggestionsEnabled && showAutoComplete && (
@@ -170,12 +197,12 @@ export function TaskCreateDialog({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">Add task</h2>
+          <h2 className="text-lg font-semibold text-foreground">{dialogCopy.title}</h2>
           <button
             type="button"
             onClick={onClose}
             className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="Close"
+            aria-label={dialogCopy.close}
           >
             <X className="size-4" />
           </button>
@@ -217,7 +244,7 @@ export function TaskCreateDialog({
                   setShowAutoComplete(false);
                 }, 200);
               }}
-              placeholder="Add title"
+              placeholder={dialogCopy.titlePlaceholder}
               disabled={isPending}
               autoFocus
               className="w-full border-0 border-b border-border/60 bg-transparent px-0 py-2 text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60"
@@ -230,7 +257,7 @@ export function TaskCreateDialog({
                 <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5">
                   <Sparkles className="size-3 text-primary" />
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    AI Suggestions
+                    {dialogCopy.aiSuggestions}
                   </span>
                   {acLoading && (
                     <Loader2 className="ml-auto size-3 animate-spin text-muted-foreground" />
@@ -246,7 +273,7 @@ export function TaskCreateDialog({
                 )}
 
                 {/* Tool calls */}
-                {toolCalls?.length > 0 && (
+                {toolCalls.length > 0 && (
                   <div className="border-b border-border/20 px-3 py-1.5">
                     {toolCalls.map((tc, i) => (
                       <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -276,11 +303,7 @@ export function TaskCreateDialog({
                       if (suggestion.description) {
                         setDescription(suggestion.description);
                       }
-                      if (suggestion.priority) {
-                        setPriority(
-                          suggestion.priority as "Low" | "Medium" | "High" | "Urgent",
-                        );
-                      }
+                      setPriority(suggestion.priority);
                       setShowAutoComplete(false);
                     }}
                   >
@@ -288,18 +311,15 @@ export function TaskCreateDialog({
                       <span className="text-sm font-medium text-foreground">
                         {suggestion.title}
                       </span>
-                      {suggestion.priority && (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
-                            priorityBadgeColors[suggestion.priority] ??
-                              "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {suggestion.priority}
-                        </span>
-                      )}
-                      {suggestion.estimatedMinutes != null && (
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                          priorityBadgeColors[suggestion.priority],
+                        )}
+                      >
+                        {dialogCopy.priorities[suggestion.priority]}
+                      </span>
+                      {typeof suggestion.estimatedMinutes === "number" && (
                         <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">
                           ~{suggestion.estimatedMinutes}m
                         </span>
@@ -328,7 +348,7 @@ export function TaskCreateDialog({
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Date
+                  {dialogCopy.date}
                 </label>
                 <input
                   type="date"
@@ -343,7 +363,7 @@ export function TaskCreateDialog({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Start time
+                  {dialogCopy.startTime}
                 </label>
                 <input
                   type="time"
@@ -355,7 +375,7 @@ export function TaskCreateDialog({
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  End time
+                  {dialogCopy.endTime}
                 </label>
                 <input
                   type="time"
@@ -371,12 +391,12 @@ export function TaskCreateDialog({
           {/* Description */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Description (optional)
+              {dialogCopy.description}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add description"
+              placeholder={dialogCopy.descriptionPlaceholder}
               disabled={isPending}
               rows={3}
               className="w-full resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
@@ -386,7 +406,7 @@ export function TaskCreateDialog({
           {/* Priority */}
           <div>
             <label className="mb-2 block text-xs font-medium text-muted-foreground">
-              Priority
+              {dialogCopy.priority}
             </label>
             <div className="flex gap-2">
               {(["Low", "Medium", "High", "Urgent"] as const).map((option) => (
@@ -402,7 +422,7 @@ export function TaskCreateDialog({
                       : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground",
                   )}
                 >
-                  {option}
+                  {dialogCopy.priorities[option]}
                 </button>
               ))}
             </div>
@@ -418,7 +438,7 @@ export function TaskCreateDialog({
             disabled={isPending}
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
-            Cancel
+            {dialogCopy.cancel}
           </button>
           <button
             type="button"
@@ -429,7 +449,7 @@ export function TaskCreateDialog({
               "min-w-20 rounded-lg",
             )}
           >
-            {isPending ? "Saving..." : "Save"}
+            {isPending ? dialogCopy.saving : dialogCopy.save}
           </button>
         </div>
       </div>

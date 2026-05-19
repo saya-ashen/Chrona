@@ -4,7 +4,7 @@ import type {
   SchedulePageData,
   UnscheduledItem,
 } from "@/components/schedule/schedule-page-types";
-import type { Locale } from "@/i18n/config";
+import type { Locale } from "@chrona/i18n";
 import type { ScheduleViewMode } from "@/components/schedule/schedule-page-types";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";

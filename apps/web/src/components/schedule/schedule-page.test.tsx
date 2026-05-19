@@ -18,12 +18,13 @@ vi.mock("@/lib/router", () => ({
   useAppRouter: () => ({ push, refresh }),
 }));
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {} }),
   useLocale: () => "en",
 }));
 
-vi.mock("@/i18n/routing", () => ({
+vi.mock("@chrona/i18n", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_locale: string, href: string) => href,
 }));
 

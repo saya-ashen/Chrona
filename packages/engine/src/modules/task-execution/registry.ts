@@ -70,5 +70,5 @@ export function validateRuntimeTaskConfig(
 }
 
 export function listExecutionRuntimes() {
-  return [...runtimeRegistry.keys()];
+  return [HERMES_EXECUTION_RUNTIME];
 }

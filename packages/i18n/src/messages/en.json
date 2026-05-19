@@ -851,8 +851,27 @@
       "applyPlan": "Apply Plan"
     },
     "taskCreateDialog": {
+      "title": "Add task",
+      "close": "Close",
+      "titlePlaceholder": "Add title",
+      "aiSuggestions": "AI Suggestions",
       "generatingSuggestions": "Generating suggestions...",
-      "aiTaskPlanning": "AI Task Planning"
+      "aiTaskPlanning": "AI Task Planning",
+      "date": "Date",
+      "startTime": "Start time",
+      "endTime": "End time",
+      "description": "Description (optional)",
+      "descriptionPlaceholder": "Add description",
+      "priority": "Priority",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "priorities": {
+        "Low": "Low",
+        "Medium": "Medium",
+        "High": "High",
+        "Urgent": "Urgent"
+      }
     },
     "scheduleCommandBar": {
       "generatingSuggestions": "Generating suggestions..."
@@ -931,6 +950,24 @@
       "dueDateLabel": "Due date",
       "createButton": "Create Task",
       "all": "All",
+      "needs_me": "Needs Me",
+      "ready": "Ready",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "filterNeedsMe": "Needs Me",
+      "listDescription": "Review task state and open work that needs attention.",
+      "statTotal": "Total",
+      "statNeeds": "Needs",
+      "statReady": "Ready",
+      "viewDetails": "View Details",
+      "duePrefix": "Due",
+      "updatedPrefix": "Updated",
+      "emptyFiltered": "No tasks match the current filter.",
+      "relativeJustNow": "just now",
+      "relativeMinutesAgo": "{count}m ago",
+      "relativeHoursAgo": "{count}h ago",
+      "relativeDaysAgo": "{count}d ago",
       "filters": {
         "Running": "Running",
         "WaitingForApproval": "WaitingForApproval",
@@ -966,13 +1003,24 @@
     "settings": {
       "title": "Settings",
       "subtitle": "Configure AI clients and advanced controls.",
+      "controlCenter": "Control center",
       "advancedTitle": "Advanced",
       "advancedDescription": "Deeper operational controls live outside the daily task flow.",
       "openAdvancedSettings": "Open Advanced Settings",
+      "aiClientsTitle": "AI Clients",
       "aiClientsDescription": "Manage AI clients and configure which client each feature uses",
       "manageAiClients": "Manage AI Clients",
       "scheduleAiTitle": "Schedule AI automation",
-      "scheduleAiDescription": "Control which AI actions may run automatically in the schedule workflow."
+      "scheduleAiDescription": "Control which AI actions may run automatically in the schedule workflow.",
+      "scheduleAiPanel": {
+        "autoSuggestions": "Auto suggestions",
+        "autoSuggestionsDescription": "Suggest task titles/details while typing. Off by default to avoid unsolicited AI calls.",
+        "autoPlanGeneration": "Auto-generate plan after saving",
+        "autoPlanGenerationDescription": "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
+        "defaultOn": "Default on",
+        "defaultOff": "Default off",
+        "saved": "Saved"
+      }
     },
     "aiClientsPage": {
       "title": "AI Clients",

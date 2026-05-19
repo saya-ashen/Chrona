@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { ContextSummaryCard } from "./context-summary-card";
 import { ConversationThread } from "./conversation-thread";
 import { ProposalPreviewCard } from "./proposal-preview-card";

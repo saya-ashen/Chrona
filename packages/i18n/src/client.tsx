@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { defaultLocale, type Locale } from "@/i18n/config";
-import { fallbackMessages, type Messages } from "@/i18n/messages";
+import { defaultLocale, type Locale } from "./locale";
+import { fallbackMessages, type Messages } from "./messages";
 
 type I18nContextValue = {
   locale: Locale;

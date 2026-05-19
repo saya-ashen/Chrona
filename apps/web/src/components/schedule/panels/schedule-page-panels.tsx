@@ -20,7 +20,7 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 export { DayTimelineSummary } from "./schedule-panel-primitives";

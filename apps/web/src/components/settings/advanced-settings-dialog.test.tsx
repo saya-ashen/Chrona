@@ -9,7 +9,7 @@ vi.mock("@/lib/router", () => ({
   AppLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a>,
 }));
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {

@@ -3,11 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleTaskList, type ScheduleTaskListItem } from "../schedule-task-list";
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ t: (key: string) => key, messages: {} }),
   useLocale: () => "en",
 }));
-vi.mock("@/i18n/routing", () => ({ localizeHref: (_: string, href: string) => href }));
+vi.mock("@chrona/i18n", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@chrona/i18n")>()),
+  localizeHref: (_: string, href: string) => href,
+}));
 vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
 vi.mock("@/components/ui/status-badge", () => ({
   StatusBadge: ({ children }: any) => <span data-testid="status-badge">{children}</span>,

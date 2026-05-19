@@ -7,7 +7,7 @@ import {
   formatTime,
   toTimestamp,
 } from "@/components/schedule/schedule-page-utils";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 
 export function EmptyState({ children }: { children: string }) {
   return (

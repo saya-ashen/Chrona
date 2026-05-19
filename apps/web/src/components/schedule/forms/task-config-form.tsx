@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import {
   deleteValueAtPath,
   getValueAtPath,
@@ -606,9 +606,6 @@ export function TaskConfigForm({
   const visibleStandardFields = selectedExecutionRuntime.spec.fields.filter(
     (field) => !field.advanced && isFieldVisible(field, visibleExecutionConfig),
   );
-  const visibleAdvancedFields = selectedExecutionRuntime.spec.fields.filter(
-    (field) => field.advanced && isFieldVisible(field, visibleExecutionConfig),
-  );
   const scheduledStartAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledStartTime);
   const scheduledEndAtPreview = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledEndTime);
   const scheduleDurationLabel = formatDurationLabel(scheduledStartAtPreview, scheduledEndAtPreview);
@@ -881,11 +878,11 @@ export function TaskConfigForm({
           );
         })}
 
-        <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">{compact ? copy.moreOptions : copy.advancedFields}</summary>
+        {compact ? (
+          <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
+            <summary className="cursor-pointer text-sm font-medium text-foreground">{copy.moreOptions}</summary>
 
-          <div className="mt-3 space-y-3">
-            {compact ? (
+            <div className="mt-3 space-y-3">
               <>
                 <Field label={copy.priority} className="text-xs text-muted-foreground">
                   <select
@@ -939,35 +936,8 @@ export function TaskConfigForm({
                   />
                 </Field>
               </>
-            ) : (
-              <>
-                {executionRuntimes.length > 1 ? (
-                  <Field label={copy.adapter} className="text-xs text-muted-foreground">
-                    <select
-                      name="executionRuntime"
-                      value={formState.executionRuntime}
-                      onChange={(event) =>
-                        replaceFormState(
-                          applyRuntimeAdapterChange(
-                            getValues(),
-                            resolveExecutionRuntime(executionRuntimes, event.target.value, defaultExecutionRuntime),
-                          ),
-                        )
-                      }
-                      className={selectClassName}
-                    >
-                      {executionRuntimes.map((runtime) => (
-                        <option key={runtime.key} value={runtime.key}>
-                          {runtime.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                ) : null}
-              </>
-            )}
 
-            {(compact ? [...optionalRuntimeFields, ...visibleAdvancedFields] : visibleAdvancedFields).map((field) => {
+              {optionalRuntimeFields.map((field) => {
               const value = readDisplayedFieldValue(field, formState.fieldExecutionConfig);
 
               if (field.kind === "textarea") {
@@ -1063,19 +1033,9 @@ export function TaskConfigForm({
                 </Field>
               );
             })}
-
-            <Field label={copy.runtimeParams} className="text-xs text-muted-foreground">
-              <textarea
-                name="executionConfig"
-                rows={6}
-                value={formState.extraExecutionConfig}
-                onChange={(event) => setValue("extraExecutionConfig", event.target.value, { shouldDirty: true })}
-                placeholder={copy.runtimeParamsPlaceholder}
-                className={textareaClassName}
-              />
-            </Field>
-          </div>
-        </details>
+            </div>
+          </details>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
           <div className="flex flex-wrap items-center gap-2">{footerActions}</div>

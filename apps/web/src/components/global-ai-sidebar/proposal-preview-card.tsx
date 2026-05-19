@@ -1,5 +1,5 @@
 import type { AiProposalPreview } from "@chrona/contracts";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 export function ProposalPreviewCard({ proposal }: { proposal: AiProposalPreview | null }) {
   const { t } = useI18n();

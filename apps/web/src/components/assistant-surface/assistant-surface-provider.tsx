@@ -24,6 +24,8 @@ import {
   pickTopAssistantSummary,
   sortAssistantSummaries,
 } from "@chrona/domain";
+import { getAssistantSurfaceMessages } from "@chrona/i18n";
+import { useLocale } from "@chrona/i18n/react";
 
 type AssistantSurfaceHandlers = {
   onProposal?: (route: AssistantProposalRoute) => void;
@@ -64,24 +66,30 @@ type Action =
   | { type: "set-proposal"; proposal: AiProposalPreview | null }
   | { type: "add-message"; message: string };
 
-const emptySurface: AssistantSurfaceState = {
-  pageType: "unsupported",
-  fingerprint: "unsupported",
-  title: "Chrona AI",
-  primaryObjectLabel: "Chrona",
-  status: "unavailable",
-  topSummary: { id: "unsupported", label: "Status", value: "No active assistant context", severity: "neutral" },
-  summaries: [{ id: "unsupported", label: "Status", value: "No active assistant context", severity: "neutral" }],
-  quickActions: [normalizeAssistantAction({
-    id: "general-help",
-    label: "Ask about this page",
-    description: "Get non-mutating guidance for the current page.",
-    kind: "informational",
-    enabled: true,
-  })],
-  recentProposals: [],
-  requestInputEnabled: true,
-};
+function createEmptySurface(locale?: string | null): AssistantSurfaceState {
+  const messages = getAssistantSurfaceMessages(locale);
+  const summary = { id: "unsupported", label: messages.statusLabel, value: messages.noActiveContext, severity: "neutral" as const };
+  return {
+    pageType: "unsupported",
+    fingerprint: "unsupported",
+    title: messages.title,
+    primaryObjectLabel: messages.primaryObjectLabel,
+    status: "unavailable",
+    topSummary: summary,
+    summaries: [summary],
+    quickActions: [normalizeAssistantAction({
+      id: "general-help",
+      label: messages.askAboutPage,
+      description: messages.nonMutatingGuidance,
+      kind: "informational",
+      enabled: true,
+    })],
+    recentProposals: [],
+    requestInputEnabled: true,
+  };
+}
+
+const emptySurface = createEmptySurface();
 
 const initialState: State = {
   isOpen: false,
@@ -127,7 +135,8 @@ function mapQuickAction(action: AiSidebarQuickAction): AssistantQuickAction {
   });
 }
 
-function createSurfaceState(context: AiSidebarPageContextSummary, actions: AiSidebarQuickAction[]): AssistantSurfaceState {
+function createSurfaceState(context: AiSidebarPageContextSummary, actions: AiSidebarQuickAction[], locale?: string | null): AssistantSurfaceState {
+  const messages = getAssistantSurfaceMessages(locale);
   const summaries = sortAssistantSummaries(context.highlights.map((highlight, index) => ({
     id: `${context.type}-${index}-${highlight.label}`,
     label: highlight.label,
@@ -146,7 +155,7 @@ function createSurfaceState(context: AiSidebarPageContextSummary, actions: AiSid
     quickActions: actions.map(mapQuickAction),
     recentProposals: [],
     requestInputEnabled: true,
-    unavailableReason: context.type === "unsupported" ? "This page does not expose assistant actions yet." : undefined,
+    unavailableReason: context.type === "unsupported" ? messages.unsupportedUnavailable : undefined,
   };
 }
 
@@ -165,17 +174,18 @@ function assistantSurfaceContextSignature(surface: AssistantSurfaceState) {
   });
 }
 
-function createSchedulePreview(selectedDate: string): ScheduleGhostBlockPreview {
+function createSchedulePreview(selectedDate: string, locale?: string | null): ScheduleGhostBlockPreview {
+  const messages = getAssistantSurfaceMessages(locale);
   const start = new Date(`${selectedDate}T09:00:00`);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   return {
     selectedDate,
     placements: [{
       taskId: "assistant-preview",
-      title: "Assistant proposal",
+      title: messages.proposalTitle,
       startAt: start.toISOString(),
       endAt: end.toISOString(),
-      reason: "Preview only. Confirm from the schedule page.",
+      reason: messages.schedulePreviewReason,
       confidence: 0.7,
     }],
     unplacedItems: [],
@@ -184,7 +194,8 @@ function createSchedulePreview(selectedDate: string): ScheduleGhostBlockPreview 
   };
 }
 
-function createProposalPreview(surface: AssistantSurfaceState, action: AssistantQuickAction): AiProposalPreview {
+function createProposalPreview(surface: AssistantSurfaceState, action: AssistantQuickAction, locale?: string | null): AiProposalPreview {
+  const messages = getAssistantSurfaceMessages(locale);
   const now = new Date();
   return {
     id: `assistant-${now.getTime()}`,
@@ -192,19 +203,19 @@ function createProposalPreview(surface: AssistantSurfaceState, action: Assistant
     createdAt: now.toISOString(),
     kind: surface.pageType === "schedule" ? "schedule" : "task",
     summary: action.label,
-    affectedAreas: [action.previewSurface ?? "Assistant proposal"],
+    affectedAreas: [action.previewSurface ?? messages.proposalTitle],
     riskLevel: "low",
-    explanation: "Proposal created by the dropdown. Page preview owns confirmation.",
+    explanation: messages.dropdownProposalExplanation,
     confirmability: "confirmable",
     taskPreview: surface.pageType === "task" ? {
       taskId: surface.primaryObjectLabel,
       changeType: action.id === "retry-node" ? "retry-node" : action.id === "add-step" ? "add-step" : "plan-modification",
       affectedNodes: [],
-      addedSteps: action.id === "add-step" ? ["Assistant suggested follow-up"] : [],
-      planDiffSummary: "Preview route created. No task changes applied from dropdown.",
+      addedSteps: action.id === "add-step" ? [messages.suggestedFollowUp] : [],
+      planDiffSummary: messages.previewRouteSummary,
       requiresReview: true,
     } : null,
-    schedulePreview: surface.pageType === "schedule" ? createSchedulePreview(surface.primaryObjectLabel) : null,
+    schedulePreview: surface.pageType === "schedule" ? createSchedulePreview(surface.primaryObjectLabel, locale) : null,
   };
 }
 
@@ -233,15 +244,20 @@ function reducer(state: State, action: Action): State {
 const AssistantSurfaceContext = createContext<AssistantSurfaceContextValue>(fallbackContext);
 
 export function AssistantSurfaceProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const locale = useLocale();
+  const [state, dispatch] = useReducer(reducer, initialState, (stateValue) => ({
+    ...stateValue,
+    surface: createEmptySurface(locale),
+  }));
+  const assistantMessages = getAssistantSurfaceMessages(locale);
 
   const open = useCallback(() => dispatch({ type: "open" }), []);
   const close = useCallback(() => dispatch({ type: "close" }), []);
   const toggle = useCallback(() => dispatch({ type: "toggle" }), []);
   const setInput = useCallback((input: string) => dispatch({ type: "set-input", input }), []);
   const setPageContext = useCallback((context: AiSidebarPageContextSummary, actions: AiSidebarQuickAction[]) => {
-    dispatch({ type: "set-surface", surface: createSurfaceState(context, actions) });
-  }, []);
+    dispatch({ type: "set-surface", surface: createSurfaceState(context, actions, locale) });
+  }, [locale]);
   const registerHandlers = useCallback((_handlers: AssistantSurfaceHandlers) => () => undefined, []);
   const runQuickAction = useCallback((action: AssistantQuickAction) => {
     if (!action.enabled) return;
@@ -249,7 +265,7 @@ export function AssistantSurfaceProvider({ children }: { children: ReactNode }) 
       dispatch({ type: "add-message", message: `${action.label}: ${action.description}` });
       return;
     }
-    const proposal = createProposalPreview(state.surface, action);
+    const proposal = createProposalPreview(state.surface, action, locale);
     const route = createAssistantProposalRoute({
       id: proposal.id,
       surface: action.previewSurface,
@@ -260,8 +276,8 @@ export function AssistantSurfaceProvider({ children }: { children: ReactNode }) 
     const result: AssistantActionResult = { kind: "proposal", message: proposal.summary, route };
     dispatch({ type: "set-proposal", proposal });
     dispatch({ type: "set-surface", surface: { ...state.surface, recentProposals: [result.route, ...state.surface.recentProposals].slice(0, 3) } });
-    dispatch({ type: "add-message", message: `${result.message}: open owning page preview to confirm.` });
-  }, [state.surface]);
+    dispatch({ type: "add-message", message: `${result.message}: ${assistantMessages.openOwningPagePreview}` });
+  }, [assistantMessages.openOwningPagePreview, locale, state.surface]);
   const submitRequest = useCallback((message: string) => {
     const trimmed = message.trim();
     if (!trimmed) return;

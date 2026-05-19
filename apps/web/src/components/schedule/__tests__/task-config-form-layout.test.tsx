@@ -1,12 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {}, t: (k: string) => k }),
   useLocale: () => "en",
 }));
@@ -88,35 +87,17 @@ describe("TaskConfigForm – field layout", () => {
     expect(prioritySelect).toBeInTheDocument();
   });
 
-  it("advanced fields section is collapsed by default", () => {
+  it("hides advanced fields in non-compact mode", () => {
     render(<TaskConfigForm {...defaultProps} />);
 
-    const details = screen.getByText("Advanced fields").closest("details");
-    expect(details).not.toHaveAttribute("open");
+    expect(screen.queryByText("Advanced fields")).not.toBeInTheDocument();
   });
 
-  it("prompt field is inside advanced section (not visible by default)", () => {
+  it("hides advanced runtime fields in non-compact mode", () => {
     render(<TaskConfigForm {...defaultProps} />);
 
-    // Prompt label should exist but be inside closed details
-    const promptLabel = screen.queryByText("Prompt / instructions");
-    if (promptLabel) {
-      // It exists but should be inside a closed <details>
-      const details = promptLabel.closest("details");
-      expect(details).not.toHaveAttribute("open");
-    }
-  });
-
-  it("opening advanced fields reveals prompt and temperature", async () => {
-    const user = userEvent.setup();
-    render(<TaskConfigForm {...defaultProps} />);
-
-    // Click to expand advanced fields
-    await user.click(screen.getByText("Advanced fields"));
-
-    // Now prompt and temperature should be visible
-    expect(screen.getByText("Prompt / instructions")).toBeInTheDocument();
-    expect(screen.getByText("Temperature")).toBeInTheDocument();
+    expect(screen.queryByText("Prompt / instructions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Temperature")).not.toBeInTheDocument();
   });
 
   it("submit button is present", () => {

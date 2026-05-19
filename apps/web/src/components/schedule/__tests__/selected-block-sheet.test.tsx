@@ -6,12 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {}, t: (k: string) => k }),
   useLocale: () => "en",
 }));
 
-vi.mock("@/i18n/routing", () => ({
+vi.mock("@chrona/i18n", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_locale: string, href: string) => href,
 }));
 

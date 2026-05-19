@@ -8,7 +8,7 @@ vi.mock("@/lib/task-actions-client", () => ({
   clearSchedule: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock("@/i18n/client", () => ({ useI18n: () => ({ messages: {} }) }));
+vi.mock("@chrona/i18n/react", () => ({ useI18n: () => ({ messages: {} }) }));
 vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
 vi.mock("@/components/ui/field", () => ({
   Field: ({ children, label }: any) => (

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { api } from "@/lib/rpc-client";
 
 type AiClientType = "openclaw" | "llm" | "hermes";
@@ -32,38 +31,42 @@ type TestResult = {
   reason: string | null;
 };
 
+type RuntimeProviderOption = {
+  key: AiClientType;
+  label: string;
+};
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
   isDefault: boolean;
-  bridgeUrl: string;
-  bridgeToken: string;
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
-  model: string;
 }): ClientFormPayload {
-  const config = input.type === "openclaw"
-    ? {
-        bridgeUrl: input.bridgeUrl,
-        bridgeToken: input.bridgeToken,
-        model: input.model.trim() || OPENCLAW_DEFAULT_MODEL,
-        timeoutSeconds: Number(input.timeoutSeconds),
-      }
-    : input.type === "hermes"
-      ? {
-          baseUrl: input.baseUrl || "http://127.0.0.1:8642",
-          apiKey: input.apiKey,
-          timeoutMs: Number(input.timeoutSeconds) * 1000,
-        }
-      : { baseUrl: input.baseUrl, apiKey: input.apiKey, model: input.model };
-
   return {
     name: input.name,
     type: input.type,
-    config,
+    config: {
+      baseUrl: input.baseUrl || "http://127.0.0.1:8642",
+      apiKey: input.apiKey,
+      timeoutMs: Number(input.timeoutSeconds) * 1000,
+    },
     isDefault: input.isDefault,
   };
+}
+
+function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
+  const providers = (input as { providers?: unknown[] }).providers ?? [];
+  return providers
+    .filter((provider): provider is { key: AiClientType; label?: string } => {
+      const key = (provider as { key?: unknown }).key;
+      return key === "hermes" || key === "openclaw" || key === "llm";
+    })
+    .map((provider) => ({
+      key: provider.key,
+      label: provider.label ?? provider.key,
+    }));
 }
 
 async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
@@ -161,23 +164,23 @@ function ClientForm({
   onSave,
   onCancel,
   copy,
+  providers,
 }: {
   initial?: AiClientInfo;
   onSave: (data: ClientFormPayload) => void;
   onCancel: () => void;
   copy: Record<string, string>;
+  providers: RuntimeProviderOption[];
 }) {
+  const fallbackType = providers[0]?.key ?? "hermes";
   const [name, setName] = useState(initial?.name ?? "");
-  const [type, setType] = useState<AiClientType>(initial?.type ?? "openclaw");
-  const [isDefault, setIsDefault] = useState(initial?.isDefault ?? false);
-  const [bridgeUrl, setBridgeUrl] = useState((initial?.config as { bridgeUrl?: string })?.bridgeUrl ?? "http://localhost:7677");
-  const [bridgeToken, setBridgeToken] = useState((initial?.config as { bridgeToken?: string })?.bridgeToken ?? "");
-  const [timeoutSeconds, setTimeoutSeconds] = useState(String((initial?.config as { timeoutSeconds?: number })?.timeoutSeconds ?? 120));
-  const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? (initial?.type === "hermes" ? "http://127.0.0.1:8642" : ""));
-  const [apiKey, setApiKey] = useState((initial?.config as { apiKey?: string })?.apiKey ?? "");
-  const [model, setModel] = useState(
-    (initial?.config as { model?: string })?.model ?? OPENCLAW_DEFAULT_MODEL,
+  const [type, setType] = useState<AiClientType>(
+    initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallbackType,
   );
+  const [isDefault, setIsDefault] = useState(initial?.isDefault ?? false);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(String((initial?.config as { timeoutSeconds?: number })?.timeoutSeconds ?? 120));
+  const [baseUrl, setBaseUrl] = useState((initial?.config as { baseUrl?: string })?.baseUrl ?? "http://127.0.0.1:8642");
+  const [apiKey, setApiKey] = useState((initial?.config as { apiKey?: string })?.apiKey ?? "");
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
 
@@ -185,12 +188,9 @@ function ClientForm({
     name,
     type,
     isDefault,
-    bridgeUrl,
-    bridgeToken,
     timeoutSeconds,
     baseUrl,
     apiKey,
-    model,
   });
 
   return (
@@ -202,7 +202,7 @@ function ClientForm({
             className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My OpenClaw Client"
+            placeholder="My Hermes Client"
           />
         </label>
         <label className="space-y-1.5">
@@ -212,35 +212,38 @@ function ClientForm({
             value={type}
             onChange={(e) => setType(e.target.value as AiClientType)}
           >
-            <option value="openclaw">OpenClaw</option>
-            <option value="hermes">{copy.hermes}</option>
-            <option value="llm">{copy.llmCompatible}</option>
+            {providers.map((provider) => (
+              <option key={provider.key} value={provider.key}>
+                {provider.label}
+              </option>
+            ))}
           </select>
         </label>
       </div>
 
-      {type === "openclaw" ? (
-        <div className="grid gap-3 md:grid-cols-3">
+      <div className="space-y-3">
+        <label className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Base URL</span>
+          <input
+            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="http://127.0.0.1:8642"
+          />
+        </label>
+        <div className="grid gap-3 md:grid-cols-2">
           <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Bridge URL</span>
-            <input
-              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-              value={bridgeUrl}
-              onChange={(e) => setBridgeUrl(e.target.value)}
-            />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Bridge Token</span>
+            <span className="text-xs text-muted-foreground">API Key</span>
             <input
               className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
               type="password"
-              value={bridgeToken}
-              onChange={(e) => setBridgeToken(e.target.value)}
-              placeholder="token"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="optional for localhost"
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">{copy.timeoutSeconds}</span>
+            <span className="text-xs text-muted-foreground">Timeout (seconds)</span>
             <input
               className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
               type="number"
@@ -249,72 +252,7 @@ function ClientForm({
             />
           </label>
         </div>
-      ) : type === "hermes" ? (
-        <div className="space-y-3">
-          <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Base URL</span>
-            <input
-              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="http://127.0.0.1:8642"
-            />
-          </label>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">API Key</span>
-              <input
-                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="optional for localhost"
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">Timeout (seconds)</span>
-              <input
-                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-                type="number"
-                value={timeoutSeconds}
-                onChange={(e) => setTimeoutSeconds(e.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Base URL</span>
-            <input
-              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.openai.com/v1"
-            />
-          </label>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">API Key</span>
-              <input
-                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">{copy.modelLabel}</span>
-              <input
-                className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-      )}
+      </div>
 
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
@@ -370,12 +308,25 @@ export function AiClientsManager() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [providers, setProviders] = useState<RuntimeProviderOption[]>([]);
   const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>({});
 
   const fetchClients = useCallback(async () => {
-    const res = await api.ai.clients.$get();
-    const data = await res.json();
-    setClients("clients" in data ? (data.clients as AiClientInfo[]) : []);
+    const [clientsRes, providersRes] = await Promise.all([
+      api.ai.clients.$get(),
+      api.runtime.providers.$get(),
+    ]);
+    const clientsData = await clientsRes.json();
+    const providersData = await providersRes.json();
+    const availableProviders = normalizeRuntimeProviders(providersData);
+    setProviders(availableProviders);
+    setClients(
+      "clients" in clientsData
+        ? (clientsData.clients as AiClientInfo[]).filter((client) =>
+            availableProviders.some((provider) => provider.key === client.type),
+          )
+        : [],
+    );
     setLoading(false);
   }, []);
 
@@ -472,7 +423,7 @@ export function AiClientsManager() {
         </button>
       </div>
 
-      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} />}
+      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} />}
 
       {clients.length === 0 && !showForm && (
         <div className="rounded-2xl border border-dashed border-border/70 p-8 text-center text-sm text-muted-foreground">{copy.emptyState}</div>
@@ -484,7 +435,7 @@ export function AiClientsManager() {
         return (
           <div key={client.id} className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
           {editingId === client.id ? (
-            <ClientForm initial={client} onSave={(data) => handleUpdate(client.id, data)} onCancel={() => setEditingId(null)} copy={copy} />
+            <ClientForm initial={client} onSave={(data) => handleUpdate(client.id, data)} onCancel={() => setEditingId(null)} copy={copy} providers={providers} />
           ) : (
             <>
               <div className="flex items-start justify-between gap-4">

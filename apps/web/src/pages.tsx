@@ -4,17 +4,13 @@ import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import { TaskListPage } from "@/components/tasks/task-list-page";
-import { AdvancedSettingsDialog } from "@/components/settings/advanced-settings-dialog";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
-import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import type { Locale } from "@/i18n/config";
-import { resolveLocale } from "@/i18n/config";
-import { localizeHref } from "@/i18n/routing";
-import type { getDictionary } from "@/i18n/get-dictionary";
+import type { getDictionary, Locale } from "@chrona/i18n";
+import { localizeHref, resolveLocale } from "@chrona/i18n";
 
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
@@ -130,49 +126,39 @@ export function SettingsRoutePage() {
 
   return (
     <>
-      <div className="space-y-4 rounded-2xl border bg-card p-6 shadow-sm">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
-          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-        </div>
-        <div className="rounded-xl border bg-muted/30 p-4">
-          <div className="space-y-1">
-            <h2 className="text-sm font-medium text-foreground">AI Clients</h2>
-            <p className="text-sm text-muted-foreground">{t.aiClientsDescription}</p>
+      <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[24px] bg-[linear-gradient(135deg,rgba(248,250,252,0.94),rgba(238,242,255,0.78))] p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-0.5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-lg font-semibold tracking-tight">{t.title}</h1>
+                <span className="rounded-full border border-primary/15 bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
+                  {t.controlCenter}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t.subtitle}</p>
+            </div>
           </div>
-          <div className="mt-3">
-            <LocalizedLink
-              href="/settings?panel=ai-clients"
-              className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-            >
-              {t.manageAiClients}
-            </LocalizedLink>
-          </div>
-        </div>
-        <ScheduleAiSettingsPanel
-          title={t.scheduleAiTitle}
-          description={t.scheduleAiDescription}
-        />
-        <div className="rounded-xl border bg-muted/30 p-4">
-          <div className="space-y-1">
-            <h2 className="text-sm font-medium text-foreground">{t.advancedTitle}</h2>
-            <p className="text-sm text-muted-foreground">{t.advancedDescription}</p>
-          </div>
-          <div className="mt-3">
-            <LocalizedLink
-              href="/settings?panel=advanced"
-              className="inline-flex rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-            >
-              {t.openAdvancedSettings}
-            </LocalizedLink>
+
+          <div className="grid min-h-0 flex-1 gap-3">
+            <div className="rounded-[26px] border border-white/70 bg-slate-950 p-5 text-white shadow-sm">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold">{t.aiClientsTitle}</h2>
+                <p className="text-sm leading-6 text-white/60">{t.aiClientsDescription}</p>
+              </div>
+              <div className="mt-4">
+                <LocalizedLink
+                  href="/settings?panel=ai-clients"
+                  className="inline-flex rounded-2xl border border-white/15 bg-white px-3 py-2 text-sm font-medium text-slate-950 shadow-sm transition-colors hover:bg-white/90"
+                >
+                  {t.manageAiClients}
+                </LocalizedLink>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <AiClientsDialog isOpen={panel === "ai-clients"} closeHref={`/${locale}/settings`} />
-      <AdvancedSettingsDialog
-        isOpen={panel === "advanced"}
-        closeHref={`/${locale}/settings`}
-      />
     </>
   );
 }

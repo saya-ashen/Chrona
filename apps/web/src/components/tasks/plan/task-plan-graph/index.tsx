@@ -14,7 +14,7 @@ import {
   useNodesState,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import {
   AUTO_FULL_MODE_MIN_WIDTH,
   DEFAULT_GRAPH_COPY,

@@ -8,7 +8,7 @@ vi.mock("@/lib/router", () => ({
   useAppRouter: () => ({ push }),
 }));
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {

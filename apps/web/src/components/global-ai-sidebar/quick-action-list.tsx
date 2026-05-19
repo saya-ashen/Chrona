@@ -1,5 +1,5 @@
 import type { AiSidebarQuickAction } from "@chrona/contracts";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 export function QuickActionList({ actions, onAction }: { actions: AiSidebarQuickAction[]; onAction: (action: AiSidebarQuickAction) => void }) {
   const { t } = useI18n();

@@ -6,7 +6,7 @@ import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "@/components/sc
 import type { QuickCreateDraft } from "@/components/schedule/schedule-page-types";
 import { buildQuickCreateDraft, toDateForDay } from "@/components/schedule/schedule-page-utils";
 import { buttonVariants } from "@/components/ui/button";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import { useAutoComplete, type StructuredSuggestion } from "@/hooks/use-ai";

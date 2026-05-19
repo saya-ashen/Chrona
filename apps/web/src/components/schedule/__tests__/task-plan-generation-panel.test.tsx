@@ -12,7 +12,7 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {}, t: (k: string) => k }),
   useLocale: () => "en",
 }));

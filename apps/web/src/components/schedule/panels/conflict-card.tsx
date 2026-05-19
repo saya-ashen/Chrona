@@ -4,7 +4,7 @@ import type {
 } from "@/components/schedule/schedule-page-types";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 type ConflictCardProps = {
   conflict: ScheduleConflict;

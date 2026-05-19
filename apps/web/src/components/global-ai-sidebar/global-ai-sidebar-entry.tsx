@@ -2,7 +2,7 @@
 
 import { Sparkles } from "lucide-react";
 import { useEffect } from "react";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { useGlobalAiSidebar } from "./global-ai-sidebar-provider";
 
 export function GlobalAiSidebarEntry() {

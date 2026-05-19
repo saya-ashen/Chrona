@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AiSidebarMessage } from "@chrona/contracts";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 export function ConversationThread({ messages, onSubmit }: { messages: AiSidebarMessage[]; onSubmit: (message: string) => void }) {
