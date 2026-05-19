@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspaceAiSection } from "../sections/task-workspace-ai-section";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
@@ -117,9 +117,20 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       taskId: task.id,
       setSaveError,
     });
+  const assistantContext = useMemo(() => createTaskAiSidebarContext(task), [
+    task.blockReason?.actionRequired,
+    task.blockReason?.blockType,
+    task.executionSummary?.waiting,
+    task.graphNodeStates,
+    task.id,
+    task.isRunnable,
+    task.savedPlan?.id,
+    task.status,
+    task.title,
+  ]);
 
   useEffect(() => {
-    const { context, actions } = createTaskAiSidebarContext(task);
+    const { context, actions } = assistantContext;
     setPageContext(context, actions);
     return registerHandlers({
       onConfirmProposal: async (proposal) => {
@@ -131,7 +142,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       },
       onDismissProposal: handleCancelProposal,
     });
-  }, [handleApplyProposal, handleCancelProposal, registerHandlers, setPageContext, task]);
+  }, [assistantContext, handleApplyProposal, handleCancelProposal, registerHandlers, setPageContext]);
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col gap-2 xl:overflow-hidden">

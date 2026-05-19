@@ -179,10 +179,10 @@ export function SchedulePageMainPanel({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden xl:min-h-0">
-      <SurfaceCard variant="highlight" className="flex min-h-[34rem] flex-1 flex-col rounded-[30px] p-3 sm:p-4 xl:min-h-0">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <SurfaceCard variant="highlight" className="flex min-h-[34rem] flex-1 flex-col rounded-[24px] p-3 xl:min-h-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-foreground">
               {copy.scheduledTimeline}
             </h2>
           </div>
@@ -195,7 +195,7 @@ export function SchedulePageMainPanel({
           </div>
         </div>
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[26px] border border-border/55 bg-background/80 p-2 sm:p-3">
+        <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-border/45 bg-background/65">
           {activeView === "timeline" ? (
             activeGroup ? (
               <DayTimeline
