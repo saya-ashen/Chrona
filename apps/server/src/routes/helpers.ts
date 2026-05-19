@@ -1,5 +1,6 @@
 import { createLogger } from "@chrona/shared/logger";
 import { ENGINE_ERROR_CODES } from "@chrona/engine";
+import { getApiMessages, type Locale } from "@chrona/i18n";
 
 import { HttpError } from "../lib/http";
 
@@ -22,18 +23,19 @@ function isInvalidDate(value: Date | null | undefined) {
 
 export function ensureValidDateFields(
   fields: Record<string, Date | null | undefined>,
+  locale: Locale = "en",
 ) {
+  const messages = getApiMessages(locale);
   for (const [field, value] of Object.entries(fields)) {
     if (isInvalidDate(value)) {
-      throw new HttpError(400, `${field} must be a valid date string`);
+      throw new HttpError(400, messages.invalidDateField.replace("{field}", field));
     }
   }
 }
 
-export function planGenerationConflictBody(taskId: string) {
+export function planGenerationConflictBody(taskId: string, locale: Locale = "en") {
   return {
-    error:
-      "A task plan generation job is already running. Stop the current generation before starting a new one.",
+    error: getApiMessages(locale).planGenerationInFlight,
     code: ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT,
     taskId,
     stopEndpoint: `/api/tasks/${taskId}/plan/generations/stop`,

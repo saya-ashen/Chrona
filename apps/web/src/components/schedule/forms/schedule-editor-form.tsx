@@ -5,7 +5,7 @@ import { useState } from "react";
 import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
 import { buttonVariants } from "@/components/ui/button";
 import { Field, inputClassName } from "@/components/ui/field";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 type ScheduleEditorFormProps = {
   taskId: string;

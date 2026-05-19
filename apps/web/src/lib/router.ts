@@ -2,7 +2,7 @@ import { createElement, useMemo } from "react";
 import type { LinkProps, To } from "react-router-dom";
 import { Link, useLocation, useNavigate, useRevalidator } from "react-router-dom";
 
-import { stripLocalePrefix } from "@/i18n/routing";
+import { stripLocalePrefix } from "@chrona/i18n";
 
 export type AppLinkProps = LinkProps;
 

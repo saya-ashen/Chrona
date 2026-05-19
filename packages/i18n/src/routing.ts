@@ -1,4 +1,4 @@
-import { defaultLocale, locales, type Locale, resolveLocale } from "@/i18n/config";
+import { defaultLocale, locales, type Locale, resolveLocale } from "./locale";
 
 function isExternalHref(href: string) {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href);
@@ -40,6 +40,5 @@ export function localizeHref(locale: Locale | undefined, href: string) {
 
   return `${localizedPath}${search ? `?${search}` : ""}${hash ? `#${hash}` : ""}`;
 }
-
 
 

@@ -6,15 +6,17 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
 import { AssistantSurfaceTrigger } from "@/components/assistant-surface/assistant-surface-trigger";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { useAppPathname } from "@/lib/router";
+import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
+import { createTaskFromSchedule } from "@/lib/task-actions-client";
+import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 type ControlPlaneShellProps = {
   children: ReactNode;
@@ -33,7 +35,18 @@ type NavEntry = {
 
 export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspace }: ControlPlaneShellProps) {
   const { t } = useI18n();
+  const router = useAppRouter();
   const pathname = useAppPathname() ?? "/schedule";
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const taskDialogDefaults = useMemo(() => {
+    const initialStartAt = new Date();
+    initialStartAt.setHours(9, 0, 0, 0);
+    const initialEndAt = new Date(initialStartAt);
+    initialEndAt.setHours(10, 0, 0, 0);
+
+    return { initialStartAt, initialEndAt };
+  }, [showCreateTaskDialog]);
   const breadcrumb = pathname
     .split("/")
     .filter(Boolean)
@@ -128,8 +141,9 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              <LocalizedLink
-                href="/schedule?new=1"
+              <button
+                type="button"
+                onClick={() => setShowCreateTaskDialog(true)}
                 className={buttonVariants({
                   variant: "outline",
                   size: "sm",
@@ -138,7 +152,7 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
               >
                 <Plus className="mr-1 size-3.5" />
                 {t("nav.newTask")}
-              </LocalizedLink>
+              </button>
               <LocaleSwitcher />
             </div>
             <AssistantSurfaceDropdown />
@@ -148,6 +162,27 @@ export function ControlPlaneShell({ children, defaultWorkspace: _defaultWorkspac
             {children}
           </main>
       </div>
+      <TaskCreateDialog
+        isOpen={showCreateTaskDialog}
+        initialStartAt={taskDialogDefaults.initialStartAt}
+        initialEndAt={taskDialogDefaults.initialEndAt}
+        isPending={isCreatingTask}
+        onClose={() => setShowCreateTaskDialog(false)}
+        onSubmit={async (input) => {
+          try {
+            setIsCreatingTask(true);
+            await createTaskFromSchedule({
+              workspaceId: _defaultWorkspace.id,
+              title: input.title,
+              description: input.description || null,
+              priority: input.priority,
+            });
+            router.refresh();
+          } finally {
+            setIsCreatingTask(false);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { ENGINE_ERROR_CODES, EngineError } from "@chrona/engine";
+import { getApiMessages } from "@chrona/i18n";
 
 export function json<T>(c: Context, payload: T, status: number = 200) {
   return c.json(payload, status as never);
@@ -24,6 +25,7 @@ export function parseLimit(
   value: string | undefined,
   defaultValue: number,
   max: number,
+  locale?: string | null,
 ) {
   if (!value) {
     return defaultValue;
@@ -31,7 +33,7 @@ export function parseLimit(
 
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) {
-    throw new HttpError(400, "limit must be a valid integer");
+    throw new HttpError(400, getApiMessages(locale).invalidLimit);
   }
 
   return Math.min(Math.max(parsed, 1), max);

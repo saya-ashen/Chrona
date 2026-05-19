@@ -14,7 +14,7 @@ import {
   getPriorityTone,
 } from "@/components/schedule/schedule-page-utils";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 const DRAG_EMPTY_IMAGE = typeof Image !== "undefined" ? new Image() : null;

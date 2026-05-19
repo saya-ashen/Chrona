@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { ChronaEngine } from "@chrona/engine";
 import type { AssistantActionRequest, AssistantSurfacePageType } from "@chrona/contracts";
+import { getPreferredLocale } from "@chrona/i18n";
 
 import { json } from "../lib/http";
 import { getAssistantSurfaceState, requestAssistantAction } from "../services/assistant-surface.service";
@@ -14,10 +15,12 @@ export function createAssistantSurfaceRoutes(_engine: ChronaEngine) {
   return new Hono()
     .get("/assistant-surface", (c) => {
       const pageType = parsePageType(c.req.query("pageType"));
-      return json(c, getAssistantSurfaceState({ pageType }));
+      const locale = getPreferredLocale(c.req.header("accept-language"));
+      return json(c, getAssistantSurfaceState({ pageType, locale }));
     })
     .post("/assistant-surface/actions", async (c) => {
       const payload = await c.req.json<AssistantActionRequest>();
-      return json(c, requestAssistantAction(payload));
+      const locale = getPreferredLocale(c.req.header("accept-language"));
+      return json(c, requestAssistantAction(payload, locale));
     });
 }

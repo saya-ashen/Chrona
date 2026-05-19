@@ -16,7 +16,7 @@ import {
   SurfaceCardTitle,
 } from "@/components/ui/surface-card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 export type ScheduleTaskListItem = {

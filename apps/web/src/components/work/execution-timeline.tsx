@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 type ExecutionEvent = {
   id: string;

@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import { AppLink, type AppLinkProps } from "@/lib/router";
-import { useLocale } from "@/i18n/client";
-import { localizeHref } from "@/i18n/routing";
+import { useLocale } from "@chrona/i18n/react";
+import { localizeHref } from "@chrona/i18n";
 
 type LocalizedLinkProps = Omit<AppLinkProps, "to"> & {
   href: string;

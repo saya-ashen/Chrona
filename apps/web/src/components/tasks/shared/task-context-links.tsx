@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 type TaskContextLinksProps = {
   taskId: string;

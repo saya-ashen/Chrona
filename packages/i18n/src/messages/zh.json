@@ -827,8 +827,27 @@
       "applyPlan": "应用规划"
     },
     "taskCreateDialog": {
+      "title": "新建任务",
+      "close": "关闭",
+      "titlePlaceholder": "添加标题",
+      "aiSuggestions": "AI 建议",
       "generatingSuggestions": "正在生成建议...",
-      "aiTaskPlanning": "AI 任务规划"
+      "aiTaskPlanning": "AI 任务规划",
+      "date": "日期",
+      "startTime": "开始时间",
+      "endTime": "结束时间",
+      "description": "描述（可选）",
+      "descriptionPlaceholder": "添加描述",
+      "priority": "优先级",
+      "cancel": "取消",
+      "save": "保存",
+      "saving": "保存中...",
+      "priorities": {
+        "Low": "低",
+        "Medium": "中",
+        "High": "高",
+        "Urgent": "紧急"
+      }
     },
     "scheduleCommandBar": {
       "generatingSuggestions": "正在生成建议..."
@@ -931,6 +950,24 @@
       "dueDateLabel": "截止时间",
       "createButton": "创建任务",
       "all": "全部",
+      "needs_me": "需要我处理",
+      "ready": "可执行",
+      "running": "运行中",
+      "completed": "已完成",
+      "failed": "失败",
+      "filterNeedsMe": "需要我处理",
+      "listDescription": "查看任务状态，并打开需要处理的工作。",
+      "statTotal": "总数",
+      "statNeeds": "待处理",
+      "statReady": "可执行",
+      "viewDetails": "查看详情",
+      "duePrefix": "截止",
+      "updatedPrefix": "更新",
+      "emptyFiltered": "当前筛选下没有匹配任务。",
+      "relativeJustNow": "刚刚",
+      "relativeMinutesAgo": "{count} 分钟前",
+      "relativeHoursAgo": "{count} 小时前",
+      "relativeDaysAgo": "{count} 天前",
       "filters": {
         "Running": "运行中",
         "WaitingForApproval": "等待审批",
@@ -966,13 +1003,24 @@
     "settings": {
       "title": "设置",
       "subtitle": "配置 AI Clients，并进入更高级的控制。",
+      "controlCenter": "控制中心",
       "advancedTitle": "高级设置",
       "advancedDescription": "更深层的运行控制放在日常任务流之外。",
       "openAdvancedSettings": "打开高级设置",
+      "aiClientsTitle": "AI Clients",
       "aiClientsDescription": "管理 AI 客户端，配置各智能功能使用的 Client",
       "manageAiClients": "管理 AI Clients",
       "scheduleAiTitle": "日程 AI 自动化",
-      "scheduleAiDescription": "控制日程工作流中哪些 AI 动作可以自动运行。"
+      "scheduleAiDescription": "控制日程工作流中哪些 AI 动作可以自动运行。",
+      "scheduleAiPanel": {
+        "autoSuggestions": "自动建议",
+        "autoSuggestionsDescription": "输入时建议任务标题和详情。默认关闭，避免未经请求的 AI 调用。",
+        "autoPlanGeneration": "保存后自动生成计划",
+        "autoPlanGenerationDescription": "保存任务后启动任务计划生成。默认开启；关闭后需手动重新生成。",
+        "defaultOn": "默认开启",
+        "defaultOff": "默认关闭",
+        "saved": "已保存"
+      }
     },
     "aiClientsPage": {
       "title": "AI Clients",
@@ -999,7 +1047,7 @@
       "statusUnknown": "未测试",
       "reasonUnknown": "暂无详情",
       "featureSuggest": "智能建议",
-      "featureGeneratePlan": "タスクプラン生成",
+      "featureGeneratePlan": "任务计划生成",
       "featureConflicts": "冲突分析",
       "featureTimeslots": "时间段推荐",
       "featureChat": "对话 / 计划生成"

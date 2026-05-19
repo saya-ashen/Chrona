@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { SelectedBlockMainColumn } from "@/components/schedule/panels/selected-block-sheet/selected-block-main-column";
 import { SelectedBlockSheetHeader } from "@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header";
 import type { SelectedBlockSheetProps } from "@/components/schedule/panels/selected-block-sheet/types";

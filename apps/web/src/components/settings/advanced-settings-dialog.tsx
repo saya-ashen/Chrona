@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { useAppRouter } from "@/lib/router";
 
 type AdvancedSettingsDialogProps = {

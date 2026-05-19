@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Command, Sparkles } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 import { useAssistantSurface } from "./assistant-surface-provider";
 

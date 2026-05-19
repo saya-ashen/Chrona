@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { ENGINE_ERROR_CODES, EngineError, type ChronaEngine } from "@chrona/engine";
+import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import {
   planStateParamSchema,
@@ -470,13 +471,13 @@ export function createPlansRoutes(engine: ChronaEngine) {
             cause instanceof EngineError &&
             cause.code === ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT
           ) {
-            return json(c, planGenerationConflictBody(taskId), 409);
+            return json(c, planGenerationConflictBody(taskId, getPreferredLocale(c.req.header("accept-language"))), 409);
           }
           const httpError = toHttpError(cause);
           if (httpError) {
             return error(c, httpError.message, httpError.status);
           }
-          return internalServerError(c, "POST /api/tasks/:taskId/plan/generations", cause, "Failed to generate task plan");
+          return internalServerError(c, "POST /api/tasks/:taskId/plan/generations", cause, getApiMessages(getPreferredLocale(c.req.header("accept-language"))).failedGenerateTaskPlan);
         }
       },
     )

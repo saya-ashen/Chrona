@@ -1,4 +1,4 @@
-import enMessages from "@/i18n/messages/en.json";
+import enMessages from "./messages/en.json";
 
 export type Messages = typeof enMessages;
 

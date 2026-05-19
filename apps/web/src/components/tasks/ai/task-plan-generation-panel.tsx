@@ -13,7 +13,7 @@ import { TaskPlanEmptyState } from "@/components/tasks/ai/task-plan-empty-state"
 import { TaskPlanGenerationProgress } from "@/components/tasks/ai/task-plan-generation-progress";
 import { TaskPlanResultPanel } from "@/components/tasks/ai/task-plan-result-panel";
 import { TaskPlanSaveBeforeRegenerateDialog } from "@/components/tasks/ai/task-plan-save-before-regenerate-dialog";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import { useTaskPlanGeneration } from "@/hooks/ai/use-task-plan-generation";
 
 interface TaskPlanGenerationPanelProps {

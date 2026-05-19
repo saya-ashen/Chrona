@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 
 import { WorkPageComposerDock } from "./work-page/work-page-composer-dock";
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page/work-page-copy";

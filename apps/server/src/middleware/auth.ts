@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "hono";
+import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { readEnv } from "../config/env";
 
 const SKIP_PATHS = ["/api/health", "/health"];
@@ -25,7 +26,8 @@ export function apiKeyAuth(): MiddlewareHandler {
       : null;
 
     if (providedKey !== expectedKey) {
-      return c.json({ error: "Unauthorized" }, 401);
+      const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
+      return c.json({ error: messages.unauthorized }, 401);
     }
 
     return next();

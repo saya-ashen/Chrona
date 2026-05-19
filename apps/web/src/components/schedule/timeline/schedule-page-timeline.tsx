@@ -42,8 +42,7 @@ import {
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
 import { type TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
-import { SurfaceCard } from "@/components/ui/surface-card";
-import { useI18n, useLocale } from "@/i18n/client";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 const TIMELINE_HOUR_HEIGHT_MIN = 44;

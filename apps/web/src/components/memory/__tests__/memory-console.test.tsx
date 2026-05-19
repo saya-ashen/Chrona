@@ -19,7 +19,7 @@ vi.mock("@/components/ui/surface-card", () => ({
   SurfaceCardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {

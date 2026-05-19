@@ -44,7 +44,7 @@ function expectNoNodeOverlap(
   }
 }
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {} }),
 }));
 

@@ -2,7 +2,7 @@
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
-import { useI18n } from "@/i18n/client";
+import { useI18n } from "@chrona/i18n/react";
 import type { WorkCopy } from "./work-page/work-page-types";
 
 type TaskPlanSidePanelProps = {

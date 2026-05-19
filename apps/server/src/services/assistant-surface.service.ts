@@ -5,21 +5,23 @@ import type {
   AssistantSurfaceState,
 } from "@chrona/contracts";
 import { createAssistantProposalRoute, normalizeAssistantAction } from "@chrona/domain";
+import { getAssistantSurfaceMessages, type Locale } from "@chrona/i18n";
 
-function unavailableState(pageType: AssistantSurfacePageType, reason: string): AssistantSurfaceState {
-  const summary = { id: "unavailable", label: "Status", value: reason, severity: "neutral" as const };
+function unavailableState(pageType: AssistantSurfacePageType, reason: string, locale: Locale): AssistantSurfaceState {
+  const messages = getAssistantSurfaceMessages(locale);
+  const summary = { id: "unavailable", label: messages.statusLabel, value: reason, severity: "neutral" as const };
   return {
     pageType,
     fingerprint: `${pageType}:unavailable`,
-    title: "Chrona AI",
+    title: messages.title,
     primaryObjectLabel: pageType,
     status: "unavailable",
     topSummary: summary,
     summaries: [summary],
     quickActions: [normalizeAssistantAction({
       id: "general-help",
-      label: "Ask about this page",
-      description: "Get informational guidance for this page.",
+      label: messages.askAboutPage,
+      description: messages.informationalGuidance,
       kind: "informational",
       enabled: true,
     })],
@@ -29,24 +31,27 @@ function unavailableState(pageType: AssistantSurfacePageType, reason: string): A
   };
 }
 
-export function getAssistantSurfaceState({ pageType }: { pageType: AssistantSurfacePageType }): AssistantSurfaceState {
-  if (pageType === "schedule") return unavailableState(pageType, "Schedule state is supplied by the active page projection.");
-  if (pageType === "task") return unavailableState(pageType, "Task state is supplied by the active workspace projection.");
-  if (pageType === "workbench") return unavailableState(pageType, "Workbench result actions are available from execution result context.");
-  return unavailableState("unsupported", "This page does not expose assistant actions yet.");
+export function getAssistantSurfaceState({ pageType, locale }: { pageType: AssistantSurfacePageType; locale?: Locale }): AssistantSurfaceState {
+  const resolvedLocale = locale ?? "en";
+  const messages = getAssistantSurfaceMessages(resolvedLocale);
+  if (pageType === "schedule") return unavailableState(pageType, messages.scheduleUnavailable, resolvedLocale);
+  if (pageType === "task") return unavailableState(pageType, messages.taskUnavailable, resolvedLocale);
+  if (pageType === "workbench") return unavailableState(pageType, messages.workbenchUnavailable, resolvedLocale);
+  return unavailableState("unsupported", messages.unsupportedUnavailable, resolvedLocale);
 }
 
-export function requestAssistantAction(request: AssistantActionRequest): AssistantActionResult {
+export function requestAssistantAction(request: AssistantActionRequest, locale: Locale = "en"): AssistantActionResult {
+  const messages = getAssistantSurfaceMessages(locale);
   const previewSurface = normalizeAssistantAction({
     id: request.actionId,
     label: request.actionId,
-    description: "Assistant action request",
+    description: messages.actionRequestDescription,
     kind: "informational",
     enabled: true,
   }).previewSurface;
 
   if (!previewSurface) {
-    return { kind: "informational", message: request.input?.trim() || "Assistant action queued for page context." };
+    return { kind: "informational", message: request.input?.trim() || messages.actionQueued };
   }
 
   const route = createAssistantProposalRoute({
@@ -55,5 +60,5 @@ export function requestAssistantAction(request: AssistantActionRequest): Assista
     label: request.actionId,
     baseHref: request.pageType === "schedule" ? "/schedule" : "/tasks",
   });
-  return { kind: "proposal", message: "Proposal route created. Confirm changes on the owning page.", route };
+  return { kind: "proposal", message: messages.proposalCreated, route };
 }

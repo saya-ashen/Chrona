@@ -3,9 +3,9 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/i18n/client";
-import { locales } from "@/i18n/config";
-import { localizeHref } from "@/i18n/routing";
+import { useI18n } from "@chrona/i18n/react";
+import { locales } from "@chrona/i18n";
+import { localizeHref } from "@chrona/i18n";
 
 export function LocaleSwitcher() {
   const { locale, t } = useI18n();

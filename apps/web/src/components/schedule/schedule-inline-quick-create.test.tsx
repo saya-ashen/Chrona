@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/i18n/client", () => ({
+vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {} }),
 }));
 
