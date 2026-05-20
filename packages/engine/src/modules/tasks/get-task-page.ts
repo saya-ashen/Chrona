@@ -15,6 +15,14 @@ type TaskPlanGenerationStatus =
   | "waiting_acceptance"
   | "accepted";
 
+type WorkspaceActivityTimelineItem = {
+  id: string;
+  title: string;
+  description: string;
+  tone: "success" | "warning" | "critical" | "info" | "neutral";
+  timestamp?: string | null;
+};
+
 function readBlockReason(task: {
   blockReason: unknown;
   projection: {
@@ -42,6 +50,71 @@ function readBlockReason(task: {
   );
 }
 
+function stringPayloadValue(payload: unknown, key: string) {
+  return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as Record<string, unknown>)[key] === "string"
+    ? (payload as Record<string, string>)[key]
+    : null;
+}
+
+function runtimePayloadEvent(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const event = (payload as { event?: unknown }).event;
+  return event && typeof event === "object" && !Array.isArray(event) ? event as Record<string, unknown> : null;
+}
+
+function providerActivityDescription(event: Record<string, unknown>, fallback: string) {
+  if (typeof event.text === "string" && event.text.trim()) return event.text.trim();
+  if (typeof event.toolName === "string" && event.toolName.trim()) return event.toolName.trim();
+  if (typeof event.tool === "string" && event.tool.trim()) return event.tool.trim();
+  if (typeof event.error === "string" && event.error.trim()) return event.error.trim();
+  const error = event.error;
+  if (error && typeof error === "object" && !Array.isArray(error) && typeof (error as { message?: unknown }).message === "string") {
+    return (error as { message: string }).message;
+  }
+  if (typeof event.rawEventType === "string" && event.rawEventType.trim()) return event.rawEventType.trim();
+  return fallback;
+}
+
+function mapProviderEventToActivity(event: {
+  id: string;
+  eventType: string;
+  payload: unknown;
+  runtimeTs: Date | null;
+  createdAt: Date;
+}): WorkspaceActivityTimelineItem {
+  const payloadEvent = runtimePayloadEvent(event.payload);
+  const provider = stringPayloadValue(event.payload, "provider") ?? stringPayloadValue(event.payload, "runtimeName") ?? "provider";
+  const eventType = payloadEvent && typeof payloadEvent.type === "string" ? payloadEvent.type : event.eventType.replace(/^provider\./, "");
+  const timestamp = (event.runtimeTs ?? event.createdAt).toISOString();
+
+  switch (eventType) {
+    case "run_started":
+      return { id: event.id, title: "Provider run started", description: provider, tone: "info", timestamp };
+    case "text_delta":
+      return { id: event.id, title: "Assistant response", description: providerActivityDescription(payloadEvent ?? {}, "Assistant output streamed."), tone: "info", timestamp };
+    case "reasoning_delta":
+      return { id: event.id, title: "Reasoning", description: providerActivityDescription(payloadEvent ?? {}, "Reasoning streamed."), tone: "neutral", timestamp };
+    case "tool_call":
+    case "tool_started":
+      return { id: event.id, title: "Tool started", description: providerActivityDescription(payloadEvent ?? {}, "Provider tool started."), tone: "info", timestamp };
+    case "tool_result":
+    case "tool_completed": {
+      const hasError = Boolean(payloadEvent && "error" in payloadEvent && payloadEvent.error);
+      return { id: event.id, title: hasError ? "Tool failed" : "Tool completed", description: providerActivityDescription(payloadEvent ?? {}, "Provider tool completed."), tone: hasError ? "critical" : "success", timestamp };
+    }
+    case "approval_required":
+      return { id: event.id, title: "Approval required", description: provider, tone: "warning", timestamp };
+    case "run_completed":
+      return { id: event.id, title: "Provider run completed", description: provider, tone: "success", timestamp };
+    case "run_failed":
+      return { id: event.id, title: "Provider run failed", description: providerActivityDescription(payloadEvent ?? {}, provider), tone: "critical", timestamp };
+    case "run_cancelled":
+      return { id: event.id, title: "Provider run cancelled", description: provider, tone: "warning", timestamp };
+    default:
+      return { id: event.id, title: "Provider event", description: providerActivityDescription(payloadEvent ?? {}, eventType), tone: "neutral", timestamp };
+  }
+}
+
 export async function getTaskPage(taskId: string) {
   await syncTaskRunForRead(taskId);
 
@@ -62,6 +135,11 @@ export async function getTaskPage(taskId: string) {
       runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      events: {
+        where: { source: "provider" },
+        orderBy: { ingestSequence: "desc" },
+        take: 50,
+      },
       scheduleProposals: {
         where: { status: "Pending" },
         orderBy: { createdAt: "desc" },
@@ -162,5 +240,6 @@ export async function getTaskPage(taskId: string) {
       type: artifact.type,
       uri: artifact.uri,
     })),
+    activityTimeline: [...task.events].reverse().map(mapProviderEventToActivity),
   };
 }

@@ -1,7 +1,7 @@
 import { api } from "@/lib/rpc-client";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionActionInput, PlanExecutionResult, PlanExecutionSSEEvent, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, PlanExecutionSSEEvent, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
   ExecutionOverviewCard,
   ExecutionFlowView,
@@ -137,20 +137,51 @@ export function pickWorkspaceCurrentNode(
     ?? null;
 }
 
-function buildLatestResultCard(pageData: TaskPageData, currentNode: PlanNodeDataModel | null): ExecutionOverviewCard {
-  const nodeSummary = currentNode?.completionSummary
-    ?? currentNode?.result?.outputSummary
+function nodeResultSummary(node: PlanNodeDataModel) {
+  return node.completionSummary
+    ?? node.result?.outputSummary
+    ?? (node.resultOutputs ?? []).map(stringifyNodeResultOutput).find((value) => value.trim())
     ?? null;
+}
+
+function stringifyNodeResultOutput(output: NodeResultOutput) {
+  if (output.kind === "text" || output.kind === "markdown") return output.content;
+  if (output.kind === "json") return JSON.stringify(output.value, null, 2);
+  if (output.kind === "file") return [output.title, output.path, output.description].filter(Boolean).join("\n");
+  return "";
+}
+
+function nodeResultContent(node: PlanNodeDataModel) {
+  const parts = [
+    node.result?.outputSummary,
+    node.completionSummary,
+    ...(node.resultOutputs ?? []).map(stringifyNodeResultOutput),
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return Array.from(new Set(parts)).join("\n\n");
+}
+
+function pickLatestResultNode(graphPlan: TaskPlanGraphPlan | null) {
+  return [...(graphPlan?.steps ?? graphPlan?.nodes ?? [])]
+    .reverse()
+    .find((node) => nodeResultSummary(node))
+    ?? null;
+}
+
+function buildLatestResultCard(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): ExecutionOverviewCard {
+  const latestResultNode = pickLatestResultNode(graphPlan);
+  const nodeSummary = latestResultNode ? nodeResultSummary(latestResultNode) : null;
 
   if (nodeSummary) {
     return {
-      id: `node-result-${currentNode?.id ?? "current"}`,
+      id: `node-result-${latestResultNode?.id ?? "current"}`,
       title: "Latest result",
       description: nodeSummary,
-      statusLabel: currentNode?.statusLabel ?? currentNode?.status,
-      tone: overviewToneForNode(currentNode),
+      content: latestResultNode ? nodeResultContent(latestResultNode) : undefined,
+      statusLabel: latestResultNode?.statusLabel ?? latestResultNode?.status,
+      tone: overviewToneForNode(latestResultNode),
       actionLabel: "Review result actions",
-      actionNodeId: currentNode?.id,
+      actionNodeId: latestResultNode?.id,
     };
   }
 
@@ -162,7 +193,6 @@ function buildLatestResultCard(pageData: TaskPageData, currentNode: PlanNodeData
       statusLabel: pageData.latestRunSummary.syncStatus,
       tone: pageData.latestRunSummary.status === "Completed" ? "success" : "info",
       actionLabel: "Review run context",
-      actionNodeId: currentNode?.id,
     };
   }
 
@@ -276,6 +306,7 @@ function buildArtifactItems(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan
     title: `${node.title} output ${index + 1}`,
     type: output.kind,
     sourceNodeId: node.id,
+    content: stringifyNodeResultOutput(output),
   })));
 
   return [
@@ -290,6 +321,7 @@ function buildArtifactItems(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan
 }
 
 function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): WorkspaceActivityItem[] {
+  const providerActivity = (pageData.activityTimeline ?? []).slice(-20).reverse();
   const approvalActivity = pageData.approvals.slice(0, 3).map((approval) => ({
     id: `approval-${approval.id}`,
     title: approval.title,
@@ -327,7 +359,7 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
     }));
 
   if (pageData.latestRunSummary) {
-    return [{
+    return [...providerActivity, {
       id: `run-${pageData.latestRunSummary.id}`,
       title: "Latest run",
       description: pageData.latestRunSummary.status,
@@ -336,7 +368,7 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
     }, ...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
   }
 
-  return [...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
+  return [...providerActivity, ...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
 }
 
 function buildTaskHeaderView(
@@ -494,7 +526,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       isEmpty: !currentNode,
     },
     readiness: buildReadinessCard(pageData, currentNode),
-    latestResult: buildLatestResultCard(pageData, currentNode),
+    latestResult: buildLatestResultCard(pageData, input.graphPlan),
     attention,
     artifacts: buildArtifactItems(pageData, input.graphPlan),
     activity: buildActivity(pageData, input.graphPlan),

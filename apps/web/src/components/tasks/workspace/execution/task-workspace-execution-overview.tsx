@@ -1,12 +1,25 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Archive, Bell, CalendarClock, CheckCircle2, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "actions" | "result" | "artifacts" | "activity";
+
+export type CommandCenterPrimaryAction = {
+  label: string;
+  description: string;
+  statusLabel?: string;
+  tone?: ExecutionOverviewCard["tone"];
+  disabled?: boolean;
+  isLoading?: boolean;
+  onClick?: () => void;
+  actionControls?: ReactNode;
+  suppressAttentionCard?: boolean;
+};
 
 const COMMAND_CENTER_TABS: Array<{ id: CommandCenterTab; label: string }> = [
   { id: "actions", label: "操作" },
@@ -21,6 +34,8 @@ export function TaskWorkspaceExecutionOverview({
   attention,
   artifacts,
   activity,
+  runtimeEvents = [],
+  primaryAction,
   progressLabel = readiness.statusLabel ?? readiness.title,
   taskStatus = readiness.title,
   nextAction = latestResult.description,
@@ -31,6 +46,8 @@ export function TaskWorkspaceExecutionOverview({
   attention: ExecutionOverviewCard | null;
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
+  runtimeEvents?: WorkspaceRuntimeEvent[];
+  primaryAction?: CommandCenterPrimaryAction | null;
   progressLabel?: string;
   taskStatus?: string;
   nextAction?: string;
@@ -69,8 +86,11 @@ export function TaskWorkspaceExecutionOverview({
 
           <TabsContent value="actions" className="space-y-2">
             <>
+              {primaryAction ? <PrimaryActionCard action={primaryAction} /> : null}
               <TaskSummaryCard status={taskStatus} progressLabel={progressLabel} nextAction={nextAction} />
-              <AttentionCard card={pendingAttention} readiness={readiness} onAction={onAction} />
+              {primaryAction?.suppressAttentionCard ? null : (
+                <AttentionCard card={pendingAttention} readiness={readiness} onAction={onAction} />
+              )}
             </>
           </TabsContent>
           <TabsContent value="result" className="space-y-2">
@@ -80,11 +100,38 @@ export function TaskWorkspaceExecutionOverview({
             <ArtifactsCard artifacts={artifacts} onAction={onAction} />
           </TabsContent>
           <TabsContent value="activity" className="space-y-2">
-            <ActivityCard activity={activity} />
+            <ActivityCard activity={activity} runtimeEvents={runtimeEvents} />
           </TabsContent>
         </Tabs>
       </div>
     </aside>
+  );
+}
+
+function PrimaryActionCard({ action }: { action: CommandCenterPrimaryAction }) {
+  return (
+    <section className={cn("rounded-[1rem] border p-3 shadow-sm", cardToneClass(action.tone ?? "info"))}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Current operation</p>
+          <p className="mt-0.5 break-words text-sm font-semibold text-slate-950">{action.label}</p>
+        </div>
+        {action.statusLabel ? <span className="shrink-0 rounded-full bg-white/85 px-2 py-0.5 text-xs font-medium text-slate-600">{action.statusLabel}</span> : null}
+      </div>
+      <p className="mt-2 break-words text-[13px] leading-[1.4] text-slate-800">{action.description}</p>
+      {action.actionControls ? <div className="mt-3">{action.actionControls}</div> : null}
+      {action.onClick ? (
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3 h-8 rounded-full px-3 text-xs shadow-sm"
+          disabled={action.disabled || action.isLoading}
+          onClick={action.onClick}
+        >
+          {action.isLoading ? "Generating..." : action.label}
+        </Button>
+      ) : null}
+    </section>
   );
 }
 
@@ -124,6 +171,8 @@ function cardToneClass(tone: ExecutionOverviewCard["tone"]) {
 }
 
 function LatestResultCard({ card, onAction }: { card: ExecutionOverviewCard; onAction?: OverviewAction }) {
+  const resultText = card.content?.trim() || card.description;
+
   return (
     <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -135,14 +184,14 @@ function LatestResultCard({ card, onAction }: { card: ExecutionOverviewCard; onA
         </div>
         {card.statusLabel ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{card.statusLabel}</span> : null}
       </div>
-      <div className="mt-2 line-clamp-3 break-words rounded-xl border border-slate-200/70 bg-slate-950/[0.035] px-2.5 py-2 text-[13px] leading-[1.4] text-slate-700">
-        {card.description === "No execution result yet."
+      <div className="mt-2 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200/70 bg-slate-950/[0.035] px-2.5 py-2 text-[13px] leading-[1.45] text-slate-800">
+        {resultText === "No execution result yet."
           ? "Result summary will appear here after the current node finishes."
-          : card.description}
+          : resultText}
       </div>
       {card.actionLabel && onAction ? (
         <button type="button" className="mt-2 text-xs font-semibold text-cyan-700 hover:text-cyan-900" onClick={() => onAction(card.actionNodeId)}>
-          View full result -&gt;
+          Locate result node
         </button>
       ) : null}
     </section>
@@ -175,6 +224,8 @@ function AttentionCard({ card, readiness, onAction }: { card: ExecutionOverviewC
 }
 
 function ArtifactsCard({ artifacts, onAction }: { artifacts: WorkspaceArtifactItem[]; onAction?: OverviewAction }) {
+  const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(artifacts[0]?.id ?? null);
+
   return (
     <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -186,20 +237,36 @@ function ArtifactsCard({ artifacts, onAction }: { artifacts: WorkspaceArtifactIt
       {artifacts.length === 0 ? (
         <p className="mt-1.5 text-[13px] text-slate-500">No artifacts yet.</p>
       ) : (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1.5">
           {artifacts.slice(0, 4).map((artifact) => (
-            <div key={artifact.id} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-2 py-1.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
-                <FileText className="size-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-medium text-slate-900">{artifact.title}</p>
-                <p className="break-words text-xs text-slate-500">{artifact.type}</p>
-              </div>
-              {artifact.sourceNodeId && onAction ? (
-                <button type="button" className="text-xs font-semibold text-cyan-700" onClick={() => onAction(artifact.sourceNodeId)}>
-                  Source
-                </button>
+            <div key={artifact.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-2 py-1.5">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 text-left"
+                onClick={() => setExpandedArtifactId((current) => current === artifact.id ? null : artifact.id)}
+                aria-expanded={expandedArtifactId === artifact.id}
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
+                  <FileText className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words text-sm font-medium text-slate-900">{artifact.title}</span>
+                  <span className="block break-words text-xs text-slate-500">{artifact.type}</span>
+                </span>
+              </button>
+              {expandedArtifactId === artifact.id ? (
+                <div className="mt-2 rounded-lg border border-slate-200/70 bg-white/85 p-2">
+                  {artifact.content ? (
+                    <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-700">{artifact.content}</pre>
+                  ) : (
+                    <p className="text-xs text-slate-500">No inline preview is available for this artifact.</p>
+                  )}
+                  {artifact.sourceNodeId && onAction ? (
+                    <button type="button" className="mt-2 text-xs font-semibold text-cyan-700" onClick={() => onAction(artifact.sourceNodeId)}>
+                      Locate source node
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ))}
@@ -217,7 +284,68 @@ function dotClassName(tone: WorkspaceActivityItem["tone"]) {
   return "bg-slate-300";
 }
 
-export function ActivityCard({ activity }: { activity: WorkspaceActivityItem[] }) {
+function runtimeEventTone(event: WorkspaceRuntimeEvent): WorkspaceActivityItem["tone"] {
+  if (event.event.type === "tool_completed") return event.event.error ? "critical" : "success";
+  if (event.event.type === "approval_required") return "warning";
+  if (event.event.type === "run_status") {
+    if (event.event.status === "completed") return "success";
+    if (event.event.status === "failed") return "critical";
+    if (event.event.status === "cancelled") return "warning";
+  }
+  return event.event.type === "reasoning_delta" || event.event.type === "raw_event" ? "neutral" : "info";
+}
+
+function runtimeEventTitle(event: WorkspaceRuntimeEvent) {
+  switch (event.event.type) {
+    case "assistant_text_delta":
+      return "Assistant response";
+    case "reasoning_delta":
+      return "Reasoning";
+    case "tool_started":
+      return "Tool started";
+    case "tool_completed":
+      return event.event.error ? "Tool failed" : "Tool completed";
+    case "approval_required":
+      return "Approval required";
+    case "run_status":
+      return "Provider run status";
+    case "raw_event":
+      return "Provider event";
+  }
+}
+
+function runtimeEventDescription(event: WorkspaceRuntimeEvent) {
+  switch (event.event.type) {
+    case "assistant_text_delta":
+    case "reasoning_delta":
+      return event.event.text.trim() || event.provider;
+    case "tool_started":
+      return event.event.preview ? `${event.event.label}: ${String(event.event.preview)}` : event.event.label;
+    case "tool_completed":
+      return event.event.error?.message ?? event.event.label;
+    case "approval_required":
+      return event.nodeTitle ?? event.provider;
+    case "run_status":
+      return event.event.message ?? event.event.status;
+    case "raw_event":
+      return event.rawEventType ?? event.event.rawEventType ?? "Raw provider event";
+  }
+}
+
+function runtimeEventToActivityItem(event: WorkspaceRuntimeEvent, index: number): WorkspaceActivityItem {
+  return {
+    id: `live-${event.runId ?? event.nativeRunId ?? event.nodeId ?? "runtime"}-${event.sequence ?? index}-${event.event.type}`,
+    title: runtimeEventTitle(event),
+    description: runtimeEventDescription(event),
+    tone: runtimeEventTone(event),
+    timestamp: event.timestamp ?? null,
+  };
+}
+
+export function ActivityCard({ activity, runtimeEvents = [] }: { activity: WorkspaceActivityItem[]; runtimeEvents?: WorkspaceRuntimeEvent[] }) {
+  const liveActivity = runtimeEvents.slice(-20).reverse().map(runtimeEventToActivityItem);
+  const items = [...liveActivity, ...activity].slice(0, 30);
+
   return (
     <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -226,11 +354,11 @@ export function ActivityCard({ activity }: { activity: WorkspaceActivityItem[] }
           <p className="text-sm font-semibold text-slate-950">Execution activity</p>
         </div>
       </div>
-      {activity.length === 0 ? (
+      {items.length === 0 ? (
         <p className="mt-1.5 text-[13px] text-slate-500">Activity will appear after planning or execution starts.</p>
       ) : (
         <div className="mt-1.5 space-y-1.5">
-          {activity.slice(0, 5).map((item) => (
+          {items.map((item) => (
             <div key={item.id} className="flex gap-2">
               <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", dotClassName(item.tone))} />
               <div className="min-w-0 flex-1">

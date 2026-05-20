@@ -77,6 +77,7 @@ export type TaskPageData = {
     type: string;
     uri?: string;
   }>;
+  activityTimeline?: WorkspaceActivityItem[];
 };
 
 export type EditableTask = {
@@ -222,6 +223,7 @@ export type ExecutionOverviewCard = {
   id: string;
   title: string;
   description: string;
+  content?: string;
   statusLabel?: string;
   tone: ExecutionOverviewTone;
   actionLabel?: string;
@@ -234,6 +236,7 @@ export type WorkspaceArtifactItem = {
   type: string;
   uri?: string;
   sourceNodeId?: string;
+  content?: string;
 };
 
 export type WorkspaceActivityItem = {

@@ -51,7 +51,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Select a plan node, generate a plan, or wait for execution to expose the current node details here.")).toBeInTheDocument();
   });
 
-  it("renders result, evidence, action, and configuration details for a selected node", async () => {
+  it("renders result, evidence, action, and node details for a selected node", async () => {
     const dispatchAction = vi.fn().mockResolvedValue({ message: "Action sent" });
     const node = createTaskWorkspaceFixtureNode({
       id: "approval",
@@ -80,6 +80,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Result summary")).toBeInTheDocument();
     expect(screen.getAllByText("Generated patch touches task workspace only.").length).toBeGreaterThan(0);
     expect(screen.getByText("Patch summary")).toBeInTheDocument();
+    expect(screen.queryByText("Key evidence")).not.toBeInTheDocument();
     expect(screen.queryByText("Execution panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Current node")).not.toBeInTheDocument();
 
@@ -103,7 +104,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       decision: "approve",
     })));
 
-    fireEvent.click(screen.getByRole("tab", { name: "Configuration" }));
+    expect(screen.queryByRole("tab", { name: "Configuration" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Details" }));
 
     expect(screen.getByText("Review patch safety")).toBeInTheDocument();
     expect(screen.getByText("Research current task workspace")).toBeInTheDocument();

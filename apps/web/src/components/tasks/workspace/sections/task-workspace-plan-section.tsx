@@ -5,8 +5,14 @@ import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
-import { TaskWorkspaceExecutionOverview } from "../execution/task-workspace-execution-overview";
-import { TaskWorkspaceNodeDetailPanel } from "../execution/task-workspace-node-detail-panel";
+import {
+  TaskWorkspaceExecutionOverview,
+  type CommandCenterPrimaryAction,
+} from "../execution/task-workspace-execution-overview";
+import {
+  TaskWorkspaceNodeDetailPanel,
+  WorkspaceNodeActionControls,
+} from "../execution/task-workspace-node-detail-panel";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
   createTaskWorkspaceExecutionConsoleView,
@@ -22,6 +28,18 @@ import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 function isCompletedGraphNode(status: string) {
   return status === "done" || status === "completed" || status === "skipped";
+}
+
+function hasStartedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
+  return (graphPlan?.nodes ?? []).some((node) => node.status !== "idle" && node.status !== "pending" && node.status !== "ready");
+}
+
+function hasNodeActionPayload(node: PlanNodeDataModel | null) {
+  if (!node) return false;
+  if ((node.availableActions?.length ?? 0) > 0) return true;
+  if ((node.interactiveFields?.length ?? 0) === 0) return false;
+  const submittedInput = node.inputFields && Object.values(node.inputFields).some((value) => value.trim());
+  return !(node.status === "done" || node.status === "skipped") || !submittedInput;
 }
 
 function isNodeDetailDrawerTarget(target: EventTarget | null) {
@@ -102,6 +120,7 @@ export function TaskWorkspacePlanSection({
       : null);
   const recoveryActions = pageData.reconciliation?.repairActions ?? [];
   const recoveryIssue = pageData.reconciliation?.issues.find((issue) => issue.severity === "error") ?? null;
+  const recoveryCurrentNodeId = pageData.reconciliation?.currentNodeId ?? undefined;
   const graphNodes = graphPlan?.nodes ?? [];
   const completedNodeCount = graphNodes.filter((node) =>
     isCompletedGraphNode(node.status),
@@ -112,6 +131,51 @@ export function TaskWorkspacePlanSection({
       ? `${completedNodeCount}/${totalNodeCount}`
       : consoleView.progress.label;
   const completionLabel = totalNodeCount > 0 ? `${progressLabel} steps` : consoleView.progress.label;
+  const isGeneratingPlan = planGenerationStatus === "generating";
+  const currentOperationNode = consoleView.nodeDetail.currentNode;
+  const hasCurrentOperationControls = hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason;
+  const primaryAction: CommandCenterPrimaryAction = !plan
+    ? {
+        label: isGeneratingPlan ? "Generating..." : "Generate plan",
+        description: isGeneratingPlan
+          ? "A fresh plan is being generated for this task."
+          : "Create an execution plan before starting task work.",
+        statusLabel: planGenerationStatus,
+        tone: "info",
+        disabled: isGeneratingPlan,
+        isLoading: isGeneratingPlan,
+        onClick: onGeneratePlan,
+      }
+    : !hasStartedGraphExecution(graphPlan)
+      ? {
+          label: "Start plan",
+          description: "Run the accepted plan and move into the first executable step.",
+          statusLabel: plan.status,
+          tone: "success",
+          onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
+        }
+      : hasCurrentOperationControls && currentOperationNode
+        ? {
+            label: "Current node action",
+            description: currentOperationNode.nextAction ?? currentOperationNode.summary ?? "Complete the current node action to continue.",
+            statusLabel: currentOperationNode.statusLabel ?? currentOperationNode.status,
+            tone: consoleView.attention?.tone ?? consoleView.readiness.tone,
+            actionControls: (
+              <WorkspaceNodeActionControls
+                node={currentOperationNode}
+                disabledActionReason={consoleView.nodeDetail.disabledActionReason}
+                onDispatchExecutionAction={onDispatchExecutionAction}
+                className="border-0 bg-transparent p-0 shadow-none"
+              />
+            ),
+          }
+        : {
+            label: "No current operation",
+            description: "This task has no node input or execution action available right now.",
+            statusLabel: consoleView.header.primaryStateLabel ?? pageData.task.status,
+            tone: "neutral",
+            suppressAttentionCard: true,
+          };
   const handlePlanNodeChange = useCallback((
     node: PlanNodeDataModel | null,
     nodes: PlanNodeDataModel[],
@@ -133,9 +197,10 @@ export function TaskWorkspacePlanSection({
     }
     setPreferredNodeDetailTab("action");
 
-    document
-      .getElementById("task-workspace-node-actions")
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const actionsPanel = document.getElementById("task-workspace-node-actions");
+    if (typeof actionsPanel?.scrollIntoView === "function") {
+      actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   };
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
@@ -186,7 +251,7 @@ export function TaskWorkspacePlanSection({
                   type="button"
                   className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
                   disabled={!action.enabled}
-                  onClick={() => focusNodeActions(pageData.reconciliation?.currentNodeId ?? undefined)}
+                  onClick={() => focusNodeActions(recoveryCurrentNodeId)}
                 >
                   {action.label}
                 </button>
@@ -221,6 +286,8 @@ export function TaskWorkspacePlanSection({
               attention={consoleView.attention}
               artifacts={consoleView.artifacts}
               activity={consoleView.activity}
+              runtimeEvents={runtimeEvents}
+              primaryAction={primaryAction}
               progressLabel={completionLabel}
               taskStatus={consoleView.header.primaryStateLabel ?? pageData.task.status}
               nextAction={consoleView.latestResult.description}

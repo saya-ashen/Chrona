@@ -2,14 +2,14 @@ import { Handle, Position, type NodeProps, type NodeTypes } from "@xyflow/react"
 import { Check, Circle, Clock3, ClipboardCheck, GitBranch, Hammer, Hand, Minus, MoreHorizontal, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NODE_WIDTH } from "./constants";
-import { nodeKindLabel, TONE_STYLES } from "./logic";
+import { getShapeStyle, nodeKindLabel, TONE_STYLES } from "./logic";
 import {
   TASK_PLAN_GRAPH_THEME,
   resolveInteractionTheme,
   resolveNodeKindTheme,
   resolveRuntimeSpotlightTheme,
 } from "./theme";
-import type { FlowGraphNode, PlanNodeStatus } from "./types";
+import type { FlowGraphNode, NodeShape, NodeTone, PlanNodeStatus } from "./types";
 
 function resolveExecutionStatus(node: FlowGraphNode["data"]["node"]) {
   if (node.status === "skipped") return "skipped";
@@ -161,6 +161,38 @@ type NodeFrameProps = {
 
 type NodeFrameSharedProps = Omit<NodeFrameProps, "children">;
 
+const SHAPE_OUTLINE_POINTS: Partial<Record<NodeShape, string>> = {
+  diamond: "16,1 84,1 99,50 84,99 16,99 1,50",
+  parallelogram: "10,1 99,1 90,99 1,99",
+};
+
+const SHAPE_OUTLINE_CLASS_BY_TONE: Record<NodeTone, string> = {
+  active: "text-cyan-200/85",
+  attention: "text-fuchsia-200/80",
+  blocked: "text-rose-200/90",
+  done: "text-emerald-300/44",
+  skipped: "text-slate-500/48",
+  upcoming: "text-violet-300/65",
+  idle: "text-slate-500/45",
+};
+
+function ShapeOutline({ shape, tone }: { shape: NodeShape; tone: NodeTone }) {
+  const points = SHAPE_OUTLINE_POINTS[shape];
+  if (!points) return null;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("pointer-events-none absolute inset-0 z-20 size-full overflow-visible", SHAPE_OUTLINE_CLASS_BY_TONE[tone])}
+      focusable="false"
+      preserveAspectRatio="none"
+      viewBox="0 0 100 100"
+    >
+      <polygon fill="none" points={points} stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 type NodeFrameShellProps = NodeFrameProps & {
   accentClassName: string;
   className?: string;
@@ -171,7 +203,6 @@ type NodeFrameShellProps = NodeFrameProps & {
 type NodeCardContentProps = {
   data: NodeCardPreparedData;
   estimatedLabel: string | null;
-  interactionFrame: ReturnType<typeof resolveInteractionTheme>;
   kindTheme: ReturnType<typeof resolveNodeKindTheme>;
   runtimeSpotlight: ReturnType<typeof resolveRuntimeSpotlightTheme>;
   styles: (typeof TONE_STYLES)[keyof typeof TONE_STYLES];
@@ -219,14 +250,17 @@ function NodeFrameShell({
         styles.border,
         styles.bg,
         styles.text,
+        SHAPE_OUTLINE_POINTS[shape] && "border-transparent",
         isSelected && "ring-2 ring-white/55",
         isCurrent && "shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_24px_80px_rgba(34,211,238,0.25)]",
         runtimeSpotlight?.ring,
         TASK_PLAN_GRAPH_THEME.visualWeightClassNames[visualWeight],
         visualWeight === "normal" && isFocus && "brightness-100",
       )}
+      style={getShapeStyle(shape)}
     >
       {runtimeSpotlight ? <span aria-hidden="true" className={cn("pointer-events-none absolute inset-0 animate-pulse", runtimeSpotlight.glow, className)} /> : null}
+      <ShapeOutline shape={shape} tone={tone} />
       <span aria-hidden="true" className={cn("pointer-events-none absolute top-0 h-1 bg-gradient-to-r", accentClassName, interactionFrame.accent)} />
       {rail}
       <span aria-hidden="true" className={cn("pointer-events-none absolute -right-10 -top-10 size-24 rounded-full blur-2xl transition group-hover:bg-cyan-200/13", kindTheme.halo)} />
@@ -256,13 +290,6 @@ function CheckpointNodeFrame(props: NodeFrameProps) {
       {...props}
       accentClassName="inset-x-0"
       className={props.kindTheme.card}
-      rail={<span aria-hidden="true" className={cn("pointer-events-none absolute left-0 top-0 h-full w-1.5 rounded-l-[18px]", props.kindTheme.rail)} />}
-      decorations={
-        <>
-          <span aria-hidden="true" className="pointer-events-none absolute left-1.5 top-2 h-[calc(100%-1rem)] w-px rounded-full bg-emerald-50/28" />
-          <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-8 w-8 rounded-bl-[18px] border-b border-l border-emerald-100/18 bg-emerald-200/[0.035]" />
-        </>
-      }
     />
   );
 }
@@ -275,10 +302,6 @@ function ConditionNodeFrame(props: NodeFrameProps) {
       className={props.kindTheme.card}
       decorations={
         <>
-          <span aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 h-10 w-px -translate-y-1/2 bg-gradient-to-b from-transparent via-fuchsia-100/35 to-transparent" />
-          <span aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 h-10 w-px -translate-y-1/2 bg-gradient-to-b from-transparent via-fuchsia-100/35 to-transparent" />
-          <span aria-hidden="true" className="pointer-events-none absolute left-0 top-1/2 h-7 w-3 -translate-y-1/2 rounded-r-full border-y border-r border-fuchsia-100/22 bg-fuchsia-200/8" />
-          <span aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-7 w-3 -translate-y-1/2 rounded-l-full border-y border-l border-fuchsia-100/22 bg-fuchsia-200/8" />
           <span aria-hidden="true" className="pointer-events-none absolute bottom-2 right-8 flex gap-1">
             <span className="h-1 w-2 rounded-full bg-fuchsia-100/38" />
             <span className="h-1 w-2 rounded-full bg-fuchsia-100/22" />
@@ -301,7 +324,7 @@ function WaitNodeFrame(props: NodeFrameProps) {
   );
 }
 
-function NodeCardContent({ data, estimatedLabel, interactionFrame, kindTheme, runtimeSpotlight, styles }: NodeCardContentProps) {
+function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight, styles }: NodeCardContentProps) {
   const { graphCopy, node, stepNumber } = data;
   const anchorClassName = isCheckpointNode(node) ? "rounded-[10px_16px_10px_10px]" : isConditionNode(node) ? "rounded-[10px]" : undefined;
 
@@ -317,9 +340,6 @@ function NodeCardContent({ data, estimatedLabel, interactionFrame, kindTheme, ru
         <p className="mt-1.5 break-words pr-6 text-[13px] font-semibold leading-snug text-slate-50 line-clamp-2">{node.title}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className={cn("rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em]", interactionFrame.badge)}>
-            {interactionFrame.label}
-          </span>
           {runtimeSpotlight ? (
             <span className={cn("rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em]", runtimeSpotlight.badge)}>
               {runtimeSpotlight.label}
@@ -374,14 +394,13 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
     styles,
   } satisfies NodeFrameSharedProps;
   const content = (
-    <NodeCardContent
-      data={data}
-      estimatedLabel={estimatedLabel}
-      interactionFrame={interactionFrame}
-      kindTheme={kindTheme}
-      runtimeSpotlight={runtimeSpotlight}
-      styles={styles}
-    />
+      <NodeCardContent
+        data={data}
+        estimatedLabel={estimatedLabel}
+        kindTheme={kindTheme}
+        runtimeSpotlight={runtimeSpotlight}
+        styles={styles}
+      />
   );
 
   return (
