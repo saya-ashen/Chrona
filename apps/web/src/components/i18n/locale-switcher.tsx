@@ -1,8 +1,7 @@
 "use client";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@chrona/i18n/react";
 import { locales } from "@chrona/i18n";
 import { localizeHref } from "@chrona/i18n";
@@ -16,16 +15,11 @@ export function LocaleSwitcher() {
         const isActive = candidate === locale;
 
         return (
-          <LocalizedLink
-            key={candidate}
-            href={localizeHref(candidate, "/schedule")}
-            className={cn(
-              buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }),
-              "h-8 px-2 text-xs",
-            )}
-          >
-            {t(`locale.${candidate}`)}
-          </LocalizedLink>
+          <Button key={candidate} asChild variant={isActive ? "secondary" : "ghost"} size="sm" className="h-8 px-2 text-xs">
+            <LocalizedLink href={localizeHref(candidate, "/schedule")}>
+              {t(`locale.${candidate}`)}
+            </LocalizedLink>
+          </Button>
         );
       })}
     </div>

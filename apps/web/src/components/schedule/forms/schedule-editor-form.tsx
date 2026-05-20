@@ -3,8 +3,9 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
-import { buttonVariants } from "@/components/ui/button";
-import { Field, inputClassName } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { useI18n } from "@chrona/i18n/react";
 
 type ScheduleEditorFormProps = {
@@ -106,42 +107,42 @@ export function ScheduleEditorForm({
       {errorMessage ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
 
       <form onSubmit={(event) => void handleScheduleSubmit(event)} className="grid gap-2 md:grid-cols-3">
-        <Field label={copy.due} className="text-xs text-muted-foreground">
-          <input
+        <Field className="text-xs text-muted-foreground">
+          <FieldLabel>{copy.due}</FieldLabel>
+          <Input
             type="datetime-local"
             name="dueAt"
             defaultValue={formatDateTimeInput(dueAt)}
-            className={inputClassName}
           />
         </Field>
-        <Field label={copy.start} className="text-xs text-muted-foreground">
-          <input
+        <Field className="text-xs text-muted-foreground">
+          <FieldLabel>{copy.start}</FieldLabel>
+          <Input
             type="datetime-local"
             name="scheduledStartAt"
             defaultValue={formatDateTimeInput(scheduledStartAt)}
-            className={inputClassName}
           />
         </Field>
-        <Field label={copy.end} className="text-xs text-muted-foreground">
-          <input
+        <Field className="text-xs text-muted-foreground">
+          <FieldLabel>{copy.end}</FieldLabel>
+          <Input
             type="datetime-local"
             name="scheduledEndAt"
             defaultValue={formatDateTimeInput(scheduledEndAt)}
-            className={inputClassName}
           />
         </Field>
         <div className="flex flex-wrap gap-2 md:col-span-3">
-          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default" })}>
+          <Button type="submit" disabled={isPending} variant="default">
             {isPending ? copy.saving : submitLabel}
-          </button>
+          </Button>
         </div>
       </form>
 
       {allowClear ? (
         <form onSubmit={(event) => void handleClearSubmit(event)}>
-          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "outline" })}>
+          <Button type="submit" disabled={isPending} variant="outline">
             {isPending ? copy.updating : copy.clearSchedule}
-          </button>
+          </Button>
         </form>
       ) : null}
     </div>

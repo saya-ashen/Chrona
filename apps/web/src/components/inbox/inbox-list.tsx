@@ -1,12 +1,7 @@
 import type { ReactNode } from "react";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  SurfaceCard,
-  SurfaceCardDescription,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 
 type InboxListProps = {
@@ -43,18 +38,18 @@ export function InboxList({ items, copy: copyProp }: InboxListProps) {
   return (
     <div className="space-y-4">
       {items.map((item) => (
-        <SurfaceCard key={item.id} className="space-y-4">
-          <SurfaceCardHeader>
+        <Card key={item.id} className="space-y-4">
+          <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
-                <SurfaceCardTitle>{item.actionType}</SurfaceCardTitle>
-                <SurfaceCardDescription>{item.sourceTaskTitle}</SurfaceCardDescription>
+                <CardTitle>{item.actionType}</CardTitle>
+                <CardDescription>{item.sourceTaskTitle}</CardDescription>
               </div>
-              <StatusBadge tone={item.riskLevel.toLowerCase() === "high" ? "critical" : item.riskLevel.toLowerCase() === "medium" ? "warning" : "neutral"}>
+              <Badge variant={item.riskLevel.toLowerCase() === "high" ? "destructive" : item.riskLevel.toLowerCase() === "medium" ? "secondary" : "outline"}>
                 {copy.risk}: {item.riskLevel}
-              </StatusBadge>
+              </Badge>
             </div>
-          </SurfaceCardHeader>
+          </CardHeader>
           <div className="grid gap-2 text-sm text-muted-foreground">
             {item.detail ? <p>{item.detail}</p> : null}
             <p>{copy.task}: {item.sourceTaskTitle}</p>
@@ -68,28 +63,28 @@ export function InboxList({ items, copy: copyProp }: InboxListProps) {
           <div className="flex flex-wrap gap-2">
             {item.actions ?? (
               <>
-                <button
+                <Button
                   type="button"
-                  className={buttonVariants({ variant: "default" })}
+                  variant="default"
                 >
                   {copy.approve}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className={buttonVariants({ variant: "destructive" })}
+                  variant="destructive"
                 >
                   {copy.reject}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className={buttonVariants({ variant: "outline" })}
+                  variant="outline"
                 >
                   {copy.editAndApprove}
-                </button>
+                </Button>
               </>
             )}
           </div>
-        </SurfaceCard>
+        </Card>
       ))}
     </div>
   );

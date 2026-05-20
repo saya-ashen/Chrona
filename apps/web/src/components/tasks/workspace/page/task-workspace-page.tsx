@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from "react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
-import { TaskWorkspaceAiSection } from "../sections/task-workspace-ai-section";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
@@ -65,7 +64,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     draftEditableTask,
     editSummary,
     planningTaskDraft,
-    assistantBuildCurrentTask,
     handleTaskConfigDraftStateChange,
     persistTaskConfig,
     handleSaveCurrentDraft,
@@ -81,15 +79,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     isGraphPlanPending,
     acceptPlanError,
     setAcceptPlanError,
-    isAiWorkspaceOpen,
-    setIsAiWorkspaceOpen,
     requestGenerationKey,
     runtimeEvents,
+    latestActivitySummary,
     acceptPlanById,
     dispatchExecutionAction,
-    handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
-    assistantBuildCurrentPlan,
   } = useTaskWorkspacePlanState(task, refreshWorkspace);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
     pageData,
@@ -98,10 +93,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const isGeneratingPlan = planGenerationStatus === "generating";
   const {
     currentProposal,
-    setCurrentProposal,
     isApplying,
     handleApplyProposal,
-    handleProposal,
     handleCancelProposal,
   } = useTaskWorkspaceProposalFlow({
     task,
@@ -117,7 +110,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       taskId: task.id,
       setSaveError,
     });
-  const assistantContext = useMemo(() => createTaskAiSidebarContext(task), [
+  const assistantContext = useMemo(() => createTaskAiSidebarContext(task, {
+    latestActivitySummary,
+  }), [
+    latestActivitySummary,
     task.blockReason?.actionRequired,
     task.blockReason?.blockType,
     task.executionSummary?.waiting,
@@ -208,22 +204,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}
         acceptPlanError={acceptPlanError}
-        runtimeEvents={runtimeEvents}
-        onGeneratePlan={handleGeneratePlanFromHeader}
-        onDispatchExecutionAction={dispatchExecutionAction}
-      />
-
-      <TaskWorkspaceAiSection
-        isOpen={isAiWorkspaceOpen}
-        onOpen={handleOpenAiWorkspace}
-        onClose={() => setIsAiWorkspaceOpen(false)}
-        taskId={task.id}
         planningTaskDraft={planningTaskDraft}
-        savedPlan={plan}
-        generationStatus={planGenerationStatus}
-        acceptedPlanId={plan?.status === "accepted" ? plan.id : null}
         hasUnsavedConfigChanges={hasUnsavedConfigChanges}
         unsavedConfigDraft={planningTaskDraft}
+        requestGenerationKey={requestGenerationKey}
+        runtimeEvents={runtimeEvents}
+        onGeneratePlan={handleGeneratePlanFromHeader}
         onPlanLoaded={setPlan}
         onApplyPlan={async (result) => {
           if (!result.id) return;
@@ -231,17 +217,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           await acceptPlanById(result.id);
         }}
         onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
-        buildCurrentTask={assistantBuildCurrentTask}
-        buildCurrentPlan={assistantBuildCurrentPlan}
-        onProposal={handleProposal}
-        onApplyProposal={handleApplyProposal}
-        onDismissProposal={() => {
-          setCurrentProposal(null);
-        }}
-        isApplying={isApplying}
-        requestGenerationKey={requestGenerationKey}
-        showInlineGenerateButton={false}
-        emptyPlanDescription="Use the plan button in the graph header when you want a new task plan."
+        onDispatchExecutionAction={dispatchExecutionAction}
       />
     </div>
   );

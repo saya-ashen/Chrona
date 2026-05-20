@@ -1,7 +1,7 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export const workInspectorSections = ["plan", "approvals", "artifacts", "tools", "context"] as const;
 
@@ -12,7 +12,7 @@ type WorkInspectorLabels = {
   sections: Record<InspectorSection, string>;
   emptyValue: string;
   emptyScheduleWindow: string;
-  stepStatuses: Record<string, { label: string; tone: "neutral" | "info" | "success" | "warning" | "critical" }>;
+  stepStatuses: Record<string, { label: string; tone: "outline" | "info" | "success" | "warning" | "critical" }>;
   planTitle: string;
   planReadySummary: string;
   planEmptySummary: string;
@@ -118,17 +118,17 @@ export function renderWorkInspectorSectionPanel(
         {currentException ? <p className="text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
         {currentAction ? (
           isInternalAppHref(currentAction.href) ? (
-            <LocalizedLink href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </LocalizedLink>
+            <Button asChild>
+              <LocalizedLink href={currentAction.href}>{currentAction.label}</LocalizedLink>
+            </Button>
           ) : currentAction.href.startsWith("#") ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </a>
+            <Button asChild>
+              <a href={currentAction.href}>{currentAction.label}</a>
+            </Button>
           ) : isSafeExternalHref(currentAction.href) ? (
-            <a href={currentAction.href} className={buttonVariants({ variant: "default", size: "default" })}>
-              {currentAction.label}
-            </a>
+            <Button asChild>
+              <a href={currentAction.href}>{currentAction.label}</a>
+            </Button>
           ) : null
         ) : null}
 
@@ -151,7 +151,7 @@ export function renderWorkInspectorSectionPanel(
           <div key={approval.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium text-foreground">{approval.title}</p>
-              <StatusBadge tone="warning">{approval.status}</StatusBadge>
+              <Badge variant="secondary">{approval.status}</Badge>
             </div>
             {approval.summary ? <p className="mt-2 text-muted-foreground">{approval.summary}</p> : null}
           </div>
@@ -192,7 +192,7 @@ export function renderWorkInspectorSectionPanel(
           <div key={tool.id} className="rounded-[22px] border border-border/60 bg-background/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium text-foreground">{tool.toolName}</p>
-              <StatusBadge>{tool.status}</StatusBadge>
+              <Badge>{tool.status}</Badge>
             </div>
             {tool.argumentsSummary ? <p className="mt-2 text-muted-foreground">{labels.toolArguments}：{tool.argumentsSummary}</p> : null}
             {tool.resultSummary ? <p className="mt-1 text-muted-foreground">{labels.toolResult}：{tool.resultSummary}</p> : null}

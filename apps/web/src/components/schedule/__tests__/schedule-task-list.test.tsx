@@ -11,15 +11,22 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_: string, href: string) => href,
 }));
-vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children }: any) => <span data-testid="status-badge">{children}</span>,
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
 }));
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children }: any) => <div>{children}</div>,
-  SurfaceCardDescription: ({ children }: any) => <p>{children}</p>,
-  SurfaceCardHeader: ({ children }: any) => <div>{children}</div>,
-  SurfaceCardTitle: ({ children }: any) => <h3>{children}</h3>,
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children }: any) => <span data-testid="status-badge">{children}</span>,
+}));
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children }: any) => <div>{children}</div>,
+  CardDescription: ({ children }: any) => <p>{children}</p>,
+  CardHeader: ({ children }: any) => <div>{children}</div>,
+  CardTitle: ({ children }: any) => <h3>{children}</h3>,
 }));
 vi.mock("@/components/tasks/shared/task-context-links", () => ({ TaskContextLinks: () => null }));
 vi.mock("@/components/i18n/localized-link", () => ({

@@ -10,12 +10,7 @@ import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy"
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 
 import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
-import {
-  SurfaceCard,
-  SurfaceCardDescription,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "./schedule-panel-primitives";
 
 /**
@@ -62,11 +57,11 @@ export function ScheduleLeftSidebar({
         }))}
       />
 
-      <SurfaceCard variant="default" padding="sm" className="space-y-3">
-        <SurfaceCardHeader>
-          <SurfaceCardTitle>Insights</SurfaceCardTitle>
-          <SurfaceCardDescription>Task distribution and risk signals</SurfaceCardDescription>
-        </SurfaceCardHeader>
+      <Card className="space-y-3">
+        <CardHeader>
+          <CardTitle>Insights</CardTitle>
+          <CardDescription>Task distribution and risk signals</CardDescription>
+        </CardHeader>
         <div className="space-y-2 text-sm">
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
             <p className="text-xs text-muted-foreground">Selected day</p>
@@ -81,7 +76,7 @@ export function ScheduleLeftSidebar({
             <p className="mt-1 text-lg font-semibold text-rose-600">{selectedDay?.riskCount ?? 0}</p>
           </div>
         </div>
-      </SurfaceCard>
+      </Card>
     </aside>
   );
 }
@@ -121,11 +116,11 @@ export function ScheduleRightSidebar({
 }) {
   return (
     <aside className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1">
-      <SurfaceCard padding="sm" className="xl:sticky xl:top-0">
-        <SurfaceCardHeader>
-          <SurfaceCardTitle>{copy.unscheduledQueue}</SurfaceCardTitle>
-          <SurfaceCardDescription>{copy.unscheduledQueueDescription}</SurfaceCardDescription>
-        </SurfaceCardHeader>
+      <Card className="xl:sticky xl:top-0">
+        <CardHeader>
+          <CardTitle>{copy.unscheduledQueue}</CardTitle>
+          <CardDescription>{copy.unscheduledQueueDescription}</CardDescription>
+        </CardHeader>
         <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 xl:max-h-[calc(100vh-19rem)]">
           {viewData.unscheduled.length === 0 ? (
             <EmptyState>{copy.noUnscheduledWork}</EmptyState>
@@ -152,7 +147,7 @@ export function ScheduleRightSidebar({
             ))
           )}
         </div>
-      </SurfaceCard>
+      </Card>
     </aside>
   );
 }

@@ -1,5 +1,5 @@
 import { CheckCircle2, Clock3 } from "lucide-react";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { WorkPageSectionFrame } from "./work-page-section-frame";
 import type { WorkCopy } from "./work-page-types";
 
@@ -23,7 +23,7 @@ export function WorkPageRightRail({
       <WorkPageSectionFrame title="Quick Actions" bodyClassName="overflow-auto">
         <div className="flex items-start justify-between gap-3">
           <p className="text-sm leading-6 text-muted-foreground">{suggestedAction}</p>
-          <StatusBadge tone="info">OK</StatusBadge>
+          <Badge variant="secondary">OK</Badge>
         </div>
       </WorkPageSectionFrame>
 

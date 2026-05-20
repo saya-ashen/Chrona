@@ -1,11 +1,15 @@
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
 
 describe("TaskWorkspaceExecutionOverview", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders latest result, attention, artifacts, and activity from the workspace view", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
     const onAction = vi.fn();
@@ -22,13 +26,17 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    expect(screen.getByText("Execution result overview")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    expect(screen.getByText("Latest result")).toBeInTheDocument();
     expect(screen.getAllByText("Needs handling").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Approve result").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "结果" }));
+    expect(screen.getByText("Latest result")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
     expect(screen.getByText("Artifacts (0)")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
     expect(screen.getByText("Execution activity", { selector: "p" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "操作" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Resolve in node panel" }));
     expect(onAction).toHaveBeenCalledWith("approval");
@@ -50,6 +58,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
 
     expect(screen.getAllByText("No execution result yet.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
     expect(screen.getByText("done output 1", { exact: false })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Source" }));
@@ -78,7 +87,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     expect(screen.getAllByText("No execution result yet.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("No approval, input, or blocker needs attention.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
     expect(screen.getAllByText("No artifacts yet.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
     expect(screen.getByText("Activity will appear after planning or execution starts.")).toBeInTheDocument();
 
     rerender(
@@ -92,6 +103,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "操作" }));
     expect(screen.getAllByText("Run is Running").length).toBeGreaterThan(0);
   });
 

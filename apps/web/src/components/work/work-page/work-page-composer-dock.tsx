@@ -1,6 +1,6 @@
 import { Activity, ChevronDown, ChevronUp } from "lucide-react";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { WorkComposerCard } from "./work-composer-card";
 import type { WorkComposer, WorkCopy, WorkPageData } from "./work-page-types";
 
@@ -58,14 +58,14 @@ export function WorkPageComposerDock({
                   <p className="text-sm font-semibold text-foreground">Add Input</p>
                   <p className="truncate text-xs text-muted-foreground">{dockSummary}</p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => onExpandChange(false)}
                   className="inline-flex h-8 items-center gap-1 rounded-xl border border-border/70 bg-background px-3 text-sm text-muted-foreground hover:bg-muted/40"
                 >
                   Collapse
                   <ChevronDown className="size-4" />
-                </button>
+                </Button>
               </div>
               <WorkComposerCard
                 className="border-border/80 bg-white shadow-none"
@@ -94,7 +94,7 @@ export function WorkPageComposerDock({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">Add Input</p>
-                  <StatusBadge tone={workComposer ? "warning" : "info"}>{workComposer ? "Needed" : "Standby"}</StatusBadge>
+                  <Badge variant={workComposer ? "secondary" : "secondary"}>{workComposer ? "Needed" : "Standby"}</Badge>
                 </div>
                 <p className="mt-1 truncate text-sm text-muted-foreground">{dockSummary}</p>
               </div>
@@ -112,15 +112,15 @@ export function WorkPageComposerDock({
           <div className="flex items-center justify-between gap-3">
             <span>No plan yet. Create or accept a plan before execution.</span>
             {data.taskPlan.nodes.length > 0 ? (
-              <button
+              <Button
                 type="button"
                 disabled={isPending}
                 onClick={() => void onStartExecution()}
-                className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shrink-0" })}
+                variant="default" size="sm" className="rounded-xl shrink-0"
               >
                 <Activity className="mr-1.5 size-3.5" />
                 Start Execution
-              </button>
+              </Button>
             ) : null}
           </div>
         </section>
@@ -130,15 +130,15 @@ export function WorkPageComposerDock({
             <span>
               Execution is {executionStatus}. {executionStatus === "waiting_for_user" ? "Provide input to continue." : executionStatus === "waiting_for_approval" ? "Review and approve pending actions." : executionStatus === "blocked" ? "Resolve the blocking issue to resume." : "Start or resume execution."}
             </span>
-            <button
+            <Button
               type="button"
               disabled={isPending}
               onClick={() => void onStartExecution()}
-              className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shrink-0" })}
+              variant="default" size="sm" className="rounded-xl shrink-0"
             >
               <Activity className="mr-1.5 size-3.5" />
               Resume
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}

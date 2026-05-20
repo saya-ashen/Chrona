@@ -10,7 +10,13 @@ export function AssistantSurfaceTrigger() {
   const { t } = useI18n();
   const assistant = useAssistantSurface();
   const summary = assistant.state.topSummary;
-  const summaryLabel = summary.label === "Status" ? t("components.assistantSurface.signal") : summary.label;
+  const activitySummary = assistant.state.summaries.find((item) => item.label === "Activity");
+  const displaySummary = activitySummary ?? summary;
+  const summaryLabel = displaySummary.label === "Activity"
+    ? t("components.assistantSurface.activity")
+    : displaySummary.label === "Status"
+      ? t("components.assistantSurface.signal")
+      : displaySummary.label;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -52,7 +58,7 @@ export function AssistantSurfaceTrigger() {
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="hidden text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:inline">{summaryLabel}</span>
         <span className="min-w-0 max-w-[74px] truncate text-xs font-semibold text-primary sm:max-w-[128px]">
-          {summary.value}
+          {displaySummary.value}
         </span>
       </span>
       <span className="hidden text-[11px] font-semibold text-muted-foreground/80 sm:inline">⌘K</span>

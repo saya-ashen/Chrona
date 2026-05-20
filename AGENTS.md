@@ -109,6 +109,25 @@ Descriptive source labels for `search(source: "label")`.
 - Do NOT hand-roll SSE parsing with `ReadableStream#getReader()`, `TextDecoder`, or manual `event:` / `data:` splitting in React components or hooks.
 - Route SSE calls through a shared helper (`apps/web/src/lib/fetch-json-event-source.ts`) so headers, error handling, JSON parsing, and non-stream fallbacks stay consistent.
 
+## Frontend UI foundation
+
+- In `apps/web/src/components/ui`, shadcn/ui primitives are the foundation for
+  basic controls. Use or generate standard shadcn primitives before creating any
+  custom button, badge, card, field, input, textarea, select, dialog, dropdown,
+  tabs, tooltip, separator, skeleton, or alert component.
+- Do NOT recreate generic primitives with custom helpers such as local
+  `buttonVariants`, generic status badge variants, generic surface cards, or
+  reusable field class constants when shadcn covers the role.
+- Chrona wrappers are allowed only when they add product/domain meaning or
+  repeated product-specific composition. Wrappers must compose shadcn primitives
+  and must not keep legacy compatibility aliases.
+- Before accepting UI foundation changes, run `bun run check:ui-foundation`.
+  If it flags removed imports, consumer `buttonVariants`, reusable field class
+  helpers, generic status badges, or generic surface cards, replace consumers
+  with official shadcn primitives first. Wrapper decision order: use generated
+  shadcn primitive, compose it in the feature component, then create a
+  product-named wrapper only when the wrapper carries Chrona domain meaning.
+
 ## Frontend development principles
 
 - Use `agent-browser` for every frontend UX change.
@@ -161,7 +180,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/010-ai-dropdown-surface/plan.md`
+`specs/011-shadcn-ui-refactor/plan.md`
 
 <!-- SPECKIT END -->
 

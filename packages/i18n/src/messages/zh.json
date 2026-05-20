@@ -53,6 +53,7 @@
       "entryLabel": "打开 Chrona AI 下拉菜单",
       "entry": "Chrona AI",
       "signal": "信号",
+      "activity": "活动",
       "panelLabel": "Chrona AI 下拉菜单",
       "eyebrow": "页面感知 AI",
       "close": "关闭",

@@ -1,8 +1,6 @@
 import { AlertTriangle, Check, RotateCcw } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
+import { Button } from "@/components/ui/button";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
@@ -37,17 +35,16 @@ export function TaskPlanResultPanel({
     <div className="space-y-3 rounded-xl border border-transparent bg-transparent p-0">
       {showRegenerateButton ? (
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={onRegenerate}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10",
-            )}
+            variant="outline"
+            size="sm"
+            className="rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10"
           >
             <RotateCcw className="size-3.5" />
             Regenerate plan
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -91,17 +88,16 @@ export function TaskPlanResultPanel({
 
           {onApply ? (
             <div className="flex justify-end rounded-lg border border-border/40 bg-background/70 px-3 py-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => onApply(activeReadModel)}
-                className={cn(
-                  buttonVariants({ variant: "default", size: "sm" }),
-                  "rounded-xl",
-                )}
+                variant="default"
+                size="sm"
+                className="rounded-xl"
               >
                 <Check className="size-4" />
                 Apply Plan
-              </button>
+              </Button>
             </div>
           ) : null}
         </>

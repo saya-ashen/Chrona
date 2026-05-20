@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 import { Maximize2, Minus, Plus, Scan, LocateFixed } from "lucide-react";
 import { PanOnScrollMode, ReactFlow, type NodeMouseHandler, type ReactFlowInstance } from "@xyflow/react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { edgeTypes } from "./edge";
 import { EdgeLegend } from "./legend";
@@ -78,12 +78,6 @@ export function TaskPlanGraphFrame({
     () => `${layout.contentWidth}:${layout.contentHeight}:${nodes.map((node) => node.id).join("|")}`,
     [layout.contentHeight, layout.contentWidth, nodes],
   );
-  const controlClassName = buttonVariants({
-    variant: "ghost",
-    size: "icon",
-    className: "size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60",
-  });
-
   const fitGraph = useCallback((duration = 220) => {
     const flow = flowRef.current;
     if (!flow) {
@@ -292,21 +286,21 @@ export function TaskPlanGraphFrame({
           >
             {graphCopy.wheelZoomHint}
           </span>
-          <button type="button" aria-label={graphCopy.zoomIn} className={controlClassName} onClick={handleZoomIn}>
+          <Button type="button" aria-label={graphCopy.zoomIn} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleZoomIn}>
             <Plus className="size-4" />
-          </button>
-          <button type="button" aria-label={graphCopy.zoomOut} className={controlClassName} onClick={handleZoomOut}>
+          </Button>
+          <Button type="button" aria-label={graphCopy.zoomOut} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleZoomOut}>
             <Minus className="size-4" />
-          </button>
-          <button type="button" aria-label={graphCopy.fitGraph} className={controlClassName} onClick={() => fitGraph()}>
+          </Button>
+          <Button type="button" aria-label={graphCopy.fitGraph} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={() => fitGraph()}>
             <Scan className="size-4" />
-          </button>
-          <button type="button" aria-label={graphCopy.centerCurrentNode} className={controlClassName} onClick={handleCenterCurrentNode}>
+          </Button>
+          <Button type="button" aria-label={graphCopy.centerCurrentNode} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleCenterCurrentNode}>
             <LocateFixed className="size-4" />
-          </button>
-          <button type="button" aria-label={graphCopy.expandGraph} className={controlClassName} onClick={onExpandGraph}>
+          </Button>
+          <Button type="button" aria-label={graphCopy.expandGraph} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={onExpandGraph}>
             <Maximize2 className="size-4" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

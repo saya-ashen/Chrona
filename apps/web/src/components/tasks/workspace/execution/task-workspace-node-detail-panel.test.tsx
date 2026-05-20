@@ -26,6 +26,22 @@ afterEach(() => {
   cleanup();
 });
 
+if (!HTMLElement.prototype.hasPointerCapture) {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+}
+
+if (!HTMLElement.prototype.setPointerCapture) {
+  HTMLElement.prototype.setPointerCapture = () => undefined;
+}
+
+if (!HTMLElement.prototype.releasePointerCapture) {
+  HTMLElement.prototype.releasePointerCapture = () => undefined;
+}
+
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => undefined;
+}
+
 describe("TaskWorkspaceNodeDetailPanel", () => {
   it("renders the empty node detail state", () => {
     render(<TaskWorkspaceNodeDetailPanel detail={detail()} selectedNodes={[]} onDispatchExecutionAction={vi.fn()} />);
@@ -78,7 +94,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Send Accept" })).toBeDisabled();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Approve" } });
+    fireEvent.pointerDown(screen.getByRole("combobox"), { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("option", { name: "Approve" }));
     fireEvent.click(screen.getByRole("button", { name: "Send Accept" }));
     await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith(expect.objectContaining({
       action: "resume_with_approval",
@@ -191,7 +208,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
     expect(screen.getByLabelText(/默认查询地点或地点输入方式/)).toHaveValue("北京");
-    expect(screen.getByLabelText(/输出格式要求/)).toHaveValue("无");
+    expect(screen.getByLabelText(/输出格式要求/)).toHaveTextContent("无");
     expect(screen.getByLabelText(/运行环境或语言偏好/)).toHaveValue("无");
     expect(screen.getByLabelText(/未提交字段/)).toHaveValue("");
     expect(screen.queryByDisplayValue(/Checkpoint completed/)).not.toBeInTheDocument();

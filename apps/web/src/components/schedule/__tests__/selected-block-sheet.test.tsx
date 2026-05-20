@@ -30,22 +30,29 @@ vi.mock("@/lib/router", () => ({
 }));
 
 
-vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
+}));
 
 
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children, tone }: { children?: React.ReactNode; tone?: string }) => (
-    <span data-tone={tone}>{children}</span>
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children, variant }: { children?: React.ReactNode; variant?: string }) => (
+    <span data-variant={variant}>{children}</span>
   ),
 }));
 
 
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children, as: Component = "div", ...props }: { children?: ReactNode; as?: ElementType }) => (
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children, as: Component = "div", ...props }: { children?: ReactNode; as?: ElementType }) => (
     <Component {...props}>{children}</Component>
   ),
-  SurfaceCardHeader: ({ children, ...props }: { children?: ReactNode }) => <div {...props}>{children}</div>,
-  SurfaceCardTitle: ({ children, ...props }: { children?: ReactNode }) => <h3 {...props}>{children}</h3>,
+  CardHeader: ({ children, ...props }: { children?: ReactNode }) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: { children?: ReactNode }) => <h3 {...props}>{children}</h3>,
 }));
 
 // Mock the schedule editor form

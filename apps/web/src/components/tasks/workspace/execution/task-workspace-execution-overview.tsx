@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Archive, Bell, CalendarClock, CheckCircle2, FileText, Sparkles } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
 
@@ -40,7 +41,7 @@ export function TaskWorkspaceExecutionOverview({
     id: "attention-empty",
     title: "Needs handling",
     description: "No approval, input, or blocker needs attention.",
-    tone: "success" as const,
+    tone: "neutral" as const,
   };
 
   return (
@@ -57,36 +58,31 @@ export function TaskWorkspaceExecutionOverview({
             </div>
           </div>
         </div>
-        <div className="mb-2 grid grid-cols-4 gap-1 rounded-[0.9rem] border border-slate-200/80 bg-slate-100/70 p-1">
-          {COMMAND_CENTER_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              className={cn(
-                "rounded-[0.7rem] px-2 py-1.5 text-xs font-semibold transition-colors",
-                activeTab === tab.id
-                  ? "bg-slate-950 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-white/75 hover:text-slate-950",
-              )}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-2" role="tabpanel">
-          {activeTab === "actions" ? (
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CommandCenterTab)} className="gap-2">
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-[0.9rem] border border-slate-200/80 bg-slate-100/70 p-1">
+            {COMMAND_CENTER_TABS.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="rounded-[0.7rem] px-2 py-1.5 text-xs font-semibold data-active:bg-slate-950 data-active:text-white data-active:shadow-sm" onClick={() => setActiveTab(tab.id)}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="actions" className="space-y-2">
             <>
               <TaskSummaryCard status={taskStatus} progressLabel={progressLabel} nextAction={nextAction} />
               <AttentionCard card={pendingAttention} readiness={readiness} onAction={onAction} />
             </>
-          ) : null}
-          {activeTab === "result" ? <LatestResultCard card={latestResult} onAction={onAction} /> : null}
-          {activeTab === "artifacts" ? <ArtifactsCard artifacts={artifacts} onAction={onAction} /> : null}
-          {activeTab === "activity" ? <ActivityCard activity={activity} /> : null}
-        </div>
+          </TabsContent>
+          <TabsContent value="result" className="space-y-2">
+            <LatestResultCard card={latestResult} onAction={onAction} />
+          </TabsContent>
+          <TabsContent value="artifacts" className="space-y-2">
+            <ArtifactsCard artifacts={artifacts} onAction={onAction} />
+          </TabsContent>
+          <TabsContent value="activity" className="space-y-2">
+            <ActivityCard activity={activity} />
+          </TabsContent>
+        </Tabs>
       </div>
     </aside>
   );
@@ -169,9 +165,9 @@ function AttentionCard({ card, readiness, onAction }: { card: ExecutionOverviewC
       <p className="mt-1.5 break-words text-xs text-slate-500">Readiness: {readiness.description}</p>
       {card.actionLabel && onAction ? (
         <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonVariants({ variant: "default", size: "sm", className: "h-8 rounded-full px-3 text-xs shadow-sm" })} onClick={() => onAction(card.actionNodeId)}>
+            <Button type="button" variant="default" size="sm" className="h-8 rounded-full px-3 text-xs shadow-sm" onClick={() => onAction(card.actionNodeId)}>
             {card.actionLabel}
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>

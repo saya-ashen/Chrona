@@ -60,13 +60,12 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-plan-state", () =
     isAcceptingPlan: false,
     acceptPlanError: null,
     setAcceptPlanError: vi.fn(),
-    isAiWorkspaceOpen: false,
-    setIsAiWorkspaceOpen: vi.fn(),
     requestGenerationKey: 0,
+    runtimeEvents: [],
+    latestActivitySummary: null,
     acceptPlanById: vi.fn(),
     handleAcceptPlan: vi.fn(),
     dispatchExecutionAction: vi.fn(),
-    handleOpenAiWorkspace: vi.fn(),
     handleGeneratePlanFromHeader: vi.fn(),
     assistantBuildCurrentPlan: vi.fn(),
   }),
@@ -93,11 +92,16 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } } }) => (
+  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string }) => (
     <header>
       <h1>{task.title}</h1>
+      <section aria-label="Workspace state">
+        <p>Current state</p>
+        <p>{header.status === "running" ? "Running" : header.status}</p>
+      </section>
       <p>header-status:{task.status}</p>
       <p>workspace-status:{header.status}</p>
+      <p>{workspaceStateGuidance}</p>
       <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
       <button type="button">Edit</button>
       {header.actions.filter((action) => action.id !== "more").map((action) => (
@@ -116,7 +120,7 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
   const { createTaskWorkspaceExecutionConsoleView } = await import("@/components/tasks/workspace/model/task-workspace-query");
 
   return {
-    TaskWorkspacePlanSection: ({ pageData, plan, planGenerationStatus, canAcceptPlan, graphPlan }: { pageData: TaskPageData; plan: { status?: string } | null; planGenerationStatus: TaskPlanGenerationStatus; canAcceptPlan: boolean; graphPlan: TaskPlanGraphPlan | null }) => {
+    TaskWorkspacePlanSection: ({ pageData, plan, planGenerationStatus, canAcceptPlan, graphPlan, onApplyPlan }: { pageData: TaskPageData; plan: { id?: string; status?: string } | null; planGenerationStatus: TaskPlanGenerationStatus; canAcceptPlan: boolean; graphPlan: TaskPlanGraphPlan | null; onApplyPlan?: (plan: { id?: string; status?: string }) => void }) => {
       const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
       const selectedNode = graphPlan?.nodes.find((node) => node.id === selectedNodeId) ?? null;
       const consoleView = createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, selectedNode });
@@ -145,6 +149,7 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
           <p>header-member:{consoleView.header.memberContext.memberLabel}</p>
           <p>header-notifications:{consoleView.header.memberContext.notificationCount}</p>
           <button type="button" disabled={planGenerationStatus === "generating"}>{planGenerationStatus === "generating" ? "Generating..." : plan ? "Regenerate plan" : "Generate plan"}</button>
+          {canAcceptPlan && plan ? <button type="button" onClick={() => onApplyPlan?.(plan)}>Apply Plan</button> : null}
           <section aria-label="Execution flow" />
           <section aria-label="Current node details" />
           <aside aria-label="Execution overview" />
@@ -158,10 +163,6 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
     },
   };
 });
-
-vi.mock("@/components/tasks/workspace/sections/task-workspace-ai-section", () => ({
-  TaskWorkspaceAiSection: ({ generationStatus }: { generationStatus: TaskPlanGenerationStatus }) => <aside>ai:{generationStatus}</aside>,
-}));
 
 afterEach(() => {
   cleanup();
@@ -264,7 +265,6 @@ describe("TaskWorkspacePage", () => {
     render(<TaskWorkspacePage data={taskData()} />);
 
     expect(screen.getByText("generation:generating")).toBeInTheDocument();
-    expect(screen.getByText("ai:generating")).toBeInTheDocument();
     expect(screen.getByText("nodes:1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generating..." })).toBeDisabled();
   });

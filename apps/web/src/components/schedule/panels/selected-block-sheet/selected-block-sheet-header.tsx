@@ -4,7 +4,7 @@ import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy"
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 export function SelectedBlockSheetHeader({
   item,
@@ -46,13 +46,13 @@ export function SelectedBlockSheetHeader({
             taskId={item.taskId}
             size="sm"
           />
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            variant="outline" size="sm"
           >
             {copy.close}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

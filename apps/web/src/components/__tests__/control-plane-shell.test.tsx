@@ -16,7 +16,12 @@ vi.mock("@/components/i18n/locale-switcher", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  buttonVariants: () => "btn",
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
 }));
 
 vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({

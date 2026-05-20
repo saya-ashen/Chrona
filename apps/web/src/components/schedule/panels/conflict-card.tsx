@@ -2,8 +2,8 @@ import type {
   ScheduleConflict,
   ScheduleSuggestion,
 } from "@/components/schedule/schedule-page-types";
-import { SurfaceCard } from "@/components/ui/surface-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@chrona/i18n/react";
 
 type ConflictCardProps = {
@@ -60,23 +60,23 @@ export function ConflictCard({
 
   const severityTone =
     conflict.severity === "high"
-      ? "critical"
+      ? "destructive"
       : conflict.severity === "medium"
-        ? "warning"
-        : "neutral";
+        ? "secondary"
+        : "outline";
 
   const conflictSuggestions = suggestions.filter(
     (s) => s.conflictId === conflict.id,
   );
 
   return (
-    <SurfaceCard className="space-y-3">
+    <Card className="space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <StatusBadge tone={severityTone}>
+            <Badge variant={severityTone}>
               {conflict.severity.toUpperCase()}
-            </StatusBadge>
+            </Badge>
             <span className="text-sm font-medium text-foreground">
               {copy.conflictTypes[conflict.type] || conflict.type}
             </span>
@@ -148,6 +148,6 @@ export function ConflictCard({
           ))}
         </div>
       )}
-    </SurfaceCard>
+    </Card>
   );
 }

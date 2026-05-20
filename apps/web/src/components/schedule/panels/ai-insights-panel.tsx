@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
-import { SurfaceCard } from "@/components/ui/surface-card";
+import { Card } from "@/components/ui/card";
 
 function toCompactPlan(planResult: TaskPlanReadModel | null) {
   const nodes = planResult?.compiledPlan?.nodes;
@@ -40,7 +40,7 @@ export function AiInsightsPanel({
 
   return (
     <div className="space-y-3">
-      <SurfaceCard className="border-border/70 bg-background shadow-sm">
+      <Card className="border-border/70 bg-background shadow-sm">
         <div className="space-y-3 p-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-foreground/80">
             <Sparkles className="size-3.5 text-primary" />
@@ -65,7 +65,7 @@ export function AiInsightsPanel({
             </div>
           )}
         </div>
-      </SurfaceCard>
+      </Card>
 
       <TaskPlanGenerationPanel
         taskId={item.taskId}

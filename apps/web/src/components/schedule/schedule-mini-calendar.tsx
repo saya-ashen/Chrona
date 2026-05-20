@@ -1,5 +1,5 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { SurfaceCard } from "@/components/ui/surface-card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type ScheduleMiniCalendarDay = {
@@ -23,7 +23,7 @@ export function ScheduleMiniCalendar({
   days: ScheduleMiniCalendarDay[];
 }) {
   return (
-    <SurfaceCard as="section" variant="default" padding="sm" className="space-y-4 rounded-[30px]">
+    <Card className="space-y-4 rounded-[30px]">
       <div className="flex items-center justify-between gap-3 px-1">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -67,7 +67,7 @@ export function ScheduleMiniCalendar({
           </LocalizedLink>
         ))}
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }
 

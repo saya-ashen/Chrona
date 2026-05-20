@@ -2,7 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@chrona/i18n/react";
 
@@ -23,13 +23,12 @@ export function TaskContextLinks({
 
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
-      <LocalizedLink
-        href={`/tasks/${taskId}`}
-        className={buttonVariants({ variant: "outline", size })}
-      >
-        <ExternalLink className="size-3.5" />
-        {taskLabel ?? t("common.openTask")}
-      </LocalizedLink>
+      <Button asChild variant="outline" size={size}>
+        <LocalizedLink href={`/tasks/${taskId}`}>
+          <ExternalLink className="size-3.5" />
+          {taskLabel ?? t("common.openTask")}
+        </LocalizedLink>
+      </Button>
     </div>
   );
 }

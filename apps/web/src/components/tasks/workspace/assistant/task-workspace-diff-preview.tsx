@@ -1,14 +1,9 @@
 "use client";
 
 import { AlertTriangle, Check, X } from "lucide-react";
-import {
-  SurfaceCard,
-  SurfaceCardDescription,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 
@@ -208,24 +203,24 @@ export function TaskWorkspaceDiffPreview({
   const risks = isHighRisk(proposal);
 
   return (
-    <SurfaceCard variant="highlight" className="space-y-4" padding="lg">
-      <SurfaceCardHeader>
+    <Card className="space-y-4">
+      <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <SurfaceCardTitle>Proposed Changes</SurfaceCardTitle>
-          <StatusBadge
-            tone={
+          <CardTitle>Proposed Changes</CardTitle>
+          <Badge
+            variant={
               proposal.confidence === "high"
-                ? "success"
+                ? "secondary"
                 : proposal.confidence === "medium"
-                  ? "warning"
-                  : "neutral"
+                  ? "secondary"
+                  : "outline"
             }
           >
             {proposal.confidence} confidence
-          </StatusBadge>
+          </Badge>
         </div>
-        <SurfaceCardDescription>{proposal.summary}</SurfaceCardDescription>
-      </SurfaceCardHeader>
+        <CardDescription>{proposal.summary}</CardDescription>
+      </CardHeader>
 
       {risks.length > 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -273,7 +268,7 @@ export function TaskWorkspaceDiffPreview({
             Plan Changes
           </p>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-4 space-y-2">
-            <StatusBadge tone="info">plan patch</StatusBadge>
+            <Badge variant="secondary">plan patch</Badge>
             <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
               {planSummary.map((point, i) => (
                 <li key={i}>{point}</li>
@@ -317,14 +312,12 @@ export function TaskWorkspaceDiffPreview({
       ) : null}
 
       <div className="flex items-center gap-3 pt-2">
-        <button
+        <Button
           type="button"
           onClick={() => onApply(proposal)}
           disabled={isApplying}
-          className={cn(
-            buttonVariants({ variant: "default" }),
-            isApplying && "opacity-50 cursor-not-allowed",
-          )}
+          variant="default"
+          className={cn(isApplying && "cursor-not-allowed opacity-50")}
         >
           {isApplying ? (
             <>Applying...</>
@@ -339,22 +332,22 @@ export function TaskWorkspaceDiffPreview({
               Apply Changes
             </>
           )}
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
           onClick={onCancel}
           disabled={isApplying}
-          className={buttonVariants({ variant: "outline" })}
+          variant="outline"
         >
           <X className="size-4" />
           Cancel
-        </button>
+        </Button>
 
         {applyError ? (
           <span className="text-sm text-red-600">{applyError}</span>
         ) : null}
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }

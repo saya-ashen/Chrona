@@ -23,17 +23,17 @@ import type { WorkPageClientProps } from "./work-page/work-page-types";
 function getExecutionTone(status: string) {
   switch (status) {
     case "completed":
-      return "success" as const;
+      return "secondary" as const;
     case "waiting_for_user":
     case "waiting_for_approval":
-      return "warning" as const;
+      return "secondary" as const;
     case "blocked":
-      return "critical" as const;
+      return "destructive" as const;
     case "running":
     case "started":
-      return "info" as const;
+      return "secondary" as const;
     default:
-      return "neutral" as const;
+      return "outline" as const;
   }
 }
 

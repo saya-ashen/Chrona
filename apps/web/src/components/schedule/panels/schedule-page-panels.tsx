@@ -17,7 +17,7 @@ import {
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
 } from "@/components/schedule/forms/task-config-form";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
 import { useI18n, useLocale } from "@chrona/i18n/react";
@@ -141,12 +141,12 @@ export function QueueCard({
           <span className="truncate text-[13px] font-medium text-foreground">
             {item.title}
           </span>
-          <StatusBadge
-            tone={getPriorityTone(item.priority)}
+          <Badge
+            variant={getPriorityTone(item.priority)}
             className="text-[10px] px-1.5 py-0.5"
           >
             {item.priority}
-          </StatusBadge>
+          </Badge>
           {item.dueAt ? (
             <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">
               {formatDateTime(item.dueAt, locale)}

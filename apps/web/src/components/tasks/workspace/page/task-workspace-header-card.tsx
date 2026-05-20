@@ -1,33 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { SurfaceCard, SurfaceCardHeader } from "@/components/ui/surface-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader } from "@/components/ui/card";
 import type { TaskData, TaskHeaderAction, TaskHeaderView } from "../model/task-workspace-types";
 
 function priorityTone(priority: string) {
-  if (priority === "Urgent") return "critical" as const;
-  if (priority === "High") return "warning" as const;
-  return "neutral" as const;
+  if (priority === "Urgent") return "destructive" as const;
+  if (priority === "High") return "secondary" as const;
+  return "outline" as const;
 }
 
 function statusTone(status: string) {
-  if (["Completed", "Done"].includes(status)) return "success" as const;
+  if (["Completed", "Done"].includes(status)) return "secondary" as const;
   if (["Running", "Ready", "Queued", "Scheduled"].includes(status))
-    return "info" as const;
+    return "secondary" as const;
   if (["WaitingForInput", "WaitingForApproval"].includes(status))
-    return "warning" as const;
-  if (["Failed", "Blocked"].includes(status)) return "critical" as const;
-  return "neutral" as const;
+    return "secondary" as const;
+  if (["Failed", "Blocked"].includes(status)) return "destructive" as const;
+  return "outline" as const;
 }
 
 function userStatusTone(status: TaskHeaderView["status"]) {
-  if (status === "completed") return "success" as const;
-  if (status === "running") return "info" as const;
-  if (status === "approval-needed") return "warning" as const;
-  if (status === "blocked") return "critical" as const;
-  return "neutral" as const;
+  if (status === "completed") return "secondary" as const;
+  if (status === "running") return "secondary" as const;
+  if (status === "approval-needed") return "secondary" as const;
+  if (status === "blocked") return "destructive" as const;
+  return "outline" as const;
 }
 
 function userStatusLabel(status: TaskHeaderView["status"]) {
@@ -125,12 +125,12 @@ export function TaskWorkspaceHeaderCard({
   }, [showMoreMenu]);
 
   return (
-    <SurfaceCard
+    <Card
       className="relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-slate-200/80 bg-white/88 p-1 shadow-sm backdrop-blur"
-      variant="inset"
-      padding="none"
+     
+     
     >
-      <SurfaceCardHeader className="flex flex-col gap-1.5 px-2.5 py-1.5 lg:flex-row lg:items-center lg:justify-between">
+      <CardHeader className="flex flex-col gap-1.5 px-2.5 py-1.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {workspaceStateLabel ? (
@@ -141,19 +141,19 @@ export function TaskWorkspaceHeaderCard({
             <h1 className="min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-slate-950 lg:max-w-[42vw]">
               {header.title}
             </h1>
-            <StatusBadge tone={userStatusTone(header.status)}>
+            <Badge variant={userStatusTone(header.status)}>
               {primaryStatusLabel}
-            </StatusBadge>
-            {showTaskStatus ? <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge> : null}
-            <StatusBadge tone={priorityTone(task.priority)}>
+            </Badge>
+            {showTaskStatus ? <Badge variant={statusTone(task.status)}>{task.status}</Badge> : null}
+            <Badge variant={priorityTone(task.priority)}>
               {task.priority}
-            </StatusBadge>
+            </Badge>
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {task.runnabilityState ? (
-              <StatusBadge tone={task.isRunnable ? "success" : "warning"}>
+              <Badge variant={task.isRunnable ? "secondary" : "secondary"}>
                 {task.runnabilitySummary}
-              </StatusBadge>
+              </Badge>
             ) : null}
             <span>
               {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
@@ -169,52 +169,47 @@ export function TaskWorkspaceHeaderCard({
 
         <div className="flex w-full flex-wrap items-center justify-start gap-1 sm:w-auto lg:justify-end">
           {planAction?.placement === "primary" ? (
-            <button
+            <Button
               type="button"
               disabled={planAction.disabled || planAction.isLoading}
               onClick={planAction.onClick}
-              className={buttonVariants({
-                variant: "default",
-                size: "sm",
-                className: "min-w-28 rounded-xl",
-              })}
+              variant="default"
+              size="sm"
+              className="min-w-28 rounded-xl"
             >
               {planAction.isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
               {planAction.label}
-            </button>
+            </Button>
           ) : null}
           {visibleActions.map((action) => {
             const Icon = actionIcon(action.id);
             const isPending = pendingActionId === action.id;
             return (
-              <button
+              <Button
                 key={action.id}
                 type="button"
                 disabled={action.disabled || Boolean(pendingActionId)}
                 title={action.disabledReason}
                 onClick={() => void handleAction(action)}
-                className={buttonVariants({
-                  variant: actionVariant(action.id),
-                  size: "sm",
-                  className: action.id === "start" ? "min-w-24 rounded-xl" : "rounded-xl",
-                })}
+                variant={actionVariant(action.id)}
+                size="sm"
+                className={action.id === "start" ? "min-w-24 rounded-xl" : "rounded-xl"}
               >
                 <Icon className={isPending ? "size-3.5 animate-pulse" : "size-3.5"} />
                 {isPending ? `${action.label}...` : action.label}
-              </button>
+              </Button>
             );
           })}
           <div className="relative" ref={moreMenuRef}>
-            <button
+            <Button
               type="button"
               onClick={() => setShowMoreMenu((current) => !current)}
-              className={buttonVariants({
-                variant: "ghost",
-                className: "size-7 rounded-lg",
-              })}
+              variant="ghost"
+              size="icon-xs"
+              className="rounded-lg"
             >
               <Ellipsis className="size-3.5" />
-            </button>
+            </Button>
             {showMoreMenu ? (
               <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-border/60 bg-white p-1 shadow-[0_14px_36px_rgba(15,23,42,0.12)]">
                 {header.canEditTitle ? (
@@ -268,7 +263,7 @@ export function TaskWorkspaceHeaderCard({
             ) : null}
           </div>
         </div>
-      </SurfaceCardHeader>
+      </CardHeader>
 
       {actionStatus ? (
         <p className="mt-1 px-2 text-xs text-muted-foreground" role="status">
@@ -286,28 +281,27 @@ export function TaskWorkspaceHeaderCard({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <button
+              <Button
                 type="button"
                 onClick={onDelete}
-                className={buttonVariants({
-                  variant: "destructive",
-                  size: "sm",
-                })}
+                variant="destructive"
+                size="sm"
                 disabled={isDeleting}
               >
                 {isDeleting ? "Deleting..." : "Confirm delete"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={onCancelDeleteConfirm}
-                className={buttonVariants({ variant: "ghost", size: "sm" })}
+                variant="ghost"
+                size="sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       ) : null}
-    </SurfaceCard>
+    </Card>
   );
 }
