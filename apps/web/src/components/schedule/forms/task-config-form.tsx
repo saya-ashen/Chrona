@@ -147,7 +147,7 @@ function TaskConfigSelect({
         <SelectTrigger id={triggerId} className="w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="z-[160]">
           <SelectGroup>
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
@@ -188,7 +188,7 @@ function TaskConfigDatePicker({
             {selectedDate ? formatLocalDateLabel(selectedDate) : placeholder}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto p-0">
+        <PopoverContent align="start" className="z-[160] w-auto p-0">
           <Calendar
             mode="single"
             selected={selectedDate ?? undefined}

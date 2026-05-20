@@ -201,6 +201,7 @@ export function SchedulePage({
           onCreateTaskBlock={handleCreateTaskBlock}
           onScheduledDragStart={handleScheduledDragStart}
           onDragEnd={handleQueueDragEnd}
+          onSelectTask={setLocalSelectedTaskId}
           onSaveTaskConfigAction={handleTaskConfigSave}
         />
 

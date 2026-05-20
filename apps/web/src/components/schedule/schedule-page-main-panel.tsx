@@ -151,6 +151,7 @@ export function SchedulePageMainPanel({
   onCreateTaskBlock,
   onScheduledDragStart,
   onDragEnd,
+  onSelectTask,
   onSaveTaskConfigAction,
 }: {
   copy: SchedulePageCopy;
@@ -172,6 +173,7 @@ export function SchedulePageMainPanel({
   onCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
   onScheduledDragStart: (item: SchedulePageData["scheduled"][number]) => void;
   onDragEnd: () => void;
+  onSelectTask: (taskId: string) => void;
   onSaveTaskConfigAction: (
     taskId: string,
     input: TaskConfigFormInput,
@@ -213,6 +215,7 @@ export function SchedulePageMainPanel({
                 onCreateTaskBlock={onCreateTaskBlock}
                 onScheduledDragStart={onScheduledDragStart}
                 onDragEnd={onDragEnd}
+                onSelectTask={onSelectTask}
               />
             ) : (
               <EmptyState>{copy.noTimelineDay}</EmptyState>

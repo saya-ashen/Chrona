@@ -1,52 +1,82 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type MouseEvent,
-} from "react";
+import FullCalendar from "@fullcalendar/react";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin, {
+  type DateClickArg,
+  type EventResizeDoneArg,
+} from "@fullcalendar/interaction";
+import type {
+  DatesSetArg,
+  DateSelectArg,
+  EventContentArg,
+  EventDropArg,
+  EventInput,
+} from "@fullcalendar/core";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   getSchedulePageCopy,
-  TIMELINE_COMPOSER_HEIGHT,
-  TIMELINE_COMPOSER_MARGIN,
   TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
 import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 import { DayTimelineSummary } from "@/components/schedule/panels/schedule-page-panels";
-import {
-  ScheduledTimelineBlock,
-  TimelinePlacementCard,
-} from "@/components/schedule/timeline/schedule-timeline-primitives";
+import { TimelinePlacementCard } from "@/components/schedule/timeline/schedule-timeline-primitives";
 import { ScheduleGhostBlockLayer } from "@/components/global-ai-sidebar/schedule-ghost-block-layer";
 import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type {
   ScheduledItem,
   TimelineCreateInput,
   TimelineDragItem,
-  TimelineInteractionMode,
   TimelinePlacementPreview,
-  TimelineResizeDraft,
 } from "@/components/schedule/schedule-page-types";
 import {
-  buildCompressedTimeline,
+  buildScheduleHref,
   buildTimelinePlacementPreview,
   clampScheduledEndMinute,
   clampScheduledStartMinute,
   formatDayHeading,
-  formatTime,
+  formatTimeRange,
+  getBlockDurationMinutes,
+  getPriorityAccent,
   getTodayKey,
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
 import { type TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
+import { Badge } from "@/components/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
-const TIMELINE_HOUR_HEIGHT_MIN = 44;
-const TIMELINE_HOUR_HEIGHT_MAX = 62;
+const TIMELINE_HOUR_HEIGHT = 56;
+const WORKDAY_START_HOUR = 8;
+
+function minutesFromDate(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function dateForMinute(dayDate: Date, minute: number) {
+  const nextDate = new Date(dayDate);
+  nextDate.setHours(Math.floor(minute / 60), minute % 60, 0, 0);
+  return nextDate;
+}
+
+function fullCalendarTime(hour: number, minute = 0) {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+}
+
+function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): TimelineDragItem {
+  return {
+    kind: "scheduled",
+    taskId: item.taskId,
+    title: item.title,
+    dueAt: item.dueAt,
+    durationMinutes: Math.max(
+      getBlockDurationMinutes({ scheduledStartAt: startAt, scheduledEndAt: endAt }),
+      TIMELINE_SLOT_MINUTES,
+    ),
+  };
+}
+
 function TimelineComposer({
   draft,
   defaultExecutionRuntime,
@@ -54,7 +84,7 @@ function TimelineComposer({
   onClose,
   onCreate,
 }: {
-  draft: { top: number; height: number; startAt: Date; endAt: Date; startMinute: number; endMinute: number };
+  draft: TimelinePlacementPreview;
   defaultExecutionRuntime: string;
   isPending: boolean;
   onClose: () => void;
@@ -99,6 +129,7 @@ export function DayTimeline({
   onCreateTaskBlock,
   onScheduledDragStart,
   onDragEnd,
+  onSelectTask = () => {},
 }: {
   items: ScheduledItem[];
   dayDate: Date;
@@ -118,196 +149,112 @@ export function DayTimeline({
   onCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
   onScheduledDragStart: (item: ScheduledItem) => void;
   onDragEnd: () => void;
+  onSelectTask?: (taskId: string) => void;
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
-  const _compressedTimeline = useMemo(
-    () => buildCompressedTimeline(items),
+  const selectedItemById = useMemo(
+    () => new Map(items.map((item) => [item.taskId, item])),
     [items],
   );
-  const [hourHeight, setHourHeight] = useState(52);
-  const timelineHeight = hourHeight * 24;
-  const [viewportMinHeight, setViewportMinHeight] = useState(0);
-  const effectiveTimelineHeight = Math.max(timelineHeight, viewportMinHeight);
-  const hours = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
-  const workdayStartMinute = 8 * 60;
-  const workdayEndMinute = 18 * 60;
-
-  function mapMinuteToY(minute: number) {
-    const clamped = Math.min(Math.max(minute, 0), 24 * 60);
-    return (clamped / 60) * hourHeight;
-  }
-
-  function mapYToMinute(y: number) {
-    const clamped = Math.min(Math.max(y, 0), timelineHeight);
-    return (clamped / hourHeight) * 60;
-  }
-  const isToday = selectedDay === getTodayKey();
-  const currentTimeMarker = useMemo(() => {
-    if (!isToday) {
-      return null;
-    }
-
-    const now = new Date();
-    const minute = now.getHours() * 60 + now.getMinutes();
-
-    return {
-      top: mapMinuteToY(minute),
-      label: formatTime(now, locale),
-    };
-  }, [hourHeight, isToday, locale]);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const timelineRef = useRef<HTMLDivElement | null>(null);
-  const dragPreviewRef = useRef<TimelinePlacementPreview | null>(null);
-  const dragRafRef = useRef<number | null>(null);
-  const [interactionMode, setInteractionMode] = useState<TimelineInteractionMode>("idle");
-  const [dragPreview, setDragPreview] = useState<TimelinePlacementPreview | null>(null);
+  const calendarRef = useRef<FullCalendar | null>(null);
+  const dropZoneRef = useRef<HTMLDivElement | null>(null);
   const [composerDraft, setComposerDraft] = useState<TimelinePlacementPreview | null>(null);
-  const [resizeDraft, setResizeDraft] = useState<TimelineResizeDraft | null>(null);
-  const resizeDraftRef = useRef<TimelineResizeDraft | null>(null);
+  const [dragPreview, setDragPreview] = useState<TimelinePlacementPreview | null>(null);
+  const [hiddenTaskId, setHiddenTaskId] = useState<string | null>(null);
 
-  function updateResizeDraft(nextDraft: TimelineResizeDraft | null) {
-    resizeDraftRef.current = nextDraft;
-    setResizeDraft(nextDraft);
-  }
+  const mapMinuteToY = (minute: number) => {
+    const clamped = Math.min(Math.max(minute, 0), 24 * 60);
+    return (clamped / 60) * TIMELINE_HOUR_HEIGHT;
+  };
 
-  function closeComposer() {
-    setInteractionMode("idle");
-    setComposerDraft(null);
-  }
-
-  useEffect(() => {
-    if (!composerDraft || !scrollContainerRef.current) {
-      return;
-    }
-
-    const scrollContainer = scrollContainerRef.current;
-    const composerTop = Math.min(
-      Math.max(
-        composerDraft.top + composerDraft.height - TIMELINE_COMPOSER_HEIGHT,
-        TIMELINE_COMPOSER_MARGIN,
-      ),
-      Math.max(
-        TIMELINE_COMPOSER_MARGIN,
-        effectiveTimelineHeight - TIMELINE_COMPOSER_HEIGHT - TIMELINE_COMPOSER_MARGIN,
-      ),
-    );
-    const visibleTop = scrollContainer.scrollTop;
-    const visibleBottom = visibleTop + scrollContainer.clientHeight;
-    const composerBottom = composerTop + TIMELINE_COMPOSER_HEIGHT;
-
-    function setScrollTop(top: number) {
-      if (typeof scrollContainer.scrollTo === "function") {
-        scrollContainer.scrollTo({ top, behavior: "smooth" });
-        return;
-      }
-
-      scrollContainer.scrollTop = top;
-    }
-
-    if (composerTop < visibleTop + TIMELINE_COMPOSER_MARGIN) {
-      setScrollTop(Math.max(composerTop - 16, 0));
-      return;
-    }
-
-    if (composerBottom > visibleBottom - TIMELINE_COMPOSER_MARGIN) {
-      setScrollTop(
-        Math.max(composerBottom - scrollContainer.clientHeight + 16, 0),
-      );
-    }
-  }, [composerDraft, effectiveTimelineHeight]);
-
-  useEffect(() => {
-    const node = scrollContainerRef.current;
-    if (!node) {
-      return;
-    }
-
-    const scrollNode = node;
-
-    function syncViewportMinHeight() {
-      const availableHeight = Math.max(scrollNode.clientHeight - 16, 640);
-      const fittedHourHeight = Math.min(
-        TIMELINE_HOUR_HEIGHT_MAX,
-        Math.max(TIMELINE_HOUR_HEIGHT_MIN, Math.floor(availableHeight / 18)),
-      );
-
-      setHourHeight(fittedHourHeight);
-      setViewportMinHeight(Math.max(availableHeight, fittedHourHeight * 14));
-    }
-
-    syncViewportMinHeight();
-    window.addEventListener("resize", syncViewportMinHeight);
-
-    return () => {
-      window.removeEventListener("resize", syncViewportMinHeight);
-    };
-  }, []);
-
-  function getMinuteFromClientY(clientY: number) {
-    const timeline = timelineRef.current;
-
-    if (!timeline) {
-      return 9 * 60;
-    }
-
-    const rect = timeline.getBoundingClientRect();
-
-    if (rect.height <= 0) {
-      return 9 * 60;
-    }
-
-    return mapYToMinute(clientY - rect.top);
-  }
-
-  function buildPlacementPreview(
+  const buildPlacementPreview = (
     startMinute: number,
     endMinute: number,
     source: TimelinePlacementPreview["source"],
     taskId?: string,
-  ) {
-    return buildTimelinePlacementPreview({
-      selectedDay,
-      startMinute,
-      endMinute,
-      compressedTimeline: { mapMinuteToY },
-      items,
-      taskId,
-      source,
-    });
+  ) => buildTimelinePlacementPreview({
+    selectedDay,
+    startMinute,
+    endMinute,
+    compressedTimeline: { mapMinuteToY },
+    items,
+    taskId,
+    source,
+  });
+
+  const calendarEvents = useMemo<EventInput[]>(() => items.map((item) => {
+    const start = item.scheduledStartAt ?? dateForMinute(dayDate, 9 * 60);
+    const end = item.scheduledEndAt ?? dateForMinute(
+      dayDate,
+      minutesFromDate(start) + DEFAULT_SCHEDULE_BLOCK_MINUTES,
+    );
+    const isCurrent = selectedDay === getTodayKey() && start.getTime() <= Date.now() && end.getTime() >= Date.now();
+    const isPast = selectedDay === getTodayKey() && end.getTime() < Date.now();
+    const hasConflict = conflictTaskIds?.has(item.taskId) ?? false;
+
+    return {
+      id: item.taskId,
+      title: item.title,
+      start,
+      end,
+      editable: !isPending,
+      durationEditable: !isPending,
+      startEditable: !isPending,
+      classNames: [
+        "chrona-calendar-event",
+        selectedTaskId === item.taskId ? "chrona-calendar-event-selected" : "",
+        isCurrent ? "chrona-calendar-event-current" : "",
+        isPast ? "chrona-calendar-event-past" : "",
+        hasConflict ? "chrona-calendar-event-conflict" : "",
+        hiddenTaskId === item.taskId ? "chrona-calendar-event-hidden" : "",
+      ].filter(Boolean),
+      extendedProps: { item, hasConflict, isCurrent },
+    };
+  }), [conflictTaskIds, dayDate, hiddenTaskId, isPending, items, selectedDay, selectedTaskId]);
+
+  function closeComposer() {
+    setComposerDraft(null);
   }
 
-  function getDragPreview(clientY: number) {
-    const rawMinute = getMinuteFromClientY(clientY);
-    const snappedStartMinute = clampScheduledStartMinute(
-      snapMinuteToGrid(rawMinute),
-    );
-    const durationMinutes = draggedItem?.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES;
-    const endMinute = Math.min(snappedStartMinute + durationMinutes, 24 * 60);
+  function getDragPreviewFromDate(date: Date) {
+    if (!draggedItem) {
+      return null;
+    }
 
-    const preview = buildPlacementPreview(
+    const snappedStartMinute = clampScheduledStartMinute(
+      snapMinuteToGrid(minutesFromDate(date)),
+    );
+    const endMinute = Math.min(
+      snappedStartMinute + (draggedItem.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES),
+      24 * 60,
+    );
+
+    return buildPlacementPreview(
       snappedStartMinute,
       endMinute,
       "drag",
-      draggedItem?.kind === "scheduled" ? draggedItem.taskId : undefined,
+      draggedItem.kind === "scheduled" ? draggedItem.taskId : undefined,
     );
-
-    const maxTop = Math.max(0, effectiveTimelineHeight - preview.height);
-    return { ...preview, top: Math.min(Math.max(preview.top, 0), maxTop) };
   }
 
-  function createDraftAtMinute(minute: number) {
-    const snappedStartMinute = clampScheduledStartMinute(snapMinuteToGrid(minute));
-    const endMinute = Math.min(snappedStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES, 24 * 60);
-    return buildPlacementPreview(snappedStartMinute, endMinute, "create");
-  }
+  function getDragDateFromClientY(clientY: number) {
+    const api = calendarRef.current?.getApi();
+    const zone = dropZoneRef.current;
+    const slats = zone?.querySelector(".fc-timegrid-slots");
 
-  function openComposerAtMinute(minute: number) {
-    setInteractionMode("creating");
-    updateResizeDraft(null);
-    setDragPreview(null);
-    setComposerDraft(createDraftAtMinute(minute));
+    if (!api || !slats) {
+      return dateForMinute(dayDate, 9 * 60);
+    }
+
+    const rect = slats.getBoundingClientRect();
+    if (rect.height <= 0) {
+      return dateForMinute(dayDate, 9 * 60);
+    }
+
+    const minute = (Math.min(Math.max(clientY - rect.top, 0), rect.height) / rect.height) * 24 * 60;
+    return dateForMinute(dayDate, minute);
   }
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -317,47 +264,7 @@ export function DayTimeline({
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-
-    if (interactionMode !== "dragging") {
-      setInteractionMode("dragging");
-      setComposerDraft(null);
-      updateResizeDraft(null);
-    }
-
-    dragPreviewRef.current = getDragPreview(event.clientY);
-
-    if (dragRafRef.current === null) {
-      dragRafRef.current = requestAnimationFrame(() => {
-        dragRafRef.current = null;
-        if (dragPreviewRef.current) {
-          setDragPreview(dragPreviewRef.current);
-        }
-      });
-    }
-  }
-
-  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
-    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      return;
-    }
-
-    if (dragRafRef.current !== null) {
-      cancelAnimationFrame(dragRafRef.current);
-      dragRafRef.current = null;
-    }
-    dragPreviewRef.current = null;
-    setInteractionMode("idle");
-    setDragPreview(null);
-  }
-
-  function clearDragState() {
-    if (dragRafRef.current !== null) {
-      cancelAnimationFrame(dragRafRef.current);
-      dragRafRef.current = null;
-    }
-    dragPreviewRef.current = null;
-    setInteractionMode("idle");
-    setDragPreview(null);
+    setDragPreview(getDragPreviewFromDate(getDragDateFromClientY(event.clientY)));
   }
 
   async function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -366,8 +273,8 @@ export function DayTimeline({
     }
 
     event.preventDefault();
-    const preview = getDragPreview(event.clientY) ?? dragPreviewRef.current;
-    clearDragState();
+    const preview = getDragPreviewFromDate(getDragDateFromClientY(event.clientY)) ?? dragPreview;
+    setDragPreview(null);
 
     if (!preview || preview.hasConflict) {
       return;
@@ -376,23 +283,50 @@ export function DayTimeline({
     await onScheduleDrop(draggedItem, preview.startAt, preview.endAt);
   }
 
-  async function commitKeyboardAdjustment(
-    item: ScheduledItem,
-    adjustment: {
-      startMinute: number;
-      endMinute: number;
-    },
-  ) {
-    if (isPending || draggedItem) {
+  function handleDateClick(info: DateClickArg) {
+    if (draggedItem || isPending) {
       return;
     }
 
-    const preview = buildPlacementPreview(
-      adjustment.startMinute,
-      adjustment.endMinute,
-      "resize",
-      item.taskId,
+    const startMinute = clampScheduledStartMinute(snapMinuteToGrid(minutesFromDate(info.date)));
+    const endMinute = Math.min(startMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES, 24 * 60);
+    setComposerDraft(buildPlacementPreview(startMinute, endMinute, "create"));
+  }
+
+  function handleDateSelect(info: DateSelectArg) {
+    if (draggedItem || isPending) {
+      return;
+    }
+
+    const calendarApi = calendarRef.current?.getApi();
+    const startMinute = clampScheduledStartMinute(snapMinuteToGrid(minutesFromDate(info.start)));
+    const rawEndMinute = minutesFromDate(info.end);
+    const endMinute = clampScheduledEndMinute(
+      startMinute,
+      snapMinuteToGrid(rawEndMinute),
     );
+
+    calendarApi?.unselect();
+    setComposerDraft(buildPlacementPreview(startMinute, endMinute, "create"));
+  }
+
+  async function handleKeyboardAdjust(item: ScheduledItem, key: "ArrowUp" | "ArrowDown") {
+    if (!item.scheduledStartAt || isPending || draggedItem) {
+      return;
+    }
+
+    const step = key === "ArrowUp" ? -TIMELINE_SLOT_MINUTES : TIMELINE_SLOT_MINUTES;
+    const currentStartMinute = minutesFromDate(item.scheduledStartAt);
+    const currentEndMinute = item.scheduledEndAt
+      ? minutesFromDate(item.scheduledEndAt)
+      : currentStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES;
+    const duration = Math.max(currentEndMinute - currentStartMinute, TIMELINE_SLOT_MINUTES);
+    const nextStartMinute = clampScheduledStartMinute(currentStartMinute + step);
+    const nextEndMinute = clampScheduledEndMinute(
+      nextStartMinute,
+      nextStartMinute + duration,
+    );
+    const preview = buildPlacementPreview(nextStartMinute, nextEndMinute, "resize", item.taskId);
 
     if (preview.hasConflict) {
       return;
@@ -411,145 +345,147 @@ export function DayTimeline({
     );
   }
 
-  async function handleKeyboardAdjust(
-    item: ScheduledItem,
-    key: "ArrowUp" | "ArrowDown",
-    mode: "move" | "resize",
-  ) {
-    if (!item.scheduledStartAt) {
+  function handleAccessibleResizeStart(item: ScheduledItem) {
+    if (!item.scheduledStartAt || isPending || draggedItem) {
       return;
     }
 
-    const step = key === "ArrowUp" ? -TIMELINE_SLOT_MINUTES : TIMELINE_SLOT_MINUTES;
-    const currentStartMinute =
-      item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes();
+    const startMinute = minutesFromDate(item.scheduledStartAt);
     const currentEndMinute = item.scheduledEndAt
-      ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
-      : currentStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES;
-
-    if (mode === "move") {
-      const duration = Math.max(
-        currentEndMinute - currentStartMinute,
-        TIMELINE_SLOT_MINUTES,
-      );
-      const nextStartMinute = clampScheduledStartMinute(currentStartMinute + step);
-      const nextEndMinute = Math.min(nextStartMinute + duration, 24 * 60);
-
-      await commitKeyboardAdjustment(item, {
-        startMinute: nextStartMinute,
-        endMinute: nextEndMinute,
-      });
-      return;
-    }
-
-    const nextEndMinute = clampScheduledEndMinute(
-      currentStartMinute,
-      currentEndMinute + step,
-    );
-
-    if (nextEndMinute === currentEndMinute) {
-      return;
-    }
-
-    await commitKeyboardAdjustment(item, {
-      startMinute: currentStartMinute,
-      endMinute: nextEndMinute,
-    });
-  }
-
-  function handleResizeStart(item: ScheduledItem, _clientY: number) {
-    if (isPending || !item.scheduledStartAt) {
-      return;
-    }
-
-    const startMinute = item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes();
-    const currentEndMinute = item.scheduledEndAt
-      ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
+      ? minutesFromDate(item.scheduledEndAt)
       : startMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES;
-    const initialPreview = buildPlacementPreview(startMinute, currentEndMinute, "resize", item.taskId);
-    const initialDraft = { ...initialPreview, taskId: item.taskId, edge: "end" } satisfies TimelineResizeDraft;
 
-    setInteractionMode("resizing");
-    setComposerDraft(null);
-    setDragPreview(null);
-    updateResizeDraft(initialDraft);
-
-    const resizePreviewRef = { current: initialDraft };
-    let resizeRaf: number | null = null;
-
-    function handlePointerMove(moveEvent: globalThis.MouseEvent) {
-      const snappedEndMinute = clampScheduledEndMinute(
-        startMinute,
-        snapMinuteToGrid(getMinuteFromClientY(moveEvent.clientY)),
-      );
-
-      resizePreviewRef.current = {
-        ...buildPlacementPreview(startMinute, snappedEndMinute, "resize", item.taskId),
-        taskId: item.taskId,
-        edge: "end" as const,
-      };
-
-      if (resizeRaf === null) {
-        resizeRaf = requestAnimationFrame(() => {
-          resizeRaf = null;
-          updateResizeDraft(resizePreviewRef.current);
-        });
-      }
-    }
-
-    async function handlePointerUp() {
-      window.removeEventListener("mousemove", handlePointerMove);
-      if (resizeRaf !== null) {
-        cancelAnimationFrame(resizeRaf);
-        resizeRaf = null;
-      }
-      setInteractionMode("idle");
-
-      const finalDraft = resizePreviewRef.current;
-      updateResizeDraft(null);
-
-      if (finalDraft.hasConflict) {
-        return;
-      }
-
-      await onScheduleDrop(
-        {
-          kind: "scheduled",
-          taskId: item.taskId,
-          title: item.title,
-          dueAt: item.dueAt,
-          durationMinutes: finalDraft.endMinute - finalDraft.startMinute,
-        },
-        item.scheduledStartAt ?? finalDraft.startAt,
-        finalDraft.endAt,
-      );
-    }
-
-    window.addEventListener("mousemove", handlePointerMove);
     window.addEventListener(
       "mouseup",
       () => {
-        void handlePointerUp();
+        const nextEndMinute = clampScheduledEndMinute(
+          startMinute,
+          currentEndMinute - TIMELINE_SLOT_MINUTES,
+        );
+        const preview = buildPlacementPreview(startMinute, nextEndMinute, "resize", item.taskId);
+
+        if (preview.hasConflict) {
+          return;
+        }
+
+        void onScheduleDrop(
+          {
+            kind: "scheduled",
+            taskId: item.taskId,
+            title: item.title,
+            dueAt: item.dueAt,
+            durationMinutes: preview.endMinute - preview.startMinute,
+          },
+          preview.startAt,
+          preview.endAt,
+        );
       },
       { once: true },
     );
   }
 
-  function handleTimelineClick(event: MouseEvent<HTMLDivElement>) {
-    if (draggedItem || isPending) {
+  async function commitScheduledMove(
+    item: ScheduledItem,
+    startAt: Date | null,
+    endAt: Date | null,
+    revert: () => void,
+  ) {
+    if (!startAt || isPending) {
+      revert();
       return;
     }
 
-    const target = event.target as HTMLElement;
+    const safeEndAt = endAt ?? dateForMinute(
+      startAt,
+      minutesFromDate(startAt) + getBlockDurationMinutes(item),
+    );
+    const preview = buildPlacementPreview(
+      minutesFromDate(startAt),
+      minutesFromDate(safeEndAt),
+      "resize",
+      item.taskId,
+    );
 
-    if (
-      target.closest("[data-timeline-block]") ||
-      target.closest("[data-timeline-composer]")
-    ) {
+    if (preview.hasConflict) {
+      revert();
       return;
     }
 
-    openComposerAtMinute(getMinuteFromClientY(event.clientY));
+    await onScheduleDrop(buildDragItem(item, startAt, safeEndAt), startAt, safeEndAt);
+  }
+
+  async function handleEventDrop(info: EventDropArg) {
+    const item = selectedItemById.get(info.event.id);
+    if (!item) {
+      info.revert();
+      return;
+    }
+
+    await commitScheduledMove(item, info.event.start, info.event.end, info.revert);
+  }
+
+  async function handleEventResize(info: EventResizeDoneArg) {
+    const item = selectedItemById.get(info.event.id);
+    if (!item) {
+      info.revert();
+      return;
+    }
+
+    await commitScheduledMove(item, info.event.start, info.event.end, info.revert);
+  }
+
+  function handleDatesSet(_info: DatesSetArg) {
+    window.requestAnimationFrame(() => {
+      const calendarScroller = dropZoneRef.current?.querySelector(".fc-scroller") as HTMLElement | null;
+      if (calendarScroller && calendarScroller.scrollTop < WORKDAY_START_HOUR * TIMELINE_HOUR_HEIGHT * 0.75) {
+        calendarScroller.scrollTop = WORKDAY_START_HOUR * TIMELINE_HOUR_HEIGHT;
+      }
+    });
+  }
+
+  function renderEventContent(info: EventContentArg) {
+    const item = info.event.extendedProps.item as ScheduledItem | undefined;
+    if (!item) {
+      return <span>{info.event.title}</span>;
+    }
+
+    const hasConflict = Boolean(info.event.extendedProps.hasConflict);
+    const isCurrent = Boolean(info.event.extendedProps.isCurrent);
+
+    return (
+      <div
+        className="flex h-full min-h-0 gap-2 overflow-hidden p-2 text-left"
+        draggable={!isPending}
+        onDragStart={() => {
+          setHiddenTaskId(item.taskId);
+          onScheduledDragStart(item);
+        }}
+        onDragEnd={() => {
+          setHiddenTaskId(null);
+          onDragEnd();
+        }}
+      >
+        <div className={cn("w-1 shrink-0 rounded-full", isCurrent ? "bg-primary" : getPriorityAccent(item.priority))} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="line-clamp-1 text-sm font-medium text-foreground">{info.event.title}</p>
+            <Badge variant="secondary" className="shrink-0 px-2 py-0 text-[10px]">
+              {item.priority}
+            </Badge>
+          </div>
+          <p className="truncate text-xs text-muted-foreground">
+            {formatTimeRange(info.event.start, info.event.end, locale, copy)}
+          </p>
+          {hasConflict || item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              {hasConflict ? <Badge variant="destructive">{copy.conflictPreviewLabel}</Badge> : null}
+              {item.scheduleStatus === "Overdue" ? <Badge variant="destructive">{copy.overdue}</Badge> : null}
+              {item.approvalPendingCount ? <Badge variant="secondary">{copy.approvalPending}</Badge> : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -572,127 +508,102 @@ export function DayTimeline({
       </div>
 
       <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto bg-gradient-to-b from-white/92 via-white/88 to-slate-50/90 p-1.5 pr-0 sm:p-2"
+        ref={dropZoneRef}
+        role="region"
+        aria-label={`Schedule drop zone for ${formatDayHeading(dayDate, locale, copy)}`}
+        className={cn(
+          "chrona-fullcalendar relative min-h-0 flex-1 overflow-hidden bg-slate-50/85 p-1.5 sm:p-2",
+          draggedItem && "chrona-fullcalendar-drop-mode",
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setDragPreview(null);
+          }
+        }}
+        onDrop={(event) => {
+          void handleDrop(event);
+        }}
       >
-        <div className="flex min-w-0 gap-1.5 sm:gap-2">
-          <div className="sticky left-0 z-20 w-14 shrink-0 self-start rounded-2xl border border-border/40 bg-white/95 py-3 pl-1 shadow-[8px_0_18px_rgba(15,23,42,0.04)] sm:w-20 sm:pl-2">
-            <div className="relative" style={{ height: `${effectiveTimelineHeight}px` }}>
-              {hours.map((hour) => (
-                <div
-                  key={hour}
-                  className="absolute left-0 right-0"
-                  style={{ top: `${mapMinuteToY(hour * 60)}px` }}
-                >
-                  <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground sm:px-1.5 sm:text-[11px]">
-                    {formatTime(new Date(2026, 0, 1, hour, 0), locale)}
-                  </span>
-                </div>
-              ))}
-              <div
-                className="absolute left-0 right-0"
-                style={{ top: `${effectiveTimelineHeight}px` }}
-              >
-                <span className="-translate-y-1/2 rounded-md bg-slate-100 px-1 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground sm:px-1.5 sm:text-[11px]">
-                  11:59 PM
-                </span>
-              </div>
-            </div>
-          </div>
+        <div className="relative h-full min-h-[40rem] rounded-2xl border border-border/75 bg-background shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04),0_16px_38px_rgba(15,23,42,0.08)]">
+          {selectedDay === getTodayKey() ? (
+            <span className="sr-only" aria-label="Current time marker" />
+          ) : null}
+          <div className="sr-only">
+            {items.map((item) => (
+              <div key={item.taskId}>
+                <a
+                  href={buildScheduleHref(selectedDay, item.taskId)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onSelectTask(item.taskId);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                      return;
+                    }
 
-          <div
-            ref={timelineRef}
-            role="region"
-            aria-label={`Schedule drop zone for ${formatDayHeading(dayDate, locale, copy)}`}
-            tabIndex={0}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={(event) => {
-              void handleDrop(event);
-            }}
-            onClick={handleTimelineClick}
-            className={cn(
-              "relative min-w-0 flex-1 touch-manipulation rounded-2xl border border-border/60 bg-white/82 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/35",
-              draggedItem && "border-primary/50 bg-primary/[0.08] shadow-[inset_0_0_0_1px_rgba(99,88,233,0.12)]",
-            )}
-            style={{ height: `${effectiveTimelineHeight}px` }}
-          >
-            <div
-              className="pointer-events-none absolute inset-x-1 rounded-[22px] border border-primary/10 bg-primary/[0.035]"
-              style={{
-                top: `${mapMinuteToY(workdayStartMinute)}px`,
-                height: `${mapMinuteToY(workdayEndMinute) - mapMinuteToY(workdayStartMinute)}px`,
-              }}
-            />
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="absolute inset-x-0"
-                style={{
-                  top: `${mapMinuteToY(hour * 60)}px`,
-                  height: `${hourHeight}px`,
-                }}
-              >
-                <div className="absolute inset-x-0 top-0 border-t border-border/35" />
-                {hour >= workdayStartMinute / 60 && hour < workdayEndMinute / 60 ? (
-                  <div className="pointer-events-none absolute inset-x-2 top-2 h-px bg-primary/10" />
-                ) : null}
+                    event.preventDefault();
+                    void handleKeyboardAdjust(item, event.key);
+                  }}
+                >
+                  {item.title}
+                </a>
+                <button
+                  type="button"
+                  onMouseDown={() => handleAccessibleResizeStart(item)}
+                >
+                  {copy.resizeHandleLabel} {item.title}
+                </button>
               </div>
             ))}
-            <div
-              className="absolute inset-x-0 border-t border-border/35"
-              style={{ top: `${effectiveTimelineHeight}px` }}
-            />
-            {hours.map((hour) => {
-                const halfHourTop = mapMinuteToY(hour * 60 + 30);
+          </div>
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[timeGridPlugin, interactionPlugin]}
+            initialView="timeGridDay"
+            initialDate={dayDate}
+            headerToolbar={false}
+            allDaySlot={false}
+            dayHeaders={false}
+            height="100%"
+            expandRows={false}
+            slotMinTime={fullCalendarTime(0)}
+            slotMaxTime={fullCalendarTime(24)}
+            scrollTime={fullCalendarTime(WORKDAY_START_HOUR)}
+            slotDuration={`00:${String(TIMELINE_SLOT_MINUTES).padStart(2, "0")}:00`}
+            snapDuration={`00:${String(TIMELINE_SLOT_MINUTES).padStart(2, "0")}:00`}
+            slotLabelFormat={{ hour: "numeric", minute: "2-digit" }}
+            nowIndicator={selectedDay === getTodayKey()}
+            selectable={!isPending && !draggedItem}
+            selectMirror={true}
+            unselectAuto={false}
+            editable={!isPending}
+            eventDurationEditable={!isPending}
+            eventStartEditable={!isPending}
+            eventOverlap={false}
+            eventResizableFromStart={false}
+            datesSet={handleDatesSet}
+            dateClick={handleDateClick}
+            select={handleDateSelect}
+            eventClick={(info) => {
+              info.jsEvent.preventDefault();
+              onSelectTask(info.event.id);
+            }}
+            eventDragStart={(info) => setHiddenTaskId(info.event.id)}
+            eventDragStop={() => setHiddenTaskId(null)}
+            eventDrop={(info) => {
+              void handleEventDrop(info);
+            }}
+            eventResize={(info) => {
+              void handleEventResize(info);
+            }}
+            events={calendarEvents}
+            eventContent={renderEventContent}
+          />
 
-                return (
-                  <div
-                    key={`${hour}-30`}
-                    className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-200/70"
-                    style={{ top: `${halfHourTop}px` }}
-                  />
-                );
-              })}
-
-            {currentTimeMarker ? (
-              <div
-                aria-label={`Current time ${currentTimeMarker.label}`}
-                className="pointer-events-none absolute inset-x-0 z-20"
-                style={{ top: `${currentTimeMarker.top}px` }}
-              >
-                <div className="flex -translate-y-1/2 items-center gap-2 px-2 sm:px-3">
-                  <span className="size-2.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(99,88,233,0.14)]" />
-                  <div className="h-px flex-1 bg-primary/80" />
-                  <span className="rounded-full border border-primary/20 bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm">
-                    {currentTimeMarker.label}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-
-            {items.length === 0 ? (
-              <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded-3xl border border-dashed border-primary/30 bg-white/95 p-5 text-sm text-muted-foreground shadow-[0_12px_32px_rgba(15,23,42,0.09)]">
-                <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
-                <p className="mt-1">{copy.emptyDayLaneDescription}</p>
-              </div>
-            ) : null}
-
+          <div className="pointer-events-none absolute inset-x-[70px] top-0 h-full sm:inset-x-[82px]">
             <ScheduleGhostBlockLayer preview={ghostPreview} mapMinuteToY={mapMinuteToY} />
-
-            {composerDraft ? (
-              <TimelineComposer
-                draft={composerDraft}
-                defaultExecutionRuntime={defaultExecutionRuntime}
-                isPending={isPending}
-                onClose={closeComposer}
-                onCreate={async (input) => {
-                  await onCreateTaskBlock(input);
-                  closeComposer();
-                }}
-              />
-            ) : null}
-
             {draggedItem && dragPreview ? (
               <TimelinePlacementCard
                 preview={dragPreview}
@@ -700,62 +611,28 @@ export function DayTimeline({
                 kind={draggedItem.kind}
               />
             ) : null}
-
-            {resizeDraft ? (
-              <TimelinePlacementCard
-                preview={resizeDraft}
-                title={items.find((item) => item.taskId === resizeDraft.taskId)?.title ?? copy.adjustBlock}
-                kind="scheduled"
-              />
-            ) : null}
-
-            {items.map((item) => {
-              const now = Date.now();
-              const start = item.scheduledStartAt
-                ? item.scheduledStartAt.getHours() * 60 + item.scheduledStartAt.getMinutes()
-                : 0;
-              const end = item.scheduledEndAt
-                ? item.scheduledEndAt.getHours() * 60 + item.scheduledEndAt.getMinutes()
-                : start + 60;
-              const safeEnd = Math.max(end, start + 45);
-              const top = mapMinuteToY(start);
-              const height = Math.max(
-                mapMinuteToY(safeEnd) - top,
-                56,
-              );
-              const isCurrent = Boolean(
-                isToday &&
-                  item.scheduledStartAt &&
-                  item.scheduledEndAt &&
-                  item.scheduledStartAt.getTime() <= now &&
-                  item.scheduledEndAt.getTime() >= now,
-              );
-              const isPast = Boolean(
-                isToday && item.scheduledEndAt && item.scheduledEndAt.getTime() < now,
-              );
-
-              return (
-                <ScheduledTimelineBlock
-                  key={item.taskId}
-                  item={item}
-                  selectedDay={selectedDay}
-                  top={top}
-                  height={height}
-                  isSelected={selectedTaskId === item.taskId}
-                  isCurrent={isCurrent}
-                  isPast={isPast}
-                  hasConflict={conflictTaskIds?.has(item.taskId) ?? false}
-                  isPending={isPending}
-                  isHidden={interactionMode === "resizing" && resizeDraft?.taskId === item.taskId}
-                  onDragStart={onScheduledDragStart}
-                  onDragEnd={onDragEnd}
-                  onResizeStart={handleResizeStart}
-                  onKeyboardAdjust={handleKeyboardAdjust}
-                />
-              );
-            })}
           </div>
+
+          {items.length === 0 ? (
+            <div className="pointer-events-none absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-3xl border border-dashed border-primary/30 bg-white/95 p-5 text-sm text-muted-foreground shadow-[0_12px_32px_rgba(15,23,42,0.09)] sm:left-24 sm:right-6">
+              <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
+              <p className="mt-1">{copy.emptyDayLaneDescription}</p>
+            </div>
+          ) : null}
         </div>
+
+        {composerDraft ? (
+          <TimelineComposer
+            draft={composerDraft}
+            defaultExecutionRuntime={defaultExecutionRuntime}
+            isPending={isPending}
+            onClose={closeComposer}
+            onCreate={async (input) => {
+              await onCreateTaskBlock(input);
+              closeComposer();
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -140,6 +140,135 @@
   }
 }
 
+@layer components {
+  .chrona-fullcalendar .fc {
+    --fc-border-color: color-mix(in oklab, var(--border) 86%, transparent);
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: color-mix(in oklab, var(--muted) 68%, var(--background));
+    --fc-now-indicator-color: var(--primary);
+    --fc-event-bg-color: transparent;
+    --fc-event-border-color: transparent;
+    height: 100%;
+    font-family: inherit;
+  }
+
+  .chrona-fullcalendar .fc-theme-standard td,
+  .chrona-fullcalendar .fc-theme-standard th,
+  .chrona-fullcalendar .fc-scrollgrid {
+    border-color: color-mix(in oklab, var(--border) 88%, transparent);
+  }
+
+  .chrona-fullcalendar .fc-scrollgrid {
+    border: 0;
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  .chrona-fullcalendar .fc-timegrid-slot {
+    height: 3.5rem;
+  }
+
+  .chrona-fullcalendar .fc-timegrid-slot-label {
+    background: color-mix(in oklab, var(--muted) 34%, var(--background));
+    color: var(--muted-foreground);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .chrona-fullcalendar .fc-timegrid-slot-minor {
+    border-top-style: dashed;
+  }
+
+  .chrona-fullcalendar .fc-timegrid-col {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--background) 94%, var(--muted)) 0%,
+        color-mix(in oklab, var(--muted) 26%, var(--background)) 100%
+      );
+  }
+
+  .chrona-fullcalendar-drop-mode .fc-timegrid-col {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--muted) 42%, var(--background)) 0%,
+        color-mix(in oklab, var(--muted) 28%, var(--background)) 100%
+      );
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event {
+    margin-inline: 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--border) 92%, var(--foreground));
+    border-radius: 1rem;
+    background: var(--background);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--background) 75%, transparent),
+      0 10px 24px rgb(15 23 42 / 0.16),
+      0 2px 5px rgb(15 23 42 / 0.1);
+    color: var(--foreground);
+    overflow: hidden;
+    transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, background 160ms ease;
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event .fc-event-main {
+    background: var(--background);
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event:hover,
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-selected {
+    border-color: var(--primary);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--primary) 22%, transparent),
+      0 14px 30px rgb(15 23 42 / 0.18),
+      0 0 0 2px color-mix(in oklab, var(--primary) 16%, transparent);
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-current {
+    background: color-mix(in oklab, var(--primary-soft) 42%, var(--background));
+    border-color: var(--primary-border);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--primary-border) 34%, transparent),
+      0 16px 34px rgb(15 23 42 / 0.2);
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-current .fc-event-main {
+    background: color-mix(in oklab, var(--primary-soft) 42%, var(--background));
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-conflict {
+    border-color: color-mix(in oklab, var(--destructive) 72%, white);
+    background: color-mix(in oklab, var(--destructive) 7%, var(--background));
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-conflict .fc-event-main {
+    background: color-mix(in oklab, var(--destructive) 7%, var(--background));
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-past:not(.chrona-calendar-event-current) {
+    opacity: 0.7;
+  }
+
+  .chrona-fullcalendar .fc-event.chrona-calendar-event-hidden {
+    opacity: 0.4;
+  }
+
+  .chrona-fullcalendar .fc-event-main {
+    height: 100%;
+    color: inherit;
+  }
+
+  .chrona-fullcalendar .fc-timegrid-now-indicator-line {
+    border-color: var(--primary);
+  }
+
+  .chrona-fullcalendar .fc-timegrid-now-indicator-arrow {
+    border-color: var(--primary);
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+  }
+}
+
 @keyframes assistant-surface-curtain-down {
   from {
     opacity: 0;
