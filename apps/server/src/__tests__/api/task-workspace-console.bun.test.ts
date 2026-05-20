@@ -110,4 +110,48 @@ describe("task workspace console read data", () => {
       uri: "file://patch.diff",
     }));
   });
+
+  it("returns persisted provider runtime activity for the workspace activity timeline", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Provider Activity");
+    const { taskId } = await seedTask(workspaceId, { title: "Stream provider activity" });
+    const run = await db.run.create({
+      data: {
+        taskId,
+        runtimeName: "openclaw",
+        runtimeRunRef: "run-provider-activity",
+        status: RunStatus.Running,
+        triggeredBy: "agent",
+        startedAt: new Date("2026-05-12T12:00:00.000Z"),
+      },
+    });
+
+    await db.event.create({
+      data: {
+        eventType: "provider.tool_started",
+        workspaceId,
+        taskId,
+        runId: run.id,
+        actorType: "runtime",
+        actorId: "openclaw",
+        source: "provider",
+        payload: {
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          event: { type: "tool_started", toolName: "chrona_plan_read" },
+        },
+        dedupeKey: "provider-runtime-test-event",
+        runtimeTs: new Date("2026-05-12T12:01:00.000Z"),
+        ingestSequence: 1,
+      },
+    });
+
+    const page = await getTaskPage(taskId);
+
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Tool started",
+      description: "chrona_plan_read",
+      tone: "info",
+      timestamp: "2026-05-12T12:01:00.000Z",
+    }));
+  });
 });

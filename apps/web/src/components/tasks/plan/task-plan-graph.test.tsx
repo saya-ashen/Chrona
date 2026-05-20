@@ -603,9 +603,13 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(await screen.findByTestId("task-plan-node-node-condition")).toHaveAttribute("data-node-shape", "diamond");
+    const conditionNode = await screen.findByTestId("task-plan-node-node-condition");
+    expect(conditionNode).toHaveAttribute("data-node-shape", "diamond");
     expect(screen.getByTestId("task-plan-node-node-task")).toHaveAttribute("data-node-shape", "rounded");
-    expect(screen.getByTestId("task-plan-node-node-checkpoint")).toHaveAttribute("data-node-shape", "parallelogram");
+    const checkpointNode = screen.getByTestId("task-plan-node-node-checkpoint");
+    expect(checkpointNode).toHaveAttribute("data-node-shape", "parallelogram");
+    expect(conditionNode.querySelector('polygon[points="16,1 84,1 99,50 84,99 16,99 1,50"]')).not.toBeNull();
+    expect(checkpointNode.querySelector('polygon[points="10,1 99,1 90,99 1,99"]')).not.toBeNull();
   });
 
   it("uses hybrid lanes for branch and sidecar nodes instead of a single vertical rail", async () => {

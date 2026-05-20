@@ -1,5 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type {
   OpenClawChatHistory,
@@ -36,6 +37,10 @@ export type AiRuntimeInvocation = {
 
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
+    const task = await db.task.findUniqueOrThrow({
+      where: { id: input.taskId },
+      select: { workspaceId: true },
+    });
     const run = await db.run.create({
       data: {
         taskId: input.taskId,
@@ -67,6 +72,12 @@ export class AiRuntimeInvoker {
       });
       const response = await runProviderRequest(client.providerClient, request, {
         onRuntimeEvent: input.onRuntimeEvent,
+        eventPersistence: {
+          workspaceId: task.workspaceId,
+          taskId: input.taskId,
+          runId: run.id,
+          runtimeName: input.runtimeName,
+        },
       });
       const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
       const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
@@ -122,7 +133,10 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
 async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
   request: OpenClawGatewayRequest,
-  options: { onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void } = {},
+  options: {
+    onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+    eventPersistence?: RuntimeEventPersistenceContext;
+  } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
   if (providerClient.provider !== "openclaw") {
@@ -153,11 +167,21 @@ async function collectProviderRunSnapshot(
   events: AsyncIterable<ProviderRunEvent>,
   fallbackSessionId: string,
   fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string },
-  options: { onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void } = {},
+  options: {
+    onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+    eventPersistence?: RuntimeEventPersistenceContext;
+  } = {},
 ): Promise<ProviderRunSnapshot> {
   let snapshot: ProviderRunSnapshot | null = null;
+  let eventIndex = 0;
   for await (const event of events) {
+    eventIndex += 1;
     await options.onRuntimeEvent?.(event);
+    await persistProviderRuntimeEvent({
+      context: options.eventPersistence,
+      event,
+      fallbackIndex: eventIndex,
+    });
     if (event.type === "run_completed") {
       snapshot = {
         provider,
@@ -189,6 +213,52 @@ async function collectProviderRunSnapshot(
     throw new Error("Provider run finished without a snapshot");
   }
   return snapshot;
+}
+
+type RuntimeEventPersistenceContext = {
+  workspaceId: string;
+  taskId: string;
+  runId: string;
+  runtimeName: string;
+};
+
+async function persistProviderRuntimeEvent(input: {
+  context?: RuntimeEventPersistenceContext;
+  event: ProviderRunEvent;
+  fallbackIndex: number;
+}) {
+  const context = input.context;
+  if (!context) return;
+
+  try {
+    const runtimeTs = typeof input.event.timestamp === "string"
+      ? new Date(input.event.timestamp)
+      : new Date();
+    const sequence = input.event.sequence ?? input.fallbackIndex;
+
+    await appendCanonicalEvent({
+      eventType: `provider.${input.event.type}`,
+      workspaceId: context.workspaceId,
+      taskId: context.taskId,
+      runId: context.runId,
+      actorType: "runtime",
+      actorId: context.runtimeName,
+      source: "provider",
+      payload: {
+        runtimeName: context.runtimeName,
+        provider: input.event.provider,
+        runId: input.event.runId,
+        nativeRunId: input.event.nativeRunId,
+        sequence,
+        rawEventType: input.event.rawEventType,
+        event: input.event,
+      },
+      dedupeKey: `provider.runtime:${context.runId}:${sequence}:${input.event.type}:${input.event.rawEventType ?? "event"}`,
+      runtimeTs: Number.isNaN(runtimeTs.getTime()) ? new Date() : runtimeTs,
+    });
+  } catch {
+    // Runtime event persistence must not interrupt provider streaming.
+  }
 }
 
 function buildExecutionGatewayRequest(input: {

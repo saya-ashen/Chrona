@@ -44,7 +44,7 @@ const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
   result: "Result",
   action: "Action",
   evidence: "Evidence",
-  configuration: "Configuration",
+  configuration: "Details",
 };
 
 type NodeDetailVariant = "panel" | "rail" | "drawer";
@@ -161,36 +161,6 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
           </p>
         )}
       </div>
-      <EvidenceSummary node={node} />
-    </div>
-  );
-}
-
-function EvidenceSummary({ node }: { node: PlanNodeDataModel }) {
-  const evidence = useMemo(
-    () => evidenceLines(node.resultEvidence),
-    [node.resultEvidence],
-  );
-
-  return (
-    <div className="rounded-[1rem] border border-cyan-100 bg-cyan-50/60 p-3 shadow-sm">
-      <p className="text-sm font-semibold text-slate-950">Key evidence</p>
-      {evidence.length > 0 ? (
-        <div className="mt-1.5 space-y-1">
-          {evidence.slice(0, 4).map((line) => (
-            <div
-              key={line}
-              className="rounded-lg border border-cyan-100/70 bg-white/85 px-2 py-1.5 text-xs text-slate-600"
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-2 text-xs text-slate-500">
-          No evidence or runtime metadata is attached to this node yet.
-        </p>
-      )}
     </div>
   );
 }
@@ -322,29 +292,27 @@ function hasSubmittedInputFields(inputFields: Record<string, string> | undefined
   return Boolean(inputFields && Object.values(inputFields).some((value) => value.trim()));
 }
 
-function ActionTab({
+export function WorkspaceNodeActionControls({
   node,
   disabledActionReason,
-  selectedActionId,
-  setSelectedActionId,
-  fieldValues,
-  setFieldValues,
   onDispatchExecutionAction,
+  className,
 }: {
   node: PlanNodeDataModel;
   disabledActionReason?: string;
-  selectedActionId: string | null;
-  setSelectedActionId: (actionId: string) => void;
-  fieldValues: Record<string, string>;
-  setFieldValues: (
-    update: (current: Record<string, string>) => Record<string, string>,
-  ) => void;
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
+  className?: string;
 }) {
   const actions = node.availableActions ?? [];
   const fields = node.interactiveFields ?? [];
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(() =>
+    pickDefaultWorkspaceAction(node),
+  );
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
+    buildDefaultWorkspaceActionFields(fields),
+  );
   const selectedAction = actions.find((action) => action.id === selectedActionId) ?? null;
   const submittedFields = node.inputFields;
   const isReadOnlySubmittedInput = fields.length > 0 && isTerminalStatus(node.status) && hasSubmittedInputFields(submittedFields);
@@ -357,6 +325,11 @@ function ActionTab({
     isDispatching,
     baseReason: disabledActionReason,
   });
+
+  useEffect(() => {
+    setSelectedActionId(pickDefaultWorkspaceAction(node));
+    setFieldValues(buildDefaultWorkspaceActionFields(fields));
+  }, [node.id]);
 
   async function handleSubmitAction() {
     if (submitDisabledReason) return;
@@ -379,7 +352,7 @@ function ActionTab({
   }
 
   return (
-    <div className="rounded-[1rem] border border-orange-200 bg-orange-50/70 p-3 shadow-sm">
+    <div className={cn("rounded-[1rem] border border-orange-200 bg-orange-50/70 p-3 shadow-sm", className)}>
       <p className="text-sm font-semibold text-slate-950">Action required</p>
       <p className="mt-1 break-words text-sm text-slate-600">
         {node.nextAction ??
@@ -484,6 +457,7 @@ function ConfigurationTab({
         node={node}
         graphCopy={DEFAULT_GRAPH_COPY}
         nodes={nodes}
+        tone="light"
       />
     </div>
   );
@@ -514,19 +488,6 @@ export function TaskWorkspaceNodeDetailPanel({
   const [activeTab, setActiveTab] = useState<
     NodeDetailPanelState["tabs"][number]
   >(detail.tabs[0] ?? "result");
-  const [selectedActionId, setSelectedActionId] = useState<string | null>(() =>
-    currentNode ? pickDefaultWorkspaceAction(currentNode) : null,
-  );
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
-    buildDefaultWorkspaceActionFields(currentNode?.interactiveFields ?? []),
-  );
-
-  useEffect(() => {
-    setSelectedActionId(currentNode ? pickDefaultWorkspaceAction(currentNode) : null);
-    setFieldValues(
-      buildDefaultWorkspaceActionFields(currentNode?.interactiveFields ?? []),
-    );
-  }, [currentNode?.id]);
 
   useEffect(() => {
     if (preferredTab && detail.tabs.includes(preferredTab)) {
@@ -664,13 +625,9 @@ export function TaskWorkspaceNodeDetailPanel({
             <EvidenceTab node={node} />
           </TabsContent>
           <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-            <ActionTab
+            <WorkspaceNodeActionControls
               node={node}
               disabledActionReason={detail.disabledActionReason}
-              selectedActionId={selectedActionId}
-              setSelectedActionId={setSelectedActionId}
-              fieldValues={fieldValues}
-              setFieldValues={setFieldValues}
               onDispatchExecutionAction={onDispatchExecutionAction}
             />
           </TabsContent>

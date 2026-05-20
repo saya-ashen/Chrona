@@ -29,6 +29,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Needs handling").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Approve result").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "结果" }));
     expect(screen.getByText("Latest result")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
@@ -42,7 +43,37 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(onAction).toHaveBeenCalledWith("approval");
   });
 
-  it("renders artifact source links with artifact-backed overview data", () => {
+  it("renders live provider runtime events in the activity tab", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+
+    render(
+      <TaskWorkspaceExecutionOverview
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        runtimeEvents={[{
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "execute",
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "run-1",
+          sequence: 1,
+          timestamp: "2026-05-12T10:01:00.000Z",
+          event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
+    expect(screen.getByText("Tool started")).toBeInTheDocument();
+    expect(screen.getByText("正在读取计划")).toBeInTheDocument();
+  });
+
+  it("renders full latest result and expandable artifact content", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
     const onAction = vi.fn();
 
@@ -57,12 +88,44 @@ describe("TaskWorkspaceExecutionOverview", () => {
       />,
     );
 
-    expect(screen.getAllByText("No execution result yet.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "结果" }));
+    expect(screen.getByText("summary")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View full result ->" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Locate result node" }));
+    expect(onAction).toHaveBeenCalledWith("done");
+
     fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
     expect(screen.getByText("done output 1", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("summary")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    fireEvent.click(screen.getByRole("button", { name: "Locate source node" }));
     expect(onAction).toHaveBeenCalledWith("done");
+  });
+
+  it("renders a command center primary action", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const onClick = vi.fn();
+
+    render(
+      <TaskWorkspaceExecutionOverview
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        primaryAction={{
+          label: "Generate plan",
+          description: "Create an execution plan before starting task work.",
+          statusLabel: "idle",
+          tone: "info",
+          onClick,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Current operation")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it("renders empty and stale workspace overview states", () => {

@@ -133,9 +133,28 @@ describe("task workspace execution console view model", () => {
     expect(view.navigation).toMatchObject({ brandName: "Chrona", activeSection: "tasks", settingsAvailable: true, memberIdentity: "Project member", notificationCount: 2 });
     expect(view.executionFlow.nodes[0]).toMatchObject({ id: "active", stepNumber: 1, status: "running" });
     expect(view.readiness).toMatchObject({ title: "Current work", statusLabel: "Running", tone: "info", actionNodeId: "active" });
-    expect(view.latestResult).toMatchObject({ title: "Latest run", actionNodeId: "active" });
+    expect(view.latestResult).toMatchObject({ title: "Latest run" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1" }));
     expect(view.activity[0]).toMatchObject({ id: "run-run-1", tone: "info" });
+  });
+
+  it("prioritizes persisted provider activity over summary activity", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        latestRunSummary: { id: "run-1", status: "Running", startedAt: "2026-05-12T10:00:00.000Z", syncStatus: "syncing" },
+        activityTimeline: [{
+          id: "provider-event-1",
+          title: "Tool started",
+          description: "chrona_plan_read",
+          tone: "info",
+          timestamp: "2026-05-12T10:01:00.000Z",
+        }],
+      }),
+      graphPlan: graph([node({ id: "active", status: "active", statusLabel: "Running" })]),
+    });
+
+    expect(view.activity[0]).toMatchObject({ id: "provider-event-1", title: "Tool started" });
+    expect(view.activity).toEqual(expect.arrayContaining([expect.objectContaining({ id: "run-run-1" })]));
   });
 
   it("surfaces pending schedule proposals as readiness and activity", () => {
@@ -195,6 +214,30 @@ describe("task workspace execution console view model", () => {
     expect(view.progress).toMatchObject({ completedSteps: 1, totalSteps: 1, percentComplete: 100 });
     expect(view.latestResult).toMatchObject({ description: "Finished research", tone: "success", actionNodeId: "done" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "done-output-0", sourceNodeId: "done" }));
+  });
+
+  it("keeps latest result tied to the newest completed result when selection changes", () => {
+    const first = node({
+      id: "first-result",
+      status: "done",
+      completionSummary: "Older result",
+    });
+    const latest = node({
+      id: "latest-result",
+      status: "done",
+      completionSummary: "Newest result",
+    });
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([first, latest], "latest-result"),
+      selectedNode: first,
+    });
+
+    expect(view.nodeDetail.currentNode?.id).toBe("first-result");
+    expect(view.latestResult).toMatchObject({
+      description: "Newest result",
+      actionNodeId: "latest-result",
+    });
   });
 
   it("does not let a stale blocked selection override a completed workspace state", () => {
