@@ -46,10 +46,10 @@ export function SelectedBlockSheet({
 
   return (
     <Drawer open direction="bottom" onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DrawerContent className="z-[130] max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:inset-x-auto md:inset-y-4 md:left-1/2 md:w-[min(1180px,calc(100vw-2rem))] md:max-h-none md:-translate-x-1/2 md:rounded-[2rem]">
+      <DrawerContent className="z-[130] max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:!bottom-auto md:!left-1/2 md:!right-auto md:!top-1/2 md:!mt-0 md:!h-auto md:!max-h-[calc(100vh-2rem)] md:!overflow-hidden md:w-[min(1180px,calc(100vw-2rem))] md:!-translate-x-1/2 md:!-translate-y-1/2 md:rounded-[2rem] md:shadow-[0_24px_90px_-32px_rgba(15,23,42,0.55)]">
         <DrawerTitle className="sr-only">{copy.taskDetails}</DrawerTitle>
         <DrawerDescription className="sr-only">{copy.closeTaskDetails}</DrawerDescription>
-        <div className="flex max-h-[92vh] min-h-0 flex-col md:max-h-[calc(100vh-2rem)]">
+        <div className="flex max-h-[92vh] min-h-0 flex-col overflow-hidden md:h-auto md:max-h-[calc(100vh-2rem)]">
           <SelectedBlockSheetHeader
             item={item}
             locale={locale}

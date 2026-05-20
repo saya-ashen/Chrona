@@ -543,192 +543,32 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
   });
 
-  it("polls the lightweight task plan-state endpoint instead of refreshing schedule projection while generation runs", async () => {
-    mockFetch.mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-
-      if (url.includes("/api/tasks/task-1/plan")) {
-        return Promise.resolve(createJsonResponse({
-          taskId: "task-1",
-          aiPlanGenerationStatus: "waiting_acceptance",
-          savedPlan: makeStubTaskPlanReadModel({
-            id: "plan-polled",
-            status: "draft",
-            revision: 5,
-            summary: "polled draft",
-            updatedAt: "2026-04-25T14:45:00.000Z",
-          }),
-        }));
-      }
-
-      if (url.includes("/api/schedule")) {
-        throw new Error("schedule projection should not be fetched during plan polling");
-      }
-
-      if (url.includes("/api/tasks/task-1/plan/accept")) {
-        return Promise.resolve(createJsonResponse({ ok: true }));
-      }
-
-      return Promise.resolve(createJsonResponse([]));
-    });
-
+  it("does not poll the task plan endpoint while the edit sheet is open", async () => {
     render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
 
     await act(async () => {
-      vi.advanceTimersByTime(1900);
+      vi.advanceTimersByTime(5000);
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-polled");
-    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
+    expect(mockFetch).not.toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
     expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
-  it("probes the lightweight task plan-state endpoint for a newly created task without a saved plan", async () => {
+  it("does not probe the task plan endpoint for a selected task without a saved plan", async () => {
     render(<SelectedBlockSheet {...defaultSheetProps} />);
 
     await act(async () => {
-      vi.advanceTimersByTime(500);
-      await Promise.resolve();
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
-    expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
-  });
-
-  it("does not collapse back to no-plan when polling briefly returns idle during generation", async () => {
-    mockFetch.mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-
-      if (url.includes("/api/tasks/task-1/plan")) {
-        return Promise.resolve(createJsonResponse({
-          taskId: "task-1",
-          aiPlanGenerationStatus: "idle",
-          savedPlan: null,
-        }));
-      }
-
-      if (url.includes("/api/tasks/task-1/plan/accept")) {
-        return Promise.resolve(createJsonResponse({ ok: true }));
-      }
-
-      return Promise.resolve(createJsonResponse([]));
-    });
-
-    render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
-
-    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
-
-    await act(async () => {
-      vi.advanceTimersByTime(1900);
+      vi.advanceTimersByTime(5000);
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
-    expect(mockFetch).toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
-  });
-
-  it("keeps polling while generation remains unchanged across responses", async () => {
-    let pollCount = 0;
-    mockFetch.mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-
-      if (url.includes("/api/tasks/task-1/plan")) {
-        pollCount += 1;
-        return Promise.resolve(createJsonResponse({
-          taskId: "task-1",
-          aiPlanGenerationStatus: "generating",
-          savedPlan: null,
-        }));
-      }
-
-      if (url.includes("/api/tasks/task-1/plan/accept")) {
-        return Promise.resolve(createJsonResponse({ ok: true }));
-      }
-
-      return Promise.resolve(createJsonResponse([]));
-    });
-
-    render(<SelectedBlockSheet {...defaultSheetProps} item={{ ...mockItem, aiPlanGenerationStatus: "generating" }} />);
-
-    await act(async () => {
-      vi.advanceTimersByTime(1900);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(1900);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(pollCount).toBeGreaterThanOrEqual(2);
-    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "generating");
-  });
-
-  it("continues new-task probing when idle snapshots stay unchanged", async () => {
-    let pollCount = 0;
-    mockFetch.mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-
-      if (url.includes("/api/tasks/task-1/plan")) {
-        pollCount += 1;
-        return Promise.resolve(createJsonResponse({
-          taskId: "task-1",
-          aiPlanGenerationStatus: "idle",
-          savedPlan: null,
-        }));
-      }
-
-      if (url.includes("/api/tasks/task-1/plan/accept")) {
-        return Promise.resolve(createJsonResponse({ ok: true }));
-      }
-
-      return Promise.resolve(createJsonResponse([]));
-    });
-
-    render(<SelectedBlockSheet {...defaultSheetProps} />);
-
-    await act(async () => {
-      vi.advanceTimersByTime(450);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(1400);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(1400);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(pollCount).toBe(3);
+    expect(mockFetch).not.toHaveBeenCalledWith("/api/tasks/task-1/plan", expect.any(Object));
+    expect(defaultSheetProps.onMutatedAction).not.toHaveBeenCalled();
   });
 
   it("clears the dirty marker and updates the AI sidebar after the task config is saved", async () => {

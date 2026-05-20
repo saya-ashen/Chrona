@@ -77,6 +77,9 @@
     "build:binary:windows-x64": "bun run scripts/build-binaries.ts --target windows-x64"
   },
   "dependencies": {
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
     "@hono/zod-validator": "^0.7.6",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/client": "7.8.0",

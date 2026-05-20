@@ -36,21 +36,6 @@ function deriveGenerationStatus(
   return savedPlan ? "waiting_acceptance" : "idle";
 }
 
-async function fetchPersistedPlanState(taskId: string) {
-  const response = await api.tasks[":taskId"].plan.$get({
-    param: { taskId },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to load task plan state");
-  }
-
-  return await response.json() as {
-    savedPlan?: SavedTaskPlan | null;
-    aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
-  };
-}
-
 export function useSelectedBlockPlanState({
   item,
   onMutatedAction,
@@ -125,60 +110,6 @@ export function useSelectedBlockPlanState({
           : nextStatus,
     });
   }, [applyPlanStateSnapshot, displayedSavedPlan, generationSession.result, generationSession.sessionStatus]);
-
-  useEffect(() => {
-    if (generationSession.sessionStatus === "running") {
-      return;
-    }
-
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const loadPersistedPlanState = async () => {
-      try {
-        const payload = await fetchPersistedPlanState(item.taskId);
-        if (cancelled) {
-          return;
-        }
-
-        const persistedPlan = payload.savedPlan ?? null;
-        const nextStatus = deriveGenerationStatus(persistedPlan, generationSession.sessionStatus);
-        applyPlanStateSnapshot({
-          savedPlan: persistedPlan,
-          aiPlanGenerationStatus:
-            generationStatusRef.current === "generating" && nextStatus === "idle"
-              ? "generating"
-              : nextStatus,
-        });
-      } catch {
-        // Keep current optimistic session-backed state when refresh fails.
-      }
-    };
-
-    const scheduleNextPoll = (delayMs: number) => {
-      timeoutId = setTimeout(() => {
-        void loadPersistedPlanState().finally(() => {
-          if (cancelled) {
-            return;
-          }
-          if (generationStatusRef.current === "generating" || !lastDisplayedSavedPlanKeyRef.current) {
-            scheduleNextPoll(1400);
-          }
-        });
-      }, delayMs);
-    };
-
-    if (generationStatusRef.current === "generating" || !lastDisplayedSavedPlanKeyRef.current) {
-      scheduleNextPoll(generationStatusRef.current === "generating" ? 1800 : 400);
-    }
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.taskId]);
 
   const handlePlanLoaded = useCallback((saved: SavedTaskPlan | null) => {
     const nextKey = savedPlanKey(saved);
