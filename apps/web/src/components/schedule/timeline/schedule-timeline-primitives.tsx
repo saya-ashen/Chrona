@@ -13,7 +13,7 @@ import {
   getPriorityAccent,
   getPriorityTone,
 } from "@/components/schedule/schedule-page-utils";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
@@ -181,9 +181,9 @@ export function ScheduledTimelineBlock({
                   {copy.conflictPreviewLabel}
                 </span>
               ) : null}
-              <StatusBadge tone={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">
+              <Badge variant={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">
                 {item.priority}
-              </StatusBadge>
+              </Badge>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -192,14 +192,14 @@ export function ScheduledTimelineBlock({
           {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
             <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">
               {item.scheduleStatus === "Overdue" ? (
-                <StatusBadge tone="critical" className="px-2 py-0.5 text-[11px]">
+                <Badge variant="destructive" className="px-2 py-0.5 text-[11px]">
                   {copy.overdue}
-                </StatusBadge>
+                </Badge>
               ) : null}
               {item.approvalPendingCount ? (
-                <StatusBadge tone="warning" className="px-2 py-0.5 text-[11px]">
+                <Badge variant="secondary" className="px-2 py-0.5 text-[11px]">
                   {copy.approvalPending}
-                </StatusBadge>
+                </Badge>
               ) : null}
             </div>
           ) : null}

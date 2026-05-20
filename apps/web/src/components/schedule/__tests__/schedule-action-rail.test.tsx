@@ -3,12 +3,19 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleActionRail } from "../schedule-action-rail";
 
-vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SurfaceCardDescription: ({ children }: any) => <p>{children}</p>,
-  SurfaceCardHeader: ({ children }: any) => <div>{children}</div>,
-  SurfaceCardTitle: ({ children }: any) => <h3>{children}</h3>,
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
+}));
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardDescription: ({ children }: any) => <p>{children}</p>,
+  CardHeader: ({ children }: any) => <div>{children}</div>,
+  CardTitle: ({ children }: any) => <h3>{children}</h3>,
 }));
 
 const sections = [
@@ -57,7 +64,7 @@ describe("ScheduleActionRail", () => {
   it("shows the body of the active tab panel", () => {
     renderRail({ activeTab: "queue" });
     expect(screen.getByText("Queue Body")).toBeVisible();
-    expect(screen.getByText("Risks Body")).not.toBeVisible();
+    expect(screen.queryByText("Risks Body")).not.toBeInTheDocument();
   });
 
   it("ArrowRight key cycles to next tab", async () => {

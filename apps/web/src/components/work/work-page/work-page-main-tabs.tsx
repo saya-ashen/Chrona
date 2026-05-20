@@ -1,7 +1,7 @@
 import { Activity, AlertTriangle, CheckCircle2, Clock3, GitBranch, Sparkles, type LucideIcon } from "lucide-react";
 import { LatestResultPanel } from "@/components/work/latest-result-panel";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
-import { buttonVariants } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { formatDateTime } from "./work-page-formatters";
 import { WorkPageSectionFrame } from "./work-page-section-frame";
@@ -23,15 +23,15 @@ function getNodeViewStatus(
 function getNodeStatusMeta(status: NodeViewStatus, copy: WorkCopy) {
   switch (status) {
     case "completed":
-      return { label: copy.doneStep, tone: "success" as const };
+      return { label: copy.doneStep, tone: "secondary" as const };
     case "running":
-      return { label: copy.inProgressStep, tone: "info" as const };
+      return { label: copy.inProgressStep, tone: "secondary" as const };
     case "waiting":
-      return { label: copy.waitingForUserStep, tone: "warning" as const };
+      return { label: copy.waitingForUserStep, tone: "secondary" as const };
     case "blocked":
-      return { label: copy.blockedStep, tone: "critical" as const };
+      return { label: copy.blockedStep, tone: "destructive" as const };
     default:
-      return { label: copy.pendingStep, tone: "neutral" as const };
+      return { label: copy.pendingStep, tone: "outline" as const };
   }
 }
 
@@ -79,30 +79,21 @@ export function WorkPageMainTabs({
   waitingCount,
 }: WorkPageMainTabsProps) {
   return (
-    <main className="min-h-0 space-y-4 overflow-hidden">
-      <div className="flex items-center gap-1.5 border-b border-border/60 pb-2">
-        {bottomTabs.map((tab) => {
-          const Icon: LucideIcon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onTabChange(tab.id)}
-              className={
-                activeTab === tab.id
-                  ? buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })
-                  : buttonVariants({ variant: "ghost", size: "sm", className: "rounded-xl" })
-              }
-            >
-              <Icon className="size-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+    <main className="min-h-0 overflow-hidden">
+      <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as WorkPageMainTabsProps["activeTab"])} className="min-h-0 gap-4">
+        <TabsList className="h-auto w-full justify-start gap-1.5 rounded-none border-b border-border/60 bg-transparent p-0 pb-2">
+          {bottomTabs.map((tab) => {
+            const Icon: LucideIcon = tab.icon;
+            return (
+              <TabsTrigger key={tab.id} value={tab.id} className="flex-none rounded-xl px-3 py-1.5" onClick={() => onTabChange(tab.id)}>
+                <Icon data-icon="inline-start" className="size-3.5" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-      {activeTab === "latest" ? (
-        <div className="min-h-0 overflow-auto">
+        <TabsContent value="latest" className="min-h-0 overflow-auto">
           <LatestResultPanel
             output={data.latestOutput}
             updatedLabel={copy.updated}
@@ -122,11 +113,9 @@ export function WorkPageMainTabs({
               actionsTitle: copy.resultActionsTitle,
             }}
           />
-        </div>
-      ) : null}
+        </TabsContent>
 
-      {activeTab === "plan" ? (
-        <div className="min-h-0 overflow-auto">
+        <TabsContent value="plan" className="min-h-0 overflow-auto">
           <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 p-4 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.34)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(circle_at_16%_0%,rgba(34,211,238,0.20),transparent_38%),radial-gradient(circle_at_82%_4%,rgba(168,85,247,0.18),transparent_36%)]" />
             <header className="relative flex flex-col gap-4 pb-4 lg:flex-row lg:items-end lg:justify-between">
@@ -196,17 +185,13 @@ export function WorkPageMainTabs({
               </aside>
             </div>
           </section>
-        </div>
-      ) : null}
+        </TabsContent>
 
-      {activeTab === "timeline" ? (
-        <div className="min-h-0 overflow-auto">
+        <TabsContent value="timeline" className="min-h-0 overflow-auto">
           <ExecutionTimeline title="Execution Record" events={data.workstreamItems} currentRunId={currentRunId} />
-        </div>
-      ) : null}
+        </TabsContent>
 
-      {activeTab === "info" ? (
-        <div className="min-h-0 overflow-auto space-y-4">
+        <TabsContent value="info" className="min-h-0 overflow-auto space-y-4">
           <WorkPageSectionFrame title="Run Health" bodyClassName="overflow-auto">
             <div className="space-y-3 text-sm">
               {[
@@ -237,8 +222,8 @@ export function WorkPageMainTabs({
               </div>
             </div>
           </WorkPageSectionFrame>
-        </div>
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

@@ -9,15 +9,17 @@ vi.mock("@/lib/task-actions-client", () => ({
 }));
 
 vi.mock("@chrona/i18n/react", () => ({ useI18n: () => ({ messages: {} }) }));
-vi.mock("@/components/ui/button", () => ({ buttonVariants: () => "btn" }));
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
+}));
 vi.mock("@/components/ui/field", () => ({
-  Field: ({ children, label }: any) => (
-    <div>
-      <span data-testid={`label-${label}`}>{label}</span>
-      {children}
-    </div>
-  ),
-  inputClassName: "input",
+  Field: ({ children }: any) => <div>{children}</div>,
+  FieldLabel: ({ children }: any) => <span data-testid={`label-${children}`}>{children}</span>,
 }));
 
 const mockedApply = vi.mocked(applySchedule);

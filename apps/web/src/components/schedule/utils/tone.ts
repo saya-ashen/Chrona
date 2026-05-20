@@ -14,13 +14,13 @@ export function getPriorityAccent(priority: string) {
 export function getPriorityTone(priority: string) {
   switch (priority.toLowerCase()) {
     case "urgent":
-      return "critical" as const;
+      return "destructive" as const;
     case "high":
-      return "warning" as const;
+      return "secondary" as const;
     case "medium":
-      return "warning" as const;
+      return "secondary" as const;
     default:
-      return "success" as const;
+      return "outline" as const;
   }
 }
 

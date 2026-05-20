@@ -3,9 +3,23 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { buttonVariants } from "@/components/ui/button";
-import { Field, inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@chrona/i18n/react";
+import { CalendarIcon } from "lucide-react";
 import {
   deleteValueAtPath,
   getValueAtPath,
@@ -82,6 +96,110 @@ type TaskConfigFormProps = {
   onSubmitAction: (input: TaskConfigFormInput) => Promise<void> | void;
 };
 
+type TaskConfigSelectOption = {
+  value: string;
+  label: string;
+};
+
+function TaskConfigField({
+  label,
+  hint,
+  htmlFor,
+  className,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  htmlFor?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Field className={className}>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
+      {children}
+      {hint ? <FieldDescription>{hint}</FieldDescription> : null}
+    </Field>
+  );
+}
+
+function TaskConfigSelect({
+  name,
+  id,
+  value,
+  placeholder = "-",
+  options,
+  onValueChange,
+}: {
+  name: string;
+  id?: string;
+  value: string;
+  placeholder?: string;
+  options: TaskConfigSelectOption[];
+  onValueChange: (value: string) => void;
+}) {
+  const triggerId = id ?? `task-config-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
+  return (
+    <>
+      <Input type="hidden" name={name} value={value} />
+      <Select value={value || undefined} onValueChange={onValueChange}>
+        <SelectTrigger id={triggerId} className="w-full">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </>
+  );
+}
+
+function TaskConfigDatePicker({
+  name,
+  value,
+  placeholder,
+  onValueChange,
+}: {
+  name: string;
+  value: string;
+  placeholder: string;
+  onValueChange: (value: string) => void;
+}) {
+  const selectedDate = parseLocalDateInput(value);
+
+  return (
+    <>
+      <Input type="hidden" name={name} value={value} />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-start px-3 text-left font-normal"
+          >
+            <CalendarIcon data-icon="inline-start" />
+            {selectedDate ? formatLocalDateLabel(selectedDate) : placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={selectedDate ?? undefined}
+            onSelect={(date) => onValueChange(formatLocalDateInput(date ?? null))}
+          />
+        </PopoverContent>
+      </Popover>
+    </>
+  );
+}
+
 const DEFAULT_COPY = {
   moreOptions: "More options",
   starterPresets: "Starter presets",
@@ -124,6 +242,21 @@ function padDatePart(value: number) {
 function formatLocalDateInput(value?: Date | null) {
   if (!value) return "";
   return `${value.getFullYear()}-${padDatePart(value.getMonth() + 1)}-${padDatePart(value.getDate())}`;
+}
+
+function parseLocalDateInput(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if ([year, month, day].some((part) => !Number.isFinite(part))) return null;
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+function formatLocalDateLabel(value: Date) {
+  return value.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatLocalTimeInput(value?: Date | null) {
@@ -652,7 +785,7 @@ export function TaskConfigForm({
           {compact ? <p className="sr-only">{copy.starterPresets}</p> : <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{copy.starterPresets}</p>}
           <div className={compact ? "flex flex-wrap gap-2" : "mt-3 grid gap-2 sm:grid-cols-2"}>
             {presets.map((preset) => (
-              <button
+              <Button
                 key={preset.id}
                 type="button"
                 disabled={isPending}
@@ -665,56 +798,50 @@ export function TaskConfigForm({
               >
                 <p className="text-sm font-medium text-foreground">{preset.label}</p>
                 {!compact ? <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p> : null}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
       ) : null}
 
       <form onSubmit={(event) => void handleSubmit(submitForm)(event)} className="space-y-3">
-        <Field label={copy.title} className="text-xs text-muted-foreground">
-          <input
+        <TaskConfigField label={copy.title} className="text-xs text-muted-foreground">
+          <Input
             name="title"
             required
             value={formState.title}
             onChange={(event) => setValue("title", event.target.value, { shouldDirty: true })}
             placeholder={copy.titlePlaceholder}
-            className={inputClassName}
           />
-        </Field>
+        </TaskConfigField>
 
         {!compact ? (
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
             <div className="space-y-3">
-              <Field label={copy.description} className="text-xs text-muted-foreground">
-                <textarea
+              <TaskConfigField label={copy.description} className="text-xs text-muted-foreground">
+                <Textarea
                   name="description"
                   rows={5}
                   value={formState.description}
                   onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
                   placeholder={copy.descriptionPlaceholder}
-                  className={textareaClassName}
                 />
-              </Field>
+              </TaskConfigField>
             </div>
 
             <div className="space-y-3">
-              <Field label={copy.priority} className="text-xs text-muted-foreground">
-                <select
+              <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-muted-foreground">
+                <TaskConfigSelect
                   name="priority"
+                  id="task-config-priority"
                   value={formState.priority}
-                  onChange={(event) =>
-                    setValue("priority", event.target.value as TaskConfigFormInput["priority"], { shouldDirty: true })
-                  }
-                  className={selectClassName}
-                >
-                  {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
-                    <option key={priority} value={priority}>
-                      {copy.priorities[priority]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  options={(["Low", "Medium", "High", "Urgent"] as const).map((priority) => ({
+                    value: priority,
+                    label: copy.priorities[priority],
+                  }))}
+                  onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
+                />
+              </TaskConfigField>
 
               <div className="rounded-[1.2rem] border border-border/60 bg-muted/25 p-3 shadow-sm">
                 <div className="mb-2 flex items-start justify-between gap-3">
@@ -730,47 +857,34 @@ export function TaskConfigForm({
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <Field label={copy.scheduleDate} className="text-xs text-muted-foreground">
-                    <input
+                  <TaskConfigField label={copy.scheduleDate} className="text-xs text-muted-foreground">
+                    <TaskConfigDatePicker
                       name="scheduledDate"
-                      type="date"
                       value={formState.scheduledDate}
-                      onChange={(event) => setValue("scheduledDate", event.target.value, { shouldDirty: true })}
-                      className={inputClassName}
+                      placeholder={copy.scheduleDate}
+                      onValueChange={(value) => setValue("scheduledDate", value, { shouldDirty: true })}
                     />
-                  </Field>
+                  </TaskConfigField>
 
-                  <Field label={copy.scheduleStart} className="text-xs text-muted-foreground">
-                    <select
+                  <TaskConfigField label={copy.scheduleStart} className="text-xs text-muted-foreground">
+                    <TaskConfigSelect
                       name="scheduledStartTime"
                       value={formState.scheduledStartTime}
-                      onChange={(event) => setValue("scheduledStartTime", event.target.value, { shouldDirty: true })}
-                      className={selectClassName}
-                    >
-                      <option value="">--</option>
-                      {TIME_OPTIONS.map((time) => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                      placeholder="--"
+                      options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                      onValueChange={(value) => setValue("scheduledStartTime", value, { shouldDirty: true })}
+                    />
+                  </TaskConfigField>
 
-                  <Field label={copy.scheduleEnd} className="text-xs text-muted-foreground">
-                    <select
+                  <TaskConfigField label={copy.scheduleEnd} className="text-xs text-muted-foreground">
+                    <TaskConfigSelect
                       name="scheduledEndTime"
                       value={formState.scheduledEndTime}
-                      onChange={(event) => setValue("scheduledEndTime", event.target.value, { shouldDirty: true })}
-                      className={selectClassName}
-                    >
-                      <option value="">--</option>
-                      {TIME_OPTIONS.map((time) => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                      placeholder="--"
+                      options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                      onValueChange={(value) => setValue("scheduledEndTime", value, { shouldDirty: true })}
+                    />
+                  </TaskConfigField>
                 </div>
               </div>
             </div>
@@ -783,43 +897,35 @@ export function TaskConfigForm({
 
           if (field.kind === "textarea") {
             return (
-              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                <textarea
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <Textarea
                   name={field.path}
                   rows={compact ? 3 : 4}
                   value={renderFieldValue(value)}
                   onChange={(event) => updateRuntimeField(field, event.target.value)}
                   maxLength={field.constraints?.maxLength}
-                  className={textareaClassName}
                 />
-              </Field>
+              </TaskConfigField>
             );
           }
 
           if (field.kind === "select") {
             return (
-              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                <select
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <TaskConfigSelect
                   name={field.path}
                   value={renderFieldValue(value)}
-                  onChange={(event) => updateRuntimeField(field, event.target.value || undefined)}
-                  className={selectClassName}
-                >
-                  <option value="">-</option>
-                  {(field.options ?? []).map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  options={(field.options ?? []).map((option) => ({ value: option.value, label: option.label }))}
+                  onValueChange={(nextValue) => updateRuntimeField(field, nextValue || undefined)}
+                />
+              </TaskConfigField>
             );
           }
 
           if (field.kind === "number") {
             return (
-              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                <input
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <Input
                   name={field.path}
                   type="number"
                   value={renderFieldValue(value)}
@@ -827,54 +933,50 @@ export function TaskConfigForm({
                   min={field.constraints?.min}
                   max={field.constraints?.max}
                   step={field.constraints?.step}
-                  className={inputClassName}
                 />
-              </Field>
+              </TaskConfigField>
             );
           }
 
           if (field.kind === "boolean") {
             return (
-              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
                 <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
-                  <input
+                  <Checkbox
                     name={field.path}
-                    type="checkbox"
                     checked={Boolean(value)}
-                    onChange={(event) => updateRuntimeField(field, event.target.checked)}
+                    onCheckedChange={(checked) => updateRuntimeField(field, checked === true)}
                   />
                   <span>{field.label}</span>
                 </label>
-              </Field>
+              </TaskConfigField>
             );
           }
 
           if (field.kind === "json") {
             return (
-              <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                <textarea
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <Textarea
                   name={field.path}
                   rows={compact ? 4 : 5}
                   value={typeof value === "string" ? value : formatRuntimeConfig(value)}
                   onChange={(event) => updateRuntimeField(field, event.target.value)}
-                  className={textareaClassName}
                 />
-              </Field>
+              </TaskConfigField>
             );
           }
 
           return (
-            <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-              <input
+            <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <Input
                 name={field.path}
                 value={renderFieldValue(value)}
                 onChange={(event) => updateRuntimeField(field, event.target.value)}
                 minLength={field.constraints?.minLength}
                 maxLength={field.constraints?.maxLength}
                 pattern={field.constraints?.pattern}
-                className={inputClassName}
               />
-            </Field>
+            </TaskConfigField>
           );
         })}
 
@@ -884,57 +986,46 @@ export function TaskConfigForm({
 
             <div className="mt-3 space-y-3">
               <>
-                <Field label={copy.priority} className="text-xs text-muted-foreground">
-                  <select
+                <TaskConfigField label={copy.priority} htmlFor="task-config-compact-priority" className="text-xs text-muted-foreground">
+                  <TaskConfigSelect
                     name="priority"
+                    id="task-config-compact-priority"
                     value={formState.priority}
-                    onChange={(event) =>
-                      setValue("priority", event.target.value as TaskConfigFormInput["priority"], { shouldDirty: true })
-                    }
-                    className={selectClassName}
-                  >
-                    {(["Low", "Medium", "High", "Urgent"] as const).map((priority) => (
-                      <option key={priority} value={priority}>
-                        {copy.priorities[priority]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    options={(["Low", "Medium", "High", "Urgent"] as const).map((priority) => ({
+                      value: priority,
+                      label: copy.priorities[priority],
+                    }))}
+                    onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
+                  />
+                </TaskConfigField>
 
                 {executionRuntimes.length > 1 ? (
-                  <Field label={copy.adapter} className="text-xs text-muted-foreground">
-                    <select
+                  <TaskConfigField label={copy.adapter} className="text-xs text-muted-foreground">
+                    <TaskConfigSelect
                       name="executionRuntime"
                       value={formState.executionRuntime}
-                      onChange={(event) =>
+                      options={executionRuntimes.map((runtime) => ({ value: runtime.key, label: runtime.label }))}
+                      onValueChange={(value) =>
                         replaceFormState(
                           applyRuntimeAdapterChange(
                             getValues(),
-                            resolveExecutionRuntime(executionRuntimes, event.target.value, defaultExecutionRuntime),
+                            resolveExecutionRuntime(executionRuntimes, value, defaultExecutionRuntime),
                           ),
                         )
                       }
-                      className={selectClassName}
-                    >
-                      {executionRuntimes.map((runtime) => (
-                        <option key={runtime.key} value={runtime.key}>
-                          {runtime.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                    />
+                  </TaskConfigField>
                 ) : null}
 
-                <Field label={copy.description} className="text-xs text-muted-foreground">
-                  <textarea
+                <TaskConfigField label={copy.description} className="text-xs text-muted-foreground">
+                  <Textarea
                     name="description"
                     rows={3}
                     value={formState.description}
                     onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
                     placeholder={copy.descriptionPlaceholder}
-                    className={textareaClassName}
                   />
-                </Field>
+                </TaskConfigField>
               </>
 
               {optionalRuntimeFields.map((field) => {
@@ -942,43 +1033,35 @@ export function TaskConfigForm({
 
               if (field.kind === "textarea") {
                 return (
-                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                    <textarea
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <Textarea
                       name={field.path}
                       rows={3}
                       value={renderFieldValue(value)}
                       onChange={(event) => updateRuntimeField(field, event.target.value)}
                       maxLength={field.constraints?.maxLength}
-                      className={textareaClassName}
                     />
-                  </Field>
+                  </TaskConfigField>
                 );
               }
 
               if (field.kind === "select") {
                 return (
-                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                    <select
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <TaskConfigSelect
                       name={field.path}
                       value={renderFieldValue(value)}
-                      onChange={(event) => updateRuntimeField(field, event.target.value || undefined)}
-                      className={selectClassName}
-                    >
-                      <option value="">-</option>
-                      {(field.options ?? []).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                      options={(field.options ?? []).map((option) => ({ value: option.value, label: option.label }))}
+                      onValueChange={(nextValue) => updateRuntimeField(field, nextValue || undefined)}
+                    />
+                  </TaskConfigField>
                 );
               }
 
               if (field.kind === "number") {
                 return (
-                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                    <input
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <Input
                       name={field.path}
                       type="number"
                       value={renderFieldValue(value)}
@@ -986,51 +1069,47 @@ export function TaskConfigForm({
                       min={field.constraints?.min}
                       max={field.constraints?.max}
                       step={field.constraints?.step}
-                      className={inputClassName}
                     />
-                  </Field>
+                  </TaskConfigField>
                 );
               }
 
               if (field.kind === "boolean") {
                 return (
-                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
                     <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
-                      <input
+                      <Checkbox
                         name={field.path}
-                        type="checkbox"
                         checked={Boolean(value)}
-                        onChange={(event) => updateRuntimeField(field, event.target.checked)}
+                        onCheckedChange={(checked) => updateRuntimeField(field, checked === true)}
                       />
                       <span>{field.label}</span>
                     </label>
-                  </Field>
+                  </TaskConfigField>
                 );
               }
 
               if (field.kind === "json") {
                 return (
-                  <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                    <textarea
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                    <Textarea
                       name={field.path}
                       rows={4}
                       value={typeof value === "string" ? value : formatRuntimeConfig(value)}
                       onChange={(event) => updateRuntimeField(field, event.target.value)}
-                      className={textareaClassName}
                     />
-                  </Field>
+                  </TaskConfigField>
                 );
               }
 
               return (
-                <Field key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
-                  <input
+                <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <Input
                     name={field.path}
                     value={renderFieldValue(value)}
                     onChange={(event) => updateRuntimeField(field, event.target.value)}
-                    className={inputClassName}
                   />
-                </Field>
+                </TaskConfigField>
               );
             })}
             </div>
@@ -1039,9 +1118,9 @@ export function TaskConfigForm({
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
           <div className="flex flex-wrap items-center gap-2">{footerActions}</div>
-          <button type="submit" disabled={isPending} className={buttonVariants({ variant: "default", size: "default" })}>
+          <Button type="submit" disabled={isPending} variant="default" size="default">
             {isPending ? pendingLabel : submitLabel}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

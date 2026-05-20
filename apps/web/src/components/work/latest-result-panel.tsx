@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 
 type LatestResultPanelProps = {
   output: {
@@ -58,8 +58,8 @@ export function LatestResultPanel({
   ) : (
     <div className="mt-4 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge>{output.sourceLabel}</StatusBadge>
-        {usedByNextAction ? <StatusBadge tone="info">{labels.usedByNextAction}</StatusBadge> : null}
+        <Badge>{output.sourceLabel}</Badge>
+        {usedByNextAction ? <Badge variant="secondary">{labels.usedByNextAction}</Badge> : null}
       </div>
       <article className="rounded-[22px] border border-border/60 bg-muted/[0.18] px-4 py-4">
         <div className="max-w-none whitespace-pre-wrap text-sm leading-7 text-foreground/[0.88]">{output.body}</div>

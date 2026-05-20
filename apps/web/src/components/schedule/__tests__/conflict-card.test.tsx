@@ -4,11 +4,11 @@ import userEvent from "@testing-library/user-event";
 import type { ScheduleConflict, ScheduleSuggestion } from "../schedule-page-types";
 import { ConflictCard } from "../panels/conflict-card";
 
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children, tone }: any) => <span data-tone={tone}>{children}</span>,
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children, variant }: any) => <span data-variant={variant}>{children}</span>,
 }));
 
 function makeConflict(overrides: Partial<ScheduleConflict> = {}): ScheduleConflict {
@@ -42,18 +42,18 @@ describe("ConflictCard", () => {
   it("renders conflict severity badge and type label", () => {
     render(<ConflictCard conflict={makeConflict()} suggestions={[]} />);
     expect(screen.getByText("HIGH")).toBeInTheDocument();
-    expect(screen.getByText("HIGH").closest("[data-tone]")).toHaveAttribute("data-tone", "critical");
+    expect(screen.getByText("HIGH").closest("[data-variant]")).toHaveAttribute("data-variant", "destructive");
     expect(screen.getByText("Time Overlap")).toBeInTheDocument();
   });
 
-  it("maps medium severity to warning tone", () => {
+  it("maps medium severity to secondary variant", () => {
     render(<ConflictCard conflict={makeConflict({ severity: "medium" })} suggestions={[]} />);
-    expect(screen.getByText("MEDIUM").closest("[data-tone]")).toHaveAttribute("data-tone", "warning");
+    expect(screen.getByText("MEDIUM").closest("[data-variant]")).toHaveAttribute("data-variant", "secondary");
   });
 
-  it("maps low severity to neutral tone", () => {
+  it("maps low severity to outline variant", () => {
     render(<ConflictCard conflict={makeConflict({ severity: "low" })} suggestions={[]} />);
-    expect(screen.getByText("LOW").closest("[data-tone]")).toHaveAttribute("data-tone", "neutral");
+    expect(screen.getByText("LOW").closest("[data-variant]")).toHaveAttribute("data-variant", "outline");
   });
 
   it("shows description text", () => {

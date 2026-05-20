@@ -5,8 +5,11 @@ import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkle
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
-import { buttonVariants } from "@/components/ui/button";
-import { inputClassName, selectClassName, textareaClassName } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 import { interactionLabel } from "./logic";
@@ -72,13 +75,15 @@ function defaultActionForNode(node: PlanNodeDataModel) {
 
 function ActionButton({ action, isActive, onClick }: { action: PlanNodeAction; isActive: boolean; onClick: () => void }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
-      className={buttonVariants({ variant: isActive ? "default" : "outline", size: "sm", className: "rounded-xl" })}
+      variant={isActive ? "default" : "outline"}
+      size="sm"
+      className="rounded-xl"
     >
       {action.label}
-    </button>
+    </Button>
   );
 }
 
@@ -92,48 +97,50 @@ function RunField({ field, value, onChange }: { field: PlanNodeField; value: str
 
   if (field.control === "textarea") {
     return (
-      <label className="space-y-2">
-        {commonLabel}
-        <textarea
+      <Field className="gap-2">
+        <FieldLabel>{commonLabel}</FieldLabel>
+        <Textarea
           rows={4}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={cn(textareaClassName, "min-h-24 rounded-xl border-border/70 bg-background/80 text-sm")}
+          className="min-h-24 rounded-xl border-border/70 bg-background/80 text-sm"
           placeholder={`Enter ${field.label.toLowerCase()}...`}
         />
-      </label>
+      </Field>
     );
   }
 
   if (field.control === "select" || field.control === "approval") {
     return (
-      <label className="space-y-2">
-        {commonLabel}
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={cn(selectClassName, "rounded-xl border-border/70 bg-background/80 text-sm")}
-        >
-          <option value="">Select...</option>
+      <Field className="gap-2">
+        <FieldLabel>{commonLabel}</FieldLabel>
+        <Select value={value || undefined} onValueChange={onChange}>
+          <SelectTrigger className="w-full rounded-xl border-border/70 bg-background/80 text-sm">
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
           {(field.options ?? ["Approve", "Reject", "Needs changes"]).map((option) => (
-            <option key={option} value={option}>{option}</option>
+                <SelectItem key={option} value={option}>{option}</SelectItem>
           ))}
-        </select>
-      </label>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
     );
   }
 
   return (
-    <label className="space-y-2">
-      {commonLabel}
-      <input
+    <Field className="gap-2">
+      <FieldLabel>{commonLabel}</FieldLabel>
+      <Input
         type="text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={cn(inputClassName, "rounded-xl border-border/70 bg-background/80 text-sm")}
+        className="rounded-xl border-border/70 bg-background/80 text-sm"
         placeholder={`Enter ${field.label.toLowerCase()}...`}
       />
-    </label>
+    </Field>
   );
 }
 
@@ -578,10 +585,10 @@ export function TaskPlanGraphInspectorRunPanel({
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
                 disabled={isDispatching || (!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction)}
-                className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl" })}
+                variant="default" size="sm" className="rounded-xl"
                 onClick={handleRunAction}
               >
                 {isDispatching
@@ -596,18 +603,18 @@ export function TaskPlanGraphInspectorRunPanel({
                         ? <Sparkles className="size-4" />
                         : <SubmitIcon className="size-4" />}
                 {isDispatching ? "Sending..." : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
-              </button>
+              </Button>
 
               {node.status === "active" || node.active ? (
-                <button
+                <Button
                   type="button"
                   disabled={isDispatching}
-                  className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-xl" })}
+                  variant="outline" size="sm" className="rounded-xl"
                   onClick={handleMarkDone}
                 >
                   <Check className="size-4" />
                   Mark done
-                </button>
+                </Button>
               ) : null}
 
               <span className="text-xs text-muted-foreground">Actions are sent to the task execution backend.</span>

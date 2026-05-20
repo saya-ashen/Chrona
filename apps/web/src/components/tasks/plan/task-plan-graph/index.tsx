@@ -16,6 +16,14 @@ import {
 } from "@xyflow/react";
 import { useI18n } from "@chrona/i18n/react";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AUTO_FULL_MODE_MIN_WIDTH,
   DEFAULT_GRAPH_COPY,
 } from "./constants";
@@ -467,6 +475,65 @@ export function TaskPlanGraph({
 
   if (resolvedMode !== "compact" && !layout) return null;
 
+  const fullGraphDialog = (
+    <Dialog open={isFullDialogOpen} onOpenChange={setIsFullDialogOpen}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 p-0 text-slate-100 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-white/10 bg-white/[0.035] px-6 py-5">
+          <div className="flex flex-col gap-1">
+            <DialogTitle className="text-lg font-semibold tracking-tight text-white">
+              {graphCopy.fullTitle}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-400">
+              {graphCopy.fullDescription}
+            </DialogDescription>
+          </div>
+          <DialogClose
+            render={
+              <button
+                type="button"
+                aria-label={graphCopy.closeDialog}
+                className="flex size-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
+              />
+            }
+          >
+            <X className="size-4" />
+          </DialogClose>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          {layout ? (
+            <GraphShell
+              graphCopy={graphCopy}
+              layout={layout}
+              nodes={nodes}
+              edges={edges}
+              planNodes={plan.nodes}
+              overviewItems={overviewItems}
+              selectedNode={selectedNode}
+              selectedNodeId={selectedNodeId}
+              currentStepId={plan.currentStepId}
+              edgeLegend={edgeLegend}
+              nodeLegend={nodeLegend}
+              handleNodeClick={handleNodeClick}
+              stopIfNodeButton={stopIfNodeButton}
+              onDismissOverlay={handleDismissOverlay}
+              onCenterCurrentNode={handleCenterCurrentNode}
+              onExpandGraph={() => setIsFullDialogOpen(true)}
+              onFitGraph={handleFitGraph}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              inspectorPlacement={inspectorPlacement}
+              showOverview={showOverview}
+              testId="task-plan-graph-full-dialog"
+            />
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (resolvedMode === "compact") {
     return (
       <>
@@ -536,69 +603,7 @@ export function TaskPlanGraph({
             </div>
           </div>
         </div>
-
-        {isFullDialogOpen ? (
-          <>
-            <div
-              className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
-              onClick={() => setIsFullDialogOpen(false)}
-            />
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-label={graphCopy.fullTitle}
-              className="fixed left-1/2 top-1/2 z-50 flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 text-slate-100 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <header className="flex items-start justify-between gap-4 border-b border-white/10 bg-white/[0.035] px-6 py-5">
-                <div className="space-y-1">
-                  <h1 className="text-lg font-semibold tracking-tight text-white">
-                    {graphCopy.fullTitle}
-                  </h1>
-                  <p className="text-sm text-slate-400">
-                    {graphCopy.fullDescription}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFullDialogOpen(false)}
-                  aria-label={graphCopy.closeDialog}
-                  className="flex size-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
-                >
-                  <X className="size-4" />
-                </button>
-              </header>
-              <div className="min-h-0 flex-1 overflow-auto p-5">
-                {layout ? (
-                  <GraphShell
-                    graphCopy={graphCopy}
-                    layout={layout}
-                    nodes={nodes}
-                    edges={edges}
-                    planNodes={plan.nodes}
-                    overviewItems={overviewItems}
-                    selectedNode={selectedNode}
-                    selectedNodeId={selectedNodeId}
-                    currentStepId={plan.currentStepId}
-                    edgeLegend={edgeLegend}
-                    nodeLegend={nodeLegend}
-                    handleNodeClick={handleNodeClick}
-                    stopIfNodeButton={stopIfNodeButton}
-                    onDismissOverlay={handleDismissOverlay}
-                    onCenterCurrentNode={handleCenterCurrentNode}
-                    onExpandGraph={() => setIsFullDialogOpen(true)}
-                    onFitGraph={handleFitGraph}
-                    onZoomIn={handleZoomIn}
-                    onZoomOut={handleZoomOut}
-                    inspectorPlacement={inspectorPlacement}
-                    showOverview={showOverview}
-                    testId="task-plan-graph-full-dialog"
-                  />
-                ) : null}
-              </div>
-            </section>
-          </>
-        ) : null}
+        {fullGraphDialog}
       </>
     );
   }
@@ -640,67 +645,7 @@ export function TaskPlanGraph({
           showOverview={showOverview}
         />
       </div>
-
-      {isFullDialogOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
-            onClick={() => setIsFullDialogOpen(false)}
-          />
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={graphCopy.fullTitle}
-            className="fixed left-1/2 top-1/2 z-50 flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 text-slate-100 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="flex items-start justify-between gap-4 border-b border-white/10 bg-white/[0.035] px-6 py-5">
-              <div className="space-y-1">
-                <h1 className="text-lg font-semibold tracking-tight text-white">
-                  {graphCopy.fullTitle}
-                </h1>
-                <p className="text-sm text-slate-400">
-                  {graphCopy.fullDescription}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFullDialogOpen(false)}
-                aria-label={graphCopy.closeDialog}
-                className="flex size-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
-            </header>
-            <div className="min-h-0 flex-1 overflow-auto p-5">
-              <GraphShell
-                graphCopy={graphCopy}
-                layout={layout}
-                nodes={nodes}
-                edges={edges}
-                planNodes={plan.nodes}
-                overviewItems={overviewItems}
-                selectedNode={selectedNode}
-                selectedNodeId={selectedNodeId}
-                currentStepId={plan.currentStepId}
-                edgeLegend={edgeLegend}
-                nodeLegend={nodeLegend}
-                handleNodeClick={handleNodeClick}
-                stopIfNodeButton={stopIfNodeButton}
-                onDismissOverlay={handleDismissOverlay}
-                onCenterCurrentNode={handleCenterCurrentNode}
-                onExpandGraph={() => setIsFullDialogOpen(true)}
-                onFitGraph={handleFitGraph}
-                onZoomIn={handleZoomIn}
-                onZoomOut={handleZoomOut}
-                inspectorPlacement={inspectorPlacement}
-                showOverview={showOverview}
-                testId="task-plan-graph-full-dialog"
-              />
-            </div>
-          </section>
-        </>
-      ) : null}
+      {fullGraphDialog}
     </>
   );
 }

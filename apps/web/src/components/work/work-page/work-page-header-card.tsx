@@ -1,11 +1,11 @@
 import { CalendarDays, Ellipsis } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 
 type WorkPageHeaderCardProps = {
   title: string;
   executionStatus: string;
-  executionTone: "success" | "warning" | "critical" | "info" | "neutral";
+  executionTone: "secondary" | "destructive" | "outline";
   syncLabel: string;
   isStale: boolean;
   description: string;
@@ -29,8 +29,8 @@ export function WorkPageHeaderCard({
             <p className="text-[11px] text-muted-foreground">{title} / Work</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-[1.35rem]">{title}</h1>
-              <StatusBadge tone={executionTone}>{executionStatus}</StatusBadge>
-              <StatusBadge tone={isStale ? "warning" : "info"}>{syncLabel}</StatusBadge>
+              <Badge variant={executionTone}>{executionStatus}</Badge>
+              <Badge variant={isStale ? "secondary" : "secondary"}>{syncLabel}</Badge>
             </div>
             <p className="mt-1 max-w-3xl text-xs text-muted-foreground sm:text-sm">{description}</p>
           </div>

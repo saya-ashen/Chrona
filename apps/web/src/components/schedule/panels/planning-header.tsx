@@ -11,7 +11,7 @@ type ScheduleCockpitMetric = {
   label: string;
   value: string;
   hint: string;
-  tone?: "neutral" | "info" | "critical";
+  tone?: "outline" | "info" | "critical";
 };
 
 export function PlanningHeader({

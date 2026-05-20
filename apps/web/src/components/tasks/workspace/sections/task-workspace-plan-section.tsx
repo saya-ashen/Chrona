@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import { TaskWorkspaceExecutionOverview } from "../execution/task-workspace-execution-overview";
 import { TaskWorkspaceNodeDetailPanel } from "../execution/task-workspace-node-detail-panel";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
@@ -43,8 +45,15 @@ type TaskWorkspacePlanSectionProps = {
   planGenerationStatus: TaskPlanGenerationStatus;
   canAcceptPlan?: boolean;
   acceptPlanError: string | null;
+  planningTaskDraft: TaskConfigFormDraft;
+  hasUnsavedConfigChanges: boolean;
+  unsavedConfigDraft: TaskConfigFormDraft | null;
+  requestGenerationKey?: number;
   runtimeEvents: WorkspaceRuntimeEvent[];
   onGeneratePlan: () => void;
+  onPlanLoaded: (savedPlan: TaskPlanReadModel | null) => void;
+  onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
+  onSaveConfigBeforeRegenerate: () => Promise<void>;
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
@@ -57,9 +66,17 @@ export function TaskWorkspacePlanSection({
   pageData,
   plan,
   planGenerationStatus,
+  canAcceptPlan,
   acceptPlanError,
+  planningTaskDraft,
+  hasUnsavedConfigChanges,
+  unsavedConfigDraft,
+  requestGenerationKey,
   runtimeEvents,
   onGeneratePlan,
+  onPlanLoaded,
+  onApplyPlan,
+  onSaveConfigBeforeRegenerate,
   onDispatchExecutionAction,
 }: TaskWorkspacePlanSectionProps) {
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
@@ -208,6 +225,27 @@ export function TaskWorkspacePlanSection({
               taskStatus={consoleView.header.primaryStateLabel ?? pageData.task.status}
               nextAction={consoleView.latestResult.description}
               onAction={focusNodeActions}
+            />
+            <TaskPlanGenerationPanel
+              taskId={pageData.task.id}
+              title={planningTaskDraft.title}
+              description={planningTaskDraft.description}
+              priority={planningTaskDraft.priority}
+              dueAt={planningTaskDraft.dueAt}
+              autoRequest={false}
+              savedPlan={plan}
+              generationStatus={planGenerationStatus}
+              onPlanLoaded={onPlanLoaded}
+              onApply={canAcceptPlan ? onApplyPlan : undefined}
+              activeAcceptedPlanId={plan?.status === "accepted" ? plan.id : null}
+              hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+              unsavedConfigDraft={unsavedConfigDraft}
+              onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
+              showGraph={false}
+              requestGenerationKey={requestGenerationKey}
+              showEmptyGenerateButton={false}
+              showRegenerateButton={false}
+              renderIdleEmptyState={false}
             />
           <RuntimeActivityPanel events={runtimeEvents} />
           </aside>

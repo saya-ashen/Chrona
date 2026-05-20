@@ -53,6 +53,7 @@
       "entryLabel": "Open Chrona AI dropdown",
       "entry": "Chrona AI",
       "signal": "Signal",
+      "activity": "Activity",
       "panelLabel": "Chrona AI dropdown",
       "eyebrow": "Page-aware AI",
       "close": "Close",

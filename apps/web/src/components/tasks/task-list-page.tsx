@@ -5,8 +5,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/pages";
 
 type TaskItem = {
@@ -60,17 +60,17 @@ function matchesFilter(task: TaskItem, filter: FilterKey): boolean {
 }
 
 function statusTone(status: string) {
-  if (["Completed", "Done"].includes(status)) return "success" as const;
-  if (["Running", "Ready", "Queued"].includes(status)) return "info" as const;
-  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "warning" as const;
-  if (["Failed", "Blocked"].includes(status)) return "critical" as const;
-  return "neutral" as const;
+  if (["Completed", "Done"].includes(status)) return "secondary" as const;
+  if (["Running", "Ready", "Queued"].includes(status)) return "secondary" as const;
+  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "secondary" as const;
+  if (["Failed", "Blocked"].includes(status)) return "destructive" as const;
+  return "outline" as const;
 }
 
 function priorityTone(priority: string) {
-  if (priority === "Urgent") return "critical" as const;
-  if (priority === "High") return "warning" as const;
-  return "neutral" as const;
+  if (priority === "Urgent") return "destructive" as const;
+  if (priority === "High") return "secondary" as const;
+  return "outline" as const;
 }
 
 function taskAccentClass(task: TaskItem): string {
@@ -142,19 +142,17 @@ function TaskFilterBar({ filter, counts, copy, onFilterChange }: { filter: Filte
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-[20px] border border-white/70 bg-white/80 p-1.5 shadow-sm backdrop-blur">
       {FILTERS.map((f) => (
-        <button
+        <Button
           key={f.key}
           type="button"
           onClick={() => onFilterChange(f.key)}
-          className={
-            filter === f.key
-              ? buttonVariants({ variant: "default", size: "sm", className: "rounded-2xl shadow-sm" })
-              : buttonVariants({ variant: "ghost", size: "sm", className: "rounded-2xl text-slate-600 hover:bg-slate-100" })
-          }
+          variant={filter === f.key ? "default" : "ghost"}
+          size="sm"
+          className={filter === f.key ? "rounded-2xl shadow-sm" : "rounded-2xl text-slate-600 hover:bg-slate-100"}
         >
           {filterLabel(f.key, copy)}
           <span className="ml-1.5 text-[11px] opacity-60">{counts[filterKeyToCountKey(f.key)]}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -172,10 +170,10 @@ function TaskRow({ task, copy }: { task: TaskItem; copy: TaskListCopy }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
-            <StatusBadge tone={statusTone(task.status)}>{task.status}</StatusBadge>
-            <StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge>
+            <Badge variant={statusTone(task.status)}>{task.status}</Badge>
+            <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
             {task.projection?.runStatus && task.projection.runStatus !== "idle" && (
-              <StatusBadge tone="info">{task.projection.runStatus}</StatusBadge>
+              <Badge variant="secondary">{task.projection.runStatus}</Badge>
             )}
           </div>
           {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{task.description}</p>}
@@ -185,13 +183,12 @@ function TaskRow({ task, copy }: { task: TaskItem; copy: TaskListCopy }) {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <LocalizedLink
-            href={`/tasks/${task.id}`}
-            className={buttonVariants({ variant: "default", size: "sm", className: "rounded-xl shadow-sm" })}
-          >
-            <ExternalLink className="size-3.5" />
-            <span>{copy.viewDetails}</span>
-          </LocalizedLink>
+          <Button asChild variant="default" size="sm" className="rounded-xl shadow-sm">
+            <LocalizedLink href={`/tasks/${task.id}`}>
+              <ExternalLink className="size-3.5" />
+              <span>{copy.viewDetails}</span>
+            </LocalizedLink>
+          </Button>
         </div>
       </div>
     </div>

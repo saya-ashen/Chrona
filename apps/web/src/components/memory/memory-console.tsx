@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { SurfaceCard, SurfaceCardHeader, SurfaceCardTitle } from "@/components/ui/surface-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 
 type MemoryConsoleProps = {
@@ -33,16 +33,16 @@ export function MemoryConsole({ items, copy: copyProp }: MemoryConsoleProps) {
   return (
     <div className="space-y-4">
       {items.map((item) => (
-        <SurfaceCard key={item.id} className="space-y-4">
-          <SurfaceCardHeader className="space-y-3">
+        <Card key={item.id} className="space-y-4">
+          <CardHeader className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <SurfaceCardTitle className="text-base leading-6">{item.content}</SurfaceCardTitle>
+              <CardTitle className="text-base leading-6">{item.content}</CardTitle>
               <div className="flex flex-wrap gap-2">
-                <StatusBadge>{item.scope}</StatusBadge>
-                <StatusBadge tone={item.status === "Active" ? "success" : "neutral"}>{item.status}</StatusBadge>
+                <Badge>{item.scope}</Badge>
+                <Badge variant={item.status === "Active" ? "secondary" : "outline"}>{item.status}</Badge>
               </div>
             </div>
-          </SurfaceCardHeader>
+          </CardHeader>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>{copy.source}: {item.sourceType}</p>
             <p>{copy.task}: {item.taskTitle ?? "-"}</p>
@@ -52,9 +52,9 @@ export function MemoryConsole({ items, copy: copyProp }: MemoryConsoleProps) {
             {item.taskId ? (
               <TaskContextLinks taskId={item.taskId} />
             ) : null}
-            {item.actions ?? <button type="button" className={buttonVariants({ variant: "outline" })}>{copy.invalidate}</button>}
+            {item.actions ?? <Button type="button" variant="outline">{copy.invalidate}</Button>}
           </div>
-        </SurfaceCard>
+        </Card>
       ))}
     </div>
   );

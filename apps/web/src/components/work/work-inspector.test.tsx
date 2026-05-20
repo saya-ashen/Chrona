@@ -6,11 +6,16 @@ vi.mock("@/components/i18n/localized-link", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  buttonVariants: () => "btn",
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
 }));
 
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children }: any) => <span>{children}</span>,
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children }: any) => <span>{children}</span>,
 }));
 
 vi.mock("@/lib/utils", () => ({
@@ -71,14 +76,14 @@ const labels = {
   emptyValue: DEFAULT_WORK_PAGE_COPY.noValue,
   emptyScheduleWindow: DEFAULT_WORK_PAGE_COPY.noScheduleWindow,
   stepStatuses: {
-    pending: { label: DEFAULT_WORK_PAGE_COPY.pendingStep, tone: "neutral" as const },
+    pending: { label: DEFAULT_WORK_PAGE_COPY.pendingStep, tone: "outline" as const },
     in_progress: { label: DEFAULT_WORK_PAGE_COPY.inProgressStep, tone: "info" as const },
     waiting_for_user: { label: DEFAULT_WORK_PAGE_COPY.waitingForUserStep, tone: "warning" as const },
     waiting_for_child: { label: DEFAULT_WORK_PAGE_COPY.waitingForChildStep, tone: "warning" as const },
     waiting_for_approval: { label: DEFAULT_WORK_PAGE_COPY.waitingForApprovalStep, tone: "warning" as const },
     done: { label: DEFAULT_WORK_PAGE_COPY.doneStep, tone: "success" as const },
     blocked: { label: DEFAULT_WORK_PAGE_COPY.blockedStep, tone: "critical" as const },
-    skipped: { label: DEFAULT_WORK_PAGE_COPY.skippedStep, tone: "neutral" as const },
+    skipped: { label: DEFAULT_WORK_PAGE_COPY.skippedStep, tone: "outline" as const },
   },
   planTitle: DEFAULT_WORK_PAGE_COPY.taskPlan,
   planReadySummary: DEFAULT_WORK_PAGE_COPY.planReadySummary,

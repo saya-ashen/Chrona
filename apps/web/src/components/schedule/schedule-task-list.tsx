@@ -7,17 +7,11 @@ import {
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
 } from "@/components/schedule/forms/task-config-form";
-import { buttonVariants } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  SurfaceCard,
-  SurfaceCardDescription,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { useI18n, useLocale } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
 
 export type ScheduleTaskListItem = {
   taskId: string;
@@ -79,57 +73,57 @@ function formatDateTime(locale: string, value: Date | null | undefined) {
 function getPriorityTone(priority: string) {
   switch (priority.toLowerCase()) {
     case "urgent":
-      return "critical" as const;
+      return "destructive" as const;
     case "high":
-      return "warning" as const;
+      return "secondary" as const;
     case "medium":
-      return "info" as const;
+      return "secondary" as const;
     default:
-      return "success" as const;
+      return "outline" as const;
   }
 }
 
 function getScheduleTone(status: string | null | undefined) {
   if (!status) {
-    return "neutral" as const;
+    return "outline" as const;
   }
 
   switch (status.toLowerCase()) {
     case "overdue":
     case "blocked":
-      return "critical" as const;
+      return "destructive" as const;
     case "atrisk":
     case "at risk":
-      return "warning" as const;
+      return "secondary" as const;
     case "scheduled":
     case "inprogress":
-      return "info" as const;
+      return "secondary" as const;
     default:
-      return "neutral" as const;
+      return "outline" as const;
   }
 }
 
 function getRunTone(status: string | null | undefined) {
   if (!status) {
-    return "neutral" as const;
+    return "outline" as const;
   }
 
   switch (status.toLowerCase()) {
     case "completed":
-      return "success" as const;
+      return "secondary" as const;
     case "waitingforapproval":
     case "waitingforinput":
-      return "warning" as const;
+      return "secondary" as const;
     case "failed":
     case "cancelled":
-      return "critical" as const;
+      return "destructive" as const;
     default:
-      return "info" as const;
+      return "outline" as const;
   }
 }
 
 function getRunnabilityTone(isRunnable: boolean) {
-  return isRunnable ? ("success" as const) : ("warning" as const);
+  return isRunnable ? ("secondary" as const) : ("destructive" as const);
 }
 
 function matchesFilter(item: ScheduleTaskListItem, filter: ListFilterKey) {
@@ -237,13 +231,13 @@ export function ScheduleTaskList({
   const filteredItems = useMemo(() => items.filter((item) => matchesFilter(item, activeFilter)), [activeFilter, items]);
 
   return (
-    <SurfaceCard variant="highlight" className="space-y-4">
+    <Card className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <SurfaceCardHeader>
-          <SurfaceCardTitle>{copy.title}</SurfaceCardTitle>
-          <SurfaceCardDescription>{copy.description}</SurfaceCardDescription>
-        </SurfaceCardHeader>
-        <StatusBadge tone="info">{copy.triageBadge}</StatusBadge>
+        <CardHeader>
+          <CardTitle>{copy.title}</CardTitle>
+          <CardDescription>{copy.description}</CardDescription>
+        </CardHeader>
+        <Badge variant="secondary">{copy.triageBadge}</Badge>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -251,15 +245,17 @@ export function ScheduleTaskList({
           const isActive = filter.key === activeFilter;
 
           return (
-            <button
+            <Button
               key={filter.key}
               type="button"
               onClick={() => setActiveFilter(filter.key)}
-              className={cn(buttonVariants({ variant: isActive ? "secondary" : "outline", size: "sm" }), "gap-2")}
+              variant={isActive ? "secondary" : "outline"}
+              size="sm"
+              className="gap-2"
             >
               <span>{filter.label}</span>
-              <StatusBadge tone={isActive ? "info" : "neutral"}>{counts[filter.key]}</StatusBadge>
-            </button>
+              <Badge variant={isActive ? "secondary" : "outline"}>{counts[filter.key]}</Badge>
+            </Button>
           );
         })}
       </div>
@@ -278,7 +274,7 @@ export function ScheduleTaskList({
             const isExpanded = expandedTaskId === item.taskId;
 
             return (
-              <SurfaceCard key={item.taskId} variant="inset" padding="sm" className="rounded-2xl border border-border/70">
+              <Card key={item.taskId} className="rounded-2xl border border-border/70">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-1">
@@ -289,15 +285,15 @@ export function ScheduleTaskList({
                         >
                           {item.title}
                         </LocalizedLink>
-                        <StatusBadge tone={getPriorityTone(item.priority)}>{item.priority}</StatusBadge>
-                        <StatusBadge tone={getRunnabilityTone(item.isRunnable)}>{item.runnabilitySummary}</StatusBadge>
-                        <StatusBadge tone={getScheduleTone(item.scheduleStatus)}>
+                        <Badge variant={getPriorityTone(item.priority)}>{item.priority}</Badge>
+                        <Badge variant={getRunnabilityTone(item.isRunnable)}>{item.runnabilitySummary}</Badge>
+                        <Badge variant={getScheduleTone(item.scheduleStatus)}>
                           {item.scheduleStatus ?? copy.noSchedule}
-                        </StatusBadge>
+                        </Badge>
                         {item.latestRunStatus ? (
-                          <StatusBadge tone={getRunTone(item.latestRunStatus)}>
+                          <Badge variant={getRunTone(item.latestRunStatus)}>
                             {copy.runPrefix}: {item.latestRunStatus}
-                          </StatusBadge>
+                          </Badge>
                         ) : null}
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -325,27 +321,28 @@ export function ScheduleTaskList({
                     </dl>
 
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      {item.actionRequired ? <StatusBadge tone="warning">{item.actionRequired}</StatusBadge> : null}
+                      {item.actionRequired ? <Badge variant="secondary">{item.actionRequired}</Badge> : null}
                       {item.approvalPendingCount > 0 ? (
-                        <StatusBadge tone="warning">{copy.approvals}: {item.approvalPendingCount}</StatusBadge>
+                        <Badge variant="secondary">{copy.approvals}: {item.approvalPendingCount}</Badge>
                       ) : null}
                       {item.scheduleProposalCount > 0 ? (
-                        <StatusBadge tone="info">{copy.proposals}: {item.scheduleProposalCount}</StatusBadge>
+                        <Badge variant="secondary">{copy.proposals}: {item.scheduleProposalCount}</Badge>
                       ) : null}
-                      <StatusBadge>{item.executionRuntime || copy.noModel}</StatusBadge>
+                      <Badge>{item.executionRuntime || copy.noModel}</Badge>
                     </div>
                   </div>
 
                   <div className="flex w-full shrink-0 flex-col gap-2 lg:w-auto lg:min-w-[220px]">
                     <TaskContextLinks taskId={item.taskId} />
-                    <button
+                    <Button
                       type="button"
                       disabled={isPending}
                       onClick={() => setExpandedTaskId(isExpanded ? null : item.taskId)}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      variant="outline"
+                      size="sm"
                     >
                       {isExpanded ? copy.closeQuickEdit : copy.quickEdit}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -365,11 +362,11 @@ export function ScheduleTaskList({
                     />
                   </div>
                 ) : null}
-              </SurfaceCard>
+              </Card>
             );
           })
         )}
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }

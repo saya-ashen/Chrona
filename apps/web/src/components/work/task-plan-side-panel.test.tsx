@@ -24,11 +24,16 @@ vi.mock("@chrona/i18n/react", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  buttonVariants: () => "btn",
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
 }));
 
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children }: any) => <span>{children}</span>,
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children }: any) => <span>{children}</span>,
 }));
 
 vi.mock("@/lib/utils", () => ({

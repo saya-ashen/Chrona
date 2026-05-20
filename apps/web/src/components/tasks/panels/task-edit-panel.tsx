@@ -1,6 +1,6 @@
 "use client";
 
-import { SurfaceCard } from "@/components/ui/surface-card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -20,10 +20,9 @@ export function TaskEditPanel({
   className,
 }: TaskEditPanelProps) {
   return (
-    <SurfaceCard
-      as="div"
-      variant="inset"
-      padding="sm"
+    <Card
+     
+     
       className={cn(
         "overflow-hidden rounded-[1.35rem] border-border/50 bg-background/65 shadow-none",
         className,
@@ -41,6 +40,6 @@ export function TaskEditPanel({
         </div>
         {children ? <div className="px-1">{children}</div> : null}
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }

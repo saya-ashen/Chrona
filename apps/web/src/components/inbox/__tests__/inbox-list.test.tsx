@@ -6,18 +6,23 @@ vi.mock("@/components/i18n/localized-link", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  buttonVariants: () => "btn",
+  Button: ({ children, asChild, ...props }: any) => {
+    if (asChild && children) {
+      return <>{children}</>;
+    }
+    return <button {...props}>{children}</button>;
+  },
 }));
 
-vi.mock("@/components/ui/status-badge", () => ({
-  StatusBadge: ({ children }: any) => <span>{children}</span>,
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children }: any) => <span>{children}</span>,
 }));
 
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SurfaceCardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SurfaceCardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SurfaceCardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 
 vi.mock("@chrona/i18n/react", () => ({

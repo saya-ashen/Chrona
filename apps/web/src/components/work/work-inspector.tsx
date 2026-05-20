@@ -1,10 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   renderWorkInspectorSectionPanel,
   workInspectorSections as sections,
@@ -39,7 +37,7 @@ type WorkInspectorProps = {
     sections: Record<InspectorSection, string>;
     emptyValue: string;
     emptyScheduleWindow: string;
-    stepStatuses: Record<string, { label: string; tone: "neutral" | "info" | "success" | "warning" | "critical" }>;
+    stepStatuses: Record<string, { label: string; tone: "outline" | "info" | "success" | "warning" | "critical" }>;
     planTitle: string;
     planReadySummary: string;
     planEmptySummary: string;
@@ -81,102 +79,35 @@ export function WorkInspector({
   labels,
 }: WorkInspectorProps) {
   const [activeSection, setActiveSection] = useState<(typeof sections)[number]>("plan");
-  const tabRefs = useRef<Record<InspectorSection, HTMLButtonElement | null>>({
-    plan: null,
-    approvals: null,
-    artifacts: null,
-    tools: null,
-    context: null,
-  });
-
-  function focusSection(nextSection: InspectorSection) {
-    setActiveSection(nextSection);
-    tabRefs.current[nextSection]?.focus();
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, section: InspectorSection) {
-    const sectionIndex = sections.indexOf(section);
-
-    if (sectionIndex === -1) {
-      return;
-    }
-
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown": {
-        event.preventDefault();
-        focusSection(sections[(sectionIndex + 1) % sections.length]);
-        return;
-      }
-      case "ArrowLeft":
-      case "ArrowUp": {
-        event.preventDefault();
-        focusSection(sections[(sectionIndex - 1 + sections.length) % sections.length]);
-        return;
-      }
-      case "Home": {
-        event.preventDefault();
-        focusSection(sections[0]);
-        return;
-      }
-      case "End": {
-        event.preventDefault();
-        focusSection(sections[sections.length - 1]);
-        return;
-      }
-      default:
-        return;
-    }
-  }
 
   return (
     <aside aria-label={labels.ariaLabel} className="space-y-4">
       <section className="rounded-[28px] border bg-card p-4 shadow-sm">
         <h2 className="text-base font-semibold tracking-tight text-foreground">{labels.ariaLabel}</h2>
-        <div role="tablist" aria-label={labels.ariaLabel} className="flex flex-wrap gap-2">
-          {sections.map((section) => (
-            <button
-              key={section}
-              type="button"
-              ref={(node) => {
-                tabRefs.current[section] = node;
-              }}
-              id={`work-inspector-tab-${section}`}
-              role="tab"
-              aria-selected={activeSection === section}
-              aria-controls={`work-inspector-panel-${section}`}
-              tabIndex={activeSection === section ? 0 : -1}
-              onClick={() => setActiveSection(section)}
-              onKeyDown={(event) => handleTabKeyDown(event, section)}
-              className={cn(buttonVariants({ variant: activeSection === section ? "secondary" : "ghost", size: "sm" }), "rounded-full")}
-            >
-              {labels.sections[section]}
-            </button>
-          ))}
-        </div>
+        <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as InspectorSection)} className="mt-3 gap-0">
+          <TabsList aria-label={labels.ariaLabel} className="flex h-auto flex-wrap gap-2 bg-transparent p-0">
+            {sections.map((section) => (
+              <TabsTrigger key={section} value={section} className="flex-none rounded-full px-3 py-1.5 text-xs" onClick={() => setActiveSection(section)}>
+                {labels.sections[section]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {sections.map((section) => (
-          <div
-            key={section}
-            id={`work-inspector-panel-${section}`}
-            role="tabpanel"
-            aria-labelledby={`work-inspector-tab-${section}`}
-            aria-label={labels.sections[section]}
-            hidden={activeSection !== section}
-            className="mt-4 rounded-[24px] border border-border/60 bg-background/60 p-4 text-sm"
-          >
-            {renderWorkInspectorSectionPanel(section, {
-              plan,
-              currentAction,
-              currentException,
-              approvals,
-              artifacts,
-              toolCalls,
-              context,
-              labels,
-            })}
-          </div>
-        ))}
+          {sections.map((section) => (
+            <TabsContent key={section} value={section} className="mt-4 rounded-[24px] border border-border/60 bg-background/60 p-4 text-sm">
+              {renderWorkInspectorSectionPanel(section, {
+                plan,
+                currentAction,
+                currentException,
+                approvals,
+                artifacts,
+                toolCalls,
+                context,
+                labels,
+              })}
+            </TabsContent>
+          ))}
+        </Tabs>
       </section>
     </aside>
   );

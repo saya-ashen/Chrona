@@ -3,8 +3,8 @@ import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreparationChecklist, type PreparationStep } from "../panels/preparation-checklist";
 
-vi.mock("@/components/ui/surface-card", () => ({
-  SurfaceCard: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+vi.mock("@/components/ui/card", () => ({
+  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 vi.mock("@/lib/utils", () => ({ cn: (...args: any[]) => args.filter(Boolean).join(" ") }));
 vi.mock("lucide-react", () => ({

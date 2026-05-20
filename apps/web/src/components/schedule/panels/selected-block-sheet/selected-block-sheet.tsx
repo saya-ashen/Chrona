@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { SelectedBlockMainColumn } from "@/components/schedule/panels/selected-block-sheet/selected-block-main-column";
 import { SelectedBlockSheetHeader } from "@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import type { SelectedBlockSheetProps } from "@/components/schedule/panels/selected-block-sheet/types";
 import { useSelectedBlockConfigState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-config-state";
 import { useSelectedBlockPlanState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-plan-state";
@@ -22,7 +26,6 @@ export function SelectedBlockSheet({
   onMutatedAction,
   buildScheduleHref: _buildScheduleHref,
 }: SelectedBlockSheetProps) {
-  const [isMounted, setIsMounted] = useState(false);
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
@@ -41,28 +44,11 @@ export function SelectedBlockSheet({
     saveConfigBeforeRegenerate,
   } = useSelectedBlockConfigState({ item, onSaveTaskConfigAction });
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted || typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={copy.closeTaskDetails}
-        className="fixed inset-0 z-[120] bg-slate-950/35 cursor-default"
-      />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="schedule-task-sheet-title"
-        className="fixed inset-x-0 bottom-0 z-[130] max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:inset-y-4 md:left-1/2 md:w-[min(1180px,calc(100vw-2rem))] md:max-h-none md:-translate-x-1/2 md:rounded-[2rem]"
-      >
+  return (
+    <Drawer open direction="bottom" onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DrawerContent className="z-[130] max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] md:inset-x-auto md:inset-y-4 md:left-1/2 md:w-[min(1180px,calc(100vw-2rem))] md:max-h-none md:-translate-x-1/2 md:rounded-[2rem]">
+        <DrawerTitle className="sr-only">{copy.taskDetails}</DrawerTitle>
+        <DrawerDescription className="sr-only">{copy.closeTaskDetails}</DrawerDescription>
         <div className="flex max-h-[92vh] min-h-0 flex-col md:max-h-[calc(100vh-2rem)]">
           <SelectedBlockSheetHeader
             item={item}
@@ -95,8 +81,7 @@ export function SelectedBlockSheet({
             </div>
           </div>
         </div>
-      </section>
-    </>,
-    document.body,
+      </DrawerContent>
+    </Drawer>
   );
 }

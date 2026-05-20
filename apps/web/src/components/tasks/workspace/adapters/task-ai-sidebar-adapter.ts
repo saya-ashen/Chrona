@@ -5,19 +5,26 @@ function findActiveNode(task: TaskData) {
   return task.graphNodeStates?.find((node) => node.current || node.status === "running") ?? task.graphNodeStates?.[0];
 }
 
-function createTaskHighlights({ task, activeNodeId, blockReason, primaryAction }: {
+function createTaskHighlights({ task, activeNodeId, blockReason, primaryAction, latestActivitySummary }: {
   task: TaskData;
   activeNodeId: string | null;
   blockReason: string | null;
   primaryAction: string;
+  latestActivitySummary?: string | null;
 }) {
-  return [
+  const highlights = [
     { label: "Task", value: task.title },
     { label: "State", value: task.status },
     { label: "Active node", value: activeNodeId ?? "No active node" },
     { label: "Blocker", value: blockReason ?? "None", tone: blockReason ? "warning" as const : "success" as const },
     { label: "Primary action", value: primaryAction, tone: task.isRunnable ? "info" as const : "warning" as const },
   ];
+
+  if (latestActivitySummary) {
+    highlights.unshift({ label: "Activity", value: latestActivitySummary, tone: "info" as const });
+  }
+
+  return highlights;
 }
 
 function createTaskActions({ hasPlan, hasActiveNode, blockReason }: {
@@ -76,13 +83,14 @@ function createTaskFingerprint({ task, activeNodeId, activeNodeStatus, blockReas
   ].join(":");
 }
 
-function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction }: {
+function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary }: {
   task: TaskData;
   activeNodeId: string | null;
   activeNodeStatus: string | null;
   blockReason: string | null;
   reviewState: string | null;
   primaryAction: string;
+  latestActivitySummary?: string | null;
 }): AiSidebarPageContextSummary {
   return {
     type: "task",
@@ -98,11 +106,11 @@ function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, 
     reviewState,
     primaryAction,
     capabilities: ["explain-blocker", "modify-plan", "retry-node", "add-step"],
-    highlights: createTaskHighlights({ task, activeNodeId, blockReason, primaryAction }),
+    highlights: createTaskHighlights({ task, activeNodeId, blockReason, primaryAction, latestActivitySummary }),
   };
 }
 
-export function createTaskAiSidebarContext(task: TaskData): {
+export function createTaskAiSidebarContext(task: TaskData, options: { latestActivitySummary?: string | null } = {}): {
   context: AiSidebarPageContextSummary;
   actions: AiSidebarQuickAction[];
 } {
@@ -114,7 +122,15 @@ export function createTaskAiSidebarContext(task: TaskData): {
   const activeNodeStatus = activeNode?.status ?? null;
 
   return {
-    context: createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction }),
+    context: createTaskContext({
+      task,
+      activeNodeId,
+      activeNodeStatus,
+      blockReason,
+      reviewState,
+      primaryAction,
+      latestActivitySummary: options.latestActivitySummary,
+    }),
     actions: createTaskActions({ hasPlan: Boolean(task.savedPlan), hasActiveNode: Boolean(activeNode), blockReason }),
   };
 }

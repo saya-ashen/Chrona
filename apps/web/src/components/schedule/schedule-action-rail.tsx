@@ -1,11 +1,6 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  SurfaceCard,
-  SurfaceCardDescription,
-  SurfaceCardHeader,
-  SurfaceCardTitle,
-} from "@/components/ui/surface-card";
+import type { ReactNode } from "react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type ActionRailTab = "queue" | "risks" | "proposals" | "conflicts";
 
@@ -32,103 +27,31 @@ export function ScheduleActionRail({
   onTabChange: (value: ActionRailTab) => void;
   sections: RailSection[];
 }) {
-  const buttonRefs = useRef<Record<ActionRailTab, HTMLButtonElement | null>>({
-    queue: null,
-    risks: null,
-    proposals: null,
-    conflicts: null,
-  });
-
-  function focusTab(nextIndex: number) {
-    const nextSection = sections[nextIndex];
-
-    if (!nextSection) {
-      return;
-    }
-
-    onTabChange(nextSection.value);
-    buttonRefs.current[nextSection.value]?.focus();
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (sections.length === 0) {
-      return;
-    }
-
-    switch (event.key) {
-      case "ArrowRight": {
-        event.preventDefault();
-        focusTab((index + 1) % sections.length);
-        break;
-      }
-      case "ArrowLeft": {
-        event.preventDefault();
-        focusTab((index - 1 + sections.length) % sections.length);
-        break;
-      }
-      case "Home": {
-        event.preventDefault();
-        focusTab(0);
-        break;
-      }
-      case "End": {
-        event.preventDefault();
-        focusTab(sections.length - 1);
-        break;
-      }
-    }
-  }
-
   return (
-    <SurfaceCard
+    <Card
       id={id}
-      as="aside"
       aria-label={ariaLabel}
       className="xl:sticky xl:top-4 xl:self-start"
     >
-      <div role="tablist" aria-label={tablistAriaLabel} className="flex flex-wrap gap-2">
-        {sections.map((section, index) => (
-          <button
-            key={section.value}
-            type="button"
-            role="tab"
-            aria-selected={section.value === activeTab}
-            aria-controls={`schedule-action-rail-panel-${section.value}`}
-            id={`schedule-action-rail-tab-${section.value}`}
-            tabIndex={section.value === activeTab ? 0 : -1}
-            ref={(element) => {
-              buttonRefs.current[section.value] = element;
-            }}
-            onClick={() => onTabChange(section.value)}
-            onKeyDown={(event) => handleTabKeyDown(event, index)}
-            className={buttonVariants({ variant: section.value === activeTab ? "default" : "ghost", size: "sm" })}
-          >
-            {section.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as ActionRailTab)} className="gap-0">
+        <TabsList aria-label={tablistAriaLabel} className="flex h-auto flex-wrap gap-2 bg-transparent p-0">
+          {sections.map((section) => (
+            <TabsTrigger key={section.value} value={section.value} className="flex-none px-3 py-1.5 text-xs" onClick={() => onTabChange(section.value)}>
+              {section.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {sections.map((section) => {
-        const isActive = section.value === activeTab;
-
-        return (
-          <div
-            key={section.value}
-            role="tabpanel"
-            id={`schedule-action-rail-panel-${section.value}`}
-            aria-labelledby={`schedule-action-rail-tab-${section.value}`}
-            tabIndex={isActive ? 0 : -1}
-            hidden={!isActive}
-            className={isActive ? "mt-4 space-y-4" : "mt-4 hidden space-y-4"}
-          >
-            <SurfaceCardHeader>
-              <SurfaceCardTitle>{section.title}</SurfaceCardTitle>
-              {section.description ? <SurfaceCardDescription>{section.description}</SurfaceCardDescription> : null}
-            </SurfaceCardHeader>
+        {sections.map((section) => (
+          <TabsContent key={section.value} value={section.value} className="mt-4 space-y-4">
+            <CardHeader>
+              <CardTitle>{section.title}</CardTitle>
+              {section.description ? <CardDescription>{section.description}</CardDescription> : null}
+            </CardHeader>
             <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">{section.body}</div>
-          </div>
-        );
-      })}
-    </SurfaceCard>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </Card>
   );
 }

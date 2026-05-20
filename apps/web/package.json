@@ -14,10 +14,20 @@
     "@chrona/runtime-core": "workspace:*",
     "@chrona/server": "workspace:*",
     "@chrona/shared": "workspace:*",
+    "@fontsource-variable/inter": "^5.2.8",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@tanstack/react-query": "^5.100.9",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.2.1",
+    "lucide-react": "^1.16.0",
+    "radix-ui": "^1.4.3",
+    "react-day-picker": "^10.0.1",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "shadcn": "^4.7.0",
+    "tailwind-merge": "^3.6.0",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

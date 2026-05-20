@@ -3,9 +3,8 @@ import { useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 
-import { buttonVariants } from "@/components/ui/button";
-import { inputClassName } from "@/components/ui/field";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type AccessKeyUnlockProps = {
   onUnlock: (key: string, remember: boolean) => void;
@@ -40,9 +39,9 @@ export function AccessKeyUnlock({ onUnlock }: AccessKeyUnlockProps) {
         <form className="grid gap-4" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm font-medium text-slate-900">
             {t("components.accessKeyUnlock.keyLabel")}
-            <input
+            <Input
               autoFocus
-              className={cn(inputClassName, "h-12 rounded-2xl bg-white text-base")}
+              className="h-12 rounded-2xl bg-white text-base"
               name="accessKey"
               onChange={(event) => setKey(event.target.value)}
               placeholder={t("components.accessKeyUnlock.keyPlaceholder")}
@@ -64,13 +63,13 @@ export function AccessKeyUnlock({ onUnlock }: AccessKeyUnlockProps) {
             </span>
           </label>
 
-          <button
-            className={buttonVariants({ className: "h-12 rounded-2xl text-base" })}
+          <Button
+            className="h-12 rounded-2xl text-base"
             disabled={!key.trim()}
             type="submit"
           >
             {t("components.accessKeyUnlock.submit")}
-          </button>
+          </Button>
         </form>
       </section>
     </main>

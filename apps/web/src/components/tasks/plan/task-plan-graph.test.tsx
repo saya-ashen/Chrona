@@ -158,7 +158,7 @@ describe("TaskPlanGraph", () => {
     const acceptedNode = screen.getByTestId("task-plan-node-node-accepted");
     expect(pendingNode).toHaveTextContent("Ready");
     expect(pendingNode).toHaveAttribute("data-node-current", "true");
-    expect(acceptedNode).toHaveTextContent("done");
+    expect(acceptedNode).toHaveTextContent("Done");
 
     fireEvent.click(acceptedNode);
 
@@ -735,7 +735,7 @@ describe("TaskPlanGraph", () => {
     expect(skippedEdge?.style?.opacity).toBe(0.58);
     expect(skippedEdge?.zIndex).toBe(3);
     expect(skippedNode?.data.tone).toBe("skipped");
-    expect(skippedNode?.style?.opacity).toBe(0.48);
+    expect(skippedNode?.style?.opacity).toBe(0.58);
   });
 
   it("lays out long linear plans with ELK layered coordinates", async () => {

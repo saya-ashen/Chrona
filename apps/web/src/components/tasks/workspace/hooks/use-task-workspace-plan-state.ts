@@ -20,6 +20,34 @@ import type { ExecutionActionInput, PlanExecutionSSEEvent } from "@chrona/contra
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 
+function compactActivityText(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 96);
+}
+
+function getPlanGenerationActivity(generationSession: ReturnType<typeof useTaskPlanGenerationSession>) {
+  if (generationSession.sessionStatus !== "running") return null;
+
+  const latestToolResult = generationSession.toolResults.at(-1);
+  if (latestToolResult) {
+    return compactActivityText(`${latestToolResult.tool} completed`);
+  }
+
+  const latestToolCall = generationSession.toolCalls.at(-1);
+  if (latestToolCall) {
+    return compactActivityText(`Running ${latestToolCall.tool}`);
+  }
+
+  if (generationSession.statusMessage) {
+    return compactActivityText(generationSession.statusMessage);
+  }
+
+  if (generationSession.partialText) {
+    return compactActivityText(generationSession.partialText);
+  }
+
+  return "Generating plan";
+}
+
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
   if (isGenerationRunning) {
     return "generating" as const;
@@ -82,6 +110,7 @@ function samePlanFlowSnapshot(
 export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () => Promise<void>) {
   const queryClient = useQueryClient();
   const generationSession = useTaskPlanGenerationSession(task.id);
+  const latestActivitySummary = getPlanGenerationActivity(generationSession);
   const previousGenerationStatusRef = useRef(generationSession.sessionStatus);
   const syncTaskDetailPlanFields = useCallback((nextPlanState: TaskPlanState) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.page(task.id), (current: TaskPageData | undefined) => {
@@ -125,7 +154,6 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     } satisfies TaskPlanState,
   });
   const planState = planStateQuery.data;
-  const [isAiWorkspaceOpen, setIsAiWorkspaceOpen] = useState(false);
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
@@ -254,12 +282,6 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     await planStateQuery.refetch();
   }, [planStateQuery]);
 
-  useEffect(() => {
-    if (planGenerationStatus === "generating") {
-      setIsAiWorkspaceOpen(true);
-    }
-  }, [planGenerationStatus]);
-
   const canAcceptPlan = canAcceptPlanFromFlow(planFlow);
   const acceptPlanError = getAcceptPlanErrorFromFlow(planFlow);
 
@@ -307,12 +329,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     await acceptPlanById(plan.id);
   }, [acceptPlanById, plan?.id]);
 
-  const handleOpenAiWorkspace = useCallback(() => {
-    setIsAiWorkspaceOpen(true);
-  }, []);
-
   const handleGeneratePlanFromHeader = useCallback(() => {
-    setIsAiWorkspaceOpen(true);
     setRequestGenerationKey((current) => current + 1);
   }, []);
 
@@ -401,14 +418,12 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     isAcceptingPlan: isAcceptingPlanFromFlow(planFlow),
     acceptPlanError,
     setAcceptPlanError,
-    isAiWorkspaceOpen,
-    setIsAiWorkspaceOpen,
     requestGenerationKey,
     runtimeEvents,
+    latestActivitySummary,
     acceptPlanById,
     handleAcceptPlan,
     dispatchExecutionAction,
-    handleOpenAiWorkspace,
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,
   };

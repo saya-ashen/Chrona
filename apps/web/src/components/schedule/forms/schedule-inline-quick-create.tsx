@@ -2,8 +2,8 @@
 
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
-import { buttonVariants } from "@/components/ui/button";
-import { SurfaceCard } from "@/components/ui/surface-card";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export function ScheduleInlineQuickCreate({
@@ -86,7 +86,7 @@ export function ScheduleInlineQuickCreate({
 
   if (compact && !expanded) {
     return (
-      <button
+      <Button
         type="button"
         onClick={() => setExpanded(true)}
         className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left transition hover:border-primary/30 hover:bg-background"
@@ -101,12 +101,12 @@ export function ScheduleInlineQuickCreate({
           </div>
         </div>
         <ChevronRight className="size-4 text-muted-foreground" />
-      </button>
+      </Button>
     );
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" padding="sm" className="space-y-3 rounded-[24px] border-border/70 bg-background/85">
+    <Card className="space-y-3 rounded-[24px] border-border/70 bg-background/85">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -115,14 +115,16 @@ export function ScheduleInlineQuickCreate({
           {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
         </div>
         {compact ? (
-          <button
+          <Button
             type="button"
             onClick={() => setExpanded(false)}
+            variant="ghost"
+            size="icon-sm"
             className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
             aria-label="Collapse create task form"
           >
             <ChevronDown className="size-4" />
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -194,21 +196,23 @@ export function ScheduleInlineQuickCreate({
 
       <div className="flex items-center justify-end gap-2">
         {onCancel ? (
-          <button type="button" disabled={isPending} onClick={onCancel} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <Button type="button" disabled={isPending} onClick={onCancel} variant="ghost" size="sm">
             Cancel
-          </button>
+          </Button>
         ) : null}
-        <button
+        <Button
           type="button"
           disabled={isPending || title.trim().length === 0}
           onClick={() => {
             void handleSubmit();
           }}
-          className={cn(buttonVariants({ variant: "default", size: "sm" }), "rounded-full")}
+          variant="default"
+          size="sm"
+          className="rounded-full"
         >
           {submitLabel}
-        </button>
+        </Button>
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }

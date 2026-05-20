@@ -14,9 +14,8 @@ import {
 } from "@/components/schedule/forms/task-config-form";
 import { TaskAiPlanPanel } from "@/components/tasks/panels/task-ai-plan-panel";
 import { TaskEditPanel } from "@/components/tasks/panels/task-edit-panel";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import { cn } from "@/lib/utils";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
 export function SelectedBlockMainColumn({
@@ -76,33 +75,32 @@ export function SelectedBlockMainColumn({
               showDeleteConfirm ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                   <span>Delete &ldquo;{item.title}&rdquo;?</span>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => onDeleteTask(item.taskId)}
-                    className={buttonVariants({ variant: "destructive", size: "sm" })}
+                    variant="destructive" size="sm"
                   >
                     Confirm delete
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => setShowDeleteConfirm(false)}
-                    className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    variant="ghost" size="sm"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button
+                <Button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "default" }),
-                    "border-destructive/25 text-destructive hover:border-destructive/35 hover:bg-destructive/5 hover:text-destructive",
-                  )}
+                  variant="outline"
+                  size="default"
+                  className="border-destructive/25 text-destructive hover:border-destructive/35 hover:bg-destructive/5 hover:text-destructive"
                 >
                   <Trash2 className="size-4" />
                   Delete task
-                </button>
+                </Button>
               )
             ) : null}
             onDraftStateChange={onTaskConfigDraftStateChange}

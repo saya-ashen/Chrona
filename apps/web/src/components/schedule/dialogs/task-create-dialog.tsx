@@ -2,7 +2,14 @@
 
 import { Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n } from "@chrona/i18n/react";
@@ -152,17 +159,6 @@ export function TaskCreateDialog({
     }
   }, [isOpen, initialStartAt, initialEndAt, initialTitle, defaultAutoExecuteEnabled]);
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose]);
-
   async function handleSubmit() {
     if (!title.trim()) return;
 
@@ -188,32 +184,28 @@ export function TaskCreateDialog({
     onClose();
   }
 
-  if (!isOpen) return null;
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/10"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border/60 bg-background shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100vh-2rem)] max-w-md overflow-hidden rounded-2xl border border-border/60 bg-background p-0 shadow-2xl"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">{dialogCopy.title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label={dialogCopy.close}
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/60 px-6 py-4">
+          <DialogTitle className="text-lg font-semibold text-foreground">{dialogCopy.title}</DialogTitle>
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label={dialogCopy.close}
+              />
+            }
           >
             <X className="size-4" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         {/* Content */}
         <div className="space-y-4 px-6 py-5">
@@ -455,27 +447,23 @@ export function TaskCreateDialog({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 border-t border-border/60 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+          <DialogClose
+            render={<Button type="button" disabled={isPending} variant="ghost" size="sm" />}
           >
             {dialogCopy.cancel}
-          </button>
-          <button
+          </DialogClose>
+          <Button
             type="button"
             onClick={() => void handleSubmit()}
             disabled={isPending || !title.trim()}
-            className={cn(
-              buttonVariants({ variant: "default", size: "sm" }),
-              "min-w-20 rounded-lg",
-            )}
+            variant="default"
+            size="sm"
+            className="min-w-20 rounded-lg"
           >
             {isPending ? dialogCopy.saving : dialogCopy.save}
-          </button>
+          </Button>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -437,10 +437,10 @@ describe("tone and accent helpers", () => {
 
   describe("getPriorityTone", () => {
     it("returns correct tones", () => {
-      expect(getPriorityTone("Urgent")).toBe("critical");
-      expect(getPriorityTone("High")).toBe("warning");
-      expect(getPriorityTone("Medium")).toBe("warning");
-      expect(getPriorityTone("Low")).toBe("success");
+      expect(getPriorityTone("Urgent")).toBe("destructive");
+      expect(getPriorityTone("High")).toBe("secondary");
+      expect(getPriorityTone("Medium")).toBe("secondary");
+      expect(getPriorityTone("Low")).toBe("outline");
     });
   });
 

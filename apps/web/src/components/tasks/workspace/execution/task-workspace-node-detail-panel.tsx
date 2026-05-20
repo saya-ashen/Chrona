@@ -13,13 +13,23 @@ import type {
   PlanNodeDataModel,
   PlanNodeField,
 } from "@/components/tasks/plan/task-plan-graph/types";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  inputClassName,
-  selectClassName,
-  textareaClassName,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Field,
+  FieldLabel,
 } from "@/components/ui/field";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
 import {
@@ -48,20 +58,11 @@ const TAB_ORDER: NodeDetailPanelState["tabs"][number][] = [
 ];
 
 function statusTone(status: NodeDetailPanelState["status"]) {
-  if (status === "completed") return "success" as const;
-  if (status === "running") return "info" as const;
-  if (status === "approval-needed") return "warning" as const;
-  if (status === "blocked") return "critical" as const;
-  return "neutral" as const;
-}
-
-function tabClassName(active: boolean) {
-  return cn(
-    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    active
-      ? "bg-slate-950 text-white shadow-sm"
-      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-  );
+  if (status === "completed") return "secondary" as const;
+  if (status === "running") return "secondary" as const;
+  if (status === "approval-needed") return "secondary" as const;
+  if (status === "blocked") return "destructive" as const;
+  return "outline" as const;
 }
 
 function EmptyDetailState() {
@@ -118,18 +119,16 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
             Result summary
           </p>
           {runResult || outputs.length > 0 ? (
-            <button
+            <Button
               type="button"
               onClick={handleCopyResult}
-              className={buttonVariants({
-                variant: "outline",
-                size: "sm",
-                className: "h-8 rounded-full px-3 text-xs",
-              })}
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3 text-xs"
             >
               <Copy className="size-3.5" />
               Copy result
-            </button>
+            </Button>
           ) : null}
         </div>
         {copyStatus ? (
@@ -229,6 +228,7 @@ function RunField({
   onChange: (value: string) => void;
   readOnly?: boolean;
 }) {
+  const fieldId = `node-action-${field.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const label = (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium text-slate-800">{field.label}</span>
@@ -247,20 +247,20 @@ function RunField({
 
   if (field.control === "textarea") {
     return (
-      <label className="space-y-1.5">
-        {label}
-        <textarea
+      <Field className="gap-1.5">
+        <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
+        <Textarea
+          id={fieldId}
           rows={3}
           value={value}
           readOnly={readOnly}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
-            textareaClassName,
             "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
             readOnly && "bg-muted/50 text-muted-foreground",
           )}
         />
-      </label>
+      </Field>
     );
   }
 
@@ -269,47 +269,48 @@ function RunField({
     const shouldShowSubmittedOption = readOnly && value && !options.includes(value);
 
     return (
-      <label className="space-y-1.5">
-        {label}
-        <select
+      <Field className="gap-1.5">
+        <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
+        <Select
           value={value}
           disabled={readOnly}
-          onChange={(event) => onChange(event.target.value)}
-          className={cn(
-            selectClassName,
-            "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
-            readOnly && "bg-muted/50 text-muted-foreground opacity-100",
-          )}
+          onValueChange={onChange}
         >
-          <option value="">Select...</option>
-          {shouldShowSubmittedOption ? (
-            <option value={value}>{value}</option>
-          ) : null}
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger id={fieldId} className="w-full rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm">
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {shouldShowSubmittedOption ? (
+                <SelectItem value={value}>{value}</SelectItem>
+              ) : null}
+              {options.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
     );
   }
 
   return (
-    <label className="space-y-1.5">
-      {label}
-      <input
+    <Field className="gap-1.5">
+      <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
+      <Input
+        id={fieldId}
         type="text"
         value={value}
         readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          inputClassName,
           "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
           readOnly && "bg-muted/50 text-muted-foreground",
         )}
       />
-    </label>
+    </Field>
   );
 }
 
@@ -391,23 +392,26 @@ function ActionTab({
         </div>
       ) : null}
       {actions.length > 1 ? (
-        <label className="mt-2 block space-y-1.5">
-          <span className="text-sm font-medium text-slate-800">Action</span>
-          <select
+        <Field className="mt-2 gap-1.5">
+          <FieldLabel>Action</FieldLabel>
+          <Select
             value={selectedActionId ?? ""}
-            onChange={(event) => setSelectedActionId(event.target.value)}
-            className={cn(
-              selectClassName,
-              "rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm",
-            )}
+            onValueChange={setSelectedActionId}
           >
-            {actions.map((action) => (
-              <option key={action.id} value={action.id}>
-                {action.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger className="w-full rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm">
+              <SelectValue placeholder="Select action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {actions.map((action) => (
+                  <SelectItem key={action.id} value={action.id}>
+                    {action.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
       ) : null}
       {fields.length > 0 ? (
         <div className="mt-3 space-y-2">
@@ -442,19 +446,17 @@ function ActionTab({
       )}
       {hasActionPayload ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
+          <Button
             type="button"
             disabled={Boolean(submitDisabledReason)}
             title={submitDisabledReason ?? undefined}
             onClick={handleSubmitAction}
-            className={buttonVariants({
-              variant: "default",
-              size: "sm",
-              className: "h-8 rounded-full px-3 text-xs shadow-sm",
-            })}
+            variant="default"
+            size="sm"
+            className="h-8 rounded-full px-3 text-xs shadow-sm"
           >
             {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
-          </button>
+          </Button>
           {submitDisabledReason ? (
             <span className="text-xs text-slate-500">{submitDisabledReason}</span>
           ) : null}
@@ -597,12 +599,12 @@ export function TaskWorkspaceNodeDetailPanel({
           <p className={cn("shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em]", isCollapsedDrawer ? "text-cyan-200" : "text-cyan-700")}>
             Node
           </p>
-          <h2 className={cn("min-w-0 truncate text-sm font-semibold", isCollapsedDrawer ? "text-white" : "text-slate-950")}>
+          <h2 aria-label={`Current node: ${detail.title}`} className={cn("min-w-0 truncate text-sm font-semibold", isCollapsedDrawer ? "text-white" : "text-slate-950")}>
             {detail.title}
           </h2>
-          <StatusBadge tone={statusTone(detail.status)}>
+          <Badge variant={statusTone(detail.status)}>
             {detail.status ?? "waiting"}
-          </StatusBadge>
+          </Badge>
           <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", isCollapsedDrawer ? "border-white/10 bg-white/10 text-slate-300" : "border-slate-200 bg-white/80 text-slate-500")}>
             Step {detail.stepPosition}
           </span>
@@ -646,52 +648,36 @@ export function TaskWorkspaceNodeDetailPanel({
       </div>
 
       {isCollapsedDrawer ? null : (
-      <div
-        className="flex gap-1 border-b border-slate-200/80 bg-white/70 px-2.5 py-1.5"
-        role="tablist"
-        aria-label="Node detail tabs"
-      >
-        {orderedTabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            className={tabClassName(activeTab === tab)}
-            onClick={() => setActiveTab(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </button>
-        ))}
-      </div>
-      )}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as NodeDetailPanelState["tabs"][number])} className="min-h-0 flex-1 gap-0">
+          <TabsList aria-label="Node detail tabs" className="flex h-auto justify-start gap-1 rounded-none border-b border-slate-200/80 bg-white/70 px-2.5 py-1.5">
+            {orderedTabs.map((tab) => (
+              <TabsTrigger key={tab} value={tab} className="flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold data-active:bg-slate-950 data-active:text-white data-active:shadow-sm" onClick={() => setActiveTab(tab)}>
+                {TAB_LABELS[tab]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-      {isCollapsedDrawer ? null : (
-      <div
-        role="tabpanel"
-        aria-label={`${TAB_LABELS[activeTab]} tab`}
-        className={cn(
-          "min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2",
-          variant === "rail" && "max-h-none",
-        )}
-      >
-        {activeTab === "result" ? <ResultTab node={node} /> : null}
-        {activeTab === "evidence" ? <EvidenceTab node={node} /> : null}
-        {activeTab === "action" ? (
-          <ActionTab
-            node={node}
-            disabledActionReason={detail.disabledActionReason}
-            selectedActionId={selectedActionId}
-            setSelectedActionId={setSelectedActionId}
-            fieldValues={fieldValues}
-            setFieldValues={setFieldValues}
-            onDispatchExecutionAction={onDispatchExecutionAction}
-          />
-        ) : null}
-        {activeTab === "configuration" ? (
-          <ConfigurationTab node={node} nodes={selectedNodes} />
-        ) : null}
-      </div>
+          <TabsContent value="result" aria-label={`${TAB_LABELS.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+            <ResultTab node={node} />
+          </TabsContent>
+          <TabsContent value="evidence" aria-label={`${TAB_LABELS.evidence} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+            <EvidenceTab node={node} />
+          </TabsContent>
+          <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+            <ActionTab
+              node={node}
+              disabledActionReason={detail.disabledActionReason}
+              selectedActionId={selectedActionId}
+              setSelectedActionId={setSelectedActionId}
+              fieldValues={fieldValues}
+              setFieldValues={setFieldValues}
+              onDispatchExecutionAction={onDispatchExecutionAction}
+            />
+          </TabsContent>
+          <TabsContent value="configuration" aria-label={`${TAB_LABELS.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+            <ConfigurationTab node={node} nodes={selectedNodes} />
+          </TabsContent>
+        </Tabs>
       )}
 
     </section>

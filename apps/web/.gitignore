@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env*
+!.env.example
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vite/
+test-results/
+.playwright-cli/
+.playwright-browsers/

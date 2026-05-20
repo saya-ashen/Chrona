@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { QuickCreateDraft } from "@/components/schedule/schedule-page-types";
 import { buildQuickCreateDraft, toDateForDay } from "@/components/schedule/schedule-page-utils";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
@@ -387,14 +387,16 @@ export function ScheduleCommandBar({
           ) : null}
         </div>
 
-        <button
+        <Button
           type="button"
           disabled={isPending || isResolving || value.trim().length === 0}
           onClick={() => void handleSubmit()}
-          className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 rounded-xl px-4")}
+          variant="default"
+          size="sm"
+          className="h-10 rounded-xl px-4"
         >
           {isResolving ? <Loader2 className="size-4 animate-spin" /> : copy.quickCreateSubmit}
-        </button>
+        </Button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{copy.quickCreateHint || DEFAULT_SCHEDULE_PAGE_COPY.quickCreateHint}</p>
       {submitError ? <div className="mt-2 text-xs text-red-600">{submitError}</div> : null}

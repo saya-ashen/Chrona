@@ -38,6 +38,7 @@ interface TaskPlanGenerationPanelProps {
   showEmptyGenerateButton?: boolean;
   emptyStateDescription?: string;
   showRegenerateButton?: boolean;
+  renderIdleEmptyState?: boolean;
 }
 
 const DEFAULT_DECOMP_COPY = {
@@ -101,6 +102,7 @@ export function TaskPlanGenerationPanel({
   showEmptyGenerateButton = true,
   emptyStateDescription,
   showRegenerateButton = true,
+  renderIdleEmptyState = true,
 }: TaskPlanGenerationPanelProps) {
   const [showSaveBeforeRegenerate, setShowSaveBeforeRegenerate] =
     useState(false);
@@ -242,6 +244,10 @@ export function TaskPlanGenerationPanel({
   ) : null;
 
   if (!activeReadModel || !planGraph) {
+    if (!renderIdleEmptyState) {
+      return saveBeforeRegenerateDialog;
+    }
+
     return (
       <div className="space-y-3">
         {saveBeforeRegenerateDialog}

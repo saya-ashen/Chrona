@@ -1,9 +1,9 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode } from "react";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { buttonVariants } from "@/components/ui/button";
-import { textareaClassName } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type {
   WorkComposer,
@@ -62,8 +62,8 @@ function renderActionPanel(
   const shell = (title: string, body: ReactNode) => (
     <div className="rounded-[18px] border border-border/70 bg-background/75 px-3.5 py-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone="info">{copy.actionCurrentAction}</StatusBadge>
-        {currentStepTitle ? <StatusBadge tone="warning">{currentStepTitle}</StatusBadge> : null}
+        <Badge variant="secondary">{copy.actionCurrentAction}</Badge>
+        {currentStepTitle ? <Badge variant="secondary">{currentStepTitle}</Badge> : null}
       </div>
       <p className="mt-2 text-sm font-medium text-foreground">{currentIntervention.actionLabel}</p>
       <div className="mt-3 space-y-3">
@@ -186,7 +186,7 @@ export function WorkComposerCard({
       >
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
-          <StatusBadge tone="success">已同步</StatusBadge>
+          <Badge variant="secondary">已同步</Badge>
         </div>
         <div className="mt-4 space-y-2 text-sm text-muted-foreground">
           <p>{passiveDescription}</p>
@@ -209,7 +209,7 @@ export function WorkComposerCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
-            <StatusBadge tone="warning">阻塞中</StatusBadge>
+            <Badge variant="secondary">阻塞中</Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{composer.statusHint}</p>
         </div>
@@ -227,7 +227,7 @@ export function WorkComposerCard({
         </p>
       ) : null}
 
-      <textarea
+      <Textarea
         aria-label={composer.inputLabel}
         name="message"
         rows={2}
@@ -241,7 +241,6 @@ export function WorkComposerCard({
           }
         }}
         className={cn(
-          textareaClassName,
           "mt-4 min-h-28 w-full min-w-0 resize-none rounded-[18px] border-border/80 bg-background px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70",
         )}
       />
@@ -258,14 +257,12 @@ export function WorkComposerCard({
             </span>
           ) : null}
           {quickPrompts.map((prompt) => (
-            <button
+            <Button
               key={prompt}
               type="button"
-              className={buttonVariants({
-                variant: "outline",
-                size: "sm",
-                className: "rounded-full",
-              })}
+              variant="outline"
+              size="sm"
+              className="rounded-full"
               onClick={() =>
                 onComposerChange(
                   composerValue.trim()
@@ -275,39 +272,33 @@ export function WorkComposerCard({
               }
             >
               {prompt}
-            </button>
+            </Button>
           ))}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <button
+          <Button
             type="button"
             disabled={isPending}
             onClick={() => {
               void handleSubmit();
             }}
-            className={buttonVariants({
-              variant: composer.submitVariant ?? "default",
-              size: "default",
-              className: cn(
-                "h-11 rounded-xl",
-              ),
-            })}
+            variant={composer.submitVariant ?? "default"}
+            size="default"
+            className="h-11 rounded-xl"
           >
             {composer.submitLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={isPending}
             onClick={() => onComposerChange("")}
-            className={buttonVariants({
-              variant: "outline",
-              size: "default",
-              className: "h-11 rounded-xl",
-            })}
+            variant="outline"
+            size="default"
+            className="h-11 rounded-xl"
           >
             清空
-          </button>
+          </Button>
         </div>
       </div>
     </form>

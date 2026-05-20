@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Activity, Command, Sparkles } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { useI18n } from "@chrona/i18n/react";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { useAssistantSurface } from "./assistant-surface-provider";
 
@@ -19,68 +24,14 @@ export function AssistantSurfaceDropdown() {
   const { t } = useI18n();
   const assistant = useAssistantSurface();
   const surface = assistant.state;
-  const isOpen = assistant.isOpen;
-  const close = assistant.close;
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [shouldRender, setShouldRender] = useState(isOpen);
-  const [isClosing, setIsClosing] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
-      setIsClosing(false);
-      return;
-    }
-
-    if (!shouldRender) return;
-
-    setIsClosing(true);
-    const timeout = window.setTimeout(() => {
-      setShouldRender(false);
-      setIsClosing(false);
-    }, 180);
-
-    return () => window.clearTimeout(timeout);
-  }, [isOpen, shouldRender]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (panelRef.current?.contains(target)) return;
-      if (target.closest('[data-assistant-surface-trigger="true"]')) return;
-      close();
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
-    }
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [close, isOpen]);
-
-  if (!shouldRender) return null;
 
   return (
-    <div
-      ref={panelRef}
-      role="menu"
-      aria-label={t("components.assistantSurface.panelLabel")}
-      className={cn(
-        "absolute inset-x-0 top-full z-[1000] origin-top overflow-hidden rounded-b-[1.45rem] rounded-t-none border border-t-0 border-border/70 bg-background/95 shadow-[0_14px_34px_rgba(15,23,42,0.14)] backdrop-blur will-change-[clip-path,opacity,transform]",
-        isClosing
-          ? "pointer-events-none animate-[assistant-surface-curtain-up_180ms_cubic-bezier(0.4,0,1,1)_forwards]"
-          : "animate-[assistant-surface-curtain-down_220ms_cubic-bezier(0.16,1,0.3,1)]",
-      )}
-    >
+    <Drawer open={assistant.isOpen} onOpenChange={(open) => { if (!open) assistant.close(); }} direction="top">
+      <DrawerContent
+        aria-label={t("components.assistantSurface.panelLabel")}
+        className="top-12 z-[1000] mb-0 max-h-[calc(100dvh-3rem)] rounded-b-[1.45rem] border-x border-b border-t-0 border-border/70 bg-background/95 p-0 shadow-[0_14px_34px_rgba(15,23,42,0.14)] backdrop-blur data-[vaul-drawer-direction=top]:top-12 data-[vaul-drawer-direction=top]:mb-0 data-[vaul-drawer-direction=top]:max-h-[calc(100dvh-3rem)] data-[vaul-drawer-direction=top]:rounded-b-[1.45rem] data-[vaul-drawer-direction=top]:border-b"
+      >
+      <DrawerDescription className="sr-only">{t("components.assistantSurface.panelLabel")}</DrawerDescription>
       <div className="border-b border-border/60 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(239,246,255,0.82))] px-4 py-3 sm:px-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -88,10 +39,10 @@ export function AssistantSurfaceDropdown() {
               <Sparkles className="size-3.5" />
               {t("components.assistantSurface.eyebrow")}
             </p>
-            <h2 className="mt-1 truncate text-base font-semibold text-foreground">{surface.title}</h2>
+            <DrawerTitle className="mt-1 truncate text-base font-semibold text-foreground">{surface.title}</DrawerTitle>
             <p className="truncate text-xs text-muted-foreground">{surface.primaryObjectLabel}</p>
           </div>
-          <button type="button" onClick={close} className="rounded-full border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={assistant.close} className="rounded-full border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
             {t("components.assistantSurface.close")}
           </button>
         </div>
@@ -208,6 +159,7 @@ export function AssistantSurfaceDropdown() {
           </form>
         </aside>
       </div>
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

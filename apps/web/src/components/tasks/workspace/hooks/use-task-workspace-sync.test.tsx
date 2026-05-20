@@ -265,6 +265,42 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(refreshWorkspace).toHaveBeenCalledTimes(1));
   });
 
+  it("exposes the latest plan generation activity summary", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      generationId: "generation-1",
+      sessionStatus: "running",
+      isLoading: true,
+      statusMessage: "Requesting provider stream",
+      partialText: "",
+      toolCalls: [{ tool: "build_plan", input: {} }],
+      toolResults: [],
+      phase: "connecting",
+      hydrated: true,
+    };
+    mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "generating", savedPlan: initialPlan }];
+
+    const { result, rerender } = renderHook(
+      () => useTaskWorkspacePlanState(
+        pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" }).task,
+        vi.fn(async () => undefined),
+      ),
+      { wrapper: createQueryWrapper() },
+    );
+
+    expect(result.current.latestActivitySummary).toBe("Running build_plan");
+
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      toolResults: [{ tool: "build_plan", result: "done" }],
+    };
+
+    rerender();
+
+    expect(result.current.latestActivitySummary).toBe("build_plan completed");
+  });
+
   it("uses a completed generation session result even when the AI panel is not mounted", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const generatedPlan = planReadModel({ id: "plan-2", status: "ready", title: "Generated plan" });

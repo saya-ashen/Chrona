@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Circle, FileText } from "lucide-react";
 import { useState } from "react";
-import { SurfaceCard } from "@/components/ui/surface-card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export type PreparationStep = {
@@ -42,14 +42,14 @@ export function PreparationChecklist({
 
   if (localSteps.length === 0) {
     return (
-      <SurfaceCard as="div" variant="inset" padding="sm" className="rounded-2xl border-dashed">
+      <Card className="rounded-2xl border-dashed">
         <p className="text-xs text-muted-foreground">{emptyMessage}</p>
-      </SurfaceCard>
+      </Card>
     );
   }
 
   return (
-    <SurfaceCard as="div" variant="inset" padding="sm" className="space-y-3 rounded-2xl">
+    <Card className="space-y-3 rounded-2xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText className="size-4 text-primary" />
@@ -104,6 +104,6 @@ export function PreparationChecklist({
           </li>
         ))}
       </ul>
-    </SurfaceCard>
+    </Card>
   );
 }

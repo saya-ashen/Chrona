@@ -1,6 +1,6 @@
 "use client";
 
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { TaskPlanGraph, type TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 import { useI18n } from "@chrona/i18n/react";
 import type { WorkCopy } from "./work-page/work-page-types";
@@ -70,7 +70,7 @@ export function TaskPlanSidePanel({
           </div>
           {plan.state === "ready" ? (
             <div className="flex flex-wrap gap-2">
-              {plan.revision ? <StatusBadge tone="info">{getRevisionLabel(plan.revision, panelCopy)}</StatusBadge> : null}
+              {plan.revision ? <Badge variant="secondary">{getRevisionLabel(plan.revision, panelCopy)}</Badge> : null}
             </div>
           ) : null}
         </div>
@@ -84,7 +84,7 @@ export function TaskPlanSidePanel({
           <div className="mt-4 space-y-3 text-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
             <div className="rounded-[20px] border border-border/70 bg-muted/[0.24] p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone="info">{panelCopy.planOverallStatus}</StatusBadge>
+                <Badge variant="secondary">{panelCopy.planOverallStatus}</Badge>
                 {plan.generatedBy ? <span className="text-xs text-muted-foreground">{panelCopy.sourcePrefix}{plan.generatedBy}</span> : null}
               </div>
               {plan.graphSummary ? <p className="mt-3 text-muted-foreground">{plan.graphSummary}</p> : null}

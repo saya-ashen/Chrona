@@ -5,9 +5,8 @@ import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-re
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import { buttonVariants } from "@/components/ui/button";
-import { SurfaceCard } from "@/components/ui/surface-card";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 type TaskAiPlanPanelProps = {
   taskId: string;
@@ -61,10 +60,9 @@ export function TaskAiPlanPanel({
   const actionLabel = savedPlan ? "Regenerate plan" : "Generate plan";
 
   return (
-    <SurfaceCard
-      as="section"
-      variant="inset"
-      padding="none"
+    <Card
+     
+     
       className="overflow-hidden rounded-3xl border border-border/70 bg-background/90 shadow-sm"
     >
       <div className="border-b border-border/60 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_46%),hsl(var(--muted)/0.18)] px-4 py-3.5">
@@ -82,16 +80,15 @@ export function TaskAiPlanPanel({
           </div>
           <div className="flex items-center gap-2">
             {generationStatus === "generating" ? null : (
-              <button
+              <Button
                 type="button"
                 onClick={() => setRequestGenerationKey((current) => current + 1)}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10",
-                )}
+                variant="outline"
+                size="sm"
+                className="rounded-full border-primary/20 bg-background/80 text-primary hover:bg-primary/10"
               >
                 {actionLabel}
-              </button>
+              </Button>
             )}
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm ${statusConfig.className}`}>
               {statusConfig.icon}
@@ -121,6 +118,6 @@ export function TaskAiPlanPanel({
           showEmptyGenerateButton={false}
         />
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }
