@@ -48,6 +48,27 @@ function getPlanGenerationActivity(generationSession: ReturnType<typeof useTaskP
   return "Generating plan";
 }
 
+function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
+  if (!event) return null;
+
+  const value = event.event;
+  switch (value.type) {
+    case "assistant_text_delta":
+    case "reasoning_delta":
+      return compactActivityText(value.text);
+    case "tool_started":
+      return compactActivityText(`Running ${value.label}`);
+    case "tool_completed":
+      return compactActivityText(value.error ? `${value.label} failed` : `${value.label} completed`);
+    case "approval_required":
+      return "Approval required";
+    case "run_status":
+      return compactActivityText(value.message ?? value.status);
+    case "raw_event":
+      return compactActivityText(value.rawEventType ?? "Runtime event");
+  }
+}
+
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
   if (isGenerationRunning) {
     return "generating" as const;
@@ -110,7 +131,6 @@ function samePlanFlowSnapshot(
 export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () => Promise<void>) {
   const queryClient = useQueryClient();
   const generationSession = useTaskPlanGenerationSession(task.id);
-  const latestActivitySummary = getPlanGenerationActivity(generationSession);
   const previousGenerationStatusRef = useRef(generationSession.sessionStatus);
   const syncTaskDetailPlanFields = useCallback((nextPlanState: TaskPlanState) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.page(task.id), (current: TaskPageData | undefined) => {
@@ -157,6 +177,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
+  const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? getPlanGenerationActivity(generationSession);
   const [graphPlan, setGraphPlan] = useState(() => taskPlanReadModelToGraphPlan(null));
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
 

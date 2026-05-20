@@ -31,7 +31,7 @@ export function AiClientsDialog({ isOpen, closeHref }: AiClientsDialogProps) {
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[min(84vh,920px)] w-[min(960px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[28px] border border-border/60 bg-background p-0 shadow-2xl"
+        className="flex h-[min(88vh,920px)] w-[min(1280px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[28px] border border-border/60 bg-background p-0 shadow-2xl sm:!max-w-none"
       >
         <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border/60 px-6 py-5">
           <div className="flex flex-col gap-1">

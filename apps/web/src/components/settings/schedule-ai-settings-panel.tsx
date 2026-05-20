@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 import {
   DEFAULT_SCHEDULE_AI_PREFERENCES,
   type ScheduleAiPreferences,
@@ -52,15 +55,13 @@ export function ScheduleAiSettingsPanel({
   };
 
   return (
-    <section className="rounded-[26px] border border-white/70 bg-white/92 p-5 shadow-sm" aria-labelledby="schedule-ai-settings-title">
-      <div className="space-y-1">
-        <h2 id="schedule-ai-settings-title" className="text-sm font-medium text-foreground">
-          {title}
-        </h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+    <Card aria-labelledby="schedule-ai-settings-title">
+      <CardHeader>
+        <CardTitle id="schedule-ai-settings-title">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup className="gap-3">
         <PreferenceToggle
           label={copy.autoSuggestions}
           description={copy.autoSuggestionsDescription}
@@ -88,8 +89,9 @@ export function ScheduleAiSettingsPanel({
           copy={copy}
           onChange={(checked) => updatePreference("defaultAutoExecuteEnabled", checked)}
         />
-      </div>
-    </section>
+        </FieldGroup>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -111,37 +113,20 @@ function PreferenceToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="group flex cursor-pointer items-start justify-between gap-4 rounded-[22px] border border-border/60 bg-[linear-gradient(135deg,#ffffff,#f8fafc)] p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-muted/40">
-      <span className="min-w-0 space-y-1">
-        <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+    <Field orientation="horizontal" className="rounded-lg border bg-card p-4 shadow-xs">
+      <FieldContent>
+        <FieldLabel className="flex-wrap items-center">
           {label}
-          <span className="rounded-full border border-border/60 px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
-            {defaultChecked ? copy.defaultOn : copy.defaultOff}
-          </span>
-          {saving ? <span className="text-[11px] text-muted-foreground">{copy.saved}</span> : null}
-        </span>
-        <span className="block text-xs leading-5 text-muted-foreground">{description}</span>
-      </span>
-      <span
-        className={cn(
-          "relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors",
-          checked ? "border-primary bg-primary" : "border-border bg-muted",
-        )}
-        aria-hidden="true"
-      >
-        <span
-          className={cn(
-            "inline-block h-5 w-5 rounded-full bg-background shadow transition-transform",
-            checked ? "translate-x-5" : "translate-x-0.5",
-          )}
-        />
-      </span>
-      <input
-        type="checkbox"
-        className="sr-only"
+          <Badge variant="outline">{defaultChecked ? copy.defaultOn : copy.defaultOff}</Badge>
+          {saving ? <span className="text-xs font-normal text-muted-foreground">{copy.saved}</span> : null}
+        </FieldLabel>
+        <FieldDescription>{description}</FieldDescription>
+      </FieldContent>
+      <Switch
+        aria-label={label}
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
+        onCheckedChange={onChange}
       />
-    </label>
+    </Field>
   );
 }

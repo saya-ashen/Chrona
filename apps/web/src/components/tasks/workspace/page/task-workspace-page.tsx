@@ -14,6 +14,11 @@ import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-stat
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
 
+function getLatestPersistedActivitySummary(pageData: TaskPageData) {
+  const latestActivity = pageData.activityTimeline?.at(-1);
+  return latestActivity?.description || latestActivity?.title || null;
+}
+
 type Props = {
   data: TaskPageData;
   copy?: Partial<typeof DEFAULT_COPY>;
@@ -44,6 +49,10 @@ const DEFAULT_COPY = {
   workspaceState: "Workspace state",
   currentState: "Current state",
   nextAction: "Next action",
+  commandCenterActionsTab: "Actions",
+  commandCenterResultTab: "Result",
+  commandCenterArtifactsTab: "Artifacts",
+  commandCenterActivityTab: "Activity",
 };
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
@@ -90,6 +99,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     pageData,
     graphPlan,
   });
+  const assistantActivitySummary = latestActivitySummary ?? getLatestPersistedActivitySummary(pageData);
   const isGeneratingPlan = planGenerationStatus === "generating";
   const {
     currentProposal,
@@ -111,9 +121,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       setSaveError,
     });
   const assistantContext = useMemo(() => createTaskAiSidebarContext(task, {
-    latestActivitySummary,
+    latestActivitySummary: assistantActivitySummary,
   }), [
-    latestActivitySummary,
+    assistantActivitySummary,
     task.blockReason?.actionRequired,
     task.blockReason?.blockType,
     task.executionSummary?.waiting,
@@ -197,6 +207,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
+        commandCenterCopy={{
+          actionsTab: copy.commandCenterActionsTab,
+          resultTab: copy.commandCenterResultTab,
+          artifactsTab: copy.commandCenterArtifactsTab,
+          activityTab: copy.commandCenterActivityTab,
+        }}
         graphPlan={graphPlan}
         isGraphPlanPending={isGraphPlanPending}
         pageData={{ ...pageData, task: consoleView.task }}

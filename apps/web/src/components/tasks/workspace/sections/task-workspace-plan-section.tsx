@@ -7,6 +7,7 @@ import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/pl
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import {
   TaskWorkspaceExecutionOverview,
+  type CommandCenterCopy,
   type CommandCenterPrimaryAction,
 } from "../execution/task-workspace-execution-overview";
 import {
@@ -56,6 +57,7 @@ function isPlanGraphTarget(target: EventTarget | null) {
 
 type TaskWorkspacePlanSectionProps = {
   label: string;
+  commandCenterCopy?: Partial<CommandCenterCopy>;
   graphPlan: TaskPlanGraphPlan | null;
   isGraphPlanPending: boolean;
   pageData: TaskPageData;
@@ -79,6 +81,7 @@ type TaskWorkspacePlanSectionProps = {
 
 export function TaskWorkspacePlanSection({
   label,
+  commandCenterCopy,
   graphPlan,
   isGraphPlanPending,
   pageData,
@@ -288,6 +291,7 @@ export function TaskWorkspacePlanSection({
               activity={consoleView.activity}
               runtimeEvents={runtimeEvents}
               primaryAction={primaryAction}
+              copy={commandCenterCopy}
               progressLabel={completionLabel}
               taskStatus={consoleView.header.primaryStateLabel ?? pageData.task.status}
               nextAction={consoleView.latestResult.description}
@@ -314,7 +318,6 @@ export function TaskWorkspacePlanSection({
               showRegenerateButton={false}
               renderIdleEmptyState={false}
             />
-          <RuntimeActivityPanel events={runtimeEvents} />
           </aside>
         </div>
 
@@ -337,82 +340,4 @@ export function TaskWorkspacePlanSection({
       </div>
     </section>
   );
-}
-
-function RuntimeActivityPanel({ events }: { events: WorkspaceRuntimeEvent[] }) {
-  if (events.length === 0) return null;
-
-  const assistantText = events
-    .map((event) => event.event.type === "assistant_text_delta" ? event.event.text : "")
-    .join("")
-    .trim();
-  const reasoningText = events
-    .map((event) => event.event.type === "reasoning_delta" ? event.event.text : "")
-    .join("")
-    .trim();
-  const activityEvents = events
-    .filter((event) => event.event.type !== "assistant_text_delta" && event.event.type !== "reasoning_delta")
-    .slice(-12);
-
-  return (
-    <section className="rounded-[1.1rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.9),rgba(239,246,255,0.72))] p-3 shadow-sm" aria-label="Runtime activity">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-slate-950">Runtime activity</p>
-          <p className="text-xs text-slate-500">Provider stream, Chrona state remains authoritative.</p>
-        </div>
-        <span className="rounded-full border border-cyan-200/70 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
-          {events.at(-1)?.provider ?? "runtime"}
-        </span>
-      </div>
-      {assistantText ? (
-        <p className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-slate-800 shadow-inner">
-          {assistantText}
-        </p>
-      ) : null}
-      {reasoningText ? (
-        <details className="mt-2 rounded-xl border border-slate-200/80 bg-white/70 px-2.5 py-2 text-xs text-slate-500">
-          <summary className="cursor-pointer font-medium text-slate-800">Reasoning</summary>
-          <p className="mt-1 whitespace-pre-wrap leading-5">{reasoningText}</p>
-        </details>
-      ) : null}
-      {activityEvents.length > 0 ? (
-        <div className="mt-2 space-y-1.5">
-          {activityEvents.map((event, index) => (
-            <RuntimeActivityRow key={`${event.sequence ?? index}:${event.event.type}:${event.rawEventType ?? "event"}`} event={event} />
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function RuntimeActivityRow({ event }: { event: WorkspaceRuntimeEvent }) {
-  const value = event.event;
-  if (value.type === "tool_started") {
-    return (
-      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
-        <span className="font-medium text-slate-900">{value.label}</span>
-        {typeof value.preview === "string" && value.preview ? <span className="ml-1 text-slate-500">{value.preview}</span> : null}
-      </div>
-    );
-  }
-  if (value.type === "tool_completed") {
-    return (
-      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
-        <span className={value.error ? "font-medium text-red-700" : "font-medium text-emerald-700"}>
-          {value.error ? `${value.label} failed` : `${value.label} completed`}
-        </span>
-        {value.durationMs !== undefined ? <span className="ml-1 text-slate-500">{Math.round(value.durationMs)}ms</span> : null}
-        {value.error ? <span className="ml-1 text-red-700">{value.error.message}</span> : null}
-      </div>
-    );
-  }
-  if (value.type === "approval_required") {
-    return <div className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 shadow-sm">Approval required</div>;
-  }
-  if (value.type === "run_status") {
-    return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.message ?? value.status}</div>;
-  }
-  return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.type === "raw_event" ? value.rawEventType ?? "Raw provider event" : value.type}</div>;
 }

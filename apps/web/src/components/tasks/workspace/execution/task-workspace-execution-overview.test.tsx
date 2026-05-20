@@ -27,20 +27,18 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Needs handling").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Approve result").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Needs handling")).not.toBeInTheDocument();
+    expect(screen.queryByText("Approve result")).not.toBeInTheDocument();
     expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "结果" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
     expect(screen.getByText("Latest result")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
+    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
     expect(screen.getByText("Artifacts (0)")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByText("Execution activity", { selector: "p" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "操作" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Resolve in node panel" }));
-    expect(onAction).toHaveBeenCalledWith("approval");
+    fireEvent.click(screen.getByRole("tab", { name: "Actions" }));
+    expect(screen.queryByRole("button", { name: "Resolve in node panel" })).not.toBeInTheDocument();
   });
 
   it("renders live provider runtime events in the activity tab", () => {
@@ -64,13 +62,37 @@ describe("TaskWorkspaceExecutionOverview", () => {
           sequence: 1,
           timestamp: "2026-05-12T10:01:00.000Z",
           event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
+        }, {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "execute",
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-12T10:01:01.000Z",
+          event: { type: "assistant_text_delta", text: "Runtime answer" },
+        }, {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "execute",
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "run-1",
+          sequence: 3,
+          timestamp: "2026-05-12T10:01:02.000Z",
+          event: { type: "reasoning_delta", text: "Runtime reasoning" },
         }]}
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
-    expect(screen.getByText("Tool started")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByText("正在读取计划")).toBeInTheDocument();
+    expect(screen.getByText("Runtime answer")).toBeInTheDocument();
+    expect(screen.getByText("Reasoning")).toBeInTheDocument();
+    expect(screen.getByText("Runtime reasoning")).toBeInTheDocument();
   });
 
   it("renders full latest result and expandable artifact content", () => {
@@ -88,13 +110,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "结果" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
     expect(screen.getByText("summary")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View full result ->" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Locate result node" }));
     expect(onAction).toHaveBeenCalledWith("done");
 
-    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
+    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
     expect(screen.getByText("done output 1", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("summary")).toBeInTheDocument();
 
@@ -148,11 +170,12 @@ describe("TaskWorkspaceExecutionOverview", () => {
       />,
     );
 
-    expect(screen.getAllByText("No execution result yet.").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("No approval, input, or blocker needs attention.").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole("tab", { name: "产物" })[0]);
+    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
+    expect(screen.getAllByText("Result summary will appear here after the current node finishes.").length).toBeGreaterThan(0);
+    expect(screen.queryByText("No approval, input, or blocker needs attention.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
     expect(screen.getAllByText("No artifacts yet.").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("tab", { name: "活动" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByText("Activity will appear after planning or execution starts.")).toBeInTheDocument();
 
     rerender(
@@ -166,8 +189,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "操作" }));
-    expect(screen.getAllByText("Run is Running").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Actions" }));
+    expect(screen.queryByText("Run is Running")).not.toBeInTheDocument();
   });
 
   it("exposes blocked status, retry progress, and accessible action names", () => {
@@ -195,11 +218,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/blocked/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Retry refresh").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Open action controls").length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Open action controls" }));
-    expect(onAction).toHaveBeenCalledWith("blocked");
+    expect(screen.queryByText("Retry refresh")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open action controls")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open action controls" })).not.toBeInTheDocument();
   });
 });

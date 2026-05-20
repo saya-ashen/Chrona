@@ -346,6 +346,90 @@ describe("task-plan-view-model", () => {
     expect(graphPlan?.analytics.blockedNodeIds).toEqual(["approval", "sync"]);
   });
 
+  it("surfaces manual-action waiting results with blocked reasons as blocked nodes", () => {
+    const blocker = "已创建脚本文件，但当前运行环境访问 wttr.in 连续超时。";
+    const readModel: TaskPlanReadModel = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      prompt: null,
+      summary: "天气脚本计划",
+      updatedAt: "2026-05-07T10:00:00.000Z",
+      generatedBy: "ai",
+      blueprint: {
+        title: "天气脚本计划",
+        goal: "创建并验证天气脚本",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan,
+      effectivePlan: {
+        graphId: "graph-1",
+        planId: "plan-1",
+        basePlanId: "compiled-plan-1",
+        resolvedAt: "2026-05-07T10:00:00.000Z",
+        resolvedVersion: 3,
+        nodes: [
+          {
+            id: "weather-script",
+            nodeId: "weather-script",
+            activeLayerId: null,
+            semanticKey: "weather-script",
+            localId: "weather_script_local",
+            type: "task",
+            title: "创建天气脚本",
+            definition: { title: "创建天气脚本", objective: "创建天气脚本", semantics: { type: "task" } },
+            config: { expectedOutput: "天气脚本" },
+            dependencies: [],
+            dependents: [],
+            status: "waiting",
+            invalidated: false,
+            attempts: 1,
+            metadata: {},
+            dependenciesSatisfied: true,
+            ready: false,
+            reachable: true,
+            blockedReason: blocker,
+            lastError: blocker,
+            result: { status: "current", error: blocker, waitKind: "manual_action" },
+          },
+        ],
+        edges: [],
+        entryNodeIds: ["weather-script"],
+        terminalNodeIds: ["weather-script"],
+        readyNodeIds: [],
+        blockedNodeIds: [],
+        waitingNodeIds: ["weather-script"],
+        waitingForUserNodeIds: [],
+        waitingForApprovalNodeIds: [],
+        degradedNodeIds: [],
+        skippedNodeIds: [],
+        cancelledNodeIds: [],
+        completedNodeIds: [],
+        runningNodeIds: [],
+        invalidatedNodeIds: [],
+        failedNodeIds: [],
+        pendingNodeIds: [],
+      },
+    };
+
+    const graphPlan = taskPlanReadModelToGraphPlan(readModel);
+
+    expect(graphPlan?.currentStepId).toBe("weather-script");
+    expect(graphPlan?.steps[0]).toMatchObject({
+      status: "blocked",
+      statusLabel: "阻塞",
+      readiness: "blocked",
+      blocked: true,
+      actionable: true,
+      interactionType: "retry",
+      result: { error: blocker, waitKind: "manual_action" },
+    });
+    expect(graphPlan?.analytics.attentionNodeIds).toEqual(["weather-script"]);
+    expect(graphPlan?.analytics.blockedNodeIds).toEqual(["weather-script"]);
+  });
+
   it("keeps completed input checkpoints read-only while preserving fields for display", () => {
     const readModel: TaskPlanReadModel = {
       id: "plan-1",
