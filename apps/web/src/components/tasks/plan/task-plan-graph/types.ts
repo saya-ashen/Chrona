@@ -258,6 +258,7 @@ export type FlowNodeData = {
   isSelected: boolean;
   isCurrent: boolean;
   isFocus: boolean;
+  visualWeight: "primary" | "normal" | "muted";
   graphCopy: GraphCopy;
   onSelect: (nodeId: string) => void;
 };

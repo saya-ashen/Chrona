@@ -1,14 +1,13 @@
-import { cn } from "@/lib/utils";
 import type {
   EdgeLegendItem,
   GraphCopy,
   NodeLegendItem,
-  NodeShape,
   NodeTone,
   PlanEdgeEmphasis,
   PlanEdgeKind,
   PlanNodeDataModel,
 } from "./types";
+export { getShapeClassName, getShapeStyle, shapeChipClassName, TONE_STYLES } from "./theme";
 
 export function getNodeTone(node: PlanNodeDataModel): NodeTone {
   if (node.status === "blocked" || node.status === "failed" || node.status === "degraded") return "blocked";
@@ -20,62 +19,7 @@ export function getNodeTone(node: PlanNodeDataModel): NodeTone {
   return "idle";
 }
 
-export const TONE_STYLES: Record<
-  NodeTone,
-  { border: string; bg: string; ring: string; dot: string; text: string }
-> = {
-  active: {
-    border: "border-cyan-300/75",
-    bg: "bg-cyan-400/14",
-    ring: "ring-cyan-300/45",
-    dot: "bg-cyan-300",
-    text: "text-cyan-50",
-  },
-  attention: {
-    border: "border-fuchsia-300/70",
-    bg: "bg-fuchsia-400/13",
-    ring: "ring-fuchsia-300/40",
-    dot: "bg-fuchsia-300",
-    text: "text-fuchsia-50",
-  },
-  blocked: {
-    border: "border-rose-300/80",
-    bg: "bg-rose-500/14",
-    ring: "ring-rose-300/45",
-    dot: "bg-rose-300",
-    text: "text-rose-50",
-  },
-  done: {
-    border: "border-emerald-300/50",
-    bg: "bg-emerald-400/9",
-    ring: "ring-emerald-300/25",
-    dot: "bg-emerald-300",
-    text: "text-emerald-50",
-  },
-  skipped: {
-    border: "border-slate-500/45 border-dashed",
-    bg: "bg-slate-700/18",
-    ring: "ring-slate-400/15",
-    dot: "bg-slate-400/55",
-    text: "text-slate-300",
-  },
-  upcoming: {
-    border: "border-violet-300/62",
-    bg: "bg-violet-400/12",
-    ring: "ring-violet-300/32",
-    dot: "bg-violet-300",
-    text: "text-violet-50",
-  },
-  idle: {
-    border: "border-slate-500/45",
-    bg: "bg-slate-800/42",
-    ring: "ring-white/10",
-    dot: "bg-slate-300/70",
-    text: "text-slate-100",
-  },
-};
-
-export function nodeShapeForKind(kind: PlanNodeDataModel["kind"]): NodeShape {
+export function nodeShapeForKind(kind: PlanNodeDataModel["kind"]) {
   if (kind === "condition") return "diamond";
   if (kind === "wait") return "pill";
   if (kind === "checkpoint") return "parallelogram";
@@ -234,36 +178,4 @@ export function buildNodeLegend(graphCopy: GraphCopy): NodeLegendItem[] {
     { label: graphCopy.nodeTypeWait, shape: "pill", tone: "upcoming" },
     { label: graphCopy.statusSkipped, shape: "rounded", tone: "skipped" },
   ];
-}
-
-export function getShapeClassName(shape: NodeShape) {
-  if (shape === "pill") return "rounded-[999px]";
-  if (shape === "diamond") return "rounded-[8px]";
-  if (shape === "parallelogram") return "rounded-[10px]";
-  return "rounded-[12px]";
-}
-
-export function getShapeStyle(shape: NodeShape) {
-  if (shape === "diamond")
-    return {
-      clipPath: "polygon(16% 0%, 84% 0%, 100% 50%, 84% 100%, 16% 100%, 0% 50%)",
-    };
-  if (shape === "parallelogram")
-    return { clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)" };
-  return undefined;
-}
-
-export function shapeChipClassName(
-  shape: NodeShape,
-  tone: NodeTone,
-  className?: string,
-) {
-  const toneStyle = TONE_STYLES[tone];
-  return cn(
-    "block h-4 w-7 border shadow-sm",
-    toneStyle.border,
-    toneStyle.bg,
-    className,
-    getShapeClassName(shape),
-  );
 }

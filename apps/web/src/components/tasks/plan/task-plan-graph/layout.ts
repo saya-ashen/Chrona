@@ -62,6 +62,44 @@ type GraphMaps = {
   nodeById: Map<string, TaskPlanGraphPlan["nodes"][number]>;
 };
 
+function isTerminalNodeStatus(status: TaskPlanGraphPlan["nodes"][number]["status"]) {
+  return status === "done" ||
+    status === "completed" ||
+    status === "skipped" ||
+    status === "cancelled" ||
+    status === "invalidated";
+}
+
+function isCompletedNodeStatus(status: TaskPlanGraphPlan["nodes"][number]["status"]) {
+  return status === "done" || status === "completed";
+}
+
+function isAttentionNodeStatus(status: TaskPlanGraphPlan["nodes"][number]["status"]) {
+  return status === "waiting" ||
+    status === "waiting_for_user" ||
+    status === "waiting_for_approval" ||
+    status === "blocked" ||
+    status === "failed" ||
+    status === "degraded";
+}
+
+function resolveNodeFocusState(
+  node: TaskPlanGraphPlan["nodes"][number],
+  focusSet: Set<string>,
+): { isFocus: boolean; visualWeight: FlowGraphNode["data"]["visualWeight"] } {
+  const isCurrentOrAttention =
+    node.status === "active" ||
+    node.status === "in_progress" ||
+    isAttentionNodeStatus(node.status);
+  const isTerminal = isTerminalNodeStatus(node.status);
+  const isCompleted = isCompletedNodeStatus(node.status);
+  const isInActivePath = focusSet.has(node.id);
+  const isFocus = isCurrentOrAttention || (!isTerminal && (isInActivePath || focusSet.size === 0));
+  const visualWeight = isCurrentOrAttention ? "primary" : isTerminal && !isCompleted ? "muted" : isInActivePath ? "primary" : "normal";
+
+  return { isFocus, visualWeight };
+}
+
 type HybridLayoutMetadata = {
   roleById: Map<string, FlowGraphNode["data"]["layoutRole"]>;
   horizontalRunByNodeId: Map<string, string[]>;
@@ -607,6 +645,7 @@ function materializeFlowLayout(
       height: NODE_HEIGHT,
     };
     const isSelected = node.id === input.selectedNodeId;
+    const focusState = resolveNodeFocusState(node, focusSet);
     return {
       id: node.id,
       type: "taskPlanNode",
@@ -625,12 +664,7 @@ function materializeFlowLayout(
       zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
       style: {
         zIndex: isSelected ? SELECTED_NODE_Z_INDEX : 1,
-        opacity:
-          focusSet.size === 0 ||
-          focusSet.has(node.id) ||
-          node.status === "blocked"
-            ? 1
-            : 0.48,
+        opacity: focusState.visualWeight === "muted" ? 0.58 : 1,
       },
       data: {
         node,
@@ -644,10 +678,8 @@ function materializeFlowLayout(
         ),
         isSelected,
         isCurrent: node.id === input.plan.currentStepId,
-        isFocus:
-          focusSet.size === 0 ||
-          focusSet.has(node.id) ||
-          node.status === "blocked",
+        isFocus: focusState.isFocus,
+        visualWeight: focusState.visualWeight,
         graphCopy: input.graphCopy,
         onSelect: input.onSelect,
       },
@@ -875,12 +907,10 @@ export function syncNodeState(
   let changed = false;
   const nextNodes = nodes.map((node) => {
     const isSelected = node.id === input.selectedNodeId;
-    const isFocus =
-      focusSet.size === 0 ||
-      focusSet.has(node.id) ||
-      node.data.node.status === "blocked";
+    const focusState = resolveNodeFocusState(node.data.node, focusSet);
+    const isFocus = focusState.isFocus;
     const zIndex = isSelected ? SELECTED_NODE_Z_INDEX : 1;
-    const opacity = isFocus ? 1 : 0.48;
+    const opacity = focusState.visualWeight === "muted" ? 0.58 : 1;
     if (
       node.draggable === false &&
       node.selectable === false &&
@@ -889,6 +919,7 @@ export function syncNodeState(
       node.style?.opacity === opacity &&
       node.data.isSelected === isSelected &&
       node.data.isFocus === isFocus &&
+      node.data.visualWeight === focusState.visualWeight &&
       node.data.graphCopy === input.graphCopy &&
       node.data.onSelect === input.onSelect
     ) {
@@ -912,6 +943,7 @@ export function syncNodeState(
         isSelected,
         isCurrent: node.data.isCurrent,
         isFocus,
+        visualWeight: focusState.visualWeight,
         graphCopy: input.graphCopy,
         onSelect: input.onSelect,
       },

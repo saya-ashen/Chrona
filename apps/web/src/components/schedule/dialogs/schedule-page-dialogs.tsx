@@ -64,6 +64,7 @@ buildScheduleViewHref: (...args: any[]) => string;
           title: input.title,
           description: input.description,
           priority: input.priority,
+          autoExecute: input.autoExecute,
           dueAt: input.dueAt,
           executionRuntime: dialogDefaults.executionRuntime,
           executionConfig: {},

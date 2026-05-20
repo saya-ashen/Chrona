@@ -2486,6 +2486,7 @@ export const TaskScalarFieldEnum = {
   executionConfig: 'executionConfig',
   status: 'status',
   priority: 'priority',
+  autoExecute: 'autoExecute',
   parentTaskId: 'parentTaskId',
   dueAt: 'dueAt',
   blockReason: 'blockReason',
@@ -3020,6 +3021,13 @@ export type EnumTaskPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
 
 
 /**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -3030,13 +3038,6 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'GraphMutationStatus'
  */
 export type EnumGraphMutationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GraphMutationStatus'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 

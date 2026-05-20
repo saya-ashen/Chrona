@@ -5,6 +5,7 @@ import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import { TaskListPage } from "@/components/tasks/task-list-page";
 import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
+import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
 import type { WorkPageData } from "@/components/work/work-page/work-page-types";
@@ -155,6 +156,11 @@ export function SettingsRoutePage() {
                 </LocalizedLink>
               </div>
             </div>
+            <ScheduleAiSettingsPanel
+              title={t.scheduleAiTitle}
+              description={t.scheduleAiDescription}
+              copy={t.scheduleAiPanel}
+            />
           </div>
         </div>
       </div>

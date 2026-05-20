@@ -1,9 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
+import { PlanCompileError } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../errors";
 import { createAgentToolOperationsService } from "./agent-tool-operations.service";
 
-function service() {
+function service(input: { materialize?: (input: Record<string, unknown>) => Promise<unknown> } = {}) {
   const calls = {
     planGenerate: 0,
     planPatch: 0,
@@ -40,7 +41,7 @@ function service() {
       subscribeToActiveGeneration: () => null,
       subscribeToGeneration: () => null,
       accept: async () => ({ savedPlan: null }),
-      materialize: async (input: Record<string, unknown>) => {
+      materialize: input.materialize ?? (async (input: Record<string, unknown>) => {
         calls.planGenerate += 1;
         return {
           id: "plan-generated",
@@ -49,7 +50,7 @@ function service() {
           status: "draft",
           summary: (input.blueprint as { title?: string }).title,
         };
-      },
+      }),
       generate: () => { throw new Error("unused"); },
       stopGeneration: () => ({ taskId: task.id, stopped: false }),
       patch: async (input: Record<string, unknown>) => {
@@ -125,12 +126,14 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
 
 describe("agent tool operations service", () => {
   beforeEach(async () => {
+    await db.run.deleteMany();
     await db.taskSession.deleteMany();
     await db.task.deleteMany();
     await db.workspace.deleteMany();
   });
 
   afterAll(async () => {
+    await db.run.deleteMany();
     await db.taskSession.deleteMany();
     await db.task.deleteMany();
     await db.workspace.deleteMany();
@@ -356,6 +359,43 @@ describe("agent tool operations service", () => {
       }),
     ).resolves.toMatchObject({ status: "accepted", state: { planRevision: 1 } });
     expect(agentTools.calls.planGenerate).toBe(1);
+  });
+
+  it("returns plan compile issues when generated graphs are invalid", async () => {
+    const issue = { path: "edges", message: "Plan graph must be a DAG" };
+    const agentTools = service({ materialize: async () => {
+      throw new PlanCompileError("Plan blueprint compilation failed", [issue]);
+    } });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.plan.generate",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          idempotencyKey: "plan-generate-invalid-graph",
+          payload: {
+            title: "Invalid MCP plan",
+            goal: "Expose compile diagnostics",
+            nodes: [
+              { id: "first_step", type: "task", title: "First step" },
+              { id: "second_step", type: "task", title: "Second step" },
+            ],
+            edges: [
+              { from: "first_step", to: "second_step" },
+              { from: "second_step", to: "first_step" },
+            ],
+          },
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "rejected",
+      reasonCode: "VALIDATION_ERROR",
+      message: "Plan blueprint compilation failed: edges: Plan graph must be a DAG",
+      recovery: { nextTool: "chrona.plan.read", details: { issues: [issue] } },
+      evidence: { validationIssues: [issue] },
+    });
   });
 
   it("maps node terminal tools to execution dispatch without model-supplied node ids", async () => {

@@ -1,0 +1,1 @@
+ALTER TABLE "Task" ADD COLUMN "autoExecute" BOOLEAN NOT NULL DEFAULT false;

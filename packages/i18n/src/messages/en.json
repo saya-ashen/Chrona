@@ -870,6 +870,8 @@
       "date": "Date",
       "startTime": "Start time",
       "endTime": "End time",
+      "autoExecute": "Auto-execute at scheduled time",
+      "autoExecuteDescription": "Start this task automatically when the scheduled start time arrives.",
       "description": "Description (optional)",
       "descriptionPlaceholder": "Add description",
       "priority": "Priority",
@@ -1027,6 +1029,8 @@
         "autoSuggestionsDescription": "Suggest task titles/details while typing. Off by default to avoid unsolicited AI calls.",
         "autoPlanGeneration": "Auto-generate plan after saving",
         "autoPlanGenerationDescription": "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
+        "defaultAutoExecute": "Default task auto-execution",
+        "defaultAutoExecuteDescription": "Preselect auto-execute when creating scheduled tasks. Off by default so tasks only run automatically after opt-in.",
         "defaultOn": "Default on",
         "defaultOff": "Default off",
         "saved": "Saved"

@@ -72,6 +72,7 @@ function TimelineComposer({
           title: input.title,
           description: input.description,
           priority: input.priority,
+          autoExecute: input.autoExecute,
           dueAt: input.dueAt,
           executionRuntime: defaultExecutionRuntime,
           executionConfig: {},

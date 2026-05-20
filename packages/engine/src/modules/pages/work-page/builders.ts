@@ -624,7 +624,7 @@ export function buildWorkspaceRail(
     taskId: string;
     persistedStatus: string;
     displayState?: string | null;
-    task: { id: string; title: string };
+    task: { id: string; title: string } | null;
   }>,
   currentTask: {
     title: string;
@@ -632,6 +632,9 @@ export function buildWorkspaceRail(
     displayState?: string | null;
   },
 ) {
+  const projectionsWithTask = projections.filter(
+    (projection): projection is typeof projection & { task: { id: string; title: string } } => projection.task !== null,
+  );
   const items = [
     {
       taskId: currentTaskId,
@@ -640,7 +643,7 @@ export function buildWorkspaceRail(
       tone: "current",
       isCurrent: true,
     },
-    ...projections
+    ...projectionsWithTask
       .filter((projection) => projection.taskId !== currentTaskId)
       .slice(0, 8)
       .map((projection) => ({
