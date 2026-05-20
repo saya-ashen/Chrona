@@ -18,6 +18,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
       scheduledStartAt: { lte: now },
       task: {
         status: { in: ["Ready", "Scheduled", "Queued"] },
+        autoExecute: true,
       },
     },
     include: {
@@ -26,6 +27,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           id: true,
           workspaceId: true,
           status: true,
+          autoExecute: true,
           executionRuntime: true,
         },
       },

@@ -55,6 +55,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(screen.getByText("Add task")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add title")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add description")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).not.toBeChecked();
     expect(screen.getByText("Save")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
@@ -121,6 +122,7 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     // Click High priority
     await user.click(screen.getByRole("button", { name: "High" }));
+    await user.click(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i }));
 
     const saveButton = screen.getByText("Save");
     expect(saveButton).not.toBeDisabled();
@@ -134,6 +136,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(call.title).toBe("My task");
     expect(call.description).toBe("Some description");
     expect(call.priority).toBe("High");
+    expect(call.autoExecute).toBe(true);
     expect(call.dueAt).toBeNull();
     expect(call.scheduledStartAt).toBeInstanceOf(Date);
     expect(call.scheduledEndAt).toBeInstanceOf(Date);

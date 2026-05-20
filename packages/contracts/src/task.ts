@@ -65,6 +65,7 @@ export type CreateTaskInput = {
   title: string;
   description?: string | null;
   priority?: TaskPriority;
+  autoExecute?: boolean;
   parentTaskId?: string | null;
 } & Partial<TaskRuntimeFields>;
 

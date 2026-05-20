@@ -1,6 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { taskScheduling } from "@/modules/scheduling/task-scheduling";
+import { createTask } from "@/modules/tasks/create-task";
 
 const startMock = mock();
 const dispatchMock = mock();
@@ -62,6 +64,7 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
       title: "Due scheduled task",
       status: "Ready",
       priority: "High",
+      autoExecute: true,
       executionRuntime: "openclaw",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
       ...taskOverrides,
@@ -226,6 +229,17 @@ describe("auto-start-scheduled-plan", () => {
     expect(startMock).not.toHaveBeenCalled();
   });
 
+  it("ignores due scheduled tasks that did not opt in to auto execution", async () => {
+    const workspace = await createWorkspace();
+    await createDueTask(workspace.id, { autoExecute: false });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toEqual([]);
+    expect(startMock).not.toHaveBeenCalled();
+  });
+
   it("skips tasks that already have an active run", async () => {
     const workspace = await createWorkspace();
     const { task } = await createDueTask(workspace.id);
@@ -383,6 +397,57 @@ describe("auto-start-scheduled-plan", () => {
     const updatedBlock = await db.workBlock.findFirst({ where: { taskId: task.id } });
     expect(updatedBlock?.status).toBe("Active");
     expect(updatedBlock?.startedAt).not.toBeNull();
+  });
+
+  it("auto-starts a created task after scheduling through the scheduling module", async () => {
+    const now = new Date();
+    const workspace = await createWorkspace();
+    const created = await createTask({
+      workspaceId: workspace.id,
+      title: "Scheduled from create flow",
+      priority: "High",
+      autoExecute: true,
+      executionRuntime: "openclaw",
+      executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
+    });
+
+    await taskScheduling.apply({
+      taskId: created.taskId,
+      dueAt: null,
+      scheduledStartAt: new Date(now.getTime() - 60_000),
+      scheduledEndAt: new Date(now.getTime() + 30 * 60_000),
+      scheduleSource: "human",
+    });
+    await db.task.update({
+      where: { id: created.taskId },
+      data: { status: "Ready" },
+    });
+
+    startMock.mockResolvedValue({
+      taskId: created.taskId,
+      planId: "plan-created-flow",
+      mainSessionId: "session-created-flow",
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started from scheduler facade",
+    });
+
+    const result = await taskScheduling.autoStartScheduledPlans();
+
+    expect(result.started).toHaveLength(1);
+    expect(result.started[0]?.taskId).toBe(created.taskId);
+    expect(startMock).toHaveBeenCalledTimes(1);
+    expect(startMock.mock.calls[0]?.[0]).toMatchObject({
+      taskId: created.taskId,
+      trigger: "scheduler",
+    });
+
+    const block = await db.workBlock.findFirst({ where: { taskId: created.taskId } });
+    expect(block?.status).toBe("Active");
+    expect(block?.startedAt).not.toBeNull();
   });
 
   it("ignores tasks without work blocks", async () => {

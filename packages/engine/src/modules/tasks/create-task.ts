@@ -78,6 +78,7 @@ export async function createTask(input: CreateTaskInput) {
       priority: input.priority
         ? TaskPriority[input.priority]
         : TaskPriority.Medium,
+      autoExecute: input.autoExecute ?? false,
       status,
       parentTaskId: input.parentTaskId ?? null,
     },
@@ -120,6 +121,7 @@ export async function createTask(input: CreateTaskInput) {
     payload: {
       title: task.title,
       priority: task.priority,
+      autoExecute: task.autoExecute,
       status: task.status,
       parentTaskId: task.parentTaskId,
     },

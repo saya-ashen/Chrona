@@ -6,22 +6,48 @@ import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
 import type { WorkCopy, WorkPageData } from "./work-page-types";
 
-function normalizeWorkPageData(data: WorkPageData): WorkPageData {
-  const nodes = Array.isArray(data.taskPlan?.nodes) ? data.taskPlan.nodes : [];
-  const edges = Array.isArray(data.taskPlan?.edges) ? data.taskPlan.edges : [];
-  const analytics = data.taskPlan?.analytics ?? {
-    entryNodeIds: [],
-    terminalNodeIds: [],
-    activeNodeIds: [],
-    reachableFromActiveIds: [],
-    criticalPathNodeIds: [],
-    attentionNodeIds: [],
-    blockedNodeIds: [],
-    rankByNodeId: {},
-    laneByNodeId: {},
-    upstreamByNodeId: {},
-    downstreamByNodeId: {},
+type WorkPageTaskPlan = WorkPageData["taskPlan"];
+
+function buildTaskPlanAnalytics(
+  nodes: WorkPageTaskPlan["nodes"],
+  edges: WorkPageTaskPlan["edges"],
+): WorkPageTaskPlan["analytics"] {
+  const activeNodeIds = nodes.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id);
+  const attentionNodeIds = nodes
+    .filter((node) => node.status === "waiting" || node.status === "waiting_for_user" || node.status === "waiting_for_approval")
+    .map((node) => node.id);
+  const blockedNodeIds = nodes.filter((node) => node.status === "blocked").map((node) => node.id);
+  const outgoing = new Map(nodes.map((node) => [node.id, [] as string[]]));
+  const incoming = new Map(nodes.map((node) => [node.id, [] as string[]]));
+
+  for (const edge of edges) {
+    const from = edge.from ?? edge.fromNodeId;
+    const to = edge.to ?? edge.toNodeId;
+    if (!from || !to) continue;
+    outgoing.get(from)?.push(to);
+    incoming.get(to)?.push(from);
+  }
+
+  return {
+    entryNodeIds: nodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0).map((node) => node.id),
+    terminalNodeIds: nodes.filter((node) => (outgoing.get(node.id)?.length ?? 0) === 0).map((node) => node.id),
+    activeNodeIds,
+    reachableFromActiveIds: activeNodeIds.length > 0 ? activeNodeIds : [],
+    criticalPathNodeIds: nodes.map((node) => node.id),
+    attentionNodeIds,
+    blockedNodeIds,
+    rankByNodeId: Object.fromEntries(nodes.map((node, index) => [node.id, index])),
+    laneByNodeId: Object.fromEntries(nodes.map((node) => [node.id, 0])),
+    upstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, incoming.get(node.id) ?? []])),
+    downstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, outgoing.get(node.id) ?? []])),
   };
+}
+
+function normalizeWorkPageData(data: WorkPageData): WorkPageData {
+  const steps = Array.isArray(data.taskPlan?.steps) ? data.taskPlan.steps : [];
+  const nodes = Array.isArray(data.taskPlan?.nodes) ? data.taskPlan.nodes : steps;
+  const edges = Array.isArray(data.taskPlan?.edges) ? data.taskPlan.edges : [];
+  const analytics = data.taskPlan?.analytics ?? buildTaskPlanAnalytics(nodes, edges);
 
   return {
     ...data,
@@ -31,7 +57,7 @@ function normalizeWorkPageData(data: WorkPageData): WorkPageData {
       state: data.taskPlan?.state ?? (nodes.length > 0 ? "ready" : "empty"),
       nodes,
       edges,
-      steps: Array.isArray(data.taskPlan?.steps) ? data.taskPlan.steps : nodes,
+      steps: steps.length > 0 ? steps : nodes,
       analytics: {
         entryNodeIds: analytics.entryNodeIds ?? [],
         terminalNodeIds: analytics.terminalNodeIds ?? [],

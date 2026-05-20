@@ -298,6 +298,7 @@ export type TimelineCreateInput = {
   priority: "Low" | "Medium" | "High" | "Urgent";
   executionRuntime: string;
   executionConfig: RuntimeInput;
+  autoExecute: boolean;
   dueAt: Date | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;

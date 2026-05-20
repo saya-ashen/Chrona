@@ -21,6 +21,7 @@ export function createTaskFromSchedule(input: {
   title: string;
   description?: string | null;
   priority?: string;
+  autoExecute?: boolean;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   parentTaskId?: string | null;
@@ -37,6 +38,7 @@ export function createTaskFromSchedule(input: {
           | "High"
           | "Urgent"
           | undefined,
+        autoExecute: input.autoExecute,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
         parentTaskId: input.parentTaskId,

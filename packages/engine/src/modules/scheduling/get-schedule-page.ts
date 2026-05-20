@@ -76,6 +76,12 @@ function mapTaskRunnability(task: {
   };
 }
 
+function hasTask<T extends { task: unknown }>(
+  item: T,
+): item is T & { task: NonNullable<T["task"]> } {
+  return item.task !== null;
+}
+
 function getScheduledMinutes(item: {
   scheduledStartAt: Date | null;
   scheduledEndAt: Date | null;
@@ -306,7 +312,7 @@ export async function getSchedulePage(workspaceId: string) {
     spec: getRuntimeTaskConfigSpec(key),
   }));
 
-  const listItems = projections.map((item) => mapProjectionItem(item));
+  const listItems = projections.filter(hasTask).map((item) => mapProjectionItem(item));
   const planSnapshots = new Map<string, TaskPlanReadModel>();
   const planStatuses = new Map<
     string,
@@ -355,7 +361,7 @@ export async function getSchedulePage(workspaceId: string) {
     )
     .map((item) => item);
 
-  const topLevelProposals = proposals.filter(
+  const topLevelProposals = proposals.filter(hasTask).filter(
     (proposal) => proposal.task.parentTaskId === null,
   );
 

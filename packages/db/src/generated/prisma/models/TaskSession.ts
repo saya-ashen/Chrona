@@ -525,10 +525,6 @@ export type TaskSessionUncheckedUpdateManyWithoutTaskNestedInput = {
   deleteMany?: Prisma.TaskSessionScalarWhereInput | Prisma.TaskSessionScalarWhereInput[]
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type TaskSessionCreateNestedOneWithoutRunsInput = {
   create?: Prisma.XOR<Prisma.TaskSessionCreateWithoutRunsInput, Prisma.TaskSessionUncheckedCreateWithoutRunsInput>
   connectOrCreate?: Prisma.TaskSessionCreateOrConnectWithoutRunsInput

@@ -19,6 +19,7 @@ describe("ScheduleAiSettingsPanel", () => {
     expect(screen.getByText("Schedule AI automation")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /auto suggestions/i })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /auto-generate plan after saving/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /default task auto-execution/i })).not.toBeChecked();
   });
 
   it("persists updated preferences to localStorage", () => {
@@ -26,10 +27,12 @@ describe("ScheduleAiSettingsPanel", () => {
 
     fireEvent.click(screen.getByRole("checkbox", { name: /auto suggestions/i }));
     fireEvent.click(screen.getByRole("checkbox", { name: /auto-generate plan after saving/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /default task auto-execution/i }));
 
     expect(JSON.parse(window.localStorage.getItem(SCHEDULE_AI_PREFERENCES_STORAGE_KEY) ?? "{}")).toEqual({
       autoSuggestionsEnabled: true,
       autoPlanGenerationEnabled: false,
+      defaultAutoExecuteEnabled: true,
     });
   });
 });

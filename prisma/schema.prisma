@@ -156,6 +156,7 @@ model Task {
   executionConfig     Json
   status              TaskStatus
   priority            TaskPriority
+  autoExecute         Boolean                @default(false)
   parentTaskId        String?
   dueAt               DateTime?
   blockReason         Json?

@@ -17,6 +17,8 @@ type ScheduleAiSettingsPanelProps = {
     autoSuggestionsDescription: string;
     autoPlanGeneration: string;
     autoPlanGenerationDescription: string;
+    defaultAutoExecute: string;
+    defaultAutoExecuteDescription: string;
     defaultOn: string;
     defaultOff: string;
     saved: string;
@@ -28,6 +30,8 @@ const fallbackCopy = {
   autoSuggestionsDescription: "Suggest task titles/details while typing. Off by default to avoid unsolicited AI calls.",
   autoPlanGeneration: "Auto-generate plan after saving",
   autoPlanGenerationDescription: "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
+  defaultAutoExecute: "Default task auto-execution",
+  defaultAutoExecuteDescription: "Preselect auto-execute when creating scheduled tasks. Off by default so tasks only run automatically after opt-in.",
   defaultOn: "Default on",
   defaultOff: "Default off",
   saved: "Saved",
@@ -74,6 +78,15 @@ export function ScheduleAiSettingsPanel({
           saving={savingKey === "autoPlanGenerationEnabled"}
           copy={copy}
           onChange={(checked) => updatePreference("autoPlanGenerationEnabled", checked)}
+        />
+        <PreferenceToggle
+          label={copy.defaultAutoExecute}
+          description={copy.defaultAutoExecuteDescription}
+          checked={storedPreferences.defaultAutoExecuteEnabled}
+          defaultChecked={DEFAULT_SCHEDULE_AI_PREFERENCES.defaultAutoExecuteEnabled}
+          saving={savingKey === "defaultAutoExecuteEnabled"}
+          copy={copy}
+          onChange={(checked) => updatePreference("defaultAutoExecuteEnabled", checked)}
         />
       </div>
     </section>

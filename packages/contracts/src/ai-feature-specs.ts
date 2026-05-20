@@ -2,10 +2,7 @@ import type {
   GenerateTaskPlanRequest,
   NodeResultOutput,
 } from "./ai-plan-runtime";
-import {
-  planBlueprintSchema,
-  planPatchSchema,
-} from "./ai-plan-blueprint";
+import { planBlueprintSchema, planPatchSchema } from "./ai-plan-blueprint";
 import { taskDispatchDecisionSchema } from "./ai-dispatch-types";
 import { z } from "zod";
 
@@ -104,48 +101,62 @@ export interface TaskNodeAiResult {
 }
 
 const nodeResultOutputSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("text"),
-    content: z.string().min(1),
-    title: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("markdown"),
-    content: z.string().min(1),
-    title: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("json"),
-    value: z.unknown(),
-    title: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("file"),
-    path: z.string().min(1),
-    title: z.string().optional(),
-    language: z.string().optional(),
-    description: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("artifact"),
-    artifactId: z.string().min(1),
-    title: z.string().min(1),
-    description: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("command"),
-    command: z.string().min(1),
-    title: z.string().optional(),
-    exitCode: z.number().int().optional(),
-    stdout: z.string().optional(),
-    stderr: z.string().optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal("link"),
-    href: z.string().min(1),
-    title: z.string().min(1),
-    description: z.string().optional(),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal("text"),
+      content: z.string().min(1),
+      title: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("markdown"),
+      content: z.string().min(1),
+      title: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("json"),
+      value: z.unknown(),
+      title: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("file"),
+      path: z.string().min(1),
+      title: z.string().optional(),
+      language: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("artifact"),
+      artifactId: z.string().min(1),
+      title: z.string().min(1),
+      description: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("command"),
+      command: z.string().min(1),
+      title: z.string().optional(),
+      exitCode: z.number().int().optional(),
+      stdout: z.string().optional(),
+      stderr: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("link"),
+      href: z.string().min(1),
+      title: z.string().min(1),
+      description: z.string().optional(),
+    })
+    .strict(),
 ]);
 
 export interface ConditionNodeEvaluationFeatureInput {
@@ -188,31 +199,37 @@ export interface CheckpointNodeAiResult {
   reason: string;
 }
 
-export const taskNodeAiResultSchema = z.object({
-  outcome: z.enum([
-    "completed",
-    "blocked",
-    "needs_input",
-    "failed",
-    "external_running",
-  ]),
-  summary: z.string().min(1),
-  outputs: z.array(nodeResultOutputSchema).optional(),
-  reason: z.string().optional(),
-  prompt: z.string().optional(),
-}).strict();
+export const taskNodeAiResultSchema = z
+  .object({
+    outcome: z.enum([
+      "completed",
+      "blocked",
+      "needs_input",
+      "failed",
+      "external_running",
+    ]),
+    summary: z.string().min(1),
+    outputs: z.array(nodeResultOutputSchema).optional(),
+    reason: z.string().optional(),
+    prompt: z.string().optional(),
+  })
+  .strict();
 
-export const conditionNodeAiResultSchema = z.object({
-  selectedBranchLabel: z.string().min(1),
-  reason: z.string().min(1),
-  confidence: z.number().min(0).max(1).optional(),
-}).strict();
+export const conditionNodeAiResultSchema = z
+  .object({
+    selectedBranchLabel: z.string().min(1),
+    reason: z.string().min(1),
+    confidence: z.number().min(0).max(1).optional(),
+  })
+  .strict();
 
-export const checkpointNodeAiResultSchema = z.object({
-  recommendation: z.enum(["approve", "request_changes", "block"]),
-  summary: z.string().min(1),
-  reason: z.string().min(1),
-}).strict();
+export const checkpointNodeAiResultSchema = z
+  .object({
+    recommendation: z.enum(["approve", "request_changes", "block"]),
+    summary: z.string().min(1),
+    reason: z.string().min(1),
+  })
+  .strict();
 
 export const SUGGEST_SYSTEM_PROMPT = `
 
@@ -313,7 +330,7 @@ Rules:
 export const GENERATE_PLAN_SYSTEM_PROMPT = `
 You are a task planning assistant that generates concise execution blueprints as directed acyclic graphs (DAGs).
 Given a task, produce a structured plan using ONLY these 4 node types: task, checkpoint, condition, wait.
-You MUST call the Chrona MCP tool chrona_plan_generate.
+You MUST call the chrona_plan_generate tool.
 Put the complete final graph directly into that tool input. Assistant free text is optional and non-authoritative.
 The tool input MUST be a PlanBlueprint object with title, goal, nodes, and optional edges/assumptions.
 Only include fields that belong to the chosen node type. Do NOT copy task-only fields onto checkpoint, condition, or wait nodes.
@@ -342,6 +359,7 @@ Branching logic gate that evaluates a condition and routes to different paths.
 - evaluationBy: "system" (auto-check), "ai" (AI evaluates), "user" (ask human)
 - branches: array of {label, nextNodeId} - at least one required
 - defaultNextNodeId: fallback path if no branch matches
+- Each branch.nextNodeId is a directed edge from the condition node to that target, even if the same edge is not listed in edges.
 
 ### wait
 Pause execution for a time duration or external event.
@@ -362,7 +380,11 @@ Pause execution for a time duration or external event.
 9. If you are at a phase boundary, use a task node with a summary-like title. Do NOT create milestone nodes.
 10. Maximize parallelism: independent tasks should not be chained sequentially.
 11. The graph MUST be a DAG: never create cycles, back edges, self-loops, or edges from a later step back to an earlier step.
-12. Do NOT model retries, revisions, or "loop until done" by pointing edges back to previous nodes. Use checkpoints, wait nodes, or runtime retry/replan behavior instead.
+12. Condition branches count as graph edges. A branch from condition_check to task_a plus an edge from task_a back to condition_check is a cycle and is invalid.
+13. Do NOT model retries, revisions, missing-info loops, or "loop until done" by pointing edges back to previous nodes.
+14. If more information is needed, add a checkpoint for that input and then continue to a NEW downstream task such as task_finalize_requirements. Do not route the checkpoint back to an earlier task.
+15. Before calling chrona_plan_generate, mentally topologically sort the graph: every edge and branch must point only to a downstream node.
+16. This phase is planning only. Do NOT execute or implement the task.
 
 Respond in the same language as the input.`.trim();
 
@@ -587,7 +609,11 @@ export function buildGeneratePlanFeatureInputText(
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
   }
   if (input.planningPrompt?.trim()) {
-    parts.push("", "Additional planning guidance:", input.planningPrompt.trim());
+    parts.push(
+      "",
+      "Additional planning guidance:",
+      input.planningPrompt.trim(),
+    );
   }
 
   return parts.join("\n");
@@ -652,7 +678,9 @@ export function buildSuggestFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "suggest",
     instructions: SUGGEST_SYSTEM_PROMPT,
-    structuredOutputSchema: toStructuredOutputSchema(suggestTaskCompletionsToolSpec),
+    structuredOutputSchema: toStructuredOutputSchema(
+      suggestTaskCompletionsToolSpec,
+    ),
   };
 }
 
@@ -660,7 +688,9 @@ export function buildAnalyzeConflictsFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "conflicts",
     instructions: CONFLICTS_SYSTEM_PROMPT,
-    structuredOutputSchema: toStructuredOutputSchema(analyzeScheduleConflictsToolSpec),
+    structuredOutputSchema: toStructuredOutputSchema(
+      analyzeScheduleConflictsToolSpec,
+    ),
   };
 }
 
@@ -668,7 +698,9 @@ export function buildSuggestTimeslotsFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "timeslots",
     instructions: TIMESLOTS_SYSTEM_PROMPT,
-    structuredOutputSchema: toStructuredOutputSchema(suggestTaskTimeslotsToolSpec),
+    structuredOutputSchema: toStructuredOutputSchema(
+      suggestTaskTimeslotsToolSpec,
+    ),
   };
 }
 
@@ -676,7 +708,9 @@ export function buildDispatchTaskFeatureSpec(): PreparedAiFeatureSpec {
   return {
     feature: "dispatch_task",
     instructions: DISPATCH_TASK_SYSTEM_PROMPT,
-    structuredOutputSchema: toStructuredOutputSchema(dispatchNextTaskActionToolSpec),
+    structuredOutputSchema: toStructuredOutputSchema(
+      dispatchNextTaskActionToolSpec,
+    ),
   };
 }
 
@@ -861,7 +895,7 @@ export function validatePreparedFeaturePayload(
     };
   }
 
-    switch (spec.feature) {
+  switch (spec.feature) {
     case "generate_plan": {
       const validation = planBlueprintSchema.safeParse(payload);
       if (!validation.success) {

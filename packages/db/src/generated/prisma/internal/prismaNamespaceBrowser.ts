@@ -115,6 +115,7 @@ export const TaskScalarFieldEnum = {
   executionConfig: 'executionConfig',
   status: 'status',
   priority: 'priority',
+  autoExecute: 'autoExecute',
   parentTaskId: 'parentTaskId',
   dueAt: 'dueAt',
   blockReason: 'blockReason',

@@ -348,6 +348,7 @@ export async function handleCreateTaskBlockAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
+      autoExecute: input.autoExecute,
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
     })) as { taskId: string };

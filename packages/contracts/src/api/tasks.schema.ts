@@ -58,6 +58,7 @@ export const createTaskBodySchema = z.object({
   title: z.string().min(1, "title is required"),
   description: z.string().optional(),
   priority: taskPriorityEnum.optional(),
+  autoExecute: z.boolean().optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),

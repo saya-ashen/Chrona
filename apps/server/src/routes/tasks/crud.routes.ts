@@ -56,6 +56,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
           title: body.title,
           description: body.description,
           priority: body.priority,
+          autoExecute: body.autoExecute,
           executionRuntime: body.executionRuntime,
           executionConfig: body.executionConfig,
         });

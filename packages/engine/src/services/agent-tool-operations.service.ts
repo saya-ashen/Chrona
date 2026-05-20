@@ -8,6 +8,7 @@ import {
   parseChronaToolPayload,
   type PlanBlueprint,
 } from "@chrona/contracts";
+import { PlanCompileError } from "@chrona/contracts/ai";
 import { db } from "@/lib/db";
 import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 import type { createTaskExecutionService } from "./task-execution.service";
@@ -229,6 +230,7 @@ function ensureExpectedState(operation: ChronaToolOperation, state: Record<strin
 }
 
 function reasonCodeFromError(cause: unknown) {
+  if (cause instanceof PlanCompileError) return "VALIDATION_ERROR" as const;
   if (!isEngineError(cause)) return "INVALID_TRANSITION" as const;
   switch (cause.code) {
     case ENGINE_ERROR_CODES.TASK_NOT_FOUND:
@@ -245,6 +247,21 @@ function reasonCodeFromError(cause: unknown) {
     default:
       return "INVALID_TRANSITION" as const;
   }
+}
+
+function rejectionDiagnostics(cause: unknown) {
+  if (cause instanceof PlanCompileError) {
+    return {
+      message: `${cause.message}: ${cause.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`,
+      details: { issues: cause.issues },
+      evidence: { validationIssues: cause.issues },
+    };
+  }
+  return {
+    message: cause instanceof Error ? cause.message : "Chrona rejected the tool operation.",
+    details: undefined,
+    evidence: undefined,
+  };
 }
 
 export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) {
@@ -427,15 +444,16 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
         }
         return accepted;
       } catch (cause) {
+        const diagnostics = rejectionDiagnostics(cause);
         return rejectedToolResult({
           operationId: id,
           toolName,
           reasonCode: reasonCodeFromError(cause),
-          message: cause instanceof Error ? cause.message : "Chrona rejected the tool operation.",
+          message: diagnostics.message,
           affected: affectedFrom(input),
           auditRef: id,
-          recovery: { nextTool: readToolFor(toolName) },
-          evidence: operationEvidence(input),
+          recovery: { nextTool: readToolFor(toolName), details: diagnostics.details },
+          evidence: { ...operationEvidence(input), ...diagnostics.evidence },
         });
       }
     },

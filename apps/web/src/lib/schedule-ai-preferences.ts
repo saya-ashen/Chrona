@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export type ScheduleAiPreferences = {
   autoSuggestionsEnabled: boolean;
   autoPlanGenerationEnabled: boolean;
+  defaultAutoExecuteEnabled: boolean;
 };
 
 export const SCHEDULE_AI_PREFERENCES_STORAGE_KEY =
@@ -14,6 +15,7 @@ const SCHEDULE_AI_PREFERENCES_UPDATED_EVENT =
 export const DEFAULT_SCHEDULE_AI_PREFERENCES: ScheduleAiPreferences = {
   autoSuggestionsEnabled: false,
   autoPlanGenerationEnabled: true,
+  defaultAutoExecuteEnabled: false,
 };
 
 function isScheduleAiPreferences(
@@ -59,6 +61,10 @@ function readScheduleAiPreferences(): ScheduleAiPreferences {
         typeof parsed.autoPlanGenerationEnabled === "boolean"
           ? parsed.autoPlanGenerationEnabled
           : DEFAULT_SCHEDULE_AI_PREFERENCES.autoPlanGenerationEnabled,
+      defaultAutoExecuteEnabled:
+        typeof parsed.defaultAutoExecuteEnabled === "boolean"
+          ? parsed.defaultAutoExecuteEnabled
+          : DEFAULT_SCHEDULE_AI_PREFERENCES.defaultAutoExecuteEnabled,
     };
   } catch {
     return DEFAULT_SCHEDULE_AI_PREFERENCES;
@@ -71,6 +77,7 @@ export function writeScheduleAiPreferences(
   const nextPreferences: ScheduleAiPreferences = {
     autoSuggestionsEnabled: preferences.autoSuggestionsEnabled,
     autoPlanGenerationEnabled: preferences.autoPlanGenerationEnabled,
+    defaultAutoExecuteEnabled: preferences.defaultAutoExecuteEnabled,
   };
 
   const storage = getStorage();
@@ -141,4 +148,3 @@ export function useScheduleAiPreferences(): ScheduleAiPreferences {
 
   return preferences;
 }
-
