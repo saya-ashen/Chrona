@@ -87,6 +87,16 @@ function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined)
   }
 }
 
+function isManualActionBlocked(node: {
+  status?: EffectivePlanNode["status"] | null;
+  blockedReason?: string | null;
+  lastError?: string | null;
+  result?: EffectivePlanNode["result"] | null;
+}) {
+  if (node.status !== "waiting") return false;
+  return Boolean(node.blockedReason?.trim() || node.lastError?.trim() || node.result?.waitKind === "manual_action");
+}
+
 function inferIntent(kind: PlanNodeKind, metadata: PlanMetadata, status: PlanNodeStatus): PlanNodeIntent {
   if (kind === "condition") return "decision";
   if (kind === "wait") return "pause";
@@ -428,6 +438,8 @@ function toPlanNode(node: {
   dependencies?: string[];
   requiredInfo?: string[];
   status?: EffectivePlanNode["status"] | null;
+  blockedReason?: string | null;
+  lastError?: string | null;
   ready?: boolean;
   reachable?: boolean;
   result?: EffectivePlanNode["result"] | null;
@@ -440,7 +452,7 @@ function toPlanNode(node: {
     executor: node.executor ?? undefined,
     mode: node.mode ?? undefined,
   });
-  const status = normalizeStatus(node.status);
+  const status = isManualActionBlocked(node) ? "blocked" : normalizeStatus(node.status);
   const objective = node.description ?? node.title;
   const requiredInfo = node.requiredInfo ?? [];
   const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo });
@@ -773,6 +785,8 @@ export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null
         dependencies: node.dependencies ?? [],
         requiredInfo: readRuntimeArray(node, "requiredInfo"),
         status: node.status,
+        blockedReason: node.blockedReason,
+        lastError: node.lastError,
         ready: node.ready,
         reachable: node.reachable,
         result: node.result,

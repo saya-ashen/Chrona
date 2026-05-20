@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@chrona/i18n/react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
 type AiClientType = "openclaw" | "llm" | "hermes";
@@ -97,16 +106,16 @@ function getStatusLabel(copy: Record<string, string>, status: TestStatus) {
   }
 }
 
-function getStatusClasses(status: TestStatus) {
+function getStatusVariant(status: TestStatus): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
     case "available":
-      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "default";
     case "unavailable":
-      return "border-destructive/40 bg-destructive/10 text-destructive";
+      return "destructive";
     case "testing":
-      return "border-primary/40 bg-primary/10 text-primary";
+      return "secondary";
     default:
-      return "border-border/60 bg-muted/40 text-muted-foreground";
+      return "outline";
   }
 }
 
@@ -194,74 +203,74 @@ function ClientForm({
   });
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border/60 bg-card p-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">{copy.nameLabel}</span>
-          <input
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+    <Card size="sm">
+      <CardContent>
+        <FieldGroup className="gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel>{copy.nameLabel}</FieldLabel>
+              <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Hermes Client"
           />
-        </label>
-        <label className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">{copy.typeLabel}</span>
-          <select
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
-            value={type}
-            onChange={(e) => setType(e.target.value as AiClientType)}
-          >
-            {providers.map((provider) => (
-              <option key={provider.key} value={provider.key}>
-                {provider.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            </Field>
+            <Field>
+              <FieldLabel>{copy.typeLabel}</FieldLabel>
+              <Select value={type} onValueChange={(value) => setType(value as AiClientType)}>
+                <SelectTrigger className="w-full" aria-label={copy.typeLabel}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {providers.map((provider) => (
+                      <SelectItem key={provider.key} value={provider.key}>
+                        {provider.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
 
-      <div className="space-y-3">
-        <label className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">Base URL</span>
-          <input
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+          <Field>
+            <FieldLabel>Base URL</FieldLabel>
+            <Input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="http://127.0.0.1:8642"
           />
-        </label>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">API Key</span>
-            <input
-              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+          </Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel>API Key</FieldLabel>
+              <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="optional for localhost"
             />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs text-muted-foreground">Timeout (seconds)</span>
-            <input
-              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm"
+            </Field>
+            <Field>
+              <FieldLabel>Timeout (seconds)</FieldLabel>
+              <Input
               type="number"
               value={timeoutSeconds}
               onChange={(e) => setTimeoutSeconds(e.target.value)}
             />
-          </label>
-        </div>
-      </div>
+            </Field>
+          </div>
 
-      <label className="flex items-center gap-2 text-sm text-foreground">
-        <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
-        {copy.setAsDefault}
-      </label>
+          <Field orientation="horizontal">
+            <Checkbox checked={isDefault} onCheckedChange={(checked) => setIsDefault(checked === true)} />
+            <FieldLabel>{copy.setAsDefault}</FieldLabel>
+          </Field>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          className="rounded-xl border border-border/60 px-3 py-2 text-sm hover:bg-muted"
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
           onClick={async () => {
             setTestStatus("testing");
             setTestReason(null);
@@ -276,27 +285,27 @@ function ClientForm({
           }}
         >
           {copy.testAvailability}
-        </button>
-        <span className={`rounded-full border px-2.5 py-1 text-xs ${getStatusClasses(testStatus)}`}>
-          {getStatusLabel(copy, testStatus)}
-        </span>
-        <span className="text-xs text-muted-foreground">{testReason ?? copy.reasonUnknown}</span>
-      </div>
+            </Button>
+            <Badge variant={getStatusVariant(testStatus)}>{getStatusLabel(copy, testStatus)}</Badge>
+            <span className="text-xs text-muted-foreground">{testReason ?? copy.reasonUnknown}</span>
+          </div>
 
-      <div className="flex gap-2">
-        <button
-          className="rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground"
+          <div className="flex gap-2">
+            <Button
+              type="button"
           onClick={() => {
             onSave(payload);
           }}
         >
           {copy.save}
-        </button>
-        <button className="rounded-xl border border-border/60 px-3 py-2 text-sm" onClick={onCancel}>
-          {copy.cancel}
-        </button>
-      </div>
-    </div>
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>
+              {copy.cancel}
+            </Button>
+          </div>
+        </FieldGroup>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -405,47 +414,50 @@ export function AiClientsManager() {
 
   if (loading) {
     return (
-      <div className="p-1">
-        <div className="animate-pulse text-sm text-muted-foreground">{copy.loading}</div>
+      <div className="flex flex-col gap-3 p-1" aria-label={copy.loading}>
+        <Skeleton className="h-6 w-44" />
+        <Skeleton className="h-24 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">{copy.title}</h2>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-semibold tracking-tight">{copy.title}</h2>
           <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <button className="rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground" onClick={() => setShowForm(true)}>
+        <Button type="button" onClick={() => setShowForm(true)}>
           {copy.addClient}
-        </button>
+        </Button>
       </div>
 
       {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} />}
 
       {clients.length === 0 && !showForm && (
-        <div className="rounded-2xl border border-dashed border-border/70 p-8 text-center text-sm text-muted-foreground">{copy.emptyState}</div>
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">{copy.emptyState}</CardContent>
+        </Card>
       )}
 
       {clients.map((client) => {
         const cardTestState = cardTestStates[client.id] ?? { status: "idle", reason: null };
 
         return (
-          <div key={client.id} className="space-y-3 rounded-2xl border border-border/60 bg-card p-4">
+          <Card key={client.id} size="sm">
           {editingId === client.id ? (
             <ClientForm initial={client} onSave={(data) => handleUpdate(client.id, data)} onCancel={() => setEditingId(null)} copy={copy} providers={providers} />
           ) : (
             <>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
+              <CardHeader className="gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="flex min-w-0 flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-medium text-foreground">{client.name}</span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{client.type}</span>
-                    {client.isDefault && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{copy.defaultBadge}</span>}
+                    <CardTitle>{client.name}</CardTitle>
+                    <Badge variant="secondary">{client.type}</Badge>
+                    {client.isDefault && <Badge variant="default">{copy.defaultBadge}</Badge>}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <CardDescription>
                     {client.type === "openclaw" ? (
                       <span>Bridge: {(client.config as { bridgeUrl?: string }).bridgeUrl ?? "—"}</span>
                     ) : client.type === "hermes" ? (
@@ -455,52 +467,56 @@ export function AiClientsManager() {
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}
                       </span>
                     )}
-                  </div>
+                  </CardDescription>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <button
-                      className="rounded-xl border border-border/60 px-2.5 py-1.5 text-xs hover:bg-muted"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
                       onClick={() => void handleTestExistingClient(client)}
                     >
                       {copy.testAvailability}
-                    </button>
-                    <span className={`rounded-full border px-2.5 py-1 ${getStatusClasses(cardTestState.status)}`}>
-                      {getStatusLabel(copy, cardTestState.status)}
-                    </span>
+                    </Button>
+                    <Badge variant={getStatusVariant(cardTestState.status)}>{getStatusLabel(copy, cardTestState.status)}</Badge>
                     <span className="text-muted-foreground">{cardTestState.reason ?? copy.reasonUnknown}</span>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={client.enabled} onChange={(e) => handleToggleEnabled(client.id, e.target.checked)} />
-                    {copy.enabled}
-                  </label>
-                  <button className="rounded-xl border border-border/60 px-2.5 py-1.5 text-xs hover:bg-muted" onClick={() => setEditingId(client.id)}>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <Field orientation="horizontal" className="w-auto gap-2">
+                    <Checkbox checked={client.enabled} onCheckedChange={(checked) => handleToggleEnabled(client.id, checked === true)} />
+                    <FieldLabel className="text-xs text-muted-foreground">{copy.enabled}</FieldLabel>
+                  </Field>
+                  <Button type="button" variant="outline" size="xs" onClick={() => setEditingId(client.id)}>
                     {copy.edit}
-                  </button>
-                  <button className="rounded-xl border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10" onClick={() => handleDelete(client.id)}>
+                  </Button>
+                  <Button type="button" variant="destructive" size="xs" onClick={() => handleDelete(client.id)}>
                     {copy.delete}
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </CardHeader>
 
-              <div className="flex flex-wrap gap-2">
+              <Separator />
+
+              <CardContent className="flex flex-wrap gap-2 pt-4">
                 {ALL_FEATURES.map((feature) => {
                   const isBound = client.bindings.includes(feature);
                   return (
-                    <button
+                    <Button
                       key={feature}
-                      className={isBound ? "rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs text-primary transition-colors" : "rounded-full border border-border/60 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"}
+                      type="button"
+                      variant={isBound ? "secondary" : "outline"}
+                      size="xs"
                       onClick={() => handleToggleBinding(client.id, feature, isBound)}
                     >
                       {featureLabels[feature] ?? feature}
-                    </button>
+                    </Button>
                   );
                 })}
-              </div>
+              </CardContent>
             </>
           )}
-        </div>
+        </Card>
         );
       })}
     </div>

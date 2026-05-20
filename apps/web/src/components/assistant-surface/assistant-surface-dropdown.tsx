@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Command, Sparkles } from "lucide-react";
+import { Activity, Sparkles } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { useI18n } from "@chrona/i18n/react";
 import {
@@ -48,7 +48,7 @@ export function AssistantSurfaceDropdown() {
         </div>
       </div>
 
-      <div className="grid max-h-[min(72dvh,640px)] gap-3 overflow-y-auto bg-slate-50/35 p-3 sm:p-4 lg:grid-cols-[280px_minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
+      <div className="grid max-h-[min(72dvh,640px)] gap-3 overflow-y-auto bg-slate-50/35 p-3 sm:p-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
         <section className="space-y-3 rounded-[1.2rem] border border-border/70 bg-white/82 p-3 shadow-sm backdrop-blur" aria-label={t("components.assistantSurface.contextDeck")}>
           <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -75,37 +75,6 @@ export function AssistantSurfaceDropdown() {
               {surface.unavailableReason ?? t("components.assistantSurface.unavailable")}
             </p>
           ) : null}
-        </section>
-
-        <section className="rounded-[1.2rem] border border-border/70 bg-white/88 p-3 shadow-sm backdrop-blur" aria-label={t("components.assistantSurface.actionBoard")}>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              <Command className="size-3.5" />
-              {t("components.assistantSurface.actionBoard")}
-            </h3>
-            <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">{surface.quickActions.length}</span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {surface.quickActions.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-border px-3 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">{t("components.assistantSurface.noActions")}</p>
-            ) : surface.quickActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                disabled={!action.enabled}
-                onClick={() => assistant.runQuickAction(action)}
-                className="group flex min-h-[104px] flex-col justify-between rounded-2xl border border-border/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(248,250,252,0.86))] px-3 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-soft/40 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-muted-foreground disabled:shadow-none disabled:hover:translate-y-0"
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-semibold text-foreground">{action.label}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                    {action.previewRequired ? t("components.assistantSurface.previewRequired") : t("components.assistantSurface.infoOnly")}
-                  </span>
-                </span>
-                <span className="mt-3 block text-xs leading-relaxed text-muted-foreground">{action.enabled ? action.description : action.disabledReason}</span>
-              </button>
-            ))}
-          </div>
         </section>
 
         <aside className="flex min-h-[260px] flex-col rounded-[1.2rem] border border-border/70 bg-slate-950 p-3 text-white shadow-sm" aria-label={t("components.assistantSurface.commandDock")}>

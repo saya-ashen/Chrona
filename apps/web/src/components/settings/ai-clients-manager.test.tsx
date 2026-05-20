@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiClientsManager } from "@/components/settings/ai-clients-manager";
 
@@ -104,6 +105,7 @@ describe("AiClientsManager", () => {
   });
 
   it("creates a Hermes client with Hermes-specific config", async () => {
+    const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ clients: [] }),
@@ -118,9 +120,8 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
       target: { value: "Local Hermes" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
-      target: { value: "hermes" },
-    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Hermes"));
     fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
       target: { value: "http://localhost:8642" },
     });
@@ -163,6 +164,7 @@ describe("AiClientsManager", () => {
   });
 
   it("updates an existing OpenClaw client to Hermes", async () => {
+    const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -186,9 +188,8 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("Runtime Client");
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "Type" }), {
-      target: { value: "hermes" },
-    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Hermes"));
     fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
       target: { value: "http://localhost:8642" },
     });

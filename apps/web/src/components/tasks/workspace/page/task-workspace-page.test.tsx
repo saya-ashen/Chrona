@@ -13,6 +13,14 @@ const mocks = vi.hoisted(() => ({
   graphPlan: null as TaskPlanGraphPlan | null,
   planGenerationStatus: "idle" as TaskPlanGenerationStatus,
   canAcceptPlan: false,
+  setPageContext: vi.fn(),
+}));
+
+vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
+  useAssistantSurface: () => ({
+    registerHandlers: vi.fn(() => vi.fn()),
+    setPageContext: mocks.setPageContext,
+  }),
 }));
 
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", () => ({
@@ -171,6 +179,7 @@ afterEach(() => {
   mocks.graphPlan = null;
   mocks.planGenerationStatus = "idle";
   mocks.canAcceptPlan = false;
+  mocks.setPageContext.mockClear();
 });
 
 function taskData(): TaskPageData {
@@ -346,6 +355,26 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("latest-run:WaitingForApproval")).toBeInTheDocument();
     expect(screen.getByText("approvals:1")).toBeInTheDocument();
     expect(screen.getByText("artifacts:1")).toBeInTheDocument();
+  });
+
+  it("passes latest persisted activity to the assistant surface", () => {
+    const data = taskData();
+    data.activityTimeline = [{
+      id: "provider-run-completed",
+      title: "Hermes reported blocked",
+      description: "Node 7 blocked on weather API timeout",
+      tone: "warning",
+      timestamp: "2026-05-20T14:43:08.000Z",
+    }];
+
+    render(<TaskWorkspacePage data={data} />);
+
+    expect(mocks.setPageContext).toHaveBeenCalled();
+    const context = mocks.setPageContext.mock.calls.at(-1)?.[0];
+    expect(context.highlights).toContainEqual(expect.objectContaining({
+      label: "Activity",
+      value: "Node 7 blocked on weather API timeout",
+    }));
   });
 
   it("passes navigation and member notification context through the workspace page", () => {
