@@ -1,7 +1,36 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { TaskWorkspacePlanSection } from "./task-workspace-plan-section";
+
+vi.mock("elkjs/lib/elk.bundled.js", () => ({
+  default: class ELKMock {
+    layout(graph: unknown) {
+      return Promise.resolve(graph);
+    }
+  },
+}));
+
+vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
+  TaskPlanGraphPanel: ({ plan, onSelectedNodeChange }: {
+    plan: { nodes: Array<{ id: string; title: string }> };
+    onSelectedNodeChange?: (node: { id: string; title: string } | null, nodes: Array<{ id: string; title: string }>) => void;
+  }) => (
+    <div data-testid="task-plan-graph-panel">
+      {plan.nodes.map((node) => (
+        <button
+          key={node.id}
+          type="button"
+          className="react-flow__node"
+          data-testid={`task-plan-node-${node.id}`}
+          onClick={() => onSelectedNodeChange?.(node, plan.nodes)}
+        >
+          {node.title}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import {
   createTaskWorkspaceFixtureGraph,
@@ -9,11 +38,15 @@ import {
   createTaskWorkspaceFixturePageData,
 } from "../test-support/task-workspace-test-fixtures";
 
+let TaskWorkspacePlanSection: typeof import("./task-workspace-plan-section").TaskWorkspacePlanSection;
+
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {} }),
 }));
 
-beforeAll(() => {
+beforeAll(async () => {
+  ({ TaskWorkspacePlanSection } = await import("./task-workspace-plan-section"));
+
   class ResizeObserverMock {
     observe(target?: Element) {
       if (target) {
@@ -164,6 +197,68 @@ describe("TaskWorkspacePlanSection", () => {
         action: "resume_with_input",
         nodeId: "checkpoint",
         inputFields: { city: "Shanghai" },
+      });
+    });
+  });
+
+  it("shows blocked current node action with blocker reason before start plan", async () => {
+    const blocker = "已创建脚本文件，但当前运行环境访问 wttr.in 连续超时。";
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Node resumed" });
+    const node = createTaskWorkspaceFixtureNode({
+      id: "weather-script",
+      title: "创建一个获取天气的脚本",
+      status: "blocked",
+      interactionType: "retry",
+      nextAction: blocker,
+      availableActions: [
+        { id: "weather-script:resolve", label: "解决阻塞", kind: "resolve", emphasis: "primary" },
+        { id: "weather-script:retry", label: "重试节点", kind: "retry", emphasis: "warning" },
+      ],
+    });
+    const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
+
+    render(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "创建一个获取天气的脚本",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        requestGenerationKey={0}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+
+    expect(within(commandCenter).getByText("Current node action")).toBeInTheDocument();
+    expect(within(commandCenter).getAllByText(blocker).length).toBeGreaterThan(0);
+    expect(within(commandCenter).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Send 解决阻塞" }));
+
+    await waitFor(() => {
+      expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+        action: "resume_after_unblock",
+        nodeId: "weather-script",
+        note: blocker,
       });
     });
   });

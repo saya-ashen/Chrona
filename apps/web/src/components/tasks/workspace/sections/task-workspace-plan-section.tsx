@@ -137,6 +137,7 @@ export function TaskWorkspacePlanSection({
   const isGeneratingPlan = planGenerationStatus === "generating";
   const currentOperationNode = consoleView.nodeDetail.currentNode;
   const hasCurrentOperationControls = hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason;
+  const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const primaryAction: CommandCenterPrimaryAction = !plan
     ? {
         label: isGeneratingPlan ? "Generating..." : "Generate plan",
@@ -149,15 +150,7 @@ export function TaskWorkspacePlanSection({
         isLoading: isGeneratingPlan,
         onClick: onGeneratePlan,
       }
-    : !hasStartedGraphExecution(graphPlan)
-      ? {
-          label: "Start plan",
-          description: "Run the accepted plan and move into the first executable step.",
-          statusLabel: plan.status,
-          tone: "success",
-          onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
-        }
-      : hasCurrentOperationControls && currentOperationNode
+    : shouldShowCurrentOperation && currentOperationNode
         ? {
             label: "Current node action",
             description: currentOperationNode.nextAction ?? currentOperationNode.summary ?? "Complete the current node action to continue.",
@@ -172,6 +165,14 @@ export function TaskWorkspacePlanSection({
               />
             ),
           }
+        : !hasStartedGraphExecution(graphPlan)
+          ? {
+              label: "Start plan",
+              description: "Run the accepted plan and move into the first executable step.",
+              statusLabel: plan.status,
+              tone: "success",
+              onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
+            }
         : {
             label: "No current operation",
             description: "This task has no node input or execution action available right now.",

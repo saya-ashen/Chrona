@@ -175,6 +175,10 @@ export type {
   PlanRunStatus,
   NodeRuntimeState,
   NodeRuntimeStatus,
+  RuntimeProgressStatus,
+  ExecutionSessionLifecycleStatus,
+  TaskExecutionAggregateStatus,
+  WebPlanNodeStatus,
   NodeExecutionAttempt,
   CheckpointResponse,
   ArtifactRef,
@@ -353,3 +357,13 @@ export {
   taskDispatchDecisionSchema,
   taskPlanPatchSchema,
 } from "./ai-dispatch-types";
+
+export {
+  runtimeProgressStatusForWaitKind,
+  runtimeProgressStatusForNodes,
+  planRunStatusForRuntimeProgress,
+  planGraphStatusForRuntimeProgress,
+  executionSessionStatusForRuntimeProgress,
+  taskStatusForRuntimeProgress,
+  webPlanNodeStatusForRuntimeStatus,
+} from "./ai-plan-runtime";

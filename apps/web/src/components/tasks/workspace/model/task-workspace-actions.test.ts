@@ -55,6 +55,17 @@ describe("task workspace actions", () => {
     expect(buildDefaultWorkspaceActionFields(fields)).toEqual({ comment: "Looks good" });
   });
 
+  it("prefers resolve actions before retry actions for blocked nodes", () => {
+    expect(pickDefaultWorkspaceAction(node({
+      status: "blocked",
+      interactionType: "retry",
+      availableActions: [
+        { id: "retry", label: "Retry node", kind: "retry", emphasis: "warning" },
+        { id: "resolve", label: "Resolve blocker", kind: "resolve", emphasis: "primary" },
+      ],
+    }))).toBe("resolve");
+  });
+
   it("reports required fields before dispatch", () => {
     const fields = [{ key: "decision", label: "Decision", value: "", required: true }];
 
@@ -85,6 +96,46 @@ describe("task workspace actions", () => {
       fields: [{ key: "summary", label: "Summary", value: "" }],
       values: { summary: "Completed outside Chrona" },
     })).toMatchObject({ action: "complete_manual_node", nodeId: "node-1", summary: "Summary: Completed outside Chrona" });
+  });
+
+  it("maps resolve actions to resume_after_unblock without changing retry semantics", () => {
+    expect(buildWorkspaceActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network access recovered" }),
+      selectedAction: { id: "resolve", label: "Resolve blocker", kind: "resolve" },
+      fields: [],
+      values: {},
+    })).toEqual({
+      action: "resume_after_unblock",
+      nodeId: "node-1",
+      note: "Network access recovered",
+    });
+
+    expect(buildWorkspaceActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network timeout" }),
+      selectedAction: { id: "retry", label: "Retry node", kind: "retry" },
+      fields: [],
+      values: {},
+    })).toEqual({
+      action: "retry_node",
+      nodeId: "node-1",
+      prompt: "Network timeout",
+    });
+  });
+
+  it("maps resolve actions with form fields to resume_with_input", () => {
+    expect(buildWorkspaceActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Provide credentials" }),
+      selectedAction: { id: "resolve", label: "Resolve blocker", kind: "resolve" },
+      fields: [
+        { key: "apiKey", label: "API key", value: "", required: true },
+        { key: "notes", label: "Notes", value: "" },
+      ],
+      values: { apiKey: "secret", notes: "Use production account" },
+    })).toEqual({
+      action: "resume_with_input",
+      nodeId: "node-1",
+      inputFields: { apiKey: "secret", notes: "Use production account" },
+    });
   });
 
   it("maps field-only input nodes to resume_with_input", () => {

@@ -34,6 +34,20 @@ export interface CheckpointConfig {
   }>;
 }
 
+export interface NodeActionFormField {
+  name: string;
+  label: string;
+  type?: "text" | "textarea" | "select";
+  required?: boolean;
+  options?: string[];
+}
+
+export interface NodeActionForm {
+  instructions: string;
+  submitLabel?: string;
+  inputFields: NodeActionFormField[];
+}
+
 export interface ConditionConfig {
   condition: string;
   evaluationBy: string;
@@ -282,6 +296,195 @@ export type NodeRuntimeStatus =
   | "invalidated"
   | "skipped";
 
+export type RuntimeProgressStatus =
+  | "running"
+  | "waiting_for_user"
+  | "waiting_for_approval"
+  | "blocked"
+  | "completed"
+  | "cancelled";
+
+export type ExecutionSessionLifecycleStatus =
+  | "Active"
+  | "Paused"
+  | "Completed"
+  | "Abandoned";
+
+export type TaskExecutionAggregateStatus =
+  | "Running"
+  | "WaitingForInput"
+  | "WaitingForApproval"
+  | "Blocked"
+  | "Completed"
+  | "Cancelled";
+
+export type WebPlanNodeStatus =
+  | "idle"
+  | "ready"
+  | "active"
+  | "waiting"
+  | "waiting_for_user"
+  | "waiting_for_approval"
+  | "blocked"
+  | "failed"
+  | "degraded"
+  | "done"
+  | "skipped"
+  | "cancelled"
+  | "invalidated";
+
+export function webPlanNodeStatusForRuntimeStatus(
+  status: NodeRuntimeStatus | null | undefined,
+): WebPlanNodeStatus {
+  switch (status) {
+    case "running":
+      return "active";
+    case "waiting_for_approval":
+      return "waiting_for_approval";
+    case "waiting_for_user":
+      return "waiting_for_user";
+    case "waiting":
+      return "waiting";
+    case "degraded":
+      return "degraded";
+    case "blocked":
+      return "blocked";
+    case "failed":
+      return "failed";
+    case "completed":
+      return "done";
+    case "cancelled":
+      return "cancelled";
+    case "skipped":
+      return "skipped";
+    case "invalidated":
+      return "invalidated";
+    case "ready":
+      return "ready";
+    case "pending":
+    default:
+      return "idle";
+  }
+}
+
+export function runtimeProgressStatusForWaitKind(
+  waitKind: WaitKind | undefined,
+): Extract<RuntimeProgressStatus, "waiting_for_user" | "waiting_for_approval" | "blocked"> {
+  switch (waitKind) {
+    case "user_input":
+      return "waiting_for_user";
+    case "approval":
+    case "review":
+      return "waiting_for_approval";
+    default:
+      return "blocked";
+  }
+}
+
+export function runtimeProgressStatusForNodes(input: {
+  readyNodeIds: readonly string[];
+  runningNodeIds: readonly string[];
+  nodes: readonly { status: NodeRuntimeStatus; reachable?: boolean; id?: string }[];
+  blockedNodeIds: readonly string[];
+  failedNodeIds: readonly string[];
+  completedNodeIds: readonly string[];
+}): RuntimeProgressStatus {
+  if (input.readyNodeIds.length > 0 || input.runningNodeIds.length > 0) {
+    return "running";
+  }
+  if (input.nodes.some((node) => node.status === "waiting_for_user")) {
+    return "waiting_for_user";
+  }
+  if (input.nodes.some((node) => node.status === "waiting_for_approval")) {
+    return "waiting_for_approval";
+  }
+  if (input.blockedNodeIds.length > 0 || input.failedNodeIds.length > 0) {
+    return "blocked";
+  }
+
+  const reachableNodes = input.nodes.filter((node) => node.reachable !== false);
+  if (
+    reachableNodes.length > 0 &&
+    reachableNodes.every((node) =>
+      node.id ? input.completedNodeIds.includes(node.id) : node.status === "completed",
+    )
+  ) {
+    return "completed";
+  }
+
+  return "blocked";
+}
+
+export function planRunStatusForRuntimeProgress(
+  status: RuntimeProgressStatus,
+): PlanRunStatus {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "running":
+      return "running";
+    case "cancelled":
+      return "cancelled";
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "blocked":
+      return "paused";
+  }
+}
+
+export function planGraphStatusForRuntimeProgress(
+  status: RuntimeProgressStatus,
+): PlanGraphStatus {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "blocked":
+      return "paused";
+    case "running":
+      return "active";
+  }
+}
+
+export function executionSessionStatusForRuntimeProgress(
+  status: RuntimeProgressStatus,
+): ExecutionSessionLifecycleStatus {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Abandoned";
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "blocked":
+      return "Paused";
+    case "running":
+      return "Active";
+  }
+}
+
+export function taskStatusForRuntimeProgress(
+  status: RuntimeProgressStatus,
+): TaskExecutionAggregateStatus {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "waiting_for_user":
+      return "WaitingForInput";
+    case "waiting_for_approval":
+      return "WaitingForApproval";
+    case "blocked":
+      return "Blocked";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+  }
+}
+
 export interface NodeRuntimeState {
   nodeId: string;
   status: NodeRuntimeStatus;
@@ -497,6 +700,7 @@ export interface NodeResult {
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
   errorDetails?: unknown;
+  actionForm?: NodeActionForm;
   waitKind?: WaitKind;
   review?: {
     required: boolean;
@@ -589,7 +793,13 @@ export interface NodeRuntimeInput {
       branchRef: "branchOptions[].ref";
       summary: "string";
     };
-    blockSchema?: { reason: "string" };
+    blockSchema?: {
+      reason: "string";
+      actionForm: {
+        instructions: "string";
+        inputFields: Array<{ name: "string"; label: "string" }>;
+      };
+    };
     failSchema?: { error: "string" };
     waitCompleteSchema?: { summary: "string" };
   };
@@ -766,6 +976,7 @@ export type ExecutionActionInput =
       sessionId?: string;
       nodeId?: string;
       reason: string;
+      actionForm?: NodeActionForm;
       idempotencyKey?: string;
     }
   | {

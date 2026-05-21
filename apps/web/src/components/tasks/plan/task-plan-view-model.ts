@@ -1,3 +1,4 @@
+import { webPlanNodeStatusForRuntimeStatus } from "@chrona/contracts/ai";
 import type {
   CheckpointConfig,
   CompiledPlan,
@@ -40,6 +41,8 @@ type PlanMetadata = {
   completionCriteria?: string[];
 };
 
+type NodeResultActionForm = NonNullable<EffectivePlanNode["result"]>["actionForm"];
+
 function normalizePlanNodeKind(rawType: unknown): PlanNodeKind {
   switch (rawType) {
     case "task":
@@ -57,34 +60,7 @@ function normalizePlanNodeKind(rawType: unknown): PlanNodeKind {
 }
 
 function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined): PlanNodeStatus {
-  switch (status) {
-    case "running":
-      return "active";
-    case "waiting_for_approval":
-      return "waiting_for_approval";
-    case "waiting_for_user":
-      return "waiting_for_user";
-    case "degraded":
-      return "degraded";
-    case "blocked":
-      return "blocked";
-    case "failed":
-      return "failed";
-    case "completed":
-      return "done";
-    case "cancelled":
-      return "cancelled";
-    case "skipped":
-      return "skipped";
-    case "invalidated":
-      return "invalidated";
-    case "ready":
-      return "ready";
-    case "pending":
-      return "idle";
-    default:
-      return "idle";
-  }
+  return webPlanNodeStatusForRuntimeStatus(status);
 }
 
 function isManualActionBlocked(node: {
@@ -95,6 +71,19 @@ function isManualActionBlocked(node: {
 }) {
   if (node.status !== "waiting") return false;
   return Boolean(node.blockedReason?.trim() || node.lastError?.trim() || node.result?.waitKind === "manual_action");
+}
+
+function resolveBlockedNodeAction(node: {
+  nextAction?: string | null;
+  blockedReason?: string | null;
+  lastError?: string | null;
+  result?: EffectivePlanNode["result"] | null;
+}) {
+  return node.nextAction?.trim()
+    || node.blockedReason?.trim()
+    || node.lastError?.trim()
+    || node.result?.error?.trim()
+    || "Resolve the blocker before continuing execution.";
 }
 
 function inferIntent(kind: PlanNodeKind, metadata: PlanMetadata, status: PlanNodeStatus): PlanNodeIntent {
@@ -272,8 +261,23 @@ function buildInteractiveFields(node: {
   kind: PlanNodeKind;
   metadata: PlanMetadata;
   requiredInfo: string[];
+  actionForm?: NodeResultActionForm | null;
 }): PlanNodeField[] {
   const fields: PlanNodeField[] = [];
+
+  if (node.actionForm?.inputFields?.length) {
+    for (const [index, input] of node.actionForm.inputFields.entries()) {
+      fields.push({
+        key: input.name || `blocker:${index}`,
+        label: input.label || `输入 ${index + 1}`,
+        value: "",
+        control: input.type === "textarea" ? "textarea" : input.options?.length ? "select" : "text",
+        required: input.required ?? false,
+        options: input.options,
+      });
+    }
+    return fields;
+  }
 
   for (const item of node.requiredInfo) {
     fields.push({
@@ -336,6 +340,12 @@ function buildAvailableActions(node: {
   const actions: PlanNodeAction[] = [];
 
   if (node.interactionType === "retry") {
+    actions.push({
+      id: `${node.id}:resolve`,
+      label: "解决阻塞",
+      kind: "resolve",
+      emphasis: "primary",
+    });
     actions.push({
       id: `${node.id}:retry`,
       label: "重试节点",
@@ -454,8 +464,10 @@ function toPlanNode(node: {
   });
   const status = isManualActionBlocked(node) ? "blocked" : normalizeStatus(node.status);
   const objective = node.description ?? node.title;
+  const actionForm = node.result?.actionForm ?? null;
+  const nextAction = status === "blocked" ? (actionForm?.instructions ?? resolveBlockedNodeAction(node)) : (node.nextAction ?? null);
   const requiredInfo = node.requiredInfo ?? [];
-  const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo });
+  const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo, actionForm });
   const intent = inferIntent(kind, metadata, status);
   const interactionType = inferInteractionType({
     kind,
@@ -463,7 +475,7 @@ function toPlanNode(node: {
     status,
     hasInteractiveFields: interactiveFields.length > 0,
     hasOptions: (metadata.options?.length ?? 0) > 0,
-    nextAction: node.nextAction,
+    nextAction,
   });
 
   return {
@@ -488,7 +500,7 @@ function toPlanNode(node: {
     reachable: node.reachable ?? true,
     dependencies: node.dependencies ?? [],
     requiredInfo,
-    nextAction: node.nextAction ?? null,
+    nextAction,
     completionSummary: node.result?.outputSummary ?? null,
     result: node.result ?? null,
     inputFields: node.result?.inputFields,

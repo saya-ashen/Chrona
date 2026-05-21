@@ -438,7 +438,13 @@ describe("agent tool operations service", () => {
           sessionId: "session-1",
           actorType: "agent",
           idempotencyKey: "node-block-1",
-          payload: { reason: "Waiting on dependency" },
+          payload: {
+            reason: "Waiting on dependency",
+            actionForm: {
+              instructions: "Provide the dependency status update.",
+              inputFields: [{ name: "dependencyStatus", label: "Dependency status", type: "textarea", required: true }],
+            },
+          },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -477,6 +483,10 @@ describe("agent tool operations service", () => {
         action: "block_current_node",
         sessionId: "session-1",
         reason: "Waiting on dependency",
+        actionForm: {
+          instructions: "Provide the dependency status update.",
+          inputFields: [{ name: "dependencyStatus", label: "Dependency status", type: "textarea", required: true }],
+        },
       },
       {
         action: "fail_current_node",

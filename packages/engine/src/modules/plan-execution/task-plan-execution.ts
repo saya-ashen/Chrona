@@ -15,7 +15,15 @@ import { getAcceptedCompiledPlan } from "./compiled-plan-store";
 import {
   resolveEffectivePlanGraph,
   createGraphRuntime,
+  runtimeProgressStatusForNodes,
+  runtimeProgressStatusForWaitKind,
 } from "@chrona/graph-runtime";
+import {
+  executionSessionStatusForRuntimeProgress,
+  planGraphStatusForRuntimeProgress,
+  planRunStatusForRuntimeProgress,
+  taskStatusForRuntimeProgress,
+} from "@chrona/contracts";
 import type {
   GraphDispatchOutcome,
   GraphExecutionEvent,
@@ -28,6 +36,7 @@ import type {
   ExecutionActionInput,
   ExecutionContextSnapshot,
   NodeAttempt,
+  NodeActionForm,
   NodeResult,
   PlanGraph,
   PlanExecutionResult,
@@ -61,6 +70,7 @@ export type PlanExecutionRuntimeEvent = {
 };
 
 type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
+type ExecutionTaskStatus = Exclude<ReturnType<typeof taskStatusForRuntimeProgress>, "Cancelled">;
 
 const DEFAULT_MAX_STEPS = 10;
 const logger = createLogger("engine.plan-execution");
@@ -70,6 +80,21 @@ const ACTIVE_RUN_STATUSES = [
   RunStatus.WaitingForApproval,
   RunStatus.WaitingForInput,
 ] as const;
+
+const TASK_STATUS_BY_RUNTIME_PROGRESS = {
+  Running: TaskStatus.Running,
+  WaitingForInput: TaskStatus.WaitingForInput,
+  WaitingForApproval: TaskStatus.WaitingForApproval,
+  Blocked: TaskStatus.Blocked,
+  Completed: TaskStatus.Completed,
+} satisfies Record<ExecutionTaskStatus, TaskStatus>;
+
+function taskStatusForExecutionStatus(status: PlanExecutionStatus): TaskStatus {
+  if (status === "started" || status === "no_plan") return TaskStatus.Running;
+  const taskStatus = taskStatusForRuntimeProgress(status);
+  if (taskStatus === "Cancelled") return TaskStatus.Cancelled;
+  return TASK_STATUS_BY_RUNTIME_PROGRESS[taskStatus];
+}
 
 function createNodeExecutors(input: {
   aiRuntimeInvoker: AiRuntimeInvoker;
@@ -114,70 +139,23 @@ export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
 function mapWaitKindToExecutionStatus(
   waitKind: WaitKind | undefined,
 ): PlanExecutionStatus {
-  switch (waitKind) {
-    case "user_input":
-      return "waiting_for_user";
-    case "approval":
-    case "review":
-      return "waiting_for_approval";
-    default:
-      return "blocked";
-  }
+  return runtimeProgressStatusForWaitKind(waitKind);
 }
 
 function mapTerminalReasonToStatus(
   effective: EffectivePlanGraph,
 ): PlanExecutionStatus {
-  if (effective.readyNodeIds.length > 0) return "running";
-  if (effective.runningNodeIds.length > 0) return "running";
-  if (effective.nodes.some((node) => node.status === "waiting_for_user")) {
-    return "waiting_for_user";
-  }
-  if (effective.nodes.some((node) => node.status === "waiting_for_approval")) {
-    return "waiting_for_approval";
-  }
-  if (
-    effective.blockedNodeIds.length > 0 ||
-    effective.failedNodeIds.length > 0
-  ) {
-    return "blocked";
-  }
-  const reachableNodeIds = effective.nodes.filter((node) => node.reachable).map((node) => node.id);
-  if (reachableNodeIds.every((nodeId) => effective.completedNodeIds.includes(nodeId)))
-    return "completed";
-  return "blocked";
+  return runtimeProgressStatusForNodes(effective);
 }
 
 function planRunStatusForExecutionStatus(status: PlanExecutionStatus): PlanRun["status"] {
-  switch (status) {
-    case "completed":
-      return "completed";
-    case "running":
-      return "running";
-    case "cancelled":
-      return "cancelled";
-    case "waiting_for_user":
-    case "waiting_for_approval":
-    case "blocked":
-      return "paused";
-    default:
-      return "pending";
-  }
+  if (status === "started" || status === "no_plan") return "pending";
+  return planRunStatusForRuntimeProgress(status);
 }
 
 function graphStatusForExecutionStatus(status: PlanExecutionStatus): PlanGraph["status"] {
-  switch (status) {
-    case "completed":
-      return "completed";
-    case "cancelled":
-      return "cancelled";
-    case "waiting_for_user":
-    case "waiting_for_approval":
-    case "blocked":
-      return "paused";
-    default:
-      return "active";
-  }
+  if (status === "started" || status === "no_plan") return "active";
+  return planGraphStatusForRuntimeProgress(status);
 }
 
 async function getRuntimeName(taskId: string): Promise<string> {
@@ -642,12 +620,8 @@ async function pauseExecution(input: {
     completedNodeIds: completedExecutionNodeIds(input.effective),
   });
 
-  const taskStatus =
-    input.waitKind === "user_input"
-      ? TaskStatus.WaitingForInput
-      : input.waitKind === "approval" || input.waitKind === "review"
-        ? TaskStatus.WaitingForApproval
-        : TaskStatus.Blocked;
+  const executionStatus = mapWaitKindToExecutionStatus(input.waitKind);
+  const taskStatus = taskStatusForExecutionStatus(executionStatus);
 
   await db.task.update({
     where: { id: input.taskId },
@@ -673,7 +647,7 @@ async function pauseExecution(input: {
     taskId: input.taskId,
     planId: input.planId,
     mainSessionId: input.mainSessionId,
-    status: mapWaitKindToExecutionStatus(input.waitKind),
+    status: executionStatus,
     effective: input.effective,
     currentNodeId: input.currentNodeId,
     executedNodeIds: input.executedNodeIds,
@@ -729,7 +703,9 @@ async function completeExecution(input: {
   }
   await setExecutionSessionState({
     sessionId: input.session.id,
-    status: status === "completed" ? "Completed" : "Paused",
+    status: executionSessionStatusForRuntimeProgress(
+      status === "completed" ? "completed" : "blocked",
+    ),
     currentNodeId: null,
     pauseReason:
       status === "waiting_for_user"
@@ -749,14 +725,7 @@ async function completeExecution(input: {
   await db.task.update({
     where: { id: input.taskId },
     data: {
-      status:
-        status === "completed"
-          ? TaskStatus.Completed
-          : status === "waiting_for_user"
-            ? TaskStatus.WaitingForInput
-            : status === "waiting_for_approval"
-              ? TaskStatus.WaitingForApproval
-              : TaskStatus.Blocked,
+      status: taskStatusForExecutionStatus(status),
       completedAt: status === "completed" ? new Date() : undefined,
       blockReason:
         status === "blocked"
@@ -832,7 +801,7 @@ type AdvanceRuntimeCommand =
       prompt?: string;
       continueExecution?: boolean;
     }
-  | { type: "block_current_node"; nodeId?: string; reason: string }
+  | { type: "block_current_node"; nodeId?: string; reason: string; actionForm?: NodeActionForm }
   | { type: "fail_current_node"; nodeId?: string; error: string }
   | {
       type: "resume_with_approval";
@@ -1336,6 +1305,7 @@ async function advancePlanExecution(input: {
                     nodeId: commandNode!.id,
                     status: "blocked" as const,
                     reason: command.reason,
+                    actionForm: command.actionForm,
                   },
                 }
               : command.type === "fail_current_node"
@@ -1888,6 +1858,7 @@ async function dispatchExecutionAction(input: {
           type: "block_current_node",
           nodeId: input.action.nodeId,
           reason: input.action.reason,
+          actionForm: input.action.actionForm,
         },
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,

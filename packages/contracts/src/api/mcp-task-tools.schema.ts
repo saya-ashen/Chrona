@@ -115,9 +115,21 @@ export const conditionSelectPayloadSchema = z.object({
   outputs: z.array(nodeResultOutputSchema).optional(),
   evidence: nodeEvidencePayloadSchema,
 }).strict();
+const blockActionFormFieldSchema = z.object({
+  name: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(["text", "textarea", "select"]).optional(),
+  required: z.boolean().optional(),
+  options: z.array(z.string().min(1)).optional(),
+}).strict();
+const blockActionFormSchema = z.object({
+  instructions: z.string().min(1),
+  submitLabel: z.string().min(1).optional(),
+  inputFields: z.array(blockActionFormFieldSchema).min(1),
+}).strict();
 export const blockPayloadSchema = z.object({
   reason: z.string().min(1),
-  requiredInput: z.string().min(1).optional(),
+  actionForm: blockActionFormSchema,
   retryable: z.boolean().optional(),
   evidence: nodeEvidencePayloadSchema,
 }).strict();

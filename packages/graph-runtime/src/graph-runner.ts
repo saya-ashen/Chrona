@@ -12,6 +12,10 @@ import {
   planDownstreamInvalidation,
 } from "./invalidation";
 import { validatePlanGraph } from "./validation";
+import {
+  runtimeProgressStatusForNodes,
+  runtimeProgressStatusForWaitKind,
+} from "./types/runtime";
 import type {
   EffectivePlanGraph,
   EffectivePlanNode,
@@ -73,7 +77,7 @@ export type GraphNodeExecutionResult =
       reason: string;
       evidence?: GraphNodeExecutionEvidence;
     }
-  | { status: "blocked"; reason: string; evidence?: GraphNodeExecutionEvidence }
+  | { status: "blocked"; reason: string; evidence?: GraphNodeExecutionEvidence; actionForm?: NodeResult["actionForm"] }
   | {
       status: "replan_required";
       reason: string;
@@ -106,6 +110,7 @@ export type GraphExternalSyncResult =
       nodeId: string;
       status: "blocked";
       reason: string;
+      actionForm?: NodeResult["actionForm"];
       evidence?: GraphNodeExecutionEvidence;
     }
   | {
@@ -328,44 +333,13 @@ const DEFAULT_MAX_STEPS = 10;
 export function mapWaitKindToGraphStatus(
   waitKind: WaitKind | undefined,
 ): GraphExecutionStatus {
-  switch (waitKind) {
-    case "user_input":
-      return "waiting_for_user";
-    case "approval":
-    case "review":
-      return "waiting_for_approval";
-    default:
-      return "blocked";
-  }
+  return runtimeProgressStatusForWaitKind(waitKind);
 }
 
 export function mapTerminalReasonToGraphStatus(
   effective: EffectivePlanGraph,
 ): GraphExecutionStatus {
-  if (effective.readyNodeIds.length > 0) return "running";
-  if (effective.runningNodeIds.length > 0) return "running";
-  if (effective.nodes.some((node) => node.status === "waiting_for_user")) {
-    return "waiting_for_user";
-  }
-  if (effective.nodes.some((node) => node.status === "waiting_for_approval")) {
-    return "waiting_for_approval";
-  }
-  if (
-    effective.blockedNodeIds.length > 0 ||
-    effective.failedNodeIds.length > 0
-  ) {
-    return "blocked";
-  }
-  const reachableNodeIds = effective.nodes
-    .filter((node) => node.reachable)
-    .map((node) => node.id);
-  if (
-    reachableNodeIds.every((nodeId) =>
-      effective.completedNodeIds.includes(nodeId),
-    )
-  )
-    return "completed";
-  return "blocked";
+  return runtimeProgressStatusForNodes(effective);
 }
 
 function appendCapabilityUnavailableResult(input: {
@@ -454,6 +428,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "manual_action",
           error: input.result.reason,
+          actionForm: input.result.actionForm,
           evidence,
         },
       });
@@ -1074,6 +1049,7 @@ function syncExternalResultState(input: {
         status: "current",
         waitKind: "manual_action",
         error: input.externalResult.reason,
+        actionForm: input.externalResult.actionForm,
         evidence,
       };
       attemptStatus = "failed";

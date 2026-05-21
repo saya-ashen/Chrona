@@ -392,7 +392,16 @@ describe("task-plan-view-model", () => {
             reachable: true,
             blockedReason: blocker,
             lastError: blocker,
-            result: { status: "current", error: blocker, waitKind: "manual_action" },
+            result: {
+              status: "current",
+              error: blocker,
+              waitKind: "manual_action",
+              actionForm: {
+                instructions: "提供天气 API 密钥后继续执行。",
+                submitLabel: "提交密钥",
+                inputFields: [{ name: "apiKey", label: "天气 API 密钥", type: "text", required: true }],
+              },
+            },
           },
         ],
         edges: [],
@@ -424,6 +433,14 @@ describe("task-plan-view-model", () => {
       blocked: true,
       actionable: true,
       interactionType: "retry",
+      nextAction: "提供天气 API 密钥后继续执行。",
+      interactiveFields: [
+        { key: "apiKey", label: "天气 API 密钥", value: "", control: "text", required: true, options: undefined },
+      ],
+      availableActions: [
+        { id: "weather-script:resolve", label: "解决阻塞", kind: "resolve", emphasis: "primary" },
+        { id: "weather-script:retry", label: "重试节点", kind: "retry", emphasis: "warning" },
+      ],
       result: { error: blocker, waitKind: "manual_action" },
     });
     expect(graphPlan?.analytics.attentionNodeIds).toEqual(["weather-script"]);

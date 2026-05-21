@@ -497,6 +497,10 @@ describe("plan-runner task executor approval flows", () => {
         action: {
           action: "block_current_node",
           reason: "Hermes blocked externally",
+          actionForm: {
+            instructions: "Provide missing Hermes credentials.",
+            inputFields: [{ name: "hermesToken", label: "Hermes token", type: "text", required: true }],
+          },
         },
       });
       expect(externalResult.status).toBe("blocked");
@@ -528,6 +532,10 @@ describe("plan-runner task executor approval flows", () => {
       status: "current",
       error: "Hermes blocked externally",
       waitKind: "manual_action",
+      actionForm: {
+        instructions: "Provide missing Hermes credentials.",
+        inputFields: [{ name: "hermesToken", label: "Hermes token", type: "text", required: true }],
+      },
     });
     expect(persisted?.attempts).toHaveLength(1);
     expect(persisted?.attempts[0]).toMatchObject({

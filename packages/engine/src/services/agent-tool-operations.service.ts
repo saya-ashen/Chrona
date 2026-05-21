@@ -566,16 +566,17 @@ async function executeValidatedTool(
       });
     }
     case "chrona.node.block": {
-      const body = payload as { reason: string; requiredInput?: string };
-      const reason = body.requiredInput
-        ? `${body.reason}\nRequired input: ${body.requiredInput}`
-        : body.reason;
+      const body = payload as {
+        reason: string;
+        actionForm: NonNullable<Extract<Parameters<typeof deps.execution.submitNodeResult>[0]["action"], { action: "block_current_node" }>["actionForm"]>;
+      };
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
         action: {
           action: "block_current_node" as const,
           sessionId: input.sessionId,
-          reason,
+          reason: body.reason,
+          actionForm: body.actionForm,
         },
       });
     }

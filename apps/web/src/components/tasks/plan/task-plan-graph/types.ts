@@ -63,7 +63,7 @@ export type PlanNodeField = {
 export type PlanNodeAction = {
   id: string;
   label: string;
-  kind: "input" | "approve" | "confirm" | "choose" | "edit" | "retry" | "observe" | "open" | "trigger";
+  kind: "input" | "approve" | "confirm" | "choose" | "edit" | "resolve" | "retry" | "observe" | "open" | "trigger";
   emphasis?: "default" | "primary" | "warning";
 };
 
