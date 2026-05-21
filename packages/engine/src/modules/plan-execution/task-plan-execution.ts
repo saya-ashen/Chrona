@@ -2219,6 +2219,58 @@ async function submitCheckpointAction(input: {
   }
 }
 
+async function getCurrentExecution(input: { taskId: string }): Promise<PlanExecutionResult> {
+  const runtime = await ensureNativePlanRun(input.taskId);
+  if (!runtime) {
+    return {
+      taskId: input.taskId,
+      planId: null,
+      mainSessionId: null,
+      status: "no_plan",
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      message: "No accepted plan. Create or accept a plan before execution.",
+    };
+  }
+
+  const executionSession = await db.executionSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      planId: runtime.planId,
+      status: { in: ["Active", "Paused"] },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+  const mainSession = await ensurePlanMainSession({
+    taskId: input.taskId,
+    planId: runtime.planId,
+  });
+  const effective = resolveEffectivePlanGraph({
+    graph: runtime.persisted.graph!,
+    attempts: runtime.persisted.attempts,
+    results: runtime.persisted.results,
+  }) as unknown as EffectivePlanGraph;
+  const status = mapTerminalReasonToStatus(effective);
+  const currentNodeId = currentNodeFromEffective(effective)?.id ?? executionSession?.currentNodeId ?? null;
+
+  return buildExecutionResponse({
+    taskId: input.taskId,
+    planId: runtime.planId,
+    mainSessionId: mainSession.id,
+    executionSessionId: executionSession?.id,
+    planRunId: executionSession ? runtime.planId : undefined,
+    status,
+    effective,
+    currentNodeId,
+    executedNodeIds: effective.completedNodeIds,
+    message: executionSession ? "Current execution state." : "No active execution session.",
+    waitKind: executionSession?.pauseReason as WaitKind | undefined,
+  });
+}
+
 async function submitTerminalNodeResult(input: {
   taskId: string;
   action: Extract<ExecutionActionInput, {
@@ -2435,6 +2487,10 @@ export class TaskPlanExecution {
 
   async submitCheckpointAction(input: Parameters<typeof submitCheckpointAction>[0]) {
     return submitCheckpointAction(input);
+  }
+
+  async current(input: Parameters<typeof getCurrentExecution>[0]) {
+    return getCurrentExecution(input);
   }
 
   async submitNodeResult(input: Parameters<typeof submitTerminalNodeResult>[0]) {

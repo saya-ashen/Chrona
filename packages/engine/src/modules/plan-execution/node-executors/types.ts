@@ -1,6 +1,7 @@
 import type {
   EffectivePlanNode,
   EffectivePlanGraph,
+  NodeActionForm,
   PlanPatch,
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
@@ -39,6 +40,7 @@ export type NodeExecutionResult =
       prompt: string;
       reason: string;
       evidence?: NodeExecutionEvidence;
+      actionForm?: NodeActionForm;
     }
   | {
       status: "waiting_for_approval";

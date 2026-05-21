@@ -155,7 +155,23 @@ function writeExecutionEvent(stream: SseStream, event: PlanExecutionSSEEvent) {
 }
 
 export function createExecutionRoutes(engine: ChronaEngine) {
-  return new Hono().post(
+  return new Hono().get(
+    "/tasks/:taskId/execution/current",
+    zValidator("param", executionActionParamSchema),
+    async (c) => {
+      try {
+        const { taskId } = c.req.valid("param");
+        const result = await engine.tasks.execution.current({ taskId });
+        return c.json(result);
+      } catch (cause) {
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return error(c, cause instanceof Error ? cause.message : "Failed to load current execution state", 500);
+      }
+    },
+  ).post(
     "/tasks/:taskId/execution/actions",
     zValidator("param", executionActionParamSchema),
     zValidator("json", executionActionBodySchema),

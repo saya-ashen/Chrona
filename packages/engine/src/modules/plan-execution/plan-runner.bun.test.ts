@@ -191,7 +191,7 @@ function makeInputCheckpointPlan(): CompiledPlan {
     required: true,
     inputFields: [
       { name: "theme", label: "主题", required: true },
-      { name: "genre", label: "体裁与风格", required: true },
+      { name: "genre", label: "体裁与风格", type: "choice", required: true, options: ["现代诗", "散文诗"] },
     ],
   };
 
@@ -218,6 +218,42 @@ function makeInputCheckpointPlan(): CompiledPlan {
     entryNodeIds: ["checkpoint_input"],
     terminalNodeIds: ["checkpoint_input"],
     topologicalOrder: ["checkpoint_input"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
+function makeChooseCheckpointPlan(): CompiledPlan {
+  const config: CheckpointConfig = {
+    checkpointType: "choose",
+    prompt: "Choose implementation language",
+    required: true,
+    options: ["Python", "JavaScript", "Shell"],
+  };
+
+  return {
+    id: "compiled_choose_checkpoint",
+    editablePlanId: "graph_choose_checkpoint",
+    sourceVersion: 1,
+    title: "Choose checkpoint",
+    goal: "Collect a structured user choice before continuing",
+    assumptions: [],
+    nodes: [
+      {
+        id: "checkpoint_choose",
+        localId: "checkpoint_choose",
+        type: "checkpoint",
+        title: "Choose language",
+        description: "User chooses the implementation language",
+        config,
+        dependencies: [],
+        dependents: [],
+      },
+    ],
+    edges: [],
+    entryNodeIds: ["checkpoint_choose"],
+    terminalNodeIds: ["checkpoint_choose"],
+    topologicalOrder: ["checkpoint_choose"],
     completionPolicy: { type: "all_tasks_completed" },
     validationWarnings: [],
   };
@@ -364,8 +400,19 @@ describe("plan-runner native execution actions", () => {
     expect(initial.checkpoint).toMatchObject({
       kind: "user_input",
       nodeId: "checkpoint_input",
+      form: {
+        instructions: "Provide poem constraints",
+        submitLabel: "Submit input",
+        inputFields: [
+          { name: "theme", label: "主题", type: "text", required: true },
+          { name: "genre", label: "体裁与风格", type: "select", required: true, options: ["现代诗", "散文诗"] },
+        ],
+      },
     });
     expect(initial.checkpoint?.availableActions.map((action) => action.id)).toContain("submit_input");
+
+    const waitingRun = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(waitingRun?.results[0]?.actionForm).toEqual(initial.checkpoint?.form);
 
     const submitted = await taskPlanExecution.submitCheckpointAction({
       taskId: task.id,
@@ -404,6 +451,37 @@ describe("plan-runner native execution actions", () => {
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
+  });
+
+  it("exposes choose checkpoints as select action forms", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner choose checkpoint");
+    const compiledPlan = makeChooseCheckpointPlan();
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const initial = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(initial.status).toBe("waiting_for_user");
+    expect(initial.checkpoint).toMatchObject({
+      kind: "user_input",
+      nodeId: "checkpoint_choose",
+      form: {
+        instructions: "Choose implementation language",
+        submitLabel: "Submit choice",
+        inputFields: [{
+          name: "choice",
+          label: "Choose language",
+          type: "select",
+          required: true,
+          options: ["Python", "JavaScript", "Shell"],
+        }],
+      },
+    });
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results[0]?.actionForm).toEqual(initial.checkpoint?.form);
   });
 
   it("cancels paused execution session and marks task cancelled", async () => {

@@ -33,6 +33,7 @@ export const taskWorkspaceQueryKeys = {
   all: ["task-workspace"] as const,
   page: (taskId: string) => [...taskWorkspaceQueryKeys.all, "page", taskId] as const,
   planState: (taskId: string) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId] as const,
+  currentExecution: (taskId: string) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId] as const,
 };
 
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
@@ -586,6 +587,20 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
     savedPlan: payload.savedPlan ?? null,
     generationSession: payload.generationSession ?? null,
   };
+}
+
+export async function fetchCurrentTaskExecution(taskId: string): Promise<TaskExecutionDispatchResult> {
+  const response = await fetch(`/api/tasks/${taskId}/execution/current`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to load current execution state" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load current execution state");
+  }
+
+  return await response.json() as TaskExecutionDispatchResult;
 }
 
 export async function dispatchTaskExecutionAction(
