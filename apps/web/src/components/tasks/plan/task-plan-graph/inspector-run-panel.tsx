@@ -159,6 +159,7 @@ function getActionVerb(action: PlanNodeAction | null) {
   if (action.kind === "confirm") return "Confirm";
   if (action.kind === "choose") return "Choose";
   if (action.kind === "edit") return "Submit";
+  if (action.kind === "resolve") return "Resolve";
   if (action.kind === "retry") return "Retry";
   if (action.kind === "observe") return "Observe";
   if (action.kind === "trigger") return "Start plan";
@@ -412,6 +413,14 @@ function buildExecutionAction(input: {
       nodeId: input.node.id,
       decision: selectedDecision?.includes("reject") ? "reject" : "approve",
       feedback: inputText || undefined,
+    };
+  }
+
+  if (kind === "resolve") {
+    return {
+      action: "resume_after_unblock",
+      nodeId: input.node.id,
+      note: inputText || input.node.nextAction || undefined,
     };
   }
 

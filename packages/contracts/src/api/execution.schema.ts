@@ -9,6 +9,18 @@ const nodeIdSchema = z.string().min(1, "nodeId is required");
 const sessionIdSchema = z.string().min(1, "sessionId is required");
 const workBlockIdSchema = z.string().min(1, "workBlockId is required");
 const idempotencyKeySchema = z.string().min(1, "idempotencyKey is required");
+const nodeActionFormFieldSchema = z.object({
+  name: z.string().min(1, "field name is required"),
+  label: z.string().min(1, "field label is required"),
+  type: z.enum(["text", "textarea", "select"]).optional(),
+  required: z.boolean().optional(),
+  options: z.array(z.string().min(1)).optional(),
+}).strict();
+const nodeActionFormSchema = z.object({
+  instructions: z.string().min(1, "instructions are required"),
+  submitLabel: z.string().min(1).optional(),
+  inputFields: z.array(nodeActionFormFieldSchema).min(1, "at least one input field is required"),
+}).strict();
 
 export const executionActionParamSchema = z.object({ taskId: taskIdParam });
 
@@ -68,6 +80,7 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     reason: z.string().min(1, "reason is required"),
+    actionForm: nodeActionFormSchema.optional(),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({

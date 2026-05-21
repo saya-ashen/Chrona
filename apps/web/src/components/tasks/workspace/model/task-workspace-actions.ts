@@ -178,6 +178,22 @@ export function buildWorkspaceActionInput(input: {
     };
   }
 
+  if (kind === "resolve") {
+    if (input.fields.length > 0) {
+      return {
+        action: "resume_with_input",
+        nodeId: input.node.id,
+        inputFields,
+      };
+    }
+
+    return {
+      action: "resume_after_unblock",
+      nodeId: input.node.id,
+      note: inputText || input.node.nextAction || undefined,
+    };
+  }
+
   if (kind === "retry" || input.node.interactionType === "retry") {
     return {
       action: "retry_node",

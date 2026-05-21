@@ -69,7 +69,17 @@ function currentNodeResultActionHints(actionNames: string[]): NodeRuntimeInput["
     ...(actionNames.includes("chrona_condition_select")
       ? { conditionSelectSchema: { branchRef: "branchOptions[].ref", summary: "string" } }
       : {}),
-    ...(actionNames.includes("chrona_node_block") ? { blockSchema: { reason: "string" } } : {}),
+    ...(actionNames.includes("chrona_node_block")
+      ? {
+          blockSchema: {
+            reason: "string",
+            actionForm: {
+              instructions: "string",
+              inputFields: [{ name: "string", label: "string" }],
+            },
+          },
+        }
+      : {}),
     ...(actionNames.includes("chrona_node_fail") ? { failSchema: { error: "string" } } : {}),
     ...(actionNames.includes("chrona_wait_complete") ? { waitCompleteSchema: { summary: "string" } } : {}),
   };

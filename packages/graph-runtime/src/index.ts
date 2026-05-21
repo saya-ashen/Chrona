@@ -15,6 +15,10 @@ export {
   runGraphExecution,
 } from "./graph-runner";
 export {
+  runtimeProgressStatusForNodes,
+  runtimeProgressStatusForWaitKind,
+} from "./types/runtime";
+export {
   createNodeDefinitionFromCompiledNode,
   createPlanGraphFromCompiledPlan,
 } from "./graph-builder";
