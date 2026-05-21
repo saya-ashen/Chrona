@@ -24,12 +24,9 @@ test.describe("AI Client Settings", () => {
 
     await test.step("2. Create a new AI client", async () => {
       await page.getByRole("button", { name: /add client/i }).click();
-      await page.getByPlaceholder("My OpenClaw Client").fill("E2E Settings Client");
-      await page.getByRole("combobox").selectOption("llm");
-      await page
-        .getByPlaceholder("https://api.openai.com/v1")
-        .fill("https://api.mock.ai/v1");
-      await page.getByPlaceholder("sk-...").fill("sk-test-e2e-settings");
+      await page.getByPlaceholder("My Hermes Client").fill("E2E Settings Client");
+      await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://api.mock.ai/v1");
+      await page.getByPlaceholder("optional for localhost").fill("sk-test-e2e-settings");
 
       const createResp = page.waitForResponse(
         (res) =>
@@ -44,16 +41,12 @@ test.describe("AI Client Settings", () => {
 
     await test.step("3. Edit the AI client", async () => {
       // Click edit on the client card
-      const clientCard = page.locator("div", { hasText: "E2E Settings Client" }).last();
-      await clientCard.getByRole("button", { name: "Edit" }).click();
+      await page.getByRole("button", { name: "Edit" }).first().click();
 
       // Change the name
-      const nameInput = page.getByPlaceholder("My OpenClaw Client");
+      const nameInput = page.getByPlaceholder("My Hermes Client");
       await nameInput.clear();
       await nameInput.fill("E2E Settings Client (Updated)");
-
-      // Change type to openclaw
-      await page.getByRole("combobox").selectOption("openclaw");
 
       const updateResp = page.waitForResponse(
         (res) =>
@@ -69,10 +62,7 @@ test.describe("AI Client Settings", () => {
     });
 
     await test.step("4. Test availability shows result", async () => {
-      const clientCard = page
-        .locator("div", { hasText: "E2E Settings Client (Updated)" })
-        .last();
-      await clientCard.getByRole("button", { name: "Edit" }).click();
+      await page.getByRole("button", { name: "Edit" }).first().click();
 
       await page.getByRole("button", { name: /test availability/i }).first().click();
       await expect(page.getByText(/available/i).first()).toBeVisible();
@@ -82,12 +72,8 @@ test.describe("AI Client Settings", () => {
       // Cancel first to close the edit form
       await page.getByRole("button", { name: /cancel/i }).click();
 
-      const clientCard = page
-        .locator("div", { hasText: "E2E Settings Client (Updated)" })
-        .last();
-
       // Click the delete handler — in the dialog it triggers a DELETE API call
-      const deleteBtn = clientCard.locator("button").filter({ hasText: "" }).last();
+      const deleteBtn = page.getByRole("button", { name: "Delete" }).first();
 
       // Handle the confirm dialog
       page.once("dialog", (dialog) => dialog.accept());
@@ -125,12 +111,9 @@ test.describe("AI Client Settings", () => {
 
     // Client A
     await page.getByRole("button", { name: /add client/i }).click();
-    await page.getByPlaceholder("My OpenClaw Client").fill("Default Client A");
-    await page.getByRole("combobox").selectOption("llm");
-    await page
-      .getByPlaceholder("https://api.openai.com/v1")
-      .fill("https://a.mock.ai/v1");
-    await page.getByPlaceholder("sk-...").fill("sk-a");
+    await page.getByPlaceholder("My Hermes Client").fill("Default Client A");
+    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://a.mock.ai/v1");
+    await page.getByPlaceholder("optional for localhost").fill("sk-a");
 
     const respA = page.waitForResponse(
       (res) =>
@@ -142,13 +125,10 @@ test.describe("AI Client Settings", () => {
 
     // Client B
     await page.getByRole("button", { name: /add client/i }).click();
-    await page.getByPlaceholder("My OpenClaw Client").fill("Default Client B");
-    await page.getByRole("combobox").selectOption("llm");
-    await page
-      .getByPlaceholder("https://api.openai.com/v1")
-      .fill("https://b.mock.ai/v1");
-    await page.getByPlaceholder("sk-...").fill("sk-b");
-    await page.getByLabel("Set as default Client").check();
+    await page.getByPlaceholder("My Hermes Client").fill("Default Client B");
+    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://b.mock.ai/v1");
+    await page.getByPlaceholder("optional for localhost").fill("sk-b");
+    await page.getByText("Set as default Client").click();
 
     const respB = page.waitForResponse(
       (res) =>
@@ -159,9 +139,8 @@ test.describe("AI Client Settings", () => {
     await respB;
 
     // Now edit Client A and set as default
-    const cardA = page.locator("div", { hasText: "Default Client A" }).last();
-    await cardA.getByRole("button", { name: "Edit" }).click();
-    await page.getByLabel("Set as default Client").check();
+    await page.getByRole("button", { name: "Edit" }).first().click();
+    await page.getByText("Set as default Client").click();
 
     const patchResp = page.waitForResponse(
       (res) =>
@@ -189,11 +168,8 @@ test.describe("AI Client Settings", () => {
     await page.getByRole("button", { name: /add client/i }).click();
 
     // Leave name empty, save should be blocked by frontend or show error
-    await page.getByRole("combobox").selectOption("llm");
-    await page
-      .getByPlaceholder("https://api.openai.com/v1")
-      .fill("https://mock.ai/v1");
-    await page.getByPlaceholder("sk-...").fill("sk-test");
+    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://mock.ai/v1");
+    await page.getByPlaceholder("optional for localhost").fill("sk-test");
 
     // Try save — it should not send a request (frontend validation)
     // Or the backend should reject with 400

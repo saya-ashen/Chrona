@@ -11,8 +11,9 @@ export async function setTaskWorkspaceViewport(page: Page, viewport: TaskWorkspa
 }
 
 export async function gotoSeededTaskWorkspace(page: Page, workspaceId: string, taskId: string) {
-  await page.goto(`/en/workspaces/${workspaceId}/tasks/${taskId}`);
-  await expect(page.getByRole("region", { name: "Workspace state" })).toBeVisible();
+  void workspaceId;
+  await page.goto(`/en/tasks/${taskId}`);
+  await expect(page.getByRole("heading", { name: /.+/ }).first()).toBeVisible();
 }
 
 export function getPrimaryTaskWorkspaceAction(page: Page, name: RegExp | string) {

@@ -6,10 +6,10 @@ test.describe("Task workspace accessibility", () => {
     await setTaskWorkspaceViewport(page, "desktop");
     await page.goto("/en/schedule");
 
-    const quickAdd = getPrimaryTaskWorkspaceAction(page, "Quick add");
-    await expect(quickAdd).toBeVisible();
-    await quickAdd.focus();
-    await expect(quickAdd).toBeFocused();
+    const newTask = getPrimaryTaskWorkspaceAction(page, "New Task");
+    await expect(newTask).toBeVisible();
+    await newTask.focus();
+    await expect(newTask).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.getByPlaceholder("Add title")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeVisible();

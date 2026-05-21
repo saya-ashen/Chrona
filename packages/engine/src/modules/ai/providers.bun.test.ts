@@ -56,4 +56,40 @@ describe("AI provider availability", () => {
       "http://hermes.local/v1/capabilities",
     ]);
   });
+
+  it("requires Hermes run capabilities during availability checks", async () => {
+    const fetchMock = mock((url: Parameters<typeof fetch>[0]) => {
+      if (String(url).endsWith("/v1/capabilities")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          features: {
+            run_submission: true,
+            run_status: false,
+            run_events_sse: true,
+            run_stop: true,
+          },
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await testAiClientAvailability({
+      type: "hermes",
+      config: {
+        baseUrl: "http://hermes.local",
+        apiKey: "token",
+      },
+    });
+
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain("run status");
+    expect(result.reason).toContain("API_SERVER_ENABLED=true");
+    expect(result.reason).toContain("API_SERVER_KEY");
+  });
 });

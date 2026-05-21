@@ -1,6 +1,6 @@
 export {};
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 const projectRoot = process.cwd();
@@ -60,6 +60,21 @@ function resolveImport(fromFile: string, specifier: string) {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
+function resolveSimpleReExportTargets(fromFile: string, text: string) {
+  const targets: string[] = [];
+  const exportPattern = /^export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["'];?$/gm;
+  let match: RegExpExecArray | null;
+
+  while ((match = exportPattern.exec(text))) {
+    const target = resolveImport(fromFile, match[1]);
+    if (target) {
+      targets.push(target);
+    }
+  }
+
+  return targets;
+}
+
 const allSourceFiles = walk(webSrcRoot);
 const pageLikeFiles = walk(componentsRoot).filter(isPageLikeFile);
 const runtimeImportersByFile = new Map<string, Set<string>>();
@@ -82,6 +97,15 @@ for (const sourceFile of allSourceFiles) {
     const importers = runtimeImportersByFile.get(resolved) ?? new Set<string>();
     importers.add(sourceFile);
     runtimeImportersByFile.set(resolved, importers);
+
+    const reExportTargets = statSync(resolved).isFile()
+      ? resolveSimpleReExportTargets(resolved, readFileSync(resolved, "utf8"))
+      : [];
+    for (const reExportTarget of reExportTargets) {
+      const targetImporters = runtimeImportersByFile.get(reExportTarget) ?? new Set<string>();
+      targetImporters.add(sourceFile);
+      runtimeImportersByFile.set(reExportTarget, targetImporters);
+    }
   }
 }
 
