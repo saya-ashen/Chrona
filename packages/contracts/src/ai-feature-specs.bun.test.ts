@@ -27,7 +27,7 @@ describe("generate_plan feature spec", () => {
     });
     expect(spec.structuredOutputSchema).toBeUndefined();
     expect(GENERATE_PLAN_BLUEPRINT_TOOL_NAME).toBe("chrona_plan_generate");
-    expect(spec.instructions).toContain("You MUST call the Chrona MCP tool chrona_plan_generate.");
+    expect(spec.instructions).toContain("You MUST call the chrona_plan_generate tool.");
     expect(spec.inputText).toContain("Title: 制作一个汉堡");
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
   });

@@ -14,6 +14,48 @@ import {
 import { VALID_AI_FEATURES } from "../helpers";
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
+const SECRET_CONFIG_KEYS = new Set([
+  "apiKey",
+  "bridgeToken",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "secret",
+  "password",
+]);
+
+type AiClientRouteRecord = {
+  id: string;
+  name: string;
+  type: string;
+  config: unknown;
+  isDefault: boolean;
+  enabled: boolean;
+  bindings?: Array<{ feature: string }>;
+  createdAt: Date;
+};
+
+function redactClientConfig(config: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(config).filter(([key]) => !SECRET_CONFIG_KEYS.has(key)),
+  );
+}
+
+function serializeClient(client: AiClientRouteRecord) {
+  return {
+    id: client.id,
+    name: client.name,
+    type: client.type,
+    config: redactClientConfig(client.config as Record<string, unknown>),
+    isDefault: client.isDefault,
+    enabled: client.enabled,
+    bindings: (client.bindings ?? []).map(
+      (binding: { feature: string }) => binding.feature,
+    ),
+    createdAt: client.createdAt.toISOString(),
+  };
+}
+
 export function createClientsRoutes(engine: ChronaEngine) {
   // ──────────────────────────────────────────────
   // AI Client Management
@@ -25,18 +67,7 @@ export function createClientsRoutes(engine: ChronaEngine) {
         const clients = await engine.aiClients.list();
 
         return json(c, {
-          clients: clients.map((client) => ({
-            id: client.id,
-            name: client.name,
-            type: client.type,
-            config: client.config,
-            isDefault: client.isDefault,
-            enabled: client.enabled,
-            bindings: client.bindings.map(
-              (binding: { feature: string }) => binding.feature,
-            ),
-            createdAt: client.createdAt.toISOString(),
-          })),
+          clients: clients.map(serializeClient),
         });
       } catch (cause) {
         return internalServerError(
@@ -61,7 +92,7 @@ export function createClientsRoutes(engine: ChronaEngine) {
             isDefault,
           });
 
-          return json(c, { client }, 201);
+          return json(c, { client: serializeClient({ ...client, bindings: [] }) }, 201);
         } catch (cause) {
           return internalServerError(
             c,
@@ -116,7 +147,7 @@ export function createClientsRoutes(engine: ChronaEngine) {
             },
           });
 
-          return json(c, { client: updated });
+          return json(c, { client: serializeClient(updated) });
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

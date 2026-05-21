@@ -131,7 +131,7 @@ export async function createServerApp() {
 
     return c.json(
       {
-        error: error instanceof Error ? error.message : getApiMessages(getPreferredLocale(c.req.header("accept-language"))).internalServerError,
+        error: getApiMessages(getPreferredLocale(c.req.header("accept-language"))).internalServerError,
       },
       500,
     );

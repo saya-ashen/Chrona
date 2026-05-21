@@ -39,6 +39,6 @@ RUN bunx prisma generate
 EXPOSE 3101
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3101/health || exit 1
+  CMD bun -e "const response = await fetch('http://localhost:3101/health'); process.exit(response.ok ? 0 : 1)"
 
-CMD ["sh", "-c", "bunx prisma migrate deploy && bun run apps/server/src/index.bun.ts"]
+CMD ["sh", "-c", "if [ -z \"$API_KEY\" ]; then export API_KEY=$(bun -e \"console.log(crypto.randomUUID().replaceAll('-', ''))\"); echo \"Generated API_KEY for this container: $API_KEY\"; fi; bunx prisma migrate deploy && bun run apps/server/src/index.bun.ts"]

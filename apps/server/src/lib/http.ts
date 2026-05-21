@@ -16,9 +16,8 @@ export function internalServerError(
   cause: unknown,
   fallback: string,
 ) {
-  const message = cause instanceof Error ? cause.message : fallback;
   console.error(`${route} error:`, cause);
-  return error(c, message, 500);
+  return error(c, fallback, 500);
 }
 
 export function parseLimit(
