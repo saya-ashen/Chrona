@@ -41,7 +41,8 @@ function spawn(name: string, cmd: string[]) {
 
 assertSafeDevServerBind();
 
-const web = spawn("web", ["bun", "run", "--cwd", "apps/web", "dev", "--host", "0.0.0.0"]);
+const webPortArgs = process.env.CHRONA_WEB_PORT ? ["--port", process.env.CHRONA_WEB_PORT] : [];
+const web = spawn("web", ["bun", "run", "--cwd", "apps/web", "dev", "--host", "0.0.0.0", ...webPortArgs]);
 const server = spawn("server", ["bun", "--watch", "apps/server/src/index.bun.ts"]);
 
 function cleanup() {

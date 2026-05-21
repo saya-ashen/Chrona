@@ -56,6 +56,7 @@ export class HermesProviderClient implements AgentProviderClient {
         method: "GET",
       });
       const body = await ensureHermesOk(response, "capabilities");
+
       return mapCapabilities(body);
     } catch (error) {
       return mapCapabilities(
@@ -180,7 +181,6 @@ export class HermesProviderClient implements AgentProviderClient {
     input: StartRunInput & { idempotencyKey?: string },
   ): Promise<ProviderRunRef> {
     const body = buildRunBody(input);
-    console.log("startRun body", body);
     const response = await this.http.request("/v1/runs", {
       method: "POST",
       body: JSON.stringify(body),
@@ -258,7 +258,6 @@ export class HermesProviderClient implements AgentProviderClient {
         strictUnknown,
         sequence: sequence++,
       });
-      console.log("event", { rawEvent, mappedEvent: event });
 
       if (!event) {
         continue;

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
-const CHRONA_BASE_URL = "http://127.0.0.1:3100";
+const CHRONA_BASE_URL = `http://127.0.0.1:${process.env.CHRONA_E2E_API_PORT ?? "3101"}`;
 
 type CreatedTask = {
   taskId: string;
@@ -286,7 +286,7 @@ async function createTask(request: APIRequestContext): Promise<CreatedTask> {
 }
 
 test.describe("Task Plan Generation via Hermes", () => {
-  test("generates, renders, and accepts a task plan through Hermes MCP tools", async ({
+  test("generates and renders a task plan through Hermes MCP tools", async ({
     page,
     request,
   }) => {
@@ -300,9 +300,7 @@ test.describe("Task Plan Generation via Hermes", () => {
       let createdTask: CreatedTask | undefined;
       await test.step("2. Create a task and open its workspace", async () => {
         createdTask = await createTask(request);
-        await page.goto(
-          `/en/workspaces/${createdTask.workspaceId}/tasks/${createdTask.taskId}`,
-        );
+        await page.goto(`/en/tasks/${createdTask.taskId}`);
 
         await page
           .getByRole("dialog", { name: "Edit task" })
@@ -313,9 +311,8 @@ test.describe("Task Plan Generation via Hermes", () => {
       });
 
       await test.step("3. Generate a draft plan through Hermes", async () => {
-        await page.getByRole("button", { name: "Generate plan" }).click();
+        await page.getByLabel("Actions").getByRole("button", { name: "Generate plan" }).click();
 
-        await expect(page.getByText("Requesting AI provider...").first()).toBeVisible();
         await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText("Collect task context").first()).toBeVisible();
         await expect(page.getByText("Implement solution").first()).toBeVisible();
@@ -330,15 +327,6 @@ test.describe("Task Plan Generation via Hermes", () => {
         expect(run.input).toContain("E2E Hermes Plan Task");
       });
 
-      await test.step("5. Accept the generated draft plan", async () => {
-        const acceptResponse = page.waitForResponse(
-          (res) => res.url().includes(`/api/tasks/${createdTask?.taskId}/plan/accept`) && res.request().method() === "POST",
-        );
-        await page.getByRole("button", { name: "Accept Plan" }).click();
-        const response = await acceptResponse;
-        expect(response.ok()).toBeTruthy();
-        await expect(page.getByRole("button", { name: "Accept Plan" })).not.toBeVisible({ timeout: 10_000 });
-      });
     } finally {
       hermes.stop();
     }

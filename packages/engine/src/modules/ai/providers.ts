@@ -23,6 +23,45 @@ import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry, getOpenClawGatewayUrl } from "./runtime/client-registry";
 
+const HERMES_API_SERVER_DOCS_URL =
+  "https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server";
+
+const HERMES_REQUIRED_CAPABILITIES = [
+  { key: "run_submission", label: "run submission (/v1/runs)" },
+  { key: "run_status", label: "run status (/v1/runs/{run_id})" },
+  { key: "run_events_sse", label: "run event streaming (/v1/runs/{run_id}/events)" },
+  { key: "run_stop", label: "run cancellation (/v1/runs/{run_id}/stop)" },
+] as const;
+
+function unknownRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getHermesCapabilityFeatures(
+  raw: unknown,
+): Record<string, unknown> | null {
+  const health = unknownRecord(raw);
+  const capabilities = unknownRecord(health?.capabilities);
+  return unknownRecord(capabilities?.features);
+}
+
+function getMissingHermesCapabilities(raw: unknown): string[] {
+  const features = getHermesCapabilityFeatures(raw);
+  return HERMES_REQUIRED_CAPABILITIES.filter(
+    (capability) => features?.[capability.key] !== true,
+  ).map((capability) => capability.label);
+}
+
+function hermesCapabilityReason(missing: string[]): string {
+  return [
+    `Hermes API is reachable, but required capabilities are missing: ${missing.join(", ")}.`,
+    "Enable the Hermes API server with API_SERVER_ENABLED=true, set API_SERVER_KEY to the token configured in Chrona, then restart Hermes.",
+    `Docs: ${HERMES_API_SERVER_DOCS_URL}`,
+  ].join(" ");
+}
+
 async function checkClientHealth(
   client: AiClientRecord,
 ): Promise<{ available: boolean; reason: string }> {
@@ -77,9 +116,24 @@ async function checkClientHealth(
         timeoutMs: config.timeoutMs,
       }).checkHealth({ deep: true });
 
+      if (!health.ok) {
+        return {
+          available: false,
+          reason: health.reason ?? health.message ?? "Hermes health check failed",
+        };
+      }
+
+      const missingCapabilities = getMissingHermesCapabilities(health.raw);
+      if (missingCapabilities.length > 0) {
+        return {
+          available: false,
+          reason: hermesCapabilityReason(missingCapabilities),
+        };
+      }
+
       return {
-        available: health.ok,
-        reason: health.reason ?? health.message ?? (health.ok ? "Hermes API is reachable" : "Hermes health check failed"),
+        available: true,
+        reason: health.reason ?? health.message ?? "Hermes API is reachable",
       };
     }
 
