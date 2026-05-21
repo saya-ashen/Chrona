@@ -1,10 +1,10 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@chrona/i18n/react";
 
@@ -17,6 +17,12 @@ type ScheduleEditorFormProps = {
   submitLabel?: string;
   allowClear?: boolean;
   onMutatedAction?: () => Promise<void> | void;
+};
+
+type ScheduleEditorFormValues = {
+  dueAt: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
 };
 
 const DEFAULT_COPY = {
@@ -35,8 +41,8 @@ function formatDateTimeInput(value?: Date | null) {
   return value ? value.toISOString().slice(0, 16) : "";
 }
 
-function parseDateTime(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || value.trim().length === 0) {
+function parseDateTime(value: string) {
+  if (value.trim().length === 0) {
     return null;
   }
 
@@ -54,9 +60,22 @@ export function ScheduleEditorForm({
   onMutatedAction,
 }: ScheduleEditorFormProps) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.scheduleEditorForm ?? {}) };
+  const copy = { ...DEFAULT_COPY, ...messages.components?.scheduleEditorForm };
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const defaultValues = useMemo<ScheduleEditorFormValues>(() => ({
+    dueAt: formatDateTimeInput(dueAt),
+    scheduledStartAt: formatDateTimeInput(scheduledStartAt),
+    scheduledEndAt: formatDateTimeInput(scheduledEndAt),
+  }), [dueAt, scheduledEndAt, scheduledStartAt]);
+  const form = useForm<ScheduleEditorFormValues>({
+    defaultValues,
+    mode: "onChange",
+  });
+
+  useEffect(() => {
+    form.reset(defaultValues);
+  }, [defaultValues, form]);
 
   async function runAction(action: () => Promise<void>) {
     try {
@@ -71,12 +90,10 @@ export function ScheduleEditorForm({
     }
   }
 
-  async function handleScheduleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const nextDueAt = parseDateTime(formData.get("dueAt"));
-    const nextScheduledStartAt = parseDateTime(formData.get("scheduledStartAt"));
-    const nextScheduledEndAt = parseDateTime(formData.get("scheduledEndAt"));
+  async function handleScheduleSubmit(values: ScheduleEditorFormValues) {
+    const nextDueAt = parseDateTime(values.dueAt);
+    const nextScheduledStartAt = parseDateTime(values.scheduledStartAt);
+    const nextScheduledEndAt = parseDateTime(values.scheduledEndAt);
 
     if (!nextScheduledStartAt || !nextScheduledEndAt) {
       setErrorMessage(copy.fieldRequired);
@@ -94,9 +111,7 @@ export function ScheduleEditorForm({
     });
   }
 
-  async function handleClearSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handleClearSubmit() {
     await runAction(async () => {
       await clearSchedule({ taskId });
     });
@@ -106,40 +121,53 @@ export function ScheduleEditorForm({
     <div className="space-y-2">
       {errorMessage ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
 
-      <form onSubmit={(event) => void handleScheduleSubmit(event)} className="grid gap-2 md:grid-cols-3">
-        <Field className="text-xs text-muted-foreground">
-          <FieldLabel>{copy.due}</FieldLabel>
-          <Input
-            type="datetime-local"
-            name="dueAt"
-            defaultValue={formatDateTimeInput(dueAt)}
-          />
-        </Field>
-        <Field className="text-xs text-muted-foreground">
-          <FieldLabel>{copy.start}</FieldLabel>
-          <Input
-            type="datetime-local"
-            name="scheduledStartAt"
-            defaultValue={formatDateTimeInput(scheduledStartAt)}
-          />
-        </Field>
-        <Field className="text-xs text-muted-foreground">
-          <FieldLabel>{copy.end}</FieldLabel>
-          <Input
-            type="datetime-local"
-            name="scheduledEndAt"
-            defaultValue={formatDateTimeInput(scheduledEndAt)}
-          />
-        </Field>
+      <form onSubmit={(event) => void form.handleSubmit(handleScheduleSubmit)(event)}>
+        <FieldGroup className="grid gap-2 md:grid-cols-3">
+        <Controller
+          name="dueAt"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid} className="text-xs text-muted-foreground">
+              <FieldLabel htmlFor={field.name}>{copy.due}</FieldLabel>
+              <Input {...field} aria-invalid={fieldState.invalid} id={field.name} type="datetime-local" />
+              {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+            </Field>
+          )}
+        />
+        <Controller
+          name="scheduledStartAt"
+          control={form.control}
+          rules={{ required: copy.fieldRequired }}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid} className="text-xs text-muted-foreground">
+              <FieldLabel htmlFor={field.name}>{copy.start}</FieldLabel>
+              <Input {...field} aria-invalid={fieldState.invalid} id={field.name} type="datetime-local" />
+              {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+            </Field>
+          )}
+        />
+        <Controller
+          name="scheduledEndAt"
+          control={form.control}
+          rules={{ required: copy.fieldRequired }}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid} className="text-xs text-muted-foreground">
+              <FieldLabel htmlFor={field.name}>{copy.end}</FieldLabel>
+              <Input {...field} aria-invalid={fieldState.invalid} id={field.name} type="datetime-local" />
+              {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+            </Field>
+          )}
+        />
         <div className="flex flex-wrap gap-2 md:col-span-3">
           <Button type="submit" disabled={isPending} variant="default">
             {isPending ? copy.saving : submitLabel}
           </Button>
         </div>
+        </FieldGroup>
       </form>
 
       {allowClear ? (
-        <form onSubmit={(event) => void handleClearSubmit(event)}>
+        <form onSubmit={(event) => { event.preventDefault(); void handleClearSubmit(); }}>
           <Button type="submit" disabled={isPending} variant="outline">
             {isPending ? copy.updating : copy.clearSchedule}
           </Button>

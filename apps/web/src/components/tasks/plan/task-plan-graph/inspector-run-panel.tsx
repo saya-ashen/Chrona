@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,7 +88,8 @@ function ActionButton({ action, isActive, onClick }: { action: PlanNodeAction; i
   );
 }
 
-function RunField({ field, value, onChange }: { field: PlanNodeField; value: string; onChange: (value: string) => void }) {
+function RunField({ field, value, invalid, error, onChange }: { field: PlanNodeField; value: string; invalid?: boolean; error?: { message?: string }; onChange: (value: string) => void }) {
+  const fieldId = `run-panel-${field.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const commonLabel = (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium text-foreground">{field.label}</span>
@@ -97,25 +99,28 @@ function RunField({ field, value, onChange }: { field: PlanNodeField; value: str
 
   if (field.control === "textarea") {
     return (
-      <Field className="gap-2">
-        <FieldLabel>{commonLabel}</FieldLabel>
+      <Field data-invalid={invalid} className="gap-2">
+        <FieldLabel htmlFor={fieldId}>{commonLabel}</FieldLabel>
         <Textarea
+          id={fieldId}
+          aria-invalid={invalid}
           rows={4}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="min-h-24 rounded-xl border-border/70 bg-background/80 text-sm"
           placeholder={`Enter ${field.label.toLowerCase()}...`}
         />
+        {invalid ? <FieldError errors={[error]} /> : null}
       </Field>
     );
   }
 
   if (field.control === "select" || field.control === "approval") {
     return (
-      <Field className="gap-2">
-        <FieldLabel>{commonLabel}</FieldLabel>
+      <Field data-invalid={invalid} className="gap-2">
+        <FieldLabel htmlFor={fieldId}>{commonLabel}</FieldLabel>
         <Select value={value || undefined} onValueChange={onChange}>
-          <SelectTrigger className="w-full rounded-xl border-border/70 bg-background/80 text-sm">
+          <SelectTrigger id={fieldId} aria-invalid={invalid} className="w-full rounded-xl border-border/70 bg-background/80 text-sm">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -126,20 +131,24 @@ function RunField({ field, value, onChange }: { field: PlanNodeField; value: str
             </SelectGroup>
           </SelectContent>
         </Select>
+        {invalid ? <FieldError errors={[error]} /> : null}
       </Field>
     );
   }
 
   return (
-    <Field className="gap-2">
-      <FieldLabel>{commonLabel}</FieldLabel>
+    <Field data-invalid={invalid} className="gap-2">
+      <FieldLabel htmlFor={fieldId}>{commonLabel}</FieldLabel>
       <Input
+        id={fieldId}
+        aria-invalid={invalid}
         type="text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="rounded-xl border-border/70 bg-background/80 text-sm"
         placeholder={`Enter ${field.label.toLowerCase()}...`}
       />
+      {invalid ? <FieldError errors={[error]} /> : null}
     </Field>
   );
 }
@@ -453,15 +462,19 @@ export function TaskPlanGraphInspectorRunPanel({
   onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
 }) {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() => defaultActionForNode(node));
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => buildDefaultFieldValues(node.interactiveFields ?? []));
+  const form = useForm<Record<string, string>>({
+    defaultValues: buildDefaultFieldValues(node.interactiveFields ?? []),
+    mode: "onChange",
+  });
+  const fieldValues = (useWatch({ control: form.control }) as Record<string, string> | undefined) ?? buildDefaultFieldValues(node.interactiveFields ?? []);
   const [runLog, setRunLog] = useState<Array<{ id: string; title: string; detail: string }>>([]);
   const [isDispatching, setIsDispatching] = useState(false);
 
   useEffect(() => {
     setSelectedActionId(defaultActionForNode(node));
-    setFieldValues(buildDefaultFieldValues(node.interactiveFields ?? []));
+    form.reset(buildDefaultFieldValues(node.interactiveFields ?? []));
     setRunLog([]);
-  }, [node]);
+  }, [form, node]);
 
   const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
   const runResult = useMemo(() => extractRunResult(node), [node]);
@@ -480,8 +493,8 @@ export function TaskPlanGraphInspectorRunPanel({
   const availableActions = node.availableActions ?? [];
   const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
 
-  async function handleRunAction() {
-    const payload = summarizeFieldValues(interactiveFields, fieldValues);
+  async function handleRunAction(values: Record<string, string>) {
+    const payload = summarizeFieldValues(interactiveFields, values);
     const label = selectedAction?.kind === "trigger"
       ? primarySubmitLabel
       : selectedAction?.label ?? node.nextAction ?? "Run action";
@@ -493,7 +506,7 @@ export function TaskPlanGraphInspectorRunPanel({
 
     setIsDispatching(true);
     try {
-      const result = await onDispatchExecutionAction(buildExecutionAction({ node, selectedAction, fields: interactiveFields, values: fieldValues }));
+      const result = await onDispatchExecutionAction(buildExecutionAction({ node, selectedAction, fields: interactiveFields, values }));
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
@@ -562,13 +575,28 @@ export function TaskPlanGraphInspectorRunPanel({
               </div>
             ) : null}
 
-            {interactiveFields.length > 0 ? (
-              <div className="mt-3 space-y-3">
-                {interactiveFields.map((field) => (
-                  <RunField key={field.key} field={field} value={fieldValues[field.key] ?? ""} onChange={(value) => setFieldValues((current) => ({ ...current, [field.key]: value }))} />
-                ))}
-              </div>
-            ) : null}
+            <form className="mt-3 flex flex-col gap-3" onSubmit={(event) => void form.handleSubmit(handleRunAction)(event)}>
+              {interactiveFields.length > 0 ? (
+                <FieldGroup className="gap-3">
+                  {interactiveFields.map((field) => (
+                    <Controller
+                      key={field.key}
+                      name={field.key}
+                      control={form.control}
+                      rules={{ required: field.required ? "Required" : false }}
+                      render={({ field: controllerField, fieldState }) => (
+                        <RunField
+                          field={field}
+                          value={controllerField.value ?? ""}
+                          invalid={fieldState.invalid}
+                          error={fieldState.error}
+                          onChange={controllerField.onChange}
+                        />
+                      )}
+                    />
+                  ))}
+                </FieldGroup>
+              ) : null}
 
             {interactiveFields.length === 0 && ["confirm", "approve", "execute", "observe", "wait", "retry"].includes(resolvedRunPanelMode) ? (
               <div className="mt-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
@@ -584,12 +612,11 @@ export function TaskPlanGraphInspectorRunPanel({
               </div>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                type="button"
+                type="submit"
                 disabled={isDispatching || (!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction)}
                 variant="default" size="sm" className="rounded-xl"
-                onClick={handleRunAction}
               >
                 {isDispatching
                   ? <Sparkles className="size-4 animate-spin" />
@@ -619,6 +646,7 @@ export function TaskPlanGraphInspectorRunPanel({
 
               <span className="text-xs text-muted-foreground">Actions are sent to the task execution backend.</span>
             </div>
+            </form>
           </div>
         </section>
       ) : null}
