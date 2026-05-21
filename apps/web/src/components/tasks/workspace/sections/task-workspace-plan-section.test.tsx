@@ -282,6 +282,54 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
+  it("does not expose locally-derived actions without a backend checkpoint", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "checkpoint",
+      title: "Review checkpoint",
+      status: "waiting_for_user",
+      nextAction: "Provide checkpoint input",
+      requiresHumanInput: true,
+      availableActions: [{ id: "submit_input", label: "Submit input", kind: "input", emphasis: "primary" }],
+      interactiveFields: [{ key: "city", label: "City", value: "", control: "text", required: true }],
+    });
+    const graphPlan = createTaskWorkspaceFixtureGraph([node], "checkpoint");
+
+    render(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "Review task output",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+        onSubmitCheckpointAction={vi.fn()}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+
+    expect(within(commandCenter).getByText("No current operation")).toBeInTheDocument();
+    expect(within(commandCenter).queryByText("Current node action")).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
+  });
+
   it("shows blocked current node action with blocker reason before start plan", async () => {
     const blocker = "已创建脚本文件，但当前运行环境访问 wttr.in 连续超时。";
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Node resumed" });

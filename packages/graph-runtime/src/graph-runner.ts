@@ -22,6 +22,7 @@ import type {
   ExecutionContextSnapshot,
   GraphMutationOperation,
   NodeAttempt,
+  NodeActionForm,
   NodeResult,
   NodeResultEvidence,
   NodeResultOutput,
@@ -71,6 +72,7 @@ export type GraphNodeExecutionResult =
       prompt: string;
       reason: string;
       evidence?: GraphNodeExecutionEvidence;
+      actionForm?: NodeActionForm;
     }
   | {
       status: "waiting_for_approval";
@@ -406,6 +408,7 @@ function appendExecutionResult(input: {
           status: "current",
           waitKind: "user_input",
           error: input.result.reason,
+          actionForm: input.result.actionForm,
           evidence,
         },
       });

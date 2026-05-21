@@ -4,7 +4,7 @@ import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { startTaskPlanGenerationSession, useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
-import { dispatchTaskExecutionAction, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskExecutionDispatchResult, type TaskPlanState } from "../model/task-workspace-query";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -121,11 +121,28 @@ function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
   })) ?? [];
 }
 
-function withExecutionCheckpoint(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
-  if (!graphPlan || !checkpoint?.nodeId) return graphPlan;
+function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
+  if (!graphPlan) return graphPlan;
+
+  const clearNode = (node: TaskPlanGraphPlan["nodes"][number]) => ({
+    ...node,
+    checkpoint: undefined,
+    availableActions: [],
+    interactiveFields: [],
+    actionable: false,
+  });
+
+  if (!checkpoint?.nodeId) {
+    return {
+      ...graphPlan,
+      nodes: graphPlan.nodes.map(clearNode),
+      steps: graphPlan.steps.map(clearNode),
+    } satisfies TaskPlanGraphPlan;
+  }
 
   const decorateNode = (node: TaskPlanGraphPlan["nodes"][number]) => {
-    if (node.id !== checkpoint.nodeId) return node;
+    const clearedNode = clearNode(node);
+    if (node.id !== checkpoint.nodeId) return clearedNode;
     const actions = checkpoint.availableActions.map((action) => ({
       id: action.id,
       label: action.label,
@@ -136,7 +153,7 @@ function withExecutionCheckpoint(graphPlan: TaskPlanGraphPlan | null, checkpoint
       requiresPayload: action.requiresPayload,
     }));
     return {
-      ...node,
+      ...clearedNode,
       checkpoint,
       nextAction: checkpoint.message || node.nextAction,
       interactiveFields: checkpointFormFields(checkpoint),
@@ -235,11 +252,16 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       generationSession: null,
     } satisfies TaskPlanState,
   });
+  const currentExecutionQuery = useQuery({
+    queryKey: taskWorkspaceQueryKeys.currentExecution(task.id),
+    queryFn: () => fetchCurrentTaskExecution(task.id),
+  });
   const planState = planStateQuery.data;
   const [generationUserInstruction, setGenerationUserInstruction] = useState<string | null>(null);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
-  const [latestCheckpoint, setLatestCheckpoint] = useState<ExecutionCheckpoint | null>(null);
+  const currentExecution = currentExecutionQuery.data ?? null;
+  const latestCheckpoint = currentExecution?.checkpoint ?? null;
   const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? getPlanGenerationActivity(generationSession);
   const [graphPlan, setGraphPlan] = useState(() => taskPlanReadModelToGraphPlan(null));
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
@@ -353,7 +375,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     let cancelled = false;
     setIsGraphPlanPending(true);
     const timeoutId = window.setTimeout(() => {
-        const nextGraphPlan = withExecutionCheckpoint(taskPlanReadModelToGraphPlan(plan), latestCheckpoint);
+        const nextGraphPlan = withCanonicalExecutionActions(taskPlanReadModelToGraphPlan(plan), latestCheckpoint);
       if (cancelled) return;
       startTransition(() => {
         setGraphPlan(nextGraphPlan);
@@ -393,6 +415,14 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   const canAcceptPlan = canAcceptPlanFromFlow(planFlow);
   const acceptPlanError = getAcceptPlanErrorFromFlow(planFlow);
 
+  const refreshExecutionQueries = useCallback(async () => {
+    await Promise.all([
+      currentExecutionQuery.refetch(),
+      planStateQuery.refetch(),
+      refreshWorkspace(),
+    ]);
+  }, [currentExecutionQuery, planStateQuery, refreshWorkspace]);
+
   const acceptPlanMutation = useMutation({
     mutationFn: async (planId: string) => {
       const res = await api.tasks[":taskId"].plan.accept.$post({
@@ -427,10 +457,11 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       if (nextPlanState) {
         syncTaskDetailPlanFields(nextPlanState);
       }
+      await refreshExecutionQueries();
     } catch (cause) {
       setPlanFlow((current) => failPlanAccept(current, planId, cause instanceof Error ? cause.message : "Failed to accept plan"));
     }
-  }, [acceptPlanMutation, queryClient, syncTaskDetailPlanFields, task.id]);
+  }, [acceptPlanMutation, queryClient, refreshExecutionQueries, syncTaskDetailPlanFields, task.id]);
 
   const handleAcceptPlan = useCallback(async () => {
     if (!plan?.id) return;
@@ -446,6 +477,10 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       userInstruction,
     });
   }, [task.id]);
+
+  const setCurrentExecutionResult = useCallback((result: TaskExecutionDispatchResult) => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.currentExecution(task.id), result);
+  }, [queryClient, task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
@@ -466,23 +501,17 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
         } satisfies TaskPlanState;
       });
     });
-    await Promise.all([
-      planStateQuery.refetch(),
-      refreshWorkspace(),
-    ]);
-    setLatestCheckpoint(result.checkpoint);
+    setCurrentExecutionResult(result);
+    await refreshExecutionQueries();
     return result;
-  }, [planStateQuery, queryClient, refreshWorkspace, task.id]);
+  }, [queryClient, refreshExecutionQueries, setCurrentExecutionResult, task.id]);
 
   const submitCheckpointAction = useCallback(async (action: SubmitCheckpointActionInput) => {
     const result = await submitTaskCheckpointAction(task.id, action);
-    setLatestCheckpoint(result.execution.checkpoint);
-    await Promise.all([
-      planStateQuery.refetch(),
-      refreshWorkspace(),
-    ]);
+    setCurrentExecutionResult(result.execution);
+    await refreshExecutionQueries();
     return result.execution;
-  }, [planStateQuery, refreshWorkspace, task.id]);
+  }, [refreshExecutionQueries, setCurrentExecutionResult, task.id]);
 
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;
@@ -546,6 +575,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     generationUserInstruction,
     runtimeEvents,
     latestActivitySummary,
+    currentExecution,
     acceptPlanById,
     handleAcceptPlan,
     dispatchExecutionAction,

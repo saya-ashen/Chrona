@@ -163,7 +163,7 @@ export function TaskWorkspacePlanSection({
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
-  const hasCurrentOperationControls = hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
+  const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
   const handleRegeneratePlan = () => {

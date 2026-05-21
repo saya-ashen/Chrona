@@ -131,7 +131,10 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const pageData = pageQuery.data;
 
   const refreshWorkspace = useCallback(async (_options: RefreshOptions = {}) => {
-    await queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) }),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId) }),
+    ]);
   }, [queryClient, taskId]);
 
   const setTask = useCallback((value: React.SetStateAction<TaskData>) => {

@@ -1,8 +1,49 @@
-import type { CheckpointConfig, EffectivePlanNode } from "@chrona/contracts/ai";
+import type { CheckpointConfig, EffectivePlanNode, NodeActionForm, NodeActionFormField } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
 import { reviewCheckpointNodeCapability } from "../node-ai-capabilities";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
+
+function normalizeInputFieldType(type: string | undefined): NodeActionFormField["type"] {
+  if (type === "choice") return "select";
+  if (type === "text" || type === "textarea" || type === "select") return type;
+  return "text";
+}
+
+function actionFormForCheckpoint(input: {
+  config: CheckpointConfig;
+  title: string;
+}): NodeActionForm | undefined {
+  if (input.config.checkpointType === "input" && input.config.inputFields?.length) {
+    return {
+      instructions: input.config.prompt || `Please provide input for: ${input.title}`,
+      submitLabel: "Submit input",
+      inputFields: input.config.inputFields.map((field) => ({
+        name: field.name,
+        label: field.label,
+        type: normalizeInputFieldType(field.type),
+        required: field.required,
+        options: field.options,
+      })),
+    };
+  }
+
+  if (input.config.checkpointType === "choose" && input.config.options?.length) {
+    return {
+      instructions: input.config.prompt || `Choose an option for: ${input.title}`,
+      submitLabel: "Submit choice",
+      inputFields: [{
+        name: "choice",
+        label: input.title,
+        type: "select",
+        required: input.config.required,
+        options: input.config.options,
+      }],
+    };
+  }
+
+  return undefined;
+}
 
 export class CheckpointNodeExecutor implements NodeExecutor {
   readonly nodeType = "checkpoint" as const;
@@ -21,6 +62,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
     });
 
     const config = input.node.config as CheckpointConfig;
+    const actionForm = actionFormForCheckpoint({ config, title: input.node.title });
     if (input.inputFields) {
       const action = config.checkpointType === "approve" || config.checkpointType === "confirm"
         ? "approved"
@@ -65,6 +107,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
           prompt: config.prompt || `Please provide input for: ${input.node.title}`,
           reason: sessionDecision.reason,
           evidence: { sessionId: input.mainSession.id },
+          actionForm,
         };
       case "manual_only":
         return {
@@ -79,6 +122,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
             prompt: config.prompt,
             reason: `Checkpoint node ${input.node.id} requires user input`,
             evidence: { sessionId: input.mainSession.id },
+            actionForm,
           };
         }
         return reviewCheckpointNodeCapability({

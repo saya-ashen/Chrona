@@ -419,15 +419,19 @@ describe("task workspace page synchronization", () => {
     expect(result.current.planGenerationStatus).toBe("waiting_acceptance");
   });
 
-  it("uses accepted plan state over stale page task plan after accepting a draft", async () => {
+  it("refreshes workspace execution queries after accepting a draft", async () => {
     const draftPlan = planReadModel({ id: "plan-1", status: "draft", title: "Draft plan" });
     const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Accepted plan" });
+    const refreshWorkspace = vi.fn(async () => undefined);
     mocks.acceptResponse = { savedPlan: acceptedPlan };
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: acceptedPlan },
+    ];
 
     const { result } = renderHook(
       () => useTaskWorkspacePlanState(
         pageData({ taskStatus: "Ready", plan: draftPlan, aiPlanGenerationStatus: "waiting_acceptance" }).task,
-        vi.fn(async () => undefined),
+        refreshWorkspace,
       ),
       { wrapper: createQueryWrapper() },
     );
@@ -439,5 +443,6 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.plan?.status).toBe("accepted"));
     expect(result.current.plan?.summary).toBe("Accepted plan");
     expect(result.current.planGenerationStatus).toBe("accepted");
+    expect(refreshWorkspace).toHaveBeenCalledTimes(1);
   });
 });

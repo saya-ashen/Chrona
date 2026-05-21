@@ -27,6 +27,14 @@ export function createTaskExecutionService() {
       }
     },
 
+    async current(input: Parameters<typeof taskPlanExecution.current>[0]) {
+      try {
+        return await taskPlanExecution.current(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to load current execution state");
+      }
+    },
+
     async syncRuntimeResult(input: Parameters<typeof taskPlanExecution.syncRuntimeResult>[0]) {
       try {
         return await taskPlanExecution.syncRuntimeResult(input);
