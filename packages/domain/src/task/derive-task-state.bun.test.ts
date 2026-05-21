@@ -21,8 +21,8 @@ describe("deriveTaskState", () => {
       persistedStatus: "Blocked",
       displayState: "Attention Needed",
       blockReason: {
-        blockType: "execution_paused",
-        scope: "execution_session",
+        blockType: "node_blocked",
+        scope: "plan_node",
         actionRequired: "Check execution status",
       },
     });

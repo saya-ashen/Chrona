@@ -14,6 +14,7 @@ describe("runtime status model", () => {
     expect(runtimeProgressStatusForWaitKind("user_input")).toBe("waiting_for_user");
     expect(runtimeProgressStatusForWaitKind("approval")).toBe("waiting_for_approval");
     expect(runtimeProgressStatusForWaitKind("review")).toBe("waiting_for_approval");
+    expect(runtimeProgressStatusForWaitKind("replan_required")).toBe("waiting_for_approval");
     expect(runtimeProgressStatusForWaitKind("manual_action")).toBe("blocked");
     expect(runtimeProgressStatusForWaitKind(undefined)).toBe("blocked");
   });
@@ -40,6 +41,15 @@ describe("runtime status model", () => {
     expect(runtimeProgressStatusForNodes({
       readyNodeIds: [],
       runningNodeIds: [],
+      nodes: [{ id: "failed", status: "failed", reachable: true }],
+      blockedNodeIds: [],
+      failedNodeIds: ["failed"],
+      completedNodeIds: [],
+    })).toBe("failed");
+
+    expect(runtimeProgressStatusForNodes({
+      readyNodeIds: [],
+      runningNodeIds: [],
       nodes: [{ id: "done", status: "completed", reachable: true }],
       blockedNodeIds: [],
       failedNodeIds: [],
@@ -59,6 +69,11 @@ describe("runtime status model", () => {
     expect(executionSessionStatusForRuntimeProgress("running")).toBe("Active");
     expect(taskStatusForRuntimeProgress("running")).toBe("Running");
     expect(webPlanNodeStatusForRuntimeStatus("running")).toBe("active");
+
+    expect(planRunStatusForRuntimeProgress("failed")).toBe("failed");
+    expect(planGraphStatusForRuntimeProgress("failed")).toBe("paused");
+    expect(executionSessionStatusForRuntimeProgress("failed")).toBe("Paused");
+    expect(taskStatusForRuntimeProgress("failed")).toBe("Failed");
 
     expect(webPlanNodeStatusForRuntimeStatus("completed")).toBe("done");
     expect(webPlanNodeStatusForRuntimeStatus(undefined)).toBe("idle");

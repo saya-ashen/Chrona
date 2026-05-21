@@ -3,6 +3,8 @@ import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
+  checkpointActionBodySchema,
+  checkpointActionParamSchema,
   executionActionBodySchema,
   executionActionParamSchema,
 } from "@chrona/contracts/api";
@@ -219,6 +221,27 @@ export function createExecutionRoutes(engine: ChronaEngine) {
           return error(c, httpError.message, httpError.status);
         }
         return error(c, cause instanceof Error ? cause.message : "Failed to dispatch execution action", 500);
+      }
+    },
+  ).post(
+    "/tasks/:taskId/execution/checkpoint/:checkpointId/actions",
+    zValidator("param", checkpointActionParamSchema),
+    zValidator("json", checkpointActionBodySchema),
+    async (c) => {
+      try {
+        const { taskId, checkpointId } = c.req.valid("param");
+        const action = c.req.valid("json");
+        const result = await engine.tasks.execution.submitCheckpointAction({
+          taskId,
+          action: { checkpointId, ...action },
+        });
+        return c.json(result);
+      } catch (cause) {
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return error(c, cause instanceof Error ? cause.message : "Failed to submit checkpoint action", 500);
       }
     },
   );

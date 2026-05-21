@@ -34,6 +34,7 @@ export type GraphExecutionStatus =
   | "waiting_for_user"
   | "waiting_for_approval"
   | "blocked"
+  | "failed"
   | "completed"
   | "cancelled"
   | "unsupported";
@@ -449,7 +450,7 @@ function appendExecutionResult(input: {
         result: {
           ...base,
           status: "current",
-          waitKind: "approval",
+          waitKind: "replan_required",
           error: input.result.reason,
           evidence,
           review: {
@@ -518,8 +519,9 @@ function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {
     case "waiting_for_user":
       return "user_input";
     case "waiting_for_approval":
-    case "replan_required":
       return "approval";
+    case "replan_required":
+      return "replan_required";
     case "blocked":
       return "manual_action";
     default:
@@ -782,7 +784,7 @@ export async function runGraphExecution<TContext = unknown>(
       if (result.status === "failed") {
         const failedEffective = resolveEffectivePlanGraph(state);
         return {
-          status: "blocked",
+          status: "failed",
           currentNodeId: nextNodeId,
           executedNodeIds,
           effective: failedEffective,
@@ -1181,7 +1183,7 @@ export function createGraphRuntime<TContext = unknown>(
           if (!command.input.approved) {
             const effective = resolveEffectivePlanGraph(approvedState);
             return {
-              status: "blocked",
+              status: "waiting_for_approval",
               currentNodeId: command.input.nodeId,
               executedNodeIds: [],
               effective,
@@ -1326,7 +1328,7 @@ export function createGraphRuntime<TContext = unknown>(
                     : "running"
                   : command.externalResult.status === "blocked"
                   ? "blocked"
-                  : "blocked",
+                  : "failed",
               currentNodeId: command.externalResult.status === "done" ? null : command.externalResult.nodeId,
               executedNodeIds: [],
               effective,

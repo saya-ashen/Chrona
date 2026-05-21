@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { ChevronDown, ChevronUp, Copy, Maximize2, Minimize2 } from "lucide-react";
-import type { ExecutionActionInput, NodeResultOutput } from "@chrona/contracts/ai";
+import type { NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import {
@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
 import {
   buildDefaultWorkspaceActionFields,
-  buildWorkspaceActionInput,
+  buildWorkspaceCheckpointActionInput,
   getWorkspaceActionDisabledReason,
   pickDefaultWorkspaceAction,
 } from "../model/task-workspace-actions";
@@ -307,13 +307,13 @@ function hasSubmittedInputFields(inputFields: Record<string, string> | undefined
 export function WorkspaceNodeActionControls({
   node,
   disabledActionReason,
-  onDispatchExecutionAction,
+  onSubmitCheckpointAction,
   className,
 }: {
   node: PlanNodeDataModel;
   disabledActionReason?: string;
-  onDispatchExecutionAction: (
-    action: ExecutionActionInput,
+  onSubmitCheckpointAction?: (
+    action: SubmitCheckpointActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
   className?: string;
 }) {
@@ -369,7 +369,11 @@ export function WorkspaceNodeActionControls({
     setIsDispatching(true);
     setActionStatus(null);
     try {
-      const result = await onDispatchExecutionAction(buildWorkspaceActionInput({
+      if (!onSubmitCheckpointAction) {
+        throw new Error("Checkpoint actions are not available for this view.");
+      }
+
+      const result = await onSubmitCheckpointAction(buildWorkspaceCheckpointActionInput({
         node,
         selectedAction,
         fields,
@@ -524,7 +528,7 @@ export function TaskWorkspaceNodeDetailPanel({
   onDrawerSizeChange,
   preferredTab,
   onPreferredTabApplied,
-  onDispatchExecutionAction,
+  onSubmitCheckpointAction,
 }: {
   detail: NodeDetailPanelState;
   selectedNodes: PlanNodeDataModel[];
@@ -533,8 +537,8 @@ export function TaskWorkspaceNodeDetailPanel({
   onDrawerSizeChange?: (size: NodeDrawerSize) => void;
   preferredTab?: NodeDetailPanelState["tabs"][number] | null;
   onPreferredTabApplied?: () => void;
-  onDispatchExecutionAction: (
-    action: ExecutionActionInput,
+  onSubmitCheckpointAction?: (
+    action: SubmitCheckpointActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
 }) {
   const currentNode = detail.currentNode;
@@ -681,7 +685,7 @@ export function TaskWorkspaceNodeDetailPanel({
             <WorkspaceNodeActionControls
               node={node}
               disabledActionReason={detail.disabledActionReason}
-              onDispatchExecutionAction={onDispatchExecutionAction}
+              onSubmitCheckpointAction={onSubmitCheckpointAction}
             />
           </TabsContent>
           <TabsContent value="configuration" aria-label={`${TAB_LABELS.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>

@@ -137,36 +137,36 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
 
   if (input.executionSession?.status === "Paused") {
     const pauseReason = input.executionSession.pauseReason;
-    if (pauseReason === "needs_user_input") {
+    if (pauseReason === "user_input") {
       return {
         persistedStatus: "WaitingForInput",
         displayState: null,
         blockReason: {
-          blockType: "execution_paused_input",
-          scope: "execution_session",
+          blockType: "human_input_required",
+          scope: "plan_node",
           actionRequired: "Provide Input",
         },
         blockSince: activeRun?.updatedAt ?? null,
       };
     }
-    if (pauseReason === "needs_approval") {
+    if (pauseReason === "approval" || pauseReason === "review" || pauseReason === "replan_required") {
       return {
         persistedStatus: "WaitingForApproval",
         displayState: null,
         blockReason: {
-          blockType: "execution_paused_approval",
-          scope: "execution_session",
+          blockType: pauseReason === "replan_required" ? "replan_required" : "approval_required",
+          scope: "plan_node",
           actionRequired: "Review Step Output",
         },
         blockSince: activeRun?.updatedAt ?? null,
       };
     }
-    if (pauseReason === "provider_unavailable") {
+    if (pauseReason === "capability_unavailable") {
       return {
         persistedStatus: "Blocked",
         displayState: "Attention Needed",
         blockReason: {
-          blockType: "provider_unavailable",
+          blockType: "capability_unavailable",
           scope: "runtime",
           actionRequired: "Check provider availability",
         },
@@ -177,8 +177,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
       persistedStatus: "Blocked",
       displayState: "Attention Needed",
       blockReason: {
-        blockType: "execution_paused",
-        scope: "execution_session",
+        blockType: "node_blocked",
+        scope: "plan_node",
         actionRequired: "Check execution status",
       },
       blockSince: activeRun?.updatedAt ?? null,

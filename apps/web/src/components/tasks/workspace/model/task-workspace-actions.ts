@@ -1,4 +1,4 @@
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type {
   PlanNodeAction,
   PlanNodeDataModel,
@@ -154,83 +154,105 @@ export function getWorkspaceActionDisabledReason(input: {
   return null;
 }
 
-export function buildWorkspaceActionInput(input: {
+export function buildWorkspaceCheckpointActionInput(input: {
   node: PlanNodeDataModel;
   selectedAction: PlanNodeAction | null;
   fields: PlanNodeField[];
   values: Record<string, string>;
-}): ExecutionActionInput {
-  const kind = input.selectedAction?.kind;
+}): SubmitCheckpointActionInput {
+  const checkpointId = input.selectedAction?.checkpointId ?? input.node.checkpoint?.id;
+  const checkpointAction = input.selectedAction?.checkpointAction ?? actionKindForNode(input.node, input.selectedAction);
+
+  if (!checkpointId) {
+    throw new Error("No active checkpoint is available for this node.");
+  }
+
+  if (!checkpointAction) {
+    throw new Error("No checkpoint action is available for this node.");
+  }
+
   const inputText = buildWorkspaceInputText(input.fields, input.values);
   const inputFields = buildWorkspaceInputFields(input.fields, input.values);
-  const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
 
-  if (
-    kind === "approve" ||
-    input.node.interactionType === "approve" ||
-    input.node.interactionType === "confirm"
-  ) {
-    return {
-      action: "resume_with_approval",
-      nodeId: input.node.id,
-      decision: selectedDecision?.includes("reject") ? "reject" : "approve",
-      feedback: inputText || undefined,
-    };
+  return {
+    checkpointId,
+    action: checkpointAction,
+    payload: buildCheckpointActionPayload({
+      action: checkpointAction,
+      inputFields,
+      inputText,
+      fallbackText: input.node.nextAction ?? undefined,
+    }),
+  };
+}
+
+function actionKindForNode(node: PlanNodeDataModel, selectedAction: PlanNodeAction | null): CheckpointActionKind | null {
+  const kind = selectedAction?.kind;
+
+  if (kind === "approve" || node.interactionType === "approve" || node.interactionType === "confirm") {
+    return "approve_result";
   }
 
   if (kind === "resolve") {
-    if (input.fields.length > 0) {
-      return {
-        action: "resume_with_input",
-        nodeId: input.node.id,
-        inputFields,
-      };
-    }
+    return (node.interactiveFields?.length ?? 0) > 0 ? "submit_input" : "resume_after_unblock";
+  }
 
+  if (kind === "retry" || node.interactionType === "retry") {
+    return "retry_node";
+  }
+
+  if (kind === "trigger" && node.executionMode === "manual") {
+    return "mark_node_completed";
+  }
+
+  if (node.interactionType === "wait") {
+    return "resume_after_unblock";
+  }
+
+  return "submit_input";
+}
+
+function buildCheckpointActionPayload(input: {
+  action: CheckpointActionKind;
+  inputFields: Record<string, string>;
+  inputText: string;
+  fallbackText?: string;
+}) {
+  const message = input.inputText || input.fallbackText;
+
+  if (input.action === "submit_input") {
     return {
-      action: "resume_after_unblock",
-      nodeId: input.node.id,
-      note: inputText || input.node.nextAction || undefined,
+      inputFields: input.inputFields,
+      message,
     };
   }
 
-  if (kind === "retry" || input.node.interactionType === "retry") {
+  if (input.action === "mark_node_completed") {
     return {
-      action: "retry_node",
-      nodeId: input.node.id,
-      prompt: inputText || input.node.nextAction || undefined,
+      summary: message,
+      output: input.inputText || undefined,
     };
   }
 
-  if (kind === "trigger" || input.node.interactionType === "execute") {
-    if (input.node.executionMode === "manual") {
-      return {
-        action: "complete_manual_node",
-        nodeId: input.node.id,
-        summary: inputText || input.node.nextAction || `Manual node ${input.node.title} completed`,
-        output: inputText || undefined,
-      };
-    }
-
+  if (input.action === "reject_result" || input.action === "request_changes") {
     return {
-      action: "start_manual",
-      prompt: inputText || input.node.nextAction || undefined,
+      feedback: message,
     };
   }
 
-  if (input.node.interactionType === "wait") {
+  if (input.action === "retry_node") {
     return {
-      action: "resume_after_unblock",
-      nodeId: input.node.id,
-      note: inputText || input.node.nextAction || undefined,
+      prompt: message,
     };
   }
 
-  return {
-    action: "resume_with_input",
-    nodeId: input.node.id,
-    inputFields,
-  };
+  if (input.action === "resume_after_unblock" || input.action === "request_replan" || input.action === "cancel_session" || input.action === "fail_task") {
+    return {
+      reason: message,
+    };
+  }
+
+  return message ? { message } : undefined;
 }
 
 function buildWorkspaceInputFields(fields: PlanNodeField[], values: Record<string, string>) {

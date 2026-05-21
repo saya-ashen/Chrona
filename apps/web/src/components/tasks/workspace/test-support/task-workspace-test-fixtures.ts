@@ -29,6 +29,7 @@ export function createTaskWorkspaceFixtureNode(
     inputFields: input.inputFields,
     resultOutputs: input.resultOutputs,
     resultEvidence: input.resultEvidence,
+    checkpoint: input.checkpoint,
     availableActions: input.availableActions,
     interactiveFields: input.interactiveFields,
     requiresHumanInput: input.requiresHumanInput,

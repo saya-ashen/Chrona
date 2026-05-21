@@ -322,7 +322,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(session.pauseReason).toBe("approval");
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
-    expect(updatedTask.status).toBe(TaskStatus.Blocked);
+    expect(updatedTask.status).toBe(TaskStatus.WaitingForApproval);
   });
 
   it("forwards runtime events from task node execution", async () => {
@@ -583,7 +583,7 @@ describe("plan-runner task executor approval flows", () => {
       action: { action: "start_manual" },
     });
 
-    expect(result.status).toBe("blocked");
+    expect(result.status).toBe("failed");
     expect(result.message).toContain("Gateway refused the run");
     expect(result.errorDetails).toMatchObject({
       runtimeName: "openclaw",
@@ -682,19 +682,25 @@ describe("plan-runner task executor approval flows", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_reject_approval");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    await taskPlanExecution.dispatch({
+    const waiting = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
     });
+    expect(waiting.checkpoint).toMatchObject({
+      kind: "approval",
+      nodeId: "task_node",
+    });
 
-    const rejected = await taskPlanExecution.dispatch({
+    const rejectedAction = await taskPlanExecution.submitCheckpointAction({
       taskId: task.id,
       action: {
-        action: "resume_with_approval",
-        decision: "reject",
-        feedback: "not acceptable",
+        checkpointId: waiting.checkpoint!.id,
+        action: "reject_result",
+        payload: { feedback: "not acceptable" },
       },
     });
+    expect(rejectedAction.transition.type).toBe("stay_paused");
+    const rejected = rejectedAction.execution;
 
     expect(rejected.status).toBe("waiting_for_approval");
     expect(rejected.currentNodeId).toBe("task_node");
@@ -751,6 +757,11 @@ describe("plan-runner task executor approval flows", () => {
 
     expect(result.status).toBe("waiting_for_approval");
     expect(result.currentNodeId).toBe("task_node");
+    expect(result.checkpoint).toMatchObject({
+      kind: "replan_required",
+      nodeId: "task_node",
+    });
+    expect(result.checkpoint?.availableActions.map((action) => action.id)).toContain("request_replan");
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
@@ -758,7 +769,7 @@ describe("plan-runner task executor approval flows", () => {
     expect(persisted?.results[0]).toMatchObject({
       nodeId: "task_node",
       status: "current",
-      waitKind: "approval",
+      waitKind: "replan_required",
       error: "Execution context changed, please replan",
       review: {
         required: true,
@@ -772,7 +783,7 @@ describe("plan-runner task executor approval flows", () => {
       orderBy: { createdAt: "desc" },
     });
     expect(session.status).toBe("Paused");
-    expect(session.pauseReason).toBe("approval");
+    expect(session.pauseReason).toBe("replan_required");
   });
 
   it("ignores late node result reports after execution completed", async () => {

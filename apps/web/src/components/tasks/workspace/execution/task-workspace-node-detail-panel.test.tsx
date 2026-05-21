@@ -5,6 +5,20 @@ import { TaskWorkspaceNodeDetailPanel } from "./task-workspace-node-detail-panel
 import { createTaskWorkspaceFixtureNode } from "../test-support/task-workspace-test-fixtures";
 import type { NodeDetailPanelState } from "../model/task-workspace-types";
 
+const checkpoint = {
+  id: "run-1:approval:user_input",
+  taskId: "task-1",
+  sessionId: "session-1",
+  planRunId: "run-1",
+  nodeId: "approval",
+  kind: "user_input" as const,
+  title: "Action required",
+  message: "Continue node",
+  severity: "info" as const,
+  availableActions: [],
+  createdAt: "2026-05-21T00:00:00.000Z",
+};
+
 function detail(overrides: Partial<NodeDetailPanelState> = {}): NodeDetailPanelState {
   const currentNode = overrides.currentNode ?? null;
 
@@ -44,7 +58,7 @@ if (!HTMLElement.prototype.scrollIntoView) {
 
 describe("TaskWorkspaceNodeDetailPanel", () => {
   it("renders the empty node detail state", () => {
-    render(<TaskWorkspaceNodeDetailPanel detail={detail()} selectedNodes={[]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail()} selectedNodes={[]} onSubmitCheckpointAction={vi.fn()} />);
 
     expect(screen.getByRole("region", { name: "Current node details" })).toBeInTheDocument();
     expect(screen.getByText("No active node selected")).toBeInTheDocument();
@@ -64,7 +78,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       nextAction: "Approve or request changes",
       interactionType: "approve",
       dependencies: ["research"],
-      availableActions: [{ id: "approve", label: "Accept", kind: "approve", emphasis: "primary" }],
+      checkpoint,
+      availableActions: [{ id: "approve_result", label: "Accept", kind: "approve", emphasis: "primary", checkpointId: checkpoint.id, checkpointAction: "approve_result" }],
       interactiveFields: [{ key: "checkpoint:decision", label: "Decision", value: "", control: "approval", required: true }],
       completionSummary: "Generated patch touches task workspace only.",
       resultOutputs: [{ kind: "text", content: "Patch summary" }],
@@ -72,7 +87,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed", autoRefreshEnabled: true })} selectedNodes={[node]} onDispatchExecutionAction={dispatchAction} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed", autoRefreshEnabled: true })} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
 
     expect(screen.getByRole("heading", { name: "Current node: Approve generated patch" })).toBeInTheDocument();
     expect(screen.getByText("Step 1/1")).toBeInTheDocument();
@@ -99,9 +114,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     fireEvent.click(await screen.findByRole("option", { name: "Approve" }));
     fireEvent.click(screen.getByRole("button", { name: "Send Accept" }));
     await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith(expect.objectContaining({
-      action: "resume_with_approval",
-      nodeId: "approval",
-      decision: "approve",
+      checkpointId: checkpoint.id,
+      action: "approve_result",
     })));
 
     expect(screen.queryByRole("tab", { name: "Configuration" })).not.toBeInTheDocument();
@@ -119,6 +133,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       title: "Collect city",
       status: "waiting_for_user",
       interactionType: "input",
+      checkpoint: { ...checkpoint, id: "run-1:input-node:user_input", nodeId: "input-node" },
       availableActions: [],
       interactiveFields: [
         { key: "city", label: "默认城市", value: "", required: true },
@@ -127,20 +142,23 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       nextAction: "Provide missing task details",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed" })} selectedNodes={[node]} onDispatchExecutionAction={dispatchAction} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed" })} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
-    const submit = screen.getByRole("button", { name: "Send input" });
-    expect(submit).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send input" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/默认城市/), { target: { value: "北京" } });
     fireEvent.change(screen.getByLabelText(/额外需求/), { target: { value: "无" } });
-    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send input" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Send input" }));
 
     await waitFor(() => expect(dispatchAction).toHaveBeenCalledWith({
-      action: "resume_with_input",
-      nodeId: "input-node",
-      inputFields: { city: "北京", extra: "无" },
+      checkpointId: "run-1:input-node:user_input",
+      action: "submit_input",
+      payload: {
+        inputFields: { city: "北京", extra: "无" },
+        message: "默认城市: 北京\n额外需求: 无",
+      },
     }));
     expect(await screen.findByRole("status")).toHaveTextContent("Input sent");
   });
@@ -160,7 +178,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       nextAction: "Provide missing task details",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -205,7 +223,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       }],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -234,7 +252,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       resultOutputs: [{ kind: "text", content: "Patch summary" }],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy result" }));
 
@@ -253,7 +271,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       availableActions: [],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, disabledActionReason: "No actions are available for this node." })} selectedNodes={[node]} onDispatchExecutionAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, disabledActionReason: "No actions are available for this node." })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 

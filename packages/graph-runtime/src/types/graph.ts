@@ -111,6 +111,7 @@ export type WaitKind =
   | "user_input"
   | "approval"
   | "review"
+  | "replan_required"
   | "manual_action"
   | "external_dependency"
   | "capability_unavailable";

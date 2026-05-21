@@ -3,11 +3,25 @@ import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/
 import {
   buildDefaultWorkspaceActionFields,
   buildWorkspaceStateTreatment,
-  buildWorkspaceActionInput,
+  buildWorkspaceCheckpointActionInput,
   getMissingWorkspaceActionFields,
   getWorkspaceActionDisabledReason,
   pickDefaultWorkspaceAction,
-} from "./task-workspace-actions";
+  } from "./task-workspace-actions";
+
+const checkpoint = {
+  id: "run-1:node-1:user_input",
+  taskId: "task-1",
+  sessionId: "session-1",
+  planRunId: "run-1",
+  nodeId: "node-1",
+  kind: "user_input" as const,
+  title: "Action required",
+  message: "Continue node",
+  severity: "info" as const,
+  availableActions: [],
+  createdAt: "2026-05-21T00:00:00.000Z",
+};
 
 function node(overrides: Partial<PlanNodeDataModel> = {}): PlanNodeDataModel {
   return {
@@ -75,72 +89,75 @@ describe("task workspace actions", () => {
     expect(getWorkspaceActionDisabledReason({ fields, values: { decision: "Approve" }, isDispatching: true })).toBe("Action is already being sent.");
   });
 
-  it("maps approval and manual execution nodes to existing backend actions", () => {
-    expect(buildWorkspaceActionInput({
-      node: node({ interactionType: "approve" }),
-      selectedAction: { id: "approve", label: "Approve", kind: "approve" },
+  it("maps approval and manual execution nodes to checkpoint actions", () => {
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ interactionType: "approve", checkpoint }),
+      selectedAction: { id: "approve_result", label: "Approve", kind: "approve", checkpointId: checkpoint.id, checkpointAction: "approve_result" },
       fields: [{ key: "checkpoint:decision", label: "Decision", value: "", control: "approval" }],
       values: { "checkpoint:decision": "Reject" },
-    })).toMatchObject({ action: "resume_with_approval", nodeId: "node-1", decision: "reject" });
+    })).toMatchObject({ checkpointId: checkpoint.id, action: "approve_result" });
 
-    expect(buildWorkspaceActionInput({
-      node: node({ interactionType: "confirm" }),
-      selectedAction: { id: "confirm", label: "审批", kind: "approve" },
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ interactionType: "confirm", checkpoint }),
+      selectedAction: { id: "reject_result", label: "Reject", kind: "approve", checkpointId: checkpoint.id, checkpointAction: "reject_result" },
       fields: [{ key: "checkpoint:decision", label: "审批决策", value: "", control: "approval" }],
-      values: { "checkpoint:decision": "Approve" },
-    })).toMatchObject({ action: "resume_with_approval", nodeId: "node-1", decision: "approve" });
+      values: { "checkpoint:decision": "Needs changes" },
+    })).toMatchObject({ checkpointId: checkpoint.id, action: "reject_result", payload: { feedback: "审批决策: Needs changes" } });
 
-    expect(buildWorkspaceActionInput({
-      node: node({ interactionType: "execute", executionMode: "manual" }),
-      selectedAction: { id: "done", label: "Mark done", kind: "trigger" },
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ interactionType: "execute", executionMode: "manual", checkpoint }),
+      selectedAction: { id: "mark_node_completed", label: "Mark done", kind: "trigger", checkpointId: checkpoint.id, checkpointAction: "mark_node_completed" },
       fields: [{ key: "summary", label: "Summary", value: "" }],
       values: { summary: "Completed outside Chrona" },
-    })).toMatchObject({ action: "complete_manual_node", nodeId: "node-1", summary: "Summary: Completed outside Chrona" });
+    })).toMatchObject({ checkpointId: checkpoint.id, action: "mark_node_completed", payload: { summary: "Summary: Completed outside Chrona" } });
   });
 
   it("maps resolve actions to resume_after_unblock without changing retry semantics", () => {
-    expect(buildWorkspaceActionInput({
-      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network access recovered" }),
-      selectedAction: { id: "resolve", label: "Resolve blocker", kind: "resolve" },
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network access recovered", checkpoint }),
+      selectedAction: { id: "resume_after_unblock", label: "Resolve blocker", kind: "resolve", checkpointId: checkpoint.id, checkpointAction: "resume_after_unblock" },
       fields: [],
       values: {},
     })).toEqual({
+      checkpointId: checkpoint.id,
       action: "resume_after_unblock",
-      nodeId: "node-1",
-      note: "Network access recovered",
+      payload: { reason: "Network access recovered" },
     });
 
-    expect(buildWorkspaceActionInput({
-      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network timeout" }),
-      selectedAction: { id: "retry", label: "Retry node", kind: "retry" },
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Network timeout", checkpoint }),
+      selectedAction: { id: "retry_node", label: "Retry node", kind: "retry", checkpointId: checkpoint.id, checkpointAction: "retry_node" },
       fields: [],
       values: {},
     })).toEqual({
+      checkpointId: checkpoint.id,
       action: "retry_node",
-      nodeId: "node-1",
-      prompt: "Network timeout",
+      payload: { prompt: "Network timeout" },
     });
   });
 
-  it("maps resolve actions with form fields to resume_with_input", () => {
-    expect(buildWorkspaceActionInput({
-      node: node({ status: "blocked", interactionType: "retry", nextAction: "Provide credentials" }),
-      selectedAction: { id: "resolve", label: "Resolve blocker", kind: "resolve" },
+  it("maps resolve actions with form fields to checkpoint input", () => {
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ status: "blocked", interactionType: "retry", nextAction: "Provide credentials", checkpoint }),
+      selectedAction: { id: "submit_input", label: "Resolve blocker", kind: "resolve", checkpointId: checkpoint.id, checkpointAction: "submit_input" },
       fields: [
         { key: "apiKey", label: "API key", value: "", required: true },
         { key: "notes", label: "Notes", value: "" },
       ],
       values: { apiKey: "secret", notes: "Use production account" },
     })).toEqual({
-      action: "resume_with_input",
-      nodeId: "node-1",
-      inputFields: { apiKey: "secret", notes: "Use production account" },
+      checkpointId: checkpoint.id,
+      action: "submit_input",
+      payload: {
+        inputFields: { apiKey: "secret", notes: "Use production account" },
+        message: "API key: secret\nNotes: Use production account",
+      },
     });
   });
 
-  it("maps field-only input nodes to resume_with_input", () => {
-    expect(buildWorkspaceActionInput({
-      node: node({ nextAction: "Collect missing information" }),
+  it("maps field-only input nodes to checkpoint input", () => {
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ nextAction: "Collect missing information", checkpoint }),
       selectedAction: null,
       fields: [
         { key: "city", label: "默认城市", value: "", required: true },
@@ -148,9 +165,12 @@ describe("task workspace actions", () => {
       ],
       values: { city: "北京", extra: "无" },
     })).toEqual({
-      action: "resume_with_input",
-      nodeId: "node-1",
-      inputFields: { city: "北京", extra: "无" },
+      checkpointId: checkpoint.id,
+      action: "submit_input",
+      payload: {
+        inputFields: { city: "北京", extra: "无" },
+        message: "默认城市: 北京\n额外需求: 无",
+      },
     });
   });
 });

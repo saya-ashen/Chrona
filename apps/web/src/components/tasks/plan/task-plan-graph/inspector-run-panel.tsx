@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
+import type { NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
+import { buildWorkspaceCheckpointActionInput } from "@/components/tasks/workspace/model/task-workspace-actions";
 import { interactionLabel } from "./logic";
 import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
@@ -377,98 +378,12 @@ function summarizeFieldValues(fields: PlanNodeField[], values: Record<string, st
     .join(" · ");
 }
 
-function buildInputText(fields: PlanNodeField[], values: Record<string, string>) {
-  const parts = fields
-    .map((field) => {
-      const value = values[field.key]?.trim();
-      return value ? `${field.label}: ${value}` : null;
-    })
-    .filter((value): value is string => Boolean(value));
-
-  return parts.join("\n");
-}
-
-function buildInputFields(fields: PlanNodeField[], values: Record<string, string>) {
-  return Object.fromEntries(
-    fields
-      .map((field) => [field.key, values[field.key]?.trim() ?? ""] as const)
-      .filter(([, value]) => value.length > 0),
-  );
-}
-
-function buildExecutionAction(input: {
-  node: PlanNodeDataModel;
-  selectedAction: PlanNodeAction | null;
-  fields: PlanNodeField[];
-  values: Record<string, string>;
-}): ExecutionActionInput {
-  const kind = input.selectedAction?.kind;
-  const inputText = buildInputText(input.fields, input.values);
-  const inputFields = buildInputFields(input.fields, input.values);
-  const selectedDecision = input.values["checkpoint:decision"]?.trim().toLowerCase();
-
-  if (kind === "approve" || input.node.interactionType === "approve") {
-    return {
-      action: "resume_with_approval",
-      nodeId: input.node.id,
-      decision: selectedDecision?.includes("reject") ? "reject" : "approve",
-      feedback: inputText || undefined,
-    };
-  }
-
-  if (kind === "resolve") {
-    return {
-      action: "resume_after_unblock",
-      nodeId: input.node.id,
-      note: inputText || input.node.nextAction || undefined,
-    };
-  }
-
-  if (kind === "retry" || input.node.interactionType === "retry") {
-    return {
-      action: "retry_node",
-      nodeId: input.node.id,
-      prompt: inputText || input.node.nextAction || undefined,
-    };
-  }
-
-  if (kind === "trigger" || input.node.interactionType === "execute") {
-    if (input.node.executionMode === "manual") {
-      return {
-        action: "complete_manual_node",
-        nodeId: input.node.id,
-        summary: inputText || input.node.nextAction || `Manual node ${input.node.title} completed`,
-        output: inputText || undefined,
-      };
-    }
-
-    return {
-      action: "start_manual",
-      prompt: inputText || input.node.nextAction || undefined,
-    };
-  }
-
-  if (input.node.interactionType === "wait") {
-    return {
-      action: "resume_after_unblock",
-      nodeId: input.node.id,
-      note: inputText || input.node.nextAction || undefined,
-    };
-  }
-
-  return {
-    action: "resume_with_input",
-    nodeId: input.node.id,
-    inputFields,
-  };
-}
-
 export function TaskPlanGraphInspectorRunPanel({
   node,
-  onDispatchExecutionAction,
+  onSubmitCheckpointAction,
 }: {
   node: PlanNodeDataModel;
-  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<TaskExecutionDispatchResult>;
+  onSubmitCheckpointAction?: (action: SubmitCheckpointActionInput) => Promise<TaskExecutionDispatchResult>;
 }) {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() => defaultActionForNode(node));
   const form = useForm<Record<string, string>>({
@@ -508,14 +423,14 @@ export function TaskPlanGraphInspectorRunPanel({
       ? primarySubmitLabel
       : selectedAction?.label ?? node.nextAction ?? "Run action";
 
-    if (!onDispatchExecutionAction) {
+    if (!onSubmitCheckpointAction) {
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "No backend handler is connected for this surface." }, ...current].slice(0, 4));
       return;
     }
 
     setIsDispatching(true);
     try {
-      const result = await onDispatchExecutionAction(buildExecutionAction({ node, selectedAction, fields: interactiveFields, values }));
+      const result = await onSubmitCheckpointAction(buildWorkspaceCheckpointActionInput({ node, selectedAction, fields: interactiveFields, values }));
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
@@ -527,20 +442,19 @@ export function TaskPlanGraphInspectorRunPanel({
 
   async function handleMarkDone() {
     const label = "Mark done";
-    const summary = buildInputText(interactiveFields, fieldValues) || runResult || `Manual node ${node.title} completed`;
+    const summary = summarizeFieldValues(interactiveFields, fieldValues) || runResult || `Manual node ${node.title} completed`;
 
-    if (!onDispatchExecutionAction) {
+    if (!onSubmitCheckpointAction || !node.checkpoint) {
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: "No backend handler is connected for this surface." }, ...current].slice(0, 4));
       return;
     }
 
     setIsDispatching(true);
     try {
-      const result = await onDispatchExecutionAction({
-        action: "complete_manual_node",
-        nodeId: node.id,
-        summary,
-        output: summary,
+      const result = await onSubmitCheckpointAction({
+        checkpointId: node.checkpoint.id,
+        action: "mark_node_completed",
+        payload: { summary, output: summary },
       });
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
     } catch (cause) {
@@ -641,7 +555,7 @@ export function TaskPlanGraphInspectorRunPanel({
                 {isDispatching ? "Sending..." : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
               </Button>
 
-              {node.status === "active" || node.active ? (
+              {(node.status === "active" || node.active) && node.checkpoint ? (
                 <Button
                   type="button"
                   disabled={isDispatching}

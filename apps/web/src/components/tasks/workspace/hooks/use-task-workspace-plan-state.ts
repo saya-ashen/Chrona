@@ -1,9 +1,10 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
+import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
-import { dispatchTaskExecutionAction, fetchTaskPlanState, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { dispatchTaskExecutionAction, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -16,7 +17,7 @@ import {
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
-import type { ExecutionActionInput, PlanExecutionSSEEvent } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 
@@ -88,6 +89,54 @@ function selectWorkspacePlan(
   if (!pagePlan) return planStatePlan ?? null;
   if (!planStatePlan) return pagePlan;
   return pagePlan.id === planStatePlan.id ? pagePlan : planStatePlan;
+}
+
+function checkpointActionEmphasis(style: ExecutionCheckpoint["availableActions"][number]["style"]) {
+  if (style === "primary") return "primary" as const;
+  if (style === "danger") return "danger" as const;
+  return "default" as const;
+}
+
+function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
+  return checkpoint.form?.inputFields.map((field) => ({
+    key: field.name,
+    label: field.label,
+    value: field.value ?? "",
+    control: field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const,
+    required: field.required,
+    options: field.options,
+  })) ?? [];
+}
+
+function withExecutionCheckpoint(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
+  if (!graphPlan || !checkpoint?.nodeId) return graphPlan;
+
+  const decorateNode = (node: TaskPlanGraphPlan["nodes"][number]) => {
+    if (node.id !== checkpoint.nodeId) return node;
+    const actions = checkpoint.availableActions.map((action) => ({
+      id: action.id,
+      label: action.label,
+      kind: action.id === "retry_node" ? "retry" as const : action.id === "resume_after_unblock" ? "resolve" as const : "input" as const,
+      emphasis: checkpointActionEmphasis(action.style),
+      checkpointId: checkpoint.id,
+      checkpointAction: action.id,
+      requiresPayload: action.requiresPayload,
+    }));
+    return {
+      ...node,
+      checkpoint,
+      nextAction: checkpoint.message || node.nextAction,
+      interactiveFields: checkpointFormFields(checkpoint),
+      availableActions: actions,
+      actionable: actions.length > 0,
+    };
+  };
+
+  return {
+    ...graphPlan,
+    nodes: graphPlan.nodes.map(decorateNode),
+    steps: graphPlan.steps.map(decorateNode),
+  } satisfies TaskPlanGraphPlan;
 }
 
 function withGeneratedPlanResult(
@@ -177,6 +226,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
+  const [latestCheckpoint, setLatestCheckpoint] = useState<ExecutionCheckpoint | null>(null);
   const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? getPlanGenerationActivity(generationSession);
   const [graphPlan, setGraphPlan] = useState(() => taskPlanReadModelToGraphPlan(null));
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
@@ -266,7 +316,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     let cancelled = false;
     setIsGraphPlanPending(true);
     const timeoutId = window.setTimeout(() => {
-      const nextGraphPlan = taskPlanReadModelToGraphPlan(plan);
+        const nextGraphPlan = withExecutionCheckpoint(taskPlanReadModelToGraphPlan(plan), latestCheckpoint);
       if (cancelled) return;
       startTransition(() => {
         setGraphPlan(nextGraphPlan);
@@ -278,7 +328,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [plan]);
+  }, [latestCheckpoint, plan]);
 
   const setPlan = useCallback((value: SetStateAction<TaskData["savedPlan"] | null>) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
@@ -377,8 +427,19 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       planStateQuery.refetch(),
       refreshWorkspace(),
     ]);
+    setLatestCheckpoint(result.checkpoint);
     return result;
   }, [planStateQuery, queryClient, refreshWorkspace, task.id]);
+
+  const submitCheckpointAction = useCallback(async (action: SubmitCheckpointActionInput) => {
+    const result = await submitTaskCheckpointAction(task.id, action);
+    setLatestCheckpoint(result.execution.checkpoint);
+    await Promise.all([
+      planStateQuery.refetch(),
+      refreshWorkspace(),
+    ]);
+    return result.execution;
+  }, [planStateQuery, refreshWorkspace, task.id]);
 
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;
@@ -445,6 +506,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     acceptPlanById,
     handleAcceptPlan,
     dispatchExecutionAction,
+    submitCheckpointAction,
     handleGeneratePlanFromHeader,
     assistantBuildCurrentPlan,
   };

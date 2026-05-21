@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
@@ -77,6 +77,9 @@ type TaskWorkspacePlanSectionProps = {
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
+  onSubmitCheckpointAction?: (
+    action: SubmitCheckpointActionInput,
+  ) => Promise<TaskExecutionDispatchResult>;
 };
 
 export function TaskWorkspacePlanSection({
@@ -99,6 +102,7 @@ export function TaskWorkspacePlanSection({
   onApplyPlan,
   onSaveConfigBeforeRegenerate,
   onDispatchExecutionAction,
+  onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
   const [nodeDrawerSize, setNodeDrawerSize] = useState<"collapsed" | "half" | "expanded">("collapsed");
@@ -160,7 +164,7 @@ export function TaskWorkspacePlanSection({
               <WorkspaceNodeActionControls
                 node={currentOperationNode}
                 disabledActionReason={consoleView.nodeDetail.disabledActionReason}
-                onDispatchExecutionAction={onDispatchExecutionAction}
+                onSubmitCheckpointAction={onSubmitCheckpointAction}
                 className="border-0 bg-transparent p-0 shadow-none"
               />
             ),
@@ -333,7 +337,7 @@ export function TaskWorkspacePlanSection({
                 onDrawerSizeChange={setNodeDrawerSize}
                 preferredTab={preferredNodeDetailTab}
                 onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
-                onDispatchExecutionAction={onDispatchExecutionAction}
+                onSubmitCheckpointAction={onSubmitCheckpointAction}
               />
             </div>
           </div>
