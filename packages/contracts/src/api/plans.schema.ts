@@ -21,7 +21,7 @@ export const planGenerateParamSchema = z.object({
 });
 export const planGenerateBodySchema = z.object({
   forceRefresh: z.boolean().optional(),
-  planningPrompt: z.string().optional(),
+  userInstruction: z.string().trim().nullable().optional(),
 });
 
 // ── POST /tasks/:taskId/plan/generations/stop ──

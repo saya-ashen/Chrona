@@ -1218,7 +1218,7 @@ export interface GenerateTaskPlanRequest {
   priority?: string;
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
-  planningPrompt?: string | null;
+  userInstruction?: string | null;
   sessionKey?: string;
   signal?: AbortSignal;
 }
@@ -1336,7 +1336,7 @@ export type GeneratePlanSSEEvent =
 
 export interface GenerateTaskPlanApiRequest {
   forceRefresh?: boolean;
-  planningPrompt?: string | null;
+  userInstruction?: string | null;
 }
 
 /** @deprecated Replaced by TaskPlanReadModel + GeneratePlanSSEEvent */

@@ -152,3 +152,21 @@ export async function getLatestCompiledPlan(
 
   return row ? toSavedCompiledPlan(row) : null;
 }
+
+export async function updateLatestCompiledPlanPrompt(input: {
+  taskId: string;
+  prompt: string | null;
+}): Promise<void> {
+  const row = await db.taskPlan.findFirst({
+    where: { taskId: input.taskId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true },
+  });
+
+  if (!row) return;
+
+  await db.taskPlan.update({
+    where: { id: row.id },
+    data: { prompt: input.prompt },
+  });
+}

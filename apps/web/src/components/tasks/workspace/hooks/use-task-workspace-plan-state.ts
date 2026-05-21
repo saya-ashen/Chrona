@@ -2,7 +2,7 @@ import { startTransition, useCallback, useEffect, useRef, useState, type SetStat
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
+import { startTaskPlanGenerationSession, useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
 import { dispatchTaskExecutionAction, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
 import {
@@ -20,6 +20,7 @@ import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
+export type PlanGenerationRequest = { userInstruction?: string | null };
 
 function compactActivityText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 96);
@@ -88,7 +89,19 @@ function selectWorkspacePlan(
 ) {
   if (!pagePlan) return planStatePlan ?? null;
   if (!planStatePlan) return pagePlan;
-  return pagePlan.id === planStatePlan.id ? pagePlan : planStatePlan;
+  if (pagePlan.id !== planStatePlan.id) return planStatePlan;
+
+  const pageUpdatedAt = Date.parse(pagePlan.updatedAt ?? "");
+  const planStateUpdatedAt = Date.parse(planStatePlan.updatedAt ?? "");
+  if (Number.isFinite(pageUpdatedAt) && Number.isFinite(planStateUpdatedAt)) {
+    if (planStateUpdatedAt > pageUpdatedAt) return planStatePlan;
+    if (pageUpdatedAt > planStateUpdatedAt) return pagePlan;
+  }
+
+  if (planStatePlan.status === "accepted" && pagePlan.status !== "accepted") return planStatePlan;
+  if (pagePlan.status === "accepted" && planStatePlan.status !== "accepted") return pagePlan;
+
+  return planStatePlan;
 }
 
 function checkpointActionEmphasis(style: ExecutionCheckpoint["availableActions"][number]["style"]) {
@@ -223,13 +236,31 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     } satisfies TaskPlanState,
   });
   const planState = planStateQuery.data;
-  const [requestGenerationKey, setRequestGenerationKey] = useState(0);
+  const [generationUserInstruction, setGenerationUserInstruction] = useState<string | null>(null);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
   const [latestCheckpoint, setLatestCheckpoint] = useState<ExecutionCheckpoint | null>(null);
   const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? getPlanGenerationActivity(generationSession);
   const [graphPlan, setGraphPlan] = useState(() => taskPlanReadModelToGraphPlan(null));
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
+
+  useEffect(() => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+      const previous = current ?? {
+        taskId: task.id,
+        aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
+        savedPlan: null,
+        generationSession: null,
+      } satisfies TaskPlanState;
+      const nextPlan = selectWorkspacePlan(task.savedPlan, previous.savedPlan);
+
+      return {
+        ...previous,
+        savedPlan: nextPlan,
+        aiPlanGenerationStatus: derivePlanStatus(nextPlan, previous.generationSession?.status === "running"),
+      } satisfies TaskPlanState;
+    });
+  }, [queryClient, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
 
   useEffect(() => {
     if (!planState) return;
@@ -293,7 +324,13 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
 
   useEffect(() => {
     if (!planState) return;
-    const nextPlanState = withGeneratedPlanResult(planState, generationSession.result);
+    const generatedPlanState = withGeneratedPlanResult(planState, generationSession.result);
+    const selectedSavedPlan = selectWorkspacePlan(task.savedPlan, generatedPlanState.savedPlan);
+    const nextPlanState = {
+      ...generatedPlanState,
+      savedPlan: selectedSavedPlan,
+      aiPlanGenerationStatus: derivePlanStatus(selectedSavedPlan, generationSession.sessionStatus === "running"),
+    } satisfies TaskPlanState;
     const nextPlanFlow = createPlanFlowFromSnapshot(nextPlanState);
     setPlanFlow((current) => {
       if (current.status === "accepting" || samePlanFlowSnapshot(current, nextPlanFlow)) {
@@ -301,7 +338,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
       }
       return nextPlanFlow;
     });
-  }, [generationSession.result, planState]);
+  }, [generationSession.result, generationSession.sessionStatus, planState, task.savedPlan]);
 
   const plan = selectWorkspacePlan(task.savedPlan, planFlow.savedPlan);
   const planGenerationStatus = getPlanGenerationStatusFromFlow(planFlow);
@@ -400,9 +437,15 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     await acceptPlanById(plan.id);
   }, [acceptPlanById, plan?.id]);
 
-  const handleGeneratePlanFromHeader = useCallback(() => {
-    setRequestGenerationKey((current) => current + 1);
-  }, []);
+  const handleGeneratePlanFromHeader = useCallback((request?: PlanGenerationRequest) => {
+    const userInstruction = request?.userInstruction?.trim() || null;
+    setGenerationUserInstruction(userInstruction);
+    void startTaskPlanGenerationSession({
+      taskId: task.id,
+      forceRefresh: true,
+      userInstruction,
+    });
+  }, [task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
@@ -500,7 +543,7 @@ export function useTaskWorkspacePlanState(task: TaskData, refreshWorkspace: () =
     isAcceptingPlan: isAcceptingPlanFromFlow(planFlow),
     acceptPlanError,
     setAcceptPlanError,
-    requestGenerationKey,
+    generationUserInstruction,
     runtimeEvents,
     latestActivitySummary,
     acceptPlanById,

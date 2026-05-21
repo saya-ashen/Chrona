@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   pageResponses: [] as TaskPageData[],
   pageFetchCount: 0,
   planResponses: [] as Array<{ taskId: string; aiPlanGenerationStatus?: string; savedPlan?: TaskPlanReadModel | null; generationSession?: unknown }>,
+  acceptResponse: null as { savedPlan?: TaskPlanReadModel | null } | null,
   eventHandlers: new Map<string, JsonEventHandler>(),
   eventStreamMode: "open" as "open" | "reject",
   generationSession: {
@@ -63,7 +64,10 @@ vi.mock("@/lib/rpc-client", () => ({
             json: async () => mocks.planResponses.shift(),
           })),
           accept: {
-            $post: vi.fn(),
+            $post: vi.fn(async () => ({
+              ok: true,
+              json: async () => mocks.acceptResponse,
+            })),
           },
         },
       },
@@ -88,20 +92,24 @@ function createQueryWrapper() {
   };
 }
 
-function planReadModel(input: { id: string; status: "ready" | "running"; title: string }): TaskPlanReadModel {
+function planReadModel(input: {
+  id: string;
+  status: "draft" | "accepted" | "ready" | "running";
+  title: string;
+}): TaskPlanReadModel {
   const effectiveStatus = input.status === "running" ? "running" : "ready";
 
   return {
     id: input.id,
     taskId: "task-1",
-    status: "accepted",
+    status: input.status === "draft" ? "draft" : "accepted",
     revision: 1,
     summary: input.title,
     prompt: input.title,
     blueprint: null,
     generatedBy: null,
     generatedAt: "2026-05-17T00:00:00.000Z",
-    updatedAt: "2026-05-17T00:00:00.000Z",
+    updatedAt: input.status === "draft" ? "2026-05-17T00:00:00.000Z" : "2026-05-17T00:00:01.000Z",
     compiledPlan: {
       id: `${input.id}-compiled`,
       title: input.title,
@@ -199,6 +207,7 @@ afterEach(() => {
   mocks.pageResponses = [];
   mocks.pageFetchCount = 0;
   mocks.planResponses = [];
+  mocks.acceptResponse = null;
   mocks.eventHandlers.clear();
   mocks.eventStreamMode = "open";
   mocks.generationSession = {
@@ -217,6 +226,7 @@ describe("task workspace page synchronization", () => {
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
     const runningPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
+    runningPlan.updatedAt = "2026-05-17T00:00:02.000Z";
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan });
     mocks.pageResponses = [pageData({ taskStatus: "Running", plan: runningPlan, runStatus: "Running" })];
     mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: initialPlan }];
@@ -236,7 +246,7 @@ describe("task workspace page synchronization", () => {
     });
 
     await waitFor(() => expect(result.current.workspace.pageData.task.status).toBe("Running"));
-    expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Execute launch");
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Execute launch"));
     expect(result.current.plan.graphPlan?.nodes[0]?.status).toBe("active");
   });
 
@@ -407,5 +417,27 @@ describe("task workspace page synchronization", () => {
 
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
     expect(result.current.planGenerationStatus).toBe("waiting_acceptance");
+  });
+
+  it("uses accepted plan state over stale page task plan after accepting a draft", async () => {
+    const draftPlan = planReadModel({ id: "plan-1", status: "draft", title: "Draft plan" });
+    const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Accepted plan" });
+    mocks.acceptResponse = { savedPlan: acceptedPlan };
+
+    const { result } = renderHook(
+      () => useTaskWorkspacePlanState(
+        pageData({ taskStatus: "Ready", plan: draftPlan, aiPlanGenerationStatus: "waiting_acceptance" }).task,
+        vi.fn(async () => undefined),
+      ),
+      { wrapper: createQueryWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.acceptPlanById("plan-1");
+    });
+
+    await waitFor(() => expect(result.current.plan?.status).toBe("accepted"));
+    expect(result.current.plan?.summary).toBe("Accepted plan");
+    expect(result.current.planGenerationStatus).toBe("accepted");
   });
 });

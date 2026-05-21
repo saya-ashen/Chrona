@@ -5,6 +5,8 @@ import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,
@@ -19,7 +21,7 @@ import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
-import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
+import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
   TaskPageData,
   TaskPlanGenerationStatus,
@@ -41,6 +43,16 @@ function hasNodeActionPayload(node: PlanNodeDataModel | null) {
   if ((node.interactiveFields?.length ?? 0) === 0) return false;
   const submittedInput = node.inputFields && Object.values(node.inputFields).some((value) => value.trim());
   return !(node.status === "done" || node.status === "skipped") || !submittedInput;
+}
+
+function isCompletedTaskStatus(status: string | null | undefined) {
+  const normalized = status?.toLowerCase() ?? "";
+  return normalized === "done" || normalized === "completed" || normalized === "complete";
+}
+
+function hasCompletedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
+  const nodes = graphPlan?.nodes ?? [];
+  return nodes.length > 0 && nodes.every((node) => isCompletedGraphNode(node.status));
 }
 
 function isNodeDetailDrawerTarget(target: EventTarget | null) {
@@ -68,9 +80,9 @@ type TaskWorkspacePlanSectionProps = {
   planningTaskDraft: TaskConfigFormDraft;
   hasUnsavedConfigChanges: boolean;
   unsavedConfigDraft: TaskConfigFormDraft | null;
-  requestGenerationKey?: number;
   runtimeEvents: WorkspaceRuntimeEvent[];
-  onGeneratePlan: () => void;
+  generationUserInstruction?: string | null;
+  onGeneratePlan: (request?: PlanGenerationRequest) => void;
   onPlanLoaded: (savedPlan: TaskPlanReadModel | null) => void;
   onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
   onSaveConfigBeforeRegenerate: () => Promise<void>;
@@ -95,7 +107,7 @@ export function TaskWorkspacePlanSection({
   planningTaskDraft,
   hasUnsavedConfigChanges,
   unsavedConfigDraft,
-  requestGenerationKey,
+  generationUserInstruction,
   runtimeEvents,
   onGeneratePlan,
   onPlanLoaded,
@@ -104,6 +116,7 @@ export function TaskWorkspacePlanSection({
   onDispatchExecutionAction,
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
+  const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
   const [nodeDrawerSize, setNodeDrawerSize] = useState<"collapsed" | "half" | "expanded">("collapsed");
   const shouldAutoOpenDrawerRef = useRef(false);
@@ -113,6 +126,11 @@ export function TaskWorkspacePlanSection({
     pageData,
     graphPlan,
     selectedNode: selectedPlanNode,
+  });
+  const operationConsoleView = createTaskWorkspaceExecutionConsoleView({
+    pageData,
+    graphPlan,
+    selectedNode: null,
   });
   const stateMessage =
     consoleView.states.errorMessage ??
@@ -139,9 +157,18 @@ export function TaskWorkspacePlanSection({
       : consoleView.progress.label;
   const completionLabel = totalNodeCount > 0 ? `${progressLabel} steps` : consoleView.progress.label;
   const isGeneratingPlan = planGenerationStatus === "generating";
-  const currentOperationNode = consoleView.nodeDetail.currentNode;
-  const hasCurrentOperationControls = hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason;
+  const isPlanAccepted = plan?.status === "accepted";
+  const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
+  const shouldShowPlanGenerationPanel = isGeneratingPlan;
+  const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
+  const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
+  const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
+  const hasCurrentOperationControls = hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
+  const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
+  const handleRegeneratePlan = () => {
+    onGeneratePlan({ userInstruction: regenerationInstruction });
+  };
   const primaryAction: CommandCenterPrimaryAction = !plan
     ? {
         label: isGeneratingPlan ? "Generating..." : "Generate plan",
@@ -152,34 +179,88 @@ export function TaskWorkspacePlanSection({
         tone: "info",
         disabled: isGeneratingPlan,
         isLoading: isGeneratingPlan,
-        onClick: onGeneratePlan,
+        onClick: () => onGeneratePlan(),
       }
-    : shouldShowCurrentOperation && currentOperationNode
-        ? {
-            label: "Current node action",
-            description: currentOperationNode.nextAction ?? currentOperationNode.summary ?? "Complete the current node action to continue.",
-            statusLabel: currentOperationNode.statusLabel ?? currentOperationNode.status,
-            tone: consoleView.attention?.tone ?? consoleView.readiness.tone,
-            actionControls: (
-              <WorkspaceNodeActionControls
-                node={currentOperationNode}
-                disabledActionReason={consoleView.nodeDetail.disabledActionReason}
-                onSubmitCheckpointAction={onSubmitCheckpointAction}
-                className="border-0 bg-transparent p-0 shadow-none"
+    : isPlanAwaitingAcceptance
+      ? {
+          label: "Accept or regenerate plan",
+          description: "Review this draft plan. Accept it to enable execution, or regenerate it with user instructions.",
+          statusLabel: planGenerationStatus === "waiting_acceptance" ? planGenerationStatus : plan.status,
+          tone: "info",
+          actionControls: (
+            <div className="space-y-3">
+              {visibleGenerationInstruction ? (
+                <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-950">
+                  <div className="font-semibold">User instruction for this plan revision</div>
+                  <p className="mt-1 whitespace-pre-wrap leading-relaxed">{visibleGenerationInstruction}</p>
+                </div>
+              ) : null}
+              <Textarea
+                value={regenerationInstruction}
+                onChange={(event) => setRegenerationInstruction(event.target.value)}
+                placeholder="Tell Chrona what to change in the regenerated plan..."
+                className="min-h-24 resize-y rounded-xl bg-white/90 text-sm"
+                aria-label="Plan regeneration instruction"
               />
-            ),
-          }
-        : !hasStartedGraphExecution(graphPlan)
-          ? {
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-xs shadow-sm"
+                  disabled={!canAcceptPlan}
+                  onClick={() => void onApplyPlan(plan)}
+                >
+                  Accept plan
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-full px-3 text-xs"
+                  disabled={isGeneratingPlan}
+                  onClick={handleRegeneratePlan}
+                >
+                  {isGeneratingPlan ? "Generating..." : "Regenerate with instruction"}
+                </Button>
+              </div>
+              {acceptPlanError ? <p className="text-xs text-red-700">{acceptPlanError}</p> : null}
+            </div>
+          ),
+        }
+    : hasTaskCompleted
+      ? {
+          label: "Task completed",
+          description: "Execution has finished. Review the result, artifacts, or activity history if needed.",
+          statusLabel: consoleView.header.primaryStateLabel ?? pageData.task.status,
+          tone: "success",
+          suppressAttentionCard: true,
+        }
+    : !hasGraphExecutionStarted
+           ? {
               label: "Start plan",
               description: "Run the accepted plan and move into the first executable step.",
               statusLabel: plan.status,
               tone: "success",
               onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
             }
+        : shouldShowCurrentOperation && currentOperationNode
+          ? {
+              label: "Current node action",
+              description: currentOperationNode.nextAction ?? currentOperationNode.summary ?? "Complete the current node action to continue.",
+              statusLabel: currentOperationNode.statusLabel ?? currentOperationNode.status,
+              tone: operationConsoleView.attention?.tone ?? operationConsoleView.readiness.tone,
+              actionControls: (
+                <WorkspaceNodeActionControls
+                  node={currentOperationNode}
+                  disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
+                  onSubmitCheckpointAction={onSubmitCheckpointAction}
+                  className="border-0 bg-transparent p-0 shadow-none"
+                />
+              ),
+            }
         : {
             label: "No current operation",
-            description: "This task has no node input or execution action available right now.",
+            description: "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
             statusLabel: consoleView.header.primaryStateLabel ?? pageData.task.status,
             tone: "neutral",
             suppressAttentionCard: true,
@@ -279,7 +360,7 @@ export function TaskWorkspacePlanSection({
               plan={plan}
               acceptPlanError={acceptPlanError}
               planGenerationStatus={planGenerationStatus}
-              onGeneratePlan={onGeneratePlan}
+                onGeneratePlan={onGeneratePlan}
               onSelectedNodeChange={handlePlanNodeChange}
             />
           </section>
@@ -302,27 +383,29 @@ export function TaskWorkspacePlanSection({
               nextAction={consoleView.latestResult.description}
               onAction={focusNodeActions}
             />
-            <TaskPlanGenerationPanel
-              taskId={pageData.task.id}
-              title={planningTaskDraft.title}
-              description={planningTaskDraft.description}
-              priority={planningTaskDraft.priority}
-              dueAt={planningTaskDraft.dueAt}
-              autoRequest={false}
-              savedPlan={plan}
-              generationStatus={planGenerationStatus}
-              onPlanLoaded={onPlanLoaded}
-              onApply={canAcceptPlan ? onApplyPlan : undefined}
-              activeAcceptedPlanId={plan?.status === "accepted" ? plan.id : null}
-              hasUnsavedConfigChanges={hasUnsavedConfigChanges}
-              unsavedConfigDraft={unsavedConfigDraft}
-              onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
-              showGraph={false}
-              requestGenerationKey={requestGenerationKey}
-              showEmptyGenerateButton={false}
-              showRegenerateButton={false}
-              renderIdleEmptyState={false}
-            />
+            {shouldShowPlanGenerationPanel ? (
+              <TaskPlanGenerationPanel
+                taskId={pageData.task.id}
+                title={planningTaskDraft.title}
+                description={planningTaskDraft.description}
+                priority={planningTaskDraft.priority}
+                dueAt={planningTaskDraft.dueAt}
+                autoRequest={false}
+                savedPlan={plan}
+                generationStatus={planGenerationStatus}
+                onPlanLoaded={onPlanLoaded}
+                onApply={canAcceptPlan ? onApplyPlan : undefined}
+                activeAcceptedPlanId={isPlanAccepted ? plan.id : null}
+                hasUnsavedConfigChanges={hasUnsavedConfigChanges}
+                unsavedConfigDraft={unsavedConfigDraft}
+                onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
+                showGraph={false}
+                userInstruction={generationUserInstruction}
+                showEmptyGenerateButton={false}
+                showRegenerateButton={false}
+                renderIdleEmptyState={false}
+              />
+            ) : null}
           </aside>
         </div>
 

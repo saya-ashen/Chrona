@@ -352,7 +352,13 @@ export async function hydrateTaskPlanGenerationSession(taskId: string) {
   ensureActiveSubscription(taskId);
 }
 
-export async function startTaskPlanGenerationSession(taskId: string, forceRefresh = true) {
+export async function startTaskPlanGenerationSession(input: {
+  taskId: string;
+  forceRefresh?: boolean;
+  userInstruction?: string | null;
+}) {
+  const { taskId, forceRefresh = true } = input;
+  const userInstruction = input.userInstruction?.trim() || null;
   const entry = getEntry(taskId);
   entry.streamController?.abort();
   entry.activeSubscriptionController?.abort();
@@ -379,7 +385,7 @@ export async function startTaskPlanGenerationSession(taskId: string, forceRefres
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({ forceRefresh }),
+      body: JSON.stringify({ forceRefresh, userInstruction }),
       signal: controller.signal,
       onEvent({ event, data }) {
         if (event === "error") {

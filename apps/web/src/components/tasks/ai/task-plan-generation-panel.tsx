@@ -35,6 +35,7 @@ interface TaskPlanGenerationPanelProps {
   onSaveConfigBeforeRegenerate?: () => Promise<void> | void;
   showGraph?: boolean;
   requestGenerationKey?: number;
+  userInstruction?: string | null;
   showEmptyGenerateButton?: boolean;
   emptyStateDescription?: string;
   showRegenerateButton?: boolean;
@@ -99,6 +100,7 @@ export function TaskPlanGenerationPanel({
   onSaveConfigBeforeRegenerate,
   showGraph = true,
   requestGenerationKey,
+  userInstruction = null,
   showEmptyGenerateButton = true,
   emptyStateDescription,
   showRegenerateButton = true,
@@ -154,8 +156,8 @@ export function TaskPlanGenerationPanel({
 
   const requestFreshPlan = useCallback((_draft?: TaskConfigFormDraft | null) => {
     setHasRequestedStop(false);
-    requestGeneration(true);
-  }, [requestGeneration]);
+    requestGeneration({ forceRefresh: true, userInstruction });
+  }, [requestGeneration, userInstruction]);
 
   const handleRegenerate = useCallback(() => {
     if (hasUnsavedConfigChanges) {

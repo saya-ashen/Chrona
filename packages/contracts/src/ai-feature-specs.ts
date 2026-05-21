@@ -608,11 +608,11 @@ export function buildGeneratePlanFeatureInputText(
   if (typeof input.estimatedMinutes === "number") {
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
   }
-  if (input.planningPrompt?.trim()) {
+  if (input.userInstruction?.trim()) {
     parts.push(
       "",
-      "Additional planning guidance:",
-      input.planningPrompt.trim(),
+      "User instruction for this plan revision:",
+      input.userInstruction.trim(),
     );
   }
 

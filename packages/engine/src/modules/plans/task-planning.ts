@@ -104,7 +104,7 @@ export class TaskPlanning {
     return { savedPlan: await getLatestTaskPlanReadModel(input.taskId) };
   }
 
-  generate(input: { taskId: string; forceRefresh?: boolean }) {
+  generate(input: { taskId: string; forceRefresh?: boolean; userInstruction?: string | null }) {
     const streamLock = startTaskPlanGeneration(input.taskId);
     const events = generateTaskPlanManualStream({
       ...input,
