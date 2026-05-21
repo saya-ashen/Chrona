@@ -223,7 +223,7 @@ export type {
   GeneratePlanSSEEvent,
   GenerateTaskPlanApiRequest,
   WaitKind,
-} from "./ai-plan-runtime";
+} from "./plan-runtime";
 
 // AI feature specs
 export type {
@@ -249,7 +249,7 @@ export type {
   TaskWorkspaceChatRequest,
   TaskWorkspaceChatResponse,
   TaskWorkspaceUpdateProposal,
-} from "./ai-plan-runtime";
+} from "./plan-runtime";
 
 export type {
   ConflictAnalysisResult,
@@ -366,4 +366,4 @@ export {
   executionSessionStatusForRuntimeProgress,
   taskStatusForRuntimeProgress,
   webPlanNodeStatusForRuntimeStatus,
-} from "./ai-plan-runtime";
+} from "./plan-runtime";

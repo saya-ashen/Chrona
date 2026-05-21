@@ -155,7 +155,6 @@ function buildEffectiveGraphSummary(input: {
 
   return {
     graphId: input.graphId,
-    planId: input.graphId,
     basePlanId: input.basePlanId,
     resolvedAt: new Date().toISOString(),
     resolvedVersion: input.resolvedVersion,

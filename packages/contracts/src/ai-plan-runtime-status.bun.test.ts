@@ -7,7 +7,7 @@ import {
   runtimeProgressStatusForWaitKind,
   taskStatusForRuntimeProgress,
   webPlanNodeStatusForRuntimeStatus,
-} from "./ai-plan-runtime";
+} from "./plan-runtime";
 
 describe("runtime status model", () => {
   it("maps wait kinds to node-level runtime progress", () => {

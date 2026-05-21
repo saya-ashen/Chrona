@@ -267,7 +267,6 @@ function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {})
     },
     effectivePlan: overrides.effectivePlan ?? {
       graphId: overrides.id ?? "graph-stub",
-      planId: overrides.id ?? "plan-stub",
       basePlanId: overrides.id ?? "plan-stub",
       resolvedAt: "2026-04-20T09:00:00.000Z",
       resolvedVersion: 1,

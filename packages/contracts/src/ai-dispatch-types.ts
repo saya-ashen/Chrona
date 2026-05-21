@@ -1,4 +1,4 @@
-import type { CompiledEdge, CompiledNode } from "./ai-plan-runtime";
+import type { CompiledEdge, CompiledNode } from "./plan-runtime";
 import { z } from "zod";
 
 export const TASK_DISPATCH_ACTIONS = [

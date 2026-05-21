@@ -3,7 +3,7 @@ import type {
   EffectivePlanGraph,
   EffectivePlanNode,
 } from "./types";
-import type { GraphNodeExecutionResult } from "./graph-runner";
+import type { GraphNodeExecutionResult } from "./execution/types";
 
 function normalizeBranchToken(value: string): string {
   return value.trim().toLowerCase();
