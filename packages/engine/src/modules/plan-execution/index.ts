@@ -11,11 +11,17 @@ export {
 } from "./node-ai-capabilities";
 
 export {
-  TaskPlanExecution,
   createPlanRunFromCompiledPlan,
+} from "./persistence/plan-runtime-store";
+
+export {
+  TaskPlanExecution,
   taskPlanExecution,
-  type PlanExecutionRuntimeEvent,
-} from "./task-plan-execution";
+} from "./facade/task-plan-execution.facade";
+
+export type {
+  PlanExecutionRuntimeEvent,
+} from "./types";
 
 export type {
   GraphExecutionEvent,

@@ -11,6 +11,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework, orga
 | **Get started** — install and run Chrona in 2 minutes | [Quick Start (EN)](./en/quick-start.md) \| [快速开始（中文）](./zh/quick-start.md) |
 | **Understand the design** — why CQRS, how layers connect | [Architecture](./architecture.md) |
 | **Trace backend execution** — task creation through plan execution completion | [Backend Execution Flow](./backend-execution-flow.md) |
+| **Continue task execution refactoring** — known debt, solved scope, next optimal splits | [Task Execution Refactor Debt](./task-execution-refactor-debt.md) |
 | **Understand package responsibilities** — what belongs in each package and why | [Package Boundaries](./package-boundaries.md) |
 | **Explore the database** — schema, relationships, enums | [Data Model](./data-model.md) |
 | **Integrate via API** — full REST endpoint reference | [API Reference](./api-reference.md) |
@@ -62,6 +63,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework, orga
 | [快速开始（中文）](./zh/quick-start.md) | Tutorial | 安装、配置和运行第一个任务 |
 | [Architecture](./architecture.md) | Explanation | CQRS + Event Sourcing design, data flow, modules |
 | [Backend Execution Flow](./backend-execution-flow.md) | Explanation | Backend task creation, plan generation, materialization, execution, pause/resume, and completion flow |
+| [Task Execution Refactor Debt](./task-execution-refactor-debt.md) | Explanation | Solved plan-execution scope, remaining hotspots, and optimal next refactor order |
 | [Package Boundaries](./package-boundaries.md) | Explanation | Package-by-package responsibilities, dependency direction, placement rules |
 | [Data Model](./data-model.md) | Reference | Full database schema, ERD, enums, indexes |
 | [API Reference](./api-reference.md) | Reference | All REST endpoints with curl examples |
