@@ -272,7 +272,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
       zValidator("json", planGenerateBodySchema),
       async (c) => {
         const { taskId } = c.req.valid("param");
-        const { forceRefresh } = c.req.valid("json");
+        const { forceRefresh, userInstruction } = c.req.valid("json");
         try {
           const requestId = randomUUID();
           logger.info("request.start", {
@@ -281,9 +281,10 @@ export function createPlansRoutes(engine: ChronaEngine) {
             taskId,
             streaming: true,
             forceRefresh,
+            hasUserInstruction: Boolean(userInstruction?.trim()),
           });
 
-          const generation = engine.tasks.plan.generate({ taskId, forceRefresh });
+          const generation = engine.tasks.plan.generate({ taskId, forceRefresh, userInstruction });
           const generatorDump = await createDebugDump({
             enabledEnv: "CHRONA_AI_STREAM_DUMP",
             directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
@@ -295,6 +296,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
               taskId,
               generationId: generation.generationId,
               forceRefresh: forceRefresh ?? false,
+              hasUserInstruction: Boolean(userInstruction?.trim()),
             },
           });
 

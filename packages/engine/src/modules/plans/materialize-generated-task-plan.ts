@@ -22,7 +22,7 @@ export async function materializeGeneratedTaskPlan(input: {
   taskId: string;
   workspaceId: string;
   blueprint: PlanBlueprint;
-  planningPrompt?: string | null;
+  userInstruction?: string | null;
   generatedBy?: string | null;
 }): Promise<TaskPlanReadModel> {
   const { compiledPlan, planId } = compilePlanBlueprint({
@@ -38,7 +38,7 @@ export async function materializeGeneratedTaskPlan(input: {
     compiledPlan,
     editablePlan: upgradeBlueprintToEditable(input.blueprint, planId, 1),
     status: "draft",
-    prompt: input.planningPrompt ?? null,
+    prompt: input.userInstruction ?? null,
     summary: input.blueprint.title ?? null,
     generatedBy: input.generatedBy ?? "ai",
   });
@@ -74,7 +74,7 @@ export async function materializeGeneratedTaskPlan(input: {
     effectivePlanGraph,
     blueprint: input.blueprint,
     status: saved?.status ?? "draft",
-    prompt: saved?.prompt ?? input.planningPrompt ?? null,
+    prompt: saved?.prompt ?? input.userInstruction ?? null,
     summary: saved?.summary ?? input.blueprint.title ?? null,
     generatedBy: saved?.generatedBy ?? input.generatedBy ?? "ai",
     updatedAt: saved?.updatedAt ?? new Date().toISOString(),

@@ -88,7 +88,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     isGraphPlanPending,
     acceptPlanError,
     setAcceptPlanError,
-    requestGenerationKey,
+    generationUserInstruction,
     runtimeEvents,
     latestActivitySummary,
     acceptPlanById,
@@ -224,7 +224,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         planningTaskDraft={planningTaskDraft}
         hasUnsavedConfigChanges={hasUnsavedConfigChanges}
         unsavedConfigDraft={planningTaskDraft}
-        requestGenerationKey={requestGenerationKey}
+        generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
         onGeneratePlan={handleGeneratePlanFromHeader}
         onPlanLoaded={setPlan}

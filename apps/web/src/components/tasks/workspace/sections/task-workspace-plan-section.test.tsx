@@ -104,7 +104,6 @@ describe("TaskWorkspacePlanSection", () => {
         }}
         hasUnsavedConfigChanges={false}
         unsavedConfigDraft={null}
-        requestGenerationKey={0}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
         onPlanLoaded={vi.fn()}
@@ -145,7 +144,6 @@ describe("TaskWorkspacePlanSection", () => {
         }}
         hasUnsavedConfigChanges={false}
         unsavedConfigDraft={null}
-        requestGenerationKey={0}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onPlanLoaded={vi.fn()}
@@ -159,6 +157,69 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Start plan" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
+  });
+
+  it("shows accept or regenerate as the command center operation before plan acceptance", () => {
+    const onApplyPlan = vi.fn().mockResolvedValue(undefined);
+    const onGeneratePlan = vi.fn();
+    const draftPlan = {
+      id: "plan-1",
+      status: "draft",
+      revision: 1,
+      prompt: "Prefer a smaller plan and keep the first step manual.",
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const graphPlan = createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution" }),
+    ], "ready");
+
+    render(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={draftPlan}
+        planGenerationStatus="waiting_acceptance"
+        canAcceptPlan
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "Review task output",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+
+    expect(within(commandCenter).getByText("Accept or regenerate plan")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("User instruction for this plan revision")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Prefer a smaller plan and keep the first step manual.")).toBeInTheDocument();
+    expect(within(commandCenter).queryByText("Current node action")).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
+
+    fireEvent.change(within(commandCenter).getByLabelText("Plan regeneration instruction"), {
+      target: { value: "Add a verification step before accepting the final output." },
+    });
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Regenerate with instruction" }));
+
+    expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
+    expect(onGeneratePlan).toHaveBeenCalledWith({
+      userInstruction: "Add a verification step before accepting the final output.",
+    });
   });
 
   it("adds checkpoint controls as the command center operation after execution starts", async () => {
@@ -195,7 +256,6 @@ describe("TaskWorkspacePlanSection", () => {
         }}
         hasUnsavedConfigChanges={false}
         unsavedConfigDraft={null}
-        requestGenerationKey={0}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onPlanLoaded={vi.fn()}
@@ -260,7 +320,6 @@ describe("TaskWorkspacePlanSection", () => {
         }}
         hasUnsavedConfigChanges={false}
         unsavedConfigDraft={null}
-        requestGenerationKey={0}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onPlanLoaded={vi.fn()}
@@ -288,7 +347,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
-  it("shows no current operation for completed nodes without actions", () => {
+  it("shows task completed for completed nodes without actions", () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "weather-script",
       title: "创建一个获取天气的脚本",
@@ -319,7 +378,6 @@ describe("TaskWorkspacePlanSection", () => {
         }}
         hasUnsavedConfigChanges={false}
         unsavedConfigDraft={null}
-        requestGenerationKey={0}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onPlanLoaded={vi.fn()}
@@ -331,7 +389,7 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("No current operation")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Task completed")).toBeInTheDocument();
     expect(within(commandCenter).queryByText("请提供创建天气脚本所需的关键信息。")).not.toBeInTheDocument();
     expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
@@ -368,7 +426,6 @@ describe("TaskWorkspacePlanSection", () => {
           }}
           hasUnsavedConfigChanges={false}
           unsavedConfigDraft={null}
-          requestGenerationKey={0}
           runtimeEvents={[]}
           onGeneratePlan={vi.fn()}
           onPlanLoaded={vi.fn()}

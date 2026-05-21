@@ -4,9 +4,13 @@ import { db } from "@/lib/db";
 import type { PlanBlueprint } from "@chrona/contracts";
 
 import { getLatestTaskPlanGraph } from "@/modules/plan-execution/compat";
-import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
+import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 
-async function generateTaskPlanForTask(input: { taskId: string; forceRefresh?: boolean }) {
+async function generateTaskPlanForTask(input: {
+  taskId: string;
+  forceRefresh?: boolean;
+  userInstruction?: string | null;
+}) {
   const { generateTaskPlanManualStream } = await import("@/modules/plans/generate-task-plan-manual-stream");
   let result: Awaited<ReturnType<typeof getLatestTaskPlanGraph>> | null = null;
   for await (const event of generateTaskPlanManualStream(input)) {
@@ -34,7 +38,7 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   edges: [],
 }));
 
-async function* aiGeneratePlanStreamMock(request: { taskId: string; title: string; description?: string }) {
+async function* aiGeneratePlanStreamMock(request: { title: string; description?: string }) {
   const blueprint = await aiGeneratePlanMock(request);
   yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: blueprint };
 
@@ -48,13 +52,6 @@ async function* aiGeneratePlanStreamMock(request: { taskId: string; title: strin
     return;
   }
 
-  const task = await db.task.findUniqueOrThrow({ where: { id: request.taskId } });
-  await materializeGeneratedTaskPlan({
-    taskId: request.taskId,
-    workspaceId: task.workspaceId,
-    blueprint,
-    generatedBy: "test-ai",
-  });
   yield { type: "tool_result" as const, tool: "chrona_plan_generate", result: "completed" };
   yield { type: "done" as const, text: "done" };
 }
@@ -141,6 +138,35 @@ describe("generateTaskPlanForTask", () => {
     expect(sessions.map((session) => session.sessionKey)).toContain(
       `chrona:task:${task.id}:plan-graph`,
     );
+  });
+
+  it("stores regeneration user instruction on the generated plan", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Plan Instruction", status: "Active", defaultRuntime: "openclaw" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Instruction task",
+        status: "Ready",
+        priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: {},
+      },
+    });
+
+    const result = await generateTaskPlanForTask({
+      taskId: task.id,
+      forceRefresh: true,
+      userInstruction: "Add an explicit verification step before final output.",
+    });
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(result?.planId).toBe(savedPlan?.id);
+    expect(savedPlan?.prompt).toBe("Add an explicit verification step before final output.");
+    expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
+      userInstruction: "Add an explicit verification step before final output.",
+    }));
   });
 
   it("always regenerates plans through the manual stream", async () => {

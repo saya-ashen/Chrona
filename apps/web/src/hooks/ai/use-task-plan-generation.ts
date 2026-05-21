@@ -29,12 +29,16 @@ export function useTaskPlanGeneration({
   }, [onPlanLoaded]);
 
   const requestGeneration = useCallback(
-    (nextForceRefresh = true) => {
+    (input?: { forceRefresh?: boolean; userInstruction?: string | null }) => {
       if (!taskId) {
         return;
       }
 
-      void startTaskPlanGenerationSession(taskId, nextForceRefresh);
+      void startTaskPlanGenerationSession({
+        taskId,
+        forceRefresh: input?.forceRefresh ?? true,
+        userInstruction: input?.userInstruction,
+      });
     },
     [taskId],
   );
@@ -53,7 +57,7 @@ export function useTaskPlanGeneration({
     }
 
     if (state.hydrated && state.sessionStatus === "idle" && !state.result) {
-      void startTaskPlanGenerationSession(taskId, forceRefresh);
+      void startTaskPlanGenerationSession({ taskId, forceRefresh });
     }
   }, [autoRequest, forceRefresh, state.hydrated, state.result, state.sessionStatus, taskId]);
 

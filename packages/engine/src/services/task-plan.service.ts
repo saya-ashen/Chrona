@@ -43,7 +43,7 @@ export type TaskPlanService = {
     planId: string;
     workspaceId?: string;
   }): Promise<{ savedPlan: TaskPlanReadModel | null }>;
-  generate(input: { taskId: string; forceRefresh?: boolean }): {
+  generate(input: { taskId: string; forceRefresh?: boolean; userInstruction?: string | null }): {
     generationId: string;
     events: AsyncGenerator<GeneratePlanSSEEvent>;
     emit: (event: GeneratePlanSSEEvent) => void;
@@ -53,7 +53,7 @@ export type TaskPlanService = {
     taskId: string;
     workspaceId: string;
     blueprint: PlanBlueprint;
-    planningPrompt?: string | null;
+    userInstruction?: string | null;
     generatedBy?: string | null;
   }): Promise<TaskPlanReadModel>;
   stopGeneration(input: { taskId: string }): {
@@ -114,7 +114,7 @@ export function createTaskPlanService(): TaskPlanService {
         );
       }
     },
-    generate(input: { taskId: string; forceRefresh?: boolean }) {
+    generate(input: { taskId: string; forceRefresh?: boolean; userInstruction?: string | null }) {
       try {
         return taskPlanning.generate(input);
       } catch (cause) {
@@ -136,7 +136,7 @@ export function createTaskPlanService(): TaskPlanService {
       taskId: string;
       workspaceId: string;
       blueprint: PlanBlueprint;
-      planningPrompt?: string | null;
+      userInstruction?: string | null;
       generatedBy?: string | null;
     }) {
       try {
