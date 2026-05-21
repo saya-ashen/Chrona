@@ -1,8 +1,10 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type {
@@ -27,6 +29,10 @@ type WorkComposerCardProps = {
   copy: WorkCopy;
   composerResetKey: number;
   runId?: string | null;
+};
+
+type WorkComposerFormValues = {
+  message: string;
 };
 
 function shouldSubmitFromEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -167,12 +173,23 @@ export function WorkComposerCard({
   composerResetKey,
   runId,
 }: WorkComposerCardProps) {
-  async function handleSubmit() {
-    const inputText = composerValue.trim();
+  const form = useForm<WorkComposerFormValues>({
+    defaultValues: {
+      message: composerValue,
+    },
+    mode: "onChange",
+    values: {
+      message: composerValue,
+    },
+  });
+
+  async function handleSubmit(values: WorkComposerFormValues) {
+    const inputText = values.message.trim();
     const didSucceed = await onSubmit(inputText);
 
     if (didSucceed) {
       onComposerChange("");
+      form.reset({ message: "" });
     }
   }
 
@@ -200,6 +217,7 @@ export function WorkComposerCard({
     <form
       aria-label={copy.inputArea}
       key={`work-${composerResetKey}-${runId ?? "none"}-${composer.mode}`}
+      onSubmit={(event) => void form.handleSubmit(handleSubmit)(event)}
       className={cn(
         "min-w-0 max-h-[min(34vh,360px)] overflow-y-auto rounded-[24px] border border-border/70 bg-card p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)]",
         className,
@@ -227,23 +245,36 @@ export function WorkComposerCard({
         </p>
       ) : null}
 
-      <Textarea
-        aria-label={composer.inputLabel}
-        name="message"
-        rows={2}
-        required
-        value={composerValue}
-        placeholder={composer.placeholder}
-        onChange={(event) => onComposerChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (shouldSubmitFromEnter(event)) {
-            void handleSubmit();
-          }
-        }}
-        className={cn(
-          "mt-4 min-h-28 w-full min-w-0 resize-none rounded-[18px] border-border/80 bg-background px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70",
-        )}
-      />
+      <FieldGroup className="mt-4 gap-0">
+        <Controller
+          name="message"
+          control={form.control}
+          rules={{ required: true }}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel className="sr-only" htmlFor={field.name}>{composer.inputLabel}</FieldLabel>
+              <Textarea
+                {...field}
+                aria-invalid={fieldState.invalid}
+                id={field.name}
+                rows={2}
+                placeholder={composer.placeholder}
+                onChange={(event) => {
+                  field.onChange(event);
+                  onComposerChange(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (shouldSubmitFromEnter(event)) {
+                    void form.handleSubmit(handleSubmit)();
+                  }
+                }}
+                className="min-h-28 w-full min-w-0 resize-none rounded-[18px] border-border/80 bg-background px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground/70"
+              />
+              {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+            </Field>
+          )}
+        />
+      </FieldGroup>
 
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{composerValue.length}/2000</span>
@@ -278,11 +309,8 @@ export function WorkComposerCard({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Button
-            type="button"
+            type="submit"
             disabled={isPending}
-            onClick={() => {
-              void handleSubmit();
-            }}
             variant={composer.submitVariant ?? "default"}
             size="default"
             className="h-11 rounded-xl"

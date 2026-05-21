@@ -19,6 +19,8 @@ vi.mock("@/components/ui/button", () => ({
 }));
 vi.mock("@/components/ui/field", () => ({
   Field: ({ children }: any) => <div>{children}</div>,
+  FieldError: ({ errors }: any) => <div>{errors?.map((error: any) => error?.message).filter(Boolean).join(", ")}</div>,
+  FieldGroup: ({ children }: any) => <div>{children}</div>,
   FieldLabel: ({ children }: any) => <span data-testid={`label-${children}`}>{children}</span>,
 }));
 
@@ -116,7 +118,7 @@ describe("ScheduleEditorForm", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("At least one scheduling field is required."),
+        screen.getAllByText("At least one scheduling field is required.")[0],
       ).toBeDefined();
     });
   });

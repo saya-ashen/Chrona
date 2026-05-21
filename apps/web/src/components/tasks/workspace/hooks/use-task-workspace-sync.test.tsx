@@ -11,8 +11,10 @@ type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; 
 
 const mocks = vi.hoisted(() => ({
   pageResponses: [] as TaskPageData[],
+  pageFetchCount: 0,
   planResponses: [] as Array<{ taskId: string; aiPlanGenerationStatus?: string; savedPlan?: TaskPlanReadModel | null; generationSession?: unknown }>,
   eventHandlers: new Map<string, JsonEventHandler>(),
+  eventStreamMode: "open" as "open" | "reject",
   generationSession: {
     taskId: "task-1",
     generationId: null as string | null,
@@ -36,7 +38,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/fetch-json-event-source", () => ({
   fetchJsonEventSource: (input: string, options: { onEvent: JsonEventHandler }) => {
     mocks.eventHandlers.set(input, options.onEvent);
-    return Promise.resolve();
+    if (mocks.eventStreamMode === "reject") {
+      return Promise.reject(new Error("event stream closed"));
+    }
+
+    return new Promise(() => undefined);
   },
 }));
 
@@ -46,7 +52,10 @@ vi.mock("@/lib/rpc-client", () => ({
       ":taskId": {
         $get: vi.fn(async () => ({
           ok: true,
-          json: async () => mocks.pageResponses.shift(),
+          json: async () => {
+            mocks.pageFetchCount += 1;
+            return mocks.pageResponses.shift();
+          },
         })),
         plan: {
           $get: vi.fn(async () => ({
@@ -186,9 +195,12 @@ function pageData(input: {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   mocks.pageResponses = [];
+  mocks.pageFetchCount = 0;
   mocks.planResponses = [];
   mocks.eventHandlers.clear();
+  mocks.eventStreamMode = "open";
   mocks.generationSession = {
     ...mocks.generationSession,
     generationId: null,
@@ -200,6 +212,7 @@ afterEach(() => {
   };
 });
 
+// eslint-disable-next-line max-lines-per-function -- workspace sync scenarios share the same hook fixtures.
 describe("task workspace page synchronization", () => {
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
@@ -225,6 +238,61 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.workspace.pageData.task.status).toBe("Running"));
     expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Execute launch");
     expect(result.current.plan.graphPlan?.nodes[0]?.status).toBe("active");
+  });
+
+  it("does not poll active workspaces while the event stream is healthy", async () => {
+    vi.useFakeTimers();
+    const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
+    const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
+    mocks.pageResponses = [pageData({ taskStatus: "Blocked", plan: initialPlan, runStatus: "Blocked" })];
+
+    const { unmount } = renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+
+    unmount();
+    expect(mocks.pageFetchCount).toBe(0);
+    expect(mocks.pageResponses).toHaveLength(1);
+  });
+
+  it("uses fallback refresh only after the event stream becomes unhealthy", async () => {
+    vi.useFakeTimers();
+    mocks.eventStreamMode = "reject";
+    const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
+    const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
+    mocks.pageResponses = [pageData({ taskStatus: "Blocked", plan: initialPlan, runStatus: "Blocked" })];
+
+    const { unmount } = renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+
+    unmount();
+    expect(mocks.pageFetchCount).toBe(1);
+  });
+
+  it("refreshes once when the workspace tab becomes visible again", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
+    const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
+    mocks.pageResponses = [pageData({ taskStatus: "Blocked", plan: initialPlan, runStatus: "Blocked" })];
+
+    renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
+    const visibilitySpy = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+
+    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(mocks.pageFetchCount).toBeGreaterThan(0));
+    visibilitySpy.mockRestore();
   });
 
   it("refreshes the full workspace page when plan generation settles", async () => {

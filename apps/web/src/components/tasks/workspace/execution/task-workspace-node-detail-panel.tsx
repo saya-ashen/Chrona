@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { ChevronDown, ChevronUp, Copy, Maximize2, Minimize2 } from "lucide-react";
 import type { ExecutionActionInput, NodeResultOutput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
@@ -27,6 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Field,
+  FieldError,
+  FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
@@ -190,11 +193,15 @@ function EvidenceTab({ node }: { node: PlanNodeDataModel }) {
 function RunField({
   field,
   value,
+  invalid,
+  error,
   onChange,
   readOnly = false,
 }: {
   field: PlanNodeField;
   value: string;
+  invalid?: boolean;
+  error?: { message?: string };
   onChange: (value: string) => void;
   readOnly?: boolean;
 }) {
@@ -217,10 +224,11 @@ function RunField({
 
   if (field.control === "textarea") {
     return (
-      <Field className="gap-1.5">
+      <Field data-invalid={invalid} className="gap-1.5">
         <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
         <Textarea
           id={fieldId}
+          aria-invalid={invalid}
           rows={3}
           value={value}
           readOnly={readOnly}
@@ -230,6 +238,7 @@ function RunField({
             readOnly && "bg-muted/50 text-muted-foreground",
           )}
         />
+        {invalid ? <FieldError errors={[error]} /> : null}
       </Field>
     );
   }
@@ -239,14 +248,14 @@ function RunField({
     const shouldShowSubmittedOption = readOnly && value && !options.includes(value);
 
     return (
-      <Field className="gap-1.5">
+      <Field data-invalid={invalid} className="gap-1.5">
         <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
         <Select
           value={value}
           disabled={readOnly}
           onValueChange={onChange}
         >
-          <SelectTrigger id={fieldId} className="w-full rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm">
+          <SelectTrigger id={fieldId} aria-invalid={invalid} className="w-full rounded-xl border-slate-200 bg-white/90 text-sm shadow-sm">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -262,15 +271,17 @@ function RunField({
             </SelectGroup>
           </SelectContent>
         </Select>
+        {invalid ? <FieldError errors={[error]} /> : null}
       </Field>
     );
   }
 
   return (
-    <Field className="gap-1.5">
+    <Field data-invalid={invalid} className="gap-1.5">
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
       <Input
         id={fieldId}
+        aria-invalid={invalid}
         type="text"
         value={value}
         readOnly={readOnly}
@@ -280,6 +291,7 @@ function RunField({
           readOnly && "bg-muted/50 text-muted-foreground",
         )}
       />
+      {invalid ? <FieldError errors={[error]} /> : null}
     </Field>
   );
 }
@@ -306,13 +318,23 @@ export function WorkspaceNodeActionControls({
   className?: string;
 }) {
   const actions = node.availableActions ?? [];
-  const fields = node.interactiveFields ?? [];
+  const fields = useMemo(() => node.interactiveFields ?? [], [node.interactiveFields]);
+  const fieldStructureKey = fields
+    .map((field) => `${field.key}:${field.control ?? "text"}:${field.required ? "required" : "optional"}:${field.options?.join(",") ?? ""}`)
+    .join("|");
+  const actionOptionsKey = actions
+    .map((action) => `${action.id}:${action.emphasis ?? ""}`)
+    .join("|");
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() =>
     pickDefaultWorkspaceAction(node),
   );
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
-    buildDefaultWorkspaceActionFields(fields),
-  );
+  const form = useForm<Record<string, string>>({
+    defaultValues: buildDefaultWorkspaceActionFields(fields),
+    mode: "onChange",
+  });
+  const resetKey = `${node.id}|${fieldStructureKey}`;
+  const lastResetKeyRef = useRef(resetKey);
+  const fieldValues = (useWatch({ control: form.control }) as Record<string, string> | undefined) ?? buildDefaultWorkspaceActionFields(fields);
   const selectedAction = actions.find((action) => action.id === selectedActionId) ?? null;
   const submittedFields = node.inputFields;
   const isReadOnlySubmittedInput = fields.length > 0 && isTerminalStatus(node.status) && hasSubmittedInputFields(submittedFields);
@@ -327,11 +349,21 @@ export function WorkspaceNodeActionControls({
   });
 
   useEffect(() => {
-    setSelectedActionId(pickDefaultWorkspaceAction(node));
-    setFieldValues(buildDefaultWorkspaceActionFields(fields));
-  }, [node.id]);
+    setSelectedActionId((currentActionId) =>
+      currentActionId && actions.some((action) => action.id === currentActionId)
+        ? currentActionId
+        : pickDefaultWorkspaceAction(node),
+    );
+  }, [actionOptionsKey, actions, node]);
 
-  async function handleSubmitAction() {
+  useEffect(() => {
+    if (lastResetKeyRef.current === resetKey) return;
+
+    lastResetKeyRef.current = resetKey;
+    form.reset(buildDefaultWorkspaceActionFields(fields));
+  }, [fields, form, resetKey]);
+
+  async function handleSubmitAction(values: Record<string, string>) {
     if (submitDisabledReason) return;
 
     setIsDispatching(true);
@@ -341,7 +373,7 @@ export function WorkspaceNodeActionControls({
         node,
         selectedAction,
         fields,
-        values: fieldValues,
+        values,
       }));
       setActionStatus(result.message);
     } catch (cause) {
@@ -387,29 +419,50 @@ export function WorkspaceNodeActionControls({
         </Field>
       ) : null}
       {fields.length > 0 ? (
-        <div className="mt-3 space-y-2">
+        <form className="mt-3 flex flex-col gap-2" onSubmit={(event) => void form.handleSubmit(handleSubmitAction)(event)}>
           {isReadOnlySubmittedInput ? (
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
               Submitted input
             </p>
           ) : null}
-          <div className="grid gap-2 md:grid-cols-2">
+          <FieldGroup className="grid gap-2 md:grid-cols-2">
             {fields.map((field) => (
-              <RunField
+              <Controller
                 key={field.key}
-                field={field}
-                value={isReadOnlySubmittedInput ? submittedFields?.[field.key] ?? field.value?.trim() ?? "" : fieldValues[field.key] ?? ""}
-                readOnly={isReadOnlySubmittedInput}
-                onChange={(value) =>
-                  setFieldValues((current) => ({
-                    ...current,
-                    [field.key]: value,
-                  }))
+                name={field.key}
+                control={form.control}
+                rules={{ required: !isReadOnlySubmittedInput && field.required ? "Required" : false }}
+                render={({ field: controllerField, fieldState }) =>
+                  <RunField
+                    field={field}
+                    value={isReadOnlySubmittedInput ? submittedFields?.[field.key] ?? field.value?.trim() ?? "" : controllerField.value ?? ""}
+                    invalid={fieldState.invalid}
+                    error={fieldState.error}
+                    readOnly={isReadOnlySubmittedInput}
+                    onChange={controllerField.onChange}
+                  />
                 }
               />
             ))}
-          </div>
-        </div>
+          </FieldGroup>
+          {hasActionPayload ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="submit"
+                disabled={Boolean(submitDisabledReason)}
+                title={submitDisabledReason ?? undefined}
+                variant="default"
+                size="sm"
+                className="h-8 rounded-full px-3 text-xs shadow-sm"
+              >
+                {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
+              </Button>
+              {submitDisabledReason ? (
+                <span className="text-xs text-slate-500">{submitDisabledReason}</span>
+              ) : null}
+            </div>
+          ) : null}
+        </form>
       ) : (
         <p className="mt-2 rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-sm text-slate-600">
           {node.interactionType === "wait"
@@ -417,13 +470,13 @@ export function WorkspaceNodeActionControls({
             : "This node does not require free-form input."}
         </p>
       )}
-      {hasActionPayload ? (
+      {hasActionPayload && fields.length === 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             type="button"
             disabled={Boolean(submitDisabledReason)}
             title={submitDisabledReason ?? undefined}
-            onClick={handleSubmitAction}
+            onClick={() => void form.handleSubmit(handleSubmitAction)()}
             variant="default"
             size="sm"
             className="h-8 rounded-full px-3 text-xs shadow-sm"

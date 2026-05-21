@@ -1,25 +1,34 @@
-import type { FormEvent } from "react";
-import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { LockKeyhole } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 type AccessKeyUnlockProps = {
   onUnlock: (key: string, remember: boolean) => void;
 };
 
+type AccessKeyUnlockFormValues = {
+  accessKey: string;
+  remember: boolean;
+};
+
 export function AccessKeyUnlock({ onUnlock }: AccessKeyUnlockProps) {
   const { t } = useI18n();
-  const [key, setKey] = useState("");
-  const [remember, setRemember] = useState(false);
+  const form = useForm<AccessKeyUnlockFormValues>({
+    defaultValues: {
+      accessKey: "",
+      remember: false,
+    },
+    mode: "onChange",
+  });
+  const key = form.watch("accessKey");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedKey = key.trim();
-    if (!trimmedKey) return;
-    onUnlock(trimmedKey, remember);
+  function handleSubmit(values: AccessKeyUnlockFormValues) {
+    onUnlock(values.accessKey.trim(), values.remember);
   }
 
   return (
@@ -36,32 +45,43 @@ export function AccessKeyUnlock({ onUnlock }: AccessKeyUnlockProps) {
           </div>
         </div>
 
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          <label className="grid gap-2 text-sm font-medium text-slate-900">
-            {t("components.accessKeyUnlock.keyLabel")}
-            <Input
-              autoFocus
-              className="h-12 rounded-2xl bg-white text-base"
+        <form className="flex flex-col gap-4" onSubmit={(event) => void form.handleSubmit(handleSubmit)(event)}>
+          <FieldGroup className="gap-4">
+            <Controller
               name="accessKey"
-              onChange={(event) => setKey(event.target.value)}
-              placeholder={t("components.accessKeyUnlock.keyPlaceholder")}
-              type="password"
-              value={key}
+              control={form.control}
+              rules={{ required: t("components.accessKeyUnlock.keyLabel") }}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="gap-2">
+                  <FieldLabel htmlFor={field.name}>{t("components.accessKeyUnlock.keyLabel")}</FieldLabel>
+                  <Input
+                    {...field}
+                    autoFocus
+                    aria-invalid={fieldState.invalid}
+                    className="h-12 rounded-2xl bg-white text-base"
+                    id={field.name}
+                    placeholder={t("components.accessKeyUnlock.keyPlaceholder")}
+                    type="password"
+                  />
+                  {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                </Field>
+              )}
             />
-          </label>
 
-          <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-slate-50/80 p-3 text-sm text-muted-foreground">
-            <input
-              checked={remember}
-              className="mt-1 size-4 rounded border-border"
-              onChange={(event) => setRemember(event.target.checked)}
-              type="checkbox"
+            <Controller
+              name="remember"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal" className="rounded-2xl border border-border/70 bg-slate-50/80 p-3 text-sm text-muted-foreground">
+                  <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                  <FieldContent>
+                    <FieldLabel className="font-medium text-slate-900">{t("components.accessKeyUnlock.rememberLabel")}</FieldLabel>
+                    <FieldDescription>{t("components.accessKeyUnlock.rememberHint")}</FieldDescription>
+                  </FieldContent>
+                </Field>
+              )}
             />
-            <span>
-              <span className="block font-medium text-slate-900">{t("components.accessKeyUnlock.rememberLabel")}</span>
-              <span>{t("components.accessKeyUnlock.rememberHint")}</span>
-            </span>
-          </label>
+          </FieldGroup>
 
           <Button
             className="h-12 rounded-2xl text-base"

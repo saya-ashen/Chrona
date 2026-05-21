@@ -1,14 +1,18 @@
 "use client";
 
 import { Activity, Sparkles } from "lucide-react";
+import { useForm } from "react-hook-form";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { useI18n } from "@chrona/i18n/react";
+import { Button } from "@/components/ui/button";
 import {
   Drawer,
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useAssistantSurface } from "./assistant-surface-provider";
 
@@ -20,10 +24,31 @@ const severityClass = {
   neutral: "border-slate-200 bg-slate-50 text-slate-700",
 };
 
+type AssistantSurfaceFormValues = {
+  request: string;
+};
+
 export function AssistantSurfaceDropdown() {
   const { t } = useI18n();
   const assistant = useAssistantSurface();
   const surface = assistant.state;
+  const form = useForm<AssistantSurfaceFormValues>({
+    defaultValues: {
+      request: assistant.input,
+    },
+    mode: "onChange",
+    values: {
+      request: assistant.input,
+    },
+  });
+  const request = form.watch("request");
+
+  function handleSubmit(values: AssistantSurfaceFormValues) {
+    const requestText = values.request.trim();
+    if (!requestText) return;
+
+    assistant.submitRequest(requestText);
+  }
 
   return (
     <Drawer open={assistant.isOpen} onOpenChange={(open) => { if (!open) assistant.close(); }} direction="top">
@@ -110,21 +135,30 @@ export function AssistantSurfaceDropdown() {
 
           <form
             className="mt-3 flex gap-2 border-t border-white/10 pt-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              assistant.submitRequest(assistant.input);
-            }}
+            onSubmit={(event) => void form.handleSubmit(handleSubmit)(event)}
           >
-            <input
-              value={assistant.input}
-              onChange={(event) => assistant.setInput(event.currentTarget.value)}
-              disabled={!surface.requestInputEnabled}
-              placeholder={t("components.assistantSurface.inputPlaceholder")}
-              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-400 focus:border-primary/60"
-            />
-            <button type="submit" className="rounded-2xl bg-primary px-3 py-2 text-sm font-semibold text-white disabled:bg-slate-700 disabled:text-slate-400" disabled={!assistant.input.trim()}>
+            <FieldGroup className="min-w-0 flex-1 gap-0">
+              <Field data-invalid={Boolean(form.formState.errors.request)}>
+                <FieldLabel className="sr-only" htmlFor="assistant-surface-request">
+                  {t("components.assistantSurface.inputPlaceholder")}
+                </FieldLabel>
+                <Input
+                  {...form.register("request", {
+                    required: true,
+                    onChange: (event) => assistant.setInput(event.currentTarget.value),
+                  })}
+                  aria-invalid={Boolean(form.formState.errors.request)}
+                  disabled={!surface.requestInputEnabled}
+                  id="assistant-surface-request"
+                  placeholder={t("components.assistantSurface.inputPlaceholder")}
+                  className="rounded-2xl border-white/10 bg-white/10 text-white placeholder:text-slate-400 focus-visible:border-primary/60"
+                />
+                {form.formState.errors.request ? <FieldError errors={[form.formState.errors.request]} /> : null}
+              </Field>
+            </FieldGroup>
+            <Button type="submit" disabled={!request.trim()}>
               {t("components.assistantSurface.send")}
-            </button>
+            </Button>
           </form>
         </aside>
       </div>

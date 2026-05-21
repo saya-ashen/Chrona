@@ -1,13 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 import type { AiSidebarMessage } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+type ConversationFormValues = {
+  message: string;
+};
 
 export function ConversationThread({ messages, onSubmit }: { messages: AiSidebarMessage[]; onSubmit: (message: string) => void }) {
   const { t } = useI18n();
-  const [draft, setDraft] = useState("");
+  const form = useForm<ConversationFormValues>({
+    defaultValues: {
+      message: "",
+    },
+    mode: "onChange",
+  });
+  const draft = form.watch("message");
+
+  function handleSubmit(values: ConversationFormValues) {
+    const message = values.message.trim();
+    if (!message) return;
+
+    onSubmit(message);
+    form.reset();
+  }
 
   return (
     <section className="rounded-3xl border border-border/60 bg-white p-4 shadow-sm" aria-labelledby="ai-conversation-title">
@@ -23,19 +44,22 @@ export function ConversationThread({ messages, onSubmit }: { messages: AiSidebar
       </div>
       <form
         className="mt-3 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(draft);
-          setDraft("");
-        }}
+        onSubmit={(event) => void form.handleSubmit(handleSubmit)(event)}
       >
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={t("components.globalAiSidebar.followUpPlaceholder")}
-          className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-white px-3 py-2 text-sm outline-none focus:border-primary/50"
-        />
-        <button type="submit" className="rounded-2xl bg-primary px-3 py-2 text-sm font-medium text-white">{t("components.globalAiSidebar.send")}</button>
+        <FieldGroup className="min-w-0 flex-1 gap-0">
+          <Field data-invalid={Boolean(form.formState.errors.message)}>
+            <FieldLabel className="sr-only" htmlFor="global-ai-follow-up">{t("components.globalAiSidebar.followUpPlaceholder")}</FieldLabel>
+            <Input
+              {...form.register("message", { required: true })}
+              aria-invalid={Boolean(form.formState.errors.message)}
+              id="global-ai-follow-up"
+              placeholder={t("components.globalAiSidebar.followUpPlaceholder")}
+              className="rounded-2xl bg-white"
+            />
+            {form.formState.errors.message ? <FieldError errors={[form.formState.errors.message]} /> : null}
+          </Field>
+        </FieldGroup>
+        <Button type="submit" disabled={!draft.trim()}>{t("components.globalAiSidebar.send")}</Button>
       </form>
     </section>
   );

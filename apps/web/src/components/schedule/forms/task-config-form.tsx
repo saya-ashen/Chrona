@@ -2,11 +2,11 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -105,19 +105,24 @@ function TaskConfigField({
   label,
   hint,
   htmlFor,
+  invalid,
+  error,
   className,
   children,
 }: {
   label: string;
   hint?: string;
   htmlFor?: string;
+  invalid?: boolean;
+  error?: { message?: string };
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <Field className={className}>
+    <Field data-invalid={invalid} className={className}>
       <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
+      {invalid ? <FieldError errors={[error]} /> : null}
       {hint ? <FieldDescription>{hint}</FieldDescription> : null}
     </Field>
   );
@@ -804,32 +809,45 @@ export function TaskConfigForm({
         </div>
       ) : null}
 
-      <form onSubmit={(event) => void handleSubmit(submitForm)(event)} className="space-y-3">
-        <TaskConfigField label={copy.title} className="text-xs text-muted-foreground">
-          <Input
-            name="title"
-            required
-            value={formState.title}
-            onChange={(event) => setValue("title", event.target.value, { shouldDirty: true })}
-            placeholder={copy.titlePlaceholder}
-          />
-        </TaskConfigField>
+      <form onSubmit={(event) => void handleSubmit(submitForm)(event)}>
+        <FieldGroup className="gap-3">
+        <Controller
+          name="title"
+          control={control}
+          rules={{ required: copy.title }}
+          render={({ field, fieldState }) => (
+            <TaskConfigField label={copy.title} htmlFor={field.name} invalid={fieldState.invalid} error={fieldState.error} className="text-xs text-muted-foreground">
+              <Input
+                {...field}
+                aria-invalid={fieldState.invalid}
+                id={field.name}
+                placeholder={copy.titlePlaceholder}
+              />
+            </TaskConfigField>
+          )}
+        />
 
         {!compact ? (
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
-            <div className="space-y-3">
-              <TaskConfigField label={copy.description} className="text-xs text-muted-foreground">
-                <Textarea
-                  name="description"
-                  rows={5}
-                  value={formState.description}
-                  onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
-                  placeholder={copy.descriptionPlaceholder}
-                />
-              </TaskConfigField>
+            <div className="flex flex-col gap-3">
+              <Controller
+                name="description"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <TaskConfigField label={copy.description} htmlFor={field.name} invalid={fieldState.invalid} error={fieldState.error} className="text-xs text-muted-foreground">
+                    <Textarea
+                      {...field}
+                      aria-invalid={fieldState.invalid}
+                      id={field.name}
+                      rows={5}
+                      placeholder={copy.descriptionPlaceholder}
+                    />
+                  </TaskConfigField>
+                )}
+              />
             </div>
 
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-muted-foreground">
                 <TaskConfigSelect
                   name="priority"
@@ -856,7 +874,7 @@ export function TaskConfigForm({
                   ) : null}
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-3">
+                <FieldGroup className="grid gap-2 sm:grid-cols-3">
                   <TaskConfigField label={copy.scheduleDate} className="text-xs text-muted-foreground">
                     <TaskConfigDatePicker
                       name="scheduledDate"
@@ -885,7 +903,7 @@ export function TaskConfigForm({
                       onValueChange={(value) => setValue("scheduledEndTime", value, { shouldDirty: true })}
                     />
                   </TaskConfigField>
-                </div>
+                </FieldGroup>
               </div>
             </div>
           </div>
@@ -984,7 +1002,7 @@ export function TaskConfigForm({
           <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
             <summary className="cursor-pointer text-sm font-medium text-foreground">{copy.moreOptions}</summary>
 
-            <div className="mt-3 space-y-3">
+            <FieldGroup className="mt-3 gap-3">
               <>
                 <TaskConfigField label={copy.priority} htmlFor="task-config-compact-priority" className="text-xs text-muted-foreground">
                   <TaskConfigSelect
@@ -1018,12 +1036,17 @@ export function TaskConfigForm({
                 ) : null}
 
                 <TaskConfigField label={copy.description} className="text-xs text-muted-foreground">
-                  <Textarea
+                  <Controller
                     name="description"
-                    rows={3}
-                    value={formState.description}
-                    onChange={(event) => setValue("description", event.target.value, { shouldDirty: true })}
-                    placeholder={copy.descriptionPlaceholder}
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <Textarea
+                        {...field}
+                        aria-invalid={fieldState.invalid}
+                        rows={3}
+                        placeholder={copy.descriptionPlaceholder}
+                      />
+                    )}
                   />
                 </TaskConfigField>
               </>
@@ -1112,7 +1135,7 @@ export function TaskConfigForm({
                 </TaskConfigField>
               );
             })}
-            </div>
+            </FieldGroup>
           </details>
         ) : null}
 
@@ -1122,6 +1145,7 @@ export function TaskConfigForm({
             {isPending ? pendingLabel : submitLabel}
           </Button>
         </div>
+        </FieldGroup>
       </form>
     </div>
   );
