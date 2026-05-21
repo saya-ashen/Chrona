@@ -1,7 +1,7 @@
 import { api } from "@/lib/rpc-client";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, PlanExecutionSSEEvent, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput, SubmitCheckpointActionResult, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
   ExecutionOverviewCard,
   ExecutionFlowView,
@@ -20,6 +20,7 @@ import type {
 import { buildWorkspaceStateTreatment } from "./task-workspace-actions";
 
 export type TaskExecutionDispatchResult = PlanExecutionResult;
+export type TaskCheckpointActionDispatchResult = SubmitCheckpointActionResult;
 
 export type TaskPlanState = {
   taskId: string;
@@ -618,4 +619,29 @@ export async function dispatchTaskExecutionAction(
   }
 
   return result;
+}
+
+export async function submitTaskCheckpointAction(
+  taskId: string,
+  action: SubmitCheckpointActionInput,
+): Promise<TaskCheckpointActionDispatchResult> {
+  const response = await fetch(`/api/tasks/${taskId}/execution/checkpoint/${encodeURIComponent(action.checkpointId)}/actions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      action: action.action,
+      payload: action.payload,
+      idempotencyKey: action.idempotencyKey,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to submit checkpoint action" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to submit checkpoint action");
+  }
+
+  return await response.json() as TaskCheckpointActionDispatchResult;
 }

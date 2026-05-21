@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, ExecutionCheckpoint, NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -64,7 +64,10 @@ export type PlanNodeAction = {
   id: string;
   label: string;
   kind: "input" | "approve" | "confirm" | "choose" | "edit" | "resolve" | "retry" | "observe" | "open" | "trigger";
-  emphasis?: "default" | "primary" | "warning";
+  emphasis?: "default" | "primary" | "warning" | "danger";
+  checkpointId?: string;
+  checkpointAction?: CheckpointActionKind;
+  requiresPayload?: boolean;
 };
 
 export type PlanNodeDataModel = {
@@ -103,6 +106,7 @@ export type PlanNodeDataModel = {
   active?: boolean;
   blocked?: boolean;
   actionable?: boolean;
+  checkpoint?: ExecutionCheckpoint | null;
   interactiveFields?: PlanNodeField[];
   availableActions?: PlanNodeAction[];
   metadata?: Record<string, unknown>;

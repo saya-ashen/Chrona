@@ -93,6 +93,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     latestActivitySummary,
     acceptPlanById,
     dispatchExecutionAction,
+    submitCheckpointAction,
     handleGeneratePlanFromHeader,
   } = useTaskWorkspacePlanState(task, refreshWorkspace);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
@@ -234,6 +235,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         }}
         onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
         onDispatchExecutionAction={dispatchExecutionAction}
+        onSubmitCheckpointAction={submitCheckpointAction}
       />
     </div>
   );

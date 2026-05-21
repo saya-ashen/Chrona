@@ -37,6 +37,7 @@ describe("runGraphAdvancementWorker", () => {
       executedNodeIds: [],
       waitingNodeIds: [],
       blockedNodeIds: [],
+      checkpoint: null,
       message: "Running",
     }));
 

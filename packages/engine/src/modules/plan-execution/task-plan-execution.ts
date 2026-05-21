@@ -15,15 +15,21 @@ import { getAcceptedCompiledPlan } from "./compiled-plan-store";
 import {
   resolveEffectivePlanGraph,
   createGraphRuntime,
-  runtimeProgressStatusForNodes,
-  runtimeProgressStatusForWaitKind,
 } from "@chrona/graph-runtime";
 import {
-  executionSessionStatusForRuntimeProgress,
-  planGraphStatusForRuntimeProgress,
-  planRunStatusForRuntimeProgress,
-  taskStatusForRuntimeProgress,
-} from "@chrona/contracts";
+  executionStatusFromEffectiveGraph,
+  executionStatusFromGraphOutcome,
+  executionStatusFromWaitKind,
+  executionTransition,
+  graphStatusForExecutionStatus,
+  planRunStatusForExecutionStatus,
+} from "./execution-state-machine";
+import { deriveExecutionCheckpoint } from "./execution-checkpoint";
+import {
+  checkpointPayloadFields,
+  checkpointPayloadText,
+  resolveCheckpointAction,
+} from "./execution-actions";
 import type {
   GraphDispatchOutcome,
   GraphExecutionEvent,
@@ -34,6 +40,7 @@ import type {
   EffectivePlanGraph,
   EffectivePlanNode,
   ExecutionActionInput,
+  ExecutionCheckpoint,
   ExecutionContextSnapshot,
   NodeAttempt,
   NodeActionForm,
@@ -42,6 +49,8 @@ import type {
   PlanExecutionResult,
   PlanExecutionStatus,
   PlanRun,
+  SubmitCheckpointActionInput,
+  SubmitCheckpointActionResult,
   WaitKind,
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
@@ -70,7 +79,6 @@ export type PlanExecutionRuntimeEvent = {
 };
 
 type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
-type ExecutionTaskStatus = Exclude<ReturnType<typeof taskStatusForRuntimeProgress>, "Cancelled">;
 
 const DEFAULT_MAX_STEPS = 10;
 const logger = createLogger("engine.plan-execution");
@@ -80,21 +88,6 @@ const ACTIVE_RUN_STATUSES = [
   RunStatus.WaitingForApproval,
   RunStatus.WaitingForInput,
 ] as const;
-
-const TASK_STATUS_BY_RUNTIME_PROGRESS = {
-  Running: TaskStatus.Running,
-  WaitingForInput: TaskStatus.WaitingForInput,
-  WaitingForApproval: TaskStatus.WaitingForApproval,
-  Blocked: TaskStatus.Blocked,
-  Completed: TaskStatus.Completed,
-} satisfies Record<ExecutionTaskStatus, TaskStatus>;
-
-function taskStatusForExecutionStatus(status: PlanExecutionStatus): TaskStatus {
-  if (status === "started" || status === "no_plan") return TaskStatus.Running;
-  const taskStatus = taskStatusForRuntimeProgress(status);
-  if (taskStatus === "Cancelled") return TaskStatus.Cancelled;
-  return TASK_STATUS_BY_RUNTIME_PROGRESS[taskStatus];
-}
 
 function createNodeExecutors(input: {
   aiRuntimeInvoker: AiRuntimeInvoker;
@@ -139,23 +132,13 @@ export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
 function mapWaitKindToExecutionStatus(
   waitKind: WaitKind | undefined,
 ): PlanExecutionStatus {
-  return runtimeProgressStatusForWaitKind(waitKind);
+  return executionStatusFromWaitKind(waitKind);
 }
 
 function mapTerminalReasonToStatus(
   effective: EffectivePlanGraph,
 ): PlanExecutionStatus {
-  return runtimeProgressStatusForNodes(effective);
-}
-
-function planRunStatusForExecutionStatus(status: PlanExecutionStatus): PlanRun["status"] {
-  if (status === "started" || status === "no_plan") return "pending";
-  return planRunStatusForRuntimeProgress(status);
-}
-
-function graphStatusForExecutionStatus(status: PlanExecutionStatus): PlanGraph["status"] {
-  if (status === "started" || status === "no_plan") return "active";
-  return planGraphStatusForRuntimeProgress(status);
+  return executionStatusFromEffectiveGraph(effective);
 }
 
 async function getRuntimeName(taskId: string): Promise<string> {
@@ -355,13 +338,32 @@ function buildExecutionResponse(input: {
   taskId: string;
   planId: string;
   mainSessionId: string;
+  executionSessionId?: string;
+  planRunId?: string;
   status: PlanExecutionStatus;
   effective: EffectivePlanGraph;
   currentNodeId: string | null;
   executedNodeIds: string[];
   message: string;
   errorDetails?: unknown;
+  waitKind?: WaitKind;
+  checkpoint?: ExecutionCheckpoint | null;
 }): PlanExecutionResult {
+  const checkpoint = input.checkpoint ?? (
+    input.executionSessionId && input.planRunId
+      ? deriveExecutionCheckpoint({
+          taskId: input.taskId,
+          sessionId: input.executionSessionId,
+          planRunId: input.planRunId,
+          status: input.status,
+          effective: input.effective,
+          currentNodeId: input.currentNodeId,
+          waitKind: input.waitKind,
+          message: input.message,
+        })
+      : null
+  );
+
   return {
     taskId: input.taskId,
     planId: input.planId,
@@ -371,6 +373,7 @@ function buildExecutionResponse(input: {
     executedNodeIds: input.executedNodeIds,
     waitingNodeIds: input.effective.waitingNodeIds,
     blockedNodeIds: input.effective.blockedNodeIds,
+    checkpoint,
     message: input.message,
     ...(input.errorDetails ? { errorDetails: input.errorDetails } : {}),
   };
@@ -508,6 +511,7 @@ async function convergeExecutionToCommittedState(input: {
     mainSessionId: input.mainSessionId,
     session: input.session,
     effective,
+    status,
     waitKind:
       status === "waiting_for_user"
         ? "user_input"
@@ -606,38 +610,34 @@ async function pauseExecution(input: {
   mainSessionId: string;
   session: ExecutionSessionRow;
   effective: EffectivePlanGraph;
+  status?: PlanExecutionStatus;
   waitKind?: WaitKind;
   currentNodeId: string;
   executedNodeIds: string[];
   message: string;
   errorDetails?: unknown;
 }) {
-  await setExecutionSessionState({
-    sessionId: input.session.id,
-    status: "Paused",
-    currentNodeId: input.currentNodeId,
-    pauseReason: input.waitKind ?? "manual_action",
-    completedNodeIds: completedExecutionNodeIds(input.effective),
+  const executionStatus = input.status ?? mapWaitKindToExecutionStatus(input.waitKind);
+  const transition = executionTransition({
+    status: executionStatus,
+    pauseReason: input.waitKind,
+    message: input.message,
+    nodeId: input.currentNodeId,
   });
 
-  const executionStatus = mapWaitKindToExecutionStatus(input.waitKind);
-  const taskStatus = taskStatusForExecutionStatus(executionStatus);
+  await setExecutionSessionState({
+    sessionId: input.session.id,
+    status: transition.sessionStatus,
+    currentNodeId: input.currentNodeId,
+    pauseReason: transition.pauseReason,
+    completedNodeIds: completedExecutionNodeIds(input.effective),
+  });
 
   await db.task.update({
     where: { id: input.taskId },
     data: {
-      status: taskStatus,
-      blockReason: {
-        blockType:
-          input.waitKind === "user_input"
-            ? "human_input_required"
-            : input.waitKind === "approval" || input.waitKind === "review"
-              ? "approval_required"
-              : "node_blocked",
-        scope: "plan_node",
-        actionRequired: input.message,
-        nodeId: input.currentNodeId,
-      },
+      status: transition.taskStatus,
+      blockReason: transition.blockReason,
     },
   });
 
@@ -647,12 +647,15 @@ async function pauseExecution(input: {
     taskId: input.taskId,
     planId: input.planId,
     mainSessionId: input.mainSessionId,
+    executionSessionId: input.session.id,
+    planRunId: input.planId,
     status: executionStatus,
     effective: input.effective,
     currentNodeId: input.currentNodeId,
     executedNodeIds: input.executedNodeIds,
     message: input.message,
     errorDetails: input.errorDetails,
+    waitKind: input.waitKind,
   });
 }
 
@@ -690,6 +693,10 @@ async function completeExecution(input: {
   message: string;
 }) {
   const status = mapTerminalReasonToStatus(input.effective);
+  const transition = executionTransition({
+    status,
+    message: input.message,
+  });
   if (input.workspaceId && input.compiledPlan && input.persisted) {
     await persistTerminalRuntimeState({
       workspaceId: input.workspaceId,
@@ -703,18 +710,9 @@ async function completeExecution(input: {
   }
   await setExecutionSessionState({
     sessionId: input.session.id,
-    status: executionSessionStatusForRuntimeProgress(
-      status === "completed" ? "completed" : "blocked",
-    ),
+    status: transition.sessionStatus,
     currentNodeId: null,
-    pauseReason:
-      status === "waiting_for_user"
-        ? "user_input"
-        : status === "waiting_for_approval"
-          ? "approval"
-          : status === "blocked"
-            ? "manual_action"
-            : null,
+    pauseReason: transition.pauseReason,
     completedNodeIds: completedExecutionNodeIds(input.effective),
   });
 
@@ -725,16 +723,9 @@ async function completeExecution(input: {
   await db.task.update({
     where: { id: input.taskId },
     data: {
-      status: taskStatusForExecutionStatus(status),
+      status: transition.taskStatus,
       completedAt: status === "completed" ? new Date() : undefined,
-      blockReason:
-        status === "blocked"
-          ? {
-              blockType: "node_blocked",
-              scope: "plan_execution",
-              actionRequired: input.message,
-            }
-          : Prisma.DbNull,
+      blockReason: transition.blockReason,
     },
   });
 
@@ -839,6 +830,7 @@ function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
   if (outcome.waitKind) return outcome.waitKind;
   if (outcome.status === "waiting_for_user") return "user_input";
   if (outcome.status === "waiting_for_approval") return "approval";
+  if (outcome.status === "failed") return "manual_action";
   return "manual_action";
 }
 
@@ -1111,6 +1103,7 @@ async function advancePlanExecution(input: {
       executedNodeIds: [],
       waitingNodeIds: [],
       blockedNodeIds: [],
+      checkpoint: null,
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -1413,17 +1406,21 @@ async function advancePlanExecution(input: {
   });
 
   if (outcome.status === "cancelled") {
+    const transition = executionTransition({
+      status: "cancelled",
+      message: outcome.message,
+    });
     await setExecutionSessionState({
       sessionId: input.executionSession.id,
-      status: "Abandoned",
+      status: transition.sessionStatus,
       currentNodeId: null,
-      pauseReason: outcome.message,
+      pauseReason: transition.pauseReason,
       completedNodeIds: outcome.effective.completedNodeIds,
     });
     await cancelWorkBlock(input.taskId, input.executionSession.workBlockId);
     await db.task.update({
       where: { id: input.taskId },
-      data: { status: TaskStatus.Cancelled, blockReason: Prisma.DbNull },
+      data: { status: transition.taskStatus, blockReason: transition.blockReason },
     });
     await rebuildTaskProjection(input.taskId);
     return buildExecutionResponse({
@@ -1435,6 +1432,7 @@ async function advancePlanExecution(input: {
       currentNodeId: null,
       executedNodeIds: outcome.executedNodeIds,
       message: outcome.message,
+      checkpoint: null,
     });
   }
 
@@ -1479,6 +1477,7 @@ async function advancePlanExecution(input: {
     mainSessionId: input.mainSession.id,
     session: input.executionSession,
     effective: outcome.effective as unknown as EffectivePlanGraph,
+    status: executionStatusFromGraphOutcome(outcome),
     waitKind: waitKindFromOutcome(outcome),
     currentNodeId:
       currentNodeFromOutcome(outcome) ??
@@ -1506,6 +1505,7 @@ async function startPlanExecution(input: {
       executedNodeIds: [],
       waitingNodeIds: [],
       blockedNodeIds: [],
+      checkpoint: null,
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -1561,6 +1561,7 @@ async function continuePlanExecution(input: {
       executedNodeIds: [],
       waitingNodeIds: [],
       blockedNodeIds: [],
+      checkpoint: null,
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -1643,6 +1644,7 @@ async function resumePlanExecutionWithApproval(input: {
       executedNodeIds: [],
       waitingNodeIds: [],
       blockedNodeIds: [],
+      checkpoint: null,
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -1782,6 +1784,7 @@ async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
+          checkpoint: null,
           message:
             "No accepted plan. Create or accept a plan before execution.",
         };
@@ -1833,6 +1836,7 @@ async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
+          checkpoint: null,
           message:
             "No accepted plan. Create or accept a plan before execution.",
         };
@@ -1877,6 +1881,7 @@ async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
+          checkpoint: null,
           message:
             "No accepted plan. Create or accept a plan before execution.",
         };
@@ -1920,6 +1925,7 @@ async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
+          checkpoint: null,
           message:
             "No accepted plan. Create or accept a plan before execution.",
         };
@@ -1964,6 +1970,7 @@ async function dispatchExecutionAction(input: {
           executedNodeIds: [],
           waitingNodeIds: [],
           blockedNodeIds: [],
+          checkpoint: null,
           message:
             "No accepted plan. Create or accept a plan before execution.",
         };
@@ -2000,6 +2007,215 @@ async function dispatchExecutionAction(input: {
         `Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`,
       );
     }
+  }
+}
+
+async function submitCheckpointAction(input: {
+  taskId: string;
+  action: SubmitCheckpointActionInput;
+} & PlanExecutionObserver): Promise<SubmitCheckpointActionResult> {
+  const runtime = await ensureNativePlanRun(input.taskId);
+  if (!runtime) {
+    return {
+      transition: { type: "stay_paused", reason: "No accepted plan." },
+      execution: {
+        taskId: input.taskId,
+        planId: null,
+        mainSessionId: null,
+        status: "no_plan",
+        currentNodeId: null,
+        executedNodeIds: [],
+        waitingNodeIds: [],
+        blockedNodeIds: [],
+        checkpoint: null,
+        message: "No accepted plan. Create or accept a plan before execution.",
+      },
+    };
+  }
+
+  const executionSession = await db.executionSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      planId: runtime.planId,
+      status: { in: ["Active", "Paused"] },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+  if (!executionSession) {
+    throw new Error("No active execution session found for checkpoint action.");
+  }
+
+  const mainSession = await ensurePlanMainSession({
+    taskId: input.taskId,
+    planId: runtime.planId,
+  });
+  const effective = resolveEffectivePlanGraph({
+    graph: runtime.persisted.graph!,
+    attempts: runtime.persisted.attempts,
+    results: runtime.persisted.results,
+  }) as unknown as EffectivePlanGraph;
+  const status = mapTerminalReasonToStatus(effective);
+  const currentNodeId = currentNodeFromEffective(effective)?.id ?? executionSession.currentNodeId;
+  const checkpoint = deriveExecutionCheckpoint({
+    taskId: input.taskId,
+    sessionId: executionSession.id,
+    planRunId: runtime.planId,
+    status,
+    effective,
+    currentNodeId,
+    waitKind: executionSession.pauseReason as WaitKind | undefined,
+    message: "Execution checkpoint awaiting action.",
+  });
+
+  if (!checkpoint || checkpoint.id !== input.action.checkpointId) {
+    throw new Error("Checkpoint is no longer active.");
+  }
+
+  const transition = resolveCheckpointAction({
+    checkpoint,
+    action: input.action.action,
+    payload: input.action.payload,
+  });
+  const payloadText = checkpointPayloadText(input.action.payload);
+
+  switch (transition.type) {
+    case "continue_next_ready": {
+      const execution = await resumePlanExecutionWithApproval({
+        taskId: input.taskId,
+        sessionId: executionSession.id,
+        nodeId: checkpoint.nodeId ?? undefined,
+        approved: true,
+        feedback: payloadText,
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "resume_current_node": {
+      const fields = checkpointPayloadFields(input.action.payload);
+      const execution = await continuePlanExecution({
+        taskId: input.taskId,
+        reason: checkpoint.kind === "user_input" ? "checkpoint_input" : "checkpoint_resume",
+        userInput: Object.keys(fields).length ? formatInputFields(fields) : payloadText,
+        inputFields: fields,
+        sessionId: executionSession.id,
+        nodeId: checkpoint.nodeId ?? undefined,
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "rerun_current_node": {
+      if (!checkpoint.nodeId) throw new Error("Checkpoint retry requires a node.");
+      const execution = await dispatchExecutionAction({
+        taskId: input.taskId,
+        action: {
+          action: "retry_node",
+          sessionId: executionSession.id,
+          nodeId: checkpoint.nodeId,
+          prompt: payloadText,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "mark_current_completed": {
+      if (!checkpoint.nodeId) throw new Error("Checkpoint completion requires a node.");
+      const execution = await dispatchExecutionAction({
+        taskId: input.taskId,
+        action: {
+          action: "complete_manual_node",
+          sessionId: executionSession.id,
+          nodeId: checkpoint.nodeId,
+          summary: payloadText ?? "Checkpoint marked completed",
+          output: transition.output,
+          continueExecution: true,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "fail_task": {
+      if (!checkpoint.nodeId) throw new Error("Checkpoint failure requires a node.");
+      const execution = await dispatchExecutionAction({
+        taskId: input.taskId,
+        action: {
+          action: "fail_current_node",
+          sessionId: executionSession.id,
+          nodeId: checkpoint.nodeId,
+          error: transition.reason,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "cancel_session": {
+      const execution = await dispatchExecutionAction({
+        taskId: input.taskId,
+        action: {
+          action: "cancel_session",
+          sessionId: executionSession.id,
+          reason: transition.reason,
+        },
+        onGraphEvent: input.onGraphEvent,
+        onRuntimeEvent: input.onRuntimeEvent,
+        onStateChange: input.onStateChange,
+      });
+      return { transition, execution };
+    }
+    case "stay_paused": {
+      if (input.action.action === "reject_result" && checkpoint.nodeId) {
+        const execution = await resumePlanExecutionWithApproval({
+          taskId: input.taskId,
+          sessionId: executionSession.id,
+          nodeId: checkpoint.nodeId,
+          approved: false,
+          feedback: transition.reason,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        });
+        return { transition, execution };
+      }
+      await appendMainSessionEvent({
+        taskId: input.taskId,
+        planId: runtime.planId,
+        sessionId: mainSession.id,
+        eventType: "user_input_received",
+        payload: {
+          reason: `checkpoint:${input.action.action}`,
+          feedback: transition.reason,
+          nodeId: checkpoint.nodeId,
+        },
+      });
+      return {
+        transition,
+        execution: buildExecutionResponse({
+          taskId: input.taskId,
+          planId: runtime.planId,
+          mainSessionId: mainSession.id,
+          executionSessionId: executionSession.id,
+          planRunId: runtime.planId,
+          status,
+          effective,
+          currentNodeId,
+          executedNodeIds: effective.completedNodeIds,
+          message: transition.reason,
+          waitKind: executionSession.pauseReason as WaitKind | undefined,
+        }),
+      };
+    }
+    case "apply_graph_mutation":
+    case "mark_current_skipped":
+      throw new Error(`Checkpoint transition ${transition.type} is not implemented.`);
   }
 }
 
@@ -2180,26 +2396,28 @@ async function syncPlanRunRuntimeResult(
     return;
   }
 
-  if (outcome.status === "blocked") {
+  const executionStatus = executionStatusFromGraphOutcome(outcome);
+  if (executionStatus !== "completed" && executionStatus !== "running") {
+    const transition = executionTransition({
+      status: executionStatus,
+      pauseReason: waitKindFromOutcome(outcome),
+      message: outcome.message,
+      nodeId: outcome.currentNodeId ?? attempt.nodeId,
+    });
     if (executionSession) {
       await setExecutionSessionState({
         sessionId: executionSession.id,
-        status: "Paused",
+        status: transition.sessionStatus,
         currentNodeId: outcome.currentNodeId ?? attempt.nodeId,
-        pauseReason: outcome.message,
+        pauseReason: transition.pauseReason,
         completedNodeIds: outcome.effective.completedNodeIds,
       });
     }
     await db.task.update({
       where: { id: input.taskId },
       data: {
-        status: TaskStatus.Blocked,
-        blockReason: {
-          blockType: "node_blocked",
-          scope: "plan_node",
-          actionRequired: outcome.message,
-          nodeId: outcome.currentNodeId ?? attempt.nodeId,
-        },
+        status: transition.taskStatus,
+        blockReason: transition.blockReason,
       },
     });
     await rebuildTaskProjection(input.taskId);
@@ -2213,6 +2431,10 @@ export class TaskPlanExecution {
 
   async dispatch(input: Parameters<typeof dispatchExecutionAction>[0]) {
     return dispatchExecutionAction(input);
+  }
+
+  async submitCheckpointAction(input: Parameters<typeof submitCheckpointAction>[0]) {
+    return submitCheckpointAction(input);
   }
 
   async submitNodeResult(input: Parameters<typeof submitTerminalNodeResult>[0]) {

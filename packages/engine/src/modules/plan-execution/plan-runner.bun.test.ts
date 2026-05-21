@@ -280,10 +280,10 @@ describe("plan-runner native execution actions", () => {
     expect(session.pauseReason).toBe("user_input");
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
-    expect(updatedTask.status).toBe(TaskStatus.Blocked);
+    expect(updatedTask.status).toBe(TaskStatus.WaitingForInput);
     expect(updatedTask.blockReason).toMatchObject({
-      blockType: "execution_paused",
-      scope: "execution_session",
+      blockType: "human_input_required",
+      scope: "plan_node",
     });
   });
 
@@ -344,8 +344,8 @@ describe("plan-runner native execution actions", () => {
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Blocked);
     expect(updatedTask.blockReason).toMatchObject({
-      blockType: "execution_paused",
-      scope: "execution_session",
+      blockType: "node_blocked",
+      scope: "plan_node",
       actionRequired: "Check execution status",
     });
   });
@@ -361,19 +361,22 @@ describe("plan-runner native execution actions", () => {
     });
     expect(initial.status).toBe("waiting_for_user");
     expect(initial.currentNodeId).toBe("checkpoint_input");
+    expect(initial.checkpoint).toMatchObject({
+      kind: "user_input",
+      nodeId: "checkpoint_input",
+    });
+    expect(initial.checkpoint?.availableActions.map((action) => action.id)).toContain("submit_input");
 
-    const resumed = await taskPlanExecution.dispatch({
+    const submitted = await taskPlanExecution.submitCheckpointAction({
       taskId: task.id,
       action: {
-        action: "resume_with_input",
-        nodeId: "checkpoint_input",
-        inputFields: {
-          theme: "夏天",
-          style: "现代诗",
-          notes: "无",
-        },
+        checkpointId: initial.checkpoint!.id,
+        action: "submit_input",
+        payload: { inputFields: { theme: "夏天", style: "现代诗", notes: "无" } },
       },
     });
+    expect(submitted.transition.type).toBe("resume_current_node");
+    const resumed = submitted.execution;
 
     expect(resumed.status).toBe("completed");
     expect(resumed.currentNodeId).toBeNull();
@@ -436,7 +439,7 @@ describe("plan-runner native execution actions", () => {
     });
     expect(session.status).toBe("Abandoned");
     expect(session.currentNodeId).toBeNull();
-    expect(session.pauseReason).toBe("user cancelled from test");
+    expect(session.pauseReason).toBeNull();
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Cancelled);
@@ -454,21 +457,22 @@ describe("plan-runner native execution actions", () => {
     });
     expect(initial.status).toBe("blocked");
     expect(initial.currentNodeId).toBe("cond_blocked");
-
-    const session = await db.executionSession.findFirstOrThrow({
-      where: { taskId: task.id },
-      orderBy: { createdAt: "desc" },
+    expect(initial.checkpoint).toMatchObject({
+      kind: "manual_recovery",
+      nodeId: "cond_blocked",
     });
+    expect(initial.checkpoint?.availableActions.map((action) => action.id)).toContain("retry_node");
 
-    const retried = await taskPlanExecution.dispatch({
+    const retryResult = await taskPlanExecution.submitCheckpointAction({
       taskId: task.id,
       action: {
+        checkpointId: initial.checkpoint!.id,
         action: "retry_node",
-        sessionId: session.id,
-        nodeId: "cond_blocked",
-        prompt: "retry blocked node",
+        payload: { prompt: "retry blocked node" },
       },
     });
+    expect(retryResult.transition.type).toBe("rerun_current_node");
+    const retried = retryResult.execution;
 
     expect(retried.status).toBe("blocked");
     expect(retried.currentNodeId).toBe("cond_blocked");

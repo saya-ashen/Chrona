@@ -19,6 +19,14 @@ export function createTaskExecutionService() {
       }
     },
 
+    async submitCheckpointAction(input: Parameters<typeof taskPlanExecution.submitCheckpointAction>[0]) {
+      try {
+        return await taskPlanExecution.submitCheckpointAction(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to submit checkpoint action");
+      }
+    },
+
     async syncRuntimeResult(input: Parameters<typeof taskPlanExecution.syncRuntimeResult>[0]) {
       try {
         return await taskPlanExecution.syncRuntimeResult(input);

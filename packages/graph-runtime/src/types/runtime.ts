@@ -22,6 +22,7 @@ export type RuntimeProgressStatus =
   | "waiting_for_user"
   | "waiting_for_approval"
   | "blocked"
+  | "failed"
   | "completed"
   | "cancelled";
 
@@ -33,6 +34,7 @@ export function runtimeProgressStatusForWaitKind(
       return "waiting_for_user";
     case "approval":
     case "review":
+    case "replan_required":
       return "waiting_for_approval";
     default:
       return "blocked";
@@ -56,7 +58,10 @@ export function runtimeProgressStatusForNodes(input: {
   if (input.nodes.some((node) => node.status === "waiting_for_approval")) {
     return "waiting_for_approval";
   }
-  if (input.blockedNodeIds.length > 0 || input.failedNodeIds.length > 0) {
+  if (input.failedNodeIds.length > 0) {
+    return "failed";
+  }
+  if (input.blockedNodeIds.length > 0) {
     return "blocked";
   }
 

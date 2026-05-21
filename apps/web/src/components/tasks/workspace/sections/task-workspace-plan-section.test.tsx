@@ -38,6 +38,20 @@ import {
   createTaskWorkspaceFixturePageData,
 } from "../test-support/task-workspace-test-fixtures";
 
+const checkpoint = {
+  id: "run-1:checkpoint:user_input",
+  taskId: "task-1",
+  sessionId: "session-1",
+  planRunId: "run-1",
+  nodeId: "checkpoint",
+  kind: "user_input" as const,
+  title: "Action required",
+  message: "Continue node",
+  severity: "info" as const,
+  availableActions: [],
+  createdAt: "2026-05-21T00:00:00.000Z",
+};
+
 let TaskWorkspacePlanSection: typeof import("./task-workspace-plan-section").TaskWorkspacePlanSection;
 
 vi.mock("@chrona/i18n/react", () => ({
@@ -149,12 +163,15 @@ describe("TaskWorkspacePlanSection", () => {
 
   it("adds checkpoint controls as the command center operation after execution starts", async () => {
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Input sent" });
+    const onSubmitCheckpointAction = vi.fn().mockResolvedValue({ message: "Input sent" });
     const node = createTaskWorkspaceFixtureNode({
       id: "checkpoint",
       title: "Review checkpoint",
       status: "waiting_for_user",
       nextAction: "Provide checkpoint input",
       requiresHumanInput: true,
+      checkpoint,
+      availableActions: [{ id: "submit_input", label: "Submit input", kind: "input", emphasis: "primary", checkpointId: checkpoint.id, checkpointAction: "submit_input" }],
       interactiveFields: [{ key: "city", label: "City", value: "", control: "text", required: true }],
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "checkpoint");
@@ -185,18 +202,22 @@ describe("TaskWorkspacePlanSection", () => {
         onApplyPlan={vi.fn()}
         onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
+        onSubmitCheckpointAction={onSubmitCheckpointAction}
       />,
     );
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
     fireEvent.change(within(commandCenter).getByLabelText(/City/), { target: { value: "Shanghai" } });
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Send input" }));
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Send Submit input" }));
 
     await waitFor(() => {
-      expect(onDispatchExecutionAction).toHaveBeenCalledWith({
-        action: "resume_with_input",
-        nodeId: "checkpoint",
-        inputFields: { city: "Shanghai" },
+      expect(onSubmitCheckpointAction).toHaveBeenCalledWith({
+        checkpointId: checkpoint.id,
+        action: "submit_input",
+        payload: {
+          inputFields: { city: "Shanghai" },
+          message: "City: Shanghai",
+        },
       });
     });
   });
@@ -204,15 +225,18 @@ describe("TaskWorkspacePlanSection", () => {
   it("shows blocked current node action with blocker reason before start plan", async () => {
     const blocker = "已创建脚本文件，但当前运行环境访问 wttr.in 连续超时。";
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Node resumed" });
+    const onSubmitCheckpointAction = vi.fn().mockResolvedValue({ message: "Node resumed" });
+    const blockedCheckpoint = { ...checkpoint, id: "run-1:weather-script:manual_recovery", nodeId: "weather-script", kind: "manual_recovery" as const, message: blocker };
     const node = createTaskWorkspaceFixtureNode({
       id: "weather-script",
       title: "创建一个获取天气的脚本",
       status: "blocked",
       interactionType: "retry",
       nextAction: blocker,
+      checkpoint: blockedCheckpoint,
       availableActions: [
-        { id: "weather-script:resolve", label: "解决阻塞", kind: "resolve", emphasis: "primary" },
-        { id: "weather-script:retry", label: "重试节点", kind: "retry", emphasis: "warning" },
+        { id: "resume_after_unblock", label: "解决阻塞", kind: "resolve", emphasis: "primary", checkpointId: blockedCheckpoint.id, checkpointAction: "resume_after_unblock" },
+        { id: "retry_node", label: "重试节点", kind: "retry", emphasis: "warning", checkpointId: blockedCheckpoint.id, checkpointAction: "retry_node" },
       ],
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
@@ -243,6 +267,7 @@ describe("TaskWorkspacePlanSection", () => {
         onApplyPlan={vi.fn()}
         onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
+        onSubmitCheckpointAction={onSubmitCheckpointAction}
       />,
     );
 
@@ -255,10 +280,10 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Send 解决阻塞" }));
 
     await waitFor(() => {
-      expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+      expect(onSubmitCheckpointAction).toHaveBeenCalledWith({
+        checkpointId: blockedCheckpoint.id,
         action: "resume_after_unblock",
-        nodeId: "weather-script",
-        note: blocker,
+        payload: { reason: blocker },
       });
     });
   });

@@ -105,6 +105,33 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+export const checkpointActionParamSchema = z.object({
+  taskId: taskIdParam,
+  checkpointId: z.string().min(1, "checkpointId is required"),
+});
+
+export const checkpointActionKindSchema = z.enum([
+  "submit_input",
+  "approve_result",
+  "reject_result",
+  "request_changes",
+  "request_replan",
+  "accept_replan",
+  "reject_replan",
+  "retry_node",
+  "resume_after_unblock",
+  "mark_node_completed",
+  "mark_node_skipped",
+  "cancel_session",
+  "fail_task",
+]);
+
+export const checkpointActionBodySchema = z.object({
+  action: checkpointActionKindSchema,
+  payload: z.unknown().optional(),
+  idempotencyKey: idempotencyKeySchema.optional(),
+}).strict();
+
 const planEdgeTypeSchema = z.enum([
   "hard_dependency",
   "ordering",
