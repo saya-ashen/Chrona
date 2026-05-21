@@ -36,7 +36,6 @@ function makeNode(input: Partial<EffectivePlanNode> & Pick<EffectivePlanNode, "i
 function makeGraph(nodes: EffectivePlanNode[], overrides: Partial<EffectivePlanGraph> = {}): EffectivePlanGraph {
   return {
     graphId: "graph_1",
-    planId: "graph_1",
     basePlanId: "graph_1",
     resolvedAt: "2026-05-17T00:00:00.000Z",
     resolvedVersion: 3,

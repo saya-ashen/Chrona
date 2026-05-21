@@ -89,7 +89,6 @@ export function createExecutionGraphCallbacks(input: {
       if (!executor) return null;
       return executor.execute({
         taskId: input.taskId,
-        planId: input.planId,
         mainSession: input.mainSession,
         node: engineNode,
         plan: enginePlan,

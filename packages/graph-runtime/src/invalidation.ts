@@ -6,7 +6,7 @@ import type {
   NodeCancellationLayer,
   NodeInvalidationLayer,
 } from "./types";
-import type { GraphExecutionState } from "./graph-runner";
+import type { GraphExecutionState } from "./execution/types";
 
 const DEFAULT_INVALIDATION_EDGE_TYPES: EdgeType[] = ["hard_dependency", "branch"];
 

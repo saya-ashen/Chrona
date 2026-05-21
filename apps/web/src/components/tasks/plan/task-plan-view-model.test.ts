@@ -122,7 +122,6 @@ describe("task-plan-view-model", () => {
       compiledPlan,
       effectivePlan: {
         graphId: "graph-1",
-        planId: "plan-1",
         basePlanId: "compiled-plan-1",
         resolvedAt: "2026-05-07T10:00:00.000Z",
         resolvedVersion: 3,
@@ -260,7 +259,6 @@ describe("task-plan-view-model", () => {
       compiledPlan,
       effectivePlan: {
         graphId: "graph-1",
-        planId: "plan-1",
         basePlanId: "compiled-plan-1",
         resolvedAt: "2026-05-07T10:00:00.000Z",
         resolvedVersion: 3,
@@ -366,7 +364,6 @@ describe("task-plan-view-model", () => {
       compiledPlan,
       effectivePlan: {
         graphId: "graph-1",
-        planId: "plan-1",
         basePlanId: "compiled-plan-1",
         resolvedAt: "2026-05-07T10:00:00.000Z",
         resolvedVersion: 3,
@@ -466,7 +463,6 @@ describe("task-plan-view-model", () => {
       compiledPlan,
       effectivePlan: {
         graphId: "graph-1",
-        planId: "plan-1",
         basePlanId: "compiled-plan-1",
         resolvedAt: "2026-05-07T10:00:00.000Z",
         resolvedVersion: 3,
@@ -558,7 +554,6 @@ describe("task-plan-view-model", () => {
       compiledPlan,
       effectivePlan: {
         graphId: "graph-1",
-        planId: "plan-1",
         basePlanId: "compiled-plan-1",
         resolvedAt: "2026-05-07T10:00:00.000Z",
         resolvedVersion: 3,

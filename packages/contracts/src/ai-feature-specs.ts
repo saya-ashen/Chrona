@@ -1,7 +1,7 @@
 import type {
   GenerateTaskPlanRequest,
   NodeResultOutput,
-} from "./ai-plan-runtime";
+} from "./plan-runtime";
 import { planBlueprintSchema, planPatchSchema } from "./ai-plan-blueprint";
 import { taskDispatchDecisionSchema } from "./ai-dispatch-types";
 import { z } from "zod";

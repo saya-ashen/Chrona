@@ -70,7 +70,6 @@ export interface NodeExecutor {
 
 export interface NodeExecutorInput {
   taskId: string;
-  planId: string;
   mainSession: {
     id: string;
     taskId: string;

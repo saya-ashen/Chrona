@@ -34,7 +34,6 @@ function makeNode(overrides: Partial<EffectivePlanNode> & { id: string }): Effec
 function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   return {
     graphId: "graph-1",
-    planId: "plan-1",
     basePlanId: "bp-1",
     resolvedAt: "2026-04-20T09:00:00.000Z",
     resolvedVersion: 1,

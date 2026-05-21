@@ -296,7 +296,6 @@ export interface EffectivePlanEdge {
 
 export interface EffectivePlanGraph {
   graphId: string;
-  planId: string;
   basePlanId: string;
   resolvedAt: string;
   resolvedVersion: number;

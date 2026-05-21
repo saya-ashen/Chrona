@@ -31,7 +31,6 @@ describe("reconcileTaskState impossible state detection", () => {
     const nodes = [node({ id: "build", status: "pending" }), node({ id: "ship", status: "completed", dependencies: ["build"] })];
     const graph: EffectivePlanGraph = {
       graphId: "graph_1",
-      planId: "graph_1",
       basePlanId: "graph_1",
       resolvedAt: "2026-05-17T00:00:00.000Z",
       resolvedVersion: 1,

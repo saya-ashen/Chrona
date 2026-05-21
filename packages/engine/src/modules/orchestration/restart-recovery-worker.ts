@@ -24,7 +24,7 @@ export async function runRestartRecoveryWorker(input: {
       taskId: session.taskId,
       eventType: "scheduler.repair",
       reason: "restart_active_session_scan",
-      payload: { sessionId: session.id, planId: session.planId },
+      payload: { sessionId: session.id},
     });
   }
 

@@ -51,15 +51,15 @@ import {
 } from "./projection/execution-graph-selectors";
 import { getRuntimeName } from "./persistence/task-runtime-store";
 import { toGraphExecutionState } from "./runtime/graph-state";
-import { buildAdvanceDispatchCommand } from "./runtime/advance-dispatch-command";
+import { buildAdvanceDispatchCommand } from "./runtime/advance-dispatch/build-advance-dispatch-command";
 import { createExecutionGraphCallbacks } from "./runtime/graph-runtime-callbacks";
 import {
   convergeExecutionToCommittedState,
 } from "./use-cases/execution-lifecycle";
 import { handleAdvanceOutcome } from "./use-cases/advance-outcome";
 import { dispatchRuntimeCommandAction } from "./use-cases/dispatch-runtime-command-action";
-import { resolveCheckpointTransition } from "./use-cases/resolve-checkpoint-transition";
-export { syncPlanRunRuntimeResult } from "./use-cases/sync-runtime-result";
+import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
+export { syncPlanRunRuntimeResult } from "./use-cases/sync-runtime-result/sync-plan-run-runtime-result";
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
 

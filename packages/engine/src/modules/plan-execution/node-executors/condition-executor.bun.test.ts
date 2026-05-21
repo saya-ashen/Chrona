@@ -47,7 +47,6 @@ function makeConditionNode(
 function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   return {
     graphId: "graph-1",
-    planId: "plan-1",
     basePlanId: "base-1",
     resolvedAt: "2026-04-20T09:00:00.000Z",
     resolvedVersion: 1,
@@ -86,7 +85,6 @@ describe("ConditionNodeExecutor", () => {
 
     const result = await executor.execute({
       taskId: "task-1",
-      planId: "plan-1",
       mainSession: { id: "session-1", taskId: "task-1", sessionKey: "session-key" },
       node: condition,
       plan,
@@ -151,7 +149,6 @@ describe("ConditionNodeExecutor", () => {
 
     const result = await executor.execute({
       taskId: "task-1",
-      planId: "plan-1",
       mainSession: { id: "session-1", taskId: "task-1", sessionKey: "session-key" },
       node: condition,
       plan: makePlan([condition, yesNode, noNode]),

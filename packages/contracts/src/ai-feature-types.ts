@@ -3,7 +3,7 @@
  */
 
 import type { PlanBlueprint } from "./ai-plan-blueprint";
-import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./ai-plan-runtime";
+import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
 export type AiClientType = "openclaw" | "llm" | "hermes";
 export type AiFeature =

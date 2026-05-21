@@ -111,7 +111,6 @@ const sampleReadModel: TaskPlanReadModel = {
   compiledPlan: sampleCompiledPlan,
   effectivePlan: {
     graphId: "graph-1",
-    planId: "plan-1",
     basePlanId: "compiled-plan-1",
     resolvedAt: "2026-04-20T09:05:00.000Z",
     resolvedVersion: 1,
