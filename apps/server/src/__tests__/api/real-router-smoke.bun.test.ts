@@ -198,6 +198,56 @@ describe("Real router smoke", () => {
     await expectApiError(missingRes, 404);
   });
 
+  it("redacts AI client secrets from production router responses", async () => {
+    const createRes = await app().request("http://local/api/ai/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Secured Hermes",
+        type: "hermes",
+        config: {
+          baseUrl: "http://127.0.0.1:8642",
+          apiKey: "hermes-secret",
+          timeoutMs: 30000,
+        },
+      }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await json<{ client: { id: string; config: Record<string, unknown> } }>(createRes);
+    expect(created.client.config).toEqual({
+      baseUrl: "http://127.0.0.1:8642",
+      timeoutMs: 30000,
+    });
+
+    const listRes = await app().request("http://local/api/ai/clients");
+    expect(listRes.status).toBe(200);
+    const listBody = await json<{ clients: Array<{ config: Record<string, unknown> }> }>(listRes);
+    expect(listBody.clients[0].config).not.toHaveProperty("apiKey");
+
+    const updateRes = await app().request(`http://local/api/ai/clients/${created.client.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        config: {
+          baseUrl: "http://localhost:8642",
+          apiKey: "",
+          timeoutMs: 45000,
+        },
+      }),
+    });
+
+    expect(updateRes.status).toBe(200);
+    const updated = await json<{ client: { config: Record<string, unknown> } }>(updateRes);
+    expect(updated.client.config).toEqual({
+      baseUrl: "http://localhost:8642",
+      timeoutMs: 45000,
+    });
+
+    const stored = await db.aiClient.findUniqueOrThrow({ where: { id: created.client.id } });
+    expect(stored.config).toMatchObject({ apiKey: "hermes-secret" });
+  });
+
   it("runs plan accept through the production router", async () => {
     const { workspaceId } = await seedWorkspace("Real Router Plan");
     const { taskId } = await seedTask(workspaceId, { title: "Plan parent" });

@@ -295,7 +295,7 @@ describe("plan-runner task executor approval flows", () => {
 
     expect(result.status).toBe("waiting_for_approval");
     expect(result.currentNodeId).toBe("task_node");
-    expect(result.waitingNodeIds).toEqual([]);
+    expect(result.waitingNodeIds).toEqual(["task_node"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
