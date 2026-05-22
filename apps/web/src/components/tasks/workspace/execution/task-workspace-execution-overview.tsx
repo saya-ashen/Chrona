@@ -233,21 +233,70 @@ function dotClassName(tone: WorkspaceActivityItem["tone"]) {
   return "bg-slate-300";
 }
 
+type RuntimeActivityFeedItem =
+  | {
+      kind: "text";
+      id: string;
+      type: "assistant_text_delta" | "reasoning_delta";
+      provider: string;
+      text: string;
+    }
+  | {
+      kind: "event";
+      id: string;
+      event: WorkspaceRuntimeEvent;
+    };
+
+function runtimeTextScopeKey(event: WorkspaceRuntimeEvent) {
+  return [
+    event.event.type,
+    event.action,
+    event.runId ?? "run",
+    event.nodeId ?? "node",
+    event.runtimeName,
+    event.provider,
+  ].join(":");
+}
+
+function buildRuntimeActivityFeed(runtimeEvents: WorkspaceRuntimeEvent[]) {
+  const feed: RuntimeActivityFeedItem[] = [];
+  let currentTextSegment: { key: string; item: Extract<RuntimeActivityFeedItem, { kind: "text" }> } | null = null;
+
+  runtimeEvents.forEach((event, index) => {
+    if (event.event.type !== "assistant_text_delta" && event.event.type !== "reasoning_delta") {
+      currentTextSegment = null;
+      feed.push({
+        kind: "event",
+        id: `${event.sequence ?? index}:${event.event.type}:${event.rawEventType ?? "event"}`,
+        event,
+      });
+      return;
+    }
+
+    const key = runtimeTextScopeKey(event);
+    if (currentTextSegment !== null && currentTextSegment.key === key) {
+      currentTextSegment.item.text += event.event.text;
+      return;
+    }
+
+    const item = {
+      kind: "text" as const,
+      id: `${event.sequence ?? index}:${event.event.type}:${event.runId ?? "run"}`,
+      type: event.event.type,
+      provider: event.provider,
+      text: event.event.text,
+    };
+    feed.push(item);
+    currentTextSegment = { key, item };
+  });
+
+  return feed.filter((item) => item.kind === "event" || item.text.trim()).slice(-12).reverse();
+}
+
 export function ActivityCard({ activity, runtimeEvents = [] }: { activity: WorkspaceActivityItem[]; runtimeEvents?: WorkspaceRuntimeEvent[] }) {
-  const assistantText = runtimeEvents
-    .map((event) => event.event.type === "assistant_text_delta" ? event.event.text : "")
-    .join("")
-    .trim();
-  const reasoningText = runtimeEvents
-    .map((event) => event.event.type === "reasoning_delta" ? event.event.text : "")
-    .join("")
-    .trim();
-  const runtimeFeedEvents = runtimeEvents
-    .filter((event) => event.event.type !== "assistant_text_delta" && event.event.type !== "reasoning_delta")
-    .slice(-12)
-    .reverse();
+  const runtimeFeedItems = buildRuntimeActivityFeed(runtimeEvents);
   const items = activity.slice(0, 30);
-  const hasRuntimeActivity = assistantText || reasoningText || runtimeFeedEvents.length > 0;
+  const hasRuntimeActivity = runtimeFeedItems.length > 0;
 
   return (
     <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
@@ -262,21 +311,12 @@ export function ActivityCard({ activity, runtimeEvents = [] }: { activity: Works
           </span>
         ) : null}
       </div>
-      {assistantText ? (
-        <p className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-slate-800 shadow-inner">
-          {assistantText}
-        </p>
-      ) : null}
-      {reasoningText ? (
-        <details className="mt-2 rounded-xl border border-slate-200/80 bg-white/70 px-2.5 py-2 text-xs text-slate-500">
-          <summary className="cursor-pointer font-medium text-slate-800">Reasoning</summary>
-          <p className="mt-1 whitespace-pre-wrap leading-5">{reasoningText}</p>
-        </details>
-      ) : null}
-      {runtimeFeedEvents.length > 0 ? (
+      {runtimeFeedItems.length > 0 ? (
         <div className="mt-2 space-y-1.5">
-          {runtimeFeedEvents.map((event, index) => (
-            <RuntimeActivityRow key={`${event.sequence ?? index}:${event.event.type}:${event.rawEventType ?? "event"}`} event={event} />
+          {runtimeFeedItems.map((item) => (
+            item.kind === "text"
+              ? <RuntimeTextActivityRow key={item.id} item={item} />
+              : <RuntimeActivityRow key={item.id} event={item.event} />
           ))}
         </div>
       ) : null}
@@ -301,6 +341,24 @@ export function ActivityCard({ activity, runtimeEvents = [] }: { activity: Works
         </div>
       )}
     </section>
+  );
+}
+
+function RuntimeTextActivityRow({ item }: { item: Extract<RuntimeActivityFeedItem, { kind: "text" }> }) {
+  if (item.type === "reasoning_delta") {
+    return (
+      <details className="rounded-xl border border-slate-200/80 bg-white/70 px-2.5 py-2 text-xs text-slate-500 shadow-sm">
+        <summary className="cursor-pointer font-medium text-slate-800">Reasoning</summary>
+        <p className="mt-1 whitespace-pre-wrap leading-5">{item.text.trim()}</p>
+      </details>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-slate-800 shadow-inner">
+      <p className="mb-1 text-xs font-medium text-slate-500">Assistant response</p>
+      <p className="whitespace-pre-wrap">{item.text.trim()}</p>
+    </div>
   );
 }
 

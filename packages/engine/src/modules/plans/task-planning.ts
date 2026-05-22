@@ -108,6 +108,7 @@ export class TaskPlanning {
     const streamLock = startTaskPlanGeneration(input.taskId);
     const events = generateTaskPlanManualStream({
       ...input,
+      generationId: streamLock.generationId,
       signal: streamLock.signal,
     });
     return {
