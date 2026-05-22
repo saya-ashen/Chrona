@@ -1,5 +1,5 @@
 /**
- * AI Features — Streaming support (OpenClaw SSE + LLM SSE).
+ * AI Features — Streaming support (provider SSE + LLM SSE).
  */
 
 import { createHash } from "node:crypto";
@@ -25,8 +25,8 @@ import type {
 import { normalizeSuggestResponse } from "./feature-normalizers";
 import {
   buildPreparedFeatureRequest,
-  buildOpenClawFeatureGatewayRequest,
-  openclawCall,
+  buildProviderFeatureRequest,
+  providerCall,
 } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
@@ -37,7 +37,7 @@ function summarizeText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-const logger = createLogger("ai-features.openclaw.streaming");
+const logger = createLogger("ai-features.provider.streaming");
 
 export type PreparedStreamInput = {
   scope: string;
@@ -192,16 +192,16 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
   }
 }
 
-async function* openclawStream(
+async function* agentProviderStream(
   client: EngineAiClient,
   feature: AiFeature,
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
-  const openClawClient = aiClientRegistry.requireOpenClawClient(client);
-  const config = openClawClient.record.config;
+  const agentClient = aiClientRegistry.requireProviderClient(client);
+  const config = agentClient.record.config;
   const timeout = config.timeoutSeconds ?? 120;
   const { sessionId, sessionKey } = buildSessionIdentity(feature, input.scope);
-  const providerInput = buildOpenClawFeatureGatewayRequest({
+  const providerInput = buildProviderFeatureRequest({
     sessionKey,
     input: input.input,
     instructions: input.instructions,
@@ -210,7 +210,7 @@ async function* openclawStream(
     stream: false,
   });
 
-  logger.info("openclaw.stream.start", {
+  logger.info("provider.stream.start", {
     feature,
     scope: input.scope,
     sessionId,
@@ -228,7 +228,7 @@ async function* openclawStream(
       kind: "ai-stream",
       label: `${feature}-${input.scope}`,
       meta: {
-        layer: "engine.openclawStream",
+        layer: "engine.agentProviderStream",
         feature,
         scope: input.scope,
         sessionId,
@@ -238,13 +238,13 @@ async function* openclawStream(
     try {
       await dump?.write({
         type: "yield",
-        stage: "openclaw.status",
+        stage: "provider.status",
         event: { type: "status", message: "AI 正在思考..." },
       });
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-      for await (const event of openClawClient.providerClient.streamRun({
+      for await (const event of agentClient.providerClient.streamRun({
         sessionId,
         sessionKey,
         instructions: input.instructions,
@@ -266,7 +266,7 @@ async function* openclawStream(
         }
         await dump?.write({
           type: "yield",
-          stage: "openclaw.converted",
+          stage: "provider.converted",
           event: summarizeStreamEvent(parsed),
         });
         yield parsed;
@@ -276,7 +276,7 @@ async function* openclawStream(
         }
       }
 
-      logger.info("openclaw.stream.done", {
+      logger.info("provider.stream.done", {
         feature,
         scope: input.scope,
         sessionId,
@@ -286,7 +286,7 @@ async function* openclawStream(
 
       await dump?.write({
         type: "yield",
-        stage: "openclaw.done",
+        stage: "provider.done",
         event: { type: "done", textLength: fullText.length, structured: null },
       });
       yield { type: "done", text: fullText, structured: null };
@@ -295,11 +295,11 @@ async function* openclawStream(
     } catch (error) {
       await dump?.write({
         type: "error",
-        stage: "openclaw.catch",
+        stage: "provider.catch",
         message: error instanceof Error ? error.message : String(error),
       });
       await dump?.close();
-      logger.warn("openclaw.stream.fallback_to_blocking", {
+      logger.warn("provider.stream.fallback_to_blocking", {
         feature,
         scope: input.scope,
         sessionId,
@@ -319,7 +319,7 @@ async function* openclawStream(
 
   yield { type: "status", message: "AI 正在生成建议..." };
   try {
-    const text = await openclawCall(client, providerInput);
+    const text = await providerCall(client, providerInput);
     yield { type: "partial", text };
     yield { type: "done", text, structured: null };
   } catch (error) {
@@ -328,57 +328,6 @@ async function* openclawStream(
       message: error instanceof Error ? error.message : "Unknown error",
     };
   }
-}
-
-async function* providerStream(
-  client: EngineAiClient,
-  feature: AiFeature,
-  input: PreparedStreamInput,
-): AsyncGenerator<StreamEvent> {
-  const providerClient = client.providerClient;
-  if (!providerClient) {
-    yield {
-      type: "error",
-      message: `${client.record.type} client does not support streaming`,
-    };
-    return;
-  }
-
-  const { sessionKey } = buildSessionIdentity(feature, input.scope);
-  const session = await providerClient.createSession({
-    sessionKey,
-    signal: input.signal,
-  });
-  const run = await providerClient.startRun({
-    sessionId: session.sessionId,
-    sessionKey,
-    instructions: input.instructions,
-    input: input.input,
-    stream: true,
-    signal: input.signal,
-  });
-
-  let fullText = "";
-  for await (const event of providerClient.streamRun({
-    sessionId: session.sessionId,
-    sessionKey,
-    runId: run.runId,
-    instructions: input.instructions,
-    input: input.input,
-    stream: true,
-    signal: input.signal,
-  })) {
-    const parsed = convertProviderEvent(event);
-    if (!parsed) continue;
-    if (parsed.type === "partial") {
-      fullText += parsed.text;
-    }
-    yield parsed;
-    if (parsed.type === "error") return;
-    if (parsed.type === "done") return;
-  }
-
-  yield { type: "done", text: fullText, structured: null };
 }
 
 async function* llmStream(
@@ -477,11 +426,8 @@ export function dispatchStream(
   feature: AiFeature,
   input: PreparedStreamInput,
 ): AsyncGenerator<StreamEvent> {
-  if (client.record.type === "openclaw") {
-    return openclawStream(client, feature, input);
-  }
   if (client.providerClient) {
-    return providerStream(client, feature, input);
+    return agentProviderStream(client, feature, input);
   }
   const llmClient = aiClientRegistry.requireLlmClient(client);
   const request = toLlmStreamRequest(feature, input);

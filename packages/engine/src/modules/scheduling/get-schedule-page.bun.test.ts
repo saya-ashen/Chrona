@@ -48,7 +48,7 @@ describe("getSchedulePage", () => {
       data: {
         name: "Schedule Query",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
 
@@ -56,7 +56,7 @@ describe("getSchedulePage", () => {
       data: {
         name: "Other Workspace",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
 
@@ -67,7 +67,7 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "High",
         dueAt: dayAfterTomorrowEighteen,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -79,7 +79,7 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Medium",
         dueAt: todayTwenty,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -91,7 +91,7 @@ describe("getSchedulePage", () => {
         title: "Draft the follow-up outline",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -111,7 +111,7 @@ describe("getSchedulePage", () => {
         title: "Review launch checklist",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -123,7 +123,7 @@ describe("getSchedulePage", () => {
         status: "Blocked",
         priority: "Urgent",
         dueAt: todayEighteen,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -212,7 +212,7 @@ describe("getSchedulePage", () => {
         title: "Hidden schedule item",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

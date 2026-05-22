@@ -20,8 +20,7 @@
     "packages/db/src/generated/**"
   ],
   "ignoreBinaries": [
-    "scripts/demo/readme-gif.ts",
-    "scripts/openclaw/probe.ts"
+    "scripts/demo/readme-gif.ts"
   ],
   "ignoreDependencies": [
     "esbuild",

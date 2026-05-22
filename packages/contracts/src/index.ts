@@ -307,7 +307,7 @@ export type {
   AiFeature,
   HermesClientConfig,
   LLMClientConfig,
-  OpenClawClientConfig,
+  AgentProviderClientConfig,
   SmartSuggestRequest,
   SmartSuggestion,
   SmartSuggestResponse,
@@ -338,7 +338,7 @@ export type {
   StructuredResponseMeta,
 } from "./ai-feature-types";
 
-export { AiClientError, OPENCLAW_DEFAULT_MODEL } from "./ai-feature-types";
+export { AiClientError, DEFAULT_AGENT_PROVIDER_MODEL } from "./ai-feature-types";
 
 export type {
   TaskDispatchAction,

@@ -14,7 +14,7 @@
 - [X] T001 Audit existing task flow and plan execution tests in `packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts`, `apps/server/src/__tests__/api/plan-lifecycle-workflow.bun.test.ts`, and `apps/server/src/__tests__/api/task-workflow.bun.test.ts`
 - [X] T002 [P] Audit existing task workspace UI tests in `apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx`, `apps/web/src/components/tasks/plan/task-plan-graph.test.tsx`, and `apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx`
 - [X] T003 [P] Audit existing Playwright task workspace specs in `e2e/specs/task-workspace-chat.spec.ts` and `e2e/specs/task-plan-generation-hermes.spec.ts`
-- [X] T004 [P] Audit existing checkpoint and OpenClaw provider tests in `packages/providers/openclaw/src/gateway.bun.test.ts`, `packages/providers/openclaw/src/OpenClawClient.bun.test.ts`, and `apps/server/src/__tests__/api/plan-execution-output.bun.test.ts`
+- [X] T004 [P] Audit existing checkpoint and Hermes provider tests in `packages/providers/hermes/src/gateway.bun.test.ts`, `packages/providers/hermes/src/HermesClient.bun.test.ts`, and `apps/server/src/__tests__/api/plan-execution-output.bun.test.ts`
 
 ---
 
@@ -28,7 +28,7 @@
 - [X] T006 Create shared complex plan graph fixtures covering linear, branch, join, checkpoint, retry, blocked, failure, missing-result, malformed-result, empty, cyclic, and impossible graphs in `packages/engine/src/modules/plan-execution/plan-graph-test-fixtures.ts`
 - [X] T007 [P] Create shared UI task workspace test builders for loading, empty, planning, executing, blocked, failed, completed, retry, long-text, desktop, and mobile states in `apps/web/src/components/tasks/workspace/test/task-workspace-ui-fixtures.tsx`
 - [X] T008 [P] Create Playwright task workspace helper functions for seeded workspace setup, viewport changes, primary action lookup, state capture, and screenshot naming in `e2e/specs/task-workspace-test-helpers.ts`
-- [X] T009 Create shared regression assertion helper that fails on `OpenClaw did not return review_checkpoint_node_result` in logs, payloads, visible text, and error summaries in `packages/engine/src/modules/plan-execution/checkpoint-regression-assertions.ts`
+- [X] T009 Create shared regression assertion helper that fails on `Hermes did not return review_checkpoint_node_result` in logs, payloads, visible text, and error summaries in `packages/engine/src/modules/plan-execution/checkpoint-regression-assertions.ts`
 - [X] T010 [P] Document the scenario id naming convention and failure evidence fields in `specs/006-test-coverage/contracts/test-coverage-contract.md`
 
 **Checkpoint**: Foundation ready. User story tests can now be implemented independently.
@@ -71,7 +71,7 @@
 - [X] T020 [P] [US2] Add checkpoint result tests for approved, rejected, needs-changes, missing, malformed, delayed, and provider-specific fallback cases in `packages/engine/src/modules/plan-execution/plan-runner.checkpoints.bun.test.ts`
 - [X] T021 [P] [US2] Add retry, blocked node, partial branch failure, and failure containment tests in `packages/engine/src/modules/plan-execution/plan-runner.failure-recovery.bun.test.ts`
 - [X] T022 [P] [US2] Add invalid graph tests for empty, impossible, cyclic, and unsafe dependency topologies in `packages/engine/src/modules/plan-execution/plan-runner.invalid-graphs.bun.test.ts`
-- [X] T023 [P] [US2] Add API regression tests proving supported checkpoint flows do not emit `OpenClaw did not return review_checkpoint_node_result` in `apps/server/src/__tests__/api/plan-execution-checkpoint-regression.bun.test.ts`
+- [X] T023 [P] [US2] Add API regression tests proving supported checkpoint flows do not emit `Hermes did not return review_checkpoint_node_result` in `apps/server/src/__tests__/api/plan-execution-checkpoint-regression.bun.test.ts`
 
 ### Implementation for User Story 2
 

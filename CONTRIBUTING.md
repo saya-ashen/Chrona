@@ -56,9 +56,9 @@ Chrona is a Vite + Hono monorepo:
 | `packages/contracts/` | Shared DTOs, Zod schemas |
 | `packages/db/` | Prisma bootstrap and repositories |
 | `packages/domain/` | Pure business rules |
-| `packages/runtime/` | CQRS: commands, queries, projections, events |
-| `packages/providers/openclaw/` | OpenClaw bridge & integration |
-| `packages/providers/hermes/` | Hermes provider (future) |
+| `packages/runtime-core/` | Shared runtime contracts and helpers |
+| `packages/providers/foundation/` | Provider-neutral client contracts |
+| `packages/providers/hermes/` | Hermes provider adapter |
 
 See [docs/architecture.md](./docs/architecture.md) for full design details.
 

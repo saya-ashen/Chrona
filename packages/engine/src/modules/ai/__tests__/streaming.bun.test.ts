@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 
-const openclawCallMock = mock(() => Promise.resolve('{"unexpected":true}'));
+const providerCallMock = mock(() => Promise.resolve('{"unexpected":true}'));
 const executeFeatureStreamMock = mock(async function* () {
   yield* [];
   throw new Error("stream exploded");
@@ -23,12 +23,12 @@ mock.module("../providers", () => ({
       inputText,
     };
   },
-  openclawCall: openclawCallMock,
+  providerCall: providerCallMock,
 }));
 
 mock.module("../runtime/client-registry", () => ({
   aiClientRegistry: {
-    requireOpenClawClient: (client: EngineAiClient) => client,
+    requireProviderClient: (client: EngineAiClient) => client,
   },
 }));
 
@@ -36,19 +36,17 @@ import { generatePlanStream } from "../features/generate-plan";
 import type { EngineAiClient } from "../runtime/client-registry";
 
 describe("generatePlanStream", () => {
-  it("does not fall back to blocking OpenClaw calls when streaming generate_plan fails", async () => {
-    openclawCallMock.mockClear();
+  it("does not fall back to blocking provider calls when streaming generate_plan fails", async () => {
+    providerCallMock.mockClear();
     executeFeatureStreamMock.mockClear();
 
     const client = {
       record: {
         id: "client-1",
-        name: "OpenClaw",
-        type: "openclaw",
+        name: "Agent Provider",
+        type: "agent-provider",
         config: {
-          gatewayUrl: "http://gateway.local",
-          bridgeUrl: "http://gateway.local",
-          bridgeToken: "",
+          baseUrl: "http://provider.local",
         },
         isDefault: true,
         enabled: true,
@@ -62,14 +60,14 @@ describe("generatePlanStream", () => {
     }
 
     expect(executeFeatureStreamMock).toHaveBeenCalledTimes(1);
-    expect(openclawCallMock).not.toHaveBeenCalled();
+    expect(providerCallMock).not.toHaveBeenCalled();
     expect(events.at(-1)).toEqual({
       type: "error",
       message: "stream exploded",
     });
   });
 
-  it("streams non-OpenClaw provider clients through startRun and run event stream", async () => {
+  it("streams provider clients through startRun and run event stream", async () => {
     const createSessionMock = mock(() => Promise.resolve({
       provider: "hermes",
       sessionId: "session-1",

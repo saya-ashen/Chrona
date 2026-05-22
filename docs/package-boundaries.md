@@ -66,9 +66,9 @@ packages/
   runtime-core/         # backend-agnostic runtime adapter contracts
   providers/
     foundation/         # provider-facing middle layer Chrona calls
-    openclaw/
-      integration/      # OpenClaw protocol/transport/runtime integration
-      bridge/           # OpenClaw HTTP/SSE bridge server
+    hermes/
+      integration/      # Hermes protocol/transport/runtime integration
+      bridge/           # Hermes HTTP/SSE bridge server
     hermes/             # future provider, mirroring the same shape when real
   i18n/                 # small shared locale utilities
 ```
@@ -93,7 +93,7 @@ These are real system layers and should not be collapsed back into `apps/server`
 - `packages/db`
 - `packages/engine`
 - `packages/runtime-core`
-- `packages/providers/openclaw/*`
+- `packages/providers/hermes/*`
 - `packages/providers/hermes/*` when it becomes real
 
 Reason:
@@ -252,7 +252,7 @@ Put here:
 
 Chrona's intended direction is:
 
-- Chrona should not know the concrete calling protocol of OpenClaw, Hermes, or any future provider.
+- Chrona should not know the concrete calling protocol of Hermes, Hermes, or any future provider.
 - Chrona should talk to a provider-facing middle layer.
 - That middle layer should hide provider-specific details such as:
   - OpenResponses request formatting
@@ -304,7 +304,7 @@ The current codebase is partway to this design, but not fully there yet.
 
 Already aligned with the target:
 - canonical AI plan contract lives in `packages/contracts/src/ai.ts`
-- provider-specific bridge logic lives under `packages/providers/openclaw/*`
+- provider-specific bridge logic lives under `packages/providers/hermes/*`
 - engine consumes normalized feature results instead of raw provider responses
 
 Still drifting away from the target:
@@ -320,7 +320,7 @@ When changing AI/provider code, prefer this question order:
    Put it in `packages/contracts`.
 2. Is this provider-neutral layer Chrona should call?
    Put it in `packages/providers/foundation`.
-3. Does this exist only because OpenClaw/Hermes has a specific protocol?
+3. Does this exist only because Hermes/Hermes has a specific protocol?
    Put it in `packages/providers/<provider>/...`.
 
 If upper layers need to understand raw provider protocol details to work, the boundary is probably wrong.
@@ -437,7 +437,7 @@ Responsible for:
 - shared runtime interface types
 
 Not responsible for:
-- OpenClaw protocol
+- Hermes protocol
 - transport clients
 - orchestration behavior
 
@@ -445,7 +445,7 @@ Healthy boundary status:
 - one of the clearest packages in the repo
 
 Rule of thumb:
-- if a runtime adapter interface should work for OpenClaw, Hermes, or any future backend, it belongs here
+- if a runtime adapter interface should work for Hermes, Hermes, or any future backend, it belongs here
 
 ### `packages/i18n`
 
@@ -466,19 +466,19 @@ Responsible for:
 - local provider-facing client helpers
 
 Not responsible for:
-- becoming OpenClaw-specific in its public mental model
+- becoming Hermes-specific in its public mental model
 
 Current drift to watch:
-- it currently contains both abstraction (`ProviderClient`) and a concrete `OpenClawClient`
-- it also depends on OpenClaw bridge/integration contracts, so it is not fully provider-neutral yet
+- it currently contains both abstraction (`ProviderClient`) and a concrete `HermesClient`
+- it also depends on Hermes bridge/integration contracts, so it is not fully provider-neutral yet
 
 Rule of thumb:
-- this package should describe how Chrona talks to a provider client, not the entire OpenClaw protocol model
+- this package should describe how Chrona talks to a provider client, not the entire Hermes protocol model
 
-### `packages/providers/openclaw`
+### `packages/providers/hermes`
 
 Responsible for:
-- OpenClaw-specific protocol types
+- Hermes-specific protocol types
 - transport clients
 - runtime adapter/orchestration integration
 - gateway request/response mapping helpers
@@ -495,7 +495,7 @@ Current drift to watch:
 - `execution/gateway.ts` remains a complexity hotspot and still carries too many responsibilities
 
 Rule of thumb:
-- if the concept only exists because OpenClaw exists, it belongs here
+- if the concept only exists because Hermes exists, it belongs here
 
 ### `packages/providers/hermes`
 
@@ -503,7 +503,7 @@ Responsible for:
 - future Hermes provider support
 
 Current status:
-- mostly scaffolding mirroring OpenClaw layout
+- mostly scaffolding mirroring Hermes layout
 - do not treat it as an active implementation yet
 
 ## Healthy Vs Drifting Boundaries
@@ -515,7 +515,7 @@ Healthier boundaries today:
 - the `apps/web` and `apps/server` split
 
 Boundaries that still drift and therefore feel confusing:
-- `providers/foundation` abstraction vs concrete OpenClaw implementation
+- `providers/foundation` abstraction vs concrete Hermes implementation
 - `engine` public barrel vs actual package scope
 - `contracts` because of `src/hooks/`
 
@@ -591,6 +591,6 @@ Before adding a new file, ask in order:
 If you want to reduce package confusion further, the highest-value cleanup targets are:
 
 1. remove or relocate `packages/contracts/src/hooks/`
-2. make `packages/providers/foundation` truly middle-layer oriented and less OpenClaw-shaped
+2. make `packages/providers/foundation` truly middle-layer oriented and less Hermes-shaped
 3. replace deprecated runtime compatibility exports with direct imports from `@chrona/contracts`
 4. make `packages/engine/src/index.ts` reflect the package's real role more honestly

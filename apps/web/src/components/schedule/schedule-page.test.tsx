@@ -190,14 +190,14 @@ afterEach(() => {
 
 function createData(): SchedulePageData {
   return {
-    defaultExecutionRuntime: "openclaw",
+    defaultExecutionRuntime: "hermes",
     executionRuntimes: [
       {
-        key: "openclaw",
-        label: "OpenClaw",
+        key: "hermes",
+        label: "Hermes",
         spec: {
-          runtime: "openclaw",
-          version: "openclaw-v1",
+          runtime: "hermes",
+          version: "hermes-v1",
           fields: [],
           runnability: { requiredPaths: [] },
         },
@@ -263,7 +263,7 @@ function createData(): SchedulePageData {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {
           approvalPolicy: "never",
           toolMode: "workspace-write",
@@ -455,7 +455,7 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         isRunnable: true,
         runnabilityState: "ready_to_run",
@@ -500,7 +500,7 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         isRunnable: true,
         runnabilityState: "ready_to_run",

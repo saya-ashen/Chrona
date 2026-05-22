@@ -2,10 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { deriveTaskRunnability } from "@chrona/shared";
 
 describe("deriveTaskRunnability", () => {
-  it("returns runnable for openclaw adapter with model and prompt", () => {
+  it("returns runnable for hermes adapter with model and prompt", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Implement the schedule query" },
       }),
     ).toMatchObject({
@@ -16,10 +16,10 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("returns runnable for openclaw adapter without model", () => {
+  it("returns runnable for hermes adapter without model", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Implement the schedule query" },
       }),
     ).toMatchObject({
@@ -29,10 +29,10 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("returns runnable for openclaw adapter with empty prompt", () => {
+  it("returns runnable for hermes adapter with empty prompt", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       }),
     ).toMatchObject({
@@ -42,10 +42,10 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("returns runnable for openclaw adapter with runtimeInput (no model needed)", () => {
+  it("returns runnable for hermes adapter with runtimeInput (no model needed)", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {
           prompt: "Hello",
           approvalPolicy: "never",
@@ -58,10 +58,10 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("returns runnable for openclaw adapter with no prompt", () => {
+  it("returns runnable for hermes adapter with no prompt", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       }),
     ).toMatchObject({
@@ -84,7 +84,7 @@ describe("deriveTaskRunnability", () => {
     });
   });
 
-  it("default adapter (openclaw) with no explicit adapter key", () => {
+  it("default adapter (hermes) with no explicit adapter key", () => {
     expect(
       deriveTaskRunnability({}),
     ).toMatchObject({
@@ -97,7 +97,7 @@ describe("deriveTaskRunnability", () => {
   it("does not require advanced runtime config to mark a task runnable", () => {
     expect(
       deriveTaskRunnability({
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {
           prompt: "Test",
         },

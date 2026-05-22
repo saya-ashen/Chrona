@@ -85,7 +85,7 @@ describe("plan-runner task executor external results", () => {
       data: {
         taskId: task.id,
         taskSessionId: task.defaultSessionId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: "Running",
         triggeredBy: "system",
         startedAt: new Date(),
@@ -190,13 +190,13 @@ describe("plan-runner task executor external results", () => {
       evidence: {
         sessionId: "main-session",
         runId: "run_failed",
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "resp_failed",
       },
       details: {
         nodeId: "task_node",
         nodeTitle: "Execute task",
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "resp_failed",
         runId: "run_failed",
         errorSummary: "Gateway refused the run",
@@ -215,7 +215,7 @@ describe("plan-runner task executor external results", () => {
     expect(result.status).toBe("failed");
     expect(result.message).toContain("Gateway refused the run");
     expect(result.errorDetails).toMatchObject({
-      runtimeName: "openclaw",
+      runtimeName: "hermes",
       runtimeRunRef: "resp_failed",
       runId: "run_failed",
       errorSummary: "Gateway refused the run",
@@ -231,7 +231,7 @@ describe("plan-runner task executor external results", () => {
       nodeId: "task_node",
       status: "rejected",
       error: expect.stringContaining("Gateway refused the run"),
-      errorDetails: expect.objectContaining({ runtimeName: "openclaw" }),
+      errorDetails: expect.objectContaining({ runtimeName: "hermes" }),
     });
   });
 

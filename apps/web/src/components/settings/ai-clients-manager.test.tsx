@@ -41,7 +41,7 @@ const messages = {
 const providersResponse = {
   providers: [
     {
-      key: "openclaw",
+      key: "hermes",
       label: "LLM (OpenAI Compatible)",
       features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
     },
@@ -82,7 +82,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
-      target: { value: "OpenClaw Client" },
+      target: { value: "Hermes Client" },
     });
 
     const testButton = screen.getByRole("button", { name: "Test availability" });
@@ -163,16 +163,16 @@ describe("AiClientsManager", () => {
     });
   });
 
-  it("updates an existing OpenClaw client to Hermes", async () => {
+  it("updates an existing Hermes client to Hermes", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         clients: [
           {
-            id: "client_openclaw",
+            id: "client_hermes",
             name: "Runtime Client",
-            type: "openclaw",
+            type: "hermes",
             config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
             isDefault: true,
             enabled: true,
@@ -196,7 +196,7 @@ describe("AiClientsManager", () => {
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ client: { id: "client_openclaw", type: "hermes" } }),
+      json: async () => ({ client: { id: "client_hermes", type: "hermes" } }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -208,12 +208,12 @@ describe("AiClientsManager", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/ai/clients/client_openclaw",
+        "/api/ai/clients/client_hermes",
         expect.objectContaining({ method: "PATCH" }),
       );
     });
 
-    const updateCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_openclaw" && call[1]?.method === "PATCH");
+    const updateCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes" && call[1]?.method === "PATCH");
     expect(JSON.parse(updateCall?.[1]?.body as string)).toMatchObject({
       name: "Runtime Client",
       type: "hermes",
@@ -232,7 +232,7 @@ describe("AiClientsManager", () => {
           {
              id: "client_1",
              name: "Broken Bridge",
-             type: "openclaw",
+             type: "hermes",
              config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
              isDefault: false,
              enabled: true,

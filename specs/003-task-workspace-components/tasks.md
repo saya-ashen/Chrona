@@ -115,7 +115,7 @@ description: "Task list for Task Workspace Component Parity"
 
 ### Implementation for User Story 3
 
-- [X] T035 [US3] Implement left workspace navigation with Chrona identity, primary sections, active task section, notifications, and settings in `apps/web/src/components/tasks/task-workspace-navigation.tsx`
+- [X] T035 [US3] Implement left workspace navigation with Chrona identity, primary sections, active task section, notifications, and settings
 - [X] T036 [US3] Add notification state and active member identity to the top workspace context in `apps/web/src/components/tasks/task-workspace-header-card.tsx`
 - [X] T037 [US3] Implement right overview latest result card with update time and full-result affordance in `apps/web/src/components/tasks/task-workspace-execution-overview.tsx`
 - [X] T038 [US3] Implement right overview attention-needed card with blocking/approval node, reason, status, and next actions in `apps/web/src/components/tasks/task-workspace-execution-overview.tsx`

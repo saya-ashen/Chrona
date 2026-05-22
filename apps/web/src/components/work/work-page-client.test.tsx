@@ -56,7 +56,7 @@ const baseData: WorkPageData = {
     id: "task_1",
     workspaceId: "ws_1",
     title: "起草任务驱动 Agent 面板",
-    executionRuntime: "openclaw",
+    executionRuntime: "hermes",
     executionConfig: { prompt: "先整理任务目标，再输出首轮计划" },
     status: "Running",
     priority: "High",

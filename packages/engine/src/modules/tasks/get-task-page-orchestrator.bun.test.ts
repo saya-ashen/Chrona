@@ -20,7 +20,7 @@ async function seedTask(title = "Orchestrated task") {
     data: {
       name: `${title} Workspace`,
       status: "Active",
-      defaultRuntime: "openclaw",
+      defaultRuntime: "hermes",
     },
   });
   const task = await db.task.create({
@@ -29,7 +29,7 @@ async function seedTask(title = "Orchestrated task") {
       title,
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { prompt: "Run orchestrated task" },
     },
   });

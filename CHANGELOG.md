@@ -13,7 +13,7 @@
 - Workspace isolation guards in API routes
 
 ### Fixes
-- OpenClaw: prevent mixed input arrays from causing errors
+- Provider bridge: prevent mixed input arrays from causing errors
 - SPA path resolution no longer depends on CWD (`CHRONA_WEB_DIST` env fix)
 - Release quality: 235 lint errors, typecheck errors, and 2 failing tests resolved
 - Prisma 7 WASM crash workaround when `DbNull` sentinel used on nullable fields
@@ -74,4 +74,4 @@
 - **Frontend:** Vite + React 19 + React Router 7 (SPA)
 - **Backend:** Hono API server (Bun)
 - **Database:** SQLite via Prisma 7 with Bun SQLite adapter
-- **AI:** OpenClaw bridge, LLM providers via OpenRouter-compatible API
+- **AI:** Provider bridge, LLM providers via OpenRouter-compatible API

@@ -1,4 +1,4 @@
-export const LEGACY_CHECKPOINT_RESULT_ERROR = "OpenClaw did not return review_checkpoint_node_result";
+export const LEGACY_CHECKPOINT_RESULT_ERROR = "Hermes did not return review_checkpoint_node_result";
 
 export type CheckpointRegressionEvidence = {
   scenarioId: string;

@@ -31,7 +31,7 @@ graph TB
     subgraph Client["Client Layer"]
         SPA["React SPA<br/>Vite + React Router"]
         CLI["Chrona CLI<br/>chrona task|run|ai"]
-        BRIDGE["OpenClaw Bridge<br/>HTTP agent gateway"]
+        BRIDGE["Hermes Bridge<br/>HTTP agent gateway"]
     end
 
     subgraph API["API Layer (Hono)"]
@@ -51,7 +51,7 @@ graph TB
     end
 
     subgraph External["External Runtime"]
-        OCB["OpenClaw<br/>CLI Bridge"]
+        OCB["Hermes<br/>CLI Bridge"]
         LLM["LLM Providers<br/>OpenRouter-compatible"]
     end
 
@@ -93,11 +93,11 @@ C4Context
 
     Person(user, "User", "Operates Chrona via browser or CLI")
     System(chrona, "Chrona", "AI-native task control plane<br/>Self-hosted, local SQLite")
-    System_Ext(openclaw, "OpenClaw", "External agent execution gateway")
+    System_Ext(hermes, "Hermes", "External agent execution gateway")
     System_Ext(llm, "LLM Providers", "OpenRouter / OpenAI-compatible APIs")
 
     Rel(user, chrona, "Uses", "HTTPS (localhost)")
-    Rel(chrona, openclaw, "Bridges to", "HTTP/JSON")
+    Rel(chrona, hermes, "Bridges to", "HTTP/JSON")
     Rel(chrona, llm, "Calls when needed", "HTTPS/SSE")
 ```
 
@@ -118,7 +118,7 @@ C4Container
         Container(cli, "CLI", "Bun binary", "chrona task|run|schedule|ai commands")
     }
 
-    System_Ext(openclaw, "OpenClaw Bridge", "Bun HTTP service wrapping openclaw CLI")
+    System_Ext(hermes, "Hermes Bridge", "Bun HTTP service wrapping hermes CLI")
     System_Ext(llm, "LLM Providers", "OpenRouter / OpenAI API")
 
     Rel(user, web, "Visits", "localhost:3101")
@@ -126,7 +126,7 @@ C4Container
     Rel(web, api, "fetch /api/*", "JSON")
     Rel(cli, api, "fetch /api/*", "JSON")
     Rel(api, db, "Prisma queries", "SQL")
-    Rel(api, openclaw, "Agent execution", "HTTP/SSE")
+    Rel(api, hermes, "Agent execution", "HTTP/SSE")
     Rel(api, llm, "Plan generation, chat", "SSE stream")
 ```
 
@@ -220,7 +220,7 @@ graph TD
     plans["plans/"] --> ai["ai/"]
     plan-exec["plan-execution/"] --> plans
     plan-exec --> tasks
-    ai --> providers["providers/openclaw/"]
+    ai --> providers["providers/hermes/"]
     ai --> plans
     events["events/"]
     subgraph External
@@ -236,7 +236,7 @@ graph TD
 - `services/` — orchestrates across modules (tasks, pages, workspaces, ai-clients)
 - `modules/tasks/` → `runtime-sync/`
 - `modules/projections/` → `modules/tasks/` (state derivation)
-- `modules/ai/` → `modules/plans/`, `providers/openclaw/`
+- `modules/ai/` → `modules/plans/`, `providers/hermes/`
 - `modules/plan-execution/` → `modules/plans/`, `modules/tasks/`
 
 ---
@@ -389,7 +389,7 @@ In production mode, a single Hono server hosts both the static SPA (`apps/web/di
 
 **Date:** 2025 · **Status:** Accepted
 
-**Context:** Support multiple AI runtimes (OpenClaw, bare LLM) without changing the product model.
+**Context:** Support multiple AI runtimes (Hermes, bare LLM) without changing the product model.
 
 **Decision:** Define `RuntimeExecutionAdapter` in `packages/runtime-core/` as the canonical interface. The `packages/providers/foundation/` layer provides the provider-facing contracts Chrona calls through.
 
@@ -409,7 +409,7 @@ In production mode, a single Hono server hosts both the static SPA (`apps/web/di
 | **Read path** | Projections pre-computed; single SELECT for most page loads |
 | **Write path** | Serial commands via CQRS pattern; typical latency < 50ms |
 | **AI operations** | Asynchronous via SSE streaming; non-blocking to API |
-| **Agent execution** | Delegated to external runtimes (OpenClaw bridge); Chrona polls for sync |
+| **Agent execution** | Delegated to external runtimes (Hermes bridge); Chrona polls for sync |
 | **Scheduler** | Configurable polling interval (`AUTO_START_SCHEDULER_INTERVAL_MS`); lightweight DB scan |
 
 ---

@@ -84,10 +84,10 @@ CHRONA_CONFIG_DIR=/自定义/路径/配置 chrona start
 }
 ```
 
-### 方案 B：OpenClaw 网关
+### 方案 B：Hermes 网关
 
 用于专用代理执行。你需要：
-- 运行中的 OpenClaw 网关（默认: `http://localhost:18789`）
+- 运行中的 Hermes 网关（默认: `http://localhost:18789`）
 - 网关 token
 
 配置完成后可在设置页面测试连接。

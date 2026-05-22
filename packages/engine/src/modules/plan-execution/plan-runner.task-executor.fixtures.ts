@@ -58,7 +58,7 @@ export async function seedWorkspaceAndTask(title: string) {
     data: {
       name: `${title} Workspace`,
       status: "Active",
-      defaultRuntime: "openclaw",
+      defaultRuntime: "hermes",
     },
   });
 
@@ -68,7 +68,7 @@ export async function seedWorkspaceAndTask(title: string) {
       title,
       status: TaskStatus.Ready,
       priority: "Medium",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

@@ -36,7 +36,7 @@ const mockItem: ScheduledItem = {
   latestRunStatus: null,
   scheduleProposalCount: 0,
   lastActivityAt: null,
-  executionRuntime: "openclaw",
+  executionRuntime: "hermes",
   executionConfig: {},
   isRunnable: true,
   runnabilityState: "ready",

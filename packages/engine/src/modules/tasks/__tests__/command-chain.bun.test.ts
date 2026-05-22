@@ -68,7 +68,7 @@ describe("createTask", () => {
       data: {
         name: "Create Commands",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
 
@@ -77,7 +77,7 @@ describe("createTask", () => {
       title: "  Bootstrap task creation  ",
       description: "  Add the first real create flow  ",
       priority: "High",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: {
         prompt: "  Add the first real create flow  ",
       },
@@ -95,7 +95,7 @@ describe("createTask", () => {
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
     expect(storedTask.status).toBe("Draft");
-    expect(storedTask.executionRuntime).toBe("openclaw");
+    expect(storedTask.executionRuntime).toBe("hermes");
     expect(storedTask.executionConfig).toEqual({
       approvalPolicy: "never",
       prompt: "Add the first real create flow",
@@ -124,7 +124,7 @@ describe("createTask", () => {
       data: {
         name: "Invalid Config",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
 
@@ -132,7 +132,7 @@ describe("createTask", () => {
       createTask({
         workspaceId: workspace.id,
         title: "Invalid runtime config",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {
           prompt: "Run the invalid case",
           approvalPolicy: "sometimes" as never,
@@ -153,14 +153,14 @@ describe("updateTask", () => {
       data: {
         name: "Update Commands",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Keep adapter config",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {
           prompt: "Original prompt",
           temperature: 0.2,
@@ -198,14 +198,14 @@ describe("updateTask", () => {
       data: {
         name: "Promote Draft",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
-        title: "OpenClaw draft",
-        executionRuntime: "openclaw",
+        title: "Hermes draft",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -214,7 +214,7 @@ describe("updateTask", () => {
 
     await updateTask({
       taskId: task.id,
-      title: "OpenClaw ready",
+      title: "Hermes ready",
     });
 
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
@@ -226,14 +226,14 @@ describe("updateTask", () => {
       data: {
         name: "Promote With Plan",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Draft with accepted plan",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -262,14 +262,14 @@ describe("reopenTask", () => {
       data: {
         name: "Reopen Ready",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Reopen me",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",
@@ -288,14 +288,14 @@ describe("reopenTask", () => {
       data: {
         name: "Reopen Ready",
         status: "Active",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Reopen me with plan",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",

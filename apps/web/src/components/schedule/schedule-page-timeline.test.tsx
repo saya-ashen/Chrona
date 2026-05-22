@@ -36,7 +36,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    executionRuntime: overrides.executionRuntime ?? "openclaw",
+    executionRuntime: overrides.executionRuntime ?? "hermes",
     executionConfig: overrides.executionConfig ?? {},
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
@@ -65,7 +65,7 @@ describe("DayTimeline", () => {
           durationMinutes: 60,
         }}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -96,7 +96,7 @@ describe("DayTimeline", () => {
         selectedDay="2026-04-15"
         draggedItem={null}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -119,7 +119,7 @@ describe("DayTimeline", () => {
         selectedDay="2026-04-16"
         draggedItem={null}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -141,7 +141,7 @@ describe("DayTimeline", () => {
         selectedDay="2026-04-15"
         draggedItem={null}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -186,7 +186,7 @@ describe("DayTimeline", () => {
         selectedTaskId="task-1"
         draggedItem={null}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -229,7 +229,7 @@ describe("DayTimeline", () => {
         selectedTaskId="task-1"
         draggedItem={null}
         executionRuntimes={[]}
-        defaultExecutionRuntime="openclaw"
+        defaultExecutionRuntime="hermes"
         isPending={false}
         onScheduleDrop={onScheduleDrop}
         onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}

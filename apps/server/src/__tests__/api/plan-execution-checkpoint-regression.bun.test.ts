@@ -6,7 +6,7 @@ import {
 import { SAMPLE_CHECKPOINT_RESULT_CASES } from "./plan-execution-fixtures";
 
 describe("plan execution checkpoint regression", () => {
-  it("passes supported checkpoint evidence when legacy OpenClaw error is absent", () => {
+  it("passes supported checkpoint evidence when legacy Hermes error is absent", () => {
     expect(() => assertNoLegacyCheckpointResultError({
       scenarioId: "api-checkpoint-supported-flow",
       expected: "checkpoint result accepted",
@@ -27,7 +27,7 @@ describe("plan execution checkpoint regression", () => {
     }
   });
 
-  it("fails supported checkpoint evidence when legacy OpenClaw error leaks", () => {
+  it("fails supported checkpoint evidence when legacy Hermes error leaks", () => {
     expect(() => assertNoLegacyCheckpointResultError({
       scenarioId: "api-checkpoint-regression",
       expected: "checkpoint result accepted",

@@ -3,16 +3,27 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type {
-  OpenClawChatHistory,
-  OpenClawGatewayRequest,
-} from "@chrona/openclaw";
-import type {
   ProviderRunEvent,
   ProviderRunSnapshot,
   ProviderRunInput,
   StartRunInput,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "../ai/runtime/client-resolution";
+
+type ProviderChatHistory = {
+  messages: Array<{ role: string; content: string }>;
+};
+
+type ExecutionProviderRequest = {
+  sessionId: string;
+  sessionKey: string;
+  instructions: string;
+  input: unknown;
+  structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
+  terminalToolName?: string;
+  maxOutputTokens?: number;
+  timeoutSeconds?: number;
+};
 
 export type AiRuntimeInvocationInput = {
   taskId: string;
@@ -116,7 +127,7 @@ export class AiRuntimeInvoker {
   }
 }
 
-function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
+function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
   return {
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
@@ -132,32 +143,19 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
 
 async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
-  request: OpenClawGatewayRequest,
+  request: ExecutionProviderRequest,
   options: {
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
-  if (providerClient.provider !== "openclaw") {
-    const run = await providerClient.startRun(startInput);
-    return collectProviderRunSnapshot(
-      providerClient.provider,
-      providerClient.streamRun({ runId: run.runId }),
-      run.sessionId,
-      run,
-      options,
-    );
-  }
-
+  const run = await providerClient.startRun(startInput);
   return collectProviderRunSnapshot(
     providerClient.provider,
-    providerClient.streamRun({
-      ...startInput,
-      stream: true,
-    }),
-    request.sessionId,
-    undefined,
+    providerClient.streamRun({ runId: run.runId }),
+    run.sessionId,
+    run,
     options,
   );
 }
@@ -268,7 +266,7 @@ function buildExecutionGatewayRequest(input: {
   sessionKey: string;
   sessionId: string;
   executionRuntime: string;
-}): OpenClawGatewayRequest {
+}): ExecutionProviderRequest {
   const aiInput = buildExecutionAiInput({
     executionRuntime: input.executionRuntime,
     runtimeInput: input.runtimeInput,
@@ -319,12 +317,12 @@ function buildExecutionAiInput(input: {
 
 async function persistRuntimeHistory(input: {
   runId: string;
-  request: OpenClawGatewayRequest;
+  request: ExecutionProviderRequest;
   response: ProviderRunSnapshot;
 }): Promise<string[]> {
   try {
     const assistantContent = extractAssistantContent(input.response);
-    const history: OpenClawChatHistory = {
+    const history: ProviderChatHistory = {
       messages: [
         { role: "user", content: extractUserText(input.request) },
         ...(assistantContent
@@ -386,7 +384,7 @@ function extractAssistantContent(response: ProviderRunSnapshot): string | null {
   return JSON.stringify(record);
 }
 
-function extractUserText(request: OpenClawGatewayRequest): string {
+function extractUserText(request: ExecutionProviderRequest): string {
   const segments = [request.instructions];
   try {
     segments.push(JSON.stringify(request.input, null, 2));

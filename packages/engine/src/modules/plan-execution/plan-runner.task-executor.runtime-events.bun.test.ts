@@ -57,7 +57,7 @@ describe("plan-runner task executor runtime events", () => {
       {
         nodeId: "task_node",
         nodeTitle: "Execute mocked task node",
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         event: {
           type: "text_delta",
           provider: "hermes",

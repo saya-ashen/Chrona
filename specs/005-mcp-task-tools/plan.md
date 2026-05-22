@@ -10,13 +10,13 @@ Chrona will move agent-driven task lifecycle changes from provider-authored fina
 ## Technical Context
 
 **Language/Version**: TypeScript strict; Bun >=1.3.11 runtime; React 19/Vite SPA unaffected except for existing task workspace consistency checks.  
-**Primary Dependencies**: Existing Hono API server, Prisma 7 with `prisma-adapter-bun-sqlite`, Zod contracts in `packages/contracts`, engine services in `packages/engine`, OpenClaw provider bridge/tool-call tracing in `packages/providers/openclaw`. No new dependency is planned unless implementation proves an MCP server/client package is required and Bun-compatible.  
+**Primary Dependencies**: Existing Hono API server, Prisma 7 with `prisma-adapter-bun-sqlite`, Zod contracts in `packages/contracts`, engine services in `packages/engine`, Hermes provider bridge/tool-call tracing in `packages/providers/hermes`. No new dependency is planned unless implementation proves an MCP server/client package is required and Bun-compatible.  
 **Storage**: Existing SQLite through Prisma task, plan, schedule/work block, execution session, run, activity/event, and tool-call detail records. New persistence should be limited to idempotency/audit fields only if existing records cannot prove retries and accepted/rejected tool operations.  
 **Testing**: Vitest for domain/contract/engine behavior, Bun API tests for Hono/MCP integration where Bun runtime paths are required, provider tests for tool-call bridging, and existing workspace tests for no human-flow regression. Required proof commands: `bun run typecheck`, `bun run lint`, `bun run test`, plus `bun run test:api` or `bun run test:bun` for server/runtime coverage when touched.  
 **Target Platform**: Local Chrona Bun/Hono server and supported agent runtimes that can call MCP-compatible tools.  
 **Project Type**: Monorepo web application and agent runtime integration: `apps/server`, `apps/web`, `packages/contracts`, `packages/domain`, `packages/db`, `packages/engine`, `packages/providers/*`, and runtime/provider support packages.  
 **Performance Goals**: Agent-facing state-changing tool calls return accepted/rejected feedback within 1 second for validation-only paths and complete or fail within 3 seconds for ordinary task lifecycle operations under normal local conditions; no additional polling loop is introduced for existing workspace flows; provider session recording should not block accepted Chrona state changes beyond the 3 second operation budget.  
-**Constraints**: No Next.js patterns; Bun-compatible runtime only; business logic stays out of React components and Hono route handlers; shared Zod schemas live in `packages/contracts`; pure rules live in `packages/domain`; database access stays in `packages/db`; provider-specific OpenClaw logic remains under `packages/providers/openclaw`; MCP/tool transport must not become the source of task lifecycle business authority; structured final JSON from agents cannot override Chrona-owned tool results.  
+**Constraints**: No Next.js patterns; Bun-compatible runtime only; business logic stays out of React components and Hono route handlers; shared Zod schemas live in `packages/contracts`; pure rules live in `packages/domain`; database access stays in `packages/db`; provider-specific Hermes logic remains under `packages/providers/hermes`; MCP/tool transport must not become the source of task lifecycle business authority; structured final JSON from agents cannot override Chrona-owned tool results.  
 **Scale/Scope**: Core lifecycle operations for Task -> Plan -> Schedule -> Execution, including state reads, mutations, idempotency, stale-state rejection, audit/evidence capture, and compatibility with existing provider session content. Scope excludes a full task workspace UI redesign, every possible task metadata operation, and replacing all provider adapters in v1.
 
 ## Constitution Check
@@ -69,7 +69,7 @@ packages/engine/
     └── modules/plan-execution/task-plan-execution.ts
 
 packages/providers/
-└── openclaw/
+└── hermes/
     └── src/...             # Provider tool-call evidence remains provider-specific
 
 apps/web/
@@ -86,7 +86,7 @@ Resolved clarifications:
 
 - MCP is the agent-facing operation surface for this feature, but Chrona's internal contracts remain Zod/TypeScript contracts shared across Hono, engine, and tests.
 - Existing `executionActionBodySchema`, plan mutation schema, schedule schemas, and task result endpoints are the first reuse targets for tool inputs rather than creating unrelated operation names.
-- Current provider tool-call parsing in OpenClaw is evidence/trace infrastructure, not the authority for applying task lifecycle changes.
+- Current provider tool-call parsing in Hermes is evidence/trace infrastructure, not the authority for applying task lifecycle changes.
 - Idempotency must be explicit for mutating tool calls. Existing execution actions already accept optional `idempotencyKey`; task, plan, and schedule tool operations need equivalent semantics if not already available.
 - Stale-state protection should use expected revision/state fields for plan/task/schedule/execution mutations, with structured rejection and no partial writes.
 - No existing MCP files or implementation were found, so implementation should add a new adapter surface while preserving existing API and engine paths.

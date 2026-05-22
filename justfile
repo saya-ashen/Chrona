@@ -117,7 +117,3 @@ clean:
     rm -rf dist/
     rm -rf coverage/
     rm -rf .tsbuildinfo
-
-# OpenClaw runtime probe
-probe:openclaw:
-    bun run probe:openclaw

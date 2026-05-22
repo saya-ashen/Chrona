@@ -1,19 +1,21 @@
 import { z } from "zod";
 
+const aiClientTypeSchema = z.string().trim().min(1, "type is required");
+
 // ── GET /ai/clients ──
 // (no input)
 
 // ── POST /ai/clients ──
 export const createAiClientSchema = z.object({
   name: z.string().min(1, "name is required"),
-  type: z.enum(["openclaw", "llm", "hermes"], { message: "type must be 'openclaw', 'llm', or 'hermes'" }),
+  type: aiClientTypeSchema,
   config: z.record(z.string(), z.unknown()).optional(),
   isDefault: z.boolean().optional(),
 });
 
 // ── POST /ai/clients/test ──
 export const testAiClientSchema = z.object({
-  type: z.enum(["openclaw", "llm", "hermes"]),
+  type: aiClientTypeSchema,
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -21,7 +23,7 @@ export const testAiClientSchema = z.object({
 export const updateAiClientParamSchema = z.object({ clientId: z.string().min(1) });
 export const updateAiClientBodySchema = z.object({
   name: z.string().optional(),
-  type: z.enum(["openclaw", "llm", "hermes"]).optional(),
+  type: aiClientTypeSchema.optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   isDefault: z.boolean().optional(),
   enabled: z.boolean().optional(),

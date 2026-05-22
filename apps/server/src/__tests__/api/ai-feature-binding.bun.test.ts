@@ -77,7 +77,7 @@ function app() {
 
 async function createClient(name: string = "Test Client") {
   const client = await db.aiClient.create({
-    data: { name, type: "openclaw", config: {}, enabled: true },
+    data: { name, type: "hermes", config: {}, enabled: true },
   });
   return client;
 }

@@ -62,7 +62,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    executionRuntime: overrides.executionRuntime ?? "openclaw",
+    executionRuntime: overrides.executionRuntime ?? "hermes",
     executionConfig: overrides.executionConfig ?? {},
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
@@ -210,7 +210,7 @@ describe("sortScheduledItems – with string dates", () => {
 
   it("hydrates schedule page data so string scheduled dates become real Date objects", () => {
     const hydrated = hydrateSchedulePageData({
-      defaultExecutionRuntime: "openclaw",
+      defaultExecutionRuntime: "hermes",
       executionRuntimes: [],
       summary: {
         scheduledCount: 1,
@@ -805,12 +805,12 @@ describe("toTaskConfigInitialValues", () => {
       title: "Task",
       description: "Desc",
       priority: "Low",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { prompt: "Do stuff" },
       dueAt: due,
     });
     expect(result.description).toBe("Desc");
-    expect(result.executionRuntime).toBe("openclaw");
+    expect(result.executionRuntime).toBe("hermes");
     expect(result.dueAt).toBe(due);
     expect(result.executionConfig).toEqual({ prompt: "Do stuff" });
   });
@@ -887,7 +887,7 @@ describe("buildTodayFocusItems", () => {
       latestRunStatus: overrides.latestRunStatus ?? null,
       scheduleProposalCount: 0,
       lastActivityAt: null,
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: {},
       isRunnable: true,
       runnabilityState: "ready_to_run",
@@ -897,14 +897,14 @@ describe("buildTodayFocusItems", () => {
   }
 
   it("returns empty for no risks and no group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items).toEqual([]);
   });
 
   it("includes overdue risks", () => {
     const risk = makeRisk({ taskId: "t1", scheduleStatus: "Overdue" });
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(1);
     expect(items[0].reason).toBe("Overdue");
@@ -912,7 +912,7 @@ describe("buildTodayFocusItems", () => {
   });
 
   it("includes high-priority unstarted items from active group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const group = {
       key: "2026-04-15",
       date: new Date(2026, 3, 15),
@@ -930,7 +930,7 @@ describe("buildTodayFocusItems", () => {
     const risks = Array.from({ length: 8 }, (_, i) =>
       makeRisk({ taskId: `risk-${i}`, scheduleStatus: "Overdue" }),
     );
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultExecutionRuntime: "openclaw", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(5);
   });

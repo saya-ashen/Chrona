@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
-type AiClientType = "openclaw" | "llm" | "hermes";
+type AiClientType = "llm" | "hermes" | (string & {});
 
 interface AiClientInfo {
   id: string;
@@ -79,7 +79,7 @@ function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
   return providers
     .filter((provider): provider is { key: AiClientType; label?: string } => {
       const key = (provider as { key?: unknown }).key;
-      return key === "hermes" || key === "openclaw" || key === "llm";
+      return typeof key === "string" && key.trim().length > 0;
     })
     .map((provider) => ({
       key: provider.key,
@@ -463,9 +463,7 @@ export function AiClientsManager() {
                     {client.isDefault && <Badge variant="default">{copy.defaultBadge}</Badge>}
                   </div>
                   <CardDescription>
-                    {client.type === "openclaw" ? (
-                      <span>Bridge: {(client.config as { bridgeUrl?: string }).bridgeUrl ?? "—"}</span>
-                    ) : client.type === "hermes" ? (
+                    {client.type === "hermes" ? (
                       <span>Hermes: {(client.config as { baseUrl?: string }).baseUrl ?? "http://127.0.0.1:8642"}</span>
                     ) : (
                       <span>

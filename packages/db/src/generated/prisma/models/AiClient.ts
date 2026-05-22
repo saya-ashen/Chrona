@@ -27,7 +27,7 @@ export type AggregateAiClient = {
 export type AiClientMinAggregateOutputType = {
   id: string | null
   name: string | null
-  type: $Enums.AiClientType | null
+  type: string | null
   isDefault: boolean | null
   enabled: boolean | null
   createdAt: Date | null
@@ -37,7 +37,7 @@ export type AiClientMinAggregateOutputType = {
 export type AiClientMaxAggregateOutputType = {
   id: string | null
   name: string | null
-  type: $Enums.AiClientType | null
+  type: string | null
   isDefault: boolean | null
   enabled: boolean | null
   createdAt: Date | null
@@ -164,7 +164,7 @@ export type AiClientGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
 export type AiClientGroupByOutputType = {
   id: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: runtime.JsonValue
   isDefault: boolean
   enabled: boolean
@@ -196,7 +196,7 @@ export type AiClientWhereInput = {
   NOT?: Prisma.AiClientWhereInput | Prisma.AiClientWhereInput[]
   id?: Prisma.StringFilter<"AiClient"> | string
   name?: Prisma.StringFilter<"AiClient"> | string
-  type?: Prisma.EnumAiClientTypeFilter<"AiClient"> | $Enums.AiClientType
+  type?: Prisma.StringFilter<"AiClient"> | string
   config?: Prisma.JsonFilter<"AiClient">
   isDefault?: Prisma.BoolFilter<"AiClient"> | boolean
   enabled?: Prisma.BoolFilter<"AiClient"> | boolean
@@ -223,7 +223,7 @@ export type AiClientWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.AiClientWhereInput[]
   NOT?: Prisma.AiClientWhereInput | Prisma.AiClientWhereInput[]
   name?: Prisma.StringFilter<"AiClient"> | string
-  type?: Prisma.EnumAiClientTypeFilter<"AiClient"> | $Enums.AiClientType
+  type?: Prisma.StringFilter<"AiClient"> | string
   config?: Prisma.JsonFilter<"AiClient">
   isDefault?: Prisma.BoolFilter<"AiClient"> | boolean
   enabled?: Prisma.BoolFilter<"AiClient"> | boolean
@@ -252,7 +252,7 @@ export type AiClientScalarWhereWithAggregatesInput = {
   NOT?: Prisma.AiClientScalarWhereWithAggregatesInput | Prisma.AiClientScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"AiClient"> | string
   name?: Prisma.StringWithAggregatesFilter<"AiClient"> | string
-  type?: Prisma.EnumAiClientTypeWithAggregatesFilter<"AiClient"> | $Enums.AiClientType
+  type?: Prisma.StringWithAggregatesFilter<"AiClient"> | string
   config?: Prisma.JsonWithAggregatesFilter<"AiClient">
   isDefault?: Prisma.BoolWithAggregatesFilter<"AiClient"> | boolean
   enabled?: Prisma.BoolWithAggregatesFilter<"AiClient"> | boolean
@@ -263,7 +263,7 @@ export type AiClientScalarWhereWithAggregatesInput = {
 export type AiClientCreateInput = {
   id?: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: boolean
   enabled?: boolean
@@ -275,7 +275,7 @@ export type AiClientCreateInput = {
 export type AiClientUncheckedCreateInput = {
   id?: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: boolean
   enabled?: boolean
@@ -287,7 +287,7 @@ export type AiClientUncheckedCreateInput = {
 export type AiClientUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -299,7 +299,7 @@ export type AiClientUpdateInput = {
 export type AiClientUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -311,7 +311,7 @@ export type AiClientUncheckedUpdateInput = {
 export type AiClientCreateManyInput = {
   id?: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: boolean
   enabled?: boolean
@@ -322,7 +322,7 @@ export type AiClientCreateManyInput = {
 export type AiClientUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -333,7 +333,7 @@ export type AiClientUpdateManyMutationInput = {
 export type AiClientUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -377,10 +377,6 @@ export type AiClientScalarRelationFilter = {
   isNot?: Prisma.AiClientWhereInput
 }
 
-export type EnumAiClientTypeFieldUpdateOperationsInput = {
-  set?: $Enums.AiClientType
-}
-
 export type AiClientCreateNestedOneWithoutBindingsInput = {
   create?: Prisma.XOR<Prisma.AiClientCreateWithoutBindingsInput, Prisma.AiClientUncheckedCreateWithoutBindingsInput>
   connectOrCreate?: Prisma.AiClientCreateOrConnectWithoutBindingsInput
@@ -398,7 +394,7 @@ export type AiClientUpdateOneRequiredWithoutBindingsNestedInput = {
 export type AiClientCreateWithoutBindingsInput = {
   id?: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: boolean
   enabled?: boolean
@@ -409,7 +405,7 @@ export type AiClientCreateWithoutBindingsInput = {
 export type AiClientUncheckedCreateWithoutBindingsInput = {
   id?: string
   name: string
-  type: $Enums.AiClientType
+  type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: boolean
   enabled?: boolean
@@ -436,7 +432,7 @@ export type AiClientUpdateToOneWithWhereWithoutBindingsInput = {
 export type AiClientUpdateWithoutBindingsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -447,7 +443,7 @@ export type AiClientUpdateWithoutBindingsInput = {
 export type AiClientUncheckedUpdateWithoutBindingsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.EnumAiClientTypeFieldUpdateOperationsInput | $Enums.AiClientType
+  type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -548,12 +544,12 @@ export type $AiClientPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     name: string
-    type: $Enums.AiClientType
+    type: string
     /**
      * JSON config — shape depends on type:
-     * openclaw: { bridgeUrl, bridgeToken, timeoutSeconds }
      * llm: { baseUrl, apiKey, model, temperature }
      * hermes: { baseUrl, apiKey, timeoutMs }
+     * provider: { baseUrl, apiKey, model, timeoutMs }
      */
     config: runtime.JsonValue
     isDefault: boolean
@@ -986,7 +982,7 @@ export interface Prisma__AiClientClient<T, Null = never, ExtArgs extends runtime
 export interface AiClientFieldRefs {
   readonly id: Prisma.FieldRef<"AiClient", 'String'>
   readonly name: Prisma.FieldRef<"AiClient", 'String'>
-  readonly type: Prisma.FieldRef<"AiClient", 'AiClientType'>
+  readonly type: Prisma.FieldRef<"AiClient", 'String'>
   readonly config: Prisma.FieldRef<"AiClient", 'Json'>
   readonly isDefault: Prisma.FieldRef<"AiClient", 'Boolean'>
   readonly enabled: Prisma.FieldRef<"AiClient", 'Boolean'>

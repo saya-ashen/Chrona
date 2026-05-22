@@ -591,12 +591,6 @@ model RuntimeCursor {
 // AI Client Configuration
 // ────────────────────────────────────────────────────────────────────
 
-enum AiClientType {
-  openclaw
-  llm
-  hermes
-}
-
 // ────────────────────────────────────────────────────────────────────
 // Execution Layer Enums
 // ────────────────────────────────────────────────────────────────────
@@ -623,11 +617,11 @@ enum ExecutionSessionStatus {
 model AiClient {
   id        String             @id @default(cuid())
   name      String
-  type      AiClientType
+  type      String
   /// JSON config — shape depends on type:
-  ///   openclaw: { bridgeUrl, bridgeToken, timeoutSeconds }
   ///   llm: { baseUrl, apiKey, model, temperature }
   ///   hermes: { baseUrl, apiKey, timeoutMs }
+  ///   provider: { baseUrl, apiKey, model, timeoutMs }
   config    Json
   isDefault Boolean            @default(false)
   enabled   Boolean            @default(true)

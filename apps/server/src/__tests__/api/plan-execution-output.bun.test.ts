@@ -13,7 +13,6 @@ import {
   MemoryStatus,
   RunStatus,
 } from "@chrona/db/generated/prisma/client";
-import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type {
   AgentProviderClient,
   ProviderCapabilities,
@@ -25,12 +24,12 @@ import type {
 } from "@chrona/providers-foundation";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
-type TestOpenClawResponseClient = AgentProviderClient;
+type TestProviderResponseClient = AgentProviderClient;
 
-function createMockOpenClawClient(input: {
+function createMockProviderClient(input: {
   outputMessages: string[];
   runStarted?: boolean;
-}): TestOpenClawResponseClient {
+}): TestProviderResponseClient {
   const messages: Array<{ role: string; content: string }> = [];
 
   function isStartRunInput(
@@ -40,7 +39,7 @@ function createMockOpenClawClient(input: {
   }
 
   return {
-    provider: "openclaw",
+    provider: "test-provider",
     getCapabilities(): ProviderCapabilities {
       return {
         supportsSessions: true,
@@ -53,14 +52,14 @@ function createMockOpenClawClient(input: {
     },
     async checkHealth(): Promise<ProviderHealth> {
       return {
-        provider: "openclaw",
+        provider: "test-provider",
         ok: true,
         checkedAt: new Date().toISOString(),
       };
     },
     async createSession(): Promise<ProviderSessionRef> {
       return {
-        provider: "openclaw",
+        provider: "test-provider",
         sessionId: "mock-session-key",
         createdAt: new Date().toISOString(),
       };
@@ -72,7 +71,7 @@ function createMockOpenClawClient(input: {
       }
 
       const response: ProviderRunRef = {
-        provider: "openclaw",
+        provider: "test-provider",
         runId: input.runStarted === false ? "mock-failed-run" : `mock-run-ref-${Date.now()}`,
         nativeRunId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
         sessionId: request.sessionKey ?? "mock-session-key",
@@ -82,7 +81,7 @@ function createMockOpenClawClient(input: {
     },
     async *streamRun(request) {
       if (!isStartRunInput(request)) {
-        throw new Error("Mock OpenClaw streamRun requires a start input");
+        throw new Error("Mock provider streamRun requires a start input");
       }
       const run = await this.startRun(request);
       if (input.runStarted === false) {
@@ -101,14 +100,14 @@ function createMockOpenClawClient(input: {
     },
     async getRun(): Promise<ProviderRunSnapshot> {
       return {
-        provider: "openclaw",
+        provider: "test-provider",
         runId: "mock-run-ref",
         status: "completed",
       };
     },
     async cancelRun(): Promise<ProviderRunSnapshot> {
       return {
-        provider: "openclaw",
+        provider: "test-provider",
         runId: "mock-run-ref",
         status: "cancelled",
       };
@@ -124,7 +123,7 @@ function createMockHermesClient(input: {
     streamRun: [] as Array<Parameters<AgentProviderClient["streamRun"]>[0]>,
   };
 
-  const client: TestOpenClawResponseClient = {
+  const client: TestProviderResponseClient = {
     provider: "hermes",
     getCapabilities(): ProviderCapabilities {
       return {
@@ -197,17 +196,17 @@ function createMockHermesClient(input: {
 const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
 
 function installMockRegistryClient(
-  openClawClient: TestOpenClawResponseClient,
-  clientType: "openclaw" | "hermes" = "openclaw",
+  providerClient: TestProviderResponseClient,
+  clientType = "test-provider",
 ) {
   aiClientRegistry.get = (async () =>
     ({
       record: { type: clientType },
-      providerClient: openClawClient,
+      providerClient,
     }) as any) as typeof aiClientRegistry.get;
 }
 
-function extractUserText(request: OpenClawGatewayRequest): string {
+function extractUserText(request: Parameters<AgentProviderClient["startRun"]>[0]): string {
   const parts = [request.instructions];
   try {
     parts.push(JSON.stringify(request.input, null, 2));
@@ -231,8 +230,8 @@ async function seedFullSetup() {
   const session = await db.taskSession.create({
     data: {
       taskId,
-      sessionKey: `agent:openclaw:task-${taskId}`,
-      runtimeName: "openclaw",
+      sessionKey: `agent:test-provider:task-${taskId}`,
+      runtimeName: "test-provider",
       label: "Main session",
       status: "idle",
     },
@@ -331,17 +330,17 @@ describe("executeTaskNodeCapability output persistence", () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [outputContent],
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
@@ -371,17 +370,17 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("keeps the node running when the provider produces no output", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [],
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
@@ -402,17 +401,17 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("does not require structured output when text output is empty", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [],
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
@@ -434,17 +433,17 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("does not let provider completion override Chrona task state", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [],
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
@@ -456,18 +455,18 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("sets run status to Failed when the provider refuses to start", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [],
       runStarted: false,
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
@@ -478,21 +477,21 @@ describe("executeTaskNodeCapability output persistence", () => {
   it("persists the final provider response when a response has multiple deltas", async () => {
     const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
-    const openClawClient = createMockOpenClawClient({
+    const providerClient = createMockProviderClient({
       outputMessages: [
         "Thinking about this...",
         "Step 1 done.",
         "Final answer: task complete.",
       ],
     });
-    installMockRegistryClient(openClawClient);
+    installMockRegistryClient(providerClient);
 
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      runtimeName: "openclaw",
+      runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 

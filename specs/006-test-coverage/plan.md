@@ -16,7 +16,7 @@ Add complete automated coverage for Chrona's current plan-to-execution capabilit
 **Target Platform**: Local Chrona monorepo development environment: Vite web app, Bun/Hono API server, engine packages, provider integrations, and Playwright-controlled browser sessions.  
 **Project Type**: Vite + React SPA, Hono/Bun API server, SQLite/Prisma persistence, TypeScript packages for contracts/domain/db/engine/providers.  
 **Performance Goals**: Primary functional and interface test suites complete within 10 minutes locally; complex graph scenarios remain deterministic across repeated runs; UI checks capture visible failures within one test report without requiring manual reproduction first.  
-**Constraints**: No Next.js patterns; Bun-compatible runtime only; business logic stays out of React components and Hono route handlers; shared schemas remain in `packages/contracts`; pure rules remain in `packages/domain`; database access remains in `packages/db`; OpenClaw-specific behavior remains under `packages/providers/openclaw`; SSE logic in `apps/web` must keep using the shared fetch-event-source helper.  
+**Constraints**: No Next.js patterns; Bun-compatible runtime only; business logic stays out of React components and Hono route handlers; shared schemas remain in `packages/contracts`; pure rules remain in `packages/domain`; database access remains in `packages/db`; Hermes-specific behavior remains under `packages/providers/hermes`; SSE logic in `apps/web` must keep using the shared fetch-event-source helper.  
 **Scale/Scope**: Covers core Chrona task creation, plan generation, plan graph execution, checkpoints, retries, blocked/failure paths, partial progress recovery, and task workspace UI states. Scope excludes broad UI redesign, replacing agent providers, or exhaustive graph-theory validation beyond product-relevant scenarios.
 
 ## Constitution Check
@@ -102,7 +102,7 @@ Key design decisions:
 ## Post-Design Constitution Check
 
 - **Code Quality**: PASS. Design avoids new architecture and keeps tests aligned with current layer ownership. Shared fixtures and contracts are documentation/test assets, not a new business path.
-- **Testing**: PASS. Plan defines coverage by runner and behavior level, including regression coverage for the known OpenClaw checkpoint error and complex plan graph scenarios.
+- **Testing**: PASS. Plan defines coverage by runner and behavior level, including regression coverage for the known Hermes checkpoint error and complex plan graph scenarios.
 - **User Experience Consistency**: PASS. UI checks enforce existing terminology, primary action visibility, responsive layout, keyboard reachability, and clear state feedback.
 - **Performance Budgets**: PASS. Quickstart keeps the 10 minute local suite budget and deterministic-run expectation from the spec.
 

@@ -57,7 +57,6 @@
         "@chrona/db": "workspace:*",
         "@chrona/engine": "workspace:*",
         "@chrona/i18n": "workspace:*",
-        "@chrona/openclaw": "workspace:*",
         "@chrona/shared": "workspace:*",
       },
     },
@@ -133,7 +132,6 @@
         "@chrona/domain": "workspace:*",
         "@chrona/graph-runtime": "workspace:*",
         "@chrona/hermes": "workspace:*",
-        "@chrona/openclaw": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
         "@chrona/shared": "workspace:*",
@@ -159,15 +157,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@chrona/providers-foundation": "workspace:*",
-      },
-    },
-    "packages/providers/openclaw": {
-      "name": "@chrona/openclaw",
-      "version": "0.1.0",
-      "dependencies": {
-        "@chrona/contracts": "workspace:*",
-        "@chrona/providers-foundation": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
       },
     },
     "packages/runtime-core": {
@@ -279,8 +268,6 @@
     "@chrona/hermes": ["@chrona/hermes@workspace:packages/providers/hermes"],
 
     "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
-
-    "@chrona/openclaw": ["@chrona/openclaw@workspace:packages/providers/openclaw"],
 
     "@chrona/providers-foundation": ["@chrona/providers-foundation@workspace:packages/providers/foundation"],
 

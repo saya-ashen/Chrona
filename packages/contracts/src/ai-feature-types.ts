@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "openclaw" | "llm" | "hermes";
+export type AiClientType = "llm" | "hermes" | (string & {});
 export type AiFeature =
   | "suggest"
   | "generate_plan"
@@ -21,20 +21,19 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: OpenClawClientConfig | LLMClientConfig | HermesClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
 
-export const OPENCLAW_DEFAULT_MODEL = "openclaw/default";
+export const DEFAULT_AGENT_PROVIDER_MODEL = "provider/default";
 
-export interface OpenClawClientConfig {
-  bridgeUrl: string;
-  bridgeToken: string;
-  gatewayUrl?: string;
-  gatewayToken?: string;
+export interface AgentProviderClientConfig {
+  baseUrl?: string;
+  apiKey?: string;
   model?: string;
   timeoutSeconds?: number;
+  timeoutMs?: number;
 }
 
 export interface LLMClientConfig {

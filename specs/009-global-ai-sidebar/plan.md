@@ -73,7 +73,6 @@ apps/web/src/
 ├── components/global-ai-sidebar/
 │   ├── global-ai-sidebar.tsx
 │   ├── global-ai-sidebar-provider.tsx
-│   ├── global-ai-sidebar-entry.tsx
 │   ├── context-summary-card.tsx
 │   ├── quick-action-list.tsx
 │   ├── conversation-thread.tsx

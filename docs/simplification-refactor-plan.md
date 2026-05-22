@@ -56,7 +56,7 @@ Signals include:
 - `compat.ts`
 - `legacyNodeStatuses`
 - `runtimeModel` / `prompt` / `runtimeConfig` compatibility mapping
-- `openclaw-legacy-v1`
+- `hermes-legacy-v1`
 
 This increases branching and mental overhead in active code.
 
@@ -68,7 +68,7 @@ This increases branching and mental overhead in active code.
 
 ~~**Status:** Partially resolved.~~ `@chrona/domain` unused dependency in `apps/server` has been removed.
 
-Remaining `knip` findings should be re-checked against current state. `dependency-cruiser` circular-dependency findings in `packages/providers/openclaw/src/runtime/*` and `packages/engine/src/modules/ai/*` may still exist.
+Remaining `knip` findings should be re-checked against current state. `dependency-cruiser` circular-dependency findings in `packages/providers/hermes/src/runtime/*` and `packages/engine/src/modules/ai/*` may still exist.
 
 ## Refactor Principles
 

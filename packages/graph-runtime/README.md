@@ -4,7 +4,7 @@ Pure domain package for Chrona dynamic plan graph execution.
 
 This package is Chrona's lightweight, project-specific LangGraph-like runtime. It owns graph execution state, graph mutation, dependency traversal, invalidation, command reduction, node attempt/result lifecycle, validation, and deterministic runtime events.
 
-It must not depend on DB, Prisma, server routes, providers, OpenClaw, Task business logic, WorkBlock business logic, or UI code. Those concerns belong in host adapters such as `engine` or `server`.
+It must not depend on DB, Prisma, server routes, providers, Task business logic, WorkBlock business logic, or UI code. Those concerns belong in host adapters such as `engine` or `server`.
 
 ## Runtime Boundary
 
@@ -30,7 +30,7 @@ This package does not own:
 - Prisma or database access
 - Hono route handlers
 - React state or UI components
-- OpenClaw/provider-specific clients
+- provider-specific clients
 - Task or WorkBlock business persistence
 - auth/session concerns
 - schedule storage

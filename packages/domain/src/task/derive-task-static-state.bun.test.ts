@@ -6,7 +6,7 @@ describe("deriveTaskStaticState", () => {
     expect(
       deriveTaskStaticState({
         runtimeSpec: {
-          runtime: "openclaw",
+          runtime: "hermes",
           version: "v1",
           fields: [],
           runnability: { requiredPaths: [] },
@@ -82,7 +82,7 @@ describe("deriveTaskStaticState", () => {
     expect(
       deriveTaskStaticState({
         runtimeSpec: {
-          runtime: "openclaw",
+          runtime: "hermes",
           version: "v1",
           fields: [],
           runnability: { requiredPaths: [] },

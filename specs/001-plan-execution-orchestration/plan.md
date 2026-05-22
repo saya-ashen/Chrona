@@ -10,7 +10,7 @@ Chrona will preserve the existing task-to-plan execution model while improving t
 ## Technical Context
 
 **Language/Version**: TypeScript strict; React 19; Bun >=1.3.11; Vite SPA frontend; Hono API backend.  
-**Primary Dependencies**: React Router 7, `@xyflow/react` plan graph rendering, Hono, Prisma 7 with `prisma-adapter-bun-sqlite`, Zod contracts in `packages/contracts`, OpenClaw runtime bridge.  
+**Primary Dependencies**: React Router 7, `@xyflow/react` plan graph rendering, Hono, Prisma 7 with `prisma-adapter-bun-sqlite`, Zod contracts in `packages/contracts`, Hermes runtime bridge.  
 **Storage**: SQLite through Prisma; current accepted/draft task plan graphs are serialized `task_plan_graph_v1` payloads stored in `Memory`; task, run, artifact, approval, event, projection, and schedule proposal records remain Prisma-backed.  
 **Testing**: Vitest/Testing Library for web components and domain logic; Bun tests for runtime/server paths; Playwright for end-to-end flows when execution UI behavior crosses browser interactions. Required proof commands: `bun run typecheck`, `bun run lint`, `bun run test`, plus targeted web/runtime tests listed in Quickstart.  
 **Target Platform**: Local and deployed Chrona web app using Bun server runtime and Vite SPA frontend.  

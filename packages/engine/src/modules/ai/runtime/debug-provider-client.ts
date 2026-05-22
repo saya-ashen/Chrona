@@ -30,14 +30,8 @@ export function isChronaDebugProviderUrl(value: unknown) {
   );
 }
 
-export function isChronaDebugProviderConfig(config: {
-  baseUrl?: string;
-  bridgeUrl?: string;
-  gatewayUrl?: string;
-}) {
-  return [config.baseUrl, config.bridgeUrl, config.gatewayUrl].some(
-    isChronaDebugProviderUrl,
-  );
+export function isChronaDebugProviderConfig(config: { baseUrl?: string }) {
+  return isChronaDebugProviderUrl(config.baseUrl);
 }
 
 function now() {
@@ -58,11 +52,12 @@ function createRun(input: {
 }
 
 function providerRunRef(
+  provider: string,
   run: DebugRun,
   status: ProviderRunRef["status"] = "running",
 ): ProviderRunRef {
   return {
-    provider: "openclaw",
+    provider,
     runId: run.runId,
     nativeRunId: run.runId,
     providerRunId: run.runId,
@@ -138,9 +133,9 @@ function isPlanGeneration(input: StreamRunInput) {
   return "instructions" in input && input.instructions.includes(PLAN_TOOL);
 }
 
-function eventBase(run: DebugRun, sequence: number) {
+function eventBase(provider: string, run: DebugRun, sequence: number) {
   return {
-    provider: "openclaw",
+    provider,
     runId: run.runId,
     nativeRunId: run.runId,
     sessionId: run.sessionId,
@@ -156,7 +151,11 @@ async function pause(signal?: AbortSignal) {
 }
 
 export class ChronaDebugProviderClient implements AgentProviderClient {
-  readonly provider = "openclaw";
+  readonly provider: string;
+
+  constructor(provider = "chrona-debug") {
+    this.provider = provider;
+  }
 
   async getCapabilities(): Promise<ProviderCapabilities> {
     return {
@@ -197,6 +196,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
     return providerRunRef(
+      this.provider,
       createRun({ sessionId: input.sessionId, sessionKey: input.sessionKey }),
     );
   }
@@ -211,27 +211,27 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     let sequence = 0;
 
     yield {
-      ...eventBase(run, sequence++),
+      ...eventBase(this.provider, run, sequence++),
       type: "run_started",
-      run: providerRunRef(run),
+      run: providerRunRef(this.provider, run),
     };
     await pause(signal);
 
     if (isPlanGeneration(input)) {
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "reasoning_delta",
         text: "Debug provider: building deterministic SSE test plan.",
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "text_delta",
         text: "Debug plan generation output: prepare -> execute -> verify.\n",
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "tool_call",
         tool: PLAN_TOOL,
         callId: "chrona-debug-plan-call",
@@ -240,7 +240,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "tool_result",
         tool: PLAN_TOOL,
         callId: "chrona-debug-plan-call",
@@ -250,19 +250,19 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       const title = currentNodeTitle(input);
       const callId = `chrona-debug-complete-${sequence}`;
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "reasoning_delta",
         text: `Debug provider: executing ${title}.`,
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "text_delta",
         text: `Debug execution output for ${title}.\n`,
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "tool_call",
         tool: TASK_COMPLETE_TOOL,
         callId,
@@ -279,7 +279,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       };
       await pause(signal);
       yield {
-        ...eventBase(run, sequence++),
+        ...eventBase(this.provider, run, sequence++),
         type: "tool_result",
         tool: TASK_COMPLETE_TOOL,
         callId,
@@ -289,9 +289,9 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 
     await pause(signal);
     yield {
-      ...eventBase(run, sequence),
+      ...eventBase(this.provider, run, sequence),
       type: "run_completed",
-      run: providerRunRef(run, "completed"),
+      run: providerRunRef(this.provider, run, "completed"),
       outputText: isPlanGeneration(input)
         ? "Debug plan generation completed."
         : `Debug runtime run completed for ${currentNodeTitle(input)}.`,

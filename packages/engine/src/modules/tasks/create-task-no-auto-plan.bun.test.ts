@@ -43,14 +43,14 @@ describe("createTask (no auto plan generation)", () => {
 
   it("creates a task but does NOT trigger any plan generation", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "No Auto Plan Workspace", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "No Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
       title: "Create task without auto plan",
       description: "Plan generation must be explicitly requested via the SSE endpoint.",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 

@@ -46,7 +46,7 @@ Create a task.
 | `title` | string | Yes | |
 | `description` | string | No | |
 | `priority` | `"Low" \| "Medium" \| "High" \| "Urgent"` | No | Default `"Medium"` |
-| `executionRuntime` | string (`EXECUTION_RUNTIMES`) | No | e.g. `"openclaw"` |
+| `executionRuntime` | string (`EXECUTION_RUNTIMES`) | No | e.g. `"hermes"` |
 | `executionConfig` | `Record<string, unknown>` | No | Runtime-specific configuration |
 | `parentTaskId` | string \| null | No | Parent for subtask nesting |
 
@@ -325,8 +325,8 @@ Response:
   "clients": [
     {
       "id": "client_1",
-      "name": "OpenClaw",
-      "type": "openclaw",
+      "name": "Hermes",
+      "type": "hermes",
       "config": {},
       "isDefault": true,
       "enabled": true,
@@ -344,7 +344,7 @@ Create an AI client.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | |
-| `type` | `"openclaw" \| "llm"` | Yes | |
+| `type` | `"hermes" \| "llm"` | Yes | |
 | `config` | Record | Yes | Provider-specific configuration |
 | `isDefault` | boolean | No | |
 
@@ -387,7 +387,7 @@ Test connectivity to an AI provider.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `type` | `"openclaw" \| "llm"` | Yes | |
+| `type` | `"hermes" \| "llm"` | Yes | |
 | `config` | Record | Yes | |
 
 ```sh

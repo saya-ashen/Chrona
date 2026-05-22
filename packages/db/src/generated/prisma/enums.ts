@@ -172,15 +172,6 @@ export const GraphMutationStatus = {
 export type GraphMutationStatus = (typeof GraphMutationStatus)[keyof typeof GraphMutationStatus]
 
 
-export const AiClientType = {
-  openclaw: 'openclaw',
-  llm: 'llm',
-  hermes: 'hermes'
-} as const
-
-export type AiClientType = (typeof AiClientType)[keyof typeof AiClientType]
-
-
 export const WorkBlockStatus = {
   Scheduled: 'Scheduled',
   Active: 'Active',

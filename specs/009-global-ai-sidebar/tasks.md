@@ -62,13 +62,13 @@ description: "Task list for Global AI Sidebar implementation"
 ### Tests for User Story 1
 
 - [ ] T018 [P] [US1] Add component tests for fixed sidebar sections, close behavior, unsupported context, and no bottom chat bubble in `apps/web/src/components/global-ai-sidebar/__tests__/global-ai-sidebar.test.tsx`
-- [ ] T019 [P] [US1] Add component tests for `Ask Chrona / ⌘K` entry click and keyboard shortcut behavior in `apps/web/src/components/global-ai-sidebar/__tests__/global-ai-sidebar-entry.test.tsx`
+- [ ] T019 [P] [US1] Add component tests for `Ask Chrona / ⌘K` entry click and keyboard shortcut behavior
 - [ ] T020 [P] [US1] Add e2e test for opening sidebar from task and schedule routes and preserving page state in `tests/e2e/global-ai-sidebar.spec.ts`
 
 ### Implementation for User Story 1
 
 - [X] T021 [US1] Implement fixed right-side sidebar shell with context summary, quick actions, conversation, proposal preview region, and confirmation region in `apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx`
-- [X] T022 [P] [US1] Implement global entry button with shortcut hint and accessible label in `apps/web/src/components/global-ai-sidebar/global-ai-sidebar-entry.tsx`
+- [X] T022 [P] [US1] Implement global entry button with shortcut hint and accessible label
 - [X] T023 [P] [US1] Implement context summary card for task, schedule, and unsupported summaries in `apps/web/src/components/global-ai-sidebar/context-summary-card.tsx`
 - [X] T024 [P] [US1] Implement quick action list with enabled, disabled, informational, and mutating-preview affordances in `apps/web/src/components/global-ai-sidebar/quick-action-list.tsx`
 - [X] T025 [P] [US1] Implement conversation thread empty, loading, informational, proposal, error, and success message states in `apps/web/src/components/global-ai-sidebar/conversation-thread.tsx`
@@ -221,7 +221,7 @@ description: "Task list for Global AI Sidebar implementation"
 
 ```bash
 Task: "Add component tests for fixed sidebar sections, close behavior, unsupported context, and no bottom chat bubble in apps/web/src/components/global-ai-sidebar/__tests__/global-ai-sidebar.test.tsx"
-Task: "Add component tests for Ask Chrona entry click and keyboard shortcut behavior in apps/web/src/components/global-ai-sidebar/__tests__/global-ai-sidebar-entry.test.tsx"
+Task: "Add component tests for Ask Chrona entry click and keyboard shortcut behavior"
 Task: "Add e2e test for opening sidebar from task and schedule routes and preserving page state in tests/e2e/global-ai-sidebar.spec.ts"
 ```
 

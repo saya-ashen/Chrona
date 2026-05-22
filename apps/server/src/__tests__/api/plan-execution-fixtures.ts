@@ -700,7 +700,7 @@ export const SAMPLE_CHECKPOINT_RESULT_MISSING: FixtureCheckpointResultCase = {
   status: "missing_result",
   payload: null,
   delayMs: 0,
-  expectedDiagnostic: "checkpoint result missing without legacy OpenClaw error",
+  expectedDiagnostic: "checkpoint result missing without legacy Hermes error",
 };
 
 export const SAMPLE_CHECKPOINT_RESULT_MALFORMED: FixtureCheckpointResultCase = {
@@ -709,7 +709,7 @@ export const SAMPLE_CHECKPOINT_RESULT_MALFORMED: FixtureCheckpointResultCase = {
   status: "malformed_result",
   payload: { unexpected: "review payload missing outcome" },
   delayMs: 0,
-  expectedDiagnostic: "checkpoint result malformed without legacy OpenClaw error",
+  expectedDiagnostic: "checkpoint result malformed without legacy Hermes error",
 };
 
 export const SAMPLE_CHECKPOINT_RESULT_DELAYED: FixtureCheckpointResultCase = {

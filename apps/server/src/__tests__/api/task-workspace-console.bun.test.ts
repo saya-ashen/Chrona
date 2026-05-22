@@ -31,7 +31,7 @@ describe("task workspace console read data", () => {
     const run = await db.run.create({
       data: {
         taskId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run-workspace-console",
         status: RunStatus.Running,
         syncStatus: "syncing",
@@ -64,7 +64,7 @@ describe("task workspace console read data", () => {
     const run = await db.run.create({
       data: {
         taskId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run-human-review",
         status: RunStatus.WaitingForApproval,
         triggeredBy: "agent",
@@ -117,7 +117,7 @@ describe("task workspace console read data", () => {
     const run = await db.run.create({
       data: {
         taskId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run-provider-activity",
         status: RunStatus.Running,
         triggeredBy: "agent",
@@ -132,11 +132,11 @@ describe("task workspace console read data", () => {
         taskId,
         runId: run.id,
         actorType: "runtime",
-        actorId: "openclaw",
+        actorId: "hermes",
         source: "provider",
         payload: {
-          runtimeName: "openclaw",
-          provider: "openclaw",
+          runtimeName: "hermes",
+          provider: "hermes",
           event: { type: "tool_started", toolName: "chrona_plan_read" },
         },
         dedupeKey: "provider-runtime-test-event",
@@ -151,11 +151,11 @@ describe("task workspace console read data", () => {
         taskId,
         runId: run.id,
         actorType: "runtime",
-        actorId: "openclaw",
+        actorId: "hermes",
         source: "provider",
         payload: {
-          runtimeName: "openclaw",
-          provider: "openclaw",
+          runtimeName: "hermes",
+          provider: "hermes",
           runId: "provider-run-1",
           event: { type: "text_delta", text: "Hello " },
         },
@@ -168,11 +168,11 @@ describe("task workspace console read data", () => {
         taskId,
         runId: run.id,
         actorType: "runtime",
-        actorId: "openclaw",
+        actorId: "hermes",
         source: "provider",
         payload: {
-          runtimeName: "openclaw",
-          provider: "openclaw",
+          runtimeName: "hermes",
+          provider: "hermes",
           runId: "provider-run-1",
           event: { type: "text_delta", text: "world" },
         },
@@ -185,11 +185,11 @@ describe("task workspace console read data", () => {
         taskId,
         runId: run.id,
         actorType: "runtime",
-        actorId: "openclaw",
+        actorId: "hermes",
         source: "provider",
         payload: {
-          runtimeName: "openclaw",
-          provider: "openclaw",
+          runtimeName: "hermes",
+          provider: "hermes",
           runId: "provider-run-1",
           event: { type: "reasoning_delta", text: "Thinking" },
         },
