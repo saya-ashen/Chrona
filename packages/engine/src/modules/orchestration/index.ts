@@ -1,10 +1,10 @@
 /**
- * Task orchestration owns durable scheduler lifecycle, leases, active run sync,
- * graph advancement, reconciliation, degraded retry, and runtime graph mutation.
+ * Task orchestration owns durable scheduler lifecycle, leases, graph advancement,
+ * reconciliation, and runtime graph mutation.
  *
  * Keep orchestration decisions in this module. Existing scheduling,
- * runtime-sync, plan-execution, server route, and web layers should delegate to
- * orchestrator-owned contracts rather than re-deriving task execution truth.
+ * plan-execution, server route, and web layers should delegate to orchestrator-owned
+ * contracts rather than re-deriving task execution truth.
  */
 export {
   acquireSchedulerLease,
@@ -44,8 +44,5 @@ export { reconcileTaskState } from "./reconcile-task-state";
 export type { ReconciledTaskState } from "./reconcile-task-state";
 export { deriveRepairActions, detectReconciliationIssues } from "./reconcile-invariants";
 export { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
-export { runActiveRunSyncWorker } from "./active-run-sync-worker";
-export type { ActiveRunSyncWorkerResult } from "./active-run-sync-worker";
 export { runGraphAdvancementWorker } from "./graph-advancement-worker";
-export { runDegradedRetryWorker } from "./degraded-retry-worker";
 export { runRestartRecoveryWorker } from "./restart-recovery-worker";

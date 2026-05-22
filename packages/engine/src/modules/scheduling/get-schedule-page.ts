@@ -8,7 +8,6 @@ import {
   getRuntimeTaskConfigSpec,
   listExecutionRuntimes,
 } from "@/modules/task-execution/registry";
-import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
@@ -273,8 +272,6 @@ async function buildAutomationCandidates(input: {
 }
 
 export async function getSchedulePage(workspaceId: string) {
-  await syncStaleWorkspaceRunsForRead(workspaceId);
-
   const [workspace, projections, proposals] = await Promise.all([
     db.workspace.findUniqueOrThrow({
       where: { id: workspaceId },

@@ -1,7 +1,6 @@
 import { api } from "@/lib/rpc-client";
-import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput, SubmitCheckpointActionResult, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
   ExecutionOverviewCard,
   ExecutionFlowView,
@@ -19,8 +18,14 @@ import type {
 } from "./task-workspace-types";
 import { buildWorkspaceStateTreatment } from "./task-workspace-actions";
 
-export type TaskExecutionDispatchResult = PlanExecutionResult;
-export type TaskCheckpointActionDispatchResult = SubmitCheckpointActionResult;
+export type TaskWorkspaceCommandAck = {
+  commandId: string;
+  taskId: string;
+  acceptedAt: string;
+  message: string;
+};
+export type TaskExecutionDispatchResult = TaskWorkspaceCommandAck;
+export type TaskCheckpointActionDispatchResult = TaskWorkspaceCommandAck;
 
 export type TaskPlanState = {
   taskId: string;
@@ -589,7 +594,7 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
   };
 }
 
-export async function fetchCurrentTaskExecution(taskId: string): Promise<TaskExecutionDispatchResult> {
+export async function fetchCurrentTaskExecution(taskId: string): Promise<PlanExecutionResult> {
   const response = await fetch(`/api/tasks/${taskId}/execution/current`, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -600,53 +605,44 @@ export async function fetchCurrentTaskExecution(taskId: string): Promise<TaskExe
     throw new Error((err as { error?: string }).error ?? "Failed to load current execution state");
   }
 
-  return await response.json() as TaskExecutionDispatchResult;
+  return await response.json() as PlanExecutionResult;
 }
 
 export async function dispatchTaskExecutionAction(
   taskId: string,
   action: ExecutionActionInput,
-  onEvent: (event: PlanExecutionSSEEvent) => void,
-): Promise<TaskExecutionDispatchResult> {
-  let result: TaskExecutionDispatchResult | null = null;
-
-  await fetchJsonEventSource(`/api/tasks/${taskId}/execution/actions`, {
+): Promise<TaskWorkspaceCommandAck> {
+  const response = await fetch(`/api/work/${taskId}/commands`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Accept: "text/event-stream",
+      Accept: "application/json",
     },
-    body: JSON.stringify(action),
-    onEvent({ data }) {
-      const event = data as PlanExecutionSSEEvent;
-      onEvent(event);
-      if (event.type === "result") {
-        result = event.result;
-      }
-      if (event.type === "error") {
-        throw new Error(event.message);
-      }
-    },
+    body: JSON.stringify({ type: "execution.action", ...action }),
   });
 
-  if (!result) {
-    throw new Error("Execution stream ended without a result");
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to dispatch execution action" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to dispatch execution action");
   }
 
-  return result;
+  const ack = await response.json() as Omit<TaskWorkspaceCommandAck, "message">;
+  return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }
 
 export async function submitTaskCheckpointAction(
   taskId: string,
   action: SubmitCheckpointActionInput,
-): Promise<TaskCheckpointActionDispatchResult> {
-  const response = await fetch(`/api/tasks/${taskId}/execution/checkpoint/${encodeURIComponent(action.checkpointId)}/actions`, {
+): Promise<TaskWorkspaceCommandAck> {
+  const response = await fetch(`/api/work/${taskId}/commands`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
     body: JSON.stringify({
+      type: "checkpoint.action",
+      checkpointId: action.checkpointId,
       action: action.action,
       payload: action.payload,
       idempotencyKey: action.idempotencyKey,
@@ -658,5 +654,6 @@ export async function submitTaskCheckpointAction(
     throw new Error((err as { error?: string }).error ?? "Failed to submit checkpoint action");
   }
 
-  return await response.json() as TaskCheckpointActionDispatchResult;
+  const ack = await response.json() as Omit<TaskWorkspaceCommandAck, "message">;
+  return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }

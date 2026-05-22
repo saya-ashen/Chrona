@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { taskPlanExecution } from "@/modules/plan-execution";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 
 export type AutoStartScheduledPlanResult = {
   started: Array<{ taskId: string; workBlockId: string; runId: string }>;
@@ -79,6 +80,12 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
               scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
             },
           dedupeKey: `task.auto_start.skipped:${task.id}:${now.toISOString().slice(0, 13)}`,
+        });
+
+        publishTaskWorkspaceUpdatedEvent({
+          taskId: task.id,
+          workspaceId: task.workspaceId,
+          reason: "task.auto_start.skipped",
         });
         continue;
       }

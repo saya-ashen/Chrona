@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 
 export async function acceptTaskResult(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -31,6 +32,12 @@ export async function acceptTaskResult(input: { taskId: string }) {
       accepted_at: new Date().toISOString(),
     },
     dedupeKey: `task.result_accepted:${task.id}:${latestRun.id}`,
+  });
+
+  publishTaskWorkspaceUpdatedEvent({
+    taskId: task.id,
+    workspaceId: task.workspaceId,
+    reason: "task.result_accepted",
   });
 
   return {

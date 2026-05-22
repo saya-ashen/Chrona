@@ -22,6 +22,7 @@ import {
 import type { OpenClawGatewayRequest } from "@chrona/openclaw";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry, getOpenClawGatewayUrl } from "./runtime/client-registry";
+import { CHRONA_DEBUG_PROVIDER_URL, isChronaDebugProviderConfig } from "./runtime/debug-provider-client";
 
 const HERMES_API_SERVER_DOCS_URL =
   "https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server";
@@ -68,6 +69,10 @@ async function checkClientHealth(
   try {
     if (client.type === "openclaw") {
       const config = client.config as OpenClawClientConfig;
+      if (isChronaDebugProviderConfig(config)) {
+        return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
+      }
+
       const gatewayUrl = getOpenClawGatewayUrl(config);
       if (!gatewayUrl) {
         return { available: false, reason: "Gateway URL is required" };
@@ -110,6 +115,10 @@ async function checkClientHealth(
 
     if (client.type === "hermes") {
       const config = client.config as HermesClientConfig;
+      if (isChronaDebugProviderConfig(config)) {
+        return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
+      }
+
       const health = await new HermesProviderClient({
         baseUrl: config.baseUrl,
         apiKey: config.apiKey,

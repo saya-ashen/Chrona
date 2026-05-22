@@ -63,4 +63,40 @@ describe("runRestartRecoveryWorker", () => {
       "restart_degraded_run_scan",
     ]);
   });
+
+  it("skips recovery records whose task was deleted", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Orphaned Recovery Worker", status: "Active", defaultRuntime: "openclaw" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Deleted recovery task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "openclaw",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    await db.executionSession.create({
+      data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_1" },
+    });
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "openclaw",
+        runtimeRunRef: "runtime_degraded",
+        status: "Running",
+        triggeredBy: "scheduler",
+        syncStatus: "degraded",
+        retryable: true,
+      },
+    });
+    await db.task.delete({ where: { id: task.id } });
+
+    const result = await runRestartRecoveryWorker({ now: new Date("2026-05-17T00:01:00.000Z") });
+
+    expect(result).toEqual({ expiredLeaseCount: 0, activeSessionCount: 1, degradedRunCount: 1 });
+    expect(await db.schedulerEvent.count()).toBe(0);
+  });
 });

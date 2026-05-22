@@ -18,6 +18,8 @@ export default defineConfig({
       "/api": {
         target: apiBaseUrl,
         changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
       },
       "/health": {
         target: apiBaseUrl,

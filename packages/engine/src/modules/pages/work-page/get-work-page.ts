@@ -1,10 +1,9 @@
 import { db } from "@/lib/db";
-import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";
-import { isMissingRecordError, toIsoString, classifyWorkstreamItem, formatEventTitle, summarizePayload } from "./helpers";
+import { toIsoString, classifyWorkstreamItem, formatEventTitle, summarizePayload } from "./helpers";
 import {
   buildScheduleImpact,
   readBlockReason,
@@ -28,22 +27,6 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     throw new WorkPageTaskNotFoundError(taskId);
   }
 
-  try {
-    await syncTaskRunForRead(taskId, undefined, { forceActive: true });
-  } catch (error) {
-    if (isMissingRecordError(error)) {
-      const taskStillExists = await db.task.findUnique({
-        where: { id: taskId },
-        select: { id: true },
-      });
-
-      if (!taskStillExists) {
-        throw new WorkPageTaskNotFoundError(taskId);
-      }
-    }
-
-    throw error;
-  }
   const now = new Date();
 
   const task = await db.task.findUnique({

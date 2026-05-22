@@ -58,7 +58,7 @@ const DEFAULT_COPY = {
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
   const { registerHandlers, setPageContext } = useAssistantSurface();
-  const { pageData, setTask, refreshWorkspace } = useTaskWorkspacePageState(data);
+  const { pageData, setTask, refreshWorkspace, workspaceEvents } = useTaskWorkspacePageState(data);
   const task = pageData.task;
 
   const {
@@ -95,7 +95,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     dispatchExecutionAction,
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
-  } = useTaskWorkspacePlanState(task, refreshWorkspace);
+  } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
   const consoleView = createTaskWorkspaceExecutionConsoleView({
     pageData,
     graphPlan,

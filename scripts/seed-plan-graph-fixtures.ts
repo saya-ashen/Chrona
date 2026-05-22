@@ -570,6 +570,8 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
 }
 
 async function main() {
+  await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+
   const workspaceId = await resolveDefaultWorkspaceId();
 
   const seeded = [];
