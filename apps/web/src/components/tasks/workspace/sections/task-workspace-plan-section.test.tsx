@@ -82,6 +82,193 @@ afterEach(() => {
 });
 
 describe("TaskWorkspacePlanSection", () => {
+  it("keeps graph, command center, and node drawer in sync across create, accept, and run", async () => {
+    const onGeneratePlan = vi.fn();
+    const onApplyPlan = vi.fn().mockResolvedValue(undefined);
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Started" });
+    const planningTaskDraft = {
+      title: "Launch workspace flow",
+      description: "",
+      priority: "Medium",
+      dueAt: null,
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+    } as const;
+    const draftPlan = {
+      id: "plan-1",
+      status: "draft",
+      revision: 1,
+      prompt: "Generate a focused plan.",
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const acceptedPlan = {
+      ...draftPlan,
+      status: "accepted",
+      updatedAt: "2026-05-18T00:00:01.000Z",
+    } as TaskPlanReadModel;
+    const generatedNode = createTaskWorkspaceFixtureNode({
+      id: "generate",
+      title: "Generated plan node",
+      status: "ready",
+      nextAction: "Start execution",
+    });
+    const runningNode = createTaskWorkspaceFixtureNode({
+      id: "generate",
+      title: "Generated plan node",
+      status: "active",
+      nextAction: "Monitor execution",
+    });
+    const waitingNode = createTaskWorkspaceFixtureNode({
+      id: "checkpoint",
+      title: "Review generated output",
+      status: "waiting_for_user",
+      nextAction: "Provide checkpoint input",
+      requiresHumanInput: true,
+      checkpoint,
+      availableActions: [{ id: "submit_input", label: "Submit input", kind: "input", emphasis: "primary", checkpointId: checkpoint.id, checkpointAction: "submit_input" }],
+      interactiveFields: [{ key: "decision", label: "Decision", value: "", control: "text", required: true }],
+    });
+
+    const view = render(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([])}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={null}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        planningTaskDraft={planningTaskDraft}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    expect(screen.getByRole("region", { name: "Execution flow" })).toBeInTheDocument();
+    expect(within(commandCenter).getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Generate plan" }));
+    expect(onGeneratePlan).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([])}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { aiPlanGenerationStatus: "generating" } })}
+        plan={null}
+        planGenerationStatus="generating"
+        acceptPlanError={null}
+        planningTaskDraft={planningTaskDraft}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    expect(within(commandCenter).getByRole("button", { name: "Generating..." })).toBeDisabled();
+
+    view.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([generatedNode], "generate")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: draftPlan, aiPlanGenerationStatus: "waiting_acceptance" } })}
+        plan={draftPlan}
+        planGenerationStatus="waiting_acceptance"
+        canAcceptPlan
+        acceptPlanError={null}
+        planningTaskDraft={planningTaskDraft}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
+    expect(within(commandCenter).getByText("Accept or regenerate plan")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("task-plan-node-generate"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Generated plan node" })).toBeInTheDocument());
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
+    expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
+
+    view.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([generatedNode], "generate")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        planningTaskDraft={planningTaskDraft}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    expect(within(commandCenter).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Start plan" }));
+    expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
+
+    view.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([runningNode, waitingNode], "checkpoint")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted", status: "WaitingForInput" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        planningTaskDraft={planningTaskDraft}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[{
+          type: "runtime_event",
+          action: "start_manual",
+          runtimeName: "local",
+          provider: "provider",
+          event: { type: "tool_started", toolName: "chrona_execution_dispatch", label: "Starting plan" },
+        }]}
+        onGeneratePlan={onGeneratePlan}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={onApplyPlan}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+        onSubmitCheckpointAction={vi.fn()}
+      />,
+    );
+
+    expect(within(commandCenter).getByText("Current node action")).toBeInTheDocument();
+    expect(within(commandCenter).getByLabelText(/Decision/)).toBeInTheDocument();
+    fireEvent.click(within(commandCenter).getByRole("tab", { name: "Activity" }));
+    expect(within(commandCenter).getByText("Starting plan")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("task-plan-node-checkpoint"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Review generated output" })).toBeInTheDocument());
+  });
+
   it("adds generate plan as the command center operation when no plan exists", () => {
     const onGeneratePlan = vi.fn();
 

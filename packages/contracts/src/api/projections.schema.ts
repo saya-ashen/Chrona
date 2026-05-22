@@ -21,6 +21,33 @@ export const workProjectionParamSchema = z.object({
   taskId: z.string().min(1),
 });
 
+const workspaceCommandBaseSchema = z.object({
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const workCommandBodySchema = z.discriminatedUnion("type", [
+  workspaceCommandBaseSchema.extend({
+    type: z.literal("plan.generate"),
+    forceRefresh: z.boolean().optional(),
+    userInstruction: z.string().optional().nullable(),
+  }),
+  workspaceCommandBaseSchema.extend({
+    type: z.literal("plan.accept"),
+    planId: z.string().min(1),
+  }),
+  workspaceCommandBaseSchema.extend({
+    type: z.literal("execution.action"),
+    action: z.string().min(1),
+    reason: z.string().optional(),
+  }),
+  workspaceCommandBaseSchema.extend({
+    type: z.literal("checkpoint.action"),
+    checkpointId: z.string().min(1),
+    action: z.string().min(1),
+    payload: z.record(z.string(), z.unknown()).optional(),
+  }),
+]);
+
 // ── GET /workspaces/default ──
 // (no input)
 

@@ -10,6 +10,7 @@ import {
 } from "@chrona/contracts/api";
 import type { PlanExecutionSSEEvent } from "@chrona/contracts";
 import type { EffectivePlanGraph, ExecutionActionType } from "@chrona/contracts/ai";
+import type { CheckpointActionKind } from "@chrona/contracts/ai";
 import type {
   GraphExecutionEvent,
   PlanExecutionRuntimeEvent,
@@ -154,6 +155,31 @@ function writeExecutionEvent(stream: SseStream, event: PlanExecutionSSEEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
 }
 
+function checkpointActionToExecutionAction(action: CheckpointActionKind): ExecutionActionType {
+  switch (action) {
+    case "submit_input":
+      return "resume_with_input";
+    case "approve_result":
+    case "reject_result":
+    case "request_changes":
+    case "accept_replan":
+    case "reject_replan":
+    case "request_replan":
+      return "resume_with_approval";
+    case "retry_node":
+      return "retry_node";
+    case "resume_after_unblock":
+      return "resume_after_unblock";
+    case "mark_node_completed":
+    case "mark_node_skipped":
+      return "complete_manual_node";
+    case "fail_task":
+      return "fail_current_node";
+    case "cancel_session":
+      return "cancel_session";
+  }
+}
+
 export function createExecutionRoutes(engine: ChronaEngine) {
   return new Hono().get(
     "/tasks/:taskId/execution/current",
@@ -247,11 +273,59 @@ export function createExecutionRoutes(engine: ChronaEngine) {
       try {
         const { taskId, checkpointId } = c.req.valid("param");
         const action = c.req.valid("json");
-        const result = await engine.tasks.execution.submitCheckpointAction({
-          taskId,
-          action: { checkpointId, ...action },
+
+        return streamSSE(c, async (stream) => {
+          const stopHeartbeat = startSseHeartbeat(stream);
+          let writeQueue = Promise.resolve();
+          const writeEvent = (event: PlanExecutionSSEEvent) => {
+            writeQueue = writeQueue.then(() => writeExecutionEvent(stream, event)).then(() => undefined);
+            return writeQueue;
+          };
+          const executionAction = checkpointActionToExecutionAction(action.action);
+
+          stream.onAbort(() => {
+            stopHeartbeat();
+          });
+
+          try {
+            await writeEvent({
+              type: "status",
+              action: executionAction,
+              message: "Checkpoint action submitted.",
+            });
+
+            const result = await engine.tasks.execution.submitCheckpointAction({
+              taskId,
+              action: { checkpointId, ...action },
+              onGraphEvent(event: GraphExecutionEvent) {
+                void writeEvent(summarizeGraphEvent(event));
+              },
+              onRuntimeEvent(event: PlanExecutionRuntimeEvent) {
+                void writeEvent(summarizeRuntimeEvent(executionAction, event));
+              },
+              onStateChange(effectivePlan: EffectivePlanGraph) {
+                void writeEvent({
+                  type: "state",
+                  effectivePlan,
+                });
+              },
+            });
+
+            await writeEvent({ type: "result", result: result.execution });
+            await writeEvent({ type: "done" });
+          } catch (cause) {
+            const httpError = toHttpError(cause);
+            await writeEvent({
+              type: "error",
+              code: "INTERNAL_ERROR",
+              message: httpError?.message ?? (cause instanceof Error ? cause.message : "Failed to submit checkpoint action"),
+            });
+            await writeEvent({ type: "done" });
+          } finally {
+            await writeQueue;
+            stopHeartbeat();
+          }
         });
-        return c.json(result);
       } catch (cause) {
         const httpError = toHttpError(cause);
         if (httpError) {

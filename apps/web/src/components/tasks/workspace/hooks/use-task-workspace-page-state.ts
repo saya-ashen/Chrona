@@ -10,14 +10,24 @@ type RefreshOptions = {
 
 type RefreshWorkspace = (options?: RefreshOptions) => Promise<void>;
 
+export type TaskWorkspaceSseEvent = {
+  type: string;
+  sequence?: number;
+  commandId?: string;
+  commandType?: string;
+  message?: string;
+  eventKind?: string;
+};
+
 const SSE_STALE_TIMEOUT_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_STALE_TIMEOUT_MS ?? 45000);
-const SSE_RECONNECT_BASE_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_BASE_DELAY_MS ?? 1000);
-const SSE_RECONNECT_MAX_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_MAX_DELAY_MS ?? 30000);
+const SSE_RECONNECT_BASE_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_BASE_DELAY_MS ?? 5000);
+const SSE_RECONNECT_MAX_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_MAX_DELAY_MS ?? 60000);
 const FALLBACK_REFRESH_INTERVAL_MS = Number(
   import.meta.env.VITE_TASK_WORKSPACE_FALLBACK_REFRESH_INTERVAL_MS ??
     import.meta.env.VITE_TASK_WORKSPACE_POLL_INTERVAL_MS ??
     30000,
 );
+const NON_REFRESH_WORKSPACE_EVENTS = new Set(["ready", "heartbeat"]);
 
 function isWorkspaceActive(pageData: TaskPageData) {
   const executionState = pageData.task.executionSummary?.executionState;
@@ -43,25 +53,22 @@ function isWorkspaceActive(pageData: TaskPageData) {
     : false);
 }
 
-function useTaskWorkspaceEventStream(taskId: string, refreshWorkspace: RefreshWorkspace) {
+function useTaskWorkspaceEventStream(
+  taskId: string,
+  refreshWorkspace: RefreshWorkspace,
+  onWorkspaceEvent: (event: TaskWorkspaceSseEvent) => void,
+) {
   const [streamRetryKey, setStreamRetryKey] = useState(0);
   const [isStreamHealthy, setIsStreamHealthy] = useState(true);
   const staleTimerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const clearStaleTimer = useCallback(() => {
     if (staleTimerRef.current === null) return;
     window.clearTimeout(staleTimerRef.current);
     staleTimerRef.current = null;
   }, []);
-
-  const markStreamHealthy = useCallback(() => {
-    setIsStreamHealthy(true);
-    clearStaleTimer();
-    staleTimerRef.current = window.setTimeout(() => {
-      setIsStreamHealthy(false);
-    }, SSE_STALE_TIMEOUT_MS);
-  }, [clearStaleTimer]);
 
   const scheduleStreamReconnect = useCallback(() => {
     setIsStreamHealthy(false);
@@ -79,9 +86,19 @@ function useTaskWorkspaceEventStream(taskId: string, refreshWorkspace: RefreshWo
     }, delayMs);
   }, [streamRetryKey]);
 
+  const markStreamHealthy = useCallback(() => {
+    setIsStreamHealthy(true);
+    clearStaleTimer();
+    staleTimerRef.current = window.setTimeout(() => {
+      abortControllerRef.current?.abort();
+      scheduleStreamReconnect();
+    }, SSE_STALE_TIMEOUT_MS);
+  }, [clearStaleTimer, scheduleStreamReconnect]);
+
   useEffect(() => {
     const abortController = new AbortController();
     let shouldReconnect = true;
+    abortControllerRef.current = abortController;
 
     markStreamHealthy();
 
@@ -89,9 +106,10 @@ function useTaskWorkspaceEventStream(taskId: string, refreshWorkspace: RefreshWo
       method: "GET",
       signal: abortController.signal,
       headers: { Accept: "text/event-stream" },
-      onEvent({ event }) {
+      onEvent({ event, data }) {
         markStreamHealthy();
-        if (event === "task_projection_updated") {
+        if (!NON_REFRESH_WORKSPACE_EVENTS.has(event)) {
+          onWorkspaceEvent({ type: event, ...data });
           void refreshWorkspace({ silent: true });
         }
       },
@@ -109,13 +127,16 @@ function useTaskWorkspaceEventStream(taskId: string, refreshWorkspace: RefreshWo
     return () => {
       shouldReconnect = false;
       abortController.abort();
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       clearStaleTimer();
       if (reconnectTimerRef.current !== null) {
         window.clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
     };
-  }, [clearStaleTimer, markStreamHealthy, refreshWorkspace, scheduleStreamReconnect, streamRetryKey, taskId]);
+  }, [clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshWorkspace, scheduleStreamReconnect, streamRetryKey, taskId]);
 
   return isStreamHealthy;
 }
@@ -123,6 +144,7 @@ function useTaskWorkspaceEventStream(taskId: string, refreshWorkspace: RefreshWo
 export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const queryClient = useQueryClient();
   const taskId = initialData.task.id;
+  const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.page(taskId),
     queryFn: () => fetchTaskWorkspacePage(taskId),
@@ -133,6 +155,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const refreshWorkspace = useCallback(async (_options: RefreshOptions = {}) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) }),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId) }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId) }),
     ]);
   }, [queryClient, taskId]);
@@ -146,10 +169,13 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
       return { ...previous, task: nextTask } satisfies TaskPageData;
     });
   }, [initialData, queryClient, taskId]);
-  const isStreamHealthy = useTaskWorkspaceEventStream(taskId, refreshWorkspace);
+  const handleWorkspaceEvent = useCallback((event: TaskWorkspaceSseEvent) => {
+    setWorkspaceEvents((current) => [...current.slice(-199), event]);
+  }, []);
+  useTaskWorkspaceEventStream(taskId, refreshWorkspace, handleWorkspaceEvent);
 
   useEffect(() => {
-    if (isStreamHealthy || !isWorkspaceActive(pageData)) {
+    if (!isWorkspaceActive(pageData)) {
       return;
     }
 
@@ -158,7 +184,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     }, FALLBACK_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [isStreamHealthy, pageData, refreshWorkspace]);
+  }, [pageData, refreshWorkspace]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -176,5 +202,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     setTask,
     refreshWorkspace,
     isRefreshing: pageQuery.isFetching,
+    workspaceEvents,
   };
 }

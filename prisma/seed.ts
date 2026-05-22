@@ -18,6 +18,8 @@ const adapter = new PrismaBunSqlite({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+
   const workspace = await prisma.workspace.upsert({
     where: { id: "ws_demo" },
     update: {

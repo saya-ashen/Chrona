@@ -1,10 +1,7 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { syncStaleWorkspaceRunsForRead } from "@/modules/runtime-sync/freshness";
 
 export async function getInbox(workspaceId: string) {
-  await syncStaleWorkspaceRunsForRead(workspaceId);
-
   const [approvals, proposals, tasksWithLatestRuns] = await Promise.all([
     db.approval.findMany({
       where: {

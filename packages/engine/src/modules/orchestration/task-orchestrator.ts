@@ -1,6 +1,4 @@
 import { readTaskOrchestratorConfig, type TaskOrchestratorConfig } from "./orchestrator-config";
-import { runActiveRunSyncWorker } from "./active-run-sync-worker";
-import { runDegradedRetryWorker } from "./degraded-retry-worker";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
@@ -81,7 +79,15 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
           ttlMs: config.leaseTtlMs,
           now: now(),
         });
-        await worker.run();
+        try {
+          await worker.run();
+        } catch (cause) {
+          console.error("[task-orchestrator] worker failed", {
+            worker: worker.name,
+            error: cause instanceof Error ? cause.message : String(cause),
+            stack: cause instanceof Error ? cause.stack : undefined,
+          });
+        }
       }
     } finally {
       inFlight = false;
@@ -136,21 +142,9 @@ export function createDefaultTaskOrchestrator() {
         },
       },
       {
-        name: "active-run-sync",
-        async run() {
-          await runActiveRunSyncWorker();
-        },
-      },
-      {
         name: "graph-advancement",
         async run() {
           await runGraphAdvancementWorker();
-        },
-      },
-      {
-        name: "degraded-retry",
-        async run() {
-          await runDegradedRetryWorker();
         },
       },
     ],

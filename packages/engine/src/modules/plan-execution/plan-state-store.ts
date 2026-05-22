@@ -4,6 +4,7 @@ import {
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 
 type MainSessionEventType =
   | "execution_started"
@@ -107,5 +108,11 @@ export async function appendMainSessionEvent(input: {
     },
     dedupeKey: `plan_execution.${input.eventType}:${input.taskId}:${input.sessionId}:${Object.values(input.payload).join(",").slice(0, 64)}`,
     runtimeTs: new Date(),
+  });
+
+  publishTaskWorkspaceUpdatedEvent({
+    taskId: input.taskId,
+    workspaceId: task.workspaceId,
+    reason: `plan_execution.${input.eventType}`,
   });
 }

@@ -143,6 +143,35 @@ describe("task orchestrator lifecycle", () => {
     expect(extraWorker).toHaveBeenCalledTimes(1);
   });
 
+  it("isolates worker failures and continues the tick", async () => {
+    const failingWorker = mock(async () => { throw new Error("worker unavailable"); });
+    const nextWorker = mock(async () => undefined);
+    const originalConsoleError = console.error;
+    const consoleError = mock(() => undefined);
+    console.error = consoleError;
+    const { leaseRepository, orchestrator } = createHarness({
+      workers: [
+        { name: "failing-worker", run: failingWorker },
+        { name: "next-worker", run: nextWorker },
+      ],
+    });
+
+    try {
+      await orchestrator.tick();
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    expect(failingWorker).toHaveBeenCalledTimes(1);
+    expect(nextWorker).toHaveBeenCalledTimes(1);
+    expect(leaseRepository.renew).toHaveBeenCalledTimes(2);
+    expect(consoleError).toHaveBeenCalledWith("[task-orchestrator] worker failed", {
+      worker: "failing-worker",
+      error: "worker unavailable",
+      stack: expect.any(String),
+    });
+  });
+
   it("stops polling and releases a held lease", async () => {
     const { clearedHandles, leaseRepository, orchestrator } = createHarness();
 

@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { syncTaskRunForRead } from "@/modules/runtime-sync/freshness";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { reconcileTaskState } from "@/modules/orchestration/reconcile-task-state";
@@ -116,8 +115,6 @@ function mapProviderEventToActivity(event: {
 }
 
 export async function getTaskPage(taskId: string) {
-  await syncTaskRunForRead(taskId);
-
   const savedPlan = await getLatestTaskPlanReadModel(taskId);
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
     isTaskPlanGenerationRunning(taskId)

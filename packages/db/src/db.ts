@@ -20,10 +20,14 @@ async function createAdapter() {
 async function createDbClient() {
   const adapter = await createAdapter();
 
-  return new PrismaClient({
+  const client = new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
+
+  await client.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+
+  return client;
 }
 
 function hasRequiredDelegates(client: PrismaClient | undefined) {

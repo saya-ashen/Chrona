@@ -23,39 +23,53 @@ export async function deleteTask(taskId: string) {
   });
 
   await db.$transaction(async (tx) => {
-    await tx.taskProjection.deleteMany({ where: { taskId } });
-    await tx.run.deleteMany({ where: { taskId } });
-    await tx.taskSession.deleteMany({ where: { taskId } });
-    await tx.approval.deleteMany({ where: { taskId } });
-    await tx.artifact.deleteMany({ where: { taskId } });
-    await tx.memory.deleteMany({ where: { taskId } });
-    await tx.event.deleteMany({ where: { taskId } });
-    await tx.taskDependency.deleteMany({
-      where: { OR: [{ taskId }, { dependsOnTaskId: taskId }] },
-    });
-    await tx.scheduleProposal.deleteMany({ where: { taskId } });
-
-    const childTasks = await tx.task.findMany({
-      where: { parentTaskId: taskId },
-      select: { id: true },
-    });
-
-    for (const child of childTasks) {
-      await tx.taskProjection.deleteMany({ where: { taskId: child.id } });
-      await tx.run.deleteMany({ where: { taskId: child.id } });
-      await tx.taskSession.deleteMany({ where: { taskId: child.id } });
-      await tx.approval.deleteMany({ where: { taskId: child.id } });
-      await tx.artifact.deleteMany({ where: { taskId: child.id } });
-      await tx.memory.deleteMany({ where: { taskId: child.id } });
-      await tx.event.deleteMany({ where: { taskId: child.id } });
-      await tx.taskDependency.deleteMany({
-        where: { OR: [{ taskId: child.id }, { dependsOnTaskId: child.id }] },
+    async function deleteTaskTree(currentTaskId: string): Promise<void> {
+      const childTasks = await tx.task.findMany({
+        where: { parentTaskId: currentTaskId },
+        select: { id: true },
       });
-      await tx.scheduleProposal.deleteMany({ where: { taskId: child.id } });
-      await tx.task.delete({ where: { id: child.id } });
+
+      for (const child of childTasks) {
+        await deleteTaskTree(child.id);
+      }
+
+      const runs = await tx.run.findMany({
+        where: { taskId: currentTaskId },
+        select: { id: true },
+      });
+      const runIds = runs.map((run) => run.id);
+
+      if (runIds.length > 0) {
+        await tx.runtimeCursor.deleteMany({ where: { runId: { in: runIds } } });
+        await tx.toolCallDetail.deleteMany({ where: { runId: { in: runIds } } });
+        await tx.conversationEntry.deleteMany({ where: { runId: { in: runIds } } });
+      }
+
+      await tx.schedulerEvent.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.reconciliationEvent.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.graphMutationRecord.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.graphVersion.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.executionSession.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.workBlock.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskPlanLayer.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskPlanRun.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskPlan.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskProjection.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.approval.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.artifact.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.memory.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.event.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskDependency.deleteMany({
+        where: { OR: [{ taskId: currentTaskId }, { dependsOnTaskId: currentTaskId }] },
+      });
+      await tx.scheduleProposal.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.run.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskSession.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskAssistantMessage.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.task.delete({ where: { id: currentTaskId } });
     }
 
-    await tx.task.delete({ where: { id: taskId } });
+    await deleteTaskTree(taskId);
   });
 
   return { success: true, taskId };

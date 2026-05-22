@@ -7,6 +7,7 @@ const env = readEnv();
 const log = createLogger("apps.server");
 const host = env.HOST;
 const port = resolvePort(env);
+const SSE_REQUEST_TIMEOUT_SECONDS = 120;
 assertSafeBind(env);
 
 let isShuttingDown = false;
@@ -25,12 +26,16 @@ export async function startBunServer() {
   const server = Bun.serve({
     hostname: host,
     port,
-    fetch: (request) => {
+    idleTimeout: 120,
+    fetch: (request, server) => {
       if (isShuttingDown) {
         return new Response(JSON.stringify({ error: "Server is shutting down" }), {
           status: 503,
           headers: { "content-type": "application/json" },
         });
+      }
+      if (new URL(request.url).pathname.endsWith("/events")) {
+        server.timeout(request, SSE_REQUEST_TIMEOUT_SECONDS);
       }
       return app.fetch(request);
     },

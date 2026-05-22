@@ -1,6 +1,7 @@
 import { HermesProviderClient } from "@chrona/hermes";
 import { OpenClawClient } from "@chrona/openclaw";
 import { db } from "@/lib/db";
+import { ChronaDebugProviderClient, isChronaDebugProviderConfig } from "./debug-provider-client";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
@@ -70,6 +71,10 @@ function createProviderClient(
 ): EngineAiClient["providerClient"] {
   if (record.type === "hermes") {
     const config = record.config as HermesClientConfig;
+    if (isChronaDebugProviderConfig(config)) {
+      return new ChronaDebugProviderClient();
+    }
+
     return new HermesProviderClient({
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
@@ -80,6 +85,10 @@ function createProviderClient(
   if (record.type !== "openclaw") return null;
 
   const config = record.config as OpenClawClientConfig;
+  if (isChronaDebugProviderConfig(config)) {
+    return new ChronaDebugProviderClient();
+  }
+
   return new OpenClawClient({
     gatewayUrl: getOpenClawGatewayUrl(config) ?? "",
     gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
@@ -130,7 +139,10 @@ async function getAiClient(
 }
 
 function requireOpenClawClient(client: EngineAiClient): EngineOpenClawClient {
-  if (client.record.type !== "openclaw" || !client.providerClient) {
+  const isDebugProvider = isChronaDebugProviderConfig(
+    client.record.config as { baseUrl?: string; bridgeUrl?: string; gatewayUrl?: string },
+  );
+  if ((!isDebugProvider && client.record.type !== "openclaw") || !client.providerClient) {
     throw new AiClientError(
       "OpenClaw client is required",
       client.record.type,

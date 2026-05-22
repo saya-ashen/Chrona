@@ -19,6 +19,13 @@ export async function runRestartRecoveryWorker(input: {
     include: { task: { select: { workspaceId: true } } },
   });
   for (const session of activeSessions) {
+    if (!session.task) {
+      console.warn("[restart-recovery-worker] active session missing task", {
+        sessionId: session.id,
+        taskId: session.taskId,
+      });
+      continue;
+    }
     await recordEvent({
       workspaceId: session.task.workspaceId,
       taskId: session.taskId,
@@ -33,6 +40,13 @@ export async function runRestartRecoveryWorker(input: {
     include: { task: { select: { workspaceId: true } } },
   });
   for (const run of degradedRuns) {
+    if (!run.task) {
+      console.warn("[restart-recovery-worker] degraded run missing task", {
+        runId: run.id,
+        taskId: run.taskId,
+      });
+      continue;
+    }
     await recordEvent({
       workspaceId: run.task.workspaceId,
       taskId: run.taskId,
