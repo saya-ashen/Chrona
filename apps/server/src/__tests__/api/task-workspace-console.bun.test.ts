@@ -144,6 +144,119 @@ describe("task workspace console read data", () => {
         ingestSequence: 1,
       },
     });
+    await db.event.createMany({
+      data: [{
+        eventType: "provider.text_delta",
+        workspaceId,
+        taskId,
+        runId: run.id,
+        actorType: "runtime",
+        actorId: "openclaw",
+        source: "provider",
+        payload: {
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "provider-run-1",
+          event: { type: "text_delta", text: "Hello " },
+        },
+        dedupeKey: "provider-runtime-test-text-1",
+        runtimeTs: new Date("2026-05-12T12:01:01.000Z"),
+        ingestSequence: 2,
+      }, {
+        eventType: "provider.text_delta",
+        workspaceId,
+        taskId,
+        runId: run.id,
+        actorType: "runtime",
+        actorId: "openclaw",
+        source: "provider",
+        payload: {
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "provider-run-1",
+          event: { type: "text_delta", text: "world" },
+        },
+        dedupeKey: "provider-runtime-test-text-2",
+        runtimeTs: new Date("2026-05-12T12:01:02.000Z"),
+        ingestSequence: 3,
+      }, {
+        eventType: "provider.reasoning_delta",
+        workspaceId,
+        taskId,
+        runId: run.id,
+        actorType: "runtime",
+        actorId: "openclaw",
+        source: "provider",
+        payload: {
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "provider-run-1",
+          event: { type: "reasoning_delta", text: "Thinking" },
+        },
+        dedupeKey: "provider-runtime-test-reasoning-1",
+        runtimeTs: new Date("2026-05-12T12:01:03.000Z"),
+        ingestSequence: 4,
+      }, {
+        eventType: "task.updated",
+        workspaceId,
+        taskId,
+        actorType: "user",
+        actorId: "test-user",
+        source: "ui",
+        payload: { changed_fields: ["title", "priority"] },
+        dedupeKey: "task-activity-test-updated",
+        runtimeTs: new Date("2026-05-12T12:01:04.000Z"),
+        ingestSequence: 5,
+      }, {
+        eventType: "task.schedule_changed",
+        workspaceId,
+        taskId,
+        actorType: "user",
+        actorId: "test-user",
+        source: "ui",
+        payload: {
+          scheduledStartAt: "2026-05-13T09:00:00.000Z",
+          scheduledEndAt: "2026-05-13T10:00:00.000Z",
+          source: "manual",
+        },
+        dedupeKey: "task-activity-test-schedule",
+        runtimeTs: new Date("2026-05-12T12:01:05.000Z"),
+        ingestSequence: 6,
+      }, {
+        eventType: "plan_generation.started",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-test", instruction: "Make a plan" },
+        dedupeKey: "task-activity-test-plan-started",
+        runtimeTs: new Date("2026-05-12T12:01:06.000Z"),
+        ingestSequence: 7,
+      }, {
+        eventType: "plan_generation.status",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-test", phase: "requesting_provider", message: "Requesting AI provider..." },
+        dedupeKey: "task-activity-test-plan-status",
+        runtimeTs: new Date("2026-05-12T12:01:06.500Z"),
+        ingestSequence: 8,
+      }, {
+        eventType: "plan_generation.completed",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-test", plan_title: "Generated plan" },
+        dedupeKey: "task-activity-test-plan-completed",
+        runtimeTs: new Date("2026-05-12T12:01:07.000Z"),
+        ingestSequence: 9,
+      }],
+    });
 
     const page = await getTaskPage(taskId);
 
@@ -152,6 +265,43 @@ describe("task workspace console read data", () => {
       description: "chrona_plan_read",
       tone: "info",
       timestamp: "2026-05-12T12:01:00.000Z",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Assistant response",
+      description: "Hello world",
+      tone: "info",
+      timestamp: "2026-05-12T12:01:02.000Z",
+    }));
+    expect(page.activityTimeline.filter((item) => item.title === "Assistant response")).toHaveLength(1);
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Reasoning",
+      description: "Thinking",
+      tone: "neutral",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Task updated",
+      description: "Updated title, priority",
+      tone: "info",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Schedule changed",
+      description: "2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
+      tone: "info",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Plan generation started",
+      description: "Make a plan",
+      tone: "info",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Plan generation update",
+      description: "Requesting AI provider...",
+      tone: "info",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      title: "Plan generated",
+      description: "Generated plan",
+      tone: "success",
     }));
   });
 });

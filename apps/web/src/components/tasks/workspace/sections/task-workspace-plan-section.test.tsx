@@ -671,38 +671,40 @@ describe("TaskWorkspacePlanSection", () => {
       </>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(screen.getAllByText("Review task output").length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open selected node drawer" }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Hide" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("complementary", { name: "Task command center" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Hide" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: "Open selected node drawer" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open selected node drawer" }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Hide" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Top navigation action" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Hide" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId("task-plan-node-review"));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Hide" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Left navigation action" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Hide" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
     });
   });
 });

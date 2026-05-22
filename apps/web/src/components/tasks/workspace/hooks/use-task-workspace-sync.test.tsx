@@ -253,10 +253,10 @@ function emitWorkspaceEvent(input: TaskWorkspaceSseEvent) {
   });
 }
 
-function nextWorkspaceEvent(input: Omit<TaskWorkspaceSseEvent, "sequence"> & { sequence?: number }) {
+function nextWorkspaceEvent(input: TaskWorkspaceSseEvent) {
   return {
-    sequence: input.sequence ?? ++mocks.workspaceEventSequence,
     ...input,
+    sequence: input.sequence ?? ++mocks.workspaceEventSequence,
   } satisfies TaskWorkspaceSseEvent;
 }
 
@@ -369,7 +369,7 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.status).toBe("active"));
   });
 
-  it("refreshes the workspace page when any workspace update event arrives", async () => {
+  it("refreshes the workspace page when a page-level workspace update event arrives", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
     const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
     mocks.pageResponses = [pageData({ taskStatus: "Blocked", plan: initialPlan, runStatus: "Blocked" })];
@@ -383,6 +383,23 @@ describe("task workspace page synchronization", () => {
 
     await waitFor(() => expect(result.current.pageData.task.status).toBe("Blocked"));
     expect(mocks.pageFetchCount).toBe(1);
+  });
+
+  it("does not refresh the workspace page for plan-only progress events", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
+    mocks.pageResponses = [pageData({ taskStatus: "Ready", plan: initialPlan })];
+
+    renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
+    await act(async () => {
+      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "tool_call" }));
+      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
+    });
+
+    expect(mocks.pageFetchCount).toBe(0);
+    expect(mocks.pageResponses).toHaveLength(1);
   });
 
   it("does not refresh the workspace page for ready or heartbeat events", async () => {
@@ -448,12 +465,11 @@ describe("task workspace page synchronization", () => {
     visibilitySpy.mockRestore();
   });
 
-  it("refreshes the full workspace page when a plan generation result event arrives", async () => {
+  it("refreshes only plan state when a plan generation result event arrives", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const generatedPlan = planReadModel({ id: "plan-2", status: "ready", title: "Generated plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
     mocks.planResponses = [
-      { taskId: "task-1", aiPlanGenerationStatus: "generating", savedPlan: initialPlan },
       { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan },
     ];
 
@@ -468,7 +484,7 @@ describe("task workspace page synchronization", () => {
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
     });
 
-    await waitFor(() => expect(mocks.pageFetchCount).toBe(1));
+    expect(mocks.pageFetchCount).toBe(0);
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
   });
 
@@ -516,7 +532,7 @@ describe("task workspace page synchronization", () => {
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
     });
 
-    await waitFor(() => expect(mocks.pageFetchCount).toBe(1));
+    expect(mocks.pageFetchCount).toBe(0);
     expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Old plan");
     expect(result.current.plan.planGenerationStatus).toBe("accepted");
   });
@@ -635,6 +651,13 @@ describe("task workspace page synchronization", () => {
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.runtime_event",
       eventKind: "tool_started",
+      action: "start_manual",
+      nodeId: "node-1",
+      nodeTitle: "Launch plan",
+      runtimeName: "openclaw",
+      provider: "openclaw",
+      runId: "run-1",
+      event: { type: "assistant_text_delta", text: "Running" },
     }));
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.state.updated",
@@ -649,7 +672,8 @@ describe("task workspace page synchronization", () => {
       await dispatchPromise;
     });
 
-    expect(result.current.latestActivitySummary).toBe("Execution updated");
+    expect(result.current.latestActivitySummary).toBe("Running");
+    expect(result.current.runtimeEvents).toHaveLength(1);
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.status).toBe("active"));
     expect(result.current.graphPlan?.nodes[0]?.title).toBe("Waiting for user input");
     expect(result.current.currentExecution?.status).toBe("waiting_for_user");
@@ -670,6 +694,13 @@ describe("task workspace page synchronization", () => {
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.runtime_event",
       eventKind: "tool_started",
+      action: "resume_with_input",
+      nodeId: "node-1",
+      nodeTitle: "Waiting for user input",
+      runtimeName: "openclaw",
+      provider: "openclaw",
+      runId: "run-1",
+      event: { type: "assistant_text_delta", text: "Done" },
     }));
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.state.updated",
@@ -684,7 +715,7 @@ describe("task workspace page synchronization", () => {
       await checkpointPromise;
     });
 
-    expect(result.current.latestActivitySummary).toBe("Execution updated");
+    expect(result.current.latestActivitySummary).toBe("Done");
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Completed launch plan"));
     expect(result.current.graphPlan?.nodes[0]?.status).toBe("done");
     expect(result.current.currentExecution?.status).toBe("completed");

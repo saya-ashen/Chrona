@@ -19,6 +19,8 @@ import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionSSEEvent, 
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
+type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
+type WorkspaceExecutionRuntimeSseEvent = TaskWorkspaceSseEvent & Omit<WorkspaceRuntimeEvent, "type"> & { type: "execution.runtime_event" };
 export type PlanGenerationRequest = { userInstruction?: string | null };
 
 function compactActivityText(value: string) {
@@ -44,6 +46,52 @@ function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
     case "raw_event":
       return compactActivityText(value.rawEventType ?? "Runtime event");
   }
+}
+
+function isRuntimeTextDelta(event: WorkspaceRuntimeEvent): event is WorkspaceRuntimeTextEvent {
+  return event.event.type === "assistant_text_delta" || event.event.type === "reasoning_delta";
+}
+
+function runtimeTextMergeKey(event: WorkspaceRuntimeEvent) {
+  return [
+    event.event.type,
+    event.action,
+    event.runId ?? "run",
+    event.nodeId ?? "node",
+    event.runtimeName,
+    event.provider,
+  ].join(":");
+}
+
+function appendRuntimeEvent(events: WorkspaceRuntimeEvent[], event: WorkspaceRuntimeEvent) {
+  const previous = events.at(-1);
+  if (previous && isRuntimeTextDelta(previous) && isRuntimeTextDelta(event) && runtimeTextMergeKey(previous) === runtimeTextMergeKey(event)) {
+    return [
+      ...events.slice(0, -1),
+      {
+        ...event,
+        sequence: previous.sequence,
+        timestamp: event.timestamp ?? previous.timestamp,
+        event: {
+          ...event.event,
+          text: `${previous.event.text}${event.event.text}`,
+        },
+      } satisfies WorkspaceRuntimeEvent,
+    ];
+  }
+
+  return [...events, event];
+}
+
+function isFullRuntimeSseEvent(event: TaskWorkspaceSseEvent): event is WorkspaceExecutionRuntimeSseEvent {
+  return event.type === "execution.runtime_event"
+    && "event" in event
+    && typeof event.event === "object"
+    && event.event !== null
+    && "runtimeName" in event
+    && typeof event.runtimeName === "string"
+    && "provider" in event
+    && typeof event.provider === "string";
 }
 
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
@@ -319,7 +367,13 @@ export function useTaskWorkspacePlanState(
       }
 
       if (event.type === "execution.runtime_event") {
-        setGenerationActivitySummary("Execution updated");
+        if (isFullRuntimeSseEvent(event)) {
+          const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
+          setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
+          setGenerationActivitySummary(getRuntimeActivity(runtimeEvent) ?? "Execution updated");
+        } else {
+          setGenerationActivitySummary("Execution updated");
+        }
       }
 
       if (event.type === "execution.result" || event.type === "checkpoint.result") {

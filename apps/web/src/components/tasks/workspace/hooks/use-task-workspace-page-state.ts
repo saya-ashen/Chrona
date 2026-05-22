@@ -8,8 +8,6 @@ type RefreshOptions = {
   silent?: boolean;
 };
 
-type RefreshWorkspace = (options?: RefreshOptions) => Promise<void>;
-
 export type TaskWorkspaceSseEvent = {
   type: string;
   sequence?: number;
@@ -17,6 +15,7 @@ export type TaskWorkspaceSseEvent = {
   commandType?: string;
   message?: string;
   eventKind?: string;
+  [key: string]: unknown;
 };
 
 const SSE_STALE_TIMEOUT_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_STALE_TIMEOUT_MS ?? 45000);
@@ -28,6 +27,27 @@ const FALLBACK_REFRESH_INTERVAL_MS = Number(
     30000,
 );
 const NON_REFRESH_WORKSPACE_EVENTS = new Set(["ready", "heartbeat"]);
+const PAGE_REFRESH_WORKSPACE_EVENTS = new Set([
+  "task_projection_updated",
+  "task_workspace_updated",
+  "task.updated",
+  "task.deleted",
+  "schedule.updated",
+  "proposal.updated",
+  "execution.state.updated",
+  "execution.result",
+  "checkpoint.result",
+]);
+
+function shouldRefreshWorkspacePageForEvent(event: string) {
+  if (NON_REFRESH_WORKSPACE_EVENTS.has(event)) return false;
+  if (PAGE_REFRESH_WORKSPACE_EVENTS.has(event)) return true;
+
+  return !event.startsWith("plan.")
+    && !event.startsWith("execution.")
+    && !event.startsWith("checkpoint.")
+    && !event.startsWith("command.");
+}
 
 function isWorkspaceActive(pageData: TaskPageData) {
   const executionState = pageData.task.executionSummary?.executionState;
@@ -55,7 +75,7 @@ function isWorkspaceActive(pageData: TaskPageData) {
 
 function useTaskWorkspaceEventStream(
   taskId: string,
-  refreshWorkspace: RefreshWorkspace,
+  refreshWorkspacePage: () => Promise<void>,
   onWorkspaceEvent: (event: TaskWorkspaceSseEvent) => void,
 ) {
   const [streamRetryKey, setStreamRetryKey] = useState(0);
@@ -110,7 +130,9 @@ function useTaskWorkspaceEventStream(
         markStreamHealthy();
         if (!NON_REFRESH_WORKSPACE_EVENTS.has(event)) {
           onWorkspaceEvent({ type: event, ...data });
-          void refreshWorkspace({ silent: true });
+          if (shouldRefreshWorkspacePageForEvent(event)) {
+            void refreshWorkspacePage();
+          }
         }
       },
     }).then(() => {
@@ -136,7 +158,7 @@ function useTaskWorkspaceEventStream(
         reconnectTimerRef.current = null;
       }
     };
-  }, [clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshWorkspace, scheduleStreamReconnect, streamRetryKey, taskId]);
+  }, [clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshWorkspacePage, scheduleStreamReconnect, streamRetryKey, taskId]);
 
   return isStreamHealthy;
 }
@@ -159,6 +181,9 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId) }),
     ]);
   }, [queryClient, taskId]);
+  const refreshWorkspacePage = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) });
+  }, [queryClient, taskId]);
 
   const setTask = useCallback((value: React.SetStateAction<TaskData>) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.page(taskId), (current: TaskPageData | undefined) => {
@@ -172,7 +197,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const handleWorkspaceEvent = useCallback((event: TaskWorkspaceSseEvent) => {
     setWorkspaceEvents((current) => [...current.slice(-199), event]);
   }, []);
-  useTaskWorkspaceEventStream(taskId, refreshWorkspace, handleWorkspaceEvent);
+  useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent);
 
   useEffect(() => {
     if (!isWorkspaceActive(pageData)) {

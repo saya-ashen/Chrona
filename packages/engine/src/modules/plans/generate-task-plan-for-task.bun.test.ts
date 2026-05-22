@@ -129,6 +129,10 @@ describe("generateTaskPlanForTask", () => {
     const saved = await getLatestTaskPlanGraph(task.id);
     const refreshedTask = await db.task.findUnique({ where: { id: task.id } });
     const sessions = await db.taskSession.findMany({ where: { taskId: task.id } });
+    const activityEvents = await db.event.findMany({
+      where: { taskId: task.id, source: "plan_generation" },
+      orderBy: { ingestSequence: "asc" },
+    });
     const node = saved!.plan.nodes[0];
     expect(node?.title).toBe("Handle Updated task title");
     expect(node?.localId).toBe("handle_task");
@@ -138,6 +142,20 @@ describe("generateTaskPlanForTask", () => {
     expect(sessions.map((session) => session.sessionKey)).toContain(
       `chrona:task:${task.id}:plan-graph`,
     );
+    expect(activityEvents.map((event) => event.eventType)).toEqual([
+      "plan_generation.started",
+      "plan_generation.status",
+      "plan_generation.status",
+      "plan_generation.tool_called",
+      "plan_generation.draft_saved",
+      "plan_generation.status",
+      "plan_generation.completed",
+    ]);
+    expect(activityEvents[3]?.payload).toMatchObject({
+      tool: "chrona_plan_generate",
+      plan_title: "Plan for Updated task title",
+      node_count: 1,
+    });
   });
 
   it("stores regeneration user instruction on the generated plan", async () => {

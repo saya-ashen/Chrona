@@ -370,7 +370,7 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
       id: `run-${pageData.latestRunSummary.id}`,
       title: "Latest run",
       description: pageData.latestRunSummary.status,
-      tone: pageData.latestRunSummary.status === "Completed" ? "success" : "info",
+      tone: pageData.latestRunSummary.status === "Completed" ? "success" as const : "info" as const,
       timestamp: pageData.latestRunSummary.startedAt,
     }, ...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
   }

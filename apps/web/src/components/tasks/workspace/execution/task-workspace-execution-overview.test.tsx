@@ -72,7 +72,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
           runId: "run-1",
           sequence: 2,
           timestamp: "2026-05-12T10:01:01.000Z",
-          event: { type: "assistant_text_delta", text: "Runtime answer" },
+          event: { type: "assistant_text_delta", text: "Runtime " },
         }, {
           type: "runtime_event",
           action: "start_manual",
@@ -82,6 +82,17 @@ describe("TaskWorkspaceExecutionOverview", () => {
           provider: "openclaw",
           runId: "run-1",
           sequence: 3,
+          timestamp: "2026-05-12T10:01:01.500Z",
+          event: { type: "assistant_text_delta", text: "answer" },
+        }, {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "execute",
+          runtimeName: "openclaw",
+          provider: "openclaw",
+          runId: "run-1",
+          sequence: 4,
           timestamp: "2026-05-12T10:01:02.000Z",
           event: { type: "reasoning_delta", text: "Runtime reasoning" },
         }]}
@@ -91,6 +102,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByText("正在读取计划")).toBeInTheDocument();
     expect(screen.getByText("Runtime answer")).toBeInTheDocument();
+    expect(screen.queryByText("Runtime ")).not.toBeInTheDocument();
     expect(screen.getByText("Reasoning")).toBeInTheDocument();
     expect(screen.getByText("Runtime reasoning")).toBeInTheDocument();
   });
