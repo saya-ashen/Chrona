@@ -109,6 +109,49 @@ export function makeSingleTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
+export function makeTwoTaskPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `Two task plan ${editablePlanId}`,
+    goal: "Complete one runtime-backed task, then continue to the next runtime-backed task",
+    assumptions: [],
+    nodes: [
+      {
+        id: "first_task",
+        localId: "first_task",
+        type: "task",
+        title: "Collect script requirements",
+        description: "First runtime-backed task executor",
+        config: { expectedOutput: "Requirements collected" } satisfies TaskConfig,
+        dependencies: [],
+        dependents: ["second_task"],
+        mode: "auto",
+        executor: "ai",
+      },
+      {
+        id: "second_task",
+        localId: "second_task",
+        type: "task",
+        title: "Finalize script specification",
+        description: "Should run after the first provider run completes",
+        config: { expectedOutput: "Executable script specification" } satisfies TaskConfig,
+        dependencies: ["first_task"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [{ id: "edge_first_to_second", from: "first_task", to: "second_task" }],
+    entryNodeIds: ["first_task"],
+    terminalNodeIds: ["second_task"],
+    topologicalOrder: ["first_task", "second_task"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,
@@ -149,6 +192,58 @@ export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
     entryNodeIds: ["manual_task"],
     terminalNodeIds: ["auto_task"],
     topologicalOrder: ["manual_task", "auto_task"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
+export function makeInputCheckpointThenTaskPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `Input checkpoint handoff ${editablePlanId}`,
+    goal: "Complete input checkpoint, then continue automatic work",
+    assumptions: [],
+    nodes: [
+      {
+        id: "requirements_checkpoint",
+        localId: "requirements_checkpoint",
+        type: "checkpoint",
+        title: "Confirm requirements",
+        description: "Collect required user input before task execution",
+        config: {
+          checkpointType: "input",
+          prompt: "Confirm script requirements",
+          required: true,
+          inputFields: [
+            { name: "location_scope", label: "Location scope", type: "text", required: true },
+            { name: "output_format", label: "Output format", type: "text", required: true },
+          ],
+        } satisfies CheckpointConfig,
+        dependencies: [],
+        dependents: ["spec_task"],
+      },
+      {
+        id: "spec_task",
+        localId: "spec_task",
+        type: "task",
+        title: "Finalize script specification",
+        description: "Should run after checkpoint input is submitted",
+        config: {
+          expectedOutput: "Executable script specification",
+          completionCriteria: "Scope, input, output, and constraints are documented",
+        } satisfies TaskConfig,
+        dependencies: ["requirements_checkpoint"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [{ id: "edge_checkpoint_to_spec", from: "requirements_checkpoint", to: "spec_task" }],
+    entryNodeIds: ["requirements_checkpoint"],
+    terminalNodeIds: ["spec_task"],
+    topologicalOrder: ["requirements_checkpoint", "spec_task"],
     completionPolicy: { type: "all_tasks_completed" },
     validationWarnings: [],
   };

@@ -3,7 +3,7 @@
 import { CalendarDays, ClipboardList, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
-import { AssistantSurfaceTrigger } from "@/components/assistant-surface/assistant-surface-trigger";
+import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 import { createTaskFromSchedule } from "@/lib/task-actions-client";
@@ -179,7 +179,7 @@ export function ControlPlaneShell({
             </div>
 
             <div className="absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-              <AssistantSurfaceTrigger />
+              <AssistantSurfaceHeaderDrawerButton />
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">

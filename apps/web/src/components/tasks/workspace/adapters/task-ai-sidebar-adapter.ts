@@ -1,30 +1,76 @@
 import type { AiSidebarPageContextSummary, AiSidebarQuickAction } from "@chrona/contracts";
 import type { TaskData } from "../model/task-workspace-types";
 
+type TaskHighlight = AiSidebarPageContextSummary["highlights"][number];
+
 function findActiveNode(task: TaskData) {
-  return task.graphNodeStates?.find((node) => node.current || node.status === "running") ?? task.graphNodeStates?.[0];
+  const currentNodeId = task.executionSummary?.currentNodeId;
+  return task.graphNodeStates?.find((node) => node.id === currentNodeId)
+    ?? task.graphNodeStates?.find((node) => node.current || node.status === "running")
+    ?? task.graphNodeStates?.find((node) => node.requiresAction)
+    ?? task.graphNodeStates?.[0];
 }
 
-function createTaskHighlights({ task, activeNodeId, blockReason, primaryAction, latestActivitySummary }: {
+function getPlanNodeTitle(task: TaskData, nodeId: string | null) {
+  if (!nodeId) return null;
+  const node = task.savedPlan?.effectivePlan.nodes.find((item) => item.id === nodeId || item.nodeId === nodeId);
+  return node?.title ?? null;
+}
+
+function createAttentionHighlights(reviewState: string | null, blockReason: string | null): TaskHighlight[] {
+  const highlights: TaskHighlight[] = [];
+
+  if (reviewState) highlights.push({ label: "Needs review", value: reviewState, tone: "warning" });
+  if (blockReason) highlights.push({ label: "Blocked", value: blockReason, tone: "critical" });
+
+  return highlights;
+}
+
+function createActiveNodeHighlight({ nodeLabel, activeNodeStatus, executionState }: {
+  nodeLabel: string | null;
+  activeNodeStatus: string | null;
+  executionState?: TaskData["executionSummary"] extends infer Summary
+    ? Summary extends { executionState?: infer State } ? State : string
+    : string;
+}): TaskHighlight | null {
+  if (!nodeLabel) return null;
+  if (activeNodeStatus === "running" || executionState === "running") {
+    return { label: "Running", value: nodeLabel, tone: "info" as const };
+  }
+  if (activeNodeStatus === "waiting_for_user" || activeNodeStatus === "waiting_for_approval") {
+    return { label: "Waiting", value: nodeLabel, tone: "warning" as const };
+  }
+
+  return null;
+}
+
+function createTaskHighlights({ task, nodeLabel, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary }: {
   task: TaskData;
-  activeNodeId: string | null;
+  nodeLabel: string | null;
+  activeNodeStatus: string | null;
   blockReason: string | null;
+  reviewState: string | null;
   primaryAction: string;
   latestActivitySummary?: string | null;
 }) {
-  const highlights = [
+  const activeNodeHighlight = createActiveNodeHighlight({
+    nodeLabel,
+    activeNodeStatus,
+    executionState: task.executionSummary?.executionState,
+  });
+  const activityHighlight = latestActivitySummary
+    ? { label: "Activity", value: latestActivitySummary, tone: "neutral" as const }
+    : null;
+
+  return [
+    ...createAttentionHighlights(reviewState, blockReason),
+    activeNodeHighlight,
+    { label: "Next", value: primaryAction, tone: task.isRunnable ? "info" as const : "warning" as const },
     { label: "Task", value: task.title },
     { label: "State", value: task.status },
-    { label: "Active node", value: activeNodeId ?? "No active node" },
-    { label: "Blocker", value: blockReason ?? "None", tone: blockReason ? "warning" as const : "success" as const },
-    { label: "Primary action", value: primaryAction, tone: task.isRunnable ? "info" as const : "warning" as const },
-  ];
-
-  if (latestActivitySummary) {
-    highlights.unshift({ label: "Activity", value: latestActivitySummary, tone: "info" as const });
-  }
-
-  return highlights;
+    { label: "Active node", value: nodeLabel ?? "No active node" },
+    activityHighlight,
+  ].filter((item): item is TaskHighlight => Boolean(item));
 }
 
 function createTaskActions({ hasPlan, hasActiveNode, blockReason }: {
@@ -92,6 +138,9 @@ function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, 
   primaryAction: string;
   latestActivitySummary?: string | null;
 }): AiSidebarPageContextSummary {
+  const activeNodeTitle = getPlanNodeTitle(task, activeNodeId);
+  const nodeLabel = activeNodeTitle ?? activeNodeId;
+
   return {
     type: "task",
     fingerprint: createTaskFingerprint({ task, activeNodeId, activeNodeStatus, blockReason, reviewState }),
@@ -100,14 +149,26 @@ function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, 
     taskId: task.id,
     taskTitle: task.title,
     activeNodeId,
-    activeNodeTitle: activeNodeId,
+    activeNodeTitle: nodeLabel,
     nodeState: activeNodeStatus ?? task.status,
     blockReason,
     reviewState,
     primaryAction,
     capabilities: ["explain-blocker", "modify-plan", "retry-node", "add-step"],
-    highlights: createTaskHighlights({ task, activeNodeId, blockReason, primaryAction, latestActivitySummary }),
+    highlights: createTaskHighlights({ task, nodeLabel, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary }),
   };
+}
+
+function getTaskBlockReason(task: TaskData) {
+  return task.blockReason?.actionRequired ?? task.blockReason?.blockType ?? null;
+}
+
+function getTaskReviewState(task: TaskData) {
+  return task.executionSummary?.waiting?.reason ?? null;
+}
+
+function getTaskPrimaryAction(task: TaskData) {
+  return task.executionSummary?.primaryAction.label ?? (task.isRunnable ? "Continue task" : "Resolve runnability");
 }
 
 export function createTaskAiSidebarContext(task: TaskData, options: { latestActivitySummary?: string | null } = {}): {
@@ -115,9 +176,9 @@ export function createTaskAiSidebarContext(task: TaskData, options: { latestActi
   actions: AiSidebarQuickAction[];
 } {
   const activeNode = findActiveNode(task);
-  const blockReason = task.blockReason?.actionRequired ?? task.blockReason?.blockType ?? null;
-  const reviewState = task.executionSummary?.waiting ? "Review required" : null;
-  const primaryAction = task.isRunnable ? "Continue task" : "Resolve runnability";
+  const blockReason = getTaskBlockReason(task);
+  const reviewState = getTaskReviewState(task);
+  const primaryAction = getTaskPrimaryAction(task);
   const activeNodeId = activeNode?.id ?? null;
   const activeNodeStatus = activeNode?.status ?? null;
 

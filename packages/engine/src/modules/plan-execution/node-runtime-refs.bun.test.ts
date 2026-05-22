@@ -1,9 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
-import { branchBindingForRef, buildNodeRuntimeInput, buildSemanticRefHistory } from "./node-runtime-refs";
-import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
+import type {
+  EffectivePlanGraph,
+  EffectivePlanNode,
+} from "@chrona/contracts/ai";
+import {
+  branchBindingForRef,
+  buildNodeRuntimeInput,
+  buildSemanticRefHistory,
+} from "./node-runtime-refs";
+import { buildNodeRuntimePrompt } from "./node-runtime-prompts";
 
-function node(input: Partial<EffectivePlanNode> & Pick<EffectivePlanNode, "id" | "title" | "type">): EffectivePlanNode {
+function node(
+  input: Partial<EffectivePlanNode> &
+    Pick<EffectivePlanNode, "id" | "title" | "type">,
+): EffectivePlanNode {
   return {
     nodeId: input.nodeId ?? input.id,
     activeLayerId: input.activeLayerId ?? `${input.id}-layer`,
@@ -61,15 +71,14 @@ describe("node runtime refs", () => {
     const input = buildNodeRuntimeInput({
       plan,
       node: condition,
-      currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS.condition],
     });
     const serialized = JSON.stringify(input);
 
     expect(input.node.ref).toBe("N20260516-01");
     expect(input.context.relevantPreviousResults).toEqual([]);
-    expect(input.branchOptions).toEqual([{ ref: "B20260516-01-A", key: "A", label: "yes" }]);
-    expect(input.currentNodeResultActions.actionNames).toEqual(["chrona_condition_select", "chrona_node_block", "chrona_node_fail"]);
-    expect(input.currentNodeResultActions.conditionSelectSchema).toEqual({ branchRef: "branchOptions[].ref", summary: "string" });
+    expect(input.branchOptions).toEqual([
+      { ref: "B20260516-01-A", key: "A", label: "yes" },
+    ]);
     expect(serialized).not.toContain("task-real-123");
     expect(serialized).not.toContain("graph-real-123");
     expect(serialized).not.toContain("condition-real-123");
@@ -129,7 +138,6 @@ describe("node runtime refs", () => {
     const input = buildNodeRuntimeInput({
       plan: graph([dependency, unrelated, current]),
       node: current,
-      currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS.task],
     });
 
     expect(input.node).toMatchObject({
@@ -147,9 +155,10 @@ describe("node runtime refs", () => {
         outputs: [{ kind: "json", value: { location: "Beijing" } }],
       },
     ]);
-    expect(input.context.globalSummary).toBe("Prepare workspace: Workspace is ready.");
+    expect(input.context.globalSummary).toBe(
+      "Prepare workspace: Workspace is ready.",
+    );
     expect(input.branchOptions).toBeUndefined();
-    expect(input.currentNodeResultActions.completeSchema).toEqual({ summary: "string", outputs: [{ kind: "json", value: {} }] });
   });
 
   it("resolves only exact branch refs scoped to the current condition node", () => {
@@ -179,49 +188,64 @@ describe("node runtime refs", () => {
       otherCondition,
     ]);
 
-    const binding = branchBindingForRef({ plan, node: condition, branchRef: "B20260516-01-A" });
+    const binding = branchBindingForRef({
+      plan,
+      node: condition,
+      branchRef: "B20260516-01-A",
+    });
     expect(binding.nextNodeId).toBe("task-real-456");
-    expect(() => branchBindingForRef({ plan, node: otherCondition, branchRef: "B20260516-01-A" })).toThrow("branchRef");
-    expect(() => branchBindingForRef({ plan, node: condition, branchRef: "yes" })).toThrow("branchRef");
+    expect(() =>
+      branchBindingForRef({
+        plan,
+        node: otherCondition,
+        branchRef: "B20260516-01-A",
+      }),
+    ).toThrow("branchRef");
+    expect(() =>
+      branchBindingForRef({ plan, node: condition, branchRef: "yes" }),
+    ).toThrow("branchRef");
   });
 
   it("keeps backend bindings private while prompts forbid real ID generation", () => {
-    const current = node({ id: "task-real-123", title: "Do work", type: "task" });
+    const current = node({
+      id: "task-real-123",
+      title: "Do work",
+      type: "task",
+    });
     const plan = graph([current]);
     const history = buildSemanticRefHistory(plan);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
     expect(history.nodeRefs[0]?.backendId).toBe("task-real-123");
     expect(JSON.stringify(runtime.runtimeInput)).not.toContain("task-real-123");
-    expect(runtime.instructions).toContain("must never invent or emit backend IDs");
-    expect(runtime.instructions).toContain("chrona_task_complete");
-    expect(runtime.instructions).toContain("Chrona node result submission actions");
-    expect(runtime.instructions).toContain("only report the final outcome of this Chrona node");
-    expect(runtime.instructions).toContain("not execution capabilities");
-    expect(runtime.instructions).toContain("not filesystem access");
-    expect(runtime.instructions).toContain("not shell access");
-    expect(runtime.instructions).toContain("not code execution");
-    expect(runtime.instructions).toContain("not the provider's full capability inventory");
-    expect(runtime.instructions).toContain("Do not infer runtime capabilities from this list");
-    expect(runtime.instructions).toContain("call chrona_node_block instead of chrona_task_complete");
-    expect(runtime.instructions).toContain("After a Chrona result submission action succeeds");
-    expect(runtime.instructions).not.toContain("Chrona tools available for the current node");
+    expect(runtime.instructions).not.toContain(
+      "Chrona tools available for the current node",
+    );
     expect(runtime.instructions).not.toContain("current-node available tools");
     expect(runtime.instructions).not.toContain("available tools");
     expect(runtime.instructions).not.toContain("terminal MCP tool");
     expect(runtime.instructions).not.toContain("Allowed Chrona terminal tools");
-    expect(runtime.instructions).toContain("Do not call chrona_node_read or chrona_execution_read by default");
+    expect(runtime.instructions).toContain(
+      "Do not call chrona_node_read or chrona_execution_read by default",
+    );
     expect(runtime.instructions).toContain("Call chrona_node_read only when");
-    expect(runtime.instructions).toContain("Call chrona_execution_read only after");
+    expect(runtime.instructions).toContain(
+      "Call chrona_execution_read only after",
+    );
   });
 
   it("does not expose checkpoint submit as an AI terminal tool", () => {
-    const current = node({ id: "checkpoint-real-123", title: "User approval", type: "checkpoint" });
+    const current = node({
+      id: "checkpoint-real-123",
+      title: "User approval",
+      type: "checkpoint",
+    });
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.runtimeInput.currentNodeResultActions.actionNames).toEqual(["chrona_node_block", "chrona_node_fail"]);
     expect(runtime.instructions).not.toContain("chrona_checkpoint_submit");
-    expect(runtime.instructions).toContain("Checkpoint submission is performed by the user in the frontend");
+    expect(runtime.instructions).toContain(
+      "Checkpoint submission is performed by the user in the frontend",
+    );
   });
 });

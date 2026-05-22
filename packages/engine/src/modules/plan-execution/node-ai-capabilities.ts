@@ -8,7 +8,7 @@ import {
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker";
 import type { NodeExecutionResult } from "./node-executors/types";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
-import { buildNodeRuntimePrompt } from "./node-runtime-prompts";
+import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
@@ -186,7 +186,7 @@ export async function executeTaskNodeCapability(
         : "execute_task_node",
     instructions: runtime.instructions,
     inputText: JSON.stringify(runtime.runtimeInput, null, 2),
-    terminalToolName: runtime.runtimeInput.currentNodeResultActions.actionNames[0],
+    terminalToolName: NODE_RUNTIME_TERMINAL_TOOLS[input.node.type][0],
   };
 
   return runTaskNodeFeature({

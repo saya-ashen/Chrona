@@ -60,31 +60,6 @@ function matchesDependency(candidate: EffectivePlanNode, ids: Set<string>): bool
   return ids.has(candidate.id) || ids.has(candidate.nodeId) || ids.has(candidate.localId);
 }
 
-function currentNodeResultActionHints(actionNames: string[]): NodeRuntimeInput["currentNodeResultActions"] {
-  return {
-    actionNames,
-    ...(actionNames.includes("chrona_task_complete")
-      ? { completeSchema: { summary: "string", outputs: [{ kind: "json", value: {} }] } }
-      : {}),
-    ...(actionNames.includes("chrona_condition_select")
-      ? { conditionSelectSchema: { branchRef: "branchOptions[].ref", summary: "string" } }
-      : {}),
-    ...(actionNames.includes("chrona_node_block")
-      ? {
-          blockSchema: {
-            reason: "string",
-            actionForm: {
-              instructions: "string",
-              inputFields: [{ name: "string", label: "string" }],
-            },
-          },
-        }
-      : {}),
-    ...(actionNames.includes("chrona_node_fail") ? { failSchema: { error: "string" } } : {}),
-    ...(actionNames.includes("chrona_wait_complete") ? { waitCompleteSchema: { summary: "string" } } : {}),
-  };
-}
-
 function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["node"] {
   switch (node.type) {
     case "task": {
@@ -261,7 +236,6 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  currentNodeResultActionNames: string[];
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -279,6 +253,5 @@ export function buildNodeRuntimeInput(input: {
     node: runtimeNode(input.node, currentRef.ref),
     context: compactPreviousResults({ plan: input.plan, history, node: input.node }),
     branchOptions,
-    currentNodeResultActions: currentNodeResultActionHints(input.currentNodeResultActionNames),
   };
 }

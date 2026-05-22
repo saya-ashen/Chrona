@@ -95,19 +95,19 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
     };
   }
 
-  if (input.isBlocked) {
-    return {
-      label: "Blocked",
-      tone: workspaceStateToneByLabel.Blocked,
-      guidance: input.blockActionRequired ?? "Resolve the blocker before continuing execution.",
-    };
-  }
-
   if (input.currentNode?.status === "active" || input.currentNode?.status === "in_progress") {
     return {
       label: "Running",
       tone: workspaceStateToneByLabel.Running,
       guidance: input.currentNode.nextAction ?? "Monitor current execution progress.",
+    };
+  }
+
+  if (input.isBlocked) {
+    return {
+      label: "Blocked",
+      tone: workspaceStateToneByLabel.Blocked,
+      guidance: input.blockActionRequired ?? "Resolve the blocker before continuing execution.",
     };
   }
 

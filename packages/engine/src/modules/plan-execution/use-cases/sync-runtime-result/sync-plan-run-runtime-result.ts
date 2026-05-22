@@ -1,32 +1,19 @@
-import { db } from "@/lib/db";
 import { createGraphRuntime } from "@chrona/graph-runtime";
-import type {
-  EffectivePlanGraph,
-  ExecutionContextSnapshot,
-  NodeAttempt,
-  NodeResult,
-  PlanGraph,
-} from "@chrona/contracts/ai";
+import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
   EngineRuntimeContext,
   SyncPlanRunRuntimeResultInput,
 } from "../../types";
 import { ensurePlanMainSession } from "../../plan-state-store";
-import { getPlanRun } from "../../plan-run-store";
-import {
-  ensureNativePlanRun,
-  persistRuntimeState,
-} from "../../persistence/plan-runtime-store";
-import { appendGraphRuntimeEvents } from "../../persistence/runtime-event-store";
-import { markExecutionNodeActive } from "../../persistence/task-execution-store";
+import { ensureNativePlanRun } from "../../persistence/plan-runtime-store";
 import { getRuntimeName } from "../../persistence/task-runtime-store";
-import { currentNodeFromOutcome } from "../../projection/execution-graph-selectors";
+import { ensureExecutionSession } from "../../persistence/execution-session-store";
 import { toGraphExecutionState } from "../../runtime/graph-state";
-import { completeExecution } from "../execution-lifecycle";
+import { createExecutionGraphCallbacks } from "../../runtime/graph-runtime-callbacks";
+import { committedStateIfRunningNodeAdvanced } from "../../runtime/committed-state";
+import { handleAdvanceOutcome } from "../advance-outcome";
 import { runningAttemptForRuntimeRun } from "./attempts";
 import { externalResultForRuntimeRun } from "./external-result";
-import { markTaskCompleted } from "./mark-task-completed";
-import { pauseSyncedExecution } from "./pause-synced-execution";
 
 const DEFAULT_MAX_STEPS = 10;
 
@@ -49,17 +36,28 @@ export async function syncPlanRunRuntimeResult(
     planId: runtime.planId,
     runtimeName,
   });
-  const executionSession = await db.executionSession.findFirst({
-    where: { taskId: input.taskId, planId: runtime.planId },
-    orderBy: { updatedAt: "desc" },
+  const executionSession = await ensureExecutionSession({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    trigger: "system",
   });
   const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
     taskId: input.taskId,
     runtimeName,
     policies: { maxSteps: DEFAULT_MAX_STEPS },
-    callbacks: {
-      executeNode: async () => null,
-    },
+    callbacks: createExecutionGraphCallbacks({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      workspaceId: runtime.workspaceId,
+      compiledPlan: runtime.compiledPlan,
+      persisted: runtime.persisted,
+      runtimeName,
+      trigger: "system",
+      mainSession,
+      executionSession,
+      committedStateIfRunningNodeAdvanced,
+    }),
   });
   const context: EngineRuntimeContext = {
     taskId: input.taskId,
@@ -83,60 +81,11 @@ export async function syncPlanRunRuntimeResult(
     externalResult,
   });
 
-  await persistRuntimeState({
-    workspaceId: runtime.workspaceId,
+  await handleAdvanceOutcome({
     taskId: input.taskId,
-    planId: runtime.planId,
-    compiledPlan: runtime.compiledPlan,
-    graph: outcome.state.graph as unknown as PlanGraph,
-    attempts: outcome.state.attempts as unknown as NodeAttempt[],
-    results: outcome.state.results as unknown as NodeResult[],
-    executionContextSnapshots: outcome.state
-      .executionContextSnapshots as unknown as ExecutionContextSnapshot[],
-    existingRun: runtime.persisted.planRun,
-  });
-  await appendGraphRuntimeEvents({
-    taskId: input.taskId,
-    planId: runtime.planId,
-    sessionId: mainSession.id,
-    events: outcome.events,
-  });
-
-  if (outcome.status === "completed") {
-    if (executionSession) {
-      await completeExecution({
-        taskId: input.taskId,
-        planId: runtime.planId,
-        session: executionSession,
-        workspaceId: runtime.workspaceId,
-        compiledPlan: runtime.compiledPlan,
-        persisted: (await getPlanRun(input.taskId, runtime.planId)) ?? runtime.persisted,
-        mainSessionId: mainSession.id,
-        effective: outcome.effective as unknown as EffectivePlanGraph,
-        executedNodeIds: outcome.executedNodeIds,
-        message: outcome.message,
-      });
-      return;
-    }
-
-    await markTaskCompleted(input.taskId);
-    return;
-  }
-
-  if (outcome.status === "running") {
-    await markExecutionNodeActive({
-      taskId: input.taskId,
-      sessionId: executionSession?.id,
-      currentNodeId: currentNodeFromOutcome(outcome),
-      completedNodeIds: outcome.effective.completedNodeIds,
-    });
-    return;
-  }
-
-  await pauseSyncedExecution({
-    taskId: input.taskId,
-    attempt,
-    executionSessionId: executionSession?.id,
+    mainSessionId: mainSession.id,
+    runtime,
+    executionSession,
     outcome,
   });
 }

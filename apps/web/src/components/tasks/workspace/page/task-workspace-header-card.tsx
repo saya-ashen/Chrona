@@ -150,11 +150,6 @@ export function TaskWorkspaceHeaderCard({
             </Badge>
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-            {task.runnabilityState ? (
-              <Badge variant={task.isRunnable ? "secondary" : "secondary"}>
-                {task.runnabilitySummary}
-              </Badge>
-            ) : null}
             <span>
               {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
               {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}

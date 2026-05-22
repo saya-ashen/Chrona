@@ -17,7 +17,6 @@ import type { createTaskScheduleService } from "./task-schedule.service";
 import type { createTasksService } from "./tasks.service";
 import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
 import { buildNodeRuntimeInput, buildSemanticRefHistory, refForNode } from "@/modules/plan-execution/node-runtime-refs";
-import { NODE_RUNTIME_TERMINAL_TOOLS } from "@/modules/plan-execution/node-runtime-prompts";
 import {
   acceptedToolResult,
   duplicateOperationToolResult,
@@ -166,7 +165,6 @@ function readAiExecutionView(value: unknown) {
         ? buildNodeRuntimeInput({
             plan,
             node: currentNode,
-            currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS[currentNode.type]],
           }).node
         : null,
       readyNodeRefs: plan.readyNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
@@ -178,7 +176,6 @@ function readAiExecutionView(value: unknown) {
       const runtime = buildNodeRuntimeInput({
         plan,
         node,
-        currentNodeResultActionNames: [...NODE_RUNTIME_TERMINAL_TOOLS[node.type]],
       });
       return {
         ref: runtime.node.ref,
