@@ -385,6 +385,55 @@ describe("task workspace page synchronization", () => {
     expect(mocks.pageFetchCount).toBe(1);
   });
 
+  it("refreshes current execution when a workspace update exposes a checkpoint", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
+    const checkpoint = {
+      id: "checkpoint-1",
+      taskId: "task-1",
+      sessionId: "session-1",
+      planRunId: "run-1",
+      nodeId: "node-1",
+      kind: "user_input" as const,
+      title: "Input required",
+      message: "Provide missing details",
+      severity: "info" as const,
+      form: {
+        instructions: "Provide missing details",
+        inputFields: [{ name: "details", label: "Details", type: "text" as const, required: true }],
+      },
+      availableActions: [{ id: "submit_input" as const, label: "Submit input", style: "primary" as const, requiresPayload: true }],
+      createdAt: "2026-05-17T00:00:02.000Z",
+    };
+    const waitingPlan = planReadModel({ id: "plan-1", status: "running", title: "Waiting for user input" });
+    const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
+    mocks.pageResponses = [pageData({ taskStatus: "Running", plan: waitingPlan, runStatus: "Running" })];
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: waitingPlan },
+    ];
+    mocks.currentExecutionResponse = executionResult({
+      status: "waiting_for_user",
+      currentNodeId: "node-1",
+      waitingNodeIds: ["node-1"],
+      message: "Waiting for input",
+      checkpoint,
+    });
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
+    await act(async () => {
+      emitWorkspaceEvent(nextWorkspaceEvent({ type: "task_workspace_updated", reason: "plan_execution.node_waiting" }));
+    });
+
+    await waitFor(() => expect(result.current.plan.currentExecution?.checkpoint?.id).toBe(checkpoint.id));
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.checkpoint?.id).toBe(checkpoint.id));
+    expect(result.current.plan.graphPlan?.nodes[0]?.availableActions).toHaveLength(1);
+  });
+
   it("does not refresh the workspace page for plan-only progress events", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });

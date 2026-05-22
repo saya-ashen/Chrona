@@ -147,26 +147,6 @@ export interface NodeRuntimeInput {
     key: string;
     label: string;
   }>;
-  currentNodeResultActions: {
-    actionNames: string[];
-    completeSchema?: {
-      summary: "string";
-      outputs: Array<{ kind: "json"; value: Record<string, unknown> }>;
-    };
-    conditionSelectSchema?: {
-      branchRef: "branchOptions[].ref";
-      summary: "string";
-    };
-    blockSchema?: {
-      reason: "string";
-      actionForm: {
-        instructions: "string";
-        inputFields: Array<{ name: "string"; label: "string" }>;
-      };
-    };
-    failSchema?: { error: "string" };
-    waitCompleteSchema?: { summary: "string" };
-  };
 }
 
 export type ReviewOutcome = "accept" | "reject" | "request_changes";

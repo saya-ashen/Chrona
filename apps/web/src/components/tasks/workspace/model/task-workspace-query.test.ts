@@ -421,6 +421,29 @@ describe("task workspace execution console view model", () => {
     });
   });
 
+  it("does not let a stale task block reason hide a running current node", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Running",
+          blockReason: { blockType: "previous_block", actionRequired: "Old blocker" },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "prepare", status: "done" }),
+        node({ id: "execute", status: "in_progress", nextAction: "Watch the run" }),
+      ], "execute"),
+    });
+
+    expect(view.states.treatment).toMatchObject({
+      label: "Running",
+      tone: "info",
+      guidance: "Watch the run",
+    });
+    expect(view.header.status).toBe("running");
+  });
+
   it("covers shared fixture states for empty, blocked, review, completed, failed, idle, loading, artifact, stale, and permission-limited workspaces", () => {
     const empty = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
     const blocked = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.blocked);

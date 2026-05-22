@@ -94,6 +94,14 @@ function isFullRuntimeSseEvent(event: TaskWorkspaceSseEvent): event is Workspace
     && typeof event.provider === "string";
 }
 
+function shouldRefreshExecutionSnapshot(event: TaskWorkspaceSseEvent) {
+  return event.type === "execution.state.updated"
+    || event.type === "execution.result"
+    || event.type === "checkpoint.result"
+    || event.type === "task_workspace_updated"
+    || event.type === "task_projection_updated";
+}
+
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
   if (isGenerationRunning) {
     return "generating" as const;
@@ -376,12 +384,7 @@ export function useTaskWorkspacePlanState(
         }
       }
 
-      if (event.type === "execution.result" || event.type === "checkpoint.result") {
-        void currentExecutionQuery.refetch();
-        void planStateQuery.refetch();
-      }
-
-      if (event.type === "execution.state.updated") {
+      if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
         void planStateQuery.refetch();
       }

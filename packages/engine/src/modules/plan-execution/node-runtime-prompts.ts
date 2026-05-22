@@ -54,12 +54,11 @@ export function buildNodeRuntimePrompt(input: {
   const runtimeInput = buildNodeRuntimeInput({
     plan: input.plan,
     node: input.node,
-    currentNodeResultActionNames,
   });
   const instructions = [
     NODE_RUNTIME_PROTOCOL,
     nodeTypeInstructions(input.node),
-    `Chrona node result submission actions: ${currentNodeResultActionNames.join(", ")}. These actions only report the final outcome of this Chrona node back to Chrona. They are not execution capabilities, not filesystem access, not shell access, not browser access, not code execution, and not the provider's full capability inventory. Do not infer runtime capabilities from this list.`,
+    `When the node work is finished, report the result with one of these Chrona result-submission actions: ${currentNodeResultActionNames.join(", ")}. These actions only report the final outcome of this Chrona node back to Chrona.`,
     "Current Node Context JSON:",
     runtimeJson(runtimeInput),
   ].join("\n\n");

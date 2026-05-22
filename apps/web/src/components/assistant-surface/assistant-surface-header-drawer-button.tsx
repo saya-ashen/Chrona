@@ -6,12 +6,10 @@ import { useI18n } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 import { useAssistantSurface } from "./assistant-surface-provider";
 
-export function AssistantSurfaceTrigger() {
+export function AssistantSurfaceHeaderDrawerButton() {
   const { t } = useI18n();
   const assistant = useAssistantSurface();
-  const activitySummary = assistant.state.summaries.find((item) => item.label === "Activity");
-  const displaySummary = activitySummary ?? assistant.state.topSummary;
-  const summaryLabel = activitySummary ? t("components.assistantSurface.activity") : displaySummary.label;
+  const displaySummary = assistant.state.topSummary;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -28,7 +26,7 @@ export function AssistantSurfaceTrigger() {
   return (
     <button
       type="button"
-      data-assistant-surface-trigger="true"
+      data-assistant-surface-header-drawer-button="true"
       onClick={assistant.toggle}
       aria-expanded={assistant.isOpen}
       aria-haspopup="menu"
@@ -48,7 +46,7 @@ export function AssistantSurfaceTrigger() {
       </span>
       <span className="h-4 w-px bg-border/70" aria-hidden="true" />
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{summaryLabel}</span>
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{displaySummary.label}</span>
         <span className="min-w-0 max-w-[140px] truncate text-xs font-semibold text-primary sm:max-w-[260px] lg:max-w-[360px]">
           {displaySummary.value}
         </span>
