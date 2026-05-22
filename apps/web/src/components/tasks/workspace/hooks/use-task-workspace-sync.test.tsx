@@ -703,8 +703,8 @@ describe("task workspace page synchronization", () => {
       action: "start_manual",
       nodeId: "node-1",
       nodeTitle: "Launch plan",
-      runtimeName: "openclaw",
-      provider: "openclaw",
+      runtimeName: "hermes",
+      provider: "hermes",
       runId: "run-1",
       event: { type: "assistant_text_delta", text: "Running" },
     }));
@@ -746,8 +746,8 @@ describe("task workspace page synchronization", () => {
       action: "resume_with_input",
       nodeId: "node-1",
       nodeTitle: "Waiting for user input",
-      runtimeName: "openclaw",
-      provider: "openclaw",
+      runtimeName: "hermes",
+      provider: "hermes",
       runId: "run-1",
       event: { type: "assistant_text_delta", text: "Done" },
     }));

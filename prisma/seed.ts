@@ -11,6 +11,9 @@ import {
 } from "../packages/db/src/generated/prisma/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
+const DEMO_RUNTIME = "hermes";
+const DEMO_RUNTIME_REF_PREFIX = "hermes";
+
 const adapter = new PrismaBunSqlite({
   url: process.env.DATABASE_URL || "file:./prisma/dev.db",
 });
@@ -25,14 +28,14 @@ async function main() {
     update: {
       name: "Demo Workspace",
       description: "Seed data for the control-plane MVP",
-      defaultRuntime: "openclaw",
+      defaultRuntime: DEMO_RUNTIME,
       status: WorkspaceStatus.Active,
     },
     create: {
       id: "ws_demo",
       name: "Demo Workspace",
       description: "Seed data for the control-plane MVP",
-      defaultRuntime: "openclaw",
+      defaultRuntime: DEMO_RUNTIME,
       status: WorkspaceStatus.Active,
     },
   });
@@ -45,7 +48,7 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -55,7 +58,7 @@ async function main() {
       description: "Build the Task Projection pipeline",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -68,7 +71,7 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -78,7 +81,7 @@ async function main() {
       description: "Needs approval before applying file changes",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -92,7 +95,7 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -103,7 +106,7 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -117,7 +120,7 @@ async function main() {
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
       dueAt: null,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -127,7 +130,7 @@ async function main() {
       description: "Needs a planned slot before AI starts drafting.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -141,7 +144,7 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -152,7 +155,7 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      executionRuntime: "openclaw",
+      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -161,9 +164,9 @@ async function main() {
     where: { id: "run_projection" },
     update: {
       taskId: runningTask.id,
-      runtimeName: "openclaw",
-      runtimeRunRef: "oc_run_projection",
-      runtimeSessionRef: "oc_session_projection",
+      runtimeName: DEMO_RUNTIME,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_projection`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_projection`,
       status: RunStatus.Running,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:00:00.000Z"),
@@ -171,9 +174,9 @@ async function main() {
     create: {
       id: "run_projection",
       taskId: runningTask.id,
-      runtimeName: "openclaw",
-      runtimeRunRef: "oc_run_projection",
-      runtimeSessionRef: "oc_session_projection",
+      runtimeName: DEMO_RUNTIME,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_projection`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_projection`,
       status: RunStatus.Running,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:00:00.000Z"),
@@ -184,9 +187,9 @@ async function main() {
     where: { id: "run_adapter" },
     update: {
       taskId: blockedTask.id,
-      runtimeName: "openclaw",
-      runtimeRunRef: "oc_run_adapter",
-      runtimeSessionRef: "oc_session_adapter",
+      runtimeName: DEMO_RUNTIME,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_adapter`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_adapter`,
       status: RunStatus.WaitingForApproval,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:05:00.000Z"),
@@ -195,9 +198,9 @@ async function main() {
     create: {
       id: "run_adapter",
       taskId: blockedTask.id,
-      runtimeName: "openclaw",
-      runtimeRunRef: "oc_run_adapter",
-      runtimeSessionRef: "oc_session_adapter",
+      runtimeName: DEMO_RUNTIME,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_adapter`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_adapter`,
       status: RunStatus.WaitingForApproval,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:05:00.000Z"),
@@ -208,7 +211,7 @@ async function main() {
   await prisma.event.upsert({
     where: { dedupeKey: `run.started:${runningRun.id}` },
     update: {
-      payload: { runtime_name: "openclaw", runtime_run_ref: runningRun.runtimeRunRef },
+      payload: { runtime_name: DEMO_RUNTIME, runtime_run_ref: runningRun.runtimeRunRef },
     },
     create: {
       eventType: "run.started",
@@ -218,7 +221,7 @@ async function main() {
       actorType: "user",
       actorId: "seed-user",
       source: "seed",
-      payload: { runtime_name: "openclaw", runtime_run_ref: runningRun.runtimeRunRef },
+      payload: { runtime_name: DEMO_RUNTIME, runtime_run_ref: runningRun.runtimeRunRef },
       dedupeKey: `run.started:${runningRun.id}`,
       ingestSequence: 1,
     },
@@ -232,7 +235,7 @@ async function main() {
       runId: blockedRun.id,
       type: "file_change",
       title: "Approve adapter patch",
-      summary: "Apply OpenClaw mapping changes",
+      summary: "Apply provider mapping changes",
       riskLevel: "high",
       status: ApprovalStatus.Pending,
       requestedAt: new Date("2026-04-08T10:06:00.000Z"),
@@ -244,7 +247,7 @@ async function main() {
       runId: blockedRun.id,
       type: "file_change",
       title: "Approve adapter patch",
-      summary: "Apply OpenClaw mapping changes",
+      summary: "Apply provider mapping changes",
       riskLevel: "high",
       status: ApprovalStatus.Pending,
       requestedAt: new Date("2026-04-08T10:06:00.000Z"),

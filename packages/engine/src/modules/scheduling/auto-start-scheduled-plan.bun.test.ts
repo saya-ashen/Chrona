@@ -41,7 +41,7 @@ async function createWorkspace() {
     data: {
       name: "Auto Start Workspace",
       status: "Active",
-      defaultRuntime: "openclaw",
+      defaultRuntime: "hermes",
     },
   });
 }
@@ -65,7 +65,7 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
       status: "Ready",
       priority: "High",
       autoExecute: true,
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
       ...taskOverrides,
     },
@@ -247,7 +247,7 @@ describe("auto-start-scheduled-plan", () => {
     await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: "Running",
         triggeredBy: "user",
       },
@@ -279,7 +279,7 @@ describe("auto-start-scheduled-plan", () => {
     await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: "Running",
         triggeredBy: "user",
       },
@@ -407,7 +407,7 @@ describe("auto-start-scheduled-plan", () => {
       title: "Scheduled from create flow",
       priority: "High",
       autoExecute: true,
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
     });
 
@@ -458,7 +458,7 @@ describe("auto-start-scheduled-plan", () => {
         title: "No work block task",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });
@@ -477,7 +477,7 @@ describe("auto-start-scheduled-plan", () => {
         title: "Running task",
         status: "Running",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });

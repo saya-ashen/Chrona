@@ -35,8 +35,8 @@
 - [X] T013 [P] Add server assistant surface aggregation service scaffold using existing page projections/events in apps/server/src/services/assistant-surface.service.ts
 - [X] T014 [P] Add assistant surface route scaffold for state lookup and action requests in apps/server/src/routes/assistant-surface.routes.ts
 - [X] T015 Register assistant surface routes in apps/server/src/routes/api.ts
-- [X] T016 [P] Add web client helper for assistant surface state and action requests in apps/web/src/lib/assistant-surface-client.ts
-- [X] T017 [P] Add shared web proposal routing helper in apps/web/src/lib/assistant-proposal-routing.ts
+- [X] T016 [P] Add web client helper for assistant surface state and action requests
+- [X] T017 [P] Add shared web proposal routing helper
 - [X] T018 [P] Add assistant surface i18n message keys in apps/web/src/i18n/messages/en.json
 - [X] T019 [P] Add assistant surface i18n message keys in apps/web/src/i18n/messages/zh.json
 
@@ -97,7 +97,7 @@
 - [ ] T043 [US2] Implement Workbench/result AssistantSurfaceState aggregation from execution result signals in apps/server/src/services/assistant-surface.service.ts
 - [ ] T044 [US2] Implement assistant surface state lookup route and safe fallback responses in apps/server/src/routes/assistant-surface.routes.ts
 - [ ] T045 [US2] Implement assistant surface quick action request route returning informational result or proposal result envelope in apps/server/src/routes/assistant-surface.routes.ts
-- [ ] T046 [US2] Update web client helper to fetch server-provided AssistantSurfaceState and action results in apps/web/src/lib/assistant-surface-client.ts
+- [ ] T046 [US2] Update web client helper to fetch server-provided AssistantSurfaceState and action results
 - [ ] T047 [US2] Render server-provided quick actions, descriptions, severity, preview expectation, disabled reasons, and empty state in apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx
 - [ ] T048 [US2] Remove hardcoded quick-action derivation from Schedule AI sidebar adapter path in apps/web/src/components/schedule/adapters/schedule-ai-sidebar-adapter.ts
 - [ ] T049 [US2] Remove hardcoded quick-action derivation from Task AI sidebar adapter path in apps/web/src/components/tasks/workspace/adapters/task-ai-sidebar-adapter.ts
@@ -115,7 +115,7 @@
 
 ### Tests for User Story 3
 
-- [ ] T051 [P] [US3] Add proposal-routing unit tests for `schedule.timeline`, `task.config`, `task.graph`, and `workbench.result` routes in apps/web/src/lib/assistant-proposal-routing.test.ts
+- [ ] T051 [P] [US3] Add proposal-routing unit tests for `schedule.timeline`, `task.config`, `task.graph`, and `workbench.result` routes
 - [ ] T052 [P] [US3] Add server no-mutation-before-confirm tests for assistant action proposal results in apps/server/src/__tests__/api/assistant-surface-proposals.bun.test.ts
 - [ ] T053 [P] [US3] Add Schedule timeline proposal route and ghost preview tests in apps/web/src/components/schedule/schedule-page.test.tsx
 - [ ] T054 [P] [US3] Add Task config and graph proposal route tests in apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx
@@ -124,7 +124,7 @@
 
 ### Implementation for User Story 3
 
-- [X] T057 [US3] Implement proposal route creation and validation for all preview surfaces in apps/web/src/lib/assistant-proposal-routing.ts
+- [X] T057 [US3] Implement proposal route creation and validation for all preview surfaces
 - [X] T058 [US3] Render recent proposal entries as brief route links without complex diffs in apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx
 - [ ] T059 [US3] Route Schedule proposal results to timeline ghost preview mode and page-owned confirmation in apps/web/src/components/schedule/schedule-page.tsx
 - [ ] T060 [US3] Route Task configuration proposal results to task config preview mode and page-owned confirmation in apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx
@@ -220,7 +220,7 @@ Task: "T043 apps/server/src/services/assistant-surface.service.ts workbench aggr
 
 ```bash
 # Parallel route tests
-Task: "T051 apps/web/src/lib/assistant-proposal-routing.test.ts"
+Task: "T051 proposal-routing unit tests"
 Task: "T053 apps/web/src/components/schedule/schedule-page.test.tsx"
 Task: "T054 apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx"
 Task: "T055 apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx"

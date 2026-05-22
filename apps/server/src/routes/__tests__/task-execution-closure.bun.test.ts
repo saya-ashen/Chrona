@@ -73,7 +73,7 @@ describe("POST /api/tasks/:taskId/complete", () => {
     const run = await db.run.create({
       data: {
         taskId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run-done-ref",
         status: RunStatus.Completed,
         triggeredBy: "user",
@@ -139,7 +139,7 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     const run = await db.run.create({
       data: {
         taskId,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run-accept-ref",
         status: RunStatus.Completed,
         triggeredBy: "user",

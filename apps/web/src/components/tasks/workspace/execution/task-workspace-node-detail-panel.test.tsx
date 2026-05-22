@@ -83,7 +83,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       interactiveFields: [{ key: "checkpoint:decision", label: "Decision", value: "", control: "approval", required: true }],
       completionSummary: "Generated patch touches task workspace only.",
       resultOutputs: [{ kind: "text", content: "Patch summary" }],
-      resultEvidence: { runtimeName: "openclaw", runId: "run-1", artifactIds: ["artifact-1"] },
+      resultEvidence: { runtimeName: "hermes", runId: "run-1", artifactIds: ["artifact-1"] },
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
 
@@ -102,7 +102,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Evidence" }));
 
     expect(screen.getAllByText("Evidence").length).toBeGreaterThan(0);
-    expect(screen.getByText(/runtime=openclaw/)).toBeInTheDocument();
+    expect(screen.getByText(/runtime=hermes/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 

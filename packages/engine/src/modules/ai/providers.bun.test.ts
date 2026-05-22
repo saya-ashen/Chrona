@@ -27,14 +27,14 @@ describe("AI provider availability", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("uses legacy OpenClaw baseUrl as gateway URL", async () => {
+  it("uses legacy Hermes baseUrl as gateway URL", async () => {
     const fetchMock = mock((..._args: Parameters<typeof fetch>) =>
       Promise.resolve(new Response(null, { status: 200 })),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await testAiClientAvailability({
-      type: "openclaw",
+      type: "hermes",
       config: { baseUrl: "127.0.0.1:8642", bridgeToken: "" },
     });
 

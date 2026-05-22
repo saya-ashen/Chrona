@@ -89,7 +89,7 @@ describe("ConditionNodeExecutor", () => {
       node: condition,
       plan,
       trigger: "manual",
-      runtimeName: "openclaw",
+      runtimeName: "hermes",
     });
 
     expect(result.status).toBe("waiting_for_user");
@@ -153,7 +153,7 @@ describe("ConditionNodeExecutor", () => {
       node: condition,
       plan: makePlan([condition, yesNode, noNode]),
       trigger: "manual",
-      runtimeName: "openclaw",
+      runtimeName: "hermes",
       userInput: "是",
     });
 

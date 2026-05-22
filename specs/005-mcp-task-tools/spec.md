@@ -3,7 +3,7 @@
 **Feature Branch**: `005-mcp-task-tools`  
 **Created**: 2026-05-14  
 **Status**: Draft  
-**Input**: User description: "Redesign Chrona agent integration and task execution so Chrona exposes task, plan, schedule, and execution operations as MCP tools. Agents should call Chrona tools to create, modify, and advance internal state; Chrona tools own business logic and return trusted structured results. Agent-generated structured JSON must not remain the main path because backend capabilities vary across OpenClaw, Hermes, Claude Code, OpenCode, and similar agents."
+**Input**: User description: "Redesign Chrona agent integration and task execution so Chrona exposes task, plan, schedule, and execution operations as MCP tools. Agents should call Chrona tools to create, modify, and advance internal state; Chrona tools own business logic and return trusted structured results. Agent-generated structured JSON must not remain the main path because backend capabilities vary across Hermes, Hermes, Claude Code, OpenCode, and similar agents."
 
 ## User Scenarios & Testing *(mandatory)*
 

@@ -164,7 +164,7 @@ description: "Task list for Improve Workspace UX implementation"
 - [X] T057 [US4] Confirm workspace action handlers and disabled/enabled semantics are preserved in apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts
 - [X] T058 [US4] Confirm assistant workspace access remains available after layout changes in apps/web/src/components/tasks/workspace/assistant/task-ai-workspace-panel.tsx
 - [X] T059 [US4] Confirm edit section and schedule-related workspace content remain available in apps/web/src/components/tasks/workspace/sections/task-workspace-edit-section.tsx
-- [X] T060 [US4] Confirm workspace navigation controls remain available in apps/web/src/components/tasks/workspace/execution/task-workspace-navigation.tsx
+- [X] T060 [US4] Confirm workspace navigation controls remain available
 - [X] T061 [US4] Check browser console, page errors, and network requests on the representative route and record diagnostics in specs/007-improve-workspace-ux/browser-evidence.md
 
 **Checkpoint**: Existing product behavior is preserved after UX changes.

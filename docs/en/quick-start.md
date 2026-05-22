@@ -85,10 +85,10 @@ Example configuration:
 }
 ```
 
-### Option B: OpenClaw Gateway
+### Option B: Hermes Gateway
 
 For dedicated agent execution. You need:
-- A running OpenClaw gateway (default: `http://localhost:18789`)
+- A running Hermes gateway (default: `http://localhost:18789`)
 - A gateway token
 
 Test connectivity from the Settings page after configuring.

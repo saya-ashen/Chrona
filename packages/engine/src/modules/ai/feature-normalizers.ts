@@ -23,7 +23,7 @@ function ensureObject(
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new AiClientError(
       `${context} must be an object`,
-      "openclaw",
+      "hermes",
       "invalid_response",
     );
   }
@@ -59,7 +59,7 @@ export async function chat(
   client: EngineAiClient,
   request: ChatRequest,
 ): Promise<ChatResponse> {
-  if (client.record.type === "openclaw") {
+  if (client.record.type === "hermes") {
     if (request.jsonMode) {
       const content = await dispatch(client, "chat", request, "chat");
       return {

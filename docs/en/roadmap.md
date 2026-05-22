@@ -67,7 +67,7 @@ The long-term goal: make the schedule not just a passive calendar, but the **con
 | Capability | Status |
 |-----------|--------|
 | Bare LLM backend for lightweight planning/execution | 📋 Planned |
-| OpenClaw bridge for agent-style execution | 🚧 In progress |
+| Hermes bridge for agent-style execution | 🚧 In progress |
 | Hermes provider for deeper agent/tool orchestration | 📋 Planned |
 | Opencode provider for agent runtime | 📋 Planned |
 | Runtime adapter interface (`RuntimeExecutionAdapter`) | 🚧 In progress |
@@ -78,7 +78,7 @@ The long-term goal: make the schedule not just a passive calendar, but the **con
 
 > Focus: make Chrona the "action destination" for AI agents. When an agent identifies work during a conversation, it can push it into Chrona's execution pipeline.
 
-Chrona will expose an MCP (Model Context Protocol) tool or Skill that external agents (OpenClaw, Claude, etc.) can call to create tasks, generate plans, and schedule work programmatically. This turns every AI conversation into a potential source of structured, executable tasks.
+Chrona will expose an MCP (Model Context Protocol) tool or Skill that external agents (Hermes, Claude, etc.) can call to create tasks, generate plans, and schedule work programmatically. This turns every AI conversation into a potential source of structured, executable tasks.
 
 | Capability | Status |
 |-----------|--------|
@@ -86,7 +86,7 @@ Chrona will expose an MCP (Model Context Protocol) tool or Skill that external a
 | MCP tool: generate plan for a new or existing task | 📋 Planned |
 | Agent proactively asks user: "Should I schedule this in Chrona?" | 📋 Planned |
 | Auto-create tasks from external sources (email, notes, etc.) via agent parsing | 📋 Planned |
-| Chrona as a registerable Skill for OpenClaw and compatible runtimes | 📋 Planned |
+| Chrona as a registerable Skill for Hermes and compatible runtimes | 📋 Planned |
 
 **Key use cases:**
 

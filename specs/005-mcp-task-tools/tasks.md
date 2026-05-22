@@ -14,7 +14,7 @@
 - [X] T001 Audit existing task, plan, schedule, and execution service entry points in `packages/engine/src/services/tasks.service.ts`, `packages/engine/src/services/task-plan.service.ts`, `packages/engine/src/services/task-schedule.service.ts`, and `packages/engine/src/services/task-execution.service.ts`
 - [X] T002 [P] Audit existing shared operation schemas in `packages/contracts/src/api/tasks.schema.ts`, `packages/contracts/src/api/plans.schema.ts`, and `packages/contracts/src/api/execution.schema.ts`
 - [X] T003 [P] Audit existing Hono task routes in `apps/server/src/routes/tasks/crud.routes.ts`, `apps/server/src/routes/tasks/plan.routes.ts`, `apps/server/src/routes/tasks/schedule.routes.ts`, and `apps/server/src/routes/tasks/execution.routes.ts`
-- [X] T004 [P] Audit provider tool-call trace behavior in `packages/providers/openclaw/src/gateway.ts` and `packages/providers/openclaw/src/OpenClawClient.ts`
+- [X] T004 [P] Audit provider tool-call trace behavior in `packages/providers/hermes/src/gateway.ts` and `packages/providers/hermes/src/HermesClient.ts`
 
 ---
 
@@ -98,14 +98,14 @@
 
 ### Tests for User Story 3
 
-- [X] T034 [P] [US3] Add provider compatibility tests for tool-call traces that preserve evidence without applying state in `packages/providers/openclaw/src/gateway.bun.test.ts`
+- [X] T034 [P] [US3] Add provider compatibility tests for tool-call traces that preserve evidence without applying state in `packages/providers/hermes/src/gateway.bun.test.ts`
 - [X] T035 [P] [US3] Add API regression tests for absent, malformed, and conflicting final structured output after accepted tool calls in `apps/server/src/__tests__/api/plan-execution-output.bun.test.ts`
 - [X] T036 [P] [US3] Add engine tests proving session evidence cannot override `ChronaToolResult` state in `packages/engine/src/services/agent-tool-operations.service.bun.test.ts`
 
 ### Implementation for User Story 3
 
 - [X] T037 [US3] Add evidence classification for provider text, tool calls, tool outputs, and optional structured output in `packages/engine/src/services/agent-tool-operations.service.ts`
-- [X] T038 [US3] Keep OpenClaw tool-call parsing as evidence-only by mapping Chrona tool call traces without applying lifecycle state in `packages/providers/openclaw/src/gateway.ts`
+- [X] T038 [US3] Keep Hermes tool-call parsing as evidence-only by mapping Chrona tool call traces without applying lifecycle state in `packages/providers/hermes/src/gateway.ts`
 - [X] T039 [US3] Update structured-output sync behavior so final provider JSON cannot override accepted Chrona tool results in `packages/engine/src/services/task-execution.service.ts`
 - [X] T040 [US3] Preserve structured output display/diagnostic compatibility in `apps/server/src/__tests__/api/plan-execution-output.bun.test.ts`
 
@@ -181,7 +181,7 @@ Task: "T027 [P] [US2] Add unauthorized and invalid-transition API tests in apps/
 ## Parallel Example: User Story 3
 
 ```bash
-Task: "T034 [P] [US3] Add provider compatibility tests in packages/providers/openclaw/src/gateway.bun.test.ts"
+Task: "T034 [P] [US3] Add provider compatibility tests in packages/providers/hermes/src/gateway.bun.test.ts"
 Task: "T035 [P] [US3] Add API regression tests in apps/server/src/__tests__/api/plan-execution-output.bun.test.ts"
 Task: "T036 [P] [US3] Add engine evidence tests in packages/engine/src/services/agent-tool-operations.service.bun.test.ts"
 ```

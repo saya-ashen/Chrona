@@ -57,7 +57,7 @@ bun run lint && bun run typecheck && bun run test
 - **运行时同步（runtime-sync）** — 计划节点状态同步、父子计划一致性
 - **AI 模块** — 计划生成、冲突检测、时间槽建议、自动化建议
 
-这类测试手写 adapter 对象实现 `OpenClawAdapter` 接口来模拟 AI 运行时，不使用 mocking 框架。
+这类测试手写 adapter 对象实现 `HermesAdapter` 接口来模拟 AI 运行时，不使用 mocking 框架。
 
 ### 3. API 工作流测试（Bun Test — `apps/server/src/__tests__/api/`）
 
@@ -93,12 +93,12 @@ App (Hono)
 
 ### 4. 桥接合约测试（Bun Test — `apps/server/src/__tests__/bridge/`）
 
-验证 OpenClaw Bridge 的 HTTP 合约，不依赖真实网关：
+验证 Hermes Bridge 的 HTTP 合约，不依赖真实网关：
 
 | 测试文件 | 覆盖内容 |
 |----------|----------|
-| `openclaw-bridge-contract.bun.test.ts` | 健康检查、feature 路由（generate-plan 工具约束/function_call 解析/结构化结果）、execution 路由（无工具约束/输出/SSE 流）、错误处理（401/500/超时/畸形 JSON/缺失字段/token 不泄露） |
-| `openclaw-live-smoke.bun.test.ts` | **默认跳过**。当设置 `CHRONA_LIVE_OPENCLAW_TESTS=1` 时，向真实网关发请求，验证 bridge 健康状态和 plan 结构化结果 schema |
+| `hermes-bridge-contract.bun.test.ts` | 健康检查、feature 路由（generate-plan 工具约束/function_call 解析/结构化结果）、execution 路由（无工具约束/输出/SSE 流）、错误处理（401/500/超时/畸形 JSON/缺失字段/token 不泄露） |
+| `hermes-live-smoke.bun.test.ts` | **默认跳过**。当设置 `CHRONA_LIVE_HERMES_TESTS=1` 时，向真实网关发请求，验证 bridge 健康状态和 plan 结构化结果 schema |
 
 桥接测试使用 `createBridgeApp(options)` 工厂函数，注入 mock 的 `executeRequest` 来模拟网关响应，通过 `app.request()` 验证请求体构造、响应解析、错误传播。
 
@@ -127,15 +127,15 @@ Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun r
 | `expectTaskExists(taskId)` | 断言任务存在于数据库 |
 | `expectTaskNotFound(taskId)` | 断言任务不存在于数据库 |
 | `expectPlanState(taskId, expected)` | 断言计划状态（`idle` / `waiting_acceptance` / `accepted`） |
-| `runLiveOpenClaw` | 布尔标志，当 `CHRONA_LIVE_OPENCLAW_TESTS=1` 时为 `true` |
+| `runLiveHermes` | 布尔标志，当 `CHRONA_LIVE_HERMES_TESTS=1` 时为 `true` |
 
 ## Mock 策略
 
 ### 后端测试
 - **不使用 mocking 框架**（无 `vi.mock` / `jest.mock`）
-- 手写 adapter 对象实现 `OpenClawAdapter` 接口模拟 AI 运行时
+- 手写 adapter 对象实现 `HermesAdapter` 接口模拟 AI 运行时
 - 桥接测试用 mock `executeRequest` 函数替代 `globalThis.fetch`
-- `OPENCLAW_MODE=mock` 环境变量激活 fixture-based mock adapter（从 JSON 文件加载预设响应）
+- `HERMES_MODE=mock` 环境变量激活 fixture-based mock adapter（从 JSON 文件加载预设响应）
 
 ### 前端测试
 - `vi.mock(path, factory)` — stub 组件、hooks、工具模块
@@ -146,14 +146,14 @@ Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun r
 
 | 变量 | 作用 |
 |------|------|
-| `OPENCLAW_MODE=mock` | 激活 mock AI 适配器（CI 环境） |
-| `CHRONA_LIVE_OPENCLAW_TESTS=1` | 启用 OpenClaw 真实网关冒烟测试 |
+| `HERMES_MODE=mock` | 激活 mock AI 适配器（CI 环境） |
+| `CHRONA_LIVE_HERMES_TESTS=1` | 启用 Hermes 真实网关冒烟测试 |
 | `DATABASE_URL` | SQLite 数据库路径（测试自动使用临时路径） |
 
 ## CI 策略
 
 - **CI 默认运行**：所有单元测试 + API 工作流测试 + 桥接合约测试（不需要真实网络）
-- **CI 不运行**：OpenClaw 真实网关冒烟测试（需 `CHRONA_LIVE_OPENCLAW_TESTS=1`）
+- **CI 不运行**：Hermes 真实网关冒烟测试（需 `CHRONA_LIVE_HERMES_TESTS=1`）
 - **CI 不运行**：Playwright E2E 浏览器测试（需另配 Chromium 环境）
 
 ## 编写新测试
@@ -166,9 +166,9 @@ Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun r
 4. 调用业务命令函数（`createTask`、`updateTask` 等），不直接操作 Prisma
 5. 通过 `app.request()` 发请求，做状态断言
 
-### OpenClaw Provider 测试
+### Hermes Provider 测试
 
-1. 在 `packages/providers/openclaw/src/` 下靠近实现放置 `*.bun.test.ts`
+1. 在 `packages/providers/hermes/src/` 下靠近实现放置 `*.bun.test.ts`
 2. 优先测试 `transport/`、`execution/`、`features/` 这些 provider 内部子层
 3. 对外部 gateway 调用使用 mock `fetch`
 4. 验证请求体构造、响应解析、错误传播与会话语义

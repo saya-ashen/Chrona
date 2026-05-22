@@ -185,8 +185,8 @@ describe("AI Client CRUD", () => {
   // Happy path
   // ──────────────────────────────────────────────
 
-  it("POST /ai/clients creates openclaw client and returns 201", async () => {
-    const res = await createClient({ name: "My OpenClaw", type: "openclaw" });
+  it("POST /ai/clients creates hermes client and returns 201", async () => {
+    const res = await createClient({ name: "My Hermes", type: "hermes" });
 
     expect(res.status).toBe(201);
     const body = await json<{
@@ -198,8 +198,8 @@ describe("AI Client CRUD", () => {
         enabled: boolean;
       };
     }>(res);
-    expect(body.client.name).toBe("My OpenClaw");
-    expect(body.client.type).toBe("openclaw");
+    expect(body.client.name).toBe("My Hermes");
+    expect(body.client.type).toBe("hermes");
     expect(body.client.isDefault).toBe(false);
     expect(body.client.enabled).toBe(true);
   });
@@ -226,7 +226,7 @@ describe("AI Client CRUD", () => {
   });
 
   it("POST /ai/clients with isDefault=true unsets other defaults", async () => {
-    await createClient({ name: "Client A", type: "openclaw", isDefault: true });
+    await createClient({ name: "Client A", type: "hermes", isDefault: true });
     await createClient({ name: "Client B", type: "llm", isDefault: true });
 
     const listRes = await app().request("http://local/api/ai/clients");
@@ -241,7 +241,7 @@ describe("AI Client CRUD", () => {
   });
 
   it("GET /ai/clients lists all clients with bindings", async () => {
-    await createClient({ name: "Client A", type: "openclaw" });
+    await createClient({ name: "Client A", type: "hermes" });
     await createClient({ name: "Client B", type: "llm" });
 
     const res = await app().request("http://local/api/ai/clients");
@@ -254,7 +254,7 @@ describe("AI Client CRUD", () => {
   });
 
   it("PATCH /ai/clients/:id updates name and config", async () => {
-    const createRes = await createClient({ name: "Old", type: "openclaw" });
+    const createRes = await createClient({ name: "Old", type: "hermes" });
     const created = await json<{ client: { id: string } }>(createRes);
 
     const res = await app().request(
@@ -275,7 +275,7 @@ describe("AI Client CRUD", () => {
   });
 
   it("PATCH /ai/clients/:id updates client type", async () => {
-    const createRes = await createClient({ name: "Runtime", type: "openclaw" });
+    const createRes = await createClient({ name: "Runtime", type: "hermes" });
     const created = await json<{ client: { id: string } }>(createRes);
 
     const res = await app().request(
@@ -301,7 +301,7 @@ describe("AI Client CRUD", () => {
   it("PATCH /ai/clients/:id sets enabled=false", async () => {
     const createRes = await createClient({
       name: "Toggle Me",
-      type: "openclaw",
+      type: "hermes",
     });
     const created = await json<{ client: { id: string } }>(createRes);
 
@@ -322,7 +322,7 @@ describe("AI Client CRUD", () => {
   it("PATCH /ai/clients/:id sets isDefault=true and unsets others", async () => {
     const _aRes = await createClient({
       name: "A",
-      type: "openclaw",
+      type: "hermes",
       isDefault: true,
     });
     const bRes = await createClient({ name: "B", type: "llm" });
@@ -346,7 +346,7 @@ describe("AI Client CRUD", () => {
   it("DELETE /ai/clients/:id removes client", async () => {
     const createRes = await createClient({
       name: "Delete Me",
-      type: "openclaw",
+      type: "hermes",
     });
     const created = await json<{ client: { id: string } }>(createRes);
 
@@ -365,7 +365,7 @@ describe("AI Client CRUD", () => {
   // ──────────────────────────────────────────────
 
   it("POST /ai/clients missing name returns 400", async () => {
-    const res = await createClient({ type: "openclaw" });
+    const res = await createClient({ type: "hermes" });
     expect(res.status).toBe(400);
   });
 
@@ -402,7 +402,7 @@ describe("AI Client CRUD", () => {
   it("POST /ai/clients config as string returns 400 with field info", async () => {
     const res = await createClient({
       name: "Bad Config",
-      type: "openclaw",
+      type: "hermes",
       config: "not-an-object",
     });
     expect(res.status).toBe(400);

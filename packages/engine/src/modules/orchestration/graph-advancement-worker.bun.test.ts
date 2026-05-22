@@ -16,7 +16,7 @@ describe("runGraphAdvancementWorker", () => {
 
   it("starts queued tasks without active runs and records advancement", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Advance Worker", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Advance Worker", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -24,7 +24,7 @@ describe("runGraphAdvancementWorker", () => {
         title: "Advance task",
         status: "Queued",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });

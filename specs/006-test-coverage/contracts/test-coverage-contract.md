@@ -43,7 +43,7 @@ This contract defines the expected coverage, scenario groups, and diagnostic obl
 - Ready nodes do not run before prerequisites complete.
 - Blocked and waiting nodes are clearly marked.
 - Invalid graphs are rejected or contained safely.
-- Supported checkpoint flows never emit `OpenClaw did not return review_checkpoint_node_result`.
+- Supported checkpoint flows never emit `Hermes did not return review_checkpoint_node_result`.
 - Repeated runs on the same revision produce consistent pass/fail results.
 
 ## Recovery And Regression

@@ -17,8 +17,7 @@ English | [中文](./README.zh.md)
   <a href="#vision">Vision</a> ·
   <a href="#available-today">Available Today</a> ·
   <a href="#being-built">Being Built</a> ·
-  <a href="#backend-ecosystem">Backend Ecosystem</a> ·
-  <a href="#openclaw">OpenClaw</a>
+  <a href="#backend-ecosystem">Backend Ecosystem</a>
 </p>
 
 <p align="center">
@@ -302,10 +301,10 @@ Its goal is to become the control layer above multiple AI execution backends.
 
 Chrona currently supports:
 
-| Backend           | Status    | Description                                         |
-| ----------------- | --------- | --------------------------------------------------- |
-| OpenAI-compatible | Supported | Works with OpenAI-compatible APIs                   |
-| OpenClaw          | Supported | Connects Chrona to agent workflows through OpenClaw |
+| Backend           | Status    | Description                        |
+| ----------------- | --------- | ---------------------------------- |
+| OpenAI-compatible | Supported | Works with OpenAI-compatible APIs  |
+| Hermes            | Supported | Connects Chrona to agent workflows |
 
 ### Planned Support
 
@@ -316,7 +315,7 @@ Chrona plans to integrate with more AI coding and agent backends:
 | Claude Code | Planned | Connect to Claude Code workflows             |
 | Codex       | Planned | Connect to Codex-style code execution        |
 | opencode    | Planned | Connect to open-source coding agent runtimes |
-| Hermes      | Planned | Connect to Hermes agent/backend capabilities |
+| More providers | Planned | Connect to additional agent runtimes |
 
 Chrona’s long-term goal is not to become the UI for a single backend.
 
@@ -333,7 +332,7 @@ You can think of Chrona as:
                      │
      ┌───────────────┼────────────────┐
      │               │                │
-OpenClaw      Claude Code          Codex
+Hermes        Claude Code          Codex
      │               │                │
   opencode        Hermes            ...
 ```
@@ -372,76 +371,6 @@ API Key
 Model
 ```
 
-### OpenClaw
-
-Chrona also supports OpenClaw as a backend.
-
-OpenClaw is especially useful as an agent workflow backend and is an important
-part of Chrona’s Execution Layer direction.
-
----
-
-## OpenClaw
-
-Before using OpenClaw with Chrona, make sure the OpenClaw Responses endpoint is
-enabled.
-
-Add the following to your OpenClaw configuration:
-
-```json
-{
-  "gateway": {
-    "http": {
-      "endpoints": {
-        "responses": {
-          "enabled": true
-        }
-      }
-    }
-  }
-}
-```
-
-Then open Chrona and go to:
-
-```text
-Settings → AI Clients
-```
-
-Add or enable the OpenClaw backend.
-
-### Why Responses?
-
-Chrona uses OpenClaw’s Responses capability to communicate with the backend.
-
-If this endpoint is not enabled, Chrona may be able to connect to OpenClaw but
-fail to use the related AI capabilities correctly.
-
-### Future Assisted Setup
-
-Chrona may provide automatic detection and assisted configuration in a future
-release:
-
-```bash
-chrona openclaw doctor
-chrona openclaw setup
-```
-
-Target experience:
-
-```text
-✓ OpenClaw binary found
-✓ Gateway reachable
-✗ Responses endpoint disabled
-
-Run `chrona openclaw setup` to enable it.
-```
-
-`setup` can write the required configuration after user confirmation and back up
-the original config file.
-
----
-
 ## Why Chrona?
 
 AI tools are getting stronger, but workflows are still fragmented.
@@ -478,7 +407,7 @@ It is a control system for AI-native workflows.
 - [x] Generate plans
 - [x] Modify plans with AI
 - [x] OpenAI-compatible backend
-- [x] OpenClaw backend
+- [x] Provider bridge backend
 
 ### Execution Layer
 
@@ -493,11 +422,10 @@ It is a control system for AI-native workflows.
 ### Backend Ecosystem
 
 - [x] OpenAI-compatible
-- [x] OpenClaw
+- [x] Hermes
 - [ ] Claude Code
 - [ ] Codex
 - [ ] opencode
-- [ ] Hermes
 - [ ] More agent runtimes
 
 ---

@@ -3119,13 +3119,6 @@ export type EnumScheduleProposalStatusFieldRefInput<$PrismaModel> = FieldRefInpu
 
 
 /**
- * Reference to a field of type 'AiClientType'
- */
-export type EnumAiClientTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AiClientType'>
-    
-
-
-/**
  * Reference to a field of type 'WorkBlockStatus'
  */
 export type EnumWorkBlockStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkBlockStatus'>

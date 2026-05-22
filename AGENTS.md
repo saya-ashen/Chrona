@@ -10,7 +10,7 @@ patterns.
 - **Database:** SQLite via Prisma 7 with `prisma-adapter-bun-sqlite` (Bun-only
   runtime)
 - **Language:** TypeScript strict everywhere
-- **AI runtime:** OpenClaw via structured-result bridge
+- **AI runtime:** Provider bridge via structured-result contracts
 
 # context-mode — MANDATORY routing rules
 

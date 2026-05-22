@@ -13,8 +13,6 @@
       "@chrona/runtime-core": ["../../packages/runtime-core/src/index.ts"],
       "@chrona/i18n/*": ["../../packages/i18n/src/*"],
       "@chrona/i18n": ["../../packages/i18n/src/locale.ts"],
-      "@chrona/openclaw/*": ["../../packages/providers/openclaw/src/*"],
-      "@chrona/openclaw": ["../../packages/providers/openclaw/src/index.ts"],
       "@chrona/graph-runtime/*": ["../../packages/graph-runtime/src/*"],
       "@chrona/graph-runtime": ["../../packages/graph-runtime/src/index.ts"],
       "@chrona/shared/*": ["../../packages/shared/src/*"],

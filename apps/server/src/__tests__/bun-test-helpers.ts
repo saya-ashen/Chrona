@@ -6,7 +6,7 @@ import { db } from "@chrona/db";
 // Live smoke flag — skip live tests by default
 // ---------------------------------------------------------------------------
 
-export const runLiveOpenClaw = process.env.CHRONA_LIVE_OPENCLAW_TESTS === "1";
+export const runLiveHermes = process.env.CHRONA_LIVE_HERMES_TESTS === "1";
 
 // ---------------------------------------------------------------------------
 // Database reset
@@ -42,7 +42,7 @@ export interface SeedWorkspaceResult {
 
 export async function seedWorkspace(name?: string): Promise<SeedWorkspaceResult> {
   const workspace = await db.workspace.create({
-    data: { name: name ?? "Test Workspace", status: "Active", defaultRuntime: "openclaw" },
+    data: { name: name ?? "Test Workspace", status: "Active", defaultRuntime: "hermes" },
   });
   return { workspaceId: workspace.id };
 }
@@ -67,7 +67,7 @@ export async function seedTask(workspaceId: string, overrides?: {
       priority: (overrides?.priority ?? "Medium") as any,
       parentTaskId: overrides?.parentTaskId ?? null,
       dueAt: overrides?.dueAt ?? null,
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

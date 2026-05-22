@@ -2,7 +2,7 @@
  * @chrona/runtime-core
  *
  * Canonical runtime contracts and config-spec helpers.
- * Backend-agnostic: no OpenClaw protocol, no transport, no orchestration.
+ * Backend-agnostic: no Hermes protocol, no transport, no orchestration.
  */
 
 export type {

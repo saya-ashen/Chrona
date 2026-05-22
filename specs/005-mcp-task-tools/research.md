@@ -6,7 +6,7 @@
 
 **Alternatives considered**:
 
-- Keep parsing final structured JSON from agent responses. Rejected because provider capabilities differ across OpenClaw, Hermes, Claude Code, OpenCode, and similar agents, and the spec requires final JSON to stop being the main lifecycle path.
+- Keep parsing final structured JSON from agent responses. Rejected because provider capabilities differ across Hermes, Hermes, Claude Code, OpenCode, and similar agents, and the spec requires final JSON to stop being the main lifecycle path.
 - Build a parallel MCP-specific task execution engine. Rejected because it would duplicate business logic and risk divergence from human-driven flows.
 - Let provider adapters apply state changes directly. Rejected because provider packages should remain transport/evidence-specific and must not own Chrona lifecycle authority.
 
@@ -21,7 +21,7 @@
 
 ## Decision: Tool Results Are Authoritative, Provider Output Is Evidence
 
-**Rationale**: OpenClaw provider code currently parses function calls and function outputs for traces, while prior structured-output paths exist for provider/session compatibility. The new trust boundary requires accepted Chrona tool results to be the source of state truth. Provider text, malformed JSON, or optional structured output can still be recorded as `AgentSessionEvidence` for debugging and history.
+**Rationale**: Hermes provider code currently parses function calls and function outputs for traces, while prior structured-output paths exist for provider/session compatibility. The new trust boundary requires accepted Chrona tool results to be the source of state truth. Provider text, malformed JSON, or optional structured output can still be recorded as `AgentSessionEvidence` for debugging and history.
 
 **Alternatives considered**:
 

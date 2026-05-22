@@ -3,7 +3,7 @@
 **Feature Branch**: `006-test-coverage`  
 **Created**: 2026-05-15  
 **Status**: Draft  
-**Input**: User description: "现在当前的Chrona应用已经可以初步运行了，实现了基本的生成plan到执行任务的功能。但是仍然有很多问题，例如还是存在旧实现导致的错误“OpenClaw did not return review_checkpoint_node_result“，或者界面展示上的问题，所以现在我想让你帮我编写完整的测试代码，主要测试两方面，一个是功能方面，就是现在Chrona的功能是否正常，面对复杂的plan graph的时候会不会出错；另一方面是界面上的问题，就是当前的设计是否有问题，是否方便使用或者布局有没有问题。"
+**Input**: User description: "现在当前的Chrona应用已经可以初步运行了，实现了基本的生成plan到执行任务的功能。但是仍然有很多问题，例如还是存在旧实现导致的错误“Hermes did not return review_checkpoint_node_result“，或者界面展示上的问题，所以现在我想让你帮我编写完整的测试代码，主要测试两方面，一个是功能方面，就是现在Chrona的功能是否正常，面对复杂的plan graph的时候会不会出错；另一方面是界面上的问题，就是当前的设计是否有问题，是否方便使用或者布局有没有问题。"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -34,7 +34,7 @@ A maintainer can test Chrona with complex plan graphs that include branching, de
 **Acceptance Scenarios**:
 
 1. **Given** a plan graph with multiple dependent branches, **When** execution starts, **Then** Chrona only advances work whose prerequisites are satisfied and clearly marks blocked or waiting nodes.
-2. **Given** a graph includes review checkpoints, **When** execution reaches a checkpoint, **Then** Chrona handles the checkpoint result without producing the legacy error "OpenClaw did not return review_checkpoint_node_result".
+2. **Given** a graph includes review checkpoints, **When** execution reaches a checkpoint, **Then** Chrona handles the checkpoint result without producing the legacy error "Hermes did not return review_checkpoint_node_result".
 3. **Given** a graph node fails or produces incomplete output, **When** Chrona evaluates the graph, **Then** the affected node and dependent nodes move to safe states without corrupting unrelated graph progress.
 4. **Given** a graph has many nodes or nested dependencies, **When** tests exercise the full graph, **Then** Chrona remains responsive and produces deterministic, explainable execution results.
 
@@ -74,7 +74,7 @@ A developer or product reviewer can run interface-focused tests that identify vi
 
 - **FR-001**: Chrona MUST have automated tests covering the complete primary flow from task creation through plan generation, execution progress, and terminal task outcome.
 - **FR-002**: Tests MUST verify that task, plan, graph, checkpoint, execution, and final result states remain internally consistent after each major workflow step.
-- **FR-003**: Tests MUST include regression coverage for the legacy failure message "OpenClaw did not return review_checkpoint_node_result" and fail if that error appears in supported checkpoint scenarios.
+- **FR-003**: Tests MUST include regression coverage for the legacy failure message "Hermes did not return review_checkpoint_node_result" and fail if that error appears in supported checkpoint scenarios.
 - **FR-004**: Tests MUST cover complex plan graphs with branching dependencies, sequential dependencies, checkpoint nodes, retryable nodes, failure paths, and blocked paths.
 - **FR-005**: Tests MUST verify that invalid or unsafe plan graphs are rejected or contained with clear failure states rather than causing silent corruption, undefined progress, or unusable UI states.
 - **FR-006**: Tests MUST verify execution recovery behavior for interrupted, retried, or partially completed task runs.

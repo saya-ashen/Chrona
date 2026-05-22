@@ -1,5 +1,4 @@
 import { HermesProviderClient } from "@chrona/hermes";
-import { checkGatewayAvailable, normalizeGatewayHttpUrl } from "@chrona/openclaw";
 import type {
   ProviderRunInput,
   ProviderRunSnapshot,
@@ -8,20 +7,15 @@ import type {
 import type {
   AiClientRecord,
   AiFeature,
+  AgentProviderClientConfig,
   HermesClientConfig,
-  OpenClawClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
   StructuredDebugInfo,
 } from "@chrona/contracts";
-import {
-  AiClientError,
-  OPENCLAW_DEFAULT_MODEL,
-  validatePreparedFeaturePayload,
-} from "@chrona/contracts";
-import type { OpenClawGatewayRequest } from "@chrona/openclaw";
+import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
-import { aiClientRegistry, getOpenClawGatewayUrl } from "./runtime/client-registry";
+import { aiClientRegistry } from "./runtime/client-registry";
 import { CHRONA_DEBUG_PROVIDER_URL, isChronaDebugProviderConfig } from "./runtime/debug-provider-client";
 
 const HERMES_API_SERVER_DOCS_URL =
@@ -67,28 +61,6 @@ async function checkClientHealth(
   client: AiClientRecord,
 ): Promise<{ available: boolean; reason: string }> {
   try {
-    if (client.type === "openclaw") {
-      const config = client.config as OpenClawClientConfig;
-      if (isChronaDebugProviderConfig(config)) {
-        return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
-      }
-
-      const gatewayUrl = getOpenClawGatewayUrl(config);
-      if (!gatewayUrl) {
-        return { available: false, reason: "Gateway URL is required" };
-      }
-
-      const healthy = await checkGatewayAvailable({
-        gatewayHttpUrl: normalizeGatewayHttpUrl(gatewayUrl),
-        gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
-        agentId: "main",
-        model: config.model?.trim() || OPENCLAW_DEFAULT_MODEL,
-      });
-      return healthy
-        ? { available: true, reason: "Gateway is reachable" }
-        : { available: false, reason: "Gateway health check failed" };
-    }
-
     if (client.type === "llm") {
       const config = client.config as LLMClientConfig;
       if (typeof config.baseUrl !== "string" || !config.baseUrl) {
@@ -146,7 +118,15 @@ async function checkClientHealth(
       };
     }
 
-    return { available: false, reason: `Unknown client type: ${client.type}` };
+    const config = client.config as AgentProviderClientConfig;
+    if (isChronaDebugProviderConfig(config)) {
+      return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
+    }
+
+    return {
+      available: false,
+      reason: `Provider availability check is not configured for ${client.type}`,
+    };
   } catch (error) {
     return {
       available: false,
@@ -198,19 +178,30 @@ export function extractJSON(text: string): Record<string, unknown> | null {
   return null;
 }
 
-async function openclawFeaturePayload(
+export type ProviderFeatureRequest = {
+  sessionId: string;
+  sessionKey: string;
+  instructions: string;
+  input: unknown;
+  structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
+  stream: boolean;
+  maxOutputTokens?: number;
+  timeoutSeconds?: number;
+};
+
+async function providerFeaturePayload(
   client: EngineAiClient,
-  request: OpenClawGatewayRequest,
+  request: ProviderFeatureRequest,
 ): Promise<string> {
-  const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
-  const result = await runOpenClawRequest(openClawClient, request);
+  const providerClient = aiClientRegistry.requireProviderClient(client).providerClient;
+  const result = await runProviderRequest(providerClient, request);
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
   }
   return result.outputText ?? "";
 }
 
-function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
+function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
   return {
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
@@ -225,9 +216,9 @@ function toStartRunInput(request: OpenClawGatewayRequest): StartRunInput {
   };
 }
 
-async function runOpenClawRequest(
+async function runProviderRequest(
   providerClient: NonNullable<EngineAiClient["providerClient"]>,
-  request: OpenClawGatewayRequest,
+  request: ProviderFeatureRequest,
 ): Promise<ProviderRunSnapshot> {
   let finalSnapshot: ProviderRunSnapshot | null = null;
   for await (const event of providerClient.streamRun({
@@ -262,8 +253,8 @@ async function runOpenClawRequest(
   }
   if (!finalSnapshot) {
     throw new AiClientError(
-      "OpenClaw run finished without a provider snapshot",
-      "openclaw",
+      "Provider run finished without a provider snapshot",
+      providerClient.provider,
       "invalid_response",
     );
   }
@@ -322,11 +313,11 @@ async function llmFeaturePayload(
   return json.choices?.[0]?.message?.content ?? "";
 }
 
-export async function openclawCall(
+export async function providerCall(
   client: EngineAiClient,
-  request: OpenClawGatewayRequest,
+  request: ProviderFeatureRequest,
 ): Promise<string> {
-  return openclawFeaturePayload(client, request);
+  return providerFeaturePayload(client, request);
 }
 
 export async function llmCall(
@@ -364,7 +355,7 @@ export function buildPreparedFeatureRequest(input: unknown): {
   };
 }
 
-export function buildOpenClawFeatureGatewayRequest(input: {
+export function buildProviderFeatureRequest(input: {
   sessionKey: string;
   input: unknown;
   instructions?: string;
@@ -372,7 +363,7 @@ export function buildOpenClawFeatureGatewayRequest(input: {
   timeoutSeconds?: number;
   stream: boolean;
   maxOutputTokens?: number;
-}): OpenClawGatewayRequest {
+}): ProviderFeatureRequest {
   const fallbackInstructions =
     input.instructions ??
     (typeof input.input === "string" ? input.input : JSON.stringify(input.input));
@@ -399,14 +390,14 @@ type FeaturePayloadResult<T> = {
   debug?: StructuredDebugInfo;
 };
 
-async function openclawFeaturePayloadFull<T>(
+async function providerFeaturePayloadFull<T>(
   client: EngineAiClient,
   feature: AiFeature,
-  request: OpenClawGatewayRequest,
+  request: ProviderFeatureRequest,
   featureSpec?: PreparedAiFeatureSpec,
 ): Promise<FeaturePayloadResult<T>> {
-  const openClawClient = aiClientRegistry.requireOpenClawClient(client).providerClient;
-  const result = await runOpenClawRequest(openClawClient, request);
+  const providerClient = aiClientRegistry.requireProviderClient(client).providerClient;
+  const result = await runProviderRequest(providerClient, request);
 
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
@@ -483,9 +474,9 @@ export async function dispatch(
   input: unknown,
   scope = "default",
 ): Promise<string> {
-  if (client.record.type === "openclaw") {
-    return openclawFeaturePayload(client, {
-      ...buildOpenClawFeatureGatewayRequest({
+  if (client.providerClient) {
+    return providerFeaturePayload(client, {
+      ...buildProviderFeatureRequest({
         sessionKey: scope,
         instructions: `Feature: ${feature}`,
         input,
@@ -509,9 +500,9 @@ export async function dispatchFeaturePayload<T = unknown>(
   input: unknown,
   scope = "default",
 ): Promise<FeaturePayloadResult<T>> {
-  if (client.record.type === "openclaw") {
-    return openclawFeaturePayloadFull<T>(client, feature, {
-      ...buildOpenClawFeatureGatewayRequest({
+  if (client.providerClient) {
+    return providerFeaturePayloadFull<T>(client, feature, {
+      ...buildProviderFeatureRequest({
         sessionKey: scope,
         instructions: `Feature: ${feature}`,
         input,

@@ -18,7 +18,7 @@
 
 ## Decision: Treat Checkpoint Error As Regression Evidence
 
-**Decision**: Add explicit regression scenarios that fail if `OpenClaw did not return review_checkpoint_node_result` appears during supported checkpoint flows.
+**Decision**: Add explicit regression scenarios that fail if `Hermes did not return review_checkpoint_node_result` appears during supported checkpoint flows.
 
 **Rationale**: The user named this legacy error as an active concern. Tests should make the error impossible to reintroduce silently and should capture whether it appears in logs, result payloads, visible UI, or failed execution state.
 

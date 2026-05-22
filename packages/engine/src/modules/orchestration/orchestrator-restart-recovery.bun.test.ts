@@ -18,7 +18,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("removes expired leases and records recovery scans", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Recovery Worker", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Recovery Worker", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -26,7 +26,7 @@ describe("runRestartRecoveryWorker", () => {
         title: "Recovery task",
         status: "Running",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -44,7 +44,7 @@ describe("runRestartRecoveryWorker", () => {
     await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "runtime_degraded",
         status: "Running",
         triggeredBy: "scheduler",
@@ -66,7 +66,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("skips recovery records whose task was deleted", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Orphaned Recovery Worker", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Orphaned Recovery Worker", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -74,7 +74,7 @@ describe("runRestartRecoveryWorker", () => {
         title: "Deleted recovery task",
         status: "Running",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -84,7 +84,7 @@ describe("runRestartRecoveryWorker", () => {
     await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "runtime_degraded",
         status: "Running",
         triggeredBy: "scheduler",

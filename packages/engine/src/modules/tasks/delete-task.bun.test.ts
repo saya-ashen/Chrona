@@ -41,13 +41,13 @@ describe("deleteTask", () => {
 
   it("deletes execution and orchestration records for the task tree", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Delete Task", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Delete Task", status: "Active", defaultRuntime: "hermes" },
     });
     const parent = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Parent",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Running",
         priority: "Medium",
@@ -58,7 +58,7 @@ describe("deleteTask", () => {
         workspaceId: workspace.id,
         parentTaskId: parent.id,
         title: "Child",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
         status: "Running",
         priority: "Medium",
@@ -67,14 +67,14 @@ describe("deleteTask", () => {
     const run = await db.run.create({
       data: {
         taskId: child.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         runtimeRunRef: "run_child",
         status: "Running",
         triggeredBy: "user",
       },
     });
     await db.runtimeCursor.create({
-      data: { runId: run.id, runtimeName: "openclaw" },
+      data: { runId: run.id, runtimeName: "hermes" },
     });
     await db.conversationEntry.create({
       data: { runId: run.id, role: "assistant", content: "hello", sequence: 1 },

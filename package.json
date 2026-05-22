@@ -25,8 +25,7 @@
     "task-management",
     "cqrs",
     "event-sourcing",
-    "vite",
-    "openclaw"
+    "vite"
   ],
   "packageManager": "bun@1.3.11",
   "engines": {
@@ -55,7 +54,6 @@
     "test:web": "vitest run --coverage",
     "test:watch": "vitest",
     "test:api": "bun run scripts/run-api-tests.ts",
-    "test:bridge": "bun test packages/providers/openclaw/src/transport/",
     "test:bun": "bun run scripts/run-bun-tests.ts",
     "test:e2e": "playwright test",
     "demo:readme-gif": "bun scripts/demo/readme-gif.ts",
@@ -65,7 +63,6 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "setup": "bun run db:generate && bun run db:seed",
-    "probe:openclaw": "bun scripts/openclaw/probe.ts",
     "install:hermes-plugin": "bash external-plugins/hermes/install.sh",
     "cli:build": "bun build packages/cli/src/index.ts packages/cli/src/bun-entry.ts packages/cli/src/npm-launcher.ts --outdir=packages/cli/dist --target=bun --tsconfig-override=tsconfig.json",
     "prepublishOnly": "bun run typecheck && bun run lint && bun run test && bun run test:bun && bun run test:api && bun run deadcode && bun run check:ui-foundation && bun run check:boundaries && bun run build && bun run build:npm",

@@ -90,7 +90,7 @@ describe("generateTaskPlanForTask", () => {
 
   it("generates and saves a draft plan from persisted task fields", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Plan Command", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Plan Command", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -99,7 +99,7 @@ describe("generateTaskPlanForTask", () => {
         description: "Updated description from DB",
         status: "Ready",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -160,7 +160,7 @@ describe("generateTaskPlanForTask", () => {
 
   it("stores regeneration user instruction on the generated plan", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Plan Instruction", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Plan Instruction", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -168,7 +168,7 @@ describe("generateTaskPlanForTask", () => {
         title: "Instruction task",
         status: "Ready",
         priority: "High",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -189,7 +189,7 @@ describe("generateTaskPlanForTask", () => {
 
   it("always regenerates plans through the manual stream", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Cached Plan", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Cached Plan", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -197,7 +197,7 @@ describe("generateTaskPlanForTask", () => {
         title: "Cached title",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -221,7 +221,7 @@ describe("generateTaskPlanForTask", () => {
     }));
 
     const workspace = await db.workspace.create({
-      data: { name: "Invalid Plan", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Invalid Plan", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -229,7 +229,7 @@ describe("generateTaskPlanForTask", () => {
         title: "Broken planner output",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -274,7 +274,7 @@ describe("generateTaskPlanForTask", () => {
     }));
 
     const workspace = await db.workspace.create({
-      data: { name: "Enriched Plan", status: "Active", defaultRuntime: "openclaw" },
+      data: { name: "Enriched Plan", status: "Active", defaultRuntime: "hermes" },
     });
     const task = await db.task.create({
       data: {
@@ -282,7 +282,7 @@ describe("generateTaskPlanForTask", () => {
         title: "Enriched test task",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

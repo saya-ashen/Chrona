@@ -26,8 +26,8 @@
 
 ## Decision 4: Treat provider abstraction as partially complete
 
-- **Decision**: Document the runtime adapter contracts in `packages/common/runtime-core/src/contracts.ts` and `packages/runtime/src/modules/task-execution/registry.ts` as the intended provider boundary, while explicitly calling out remaining OpenClaw coupling in route helpers and plan execution paths.
-- **Rationale**: The codebase already has an adapter registry and runtime contracts, but `apps/server/src/routes/helpers.ts` and parts of execution still call OpenClaw-specific code directly.
+- **Decision**: Document the runtime adapter contracts in `packages/common/runtime-core/src/contracts.ts` and `packages/runtime/src/modules/task-execution/registry.ts` as the intended provider boundary, while explicitly calling out remaining Hermes coupling in route helpers and plan execution paths.
+- **Rationale**: The codebase already has an adapter registry and runtime contracts, but `apps/server/src/routes/helpers.ts` and parts of execution still call Hermes-specific code directly.
 - **Alternatives considered**:
   - Describe the system as already backend-neutral. Rejected because that would hide concrete migration work.
   - Treat provider isolation as absent. Rejected because the current abstraction layer is meaningful and should be built on rather than replaced.

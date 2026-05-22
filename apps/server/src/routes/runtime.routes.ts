@@ -5,7 +5,6 @@ import { json } from "../lib/http";
 
 function getRuntimeLabel(key: string) {
   if (key === "hermes") return "Hermes";
-  if (key === "openclaw") return "OpenClaw";
   return key;
 }
 

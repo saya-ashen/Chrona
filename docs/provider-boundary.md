@@ -80,9 +80,9 @@ The following logic belongs in `packages/engine` instead:
 - approval strategy
 - task and plan lifecycle transitions
 
-## OpenClaw-Specific Notes
+## Hermes-Specific Notes
 
-OpenClaw is allowed to expose OpenClaw-native concepts such as:
+Hermes is allowed to expose Hermes-native concepts such as:
 
 - session key
 - response id
@@ -91,7 +91,7 @@ OpenClaw is allowed to expose OpenClaw-native concepts such as:
 - history entries
 - tool calls
 
-OpenClaw is not allowed to expose Chrona-specific business concepts such as:
+Hermes is not allowed to expose Chrona-specific business concepts such as:
 
 - task execution
 - plan progression
@@ -102,7 +102,7 @@ OpenClaw is not allowed to expose Chrona-specific business concepts such as:
 Near-term target:
 
 1. foundation exposes only provider-neutral contracts
-2. OpenClaw adapter exposes only session/request/response/status primitives
+2. Hermes adapter exposes only session/request/response/status primitives
 3. engine owns orchestration and business state transitions
 
 This boundary intentionally breaks old abstractions that mixed provider access

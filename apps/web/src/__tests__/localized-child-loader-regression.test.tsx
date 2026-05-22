@@ -36,7 +36,7 @@ const bootData: AppBootData = {
   } as unknown) as AppBootData["dictionary"],
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
   schedule: hydrateSchedulePageData(({
-    defaultExecutionRuntime: "openclaw",
+    defaultExecutionRuntime: "hermes",
     executionRuntimes: [],
     summary: {
       scheduledCount: 0,

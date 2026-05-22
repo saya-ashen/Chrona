@@ -21,8 +21,6 @@
       "@chrona/engine": ["../../packages/engine/src/index.ts"],
       "@chrona/db/*": ["../../packages/db/src/*"],
       "@chrona/db": ["../../packages/db/src/index.ts"],
-      "@chrona/openclaw/*": ["../../packages/providers/openclaw/src/*"],
-      "@chrona/openclaw": ["../../packages/providers/openclaw/src/index.ts"],
       "@chrona/providers-foundation/*": ["../../packages/providers/foundation/src/*"],
       "@chrona/providers-foundation": ["../../packages/providers/foundation/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],

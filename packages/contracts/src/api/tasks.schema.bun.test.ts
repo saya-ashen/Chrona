@@ -9,7 +9,7 @@ import {
 
 describe("task API schemas", () => {
   it("validates executionRuntime against a supplied supported runtime list", () => {
-    const schema = createTaskBodySchemaForSupportedRuntimes(["openclaw", "local"]);
+    const schema = createTaskBodySchemaForSupportedRuntimes(["hermes", "local"]);
 
     expect(
       schema.parse({
@@ -25,7 +25,7 @@ describe("task API schemas", () => {
         title: "Use unknown runtime",
         executionRuntime: "research",
       }),
-    ).toThrow("Unsupported executionRuntime. Supported runtimes: openclaw, local");
+    ).toThrow("Unsupported executionRuntime. Supported runtimes: hermes, local");
   });
 
   it("keeps the reusable contract schema provider-agnostic", () => {
@@ -47,13 +47,13 @@ describe("task API schemas", () => {
   });
 
   it("validates update executionRuntime against the supplied runtime list", () => {
-    const schema = updateTaskBodySchemaForSupportedRuntimes(["openclaw"]);
+    const schema = updateTaskBodySchemaForSupportedRuntimes(["hermes"]);
 
-    expect(schema.parse({ executionRuntime: "openclaw" })).toMatchObject({
-      executionRuntime: "openclaw",
+    expect(schema.parse({ executionRuntime: "hermes" })).toMatchObject({
+      executionRuntime: "hermes",
     });
     expect(() => schema.parse({ executionRuntime: "local" })).toThrow(
-      "Unsupported executionRuntime. Supported runtimes: openclaw",
+      "Unsupported executionRuntime. Supported runtimes: hermes",
     );
   });
 
@@ -63,7 +63,7 @@ describe("task API schemas", () => {
       title: "Validate task flow contract",
       description: "Create, plan, execute, and observe terminal task state.",
       priority: "High",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { mode: "test" },
       parentTaskId: null,
     });
@@ -73,7 +73,7 @@ describe("task API schemas", () => {
       title: "Validate task flow contract",
       description: "Create, plan, execute, and observe terminal task state.",
       priority: "High",
-      executionRuntime: "openclaw",
+      executionRuntime: "hermes",
       executionConfig: { mode: "test" },
       parentTaskId: null,
     });

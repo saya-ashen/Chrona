@@ -37,7 +37,7 @@ describe("getDefaultWorkspace", () => {
       data: {
         id: "ws_only",
         name: "Only Workspace",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
       },
     });
@@ -56,7 +56,7 @@ describe("getDefaultWorkspace", () => {
       data: {
         id: "ws_later",
         name: "Later Workspace",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
         createdAt: new Date("2026-04-09T10:00:00.000Z"),
       },
@@ -66,7 +66,7 @@ describe("getDefaultWorkspace", () => {
       data: {
         id: "ws_earlier",
         name: "Earlier Workspace",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
         createdAt: new Date("2026-04-09T09:00:00.000Z"),
       },

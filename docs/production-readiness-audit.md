@@ -92,7 +92,7 @@ Option 3: set `CHRONA_UNSAFE_PUBLIC_BIND=1` only for explicitly unsafe local/dem
 
 Evidence: `apps/server/src/routes/ai/clients.routes.ts` returns `config: client.config` from `GET /api/ai/clients`.
 
-The stored config can include provider secrets such as OpenClaw bridge tokens or Hermes API keys.
+The stored config can include provider secrets such as Hermes bridge tokens or Hermes API keys.
 
 Impact: any user or browser session with API access can read configured AI backend credentials. This is a production security blocker.
 

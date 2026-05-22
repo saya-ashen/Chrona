@@ -43,7 +43,7 @@ describe("getWorkPage", () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work Query",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
       },
     });
@@ -54,7 +54,7 @@ describe("getWorkPage", () => {
         title: "Execution surface",
         status: TaskStatus.Blocked,
         priority: TaskPriority.High,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -62,7 +62,7 @@ describe("getWorkPage", () => {
     const run = await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: RunStatus.WaitingForApproval,
         triggeredBy: "user",
       },
@@ -118,7 +118,7 @@ describe("getWorkPage", () => {
         workspaceId: workspace.id,
         eventType: "approval.requested",
         actorType: "runtime",
-        actorId: "openclaw",
+        actorId: "hermes",
         source: "runtime",
         dedupeKey: `approval.requested:${task.id}`,
         payload: { command: "edit files", scope: "repo" },
@@ -176,7 +176,7 @@ describe("getWorkPage", () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work Plan",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
       },
     });
@@ -187,7 +187,7 @@ describe("getWorkPage", () => {
         title: "Prepare task plan",
         status: TaskStatus.WaitingForInput,
         priority: TaskPriority.High,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -195,7 +195,7 @@ describe("getWorkPage", () => {
     const run = await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: RunStatus.WaitingForApproval,
         triggeredBy: "user",
       },
@@ -361,7 +361,7 @@ describe("getWorkPage", () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work History",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
       },
     });
@@ -372,7 +372,7 @@ describe("getWorkPage", () => {
         title: "Show full conversation history",
         status: TaskStatus.Running,
         priority: TaskPriority.High,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -380,7 +380,7 @@ describe("getWorkPage", () => {
     const olderRun = await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: RunStatus.Completed,
         triggeredBy: "user",
         createdAt: new Date("2026-04-19T09:00:00.000Z"),
@@ -389,7 +389,7 @@ describe("getWorkPage", () => {
     const latestRun = await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: RunStatus.Running,
         triggeredBy: "user",
         createdAt: new Date("2026-04-20T09:00:00.000Z"),
@@ -441,7 +441,7 @@ describe("getWorkPage", () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Work Closure",
-        defaultRuntime: "openclaw",
+        defaultRuntime: "hermes",
         status: WorkspaceStatus.Active,
       },
     });
@@ -452,7 +452,7 @@ describe("getWorkPage", () => {
         title: "Close the loop",
         status: TaskStatus.Completed,
         priority: TaskPriority.High,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -460,7 +460,7 @@ describe("getWorkPage", () => {
     const run = await db.run.create({
       data: {
         taskId: task.id,
-        runtimeName: "openclaw",
+        runtimeName: "hermes",
         status: RunStatus.Completed,
         triggeredBy: "user",
         startedAt: new Date("2026-04-08T10:00:00.000Z"),
@@ -482,7 +482,7 @@ describe("getWorkPage", () => {
           runId: run.id,
           eventType: "run.completed",
           actorType: "runtime",
-          actorId: "openclaw",
+          actorId: "hermes",
           source: "runtime",
           dedupeKey: `run.completed:${run.id}`,
           payload: { outcome: "success" },
@@ -510,7 +510,7 @@ describe("getWorkPage", () => {
         title: "Follow up the loop",
         status: TaskStatus.Draft,
         priority: TaskPriority.Medium,
-        executionRuntime: "openclaw",
+        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

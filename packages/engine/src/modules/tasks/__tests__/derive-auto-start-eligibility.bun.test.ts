@@ -9,7 +9,7 @@ import {
 function makeTask(overrides: Partial<TaskLike> = {}): TaskLike {
   return {
     status: "Ready",
-    executionRuntime: "openclaw",
+    executionRuntime: "hermes",
     ...overrides,
   };
 }

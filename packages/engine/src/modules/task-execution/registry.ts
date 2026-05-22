@@ -1,32 +1,27 @@
-import {
-  OPENCLAW_EXECUTION_RUNTIME,
-  getOpenClawTaskConfigSpec,
-  validateOpenClawTaskConfig,
-} from "@chrona/openclaw";
 import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
   RuntimeTaskConfigSpec,
 } from "@chrona/runtime-core";
+import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
+
+const HERMES_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
+  runtime: HERMES_EXECUTION_RUNTIME,
+  version: "1",
+  fields: [],
+  runnability: { requiredPaths: [] },
+};
 
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
   [
     HERMES_EXECUTION_RUNTIME,
     {
       key: HERMES_EXECUTION_RUNTIME,
-      inputVersion: getOpenClawTaskConfigSpec().version,
-      getTaskConfigSpec: getOpenClawTaskConfigSpec,
-      validateTaskConfig: validateOpenClawTaskConfig,
-    },
-  ],
-  [
-    OPENCLAW_EXECUTION_RUNTIME,
-    {
-      key: OPENCLAW_EXECUTION_RUNTIME,
-      inputVersion: getOpenClawTaskConfigSpec().version,
-      getTaskConfigSpec: getOpenClawTaskConfigSpec,
-      validateTaskConfig: validateOpenClawTaskConfig,
+      inputVersion: HERMES_TASK_CONFIG_SPEC.version,
+      getTaskConfigSpec: () => HERMES_TASK_CONFIG_SPEC,
+      validateTaskConfig: (input: unknown) =>
+        validateTaskConfigAgainstSpec(HERMES_TASK_CONFIG_SPEC, input),
     },
   ],
 ]);

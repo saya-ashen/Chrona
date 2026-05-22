@@ -1,16 +1,15 @@
 import { HermesProviderClient } from "@chrona/hermes";
-import { OpenClawClient } from "@chrona/openclaw";
 import { db } from "@/lib/db";
 import { ChronaDebugProviderClient, isChronaDebugProviderConfig } from "./debug-provider-client";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
+  AgentProviderClientConfig,
   AiClientRecord,
   AiClientType,
   HermesClientConfig,
   LLMClientConfig,
-  OpenClawClientConfig,
 } from "@chrona/contracts";
-import { AiClientError, OPENCLAW_DEFAULT_MODEL } from "@chrona/contracts";
+import { AiClientError } from "@chrona/contracts";
 
 type StoredAiClient = {
   id: string;
@@ -26,8 +25,8 @@ export type EngineAiClient = {
   providerClient: AgentProviderClient | null;
 };
 
-export type EngineOpenClawClient = EngineAiClient & {
-  record: AiClientRecord & { type: "openclaw"; config: OpenClawClientConfig };
+export type EngineProviderClient = EngineAiClient & {
+  record: AiClientRecord & { config: AgentProviderClientConfig };
   providerClient: AgentProviderClient;
 };
 
@@ -56,10 +55,10 @@ function toAiClientRecord(client: StoredAiClient): AiClientRecord {
   };
 }
 
-export function getOpenClawGatewayUrl(
-  config: OpenClawClientConfig & { baseUrl?: string },
+export function getProviderBaseUrl(
+  config: AgentProviderClientConfig,
 ): string | undefined {
-  const url = config.gatewayUrl || config.bridgeUrl || config.baseUrl;
+  const url = config.baseUrl;
   if (!url) return undefined;
 
   const trimmed = url.trim().replace(/\/$/, "");
@@ -82,19 +81,9 @@ function createProviderClient(
     });
   }
 
-  if (record.type !== "openclaw") return null;
-
-  const config = record.config as OpenClawClientConfig;
-  if (isChronaDebugProviderConfig(config)) {
-    return new ChronaDebugProviderClient();
-  }
-
-  return new OpenClawClient({
-    gatewayUrl: getOpenClawGatewayUrl(config) ?? "",
-    gatewayToken: config.gatewayToken ?? config.bridgeToken ?? "",
-    model: config.model?.trim() || OPENCLAW_DEFAULT_MODEL,
-    timeoutSeconds: config.timeoutSeconds,
-  });
+  const config = record.config as AgentProviderClientConfig;
+  if (isChronaDebugProviderConfig(config)) return new ChronaDebugProviderClient(record.type);
+  return null;
 }
 
 async function refreshAiClientRegistry() {
@@ -138,19 +127,19 @@ async function getAiClient(
   return defaultClientId ? (clients.get(defaultClientId) ?? null) : null;
 }
 
-function requireOpenClawClient(client: EngineAiClient): EngineOpenClawClient {
+function requireProviderClient(client: EngineAiClient): EngineProviderClient {
   const isDebugProvider = isChronaDebugProviderConfig(
-    client.record.config as { baseUrl?: string; bridgeUrl?: string; gatewayUrl?: string },
+    client.record.config as { baseUrl?: string },
   );
-  if ((!isDebugProvider && client.record.type !== "openclaw") || !client.providerClient) {
+  if (!isDebugProvider && !client.providerClient) {
     throw new AiClientError(
-      "OpenClaw client is required",
+      "Provider client is required",
       client.record.type,
       "internal",
     );
   }
 
-  return client as EngineOpenClawClient;
+  return client as EngineProviderClient;
 }
 
 function requireLlmClient(client: EngineAiClient): EngineLlmClient {
@@ -179,8 +168,8 @@ export class AiClientRegistry {
     return getAiClient(clientId);
   }
 
-  requireOpenClawClient(client: EngineAiClient) {
-    return requireOpenClawClient(client);
+  requireProviderClient(client: EngineAiClient) {
+    return requireProviderClient(client);
   }
 
   requireLlmClient(client: EngineAiClient) {
