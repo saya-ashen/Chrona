@@ -222,6 +222,8 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).getByText("Accept or regenerate plan")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Generated plan node" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Current node: Generated plan node" })).not.toBeInTheDocument());
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
 
@@ -701,7 +703,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
   });
 
-  it("collapses the node drawer when clicking outside the drawer", async () => {
+  it("opens and closes the node drawer from selected graph nodes", async () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "review",
       title: "Review task output",
@@ -742,40 +744,41 @@ describe("TaskWorkspacePlanSection", () => {
       </>,
     );
 
-    expect(screen.getAllByText("Review task output").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId("task-plan-node-review")).toHaveTextContent("Review task output");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open selected node drawer" }));
+    fireEvent.click(screen.getByTestId("task-plan-node-review"));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("complementary", { name: "Task command center" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: "Open selected node drawer" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Open selected node drawer" }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Top navigation action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: "Open selected node drawer" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("task-plan-node-review"));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Collapse selected node drawer" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Left navigation action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Collapse selected node drawer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
     });
   });
 });

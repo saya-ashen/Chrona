@@ -74,6 +74,15 @@ export function updateTaskConfigFromSchedule(input: {
     .then(parseActionResponse);
 }
 
+export function deleteTask(input: { taskId: string }) {
+  return api.tasks[":taskId"]
+    .$delete({
+      param: { taskId: input.taskId },
+      query: {},
+    })
+    .then(parseActionResponse);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Schedule
 // ═══════════════════════════════════════════════════════════════

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
+import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
 import {
   Dialog,
   DialogContent,
@@ -93,13 +93,43 @@ export function TaskWorkspaceHeaderCard({
   onCancelDeleteConfirm,
   onDelete,
 }: TaskWorkspaceHeaderCardProps) {
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [pendingActionId, setPendingActionId] = useState<TaskHeaderAction["id"] | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
   const primaryStatusLabel = header.primaryStateLabel ?? userStatusLabel(header.status);
   const showTaskStatus = task.status !== primaryStatusLabel;
+  const menuItems: TaskActionsMenuItem[] = [
+    ...(header.canEditTitle
+      ? [{
+          id: "edit",
+          label: "Edit",
+          icon: Pencil,
+          onSelect: onEdit,
+        }]
+      : []),
+    {
+      id: "schedule",
+      label: backToScheduleLabel,
+      icon: Ellipsis,
+      href: "/schedule",
+    },
+    ...(planAction?.placement === "menu"
+      ? [{
+          id: "plan",
+          label: planAction.label,
+          icon: planAction.isLoading ? Loader2 : Sparkles,
+          disabled: planAction.disabled || planAction.isLoading,
+          onSelect: planAction.onClick,
+        }]
+      : []),
+    {
+      id: "delete",
+      label: "Delete Task",
+      icon: Trash2,
+      destructive: true,
+      onSelect: onStartDeleteConfirm,
+    },
+  ];
 
   const handleAction = async (action: TaskHeaderAction) => {
     if (action.disabled || pendingActionId) return;
@@ -114,23 +144,6 @@ export function TaskWorkspaceHeaderCard({
       setPendingActionId(null);
     }
   };
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        moreMenuRef.current &&
-        !moreMenuRef.current.contains(e.target as Node)
-      ) {
-        setShowMoreMenu(false);
-      }
-    }
-
-    if (showMoreMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showMoreMenu]);
 
   return (
     <Card
@@ -203,66 +216,7 @@ export function TaskWorkspaceHeaderCard({
               </Button>
             );
           })}
-          <div className="relative" ref={moreMenuRef}>
-            <Button
-              type="button"
-              onClick={() => setShowMoreMenu((current) => !current)}
-              variant="ghost"
-              size="icon-xs"
-              className="rounded-lg"
-            >
-              <Ellipsis className="size-3.5" />
-            </Button>
-            {showMoreMenu ? (
-              <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-border/60 bg-white p-1 shadow-[0_14px_36px_rgba(15,23,42,0.12)]">
-                {header.canEditTitle ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onEdit();
-                      setShowMoreMenu(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted"
-                  >
-                    <Pencil className="size-3.5" />
-                    Edit
-                  </button>
-                ) : null}
-                <LocalizedLink
-                  href="/schedule"
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted"
-                >
-                  <Ellipsis className="size-3.5" />
-                  {backToScheduleLabel}
-                </LocalizedLink>
-                {planAction?.placement === "menu" ? (
-                  <button
-                    type="button"
-                    disabled={planAction.disabled || planAction.isLoading}
-                    onClick={() => {
-                      planAction.onClick();
-                      setShowMoreMenu(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {planAction.isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    {planAction.label}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStartDeleteConfirm();
-                    setShowMoreMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="size-4" />
-                  Delete Task
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <TaskActionsMenu label="More task actions" items={menuItems} />
         </div>
       </CardHeader>
 

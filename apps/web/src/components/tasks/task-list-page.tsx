@@ -3,10 +3,25 @@
 import { useState } from "react";
 import {
   ExternalLink,
+  Play,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
+import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";
 
 type TaskItem = {
@@ -109,6 +124,18 @@ function filterLabel(filter: FilterKey, copy: TaskListCopy): string {
   return copy[filter];
 }
 
+function canStartTask(task: TaskItem): boolean {
+  return task.projection?.isRunnable === true && !["Running", "Completed", "Done"].includes(task.status);
+}
+
+function canCompleteTask(task: TaskItem): boolean {
+  return !["Completed", "Done"].includes(task.status);
+}
+
+function canReopenTask(task: TaskItem): boolean {
+  return ["Completed", "Done"].includes(task.status);
+}
+
 function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: string; copy: TaskListCopy; activeFilterLabel: string; counts: TaskCounts }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-0.5">
@@ -162,11 +189,74 @@ function filterKeyToCountKey(filter: FilterKey): keyof TaskCounts {
   return filter === "needs_me" ? "needsMe" : filter;
 }
 
-function TaskRow({ task, copy }: { task: TaskItem; copy: TaskListCopy }) {
+function TaskRow({
+  task,
+  copy,
+  checked,
+  isPending,
+  onToggleSelected,
+  onAction,
+  onDelete,
+}: {
+  task: TaskItem;
+  copy: TaskListCopy;
+  checked: boolean;
+  isPending: boolean;
+  onToggleSelected: (taskId: string, checked: boolean) => void;
+  onAction: (action: TaskListAction, task: TaskItem) => void;
+  onDelete: (task: TaskItem) => void;
+}) {
+  const actionItems: TaskActionsMenuItem[] = [
+    {
+      id: "open",
+      label: copy.viewDetails,
+      icon: ExternalLink,
+      href: `/tasks/${task.id}`,
+    },
+    {
+      id: "start",
+      label: copy.actionStart,
+      icon: Play,
+      disabled: !canStartTask(task) || isPending,
+      disabledReason: copy.actionStartDisabled,
+      onSelect: () => onAction("start", task),
+    },
+    ...(canReopenTask(task)
+      ? [{
+          id: "reopen",
+          label: copy.actionReopen,
+          icon: RotateCcw,
+          disabled: isPending,
+          onSelect: () => onAction("reopen", task),
+        }]
+      : [{
+          id: "complete",
+          label: copy.actionComplete,
+          icon: RotateCcw,
+          disabled: !canCompleteTask(task) || isPending,
+          onSelect: () => onAction("complete", task),
+        }]),
+    {
+      id: "delete",
+      label: copy.actionDelete,
+      icon: Trash2,
+      destructive: true,
+      disabled: isPending,
+      onSelect: () => onDelete(task),
+    },
+  ];
+
   return (
     <div className="group relative overflow-hidden rounded-[24px] border border-white/70 bg-white/92 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
       <div className={`absolute inset-y-3 left-3 w-1 rounded-full bg-gradient-to-b ${taskAccentClass(task)}`} aria-hidden="true" />
       <div className="flex flex-wrap items-center justify-between gap-3 pl-4">
+        <Checkbox
+          aria-label={copy.selectTask.replace("{title}", task.title)}
+          checked={checked}
+          disabled={isPending}
+          onCheckedChange={(value) => onToggleSelected(task.id, value === true)}
+          className="mt-1"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
@@ -189,17 +279,33 @@ function TaskRow({ task, copy }: { task: TaskItem; copy: TaskListCopy }) {
               <span>{copy.viewDetails}</span>
             </LocalizedLink>
           </Button>
+          <TaskActionsMenu label={copy.moreActions.replace("{title}", task.title)} items={actionItems} />
         </div>
       </div>
     </div>
   );
 }
 
+type TaskListAction = "start" | "complete" | "reopen";
+
+type PendingDelete =
+  | { kind: "single"; task: TaskItem }
+  | { kind: "bulk"; tasks: TaskItem[] }
+  | null;
+
 export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [isPending, setIsPending] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const navigate = useNavigate();
   const taskCopy = copy.pages.tasks;
 
   const filtered = tasks.filter((t) => matchesFilter(t, filter));
+  const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
+  const visibleSelectedCount = filtered.filter((task) => selectedIds.has(task.id)).length;
+  const allVisibleSelected = filtered.length > 0 && visibleSelectedCount === filtered.length;
 
   const counts = {
     all: tasks.length,
@@ -211,11 +317,110 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
   };
   const activeFilterLabel = filterLabel(filter, taskCopy);
 
+  function refreshTasks() {
+    navigate(".", { replace: true });
+  }
+
+  function updateSelection(taskId: string, checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(taskId);
+      else next.delete(taskId);
+      return next;
+    });
+  }
+
+  function toggleVisibleSelection(checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const task of filtered) {
+        if (checked) next.add(task.id);
+        else next.delete(task.id);
+      }
+      return next;
+    });
+  }
+
+  async function runTaskAction(action: TaskListAction, task: TaskItem) {
+    setIsPending(true);
+    setActionMessage(null);
+    try {
+      if (action === "start") await startExecution({ taskId: task.id });
+      if (action === "complete") await markTaskDone({ taskId: task.id });
+      if (action === "reopen") await reopenTask({ taskId: task.id });
+      refreshTasks();
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : taskCopy.actionFailed);
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const deleteIds = pendingDelete.kind === "single"
+      ? [pendingDelete.task.id]
+      : pendingDelete.tasks.map((task) => task.id);
+
+    setIsPending(true);
+    setActionMessage(null);
+    try {
+      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId })));
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        for (const taskId of deleteIds) next.delete(taskId);
+        return next;
+      });
+      setPendingDelete(null);
+      refreshTasks();
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : taskCopy.actionFailed);
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
       <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[24px] bg-[linear-gradient(135deg,rgba(248,250,252,0.94),rgba(238,242,255,0.78))] p-3 sm:p-4">
         <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
         <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border border-white/70 bg-white/80 px-3 py-2 text-xs shadow-sm backdrop-blur">
+          <label className="flex items-center gap-2 font-medium text-slate-700">
+            <Checkbox
+              aria-label={taskCopy.selectVisible}
+              checked={allVisibleSelected}
+              disabled={filtered.length === 0 || isPending}
+              onCheckedChange={(value) => toggleVisibleSelection(value === true)}
+            />
+            {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            {actionMessage ? <span className="text-red-600" role="status">{actionMessage}</span> : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={selectedIds.size === 0 || isPending}
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-xl"
+            >
+              {taskCopy.bulkClear}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={selectedTasks.length === 0 || isPending}
+              onClick={() => setPendingDelete({ kind: "bulk", tasks: selectedTasks })}
+              className="rounded-xl"
+            >
+              <Trash2 className="size-3.5" />
+              {taskCopy.bulkDelete}
+            </Button>
+          </div>
+        </div>
 
         {filtered.length === 0 ? (
           <div className="rounded-[26px] border border-dashed border-border/70 bg-white/80 p-10 text-center text-sm text-muted-foreground shadow-sm">
@@ -223,10 +428,41 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {filtered.map((task) => <TaskRow key={task.id} task={task} copy={taskCopy} />)}
+            {filtered.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                copy={taskCopy}
+                checked={selectedIds.has(task.id)}
+                isPending={isPending}
+                onToggleSelected={updateSelection}
+                onAction={(action, actionTask) => void runTaskAction(action, actionTask)}
+                onDelete={(deleteTaskItem) => setPendingDelete({ kind: "single", task: deleteTaskItem })}
+              />
+            ))}
           </div>
         )}
       </div>
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingDelete?.kind === "single"
+                ? taskCopy.deleteTitle.replace("{title}", pendingDelete.task.title)
+                : taskCopy.bulkDeleteTitle.replace("{count}", String(pendingDelete?.tasks.length ?? 0))}
+            </DialogTitle>
+            <DialogDescription>{taskCopy.deleteDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => setPendingDelete(null)}>
+              {taskCopy.cancel}
+            </Button>
+            <Button type="button" variant="destructive" disabled={isPending} onClick={() => void confirmDelete()}>
+              {isPending ? taskCopy.deleting : taskCopy.actionDelete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
